@@ -252,10 +252,14 @@ if (skal) {
       /c\[r\]\s*=\s*Math\.ceil\(\s*a\s*\)/.test(zuweisung),
       { zuweisung: zuweisung.trim() });
   }
-  // Die Gegenrichtung: der Bestand darf weiterhin ueber die Tier-2-KOMPONENTEN entscheiden.
-  // Verschwaende sie jemand mit der Skalierung, waere A2 der Reform stillschweigend weg.
-  check('3c: der Bestand entscheidet weiterhin über die Tier-2-Komponenten (SHIP_T2_KOMPONENTEN)',
-    /SHIP_T2_KOMPONENTEN/.test(koerper) && /nth\s*>=\s*komp\.ab/.test(koerper));
+  // 3c stand hier bis zum 18.08.2026 in der Gegenrichtung: Der Bestand MUSSTE weiterhin ueber die
+  // Tier-2-Komponenten entscheiden. Auftrag Sascha "Massenflotte muss noch raus" hat auch die
+  // entfernt - der Bestand beruehrt den Preis jetzt gar nicht mehr, weder ueber einen Faktor noch
+  // ueber eine Schwelle. Geprueft wird das an der URSACHE: Der Rumpf liest die Flotte nicht.
+  check('3c: scaledShipCost liest den Bestand ueberhaupt nicht mehr',
+    !/SHIP_T2_KOMPONENTEN/.test(koerper) && !/currentFleet\(\)/.test(koerper)
+      && !/allFleets\(\)/.test(koerper),
+    { koerper: koerper.replace(/\s+/g,' ').slice(0, 160) });
   // Und die zweite Kostenquelle, die vor der Reform ebenfalls mit der Stueckzahl wuchs.
   const tief = js.match(/function tiefenschiffKosten\([\s\S]*?\n  \}/);
   check('3d-vorab: tiefenschiffKosten ist auffindbar', !!tief);

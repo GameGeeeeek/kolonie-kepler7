@@ -1804,6 +1804,47 @@ Frachter liegen auf **beiden unabhängigen Bezugsgrössen** gleichauf (0,25 je F
 je Punktegewicht). **Die Ursache war beide Male dieselbe: eine Zahl aus der ABSICHT gesetzt statt
 gegen die Nachbarn gemessen** (Regel 41).
 
+### Nachtrag 18.08.2026 (v8.579.0): die Massenflotten-Komponente ist auch raus
+
+Auftrag Sascha: „Massenflotte muss noch raus."
+
+`SHIP_T2_KOMPONENTEN` (Etappe A2 des Wirtschafts-Umbaus) liess acht Kampfschiff-Klassen oberhalb
+einer Bestands-Schwelle je weiterem Schiff zusaetzlich Tier-2-Material kosten — Kreuzer und
+Wächter ab 250, Zerstörer und Bomber ab 200, Schlachtschiff und Trägerschiff ab 100, Leerenjäger
+ab 50, Superschlachtschiff ab 25.
+
+**Warum sie beim ersten Durchgang stehengeblieben war — und warum das falsch war.** Der Kommentar
+an der Stelle argumentierte, sie sei „keine Preisstaffel, sondern eine Schwelle: ein Tor in die
+Fabrikkette, kein Aufschlag auf den Grundpreis, und es war nicht Gegenstand des Auftrags". Aus der
+Sicht des SPIELERS ist dieser Unterschied keiner: Ab einer Stueckzahl wird Weiterbauen teurer, und
+genau das sollte der Auftrag beseitigen. **Eine Mechanik danach zu beurteilen, als was sie gemeint
+war, statt als was sie sich anfuehlt, ist derselbe Fehler wie eine zweite Anzeigestelle** — nur
+eine Ebene frueher, in der Absicht statt im Text.
+
+Entfernt sind: die Tabelle, der Zweig in `scaledShipCost`, **beide** Werft-Ankuendigungen (die
+Schiffskarte und die eigene Zeile des Superschlachtschiffs — es hat keinen `SHIP_DEFS`-Eintrag und
+brauchte deshalb schon immer eine zweite Kopie) und der zugehoerige Halbsatz im Hilfe-Abschnitt
+„Imperiums-Skalierung der Kosten".
+
+**`scaledShipCost` liest den Bestand damit gar nicht mehr** — weder ueber einen Faktor noch ueber
+eine Schwelle. Die Parameter `shipKey` und `n` bleiben in der Signatur, weil alle 36
+Kostenfunktionen sie uebergeben; der Kommentar sagt ausdruecklich, dass sie bewusst ungelesen sind
+(sonst „raeumt" sie beim naechsten Mal jemand weg und aendert dabei 36 Aufrufstellen).
+
+**Der Test ist dadurch staerker geworden, nicht schwaecher** (Regel 43). `test_werft_massenflotten`
+hielt vorher die Komponente fest; jetzt prueft er, dass der Bestand den Preis ueberhaupt nicht mehr
+beruehrt — und zwar ausgefuehrt, nicht gegreppt: Alle acht frueheren Klassen werden bei
+`Schwelle−1`, `Schwelle`, `Schwelle+1` und `Schwelle×10` durchgerechnet und duerfen keinen
+einzigen Tier-2-Posten bekommen (`3b`), und derselbe Preis muss bei Bestand 0 und 99.999 als
+VOLLSTAENDIGES Objekt identisch sein (`4a`) — ein Vergleich je Feld haette einen neu
+hinzugekommenen Posten uebersehen. Die acht Klassen stehen als **historische Regressionsliste** im
+Test, nicht aus einer Tabelle gelesen: Die Tabelle gibt es ja gerade nicht mehr.
+`test_baukorb` 3c und `test_schiffskosten` 3c sind aus demselben Grund invertiert.
+
+**Eine Balance-Folge, die benannt gehoert:** Damit faellt die einzige Senke, die grosse Flotten in
+Tier-2-Material zahlen liess. Wer Hunderte Schiffe einer Klasse stapelt, braucht die Fabrikkette
+dafuer nicht mehr. Was den Massenbau bremst, sind jetzt ausschliesslich Bauzeit und Werft.
+
 ### Nachtrag 18.08.2026 (v8.577.0): die Preise mussten wieder hoch — und warum
 
 Auftrag Sascha nach der Auslieferung: „Ändere das" — zur gemeldeten Folge, dass grosse Flotten
