@@ -938,6 +938,31 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Werkzeugmeldung** – auch dann nicht, wenn der Lauf nachweislich vollständig durchgelaufen ist.
     Wer den Marker per `;` anhängt, macht die Werkzeugmeldung strukturell nutzlos; das ist in
     Ordnung, solange man sie auch nicht liest.
+61. **Ein Prüflauf, der bei einem Fehlschlag nur GEFILTERTE Zeilen zeigt, verschweigt im
+    Ernstfall genau die Zeile, die der Testautor für diesen Fall hinterlegt hat.** Vorfall
+    18.08.2026: `test_reiterleiste.js` fiel im vollen Lauf, einzeln war er grün. Für exakt diesen
+    Fall schreibt er eine Diagnosezeile – „WARNUNG - die Reiterleiste kam in 6 s nicht zur Ruhe,
+    gemessen wird trotzdem". Im Protokoll stand sie nicht: `tests/run.js` zeigte bei einem
+    Fehlschlag nur Zeilen, die auf `/^FAIL|Error|Cannot find/` passen, gekappt bei sechs. Die
+    Antwort auf „hat die Wartelogik aufgegeben?" war damit weg, und die Fehlersuche begann bei
+    null. Es ist der **einzige** Test im Repo, der so eine Zeile schreibt – und ausgerechnet der
+    ist gefallen.
+    Das ist dieselbe Familie wie Regel 25/37: Ein Messwerkzeug, das nur einen Teil der möglichen
+    Ausgaben kennt, verschweigt im Fehlerfall die Ursache. **Die Lehre ist aber nicht „das Muster
+    erweitern"** – ein Muster deckt immer nur den einen Fall ab, an den man gerade gedacht hat.
+    Seit dem 18.08.2026 schreibt `run.js` bei jedem Fehlschlag die **vollständige** Ausgabe nach
+    `<tmp>/kepler7-fehlschlaege/<test>.log` und nennt den Pfad im Protokoll; die sechs gefilterten
+    Zeilen bleiben zusätzlich für die Lesbarkeit (`WARNUNG` gehört jetzt mit ins Muster).
+    Beidseitig gegengeprüft an einem Wegwerf-Test, der eine WARNUNG-Zeile, eine FAIL-Zeile und
+    eine musterlose Zeile schreibt: Der alte Stand zeigt **nur** die FAIL-Zeile, der neue alle
+    drei bzw. die Datei mit allen dreien. **Wer eine neue Diagnosezeile in einen Test schreibt,
+    muss sich seither nicht mehr fragen, ob das Muster sie kennt.**
+    Nebenbei ein Werkzeugfehler bei genau dieser Gegenprobe, der die Regel bestätigt: Der erste
+    Versuch fuhr den alten `run.js` aus dem Scratchpad – dort zeigt `__dirname` woandershin, der
+    Lauf fand keinen einzigen Test und meldete stattdessen einen ENOENT auf die Spieldatei. Ein
+    Prüflauf, der aus dem falschen Verzeichnis gestartet wird, misst nicht den alten Stand,
+    sondern gar nichts (dieselbe Familie wie Regel 56).
+
 19. **`echo EXIT=$?` hinter einer Pipe misst das LETZTE Pipe-Glied, nie den Test** – `node
     test.js | grep FAIL; echo EXIT=$?` meldet den grep-Status (0 = Treffer gefunden!). Vorfall
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
@@ -1461,6 +1486,214 @@ rechnen; der Missionsstart nimmt dagegen `protoBlockade` aus der Antwort, weil d
 Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung ist Pflicht**, genau wie
 bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
 sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
+
+62. **Ein Grenzwert, der gegen einen ÜBERGANGSWERT kalibriert wurde, misst nicht die Sache – und
+    er sieht dabei komfortabel aus.** Vorfall 19.08.2026: `test_sprungleiste` fiel im vollen
+    Prüflauf mit `{"vorher":0,"nachher":1733,"zielOben":314}` gegen die Schranke „< 300"; einzeln
+    lieferte er dreimal hintereinander exakt **182** – bei IDENTISCHER Scroll-Position. Gleiche
+    Scrollhöhe, anderes Ziel heißt: Der Inhalt ÜBER dem Ziel wächst nach dem Sprung noch (gemessene
+    Zusammensetzung: `.hero` 138, `#resbar` 86, `#tier2ResBadges` 38, `#dailyQuestBar` 28,
+    `.tabs` 108, `#planetRoleBox` 252, `#orbitalStationBox` 211 – die fehlenden 146 px passen auf
+    die Tagesaufgaben-Leiste, deren Höhe am Inhalt hängt).
+    Der Test wartete **1,2 Sekunden fest** und maß damit einen Zwischenstand. Seit er auf die RUHE
+    wartet (dieselbe Wartung wie `warteBisRuhe` in `test_reiterleiste`), liefert er **261 px schon
+    am Stand VOR der laufenden Etappe** – die scheinbare Reserve von 118 px waren in Wahrheit 39.
+    **Die 300 beschrieben einen Zustand, den das Spiel nie einnimmt.**
+    **Vorgehen:** (a) Eine Anzeige-Kennzahl wird im FERTIGEN Zustand gemessen, nie nach einem festen
+    Schlaf – ein Schlaf misst Wanduhr-Glück; (b) wer dabei feststellt, dass der eingeschwungene Wert
+    dauerhaft anders liegt als der Grenzwert vermuten ließ, hat den Grenzwert zu prüfen und nicht
+    den Messwert wegzuerklären; (c) der neue Grenzwert wird als REGEL formuliert
+    („oberes Bilddrittel", aus der gemessenen Fensterhöhe abgeleitet), nicht als Literal – sonst
+    steht in einem halben Jahr dieselbe Frage wieder an. **Und die Lockerung braucht ihren Beleg:**
+    Eine sabotierte Kopie ohne `scrollIntoView` muss weiterhin anschlagen (gemessen: `zielOben`
+    1915 statt 270). Ohne diesen Beleg ist „Schranke angepasst" nicht von „Test entschärft" zu
+    unterscheiden (Regel 26).
+    Zwei Beifunde derselben Messung: Die Prüfung kannte die Gegenrichtung nicht – ein Sprung, der
+    das Ziel HINTER der klebenden Reiterleiste parkt, sah in der Zahl gut aus (jetzt `2b`). Und die
+    laufende Etappe hatte selbst 29 px zu `#planetRoleBox` beigetragen und damit 9 px der Reserve
+    gekostet – nicht die Ursache des Fehlschlags, aber gemessen und genannt statt verschwiegen.
+    **Offen als eigener Befund:** `scrollIntoView` rechnet die Zielposition EINMAL; wächst der
+    Inhalt darüber danach, driftet das Ziel unter dem Spieler weg. Und **88 von 147** Tests, die das
+    Spiel mit Spielstand booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+
+63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
+    RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
+    einem einzelnen Fehlschlag, jeder einzeln grün: `test_reiterleiste`, dann `test_sprungleiste`,
+    dann `test_kartenbedienung` – und beim Nachstellen sprang er auf `test_kartengroesse` über.
+    Alle vier melden dasselbe: „Element sitzt tiefer als erwartet" bzw. „Mitte liegt außerhalb des
+    Fensters".
+    **Der Mechanismus:** `maybeShowTabHint` blendet die Leiste aus, solange ein Overlay steht
+    (`tabHintBlocked()`). Jeder Test blendet in seiner Vorbereitung genau diese Overlays aus –
+    läuft danach noch ein Haupt-Tick, erscheint die Leiste und schiebt **alles darunter um 166 px**;
+    misst der Test vorher, nicht. Gemessen an der Zerlegung des Abstands über dem Kartenkasten:
+    `#tabHintBar=166` neben `div.tabs=108`, `#resbar=86`, `div.hero=138`.
+    **`test_reiterleiste` macht es seit jeher richtig** und setzt `seenTabHints` für alle zwölf
+    Reiter; den drei anderen fehlte es. Seit dem 19.08.2026 setzen sie es ebenfalls.
+    **Vorgehen für jeden Test, der FENSTERLAGE misst** (Mitte im Bild, Element nicht verdeckt,
+    Sprungziel oben): Die Fixture muss die Möbel abschalten, die nur manchmal da sind –
+    `seenTabHints` für alle Reiter, `nextPlanetEventCheck`/`nextTraderCheck` gepinnt. Gemessen sind
+    **88 von 147** Tests, die das Spiel mit Spielstand booten und `nextPlanetEventCheck` nicht
+    pinnen; die Flanke wartet dort weiter.
+    **Und die Lehre über die Fixture hinaus:** Ein Fehlschlag, der bei jedem Lauf ein anderes Opfer
+    sucht, ist kein Wackeln von drei Tests, sondern EIN Zustand, der drei Tests trifft. Wer ihn je
+    Test „stabilisiert", baut drei Pflaster über eine Ursache (genau das war hier zweimal passiert).
+
+64. **Ein Grenzwert für eine Scroll-Lage muss die Frage stellen: Kann die Seite überhaupt weiter?**
+    Aus demselben Vorfall, und es hat mich zwei Anläufe gekostet. `test_sprungleiste` prüfte
+    „zielOben < 300", dann in meiner ersten Korrektur „oberes Bilddrittel". Beide Male war die Zahl
+    auf eine zufällige Seitenlänge kalibriert: Die geprüfte Überschrift ist der **letzte** Abschnitt
+    der Seite. Wie weit sie nach oben kommt, hängt allein daran, wie viel Seite unter ihr liegt –
+    nach dem Abschalten der 166-px-Hinweisleiste war die Seite kürzer, die Seite lief auf ihren
+    Anschlag (`scrollY 1225 = maxScroll`), und das Ziel blieb bei 508. Kein Fehler, sondern Physik.
+    Geprüft wird deshalb die EIGENSCHAFT (die Überschrift ist vollständig im Bild und nicht hinter
+    der klebenden Leiste) plus die Zusatzbedingung „im oberen Drittel, **solange die Seite noch
+    scrollen kann**".
+    **Zwei Beifunde, beide gemessen:**
+    (a) Meine eigene Ruhe-Wartung war zuerst falsch gebaut: Sie beobachtete die **Dokument**-Lage
+    des Ziels – und die ändert sich beim Scrollen überhaupt nicht. Die Schleife meldete sofort
+    „ruhig", mitten in der weichen Scroll-Animation, und lieferte je nach Zufall 270, 508 oder
+    628 px. **Ein Messwerkzeug, das die falsche Größe beobachtet, ist schlimmer als ein fester
+    Schlaf – es sieht nach Sorgfalt aus.** Beobachtet werden jetzt Fensterlage UND Scroll-Position.
+    (b) Mit korrekter Wartung landete das Ziel bei `zielOben: 0` – also **vollständig hinter der
+    klebenden Reiterleiste** (`leisteUnten: 108`). `scrollIntoView({block:'start'})` setzt es exakt
+    auf die Fensterkante. Das ist ein echter Bedienfehler derselben Klasse wie KB-10 und seit dem
+    19.08.2026 behoben: `body.compact-head [data-acc-key] { scroll-margin-top: 128px; }` – die dafür
+    gebaute CSS-Eigenschaft, kein JS, keine zweite Rechnung, und sie wirkt auf jedes künftige
+    Sprungziel automatisch. Beide Gegenproben getrennt gefahren und jede fällt spezifisch: ohne
+    `scroll-margin` genau `2b`, ohne `scrollIntoView` genau `2`.
+
+## Die Klappen weichen der Reiterleiste aus (18.08.2026)
+
+**Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
+`test_reiterleiste.js` fiel im vollen Prüflauf und war einzeln grün – auf 390x844 mit
+`["galaxie","fortschritt"]`, auf 360x740 mit `["basis","karte","galaxie","fortschritt"]`. Die
+naheliegende Erklärung („unter Suite-Last zu früh gemessen") war schon zweimal angenommen und
+hatte je eine Verstärkung der Wartelogik nach sich gezogen. Sie ist **gemessen falsch**: zwölf
+Läufe, sechs davon unter vier CPU-Lasterzeugern, 0 Fehlschläge.
+
+**Der Mechanismus, deterministisch reproduziert:** `.edge-tab` hängt am VIEWPORT (am Handy
+`bottom:8%`), `.tabs` am INHALT darüber. Wird `#eventBanner` sichtbar – ein Zufallsereignis, 138
+bis 164 px hoch –, rutscht die Leiste in das feste Band der Klappen. Weil die Klappen `z-index:50`
+tragen und die Leiste `25`, ist der Reiter darunter nicht bloß verdeckt, sondern **nicht
+antippbar**. Gemessen am Stand davor, mit `state.activeEvent` im Spielstand:
+
+| Größe | Leiste | Klappen | verdeckt |
+|---|---|---|---|
+| 390x844 | 600..717 | 685..776 | `galaxie`, `fortschritt` |
+| 360x740 | 570..687 | 589..681 | `basis`, `karte`, `galaxie`, `fortschritt` |
+| 360x640 | 570..687 | 497..589 | `basis`, `karte` |
+
+Die ersten beiden Zeilen sind **zeichengleich** mit dem, was der Prüflauf gemeldet hatte. Damit war
+der Fehlschlag reproduziert statt weiter als Zufall verbucht – vier von zwölf Reitern tot, darunter
+der, auf dem der Spieler startet.
+
+**Behoben durch Ausweichen, nicht durch eine dritte Zahl.** Zwei frühere Behebungen (`top:64%` →
+`bottom:8%`) haben je eine Bildschirmgröße freigeräumt und eine andere zugestellt; ein dritter
+fester Prozentwert hätte dasselbe getan, denn es gibt keinen richtigen: Die Leiste kann jede Höhe
+annehmen, die der Inhalt über ihr hergibt. `klappenFrei()` ist deshalb **die EINE Quelle für beide
+Klappen** (Vorbild `kbMarkerFrei`, Regel 52): Es misst die Leiste, weicht bevorzugt nach unten aus,
+sonst nach oben, und lässt die Klappe stehen, wenn nirgends Platz ist – eine überlappende Klappe ist
+ehrlicher als eine, die halb aus dem Bild hängt (dieselbe Abwägung wie beim Label-Deckel von KB-16).
+
+**Drei Dinge, die man beim Anfassen wissen muss:**
+
+- **Der Aufruf steht HINTER dem `#eventBanner`-Block in `render()`, nicht am Kopf.** Am Anfang des
+  Takts gemessen kennt `klappenFrei` die Bannerhöhe dieses Takts noch nicht und wiche erst eine
+  Sekunde später aus – für den Spieler eine Sekunde lang tote Reiter, für einen Test ein Rennen.
+  Genau dieser Reihenfolgefehler war der erste Anlauf, und er fiel nur an der wiederholten Messung
+  auf (Regel 48).
+- **Die natürliche Lage wird GEMESSEN, nicht aus `8%` nachgerechnet.** Ein nachgerechneter Wert
+  wäre eine zweite Wahrheit neben dem CSS und liefe beim nächsten Media-Query-Umbau auseinander.
+- **Die Gegenrichtung gehört dazu:** Am PC (>700 px) wird ein gesetzter Versatz ausdrücklich
+  zurückgenommen, sonst bliebe dort eine Verschiebung stehen, die niemand erklären könnte.
+
+**Und die Lehre über den Einzelfall hinaus – sie ist die eigentliche:** Ein Test, der „gelegentlich
+fällt", meldet unter Umständen einen ECHTEN Befund, den man nur nicht deterministisch stellen kann.
+Wer die Wartelogik verstärkt, bis er grün ist, hat das Signal weggedämpft, nicht die Ursache
+behoben – das ist Regel 26, angewandt auf eine wiederkehrende Flanke statt auf eine Gegenprobe.
+Richtig ist, den auslösenden Zustand zu SUCHEN (hier: was steht über der Leiste, das nur manchmal da
+ist?) und ihn dann deterministisch zu stellen. Wächter: `tests/test_klappen_kollision.js`
+(16 Prüfungen, drei Bildschirmgrößen × mit/ohne Ereignis, dazu `elementFromPoint` auf die
+ausgewichenen Klappen selbst – Regel 53: wer etwas verschiebt, misst die neue Stelle mit – und die
+PC-Gegenrichtung). Beidseitig gegengeprüft: am Stand davor fallen genau die drei „mit
+Ereignis"-Prüfungen, bei identischer Prüfungszahl.
+`test_reiterleiste.js` pinnt seither seine Ereignis-Uhren (Regel 18) und misst wieder nur seinen
+eigenen Gegenstand; der Bannerfall hat jetzt seinen eigenen, deterministischen Wächter.
+
+## Sektor-Eigenschaften (Etappe 3, 18.08.2026)
+
+Die acht Regionen der Karte trugen bis dahin nur `cx/cy/tint/desc`. `sektorVon` wurde
+**ausschließlich zum Zeichnen** benutzt – der Sektor eines Planeten hatte auf nichts im Spiel eine
+Auswirkung. Ihre Beschreibungen versprachen aber seit jeher welche („ergiebige Gürtelbahnen",
+„reich an Anomalien", „voller Passagen").
+
+**Der Befund, der die Etappe geprägt hat, ist die Gegenrichtung zu Regel 59:** Dort existiert eine
+Zahl nur im Ankündigungstext und wird beim `grep` fälschlich für vorhanden gehalten. Hier existierte
+die Ankündigung, aber **die `desc` wurde nirgends gerendert** – gemessen, nachdem ich selbst zuvor
+behauptet hatte, sie erscheine auf der Übersichts-Tafel (der Kommentar über `SEKTOR_DEFS` sagte das
+sogar wörtlich, und er war falsch). Ein Versprechen, das nur im Quelltext steht, ist für den Spieler
+weder ein Versprechen noch ein Bruch – es ist gar nichts. **Deshalb gehörte zu dieser Etappe die
+Anzeigestelle genauso zwingend wie die Mechanik.**
+
+**Vier Regeln, nach denen die Belegung entstanden ist** (sie stehen als Kommentar über
+`SEKTOR_DEFS`, hier nur die Kurzform):
+
+1. **Nur Boni, keine Mali.** Die Wirkung greift rückwirkend für jede bestehende Kolonie; wer vorher
+   dort gesiedelt hat, darf dafür nicht bestraft werden. Der **Kepler-Kern bleibt neutral** – wo
+   jeder anfängt, soll nichts locken und nichts abschrecken.
+2. **Jede Wirkung löst den Text ein, der schon dastand**, und jede Beschreibung nennt jetzt ihre
+   Zahl (`test_sektoreigenschaften` 1d prüft die REGEL, nicht die Formulierung).
+3. **Nur Kanäle, die der Server NICHT nachrechnet** – Produktion, Expeditions-Ausbeute,
+   Abgrundsplitter, Flugzeit (für Flugzeit gemessen: 0 Treffer in `server.js`). Angriff und
+   Verteidigung sind bewusst außen vor: Sie entscheiden PvP, und eine Sektor-Tabelle im Backend wäre
+   eine zweite Kopie, die auseinanderlaufen kann. **Das ist dieselbe Wahl wie bei den drei neuen
+   Doktrinen (Etappe 2) und aus demselben Grund** – ein hängender Backend-Deploy kann so keine
+   Abweichung erzeugen.
+4. **Additiv in die jeweils vorhandene, gedeckelte Gruppe**, nie eine eigene Multiplikation. Die
+   Flugzeit ist die Ausnahme und dort schon die Hausform (`allianceBaseFlightMult`).
+
+Belegung: `wispern` +8 % Produktion · `solmark` +12 % Expeditionen · `obsidian` +12 % Produktion ·
+`meridian` −10 % Flugzeit · `pulsar` +10 % Expeditionen · `ilyra` −12 % Flugzeit · `rand` +15 %
+Splitter · `kepler` neutral.
+
+**Die vier Rechenstellen** (`sektorBonus` ist Summand, `sektorFlugMult` Faktor):
+`ratesPerSecond` (nur der ROHSTOFF-Zweig – der Laborzweig bleibt frei, weil „ergiebige
+Gürtelbahnen" eine Aussage über Rohstoffe ist, nicht über Laborarbeit), die additive
+Expeditions-Gruppe, `abgrundSplitterFaktor` und `missionDurationFor` direkt neben
+`allianceBaseFlightMult`.
+
+**Woran was hängt** – das ist die Frage, die ein Spieler stellt, und sie steht deshalb im
+Hilfetext: Produktion und Splitter am **Standort**, Expedition am **Startpunkt**, Flugzeit am
+**Ziel**. Ein Mond zählt zum Sektor seines Planeten (`sektorVonPlanet` löst `moon_<planet>` über
+`moonParentKey` auf; ohne diesen Zwischenschritt bekäme JEDER Mond des Spiels den Bonus 0).
+`_sektorCache` ist eine dauerhafte `Map` – die Zuordnung Planet→Sektor ändert sich zur Laufzeit nie.
+
+**Fünf Anzeigestellen**, alle aus `sektorEffektKurz()`/`sektorEffektLang()` – EINE Quelle für Karte,
+Tooltip, Hilfe und Standort-Zeile: (a) eigene Textzeile am Regionsknoten der Übersicht plus
+`<title>`/`aria-label` mit der Langform; (b) eine dritte Kopfzeile in der Sektoransicht; (c) der
+Hilfe-Eintrag „Sektoren haben Eigenschaften", **aus `SEKTOR_DEFS` abgeleitet** (Reihenfolge vorher
+gemessen, nicht geschätzt – `SEKTOR_DEFS` steht weit vor `HELP_SECTIONS`, Regel 38); (d) die
+Beschreibung jedes Sektors; (e) eine Zeile am AKTUELLEN Standort im Basis-Reiter, **bewusst auch im
+Mond-Zweig** von `planetRoleBox` – ein Mond bekommt den Bonus wirklich, und eine Zeile, die dort
+schweigt, wäre die klassische zweite Anzeigestelle (Punkt 6).
+
+**`SEKTOR_KANAL_TEXT` ist der Angelpunkt für alles Künftige.** Wer einen neuen Kanal in `mod`
+einträgt, ergänzt ihn dort – sonst zeigt die Karte den Bonus nicht an. `test_sektoreigenschaften`
+1a/1e prüfen beides **datengetrieben**: Jeder benutzte Kanal braucht einen Anzeigetext UND eine
+Rechenstelle; 1e2 prüft die Gegenrichtung (ein Aufruf für einen Kanal, den keine Tabelle mehr führt,
+liest dauerhaft 0 und sieht im Quelltext trotzdem nach Wirkung aus). Wächter:
+`tests/test_sektoreigenschaften.js` (28 Prüfungen – Tabelle, Verdrahtung, ausgeführte Helfer,
+gerendertes Spiel und eine gemessene Produktionswirkung von +12 % über zwei Läufe mit
+unterschiedlichem Heimatsystem).
+
+**Ein Werkzeugfehler bei der Gegenprobe, und er ist die Wiederholung eines dokumentierten:**
+`test_abgrundbezug` hatte den Pfad zur Spieldatei FEST verdrahtet (`path.join(__dirname, '..',
+'weltraum_kolonie.html')`). Die Gegenprobe mit `KEPLER_SPIELDATEI=/tmp/alt.html` las damit die echte
+Datei und meldete 84 von 84 grün – also scheinbar „die neue Prüfung belegt nichts", während sie in
+Wahrheit nie am alten Stand gelaufen war. Genau die Falle aus „Korrektur 15.08.2026". Behoben, indem
+der Pfad aus `tests/lib/umgebung` kommt; danach fällt am alten Stand exakt die eine neue Prüfung,
+bei identischer Prüfungszahl. **Wer eine Gegenprobe per Env-Umleitung fährt, prüft am Messergebnis,
+dass sie gegriffen hat** – „alles grün" ist hier kein Ergebnis, sondern ein Verdacht.
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 

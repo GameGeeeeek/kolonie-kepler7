@@ -15,9 +15,14 @@
 // DAS WIEDERKEHRENDE MUSTER: Fuenf der sechs Bruecken haengen an einem `available`-Praedikat, das
 // sie aus dem Angebot haelt, solange der Abgrund verschlossen ist. Ohne das waeren sie fuer jeden
 // neuen Spieler unerfuellbare Aufgaben bzw. Beute, die er nicht benutzen kann.
+//
+// KORREKTUR 18.08.2026: Der Pfad zur Spieldatei war hier fest verdrahtet. Eine Gegenprobe mit
+// `KEPLER_SPIELDATEI=/tmp/alt.html` las damit still die ECHTE Datei und war gruen - genau die
+// Falle, die CLAUDE.md unter "Korrektur 15.08.2026" beschreibt: eine still ignorierte
+// Umgebungsvariable sieht aus wie eine bestandene Gegenprobe. Seither kommt der Pfad aus
+// tests/lib/umgebung, wo ihn KEPLER_SPIELDATEI wirklich umlenkt.
 const fs = require('fs');
-const path = require('path');
-const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
+const { SPIELDATEI } = require('./lib/umgebung');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -283,15 +288,16 @@ function arrAus(name){
   // Starthafen-Welt und ein Buendnis mit den Void-Marodeuren. Beide werden hier injiziert - so
   // prueft der Test weiterhin NUR den Tiefenhafen und faellt nicht darauf herein, dass eine der
   // beiden neuen Quellen den Unterschied macht.
-  // doctrineBonusOf (18.08.2026) ist der vierte Summand derselben Gruppe (Bergungs-Doktrin) und
-  // wird aus demselben Grund wie die zwei davor mit 0 injiziert: Der Abschnitt misst den
-  // TIEFENHAFEN, nicht die Doktrin. Ohne die Injektion stuerzt der Block mit einem ReferenceError
-  // ab - und ein Absturz beim Aufbau der Messvorrichtung nimmt alle folgenden Pruefungen mit,
-  // waehrend der rote Exit-Code aussieht wie ein echter Befund (Hausregel 34).
-  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf, veteranRoleExtra, factionOutsideBonus, doctrineBonusOf',
+  // doctrineBonusOf (18.08.2026) ist der vierte Summand derselben Gruppe (Bergungs-Doktrin),
+  // sektorBonus (18.08.2026, Randmarken +15%) der fuenfte. Beide werden aus demselben Grund wie die
+  // zwei davor mit 0 injiziert: Der Abschnitt misst den TIEFENHAFEN, nicht Doktrin oder Sektor.
+  // Ohne die Injektion stuerzt der Block mit einem ReferenceError ab - und ein Absturz beim Aufbau
+  // der Messvorrichtung nimmt alle folgenden Pruefungen mit, waehrend der rote Exit-Code aussieht
+  // wie ein echter Befund (Hausregel 34).
+  const SF = new Function('state, abgrundKanalBonus, tiefenschiffBonus, planetRoleOf, veteranRoleExtra, factionOutsideBonus, doctrineBonusOf, sektorBonus',
     'const PLANET_ROLE_TIEFENHAFEN = '+(js.match(/const PLANET_ROLE_TIEFENHAFEN = ([\d.]+);/)||[])[1]+';\n'
     + fak + '; return abgrundSplitterFaktor;');
-  const baue = (rolle, vet, voidB, dok) => SF({}, ()=>0, ()=>0, ()=>(rolle?{key:rolle}:null), ()=>vet||0, ()=>voidB||0, ()=>dok||0);
+  const baue = (rolle, vet, voidB, dok, sekt) => SF({}, ()=>0, ()=>0, ()=>(rolle?{key:rolle}:null), ()=>vet||0, ()=>voidB||0, ()=>dok||0, ()=>sekt||0);
   const ohne = baue(null, 0, 0)({}, 'home');
   const mit  = baue('deepport', 0, 0)({}, 'home');
   check('11: mit Hafen faellt mehr ab als ohne', mit > ohne, { ohne, mit });
@@ -300,6 +306,11 @@ function arrAus(name){
   check('11: die Doktrin zahlt additiv in dieselbe Gruppe ein',
     Math.abs(baue('deepport', 0, 0, 0.21)({}, 'home') - (mit + 0.21)) < 1e-9,
     { mitDoktrin: baue('deepport', 0, 0, 0.21)({}, 'home'), ohneDoktrin: mit });
+  // Und die Sektor-Eigenschaft (Randmarken) als fuenfter Summand - dieselbe Pruefung, dieselbe
+  // Begruendung: additiv in die vorhandene Gruppe, nie als eigener Faktor.
+  check('11: die Sektor-Eigenschaft zahlt additiv in dieselbe Gruppe ein',
+    Math.abs(baue('deepport', 0, 0, 0, 0.15)({}, 'home') - (mit + 0.15)) < 1e-9,
+    { mitSektor: baue('deepport', 0, 0, 0, 0.15)({}, 'home'), ohneSektor: mit });
   // Die beiden neuen Quellen (v8.372.0) muessen ebenfalls SUMMANDEN derselben Gruppe sein - eine
   // eigene Multiplikation waere genau das aufschaukelnde Muster, vor dem CLAUDE.md warnt.
   check('11: der Veteranenrang des Starthafens zahlt additiv in dieselbe Gruppe ein',

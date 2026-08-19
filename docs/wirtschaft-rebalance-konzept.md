@@ -384,11 +384,25 @@ beachten (`defVal`/`atkVal` explizit, sonst NaN).
 kosten mehr, als das Lager fasst — die einzige exponentiell mitwachsende Senke endet daran,
 nicht am Preis. Das dort skizzierte **Baustellen-Konto** (Warteschlangen-Einträge bekommen
 `eingezahlt:{res:menge}`, ein Anteil der laufenden Produktion fließt direkt in den Auftrag
-statt ins Lager) löst gleich zwei Befunde: Die Mega-Stufen 10+ werden erreichbar — die
-Lagerwand steht real schon bei Stufe 10 (0.6) — und ziehen dann ihren linearen T2-/Proto-Anteil
-weiter (das Konto muss deshalb ausdrücklich auch T2-Ressourcen einzahlen können, siehe B2);
-überschüssige Produktion bekommt ein Ziel, ohne dass irgendein Deckel angefasst wird. Das ist die größte Einzelbaustelle des Plans —
+statt ins Lager) löst gleich zwei Befunde: Die hohen Mega-Stufen werden erreichbar und
+ziehen dann ihren linearen T2-/Proto-Anteil weiter (das Konto muss deshalb ausdrücklich auch
+T2-Ressourcen einzahlen können, siehe B2); überschüssige Produktion bekommt ein Ziel, ohne dass
+irgendein Deckel angefasst wird. Das ist die größte Einzelbaustelle des Plans —
 eigene Etappe, eigenes Konzeptdokument vor der Umsetzung.
+
+**KORREKTUR 18.08.2026 — die Wand steht viel weiter innen, als hier stand.** Der Satz lautete
+ursprünglich „die Lagerwand steht real schon bei Stufe 10 (0.6)". Nachgerechnet gegen den
+GEMESSENEN Lagerdeckel (803.800 bei ambitioniertem Endausbau, CLAUDE.md Hausregel 57) steht sie
+beim Dysonschwarm bei **Stufe 4** für ein Ein-Standort-Konto und bei **Stufe 3** für elf
+Standorte — `megaStageCost` wächst mit 2,6 je Stufe und wird danach noch mit
+`empireCostFactor` (1 + 0,25 je Kolonie) multipliziert. Stufe 10 läge bei 271 Mio Erz und ist
+mit keiner denkbaren Frachterflotte lagerbar.
+Zwei Folgen: (a) B4 öffnet nicht „die Stufen 10+", sondern **die Stufen ab 3** — der Nutzen ist
+also deutlich größer als hier behauptet; (b) der `empireCostFactor` skaliert die KOSTEN mit dem
+Imperium, während der Lagerdeckel nur mit Gebäuden und Frachtern wächst — **wer expandiert,
+schiebt seine eigene Wand nach innen.** Vollständige Tabelle und Herleitung in
+`docs/baustellen-konto-konzept.md` Abschnitt 2.2. Hausregel 41: ein Konzept ist kein Messergebnis,
+auch wenn es aus derselben Feder stammt.
 
 ---
 

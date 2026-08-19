@@ -50,6 +50,16 @@ function spielstand() {
   const now = Date.now();
   return JSON.stringify({
     tutorialSeen: true, newbieWelcomeSeen: true,
+    /* Die Tab-Hinweisleiste abschalten (19.08.2026). Sie ist 166 px hoch, steht ÜBER dem
+       Tab-Inhalt, und ihr Erscheinen ist ein RENNEN: `maybeShowTabHint` blendet sie aus, solange
+       ein Overlay steht (`tabHintBlocked()`) - die Tests blenden die Overlays in ihrer
+       Vorbereitung aus, und ob danach noch ein Haupt-Tick läuft, entscheidet, ob die Leiste da ist.
+       Damit wandert alles darunter um 166 px, und Prüfungen auf Fensterlage schlagen an, ohne dass
+       am Spiel etwas falsch wäre. Gemessen an drei Fehlschlägen in drei aufeinanderfolgenden
+       Prüfläufen (test_kartenbedienung, test_kartengroesse, test_sprungleiste), jeder einzeln grün.
+       test_reiterleiste.js macht das seit jeher richtig - hier fehlte es. */
+    seenTabHints: { basis:1, verteidigung:1, forschung:1, flotte:1, expedition:1, karte:1,
+                    galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1 },
     resources: { energie: 48000, erz: 52000, kristalle: 31000, deuterium: 20000, antimaterie: 900, forschungspunkte: 2200 },
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12, werft: 9 },
     research: {}, fleet: { jaeger: 100, missions: [] }, colonies: {}, activeBasePlanet: 'home',

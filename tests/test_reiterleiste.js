@@ -53,7 +53,17 @@ const SPEICHER = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   research:{ rsolar:8, rerz:8, rkampf:7 }, fleet:{ jaeger:420, missions:[] },
   colonies:{}, activeBasePlanet:'home', shipMarks:{},
   player:{ id:'u', name:'A', allianceTag:'', avatarKey:null }, battleStats:{ wins:5, losses:1 },
-  xp:64000, buffs:[], lastTick:Date.now(), colonyNames:{}, colonyNotes:{} });
+  xp:64000, buffs:[], lastTick:Date.now(), colonyNames:{}, colonyNotes:{},
+  // Beide Ereignis-Uhren gepinnt (Hausregel 18). Bis zum 18.08.2026 standen sie hier NICHT, und
+  // das hatte Folgen in beide Richtungen: Ein zufaellig gefeuertes Ereignis blendete `#eventBanner`
+  // (138-164 px) ueber der Leiste ein, schob sie in das feste Band der `.edge-tab`-Klappen und
+  // liess diesen Test etwa bei jedem zwanzigsten Lauf mit echten verdeckten Reitern fallen.
+  // Zweimal wurde das als Wackeln unter Last gedeutet und die Wartelogik verstaerkt - der Befund
+  // war aber ein echter Bedienfehler (vier von zwoelf Reitern nicht antippbar auf 360x640).
+  // Seit der Behebung weichen die Klappen aus (`klappenFrei`), und der Bannerfall hat mit
+  // `tests/test_klappen_kollision.js` einen eigenen, DETERMINISTISCHEN Waechter. Damit darf dieser
+  // Test wieder nur seinen eigenen Gegenstand messen - das Raster - statt vom Zufall abzuhaengen.
+  nextPlanetEventCheck:Date.now()+3600000, nextTraderCheck:Date.now()+3600000 });
 
 // Zwei Größen, und das ist keine Kür: siehe Falle 3 im Kopf dieser Datei.
 // DREI Groessen, und die dritte kam am 01.08.2026 dazu, weil zwei nicht genuegten: Das

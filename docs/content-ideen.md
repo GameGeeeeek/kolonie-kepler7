@@ -114,7 +114,29 @@ danebenher ein zweites Bild zeichnet.
 
 Alles hier ist am 18.08.2026 gemessen worden und stand im ersten Durchgang noch nicht drin.
 
-### 4.1 Die Sektoren versprechen Mechanik, die es nicht gibt
+### 4.1 Die Sektoren versprechen Mechanik, die es nicht gibt — **UMGESETZT 18.08.2026 (Etappe 3)**
+
+> **Erledigt.** Die acht Sektoren tragen seither ein `mod`-Feld, sieben davon eine Wirkung. Was
+> beim Umsetzen ANDERS entschieden wurde als hier vorgeschlagen, steht in CLAUDE.md unter
+> „Sektor-Eigenschaften (Etappe 3)"; die drei wichtigsten Abweichungen:
+>
+> - **Vier Kanäle statt acht Einzelwirkungen** (Produktion, Expeditions-Ausbeute, Abgrundsplitter,
+>   Flugzeit). Die Tabelle unten schlug für jeden Sektor eine eigene Mechanik vor – acht neue
+>   Rechenwege wären acht neue Anzeigestellen gewesen. Vier Kanäle laufen alle über
+>   `SEKTOR_KANAL_TEXT` und damit über EINE Anzeige-Quelle.
+> - **Angriff, Verteidigung und Spionage-Sichtweite sind bewusst außen vor.** Sie entscheiden PvP,
+>   und der Server rechnet sie nach – eine Sektor-Tabelle im Backend wäre eine zweite Kopie, die bei
+>   einem hängenden Deploy auseinanderläuft (dieselbe Wahl wie bei den drei neuen Doktrinen).
+>   Damit entfallen die Vorschläge „+ Beute aus NPC-Kämpfen" und „+ Verteidigung hier stationierter
+>   Flotten" ersatzlos.
+> - **Der Befund war noch schärfer als hier beschrieben:** Die `desc`-Texte versprachen die Mechanik
+>   nicht nur – sie wurden **nirgends gerendert**. Ein Versprechen, das nur im Quelltext steht, ist
+>   für den Spieler weder ein Versprechen noch ein Bruch. Deshalb gehörten fünf Anzeigestellen
+>   genauso zwingend zur Etappe wie die Mechanik selbst.
+>
+> Der Rest dieses Abschnitts bleibt als Herleitung stehen – die Messung war richtig, nur die
+> vorgeschlagene Belegung ist überholt.
+
 
 **Gemessen:** `SEKTOR_DEFS` (Z. 13328) hat 8 Einträge mit den Feldern `key`, `name`, `cx`, `cy`,
 `tint`, `desc` – **kein einziges Wirkungsfeld**. `sektorVon()` (Z. 13338) wird an zwölf Stellen

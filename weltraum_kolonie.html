@@ -1365,6 +1365,18 @@
        klebte (siehe .shell oben), lief der Tab-Inhalt sichtbar durch sie hindurch - das las sich wie
        ein Darstellungsfehler, nicht wie Absicht. Der Weichzeichner allein trägt 6% Transparenz
        nicht. Der Schlagschatten setzt die Leiste stattdessen sichtbar vor den Inhalt. */
+    /* Sprungziele halten Abstand zur KLEBENDEN Reiterleiste (19.08.2026).
+       `scrollIntoView({block:'start'})` setzt das Ziel exakt auf die Fensterkante - und bei
+       kompaktem Kopf steht dort die Reiterleiste (`position:sticky; top:0`, gemessen 108 px am PC,
+       118 px am Handy). Der Spieler klickt in der Sprungleiste auf "Terraforming" und landet auf
+       einer Überschrift, die vollständig hinter der Leiste liegt. Gemessen: zielOben 0 bei
+       leisteUnten 108. Dieselbe Klasse wie KB-10 an der Karte, wo die Sticky-Leiste 118 px
+       Kartenoberkante verdeckte.
+       `scroll-margin-top` ist die dafür gebaute CSS-Eigenschaft - kein JS, keine zweite Rechnung,
+       und sie wirkt auf JEDES künftige Sprungziel automatisch. 128 px deckt beide gemessenen
+       Leistenhöhen mit etwas Luft; bewusst an `body.compact-head` gehängt, weil die Leiste nur
+       dort klebt und der Abstand sonst grundlos Platz verschenkte. */
+    body.compact-head [data-acc-key] { scroll-margin-top: 128px; }
     body.compact-head .tabs { position:sticky; top:0; z-index:25; background:#0a0d1a; padding:6px 0 8px; margin-bottom:0.8rem; box-shadow:0 6px 14px -6px rgba(0,0,0,0.85); }
     .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
     @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
@@ -7092,8 +7104,16 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.576.0';
+  const VERSION = '8.577.0';
   const PATCHNOTES = [
+    { version:'8.577.0', date:'19.08.2026', changes:[
+      '<strong>Die acht Regionen der Karte haben jetzt eine Eigenschaft.</strong> Ihre Beschreibungen versprachen seit jeher welche – „ergiebige Gürtelbahnen", „reich an Anomalien", „voller Passagen" –, nur hatte der Sektor eines Planeten auf nichts im Spiel eine Auswirkung. Das ist jetzt eingelöst: <strong>Wispern-Drift +8% Produktion</strong>, <strong>Solmark-Reichweite +12% Expeditions-Ausbeute</strong>, <strong>Obsidian-Saum +12% Produktion</strong>, <strong>Meridian-Weiten −10% Flugzeit</strong>, <strong>Pulsar-Felder +10% Expeditionen</strong>, <strong>Ilyra-Tiefen −12% Flugzeit</strong>, <strong>Randmarken +15% Abgrundsplitter</strong>.',
+      '<strong>Nur Boni, und der Kepler-Kern bleibt neutral.</strong> Die Wirkung greift rückwirkend für jede Kolonie, die du dort schon hast – du musst nichts umziehen und verlierst nirgends etwas. Im Heimatcluster, wo jeder anfängt, soll weder etwas locken noch abschrecken.',
+      '<strong>Woran was hängt:</strong> Produktion und Splitter am <strong>Standort</strong>, die Expeditions-Ausbeute am <strong>Startpunkt</strong>, die Flugzeit am <strong>Ziel</strong> – wer in die Meridian-Weiten fliegt, ist schneller da, egal woher er kommt. Ein Mond zählt zum Sektor seines Planeten. Alle Boni fließen additiv in dieselben gedeckelten Gruppen wie Forschung, Module und Doktrinen.',
+      'Zu sehen ist die Eigenschaft an <strong>fünf Stellen</strong>: an jeder Region der Übersicht, in der Kopfzeile der Sektoransicht, im Tooltip, im neuen Hilfe-Abschnitt „Sektoren haben Eigenschaften" und als Zeile am aktuellen Standort im Basis-Reiter – auch auf Monden.',
+      '<strong>Behoben: die seitlichen Klappen konnten Reiter unbedienbar machen.</strong> Stand ein Ereignis-Banner über der Reiterleiste, rutschte die Leiste in das feste Höhenband der Chat- und Status-Klappen. Weil die über der Leiste liegen, war der Reiter darunter nicht bloß verdeckt, sondern nicht antippbar – auf einem 360×640-Bildschirm traf das <strong>vier von zwölf Reitern</strong>, darunter „Basis". Die Klappen weichen jetzt aus, statt an einem festen Prozentwert der Fensterhöhe zu hängen.',
+      '<strong>Behoben: Sprungziele landeten hinter der Reiterleiste.</strong> Wer bei kompakter Kopfzeile in der Sprungleiste einen Abschnitt anklickte, landete auf einer Überschrift, die vollständig hinter der klebenden Leiste lag. Sprungziele halten jetzt Abstand.'
+    ]},
     { version:'8.576.0', date:'18.08.2026', changes:[
       '<strong>Der Stückpreis eines Schiffs hängt nicht mehr vom Bestand ab.</strong> Bisher wurde jedes weitere Exemplar teurer, ab dem 250. sogar beschleunigt – wer eine Flotte aufbaute, zahlte fürs Aufbauen. Das ist ersatzlos raus: Das tausendste Schiff kostet so viel wie das erste.',
       'Bei den <strong>Tiefenschiffen</strong> war der Effekt am stärksten, weil dort der Bestand den Stückpreis zusätzlich multiplizierte: Der 25. Nullkiel kostete <strong>20.550 statt 750</strong> Bergungsmaterial, also das 27-fache. Auch das ist behoben.',
@@ -13567,16 +13587,74 @@
   // nächstgelegene Zentrum - bewusst keine Liste je System, die beim nächsten neuen System
   // veralten würde. Namen lehnen sich an prominente Mitglieder an; desc erscheint auf der
   // Übersichts-Tafel (Hausregel 7: neuer Inhalt braucht vollständige Beschreibung).
+  /* Sektor-Eigenschaften (18.08.2026). Bis dahin trugen die acht Sektoren nur cx/cy/tint/desc, und
+     `sektorVon` wurde ausschliesslich zum ZEICHNEN der Karte benutzt - der Sektor eines Planeten
+     hatte auf nichts im Spiel eine Auswirkung. Ihre Beschreibungen versprachen aber seit jeher
+     welche ("ergiebige Guertelbahnen", "reich an Anomalien", "voller Passagen"): genau der
+     Fehlertyp, den dieses Projekt sonst als "zweite Anzeigestelle" kennt, nur andersherum - die
+     Anzeige war da, die Mechanik nicht.
+
+     VIER REGELN, nach denen die Belegung entstanden ist:
+     1. NUR BONI, keine Mali. Die Wirkung greift rueckwirkend fuer jede bestehende Kolonie; wer vor
+        dieser Regel gesiedelt hat, darf dafuer nicht bestraft werden. Der Kepler-Kern bleibt
+        bewusst neutral - im Heimatcluster soll nichts locken und nichts abschrecken.
+     2. Jede Wirkung loest den TEXT ein, der schon dastand. Kein Sektor bekommt etwas, das seine
+        Beschreibung nicht hergibt; umgekehrt nennt jede Beschreibung jetzt ihre Zahl.
+     3. Nur Kanaele, die der Server NICHT nachrechnet (Produktion, Expeditions-Ausbeute,
+        Abgrundsplitter, Flugzeit - fuer Flugzeit gemessen: 0 Treffer in server.js). Angriff und
+        Verteidigung sind bewusst aussen vor: Sie entscheiden PvP, und eine Sektor-Tabelle im
+        Backend waere eine zweite Kopie, die auseinanderlaufen kann.
+     4. Additiv in die jeweils vorhandene, gedeckelte Gruppe - nie eine eigene Multiplikation.
+        Die Flugzeit ist die Ausnahme und dort schon die Hausform (siehe allianceBaseFlightMult). */
   const SEKTOR_DEFS = [
-    { key:'kepler',   name:'Kepler-Kern',        cx:459, cy:289, tint:'#fac775', desc:'Der Heimatcluster um das Kepler-System - dichter besiedelt als jede andere Region, hier beginnt jede Kolonie.' },
-    { key:'wispern',  name:'Wispern-Drift',      cx:441, cy:89,  tint:'#85b7eb', desc:'Der stille Norden um Wispern-Nebel und Chronos-Gürtel - weite Wege, ergiebige Gürtelbahnen.' },
-    { key:'solmark',  name:'Solmark-Reichweite', cx:652, cy:137, tint:'#e05a58', desc:'Das Grenzland um Solmark und die Nyra-Weiten - umkämpft, aber reich an Anomalien.' },
-    { key:'obsidian', name:'Obsidian-Saum',      cx:811, cy:151, tint:'#f0997b', desc:'Der äußerste Ostrand um den Obsidian-Gürtel - wer hier ankommt, hat die halbe Galaxie hinter sich.' },
-    { key:'meridian', name:'Meridian-Weiten',    cx:812, cy:403, tint:'#e0e4f5', desc:'Die Südost-Ausläufer um den Meridian-Kern - alte Handelspfade, verstreute Höfe.' },
-    { key:'pulsar',   name:'Pulsar-Felder',      cx:597, cy:355, tint:'#8f86e8', desc:'Das Strahlungsfeld um den Pulsar-Ring - Navigation verlangt Erfahrung, belohnt sie aber.' },
-    { key:'ilyra',    name:'Ilyra-Tiefen',       cx:251, cy:411, tint:'#9fe1cb', desc:'Der tiefe Südwesten um Ilyra-Strom und die Dunwich-Passage - dünn kartiert, voller Passagen.' },
-    { key:'rand',     name:'Randmarken',         cx:227, cy:192, tint:'#8d92ae', desc:'Der Westsaum um Der Rand und die Oort-Schleuse - die letzte Reihe Sterne vor der Leere.' }
+    { key:'kepler',   name:'Kepler-Kern',        cx:459, cy:289, tint:'#fac775', mod:null,
+      desc:'Der Heimatcluster um das Kepler-System - dichter besiedelt als jede andere Region, hier beginnt jede Kolonie. Bewusst ohne Sektor-Eigenschaft: Wo jeder anfängt, soll nichts locken und nichts abschrecken.' },
+    { key:'wispern',  name:'Wispern-Drift',      cx:441, cy:89,  tint:'#85b7eb', mod:{ prod:0.08 },
+      desc:'Der stille Norden um Wispern-Nebel und Chronos-Gürtel - weite Wege, ergiebige Gürtelbahnen. Kolonien hier fördern 8% mehr Rohstoffe.' },
+    { key:'solmark',  name:'Solmark-Reichweite', cx:652, cy:137, tint:'#e05a58', mod:{ expedition:0.12 },
+      desc:'Das Grenzland um Solmark und die Nyra-Weiten - umkämpft, aber reich an Anomalien. Expeditionen, die von hier starten, bringen 12% mehr mit.' },
+    { key:'obsidian', name:'Obsidian-Saum',      cx:811, cy:151, tint:'#f0997b', mod:{ prod:0.12 },
+      desc:'Der äußerste Ostrand um den Obsidian-Gürtel - wer hier ankommt, hat die halbe Galaxie hinter sich. Der Weg zahlt sich aus: Kolonien hier fördern 12% mehr.' },
+    { key:'meridian', name:'Meridian-Weiten',    cx:812, cy:403, tint:'#e0e4f5', mod:{ flug:0.10 },
+      desc:'Die Südost-Ausläufer um den Meridian-Kern - alte Handelspfade, verstreute Höfe. Missionen hierher sind 10% schneller unterwegs.' },
+    { key:'pulsar',   name:'Pulsar-Felder',      cx:597, cy:355, tint:'#8f86e8', mod:{ expedition:0.10 },
+      desc:'Das Strahlungsfeld um den Pulsar-Ring - Navigation verlangt Erfahrung, belohnt sie aber: Expeditionen von hier bringen 10% mehr mit.' },
+    { key:'ilyra',    name:'Ilyra-Tiefen',       cx:251, cy:411, tint:'#9fe1cb', mod:{ flug:0.12 },
+      desc:'Der tiefe Südwesten um Ilyra-Strom und die Dunwich-Passage - dünn kartiert, voller Passagen. Missionen hierher sind 12% schneller unterwegs.' },
+    { key:'rand',     name:'Randmarken',         cx:227, cy:192, tint:'#8d92ae', mod:{ splitter:0.15 },
+      desc:'Der Westsaum um Der Rand und die Oort-Schleuse - die letzte Reihe Sterne vor der Leere. Tauchgänge, die von hier starten, bringen 15% mehr Abgrundsplitter.' }
   ];
+  /* Kurz- und Langform der Sektor-Eigenschaft - EINE Quelle fuer Karte, Tooltip und Hilfe.
+     Wer einen neuen Kanal in `mod` eintraegt, ergaenzt ihn HIER, sonst zeigt die Karte den Bonus
+     nicht an und der Spieler erfaehrt nur aus dem Quelltext davon (Hausregel 6: die zweite
+     Anzeigestelle ist der wiederkehrende Fehler dieses Projekts). `flug` traegt ein Minus, weil
+     ein Bonus dort eine KUERZERE Zeit bedeutet - dieselbe Zahl, umgekehrtes Vorzeichen. */
+  const SEKTOR_KANAL_TEXT = {
+    prod:       { kurz:'Produktion',   lang:'Rohstoffproduktion der eigenen Standorte in diesem Sektor' },
+    expedition: { kurz:'Expeditionen', lang:'Ausbeute von Expeditionen, die hier starten' },
+    splitter:   { kurz:'Splitter',     lang:'Abgrundsplitter aus Tauchgängen, die hier starten' },
+    flug:       { kurz:'Flugzeit',     lang:'Flugzeit von Missionen mit Ziel in diesem Sektor' }
+  };
+  function sektorEffektTeile(sk){
+    if (!sk || !sk.mod) return [];
+    const out = [];
+    for (const kanal of Object.keys(SEKTOR_KANAL_TEXT)){
+      const w = sk.mod[kanal];
+      if (!w) continue;
+      out.push({ kanal: kanal, vz: (kanal === 'flug' ? '\u2212' : '+'), proz: Math.round(w*100), t: SEKTOR_KANAL_TEXT[kanal] });
+    }
+    return out;
+  }
+  function sektorEffektKurz(sk){
+    const teile = sektorEffektTeile(sk);
+    if (!teile.length) return 'ohne Eigenart';
+    return teile.map(function(x){ return x.vz + x.proz + '% ' + x.t.kurz; }).join(' \u00b7 ');
+  }
+  function sektorEffektLang(sk){
+    const teile = sektorEffektTeile(sk);
+    if (!teile.length) return 'Ohne Sektor-Eigenschaft – hier gilt überall der Grundwert.';
+    return teile.map(function(x){ return x.vz + x.proz + '% auf die ' + x.t.lang + '.'; }).join(' ');
+  }
   function sektorVon(sy){
     let best = SEKTOR_DEFS[0], bd = Infinity;
     for (const sk of SEKTOR_DEFS){
@@ -13584,6 +13662,45 @@
       if (d < bd){ bd = d; best = sk; }
     }
     return best;
+  }
+  /* Der Sektor eines STANDORTS - und der Zwischenschritt, den man dabei leicht vergisst: Ein
+     Mondschluessel ("moon_<planet>") steht in PLANETS gar nicht, er erbt das System seines
+     Planeten. Ohne moonParentKey liefe jede Mondkolonie stumm auf "kein Sektor" hinaus, und die
+     Wirkung fehlte ausgerechnet dort, wo der Spieler sie am ehesten nachrechnet.
+     Der Cache ist unbefristet, weil sich der Sektor eines Systems nie aendert (sektorVon rechnet
+     nur mit den festen gx/gy) - er spart in ratesPerSecond je Standort und Sekunde eine Suche
+     ueber knapp 500 PLANETS-Eintraege. */
+  const _sektorCache = new Map();
+  function sektorVonSystemId(sysId){
+    if (!sysId) return null;
+    const sys = STAR_SYSTEMS.find(s => s.id === sysId);
+    return sys ? sektorVon(sys) : null;
+  }
+  function sektorVonPlanet(planetKey){
+    const key = planetKey || 'home';
+    if (_sektorCache.has(key)) return _sektorCache.get(key);
+    let sk = null;
+    if (key === 'home') sk = sektorVonSystemId(myHomeSystem);
+    else {
+      const echt = isMoonKey(key) ? moonParentKey(key) : key;
+      const p = PLANETS.find(x => x.id === echt);
+      sk = p ? sektorVonSystemId(p.system) : null;
+    }
+    _sektorCache.set(key, sk);
+    return sk;
+  }
+  /* Summand fuer die additiven Gruppen (Produktion, Expeditions-Ausbeute, Abgrundsplitter).
+     Neutralwert 0, nie 1 - dieselbe Trennung wie bei doctrineBonusOf. */
+  function sektorBonus(planetKey, kanal){
+    const sk = sektorVonPlanet(planetKey);
+    return (sk && sk.mod && sk.mod[kanal]) || 0;
+  }
+  /* Flugzeit ist die eine Groesse, die im Spiel als FAKTOR gefuehrt wird (siehe missionDurationFor);
+     der Sektor reiht sich dort ein statt eine eigene Gruppe aufzumachen. Zielsystem unbekannt ->
+     1, damit Missionsarten ohne echtes Ziel unberuehrt bleiben (wie allianceBaseFlightMult). */
+  function sektorFlugMult(sysId){
+    const sk = sysId ? sektorVonSystemId(sysId) : null;
+    return 1 - ((sk && sk.mod && sk.mod.flug) || 0);
   }
   let _guertelCache = null;
   function guertelSysteme(){
@@ -22013,7 +22130,7 @@
   function expeditionRewardMult(rewardMult, planetKey){
     const ring = planetKey ? orbitalStationOf(planetKey) : null;
     const signal = (ring && ring.focus==='signal') ? ring.level * ORBITAL_SIGNAL_PER_LEVEL : 0;
-    return (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + deckelWeich(moduleBonusTotal('expedition'), 1.0) + officerBonus('aufklaerer') + codexExpeditionBonus() + doctrineBonusOf('expBonus') + signal) * seasonalLootMult();
+    return (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + deckelWeich(moduleBonusTotal('expedition'), 1.0) + officerBonus('aufklaerer') + codexExpeditionBonus() + doctrineBonusOf('expBonus') + sektorBonus(planetKey, 'expedition') + signal) * seasonalLootMult();
   }
   function expeditionMaxResourceFind(rewardMult, planetKey){
     return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * expeditionRewardMult(rewardMult, planetKey));
@@ -23236,7 +23353,11 @@
         mineMult *= planetEventResMult(planet, def.produces);
         mineMult *= terraformProdMult(planet, def.produces);
         mineMult *= planetTypeProdMult(planet, def.produces);
-        mineMult *= (1 + moduleBonusAt(planet, 'prod'));
+        // Sektor-Eigenschaft als SUMMAND neben dem Modulbonus - additiv, nicht als eigener Faktor.
+        // Bewusst NUR hier und nicht bei den Forschungspunkten: Die additive Produktionsgruppe
+        // laesst Forschungspunkte ebenfalls aussen vor, und "ergiebige Guertelbahnen" ist eine
+        // Aussage ueber Rohstoffe, nicht ueber Laborarbeit.
+        mineMult *= (1 + moduleBonusAt(planet, 'prod') + sektorBonus(planet, 'prod'));
         mineMult *= seasonalSingleResMult(def.produces);
         mineMult *= seasonalMoonProdMult(planet); // wirkt nur, wenn planet ein Mond ist (siehe Funktion)
         rates[def.produces] += wirksameStufen(def, b[def.key]) * def.baseRate * mineMult;
@@ -23918,6 +24039,9 @@
     // Allianzbasis ab Stufe 4: -10% Flugzeit für Missionen ins Basis-System (nur wenn der Aufrufer
     // das Zielsystem kennt und mitgibt - Missionsarten ohne echtes Zielsystem bleiben unberührt).
     mult *= allianceBaseFlightMult(targetSystem);
+    // Sektor des ZIELS (18.08.2026). Steht bewusst direkt neben allianceBaseFlightMult: Beide
+    // haengen am Zielsystem, und beide lassen Missionsarten ohne echtes Ziel unberuehrt.
+    mult *= sektorFlugMult(targetSystem);
     mult *= Math.max(0.5, 1 - officerBonus('navigator')); // Offizier "Navigator"
     return sec * mult;
   }
@@ -38685,6 +38809,19 @@
       { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.<br><br><strong>Aufklärungsvorteil (seit 01.08.2026):</strong> Frische Aufklärung ist nicht mehr nur Information, sondern ein <strong>echter Kampfvorteil</strong>. Ist dein Bericht über ein Ziel <strong>keine 30 Minuten alt</strong> und wurde dein Späher <strong>nicht entdeckt</strong>, greifst du dieses Ziel mit <strong>+8% Angriffskraft</strong> an. Der Zuschlag steht in der Angriffs-Vorschau und im Spionagebericht ausgewiesen, und der Server rechnet ihn im PvP genauso nach – Vorschau und Kampfergebnis meinen dieselbe Zahl. Zwei Folgen: Wer angreifen will, späht <em>kurz vorher</em> statt irgendwann; und die <strong>Spionageabwehr</strong> des Ziels verteidigt jetzt zweimal – sie schiebt dem ertappten Späher aufgeblähte Verteidigungswerte unter <em>und</em> nimmt dem Angreifer den Zuschlag. Ein <strong>Bündnis mit dem Schattenbund</strong> senkt die Entdeckungschance um 25% bzw. 50% und schützt damit genau diesen Vorteil.<br><br><strong>Nach dem Kampf siehst du ohnehin, was dort stand.</strong> Seit dem 02.08.2026 führt der Bericht eines Spielerangriffs die <strong>Flotte</strong> und die <strong>Verteidigungsanlagen</strong> des Ziels mit – du hast ihnen gegenübergestanden, also stehen sie im Bericht. Die Aufklärung verliert dadurch nichts: Sie klärt <em>vorher</em> auf, also genau dann, wenn die Auskunft die Entscheidung noch beeinflussen kann – und nur sie bringt den +8%-Zuschlag.' },
       { title:'Karte bedienen (Maus, Finger, Tastatur)', body:'Die Karte hat drei Ebenen: <strong>Übersicht</strong> (die acht Regionen) → <strong>Sektoransicht</strong> (die Systeme einer Region) → <strong>geöffnetes System</strong> (Sonne, Planeten, Marker). Ein Klick geht eine Ebene tiefer, der Zurück-Knopf oben links wieder heraus.<br><br><strong>Im geöffneten System:</strong> Ziehen verschiebt den Ausschnitt, die Knöpfe rechts unten zoomen, und die ‹ ›-Knöpfe links und rechts blättern zum nächsten System – ohne den Umweg über die Sektoransicht. Am <strong>PC</strong> geht dasselbe über die Tastatur: <strong>← und →</strong> blättern zum vorherigen bzw. nächsten System, <strong>+ und −</strong> zoomen. Die Tasten <strong>↑ und ↓ sind bewusst nicht belegt</strong>, damit du die Seite weiterhin normal scrollen kannst, während die Karte offen ist. <strong>Esc</strong> klappt das System wieder zu. Das Mausrad zoomt nur zusammen mit <strong>Strg</strong> – ohne Strg scrollt es die Seite, wie man es erwartet.' },
+      { title:'Sektoren haben Eigenschaften', body:(function(){
+          // Aus SEKTOR_DEFS abgeleitet, nie eingetippt: Wer einen Sektor umstellt, aendert diesen
+          // Text automatisch mit. SEKTOR_DEFS steht weit oben in der Datei, der Zugriff hier ist
+          // also unkritisch (Hausregel 38 - Reihenfolge gemessen, nicht geschaetzt).
+          const liste = SEKTOR_DEFS.map(function(sk){
+            return '<li><strong>' + sk.name + '</strong> – ' + (sk.mod ? sektorEffektKurz(sk) + '. ' + sektorEffektLang(sk) : 'ohne Eigenart. Hier gilt überall der Grundwert.') + '</li>';
+          }).join('');
+          const mitEigenart = SEKTOR_DEFS.filter(function(sk){ return !!sk.mod; }).length;
+          return 'Die Galaxie ist in <strong>' + SEKTOR_DEFS.length + ' Regionen</strong> geteilt, und <strong>' + mitEigenart + '</strong> davon haben eine eigene Eigenschaft. Sie wirkt <em>rückwirkend</em>: Jede Kolonie, die du dort schon hast, profitiert ab sofort – du musst nichts umziehen und verlierst nirgends etwas. Der <strong>Kepler-Kern</strong> bleibt bewusst neutral, weil dort jeder anfängt.<br><br>'
+            + '<strong>Woran hängt was:</strong> Produktions- und Splitter-Boni hängen am <em>Standort</em> (der Sektor deiner Kolonie bzw. deines Startpunkts), der Expeditionsbonus am <em>Startpunkt der Expedition</em>, der Flugzeit-Bonus dagegen am <em>Ziel</em> – wer in die Meridian-Weiten fliegt, ist schneller da, egal woher er kommt. Ein Mond zählt zum Sektor seines Planeten.<br><br>'
+            + '<ul>' + liste + '</ul>'
+            + 'Alle Boni fließen <strong>additiv</strong> in dieselben gedeckelten Gruppen wie Forschung, Module und Doktrinen – sie stapeln sich also nicht multiplikativ auf. Auf der Karte steht die Eigenschaft an jeder Region (Übersicht) und in der Kopfzeile der Sektoransicht; der Tooltip nennt sie ausführlich.';
+        })() },
       { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. In der <strong>Sektoransicht</strong> trägt jedes System mit Aufklärung ein 🔎-Abzeichen samt der <strong>stärksten bekannten Verteidigung</strong> (🛡, Farbe = Verlässlichkeit wie am Marker), und schon die Übersicht zeigt das 🔎 an der Region - so siehst du auf jeder Ebene, wo du bereits Aufklärung hast.' },
       { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Es wird <strong>nichts gestohlen</strong> - stattdessen richtet ein erfolgreiches Störmanöver <strong>echten Schaden</strong> beim Ziel an: zufällig entweder wird ein <strong>Produktionsgebäude für 30 Minuten um 50% gedrosselt</strong> oder die <strong>Verteidigung des Ziels ist 30 Minuten lang um 30% geschwächt</strong> (leichter angreifbar). <strong>Ohne Flottenkampf und ohne Flottenrisiko</strong>, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Das Ziel wird benachrichtigt und kann die Sabotage aussitzen oder sofort beheben (Automatische Reparatur bzw. Metamaterial-Reparaturschwarm). Serverseitig aufgelöst und gehärtet.' },
       { title:'Voraussetzung für Spionage: Zielsystem erkundet', body:'Um einen Spieler auszuspähen, musst du vorher mindestens <strong>einen Planeten in seinem Heimatsystem</strong> mit einem Erkundungsschiff erkundet haben - "man muss erst wissen, wo jemand wohnt". Ohne diese Erkundung ist die Spionage-Schaltfläche im Spielerprofil/Bestenliste blockiert.' },
@@ -47053,7 +47190,7 @@
     const hafen = (planetRoleOf(planetKey)||{}).key === 'deepport' ? PLANET_ROLE_TIEFENHAFEN : 0;
     return 1 + abgrundKanalBonus('splitter') + tiefenschiffBonus(flotte, 'echoschnitter') + hafen
              + veteranRoleExtra(planetKey, 'abgrund') + factionOutsideBonus('void')
-             + doctrineBonusOf('splitterBonus');
+             + doctrineBonusOf('splitterBonus') + sektorBonus(planetKey, 'splitter');
   }
   function abgrundBeuteFaktor(flotte){
     return 1 + abgrundKanalBonus('beute') + tiefenschiffBonus(flotte, 'bergungskran');
@@ -54225,13 +54362,19 @@
       let hinweisMarkup = '';
       if (hinweise.size){
         const tip = Array.from(hinweise.values()).map(function(v){ return v.join('\n'); }).join('\n');
-        hinweisMarkup = '<text data-sektor-hinweise="' + hinweise.size + '" x="' + schwerX.toFixed(0) + '" y="' + (schwerY+33).toFixed(0) + '" text-anchor="middle" style="font-size:13px; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + tip + '</title>' + Array.from(hinweise.keys()).join(' ') + '</text>';
+        hinweisMarkup = '<text data-sektor-hinweise="' + hinweise.size + '" x="' + schwerX.toFixed(0) + '" y="' + (schwerY+44).toFixed(0) + '" text-anchor="middle" style="font-size:13px; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + tip + '</title>' + Array.from(hinweise.keys()).join(' ') + '</text>';
       }
-      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sk.name + ' öffnen">'
+      // Die Sektor-Eigenschaft steht als eigene Zeile am Knoten (Kurzform) und vollstaendig im
+      // Tooltip/aria-label - ein Bonus, den nur der Quelltext kennt, gibt es fuer den Spieler nicht.
+      const eigenKurz = sektorEffektKurz(sk);
+      const eigenLang = sektorEffektLang(sk);
+      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + eigenLang) + '">'
+        + '<title>' + escapeHtml(sk.name + ' – ' + eigenLang) + '</title>'
         + '<path d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="#39426b" stroke-width="1.4" stroke-linejoin="round"/>'
         + mg.map(p => '<circle cx="' + p.gx + '" cy="' + p.gy + '" r="2.4" fill="' + sk.tint + '" opacity="0.85"/>').join('')
         + '<text x="' + schwerX.toFixed(0) + '" y="' + schwerY.toFixed(0) + '" text-anchor="middle" style="font:600 15px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + (heimDrin ? '🏠 ' : '') + sk.name + '</text>'
         + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+16).toFixed(0) + '" text-anchor="middle" style="font:10.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme</text>'
+        + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+27).toFixed(0) + '" text-anchor="middle" style="font:600 10px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + escapeHtml(eigenKurz) + '</text>'
         + hinweisMarkup
         + '</g>';
     }
@@ -54461,8 +54604,9 @@
     const steuer = knopf('heimweg', 34, '⌂', 'Zur Sektoren-Übersicht')
       + knopf('links', 80, '‹', li.name)
       + knopf('rechts', W - 34, '›', re.name)
-      + '<text data-kb-titel="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + sk.name + '</text>'
-      + '<text x="' + Math.round(W/2 + 22) + '" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme · Sektor ' + (idx+1) + ' von ' + SEKTOR_DEFS.length + '</text>';
+      + '<text data-kb-titel="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;"><title>' + escapeHtml(sk.name + ' – ' + sektorEffektLang(sk)) + '</title>' + sk.name + '</text>'
+      + '<text x="' + Math.round(W/2 + 22) + '" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme · Sektor ' + (idx+1) + ' von ' + SEKTOR_DEFS.length + '</text>'
+      + '<text data-kb-eigenart="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="59" text-anchor="middle" style="font:600 10px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + escapeHtml(sektorEffektLang(sk)) + '</title>' + escapeHtml(sektorEffektKurz(sk)) + '</text>';
     svg.innerHTML = '<defs>' + defs + '</defs>'
       + sterne
       + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="url(#sekTerrit)"/>'
@@ -57955,6 +58099,76 @@
   const COMPACT_HEAD_MAX_WIDTH = 1000;
   function compactHeadAuto(){ return (typeof window!=='undefined') && window.innerWidth <= COMPACT_HEAD_MAX_WIDTH; }
   function compactHeadActive(){ return state.compactHead !== undefined ? !!state.compactHead : compactHeadAuto(); }
+  /* Die seitlichen Klappen weichen der Reiterleiste aus (18.08.2026).
+
+     Das Problem ist eine BAUART, keine Zahl: `.edge-tab` haengt am VIEWPORT (am Handy
+     `bottom:8%`), die Reiterleiste `.tabs` dagegen am INHALT ueber ihr - Kopfzeile,
+     Ressourcenleiste, Tagesaufgaben und die zwei Banner, die nur MANCHMAL da sind
+     (`#eventBanner`, `#heroRaidTimer`). Zwei voneinander unabhaengige Groessen koennen sich
+     treffen, und wo sie es tun, ist der Reiter nicht bloss verdeckt, sondern wegen z-index 50
+     gegen 25 auch nicht antippbar.
+
+     Gemessen am 18.08.2026 mit sichtbarem Ereignis-Banner (115 px hoch, schiebt die Leiste um
+     135 px nach unten):
+        390x844   Leiste 577..694, Klappen 685..776   -> "fortschritt" verdeckt
+        360x740   Leiste 521..638, Klappen 589..681   -> "galaxie", "fortschritt"
+        360x640   Leiste 521..638, Klappen 497..589   -> "basis", "karte", "galaxie", "fortschritt"
+     Vier von zwoelf Reitern, darunter der, auf dem der Spieler startet. Ohne Banner ist auf allen
+     drei Groessen nichts verdeckt - deshalb ist der Fehler nie jemandem aufgefallen, der gerade
+     kein Ereignis laufen hatte.
+
+     ZWEI fruehere Behebungen haben je EINE Bildschirmgroesse freigeraeumt und eine andere wieder
+     zugestellt (`top:64%` -> `bottom:8%`, siehe die Kommentare an der Media-Query). Ein dritter
+     fester Prozentwert wuerde dasselbe tun, denn es gibt keinen richtigen: Die Leiste kann jede
+     Hoehe annehmen, die der Inhalt ueber ihr hergibt. Deshalb WEICHT die Klappe jetzt aus, statt
+     an einer Zahl zu haengen - dieselbe Antwort wie `kbMarkerFrei` auf der Karte, und aus
+     demselben Grund EINE Quelle fuer beide Klappen statt zweier Kopien.
+
+     Ausweichrichtung: bevorzugt nach UNTEN (die Leiste steht meist darueber, und unten ist der
+     Daumen ohnehin naeher). Passt es dort nicht, nach oben. Passt es nirgends, bleibt die Klappe,
+     wo sie ist - eine ueberlappende Klappe ist ehrlicher als eine, die halb aus dem Bild haengt
+     (dieselbe Abwaegung wie beim Label-Deckel von KB-16). */
+  const KLAPPE_LUFT = 6;        // Mindestabstand zur Leiste in px
+  const KLAPPE_MIN_UNTEN = 8;   // so nah darf eine Klappe hoechstens an die Fensterunterkante
+  let _klappenLage = '';
+  function klappenFrei(){
+    const klappen = document.querySelectorAll('.edge-tab');
+    if (!klappen.length) return;
+    const bar = document.querySelector('.tabs');
+    /* Am PC gilt die Regel nicht - dort ist die Leiste einreihig und steht weit oben. Ein
+       zurueckgelassener Versatz waere da ein Fehler, den niemand erklaeren koennte, also wird
+       beim Wechsel ausdruecklich zurueckgesetzt (die Gegenrichtung mitzupruefen ist Hausregel 33). */
+    if (window.innerWidth > 700 || !bar){
+      if (_klappenLage !== ''){ klappen.forEach(k => { k.style.bottom = ''; }); _klappenLage = ''; }
+      return;
+    }
+    const H = window.innerHeight;
+    const bb = bar.getBoundingClientRect();
+    if (!bb.height) return;
+    /* Signatur zuerst: Steht die Leiste, wo sie beim letzten Takt stand, ist auch das Ergebnis
+       dasselbe. Der Haupt-Tick laeuft jede Sekunde; ein Schreibzugriff je Sekunde auf zwei
+       Elemente waere unnoetige Layout-Arbeit (dasselbe Muster wie setBoxHtml). */
+    const sig = H + ':' + Math.round(bb.top) + ':' + Math.round(bb.bottom);
+    if (sig === _klappenLage) return;
+    _klappenLage = sig;
+    klappen.forEach(k => {
+      if (getComputedStyle(k).display === 'none') return;
+      /* Die natuerliche Lage wird gemessen, nicht aus dem Prozentwert nachgerechnet: Ein
+         nachgerechneter Wert waere eine zweite Wahrheit neben dem CSS und liefe beim naechsten
+         Media-Query-Umbau auseinander. */
+      k.style.bottom = '';
+      const r = k.getBoundingClientRect();
+      const h = r.height;
+      const natuerlich = H - r.bottom;
+      const stoert = r.top < bb.bottom && r.bottom > bb.top;
+      if (!stoert) return;
+      const unten = H - h - bb.bottom - KLAPPE_LUFT;   // Klappe komplett UNTER der Leiste
+      const oben  = H - bb.top + KLAPPE_LUFT;          // Klappe komplett UEBER der Leiste
+      if (unten >= KLAPPE_MIN_UNTEN)      k.style.bottom = Math.round(unten) + 'px';
+      else if (oben <= H - h)             k.style.bottom = Math.round(oben) + 'px';
+      else                                k.style.bottom = Math.round(natuerlich) + 'px';
+    });
+  }
   function applyCompactHeadClass(){
     if (!document.body) return;
     const on = compactHeadActive();
@@ -58879,8 +59093,16 @@
         + basisDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
       const roleBox = document.getElementById('planetRoleBox');
       if (roleBox){
+        /* Die Sektor-Eigenschaft des AKTUELLEN Standorts. Sie steht bewusst auch im Mond-Zweig:
+           Ein Mond erbt den Sektor seines Planeten und bekommt den Bonus wirklich - waere die Zeile
+           nur im Planeten-Zweig, waere sie die Anzeigestelle, die auf dem Mond schweigt (Punkt 6).
+           Die Karte zeigt die Eigenart je Region, hier steht sie am eigenen Standort. */
+        const stdSektor = sektorVonPlanet(state.activeBasePlanet);
+        const sektorZeile = stdSektor
+          ? `<div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-map-2" aria-hidden="true"></i><strong>${escapeHtml(stdSektor.name)}</strong> · ${escapeHtml(sektorEffektKurz(stdSektor))} – ${escapeHtml(sektorEffektLang(stdSektor))}</div>`
+          : '';
         if (isMoonKey(state.activeBasePlanet)){
-          setBoxHtml(roleBox, 'planetRoleBox', `<div class="lb-note" style="margin-bottom:1rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Planeten-Rollen gibt es nur für kolonisierte Planeten (und die Heimatbasis), nicht für Monde.</div>`);
+          setBoxHtml(roleBox, 'planetRoleBox', sektorZeile + `<div class="lb-note" style="margin-bottom:1rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Planeten-Rollen gibt es nur für kolonisierte Planeten (und die Heimatbasis), nicht für Monde.</div>`);
         } else {
           const currentRole = planetRoleOf(state.activeBasePlanet);
           const pending = (state.pendingRoleChange||{})[state.activeBasePlanet];
@@ -58900,7 +59122,7 @@
               </div>
             `;
           }
-          setBoxHtml(roleBox, 'planetRoleBox', pendingHtml + `
+          setBoxHtml(roleBox, 'planetRoleBox', sektorZeile + pendingHtml + `
             <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-target" aria-hidden="true"></i>Planeten-Rolle: ${planetDisplayName(state.activeBasePlanet)}</div>
             <div data-hscroll="roles" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${planetRolesSichtbar().map(r => {
@@ -62303,6 +62525,12 @@
         eventBanner.style.display = 'none';
       }
     }
+    /* ERST HIER, nicht am Kopf von render(): Die zwei Banner darueber sind genau das, was die
+       Reiterleiste verschiebt. Am Anfang des Takts gemessen, kennt klappenFrei die Bannerhoehe
+       DIESES Takts noch nicht und wiche erst eine Sekunde spaeter aus - fuer den Spieler eine
+       Sekunde lang tote Reiter, fuer einen Test ein Rennen. Der Aufruf ist billig: Er faellt
+       ueber seine Signatur sofort wieder heraus, solange die Leiste steht, wo sie stand. */
+    klappenFrei();
 
     const avatarEl = document.getElementById('avatarInitials');
     if (avatarEl){

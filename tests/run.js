@@ -24,6 +24,11 @@ const fs = require('fs');
 const path = require('path');
 
 const WURZEL = path.resolve(__dirname, '..');
+/* Wohin die vollstaendige Ausgabe eines fehlgeschlagenen Tests geht. Bewusst NICHT ins Repo:
+   Protokolle sind Sitzungsmuell und haetten dort eine .gitignore-Zeile noetig, die beim naechsten
+   Aufraeumen jemand entfernt. Der Pfad wird bei jedem Fehlschlag mit ausgegeben, damit er
+   auffindbar ist, ohne dass man ihn kennen muss. */
+const FEHLSCHLAG_ORDNER = path.join(require('os').tmpdir(), 'kepler7-fehlschlaege');
 const argumente = process.argv.slice(2);
 const nurPflicht = argumente.includes('--nur-pflicht');
 // Die vier Tests, die WIRKLICH am Patchnotes-Block oder an VERSION haengen - ermittelt per
@@ -224,10 +229,33 @@ if (!nurPflicht) {
     const ok = r.status === 0;
     melde(datei.padEnd(28) + dauer.padStart(5) + (uebersprungen ? '  [übersprungen]' : ''), ok);
     if (!ok) {
-      // Bei Fehlschlag die FAIL-Zeilen zeigen, damit man nicht erst einzeln nachstarten muss.
-      const zeilen = ausgabe.split('\n').filter(l => /^FAIL|Error|Cannot find/.test(l)).slice(0, 6);
+      /* Bei Fehlschlag die FAIL-Zeilen zeigen, damit man nicht erst einzeln nachstarten muss.
+         WARNUNG gehoert seit dem 18.08.2026 mit ins Muster, und der Anlass ist der Grund, warum
+         die volle Ausgabe darunter zusaetzlich weggeschrieben wird: test_reiterleiste.js schreibt
+         fuer genau seinen Fehlerfall die Zeile "WARNUNG - die Reiterleiste kam in 6 s nicht zur
+         Ruhe, gemessen wird trotzdem". Sie passte auf keines der drei Muster und wurde verworfen -
+         also fehlte im Protokoll ausgerechnet die Auskunft, die der Testautor fuer diesen Fall
+         hinterlegt hatte, und die Fehlersuche begann bei null.
+         Das ist dieselbe Familie wie Hausregel 25/37: Ein Messwerkzeug, das nur einen Teil der
+         moeglichen Ausgaben kennt, verschweigt im Fehlerfall die Ursache. Ein Muster zu erweitern
+         behebt aber immer nur den EINEN Fall, an den man gerade gedacht hat - deshalb steht
+         daneben die vollstaendige Ausgabe in einer Datei, deren Pfad hier genannt wird. Damit ist
+         nie wieder etwas verloren, egal wie ein kuenftiger Test seine Diagnose formuliert.
+         Die Kappung bei 6 Zeilen bleibt: Sie haelt das Protokoll lesbar, und wer mehr braucht,
+         hat jetzt den Pfad. */
+      const zeilen = ausgabe.split('\n').filter(l => /^FAIL|WARNUNG|Error|Cannot find/.test(l)).slice(0, 6);
       for (const l of zeilen) console.log('         ' + l.slice(0, 160));
       if (!zeilen.length) console.log('         (keine FAIL-Zeile - Zeitüberschreitung oder Absturz)');
+      try {
+        fs.mkdirSync(FEHLSCHLAG_ORDNER, { recursive: true });
+        const ziel = path.join(FEHLSCHLAG_ORDNER, datei.replace(/\.js$/, '') + '.log');
+        fs.writeFileSync(ziel, ausgabe);
+        console.log('         volle Ausgabe: ' + ziel);
+      } catch (e) {
+        // Ein fehlgeschlagenes Wegschreiben darf den Prueflauf nie beenden - es ist Beiwerk,
+        // nicht der Zweck. Aber es wird genannt, statt still zu misslingen.
+        console.log('         (volle Ausgabe konnte nicht geschrieben werden: ' + e.message + ')');
+      }
     }
   }
 }
