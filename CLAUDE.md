@@ -2327,7 +2327,26 @@ ein 7-Zeichen-Passwort mit klarem Grund ab; geht das Frontend zuerst, blockt die
 das der Server genommen hätte. Beides ist verständlich, keines ist still. Ein Schalter ist deshalb
 nicht nötig – die zwei PRs gehören trotzdem zusammen gemerged, damit die Paritätsprüfung nicht gegen
 die alte Zahl läuft.
+## Rückfragen: immer mit Auswahlmöglichkeiten (Wunsch Sascha, 18.08.2026)
 
+**Wortlaut des Auftrags: „wenn du fragen hast gib mir immer auswahlmöglichkeit".**
+
+Eine offene Frage („Wie soll ich das machen?", „Was meinst du dazu?") schiebt die ganze Denkarbeit
+zurück und kostet Sascha mehr Zeit als das Problem wert ist. Gefragt wird deshalb **nie ohne
+vorbereitete Antworten**:
+
+- **Konkrete, benannte Optionen** statt einer offenen Frage – jede so formuliert, dass man sie
+  auswählen kann, ohne nachzufragen, was gemeint ist.
+- **Je Option die Folge dazusagen**, nicht nur den Namen: was sie kostet, was sie bringt, was sie
+  ausschließt. Eine Auswahl ohne Konsequenzen ist wieder eine offene Frage, nur mit Knöpfen.
+- **Eine Empfehlung nennen und begründen** – sie steht an erster Stelle und ist als solche
+  gekennzeichnet. Wer eine Wahl vorlegt, hat sich schon Gedanken gemacht; die gehören dazu.
+- Technisch heißt das: **`AskUserQuestion` mit 2–4 Optionen**, nicht eine Frage im Fließtext.
+
+**Und die Vorbedingung, die diese Regel erst richtig macht:** Gefragt wird ohnehin nur, wenn
+verschiedene Lesarten zu *wesentlich* anderer Arbeit führen. Alles, was sich aus dem Code, dem
+Konzept oder den Hausregeln beantworten lässt, wird gemessen statt gefragt (Regel 10/41: erst
+nachsehen, dann behaupten). Eine Auswahl vorzulegen ist kein Ersatz dafür, selbst nachzusehen.
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).

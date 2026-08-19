@@ -7104,8 +7104,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.582.0';
+  const VERSION = '8.583.0';
   const PATCHNOTES = [
+    { version:'8.583.0', date:'19.08.2026', changes:[
+      '<strong>Behoben: Eine Flugbahn startete an einer Heimatbasis, die es im gezeigten System gar nicht gibt.</strong> Wer eine Flotte von der Heimatbasis losschickte und danach ein anderes System ansah, bekam dort eine Linie zu sehen, die aus dem Nichts neben der Sonne kam – als stünde die Heimatbasis in diesem System. Gemessen lag der Startpunkt exakt 50 Einheiten neben der fremden Sonne, also genau auf der Bahn, auf der die Heimatbasis im eigenen System sitzt. Jetzt beginnt die Linie in diesem Fall an der Sonne, dem Platzhalter für „kommt von ausserhalb" – genauso, wie es für Flotten von einer Kolonie schon immer war. Danke für den Bug-Report mit Screenshot.',
+      '<strong>Im Heimatsystem ändert sich nichts:</strong> Dort startet die Flugbahn weiterhin genau am Marker deiner Basis. Das war beim Beheben der eigentliche Punkt – der naheliegende Weg hätte die Linie auch dort von der Basis losgelöst.'
+    ]},
     { version:'8.582.0', date:'19.08.2026', changes:[
       '<strong>Neu: Alien-Nester.</strong> Die vier Völker der Galaxie waren bisher eine Zeile Nachricht und ein 👽 auf der Karte. Jetzt nisten sie sich wirklich ein – als <strong>pulsierende Zellform</strong> im aufgeklappten System, mit Lebenspunkte-Balken. Ein Klick öffnet das Menü mit <strong>Nest angreifen</strong>.',
       '<strong>Anders als eine Asteroidenfestung steht ein Nest nicht nur da – es wächst.</strong> Fünf Stufen vom <strong>Sporenherd</strong> (40.000 LP) über Brutkammer, Schwarmstock und Hochnest bis zur <strong>Königin</strong> (4 Mio LP). Es reift von selbst weiter, breitet sich in Nachbarsysteme aus, und wer es stehen lässt, hat übermorgen mehr davon als heute. Das Kartenmenü sagt dir, <em>wann</em> die nächste Stufe kommt.',
@@ -56227,9 +56231,12 @@
        ein; wer eine neue hinzufuegt, tut dasselbe. */
     const platzierteMarker = [];
     const orbitsPresent = [...new Set(sysPlanets.map(p=>p.orbit||3))].sort((a,b)=>a-b);
-    // Rohe Heimatposition als Fallback (z.B. Missionslinien, wenn das Heimatsystem gerade nicht
-    // angezeigt wird) - wird unten durch die kollisionsvermeidende Position ersetzt, sobald das
-    // Heimatsystem tatsächlich sichtbar ist (siehe "Eigene Heimatbasis" weiter unten).
+    // Rohe Heimatposition; sie wird unten durch die kollisionsvermeidende Position ersetzt,
+    // sobald das Heimatsystem tatsächlich sichtbar ist (siehe "Eigene Heimatbasis" weiter unten).
+    // Hier stand bis KB-17, dieser Rohwert diene als Rückfall für Missionslinien, "wenn das
+    // Heimatsystem gerade nicht angezeigt wird" - genau das war der gemeldete Fehler: Im fremden
+    // System bezeichnet dieser Punkt nichts. Die Flugbahn nimmt ihn seitdem nur noch, wenn die
+    // Heimat wirklich im Bild ist; sonst steht dort die Sonne als Platzhalter.
     let homeMarkerPos = homeSlotXY(myHomeSlot);
 
     // Sonnentyp dieses Systems (siehe SUN_TYPES/sunTypeFor) - dieselbe Zuordnung wie in der Galaxie-
@@ -56616,9 +56623,16 @@
         if (!targetInView && !originInView) continue;
         const targetPos = targetInView ? ziel.pos : { x: SUN_X, y: SUN_Y };
         let originX, originY;
-        if (originKey === 'home'){ originX = homeMarkerPos.x; originY = homeMarkerPos.y; }
-        else if (originInView){ const oc = planetOrbitXY(originPlanet); originX = oc.x; originY = oc.y; }
-        else { originX = SUN_X; originY = SUN_Y; }
+        // Reihenfolge ist der Kern der Behebung (KB-17, Spieler-Report mit Screenshot): ZUERST
+        // wird gefragt, ob der Ursprung ueberhaupt im Bild liegt. Vorher stand der 'home'-Zweig
+        // davor und fragte originInView gar nicht ab - eine Mission von der Heimatbasis bekam
+        // deshalb in JEDEM fremden System einen Startpunkt auf der Heimat-Slot-Bahn, also eine
+        // Heimatbasis, die dort nicht steht (gemessen: 50,0 Einheiten neben der Sonne des
+        // fremden Systems). Der Kolonie-Zweig kannte den Sonnen-Platzhalter laengst; jetzt gilt
+        // er fuer beide Ursprungsarten, und die Regel steht nur noch an EINER Stelle.
+        if (!originInView){ originX = SUN_X; originY = SUN_Y; }
+        else if (originKey === 'home'){ originX = homeMarkerPos.x; originY = homeMarkerPos.y; }
+        else { const oc = planetOrbitXY(originPlanet); originX = oc.x; originY = oc.y; }
         // startTime fehlt nur bei sehr alten Spielstaenden. Der frueher hier stehende Rueckfall auf
         // die Erkundungsdauer passt nur zur Erkundung - fuer die uebrigen Arten waere er geraten.
         // Eine Stunde als neutraler Ersatz: Der Balken laeuft dann zwar nicht exakt, aber die Linie
