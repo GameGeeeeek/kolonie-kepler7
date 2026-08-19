@@ -100,7 +100,7 @@ danebenher ein zweites Bild zeichnet.
 
 | Posten | Quelle | Warum er wichtig ist |
 |---|---|---|
-| **B4 – Baustellen-Konto** | `wirtschaft-rebalance-konzept.md` §3 | Die **Lagerwand**: Kosten wachsen mit ×1,32–1,38 je Stufe, `storageCap()` linear+logarithmisch. Ab einem Punkt ist eine Forschung *dauerhaft* unbezahlbar. Das Konzept nennt sie an Z. 45806 des Spiels selbst beim Namen. **Das ist die einzige Stelle, an der das Spiel wirklich endet.** |
+| **B4 – Baustellen-Konto** ✅ UMGESETZT 19.08.2026 | `baustellen-konto-konzept.md` (§7: Abweichungen) | Die **Lagerwand**: Kosten wachsen mit ×1,32–1,38 je Stufe, `storageCap()` linear+logarithmisch. Ab einem Punkt ist eine Forschung *dauerhaft* unbezahlbar. Das Konzept nennt sie an Z. 45806 des Spiels selbst beim Namen. **Das ist die einzige Stelle, an der das Spiel wirklich endet.** |
 | **D – Protomaterie-Abnehmer** | `wirtschaft-rebalance-konzept.md` §5 | Alle heutigen Proto-Senken sind einmalig. Enthält den fertig durchgerechneten **Urmaterie-Koloss** (Apex-Schiff mit direktem Proto-Anteil). |
 | **V1 – Kostenkurve der Verteidigung brechen** | `verteidigung-flotte-konzept.md` §3 | `costMult` 1,18–1,4 bei linearem Nutzen. Ohne Deckel gibt es keine Obergrenze, an der Balance überhaupt festmachen könnte. **Achtung Bestandsschutz** (Kappungs-Marke, siehe CLAUDE.md). |
 | **V3 – Punkteachse begradigen** | `verteidigung-flotte-konzept.md` §3 | 10 Punkte je Stufe unabhängig vom Gebäude belohnt die schwächsten Bauten am stärksten. Eingriff in `computeScore()` – rückwirkend, deshalb heikel. |
@@ -395,6 +395,9 @@ Verteidigungskonzept.
 
 **Wenn nur eine Sache passiert:** das **Baustellen-Konto** (B4). Alles andere fügt Inhalt hinzu; B4
 entfernt die einzige Wand, hinter der kein Inhalt mehr hilft.
+**Umgesetzt am 19.08.2026** – für die Forschungs-Warteschlange, bewusst nicht für alle drei
+(Begründung und die Abweichungen vom Entwurf: `baustellen-konto-konzept.md` §7). Die Wand bei den
+Mega-Ausbaustufen steht damit noch; sie ist die nächste Ausbaustufe derselben Mechanik.
 
 **Wenn nur eine kleine Sache passiert:** die **Verteidigungs-Erfolge** (4.3). Null von 102 ist eine
 Lücke, die jeder Verteidiger spürt, und die Zähler dafür laufen seit Monaten mit.

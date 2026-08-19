@@ -230,3 +230,56 @@ Fundstellen von `buildQueue = []`/`researchQueue = []`, nicht als Namensliste.
    passt nicht ins Lager". Sie gehört dazu — und mit B4 wird daraus „dieser Posten braucht das
    Baustellen-Konto", also ein Hinweis mit Ausweg statt einer Sackgasse (Hausregel 35: ein Zustand
    ohne Entkommen ist eine Falschaussage).
+
+---
+
+## 7. Umgesetzt (19.08.2026) — und was dabei ANDERS entschieden wurde
+
+Der Umfang ist bewusst die **Forschungs-Warteschlange**, nicht alle drei Schlangen. Dort beißt die
+gemessene Wand am härtesten (Ewigkeitsforschungen bei Stufe 15–18 von 999), und die Erkundung hat
+**fünfzehn** Stellen gezählt, an denen Warteschlangen geleert oder gekürzt werden — jede weitere
+Schlange vervielfacht die Zahl der Stellen, an denen ein Konto verwaisen kann.
+
+Jede Abweichung unten ist eine Entscheidung mit Grund. Wer sie für ein Versehen hält und
+„repariert", baut den jeweiligen Fehler wieder ein.
+
+- **Der Regler steht je WARTESCHLANGE (wie vorgeschlagen), aber er sitzt IN der Box, nicht
+  daneben.** Der Hinweis an einem gesperrten Eintrag verweist wörtlich auf „unten" — ein Regler in
+  einer eigenen Box wäre die zweite Stelle mit derselben Aussage (Punkt 6 der Checkliste).
+- **Einzahlender Posten ist NICHT der Kopf der Schlange, sondern der erste Eintrag ÜBER dem
+  Lagerdeckel.** Der Kopf ist im Normalfall bezahlbar, ein Konto darauf wäre wirkungslos — und der
+  Spieler müsste umsortieren, um zu sparen. Die Regel „der, der es braucht" ist die einzige, die
+  ohne Erklärung vorhersehbar ist.
+- **Es gibt kein Aufräumen an den fünfzehn Entfernungsstellen, sondern einen ABGLEICH im Takt**
+  (`baustelleAufraeumen`). Eine davon zu vergessen — oder die nächste, die jemand später dazubaut —
+  ist nach Lage der Dinge der Normalfall, nicht die Ausnahme. Dieselbe Antwort wie bei
+  `astFreiePlaetze` im Backend: eine Quelle statt vieler Aufrufer, die alle daran denken müssen.
+- **Die Restkosten-Rechnung liegt an EINER Stelle** (`baustelleRestKosten`). Fünf Stellen brauchen
+  sie; beim ersten Anlauf hatten zwei davon — **beide Forschungskarten** — die volle Summe behalten,
+  und der Erforschen-Knopf blieb grau, obwohl das Konto den Posten längst gedeckt hatte. Genau der
+  Fehler, gegen den diese Etappe geschrieben ist, in der eigenen Lieferung.
+- **`affordEtaHtml` bekommt den Kontoschlüssel optional.** Ohne ihn verhält sie sich exakt wie
+  vorher — Gebäude- und Schiffskarten kennen kein Konto, und ein Hinweis darauf wäre dort ein
+  Versprechen, das nichts einlöst. Mit ihm sagt sie statt „erst mit größerer Lagerkapazität möglich"
+  (seit dem Konto schlicht unwahr), was wirklich hilft.
+- **Neu dazugekommen, weil die Umsetzung es sichtbar gemacht hat: eine RÜCKFRAGE vor dem
+  Entfernen.** Die Rückgabe läuft über `gainResources` und klemmt damit am Lagerdeckel — und ein
+  Konto ist kurz vor dem Ziel *zwangsläufig* größer als der Deckel, denn genau dafür existiert es.
+  Ohne Rückfrage kostet ein Fehlgriff auf das kleine ✕ tagelanges Ansparen, und die Erklärung dafür
+  stünde nur im Protokoll, also nach der Tat. Der Dialog nennt beide Zahlen: was zurückpasst und was
+  verloren ginge. Dieselbe Abwägung wie beim Forschungsabbruch daneben, der seine 50-%-Erstattung
+  ebenfalls vorher ansagt.
+- **Über das Prestige und den Aufstieg wandert der ANTEIL mit, nicht das Guthaben.** Das Guthaben
+  hängt an einer Forschungsstufe, und die ist nach dem Reset weg — es zu bewahren wäre Guthaben ohne
+  Posten. Der Anteil ist dagegen eine Einstellung, und eine still zurückgedrehte Einstellung ist
+  genau die Sorte Änderung, die ein Spieler zu Recht meldet. Gefährlich ist er dort nicht: Liegt kein
+  Posten über dem Deckel, liefert `baustelleZiel()` null und es wird nichts abgezweigt.
+- **Kein Eintrag in `SAVE_SANITY_LIMITS`, und das ist eine bewusste Nicht-Änderung.** Die
+  Backend-Prüfung ist eine Positivliste über wenige Felder; das Konto steht nicht darin und löst
+  deshalb keine Ablehnung aus. Ein Limit dort hätte einen echten Nutzen nur gegen einen gefälschten
+  Spielstand — und der ist bauartbedingt ohnehin möglich (die Grenze dieses Projekts ist „kann ich
+  etwas anfassen, das ANDEREN gehört?"). Dagegen hätte ein zu enges Limit einen echten Spieler vom
+  Speichern ausgesperrt, und das ist der teurere Fehler (dieselbe Begründung wie bei `maxShipMark`).
+- **Tier-2-Material sammelt das Konto nicht** — es hängt an der Produktion der sechs
+  Grundressourcen, und `forschungUeberLager` prüft auch nur die (Tier 2 hat einen eigenen, kleinen
+  Deckel). Die Wand ist eine T1-Wand; der T2-Anteil einer Forschung muss weiterhin im Lager liegen.

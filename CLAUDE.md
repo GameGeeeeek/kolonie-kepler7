@@ -835,6 +835,36 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Spiel, oder eine Invariante („diese Größe darf sich dadurch gar nicht ändern"). Das ist die
     Gegenrichtung zu Regel 2: Dort verrottet ein eingetippter Erwartungswert, hier fehlt einer.
 
+65. **Ein Test, der seinen Messwert aus dem GESPEICHERTEN Spielstand liest, misst nur die
+    Zeitpunkte, an denen `save()` gelaufen ist.** Vorfall 19.08.2026 (B4): Das Messfenster
+    „Ressourcen vorher/nachher" las zweimal denselben Stand und meldete `zuwachsMit: 0` — der
+    Spielstand wird nicht jede Sekunde geschrieben, sondern nur bei Ereignissen. Die Zahl sah aus
+    wie ein Befund („der Abzweig frisst ALLES") und war ein Artefakt des Messwerkzeugs. Behoben,
+    indem beide Enden des Fensters von einem Klick eingerahmt werden, der `save()` auslöst — der
+    Stand ist dann an beiden Enden nachweislich frisch. Dieselbe Familie wie Regel 15/17/19: nie
+    ein Messwerkzeug, das sich selbst im Weg steht.
+    **Zweite Hälfte desselben Vorfalls, und sie ist Regel 4:** Gemessen wurde **Erz** — die
+    Forschung, gegen die gemessen wurde, kostet aber gar kein Erz, sondern Kristalle, Deuterium und
+    Forschungspunkte. Der Abzweig war korrekt und traf nur eine andere Ressource; der Test sah an
+    seinem Gegenstand vorbei. Seitdem leitet er die gemessenen Ressourcen aus dem Spiel ab (die
+    Schlüssel, die wirklich auf dem Konto liegen), statt sie zu benennen.
+66. **Ein eigener `dialog`-Handler in Playwright schaltet die automatische Abweisung AB — wer den
+    Dialog nur mitschreibt, lässt den auslösenden Klick für immer hängen.** Aus derselben Etappe:
+    `page.on('dialog', d => protokoll.push(d.message()))` sah nach einem harmlosen Mitschnitt aus
+    und ließ den Test in den 300-s-Timeout laufen. Der Handler MUSS `d.dismiss()` (oder
+    `d.accept()`) aufrufen — und welches von beiden, ist zugleich die geprüfte Richtung: Abbrechen
+    darf nichts entfernen, Bestätigen schon.
+67. **Lässt sich ein Codepfad im Test nicht herstellen, ist die Frage nicht, wie man ihn erzwingt,
+    sondern warum es ihn gibt — und die Antwort ist manchmal ein echter Fund.** Aus derselben
+    Etappe: Der Versuch, den Erforschen-Knopf mit gedecktem Baustellen-Konto zu messen, lief auf
+    ein leeres Konto. Grund: `baustelleAufraeumen` löst ein Konto auf, sobald sein Posten die
+    Warteschlange verlässt — der Kartenpfad ist für ein angespartes Konto also unerreichbar, und
+    das war vorher niemandem klar. Der Umweg über diese Frage hat den eigentlichen Fund geliefert:
+    Die Rückgabe klemmt am Lagerdeckel, ein Konto ist kurz vor dem Ziel zwangsläufig größer als
+    der Deckel, und ein Fehlgriff auf das ✕ hätte tagelanges Ansparen vernichtet — mit der
+    Erklärung nur im Protokoll, also nach der Tat. Daraus wurde die Rückfrage vor dem Entfernen.
+    **Ein unerreichbarer Pfad ist kein Testproblem, sondern eine Aussage über das Bauwerk.**
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -1708,6 +1738,82 @@ Wahrheit nie am alten Stand gelaufen war. Genau die Falle aus „Korrektur 15.08
 der Pfad aus `tests/lib/umgebung` kommt; danach fällt am alten Stand exakt die eine neue Prüfung,
 bei identischer Prüfungszahl. **Wer eine Gegenprobe per Env-Umleitung fährt, prüft am Messergebnis,
 dass sie gegriffen hat** – „alles grün" ist hier kein Ergebnis, sondern ein Verdacht.
+
+## Baustellen-Konto (Etappe B4, 19.08.2026)
+
+Der Ausweg aus der **Lagerwand**. Gemessen: Die Kosten der einzigen unbegrenzt wiederholbaren
+Inhalte wachsen exponentiell (Ewigkeitsforschungen, `costMult` 1,32–1,38 je Stufe), der Lagerdeckel
+nicht. Gegen den gemessenen Endausbau-Deckel (803.800 — 11 Standorte, Lagerkomplex 45, Kryolager 15,
+500 Frachter) steht die Wand bei Stufe **15 bis 18 von 999**. Weil `SOFT_CAP_OVERFLOW_RATE` 0 ist,
+lässt sich der Betrag auch nicht ansparen: Der Posten ist dann nicht teuer, sondern unbezahlbar.
+Bitter dabei — `rewig_lager`, die Forschung, die den Deckel anhebt, läuft als erste hinein.
+
+**Die Antwort:** ein zweckgebundenes Konto je Posten. Ein wählbarer Anteil (0/25/50/75 %) der
+laufenden Produktion fließt nicht ins Lager, sondern direkt auf dieses Konto — der Betrag muss also
+nie gleichzeitig im Lager liegen. Kein Deckel wird angefasst, keine Kostenformel geändert. Der
+Posten wird **nicht billiger, nur bezahlbar**; die Wartezeit bleibt dieselbe.
+
+Konzept, Messungen und die verworfenen Alternativen: `docs/baustellen-konto-konzept.md`
+(Abschnitt 7 listet, was beim Umsetzen anders entschieden wurde als dort).
+
+**Der Umfang ist bewusst die FORSCHUNGS-Warteschlange, nicht alle drei.** Dort beißt die Wand, und
+die Erkundung hat **fünfzehn** Stellen gezählt, an denen Warteschlangen geleert oder gekürzt werden
+— jede weitere Schlange vervielfacht die Zahl der Stellen, an denen ein Konto verwaisen kann.
+
+**Fünf Dinge, die man beim Anfassen wissen muss:**
+
+- **`baustelleRestKosten(kosten, schluessel)` ist DIE eine Stelle, an der das Konto verrechnet
+  wird.** Fünf Stellen brauchen die Zahl: `startResearch`, `tryStartQueuedResearch`, die
+  Warteschlangen-Box und **beide** Forschungskarten. Beim ersten Anlauf hatten die zwei Karten die
+  volle Summe behalten — der Erforschen-Knopf blieb grau, obwohl das Konto den Posten längst
+  gedeckt hatte. Genau der Fehler, gegen den diese Etappe geschrieben ist, in der eigenen
+  Lieferung (Punkt 6 der Checkliste).
+- **Der Abzweig steht in `applySoftCappedGain` VOR der Deckel-Entscheidung.** Dahinter wäre er
+  wirkungslos: Genau im Zustand „Lager voll" ist der Zuwachs dann schon verworfen — und das ist der
+  Zustand, in dem das Konto gebraucht wird. `test_baustellenkonto` 1b prüft die REIHENFOLGE im
+  Funktionsrumpf, nicht die bloße Anwesenheit.
+- **Aufgeräumt wird per ABGLEICH im Takt (`baustelleAufraeumen`), nicht an den fünfzehn
+  Entfernungsstellen.** Eine davon zu vergessen — oder die nächste, die jemand später dazubaut —
+  ist nach Lage der Dinge der Normalfall. Dieselbe Antwort wie bei `astFreiePlaetze` im Backend:
+  eine Quelle statt vieler Aufrufer, die alle daran denken müssen.
+- **Einzahlender Posten ist NICHT der Kopf der Schlange, sondern der erste Eintrag ÜBER dem
+  Lagerdeckel** (`baustelleZiel`, 900-ms-Zwischenspeicher wie `storageCapCached`). Der Kopf ist im
+  Normalfall bezahlbar; ein Konto darauf wäre wirkungslos, und der Spieler müsste umsortieren, um
+  überhaupt sparen zu können.
+- **Tier-2-Material sammelt das Konto nicht.** Es hängt an der Produktion der sechs
+  Grundressourcen, und `forschungUeberLager` prüft auch nur die (Tier 2 hat einen eigenen, kleinen
+  Deckel). Die Wand ist eine T1-Wand. Wer das übersieht, baut einen Test, der aus dem falschen
+  Grund rot ist — genau so beim ersten Anlauf von Abschnitt 3 passiert (es fehlte nicht das Konto,
+  sondern der Nanolegierungs-Bestand).
+
+**Die Rückfrage vor dem Entfernen ist keine Höflichkeit, sondern die Folge einer Messung.** Die
+Rückgabe läuft über `gainResources` und klemmt damit am Lagerdeckel — und ein Konto ist kurz vor
+dem Ziel *zwangsläufig* größer als der Deckel, denn genau dafür existiert es. Ohne Rückfrage kostet
+ein Fehlgriff auf das kleine ✕ tagelanges Ansparen, und die Erklärung dafür stünde nur im
+Protokoll, also nach der Tat. Der Dialog nennt beide Zahlen (was zurückpasst, was verloren ginge) —
+dieselbe Abwägung wie beim Forschungsabbruch daneben, der seine 50-%-Erstattung ebenfalls vorher
+ansagt. Aufgefallen ist das erst beim TESTEN: Der Versuch, den Kartenpfad zu messen, lief auf einen
+leeren Spielstand, weil `baustelleAufraeumen` das Konto sofort auflöst, sobald der Posten die
+Schlange verlässt.
+
+**Über Prestige und Aufstieg wandert der ANTEIL mit, nicht das Guthaben.** Das Guthaben hängt an
+einer Forschungsstufe, und die ist nach dem Reset weg — es zu bewahren wäre Guthaben ohne Posten.
+Der Anteil ist eine Einstellung, und eine still zurückgedrehte Einstellung ist genau die Sorte
+Änderung, die ein Spieler zu Recht meldet. Gefährlich ist er dort nicht: Liegt kein Posten über dem
+Deckel, liefert `baustelleZiel()` null und es wird nichts abgezweigt (`test_baustellenkonto` 4).
+
+**Kein Eintrag in den Backend-`SAVE_SANITY_LIMITS`, und das ist eine bewusste Nicht-Änderung.** Die
+Prüfung dort ist eine Positivliste über wenige Felder; das Konto steht nicht darin und löst deshalb
+keine Ablehnung aus. Ein Limit hätte nur gegen einen gefälschten Spielstand genützt — und der ist
+bauartbedingt ohnehin möglich (die verteidigte Grenze ist „kann ich etwas anfassen, das ANDEREN
+gehört?"). Dagegen hätte ein zu enges Limit einen echten Spieler vom Speichern ausgesperrt, und das
+ist der teurere Fehler (dieselbe Begründung wie bei `maxShipMark`).
+
+Wächter: `tests/test_baustellenkonto.js` (32 Prüfungen — Quelltext-Verdrahtung, gemessene Wirkung,
+gerendertes Spiel, fünf Gegenproben).
+
+**Drei Lehren aus dem Bau dieses Tests, jede über den Einzelfall hinaus** — sie stehen weiter oben
+als Arbeitsregeln 65–67.
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
