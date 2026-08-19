@@ -897,6 +897,43 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Erklärung nur im Protokoll, also nach der Tat. Daraus wurde die Rückfrage vor dem Entfernen.
     **Ein unerreichbarer Pfad ist kein Testproblem, sondern eine Aussage über das Bauwerk.**
 
+68. **Ein Test kann einen Fehler als REGEL festhalten – dann ist er nicht der Wächter, sondern der
+    Grund, warum niemand hinsieht.** Vorfall 19.08.2026: Die drei PvE-Auflösungen (Anfechtung,
+    Festungsschlag, Nest-Schlag) gaben beim Auflösen die ÜBERLEBENDEN wieder in `fleet` – die
+    Schiffe stehen dort aber die ganze Mission über schon drin (nur der Flottenplatz ist belegt,
+    `computeAwayByType` hält sie von einer zweiten Verplanung zurück). Gemessen: 20 Kreuzer im
+    Bestand, 20 davon im Verband, 4 Verluste – danach standen **36** da. Ein Schlag mit der
+    Vorauswahl verdoppelte den Bestand also nahezu, seit v8.491.0 und über drei Auslieferungen
+    hinweg.
+    **`test_geteiltes_asteroidfeld` 8e hat genau das verlangt**: `nachher === vorher + mitgeflogen
+    − Verluste`, und `vorher` wird gelesen, NACHDEM die Mission gestartet ist. Der Test war grün,
+    seine Formulierung („die Schiffe sind zurück – abzüglich GENAU der Verluste des Servers") las
+    sich richtig, und er hat den Fehler dadurch drei Auslieferungen lang zementiert: Wer die
+    Rechnung anfasste, wurde von ihm zurückgepfiffen.
+    **Vorgehen:** (a) Eine Erwartung, die eine SUMME aus zwei Größen bildet, muss benennen, wo
+    jede herkommt – hier hätte die Frage „ist `mitgeflogen` in `vorher` schon enthalten?" gereicht;
+    (b) zu jeder Prüfung „der Endstand ist X" gehört die Gegenrichtung als eigene Zeile („und der
+    Bestand ist dabei NICHT gewachsen", jetzt 8e2) – eine Invariante fällt auf, wo ein Erwartungs-
+    wert mitwandert (dieselbe Familie wie Regel 62); (c) wer einen Fehler behebt, für den ein Test
+    grün ist, korrigiert den TEST und schreibt den Messwert in seinen Kommentar, statt ihn
+    stillschweigend anzupassen.
+69. **Vor dem Bau eines größeren Vorhabens prüfen, ob es auf `origin/main` schon steht – nicht nur,
+    ob die eigene VERSIONSNUMMER frei ist.** Vorfall 19.08.2026: Die Alien-Nester Phase 3
+    (Frontend) wurde in zwei Sitzungen parallel gebaut. Die andere war zuerst fertig und ging als
+    v8.582.0 (#448) live; meine Fassung war damit ein Duplikat – Kartenknoten, Kartenmenü,
+    Angriffsmission, Bericht, Hilfetext und sogar `test_nest_ui.js`/`test_nest_paritaet.js` gab es
+    danach zweimal. `naechste-version.js` hätte das nicht gemeldet, es prüft nur Nummern; gemerkt
+    habe ich es erst beim `git fetch` vor dem vollen Lauf, also nach der ganzen Arbeit.
+    **Richtig ist NICHT, den Konflikt aufzulösen** (dabei verschwindet still die eine oder die
+    andere Fassung, Regel 23): neu auf `origin/main` aufsetzen und nur das behalten, was dort
+    wirklich fehlt. Hier war das der Flottenfehler aus Regel 68 – die fremde Lieferung hatte ihn
+    vom Nachbarn geerbt, war also sogar der Anlass, ihn an EINER Stelle zu beheben.
+    **Vorgehen:** Vor dem ersten Zeichen Code `git fetch && git log --oneline -5 origin/main` und
+    die Betreffzeilen LESEN; bei einem Vorhaben aus einer Phasenliste zusätzlich `git ls-tree
+    origin/main tests/ | grep <thema>` – ein bereits gelieferter Wächter ist der sicherste Beleg,
+    dass die Etappe schon steht. Und wer parallel arbeitet, sichert vor dem Neuaufsetzen JEDE Zeile
+    aus `git status --short` (Regel 54).
+
 **Arbeitsumgebung:**
 14. **Während `node tests/run.js` läuft, die Spieldatei NICHT anfassen** – die Tests lesen sie
     live; committed wird erst nach grünem Ergebnis (der Merge ist seit dem Webhook die
@@ -1711,6 +1748,56 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
     zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
 
+## Eine PvE-Auflösung ZIEHT AB (19.08.2026) – der Fehler, der drei Auslieferungen überlebt hat
+
+**Die Schiffe eines Verbandes bleiben während der ganzen Mission in `fleet` gezählt.** Nur der
+Flottenplatz ist belegt, und `computeAwayByType()` hält sie als „unterwegs" von einer zweiten
+Verplanung zurück. Wer beim Auflösen die ÜBERLEBENDEN wieder addiert, zählt sie deshalb ein zweites
+Mal.
+
+Genau das taten **alle drei** PvE-Auflösungen: `anfechtungAufloesen` (seit v8.491.0),
+`festungAufloesen` (v8.569.0) und `nestAufloesen` (v8.582.0). Gemessen an einer Fixture mit
+20 Kreuzern, 20 davon im Verband, 4 Verlusten: danach standen **36** da. Ein Schlag mit der
+Vorauswahl – also der ganzen Kampfflotte – hat den Bestand je Mal nahezu verdoppelt.
+
+**Der Fehler ist durch KOPIEREN gewandert.** Der Festungsschlag hat ihn von der Anfechtung geerbt,
+der Nest-Schlag vom Festungsschlag; jede der drei Stellen war für sich plausibel („die Flotte kommt
+zurück"). Der NPC-Angriff macht es seit jeher richtig – `applyCombatLosses` ZIEHT AB und gibt nichts
+zurück –, aber niemand hat die beiden Wege nebeneinandergelegt.
+
+**Behoben mit EINER Funktion, nicht mit drei Korrekturen** (Hausregel 43):
+
+```js
+function pveVerlusteBuchen(fleet, verluste){
+  for (const [k, weg] of Object.entries(verluste || {})) if (weg > 0) fleet[k] = Math.max(0, (fleet[k]||0) - weg);
+}
+```
+
+Alle drei Auflösungen sammeln jetzt `verluste` (statt `zurueck`) und buchen dort. **Die Zweige ohne
+Kampf brauchen gar nichts mehr** – Server nicht erreichbar, Nest weitergezogen, Festung schon
+gefallen: leeres `verluste`, und die Flotte steht ohnehin vollzählig da. Das ist der eigentliche
+Gewinn der Umstellung: Der Fall „kein Kampf" hatte vorher eine eigene Schleife, die man beim
+Kopieren mitnehmen musste.
+
+**Drei Dinge, die man beim Anfassen wissen muss:**
+
+- **`pveVerlusteBuchen` darf es nur EINMAL geben.** Eine zweite Kopie kann wieder auseinanderlaufen –
+  das war ja der Vorfall. `tests/test_flotte_rueckkehr.js` 1a prüft die Zahl der Definitionen.
+- **Der Wächter ist datengetrieben, nicht namensbasiert** (Regel 40): Er liest JEDE Funktion der
+  Form `…Aufloesen(m, planetKey, fleet)` aus der Spieldatei, verlangt die Delegation an den Helfer
+  und verbietet jede Zuweisung auf `fleet[...]`, die einen Plus-Term enthält. Eine vierte PvE-
+  Missionsart fällt damit auf, ohne dass jemand an sie gedacht haben muss. Gegenprobe gegen den
+  Stand vor der Behebung: Er benennt `anfechtungAufloesen` und `festungAufloesen` samt der Zeile.
+- **`mining-recall` addiert legitim** und ist deshalb keine Auflösung im Sinne des Wächters: Die
+  Eskorte wurde beim Stationieren wirklich aus `fleet` herausgerechnet, sie muss zurückkommen. Wer
+  eine neue Missionsart baut, entscheidet also zuerst: Verlassen die Schiffe `fleet` beim Start?
+  Wenn nein (der Normalfall), gilt diese Regel.
+
+Wächter: `tests/test_flotte_rueckkehr.js` (11 Prüfungen, drei Gegenproben – sabotierte Kopie, Stand
+vor der Behebung, und die ausgeführte Wirkung des Helfers) sowie `test_geteiltes_asteroidfeld` 8e/8e2
+(Ende zu Ende an der Anfechtung, gemessen 16 statt 36). Der Test, der den Fehler bis dahin als REGEL
+festgehalten hat, steht als Arbeitsregel 68.
+
 ## Die Klappen weichen der Reiterleiste aus (18.08.2026)
 
 **Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
@@ -1817,14 +1904,30 @@ Hilfetext: Produktion und Splitter am **Standort**, Expedition am **Startpunkt**
 `moonParentKey` auf; ohne diesen Zwischenschritt bekäme JEDER Mond des Spiels den Bonus 0).
 `_sektorCache` ist eine dauerhafte `Map` – die Zuordnung Planet→Sektor ändert sich zur Laufzeit nie.
 
-**Fünf Anzeigestellen**, alle aus `sektorEffektKurz()`/`sektorEffektLang()` – EINE Quelle für Karte,
+**VIER Anzeigestellen**, alle aus `sektorEffektKurz()`/`sektorEffektLang()` – EINE Quelle für Karte,
 Tooltip, Hilfe und Standort-Zeile: (a) eigene Textzeile am Regionsknoten der Übersicht plus
 `<title>`/`aria-label` mit der Langform; (b) eine dritte Kopfzeile in der Sektoransicht; (c) der
 Hilfe-Eintrag „Sektoren haben Eigenschaften", **aus `SEKTOR_DEFS` abgeleitet** (Reihenfolge vorher
-gemessen, nicht geschätzt – `SEKTOR_DEFS` steht weit vor `HELP_SECTIONS`, Regel 38); (d) die
-Beschreibung jedes Sektors; (e) eine Zeile am AKTUELLEN Standort im Basis-Reiter, **bewusst auch im
-Mond-Zweig** von `planetRoleBox` – ein Mond bekommt den Bonus wirklich, und eine Zeile, die dort
-schweigt, wäre die klassische zweite Anzeigestelle (Punkt 6).
+gemessen, nicht geschätzt – `SEKTOR_DEFS` steht weit vor `HELP_SECTIONS`, Regel 38); (d) eine Zeile
+am AKTUELLEN Standort im Basis-Reiter, **bewusst auch im Mond-Zweig** von `planetRoleBox` – ein Mond
+bekommt den Bonus wirklich, und eine Zeile, die dort schweigt, wäre die klassische zweite
+Anzeigestelle (Punkt 6).
+
+**KORREKTUR 19.08.2026 – hier standen FÜNF, und die fünfte gibt es nicht.** Aufgeführt war „die
+Beschreibung jedes Sektors" (`SEKTOR_DEFS[].desc`). Gemessen: `grep -c "Der stille Norden"` und
+`grep -c "alte Handelspfade"` liefern je **1** – nur die Definition selbst. Kein Leser von
+`SEKTOR_DEFS` benutzt `desc`; die acht ausformulierten Regionstexte liegen ungenutzt in der Datei,
+und der Kommentar über der Tabelle behauptet weiterhin „desc erscheint auf der Übersichts-Tafel".
+**Das ist bitter, weil der Abschnitt direkt darüber genau diesen Befund beschreibt** – die Etappe
+entstand ja daraus, dass die `desc` nichts einlöste. Die TEXTE wurden damals aktualisiert (jede
+nennt jetzt ihre Zahl), die ANZEIGESTELLE wurde nie gebaut, und die Liste hat sie trotzdem
+mitgezählt. Ein Versprechen, das nur im Quelltext steht, ist für den Spieler gar nichts – und eine
+Dokumentation, die eine nicht existierende Anzeigestelle führt, ist die zweite Stufe desselben
+Fehlers.
+**Übertragbar:** Wer eine Liste von Anzeigestellen aufschreibt, misst jede einzeln nach (`grep`
+nach einer Zeichenkette, die NUR dort vorkommen kann) – „ich habe es gerade gebaut" ist kein Beleg
+dafür, dass es gerendert wird. Die `desc` endlich zu zeigen steht als Teil von E1 in
+`docs/sektorkarte-konzept.md`.
 
 **`SEKTOR_KANAL_TEXT` ist der Angelpunkt für alles Künftige.** Wer einen neuen Kanal in `mod`
 einträgt, ergänzt ihn dort – sonst zeigt die Karte den Bonus nicht an. `test_sektoreigenschaften`
@@ -2347,6 +2450,24 @@ vorbereitete Antworten**:
 verschiedene Lesarten zu *wesentlich* anderer Arbeit führen. Alles, was sich aus dem Code, dem
 Konzept oder den Hausregeln beantworten lässt, wird gemessen statt gefragt (Regel 10/41: erst
 nachsehen, dann behaupten). Eine Auswahl vorzulegen ist kein Ersatz dafür, selbst nachzusehen.
+
+## Sprache: durchgehend Deutsch (Auftrag Sascha, 19.08.2026)
+
+„immer auf deutsch bitte" – das gilt für **alles**, was aus dieser Arbeit herauskommt, nicht nur
+für den Spielertext: Antworten im Sitzungsverlauf, Commit-Botschaften, PR-Titel und -Beschreibungen,
+Kommentare im Quelltext, Prüfungsnamen in den Tests und die Einträge in dieser Datei.
+
+Der Grund ist derselbe wie bei allem anderen hier: Sascha liest es. Ein englischer Befund in einem
+PR-Text ist für ihn Arbeit, die er nicht bestellt hat – und ein Bericht, den der Adressat nur mit
+Mühe liest, ist kein Bericht (dieselbe Überlegung wie bei der Restzeit-Anzeige des Markts, die
+bewusst als Dauer und nicht als Uhrzeit erscheint).
+
+**Die eine Ausnahme sind Bezeichner im Code**, wo die Umgebung sie vorgibt: `fleet`, `state`,
+`composition`, `type:'nest-angriff'`, HTTP-Feldnamen, Backend-Antworten. Sie stehen im Vertrag mit
+dem Server bzw. mit dem Bestand und werden nicht eingedeutscht – neue EIGENE Bezeichner dagegen
+schon (`pveVerlusteBuchen`, `baustelleRestKosten`, `kbMarkerFrei`), so wie es dieses Projekt seit
+jeher hält.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).

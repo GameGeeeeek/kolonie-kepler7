@@ -35,7 +35,7 @@
 //     im Protokoll steht die Meldung gar nicht, sie geht als Toast raus - in beiden Faellen
 //     bekommt der Spieler den Servertext statt einer Auskunft).
 const fs = require('fs');
-const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
@@ -147,6 +147,7 @@ async function tab(browser, startSave, opt){
   page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await page.route('**/api/**', backend(store, opt));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+  await logMitschnitt(page);
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3500);
   await page.evaluate(() => {
@@ -356,13 +357,16 @@ async function marker(t){
   await t5.page.waitForTimeout(400);
   await t5.page.evaluate(() => { const x = [...document.querySelectorAll('.kmenu button')].find(y => /Schürfrecht anmelden/.test(y.textContent)); if (x) x.click(); });
   await t5.page.waitForTimeout(2000);
-  const protokoll = await t5.page.evaluate(() => {
-    const el = document.getElementById('log') || document.querySelector('.plog');
-    return el ? el.innerText.slice(0, 600) : '';
-  });
+  /* MITSCHNITT statt Endstand (19.08.2026): #log ueberschreibt sich mit jeder Meldung selbst, und
+     in den 2000 ms oben passt ein Zufallsereignis. Der Test pinnt zwar die zwei Ereignis-Uhren -
+     maybeSpawnRandomEvent hat aber gar keine und laesst sich nicht pinnen (Arbeitsregel 65).
+     Die verneinende Haelfte wird durch den Mitschnitt ausserdem erst aussagekraeftig: Sie prueft
+     jetzt den GANZEN Verlauf statt eines Augenblicks, in dem ein Fremdtext sie trivial erfuellt.
+     Die Schranke selbst bleibt unangetastet (Arbeitsregel 26) - nur die Messgroesse wechselt. */
+  const zeilen = await logZeilen(t5.page);
   check('7b: bei abgelaufener Sitzung sagt das Spiel das in eigenen Worten - nicht mit dem Servertext',
-    /Sitzung ist abgelaufen/.test(protokoll) && !/Nicht angemeldet\./.test(protokoll),
-    protokoll.split('\n').slice(0, 3));
+    zeilen.some(z => /Sitzung ist abgelaufen/.test(z)) && !zeilen.some(z => /Nicht angemeldet\./.test(z)),
+    zeilen.slice(-4));
   await t5.ctx.close();
 
   // ---- 8) Anfechtung (v8.491.0) ---------------------------------------------------------------
@@ -412,10 +416,24 @@ async function marker(t){
   // eingetippter Schiffstyp haette hier die Kappung gemessen statt der Verlustbuchung.
   const flogMit = anfMission.composition.cruisers || 0;
   check('8e-vorab: es sind wirklich Kreuzer mitgeflogen (sonst misst 8e nichts)', flogMit > 4, flogMit);
-  check('8e: die Mission ist beendet und die Schiffe sind zurück - abzüglich GENAU der Verluste des Servers',
+  /* 8e VERLANGTE BIS ZUM 19.08.2026 GENAU DIE DUPLIKATION, die es zu verhindern gab: Erwartet
+     wurde `vorher + mitgeflogen - Verluste`. `anfVor` wird aber gelesen, NACHDEM die Mission
+     losgeflogen ist - und die Schiffe eines Verbandes bleiben die ganze Mission über in `fleet`
+     gezählt (nur der Flottenplatz ist belegt, computeAwayByType hält sie von einer zweiten
+     Verplanung zurück). Die Summe zählte sie also ein zweites Mal.
+     Gemessen am Stand v8.581.0 mit dieser Fixture: 20 Kreuzer im Bestand, 20 davon im Verband,
+     4 Verluste - und danach standen 36 da. Der Test war seit v8.491.0 grün und hat den Fehler
+     dabei als REGEL festgehalten. Richtig ist `vorher - Verluste`, und weil es die alte Erwartung
+     gab, steht die Gegenrichtung jetzt als eigene Prüfung daneben (Arbeitsregel 43: nach dem
+     Zusammenführen wird der Test stärker, nicht passend). Wächter für alle drei PvE-Auflösungen:
+     tests/test_flotte_rueckkehr.js */
+  check('8e: die Mission ist beendet und die Verluste sind ABGEZOGEN',
     !(anfNach.fleet.missions || []).some(m => m.type === 'asteroid-contest') &&
-    (anfNach.fleet.cruisers || 0) === Math.max(0, (anfVor.fleet.cruisers || 0) + flogMit - 4),
-    { vorher: anfVor.fleet.cruisers, mitgeflogen: flogMit, nachher: anfNach.fleet.cruisers });
+    (anfNach.fleet.cruisers || 0) === Math.max(0, (anfVor.fleet.cruisers || 0) - 4),
+    { vorher: anfVor.fleet.cruisers, mitgeflogen: flogMit, verluste: 4, nachher: anfNach.fleet.cruisers });
+  check('8e2: der Bestand ist dabei NICHT gewachsen (die Schiffe wurden nie doppelt gezählt)',
+    (anfNach.fleet.cruisers || 0) < (anfVor.fleet.cruisers || 0),
+    { vorher: anfVor.fleet.cruisers, nachher: anfNach.fleet.cruisers });
   const anfBericht = (t6.store.__berichte || []).find(b => b && b.type === 'asteroid-contest');
   check('8f: es gibt einen Bericht mit Ausgang und beiden Verlustseiten',
     !!anfBericht && anfBericht.gewonnen === true && !!anfBericht.eigeneVerluste && !!anfBericht.gegnerVerluste,
