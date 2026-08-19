@@ -65,9 +65,15 @@ function backend(store) {
   };
 }
 
-// Beide Ereignis-Uhren gepinnt (Hausregel 18) - das Banner soll AUSSCHLIESSLICH dann stehen, wenn
-// dieser Test es setzt. Ein zusätzlich zufällig gefeuertes Ereignis würde die Aussage der
-// "ohne Ereignis"-Messung still zerstören.
+// Beide Ereignis-Uhren gepinnt (Hausregel 18). Das REICHT hier aber NICHT, und der Satz, der
+// vorher an dieser Stelle stand, war falsch: `maybeSpawnRandomEvent()` - die Funktion, die
+// `state.activeEvent` und damit das Banner setzt - hat GAR KEINE Uhr. Sie würfelt je Tick mit
+// 0,25 % und ist deshalb über den Spielstand nicht stillzulegen (`state.lastEventTime` wird zwar
+// geschrieben, aber nirgends als Sperre gelesen - wer sie pinnt, pinnt nichts). Gemessen am
+// 19.08.2026 im Suite-Lauf: ein 152 px hohes Fremd-Banner in der "ohne Ereignis"-Messung bei
+// 360x740, während 390x844 und 360x640 im selben Lauf sauber waren. Deshalb räumt `messen()`
+// unten ein zufälliges Ereignis über den SPIELERWEG weg und misst neu - und meldet, dass es das
+// getan hat, statt es zu verschweigen.
 function speicher(mitEreignis) {
   const t = Date.now();
   const s = {
@@ -144,8 +150,29 @@ async function messen(browser, g, mitEreignis) {
   // Mindestens ein voller Haupt-Tick, denn dort weicht die Klappe aus. Wer früher misst, misst
   // den Zustand VOR dem Ausweichen - und das sähe aus wie ein wirkungsloser Fix.
   await page.waitForTimeout(2600);
+
+  /* Ein zufällig gefeuertes Ereignis kapert die "ohne Ereignis"-Messung (Begründung oben). Es wird
+     über den Weg weggeräumt, den auch der Spieler hat - der "Ignorieren"-Knopf des Banners -, nicht
+     über einen Griff in den Modulscope: Der ist von außen gar nicht erreichbar, und ein Test, der
+     Spielinternes nachbaut, misst nicht mehr das Spiel (Hausregel 36/47). Bis zu drei Anläufe, weil
+     der Würfel auch danach weiterläuft; die Restwahrscheinlichkeit liegt damit unter 1 zu 10.000.
+     In der "mit Ereignis"-Messung kann das gar nicht passieren: `maybeSpawnRandomEvent` kehrt bei
+     gesetztem `state.activeEvent` in der ersten Zeile zurück. */
+  let streu = 0;
+  for (let i = 0; !mitEreignis && i < 3; i++) {
+    const steht = await page.evaluate(() => {
+      const eb = document.getElementById('eventBanner');
+      return !!eb && getComputedStyle(eb).display !== 'none';
+    });
+    if (!steht) break;
+    streu++;
+    await page.evaluate(() => { const b = document.getElementById('eventOptB'); if (b) b.click(); });
+    await page.waitForTimeout(1300);          // ein voller Tick: erst der raeumt das Banner ab
+  }
+
   const r = await page.evaluate(lese);
   r.bootfehler = fehler.slice(0, 2);
+  r.streuEreignis = streu;                    // steht im Protokoll, statt still zu bleiben
   await ctx.close();
   return r;
 }
@@ -160,7 +187,8 @@ async function messen(browser, g, mitEreignis) {
 
       check(p + 'Vorab: es gibt überhaupt zwei Klappen und ohne Ereignis kein Banner',
         ohne.klappenAnzahl >= 2 && ohne.bannerHoehe === 0 && ohne.bootfehler.length === 0,
-        { klappen: ohne.klappenAnzahl, bannerHoehe: ohne.bannerHoehe, bootfehler: ohne.bootfehler });
+        { klappen: ohne.klappenAnzahl, bannerHoehe: ohne.bannerHoehe, bootfehler: ohne.bootfehler,
+          streuEreignisWeggeklickt: ohne.streuEreignis });
 
       // Ohne diese Prüfung wäre die Hauptaussage darunter vacuous: Bleibt das Banner weg, ist
       // "nichts verdeckt" trivial erfüllt (Hausregel 37).
