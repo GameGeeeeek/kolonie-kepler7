@@ -24,15 +24,18 @@
 //      abgeschafft: Wer eine teure Forschung nach vorne zieht, WILL auf sie warten.
 //   3. Die Anzeige sagt, warum - im Warteschlangen-Eintrag UND auf der Forschungskarte.
 const fs = require('fs');
-const path = require('path');
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+/* SPIELDATEI kommt aus lib/umgebung und nicht aus einem eigenen path.join (19.08.2026). Vorher
+   stand der Pfad hier fest - eine Gegenprobe mit KEPLER_SPIELDATEI las dann die ECHTE Datei und
+   war aus dem falschen Grund gruen, also genau die Falle aus der Korrektur zu CLAUDE.md-Regel 14.
+   Dasselbe gilt fuer weitere Tests im Repo; dieser ist der zweite behobene. */
+const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 // ---- Teil 1: die Wand ist rechnerisch real (ohne Browser, Sekunden)
 {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+  const src = fs.readFileSync(SPIELDATEI, 'utf8');
   const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
   check('forschungUeberLager() existiert', /function forschungUeberLager\(/.test(js));
   // Der harte Deckel ist die Voraussetzung dafür, dass die Wand überhaupt dauerhaft ist. Wäre er

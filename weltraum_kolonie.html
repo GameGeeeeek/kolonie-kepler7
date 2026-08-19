@@ -7104,8 +7104,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.580.0';
+  const VERSION = '8.581.0';
   const PATCHNOTES = [
+    { version:'8.581.0', date:'19.08.2026', changes:[
+      '<strong>Das Baustellen-Konto: Forschungen, die mehr kosten, als dein Lager fasst, sind jetzt bezahlbar.</strong> Bisher gab es dafür keinen Weg. Die Kosten einer Forschungsstufe müssen auf einmal im Lager liegen, die Kosten wachsen aber mit jeder Stufe um 32 bis 38 Prozent, während der Lagerdeckel weit langsamer steigt. Ab einem Punkt ist eine Stufe deshalb nicht mehr teuer, sondern <em>unmöglich</em> – der Bestand kann diese Höhe nie erreichen, und ansparen ging nicht, weil über dem Deckel nichts mehr hängen bleibt. Nachgemessen an einem weit ausgebauten Konto (11 Standorte, Lagerkomplex 45, Kryolager auf Maximalstufe, 500 Frachter, Deckel 803.800): Bei den vier Ewigkeitsforschungen steht diese Wand zwischen <strong>Stufe 15 und 18 von 999</strong>. Ausgerechnet <em>Raumfaltungs-Container</em>, die Forschung, die den Lagerdeckel anhebt, läuft als erste hinein.',
+      '<strong>So funktioniert es.</strong> Im Forschung-Tab steht unter der Warteschlange ein neuer Regler: <strong>aus, 25%, 50%, 75%</strong>. Der eingestellte Anteil deiner laufenden Rohstoffproduktion geht dann nicht ins Lager, sondern direkt auf das Konto des Postens – Sekunde für Sekunde, auch weit über den Lagerdeckel hinaus. Gesammelt wird immer für <strong>genau einen</strong> Posten: den ersten Eintrag deiner Warteschlange, dessen Kosten über dem Deckel liegen. Alle anderen sind ohnehin bezahlbar. Ist das Konto voll, startet die Forschung ganz normal, sobald ein Forschungsplatz frei ist.',
+      '<strong>Was es ausdrücklich nicht tut:</strong> Es macht nichts billiger und hebt keinen Lagerdeckel an. Die Wartezeit bleibt exakt dieselbe – du zahlst denselben Preis, nur verteilt statt auf einen Schlag. Lagerausbau bleibt der Weg, der <em>schneller</em> macht.',
+      '<strong>Nichts geht verloren, und die Anzeigen sagen die Wahrheit.</strong> Nimmst du den Posten aus der Warteschlange, kommt das Eingezahlte zurück ins Lager; passt es dort nicht mehr ganz hinein, fragt das Spiel vorher nach und nennt beide Zahlen – was zurückpasst und was verloren ginge. Die Ressourcenleiste zeigt den Abzweig getrennt an („+2,2/s · +1,1/s zur Baustelle"), damit die angezeigte Rate weiter das ist, was wirklich im Lager ankommt. Warteschlange und Forschungskarte zeigen den Kontostand, und der Hinweis an einer gesperrten Forschung nennt jetzt den Ausweg statt nur die Sackgasse.',
+      'Beim Prestige und beim Aufstieg bleibt der <em>eingestellte Anteil</em> erhalten, das Guthaben nicht – es hängt an einer Forschungsstufe, und die ist nach dem Reset ohnehin weg. Steht kein Posten über deinem Lagerdeckel, sammelt der Regler nichts und deine Produktion läuft unverändert; die Box sagt dir das auch.'
+    ] },
     { version:'8.580.0', date:'18.08.2026', changes:[
       '<strong>Die Massenflotten-Komponente ist weg.</strong> Acht Kampfschiff-Klassen verlangten oberhalb einer Bestands-Schwelle je weiterem Schiff zusätzlich Tier-2-Material – Kreuzer und Wächter ab 250 Stück, Zerstörer und Bomber ab 200, Schlachtschiff und Trägerschiff ab 100, Leerenjäger ab 50, Superschlachtschiff ab 25. Ersatzlos gestrichen.',
       'Gedacht war sie als Schwelle und nicht als Preiserhöhung – ein Tor in die Fabrikkette. Für dich war der Unterschied aber keiner: Ab einer Stückzahl wurde Weiterbauen teurer, und genau das sollte seit v8.576.0 nicht mehr vorkommen.',
@@ -23202,7 +23209,14 @@
     _affordRatesAt = now;
     return _affordRatesCache;
   }
-  function affordEtaHtml(cost){
+  /* `bstSchluessel` ist optional und wird NUR von den zwei Forschungskarten mitgegeben (B4,
+     19.08.2026). Ohne ihn verhaelt sich die Funktion exakt wie vorher - Gebaeude- und
+     Schiffskarten kennen kein Baustellen-Konto, und ein Hinweis darauf waere dort ein
+     Versprechen, das nichts einloest. Mit ihm rechnet sie gegen die RESTKOSTEN und nennt im
+     Wand-Zweig den Ausweg statt "erst mit groesserer Lagerkapazitaet moeglich" - eine Aussage,
+     die seit dem Konto schlicht nicht mehr stimmt (Punkt 6 der Checkliste). */
+  function affordEtaHtml(cost, bstSchluessel){
+    if (bstSchluessel) cost = baustelleRestKosten(cost, bstSchluessel);
     if (!cost || canAfford(cost)) return '';
     // ZUERST die Frage, ob es ueberhaupt je erreichbar ist (05.08.2026). Vorher rechnete diese
     // Funktion stur "Fehlmenge / Produktionsrate" und schrieb dann z.B. "leistbar in 3 Tagen" -
@@ -23215,7 +23229,9 @@
     const ueberLager = forschungUeberLager(cost);
     if (ueberLager.length){
       const namen = ueberLager.map(w => (resDefFor(w.res)||{label:w.res}).label).join(', ');
-      return ` · <span style="color:#e0a548;">übersteigt dein Lager (${namen}) – erst mit größerer Lagerkapazität möglich</span>`;
+      const ausweg = !bstSchluessel ? 'erst mit größerer Lagerkapazität möglich'
+        : (baustelleAnteil() > 0 ? 'das Baustellen-Konto spart darauf an' : 'stell in der Forschungs-Warteschlange einen Anteil fürs Baustellen-Konto ein');
+      return ` · <span style="color:#e0a548;">übersteigt dein Lager (${namen}) – ${ausweg}</span>`;
     }
     const rates = affordRatesCached();
     let maxT = 0;
@@ -23531,8 +23547,17 @@
   // Einmal-Belohnungen oder aus der Zeit des weichen Deckels) bleibt unangetastet und wird NICHT
   // weggekappt - es kommt nur nichts mehr dazu, bis wieder Platz ist.
   const SOFT_CAP_OVERFLOW_RATE = 0;
+  /* Ein Anteil der Gutschrift geht am Lager VORBEI auf das Baustellen-Konto (B4, 19.08.2026).
+     Der Abzweig sitzt hier und nicht im Haupt-Tick, weil diese Funktion die EINE Gutschriftstelle
+     der laufenden T1-Produktion ist: Sie hat genau zwei Aufrufer, den Sekundentakt und
+     applyOfflineProgress. Ein Abzweig im Tick allein liesse jede Nachholung ungeschoren - und die
+     laeuft nicht nur beim Seitenstart, sondern auch im laufenden Spiel, sobald der Tab gedrosselt
+     war. Und er steht VOR dem Deckel-Vergleich, denn genau das ist der Zweck: Bei vollem Lager
+     soll weiter angespart werden koennen. */
   function applySoftCappedGain(resources, key, rawGain, cap){
     const current = resources[key]||0;
+    if (rawGain <= 0){ resources[key] = current; return; }
+    rawGain = baustelleAbzweigen(key, rawGain);
     if (rawGain <= 0){ resources[key] = current; return; }
     if (current >= cap){
       resources[key] = current + rawGain*SOFT_CAP_OVERFLOW_RATE;
@@ -29198,8 +29223,18 @@
     if (curLvl >= r.maxLevel){ log('Maximale Stufe bereits erreicht.', 'ti-alert-triangle'); return; }
     const targetLevel = curLvl+1;
     const cost = researchCostFor(r, targetLevel);
-    if (!canAfford(cost)){ log('Nicht genug Ressourcen.', 'ti-alert-triangle'); return; }
-    pay(cost);
+    /* Das Baustellen-Konto zaehlt wie bereits bezahlt. Es wird hier und nicht beim Aufrufer
+       eingeloest, damit BEIDE Wege es sehen - die Warteschlange und der Knopf auf der Karte;
+       sonst bliebe ein angespartes Guthaben liegen, wenn der Spieler von Hand startet.
+       Bewusst NICHT ueber gainResources ins Lager und von dort bezahlt: Der Betrag ist ja gerade
+       groesser als das Lager fasst, er wuerde beim Umweg gekappt. */
+    const bstSchluessel = baustelleSchluessel(key, targetLevel);
+    const restKosten = baustelleRestKosten(cost, bstSchluessel);
+    if (!canAfford(restKosten)){ log('Nicht genug Ressourcen.', 'ti-alert-triangle'); return; }
+    pay(restKosten);
+    // Verbraucht, nicht freigegeben: baustelleFreigeben zahlt zurueck, hier ist das Guthaben
+    // gerade in die Forschung geflossen.
+    if (Object.keys(baustelleStand(bstSchluessel)).length) delete baustelleKonten()[bstSchluessel];
     const dur = researchDuration(r, targetLevel);
     state.activeResearch = { key, targetLevel, endTime: Date.now()+dur*1000 };
     log(r.name+' (Stufe '+targetLevel+') wird erforscht – dauert '+dur+'s.', 'ti-flask');
@@ -29706,6 +29741,236 @@
     }
     return drueber;
   }
+  /* ===== Baustellen-Konto (Etappe B4, 19.08.2026) =============================================
+
+     DAS PROBLEM, GEMESSEN: Die Kosten der einzigen unbegrenzt wiederholbaren Inhalte wachsen
+     exponentiell (Ewigkeitsforschungen, costMult 1,32 bis 1,38 je Stufe), der Lagerdeckel nur
+     linear bis logarithmisch. Ab einem Punkt kostet eine Stufe mehr, als das Lager ueberhaupt
+     fassen kann - und weil SOFT_CAP_OVERFLOW_RATE 0 ist, laesst sich der Betrag auch nicht
+     ansparen. Der Posten ist dann nicht teuer, sondern unbezahlbar.
+     Gegen den gemessenen Endausbau-Deckel (803.800; 11 Standorte, Lagerkomplex 45, Kryolager 15,
+     500 Frachter) steht die Wand bei Stufe 18 / 18 / 17 / 15 - von 999 deklarierten Stufen sind
+     also fuenfzehn bis achtzehn erreichbar. Bitter dabei: `rewig_lager`, die Forschung, die den
+     Deckel ANHEBT, laeuft als erste hinein.
+
+     DIE ANTWORT: Ein zweckgebundenes Konto je Posten. Ein waehlbarer Anteil der laufenden
+     Produktion flieszt nicht ins Lager, sondern direkt auf dieses Konto - der Betrag muss also
+     nie gleichzeitig im Lager liegen. Kein Deckel wird angefasst, keine Kostenformel geaendert.
+     Der Posten wird nicht billiger, nur bezahlbar; die Wartezeit bleibt dieselbe.
+
+     VIER ENTSCHEIDUNGEN, die man kennen muss, bevor man hier etwas aendert:
+
+     (a) DER ANTEIL IST EINE WAHL, kein Automatismus. Ein fester Prozentsatz waere entweder zu
+         klein (die Wand bliebe gefuehlt) oder zu gross (die laufende Wirtschaft verhungert, und
+         niemand versteht, warum die Rate eingebrochen ist). Und die Ratenanzeige NENNT den
+         Abzweig - eine Rate, die weiter den vollen Wert zeigt, waere die klassische zweite
+         Anzeigestelle (Punkt 6 der Checkliste).
+
+     (b) GEDECKELT WIRD NUR DAS HINZUFUEGEN, nie der Bestand. Verlaesst ein Posten die
+         Warteschlange, kommt das Eingezahlte zurueck - dieselbe Regel wie bei den
+         Komfort-Grenzen. Ein Konto, das beim Umsortieren still verfaellt, bestraft eine
+         Planaenderung. Deshalb geht JEDE Entfernung durch `baustelleFreigeben()`; die Erkundung
+         hat fuenfzehn Stellen gezaehlt, an denen Warteschlangen geleert werden, und eine davon
+         zu vergessen ist nach Lage der Dinge der Normalfall, nicht die Ausnahme.
+
+     (c) DAS KONTO IST KEIN ZWEITES LAGER. Es nimmt nie mehr als die Kosten des Postens an
+         (`baustelleRest`), ist an genau einen Posten gebunden und laesst sich nur ueber den
+         Abbruch wieder herausholen. Ohne diese Grenze waere der Umweg offensichtlich: einen
+         teuren Posten einreihen und unbegrenzt ansparen.
+
+     (d) ES ZAHLT NUR DER POSTEN EIN, DER DAS KONTO BRAUCHT - der erste Eintrag der Schlange,
+         dessen Kosten ueber dem Lagerdeckel liegen. Alles andere waere fuer den Spieler nicht
+         vorhersehbar, und fuer bezahlbare Posten ist das Konto ohnehin ohne Sinn. */
+  const BAUSTELLE_ANTEILE = [0, 0.25, 0.5, 0.75];
+  function baustelleAnteil(){
+    const a = (state.baustelle||{}).anteil;
+    return BAUSTELLE_ANTEILE.indexOf(a) >= 0 ? a : 0;
+  }
+  function baustelleKonten(){
+    if (!state.baustelle) state.baustelle = { anteil: 0, konten: {} };
+    if (!state.baustelle.konten) state.baustelle.konten = {};
+    return state.baustelle.konten;
+  }
+  function baustelleSchluessel(key, stufe){ return key + ':' + stufe; }
+  /* Welcher Posten sammelt gerade? Der erste Eintrag der Forschungs-Warteschlange, dessen Kosten
+     ueber dem Lagerdeckel liegen - also genau der, der ohne Konto NIE starten koennte. Gibt es
+     keinen, sammelt nichts, und der Abzweig ist wirkungslos (die Rate zeigt dann auch keinen). */
+  function baustelleZiel(){
+    if (!state.researchQueue || !state.researchQueue.length) return null;
+    const stufen = {};
+    for (const key of state.researchQueue){
+      const r = findeForschung(key);
+      if (!r) continue;
+      const stufe = (state.research[key]||0) + 1 + (stufen[key]||0);
+      stufen[key] = (stufen[key]||0) + 1;
+      if (stufe > r.maxLevel) continue;
+      const kosten = researchCostFor(r, stufe);
+      if (forschungUeberLager(kosten).length){
+        return { key, stufe, kosten, name: r.name, schluessel: baustelleSchluessel(key, stufe) };
+      }
+    }
+    return null;
+  }
+  // Was auf dem Konto dieses Postens liegt - immer ein Objekt, nie undefined.
+  function baustelleStand(schluessel){ return baustelleKonten()[schluessel] || {}; }
+  /* Was von den Kosten eines Postens nach Abzug seines Kontos noch OFFEN ist - DIE eine Stelle
+     dafuer. Fuenf Stellen brauchen diese Zahl (startResearch, tryStartQueuedResearch, die
+     Warteschlangen-Box und beide Forschungskarten). Fuenf Kopien waeren fuenf Gelegenheiten,
+     dass eine davon die volle Summe behaelt - und genau so sah es beim ersten Anlauf aus: Die
+     Karte liess den Knopf grau, obwohl das Konto den Posten laengst bezahlbar gemacht hatte.
+     Das ist der wiederkehrende Fehler dieses Projekts (Punkt 6 der Checkliste). */
+  function baustelleRestKosten(kosten, schluessel){
+    const stand = baustelleStand(schluessel);
+    const rest = {};
+    for (const [res, menge] of Object.entries(kosten||{})){
+      const offen = menge - (stand[res]||0);
+      if (offen > 0) rest[res] = offen;
+    }
+    return rest;
+  }
+  /* Die Fortschrittszeile des Kontos, ebenfalls aus EINER Quelle - Warteschlange und beide
+     Karten zeigen dieselbe. resDefFor statt RES_DEFS.find, weil Forschungskosten seit v8.522.0
+     Tier-2-Schluessel enthalten koennen; RES_DEFS kennt die nicht und die Zeile stuende dann
+     mit "45 undefined" da (derselbe Fehler wie im Abbruch-Dialog). */
+  function baustelleKontoZeile(kosten, schluessel){
+    const stand = baustelleStand(schluessel);
+    const teile = Object.entries(kosten||{}).filter(([res]) => (stand[res]||0) > 0)
+      .map(([res, menge]) => fmt(Math.floor(stand[res]||0)) + '/' + fmt(menge) + ' ' + (resDefFor(res).label||res));
+    if (!teile.length) return '';
+    return '<div class="bmeta" style="color:#5dcaa5; margin-top:2px; font-size:11px;"><i class="ti ti-box" aria-hidden="true"></i> Baustellen-Konto: ' + teile.join(' · ') + '</div>';
+  }
+  // Was diesem Posten je Ressource noch fehlt. Das ist zugleich die Obergrenze des Kontos:
+  // mehr als die Kosten nimmt es nie an (Entscheidung c).
+  function baustelleRest(ziel){
+    const stand = baustelleStand(ziel.schluessel);
+    const rest = {};
+    for (const [res, menge] of Object.entries(ziel.kosten||{})){
+      const fehlt = menge - (stand[res]||0);
+      if (fehlt > 0) rest[res] = fehlt;
+    }
+    return rest;
+  }
+  /* Gibt ein Konto frei und zahlt zurueck - DIE eine Stelle dafuer. Sie geht ueber
+     gainResources, klemmt also am Lagerdeckel wie jeder andere Zugang; was nicht mehr
+     hineinpasst, ist weg, und genau das sagt die Meldung auch. Ein stilles Verschwinden waere
+     schlimmer als der Verlust selbst. */
+  function baustelleFreigeben(schluessel, grund){
+    const konten = baustelleKonten();
+    const stand = konten[schluessel];
+    if (!stand) return false;
+    delete konten[schluessel];
+    const teile = Object.entries(stand).filter(e => e[1] > 0);
+    if (!teile.length) return false;
+    const vorher = {};
+    for (const [res] of teile) vorher[res] = state.resources[res]||0;
+    const betrag = {};
+    for (const [res, menge] of teile) betrag[res] = Math.floor(menge);
+    gainResources(betrag);
+    const zurueck = [], verfallen = [];
+    for (const [res, menge] of Object.entries(betrag)){
+      const angekommen = (state.resources[res]||0) - vorher[res];
+      const label = (RES_DEFS.find(x => x.key === res)||{label:res}).label;
+      if (angekommen > 0) zurueck.push(fmt(angekommen) + ' ' + label);
+      if (menge - angekommen > 1) verfallen.push(fmt(menge - angekommen) + ' ' + label);
+    }
+    if (zurueck.length || verfallen.length){
+      log('Baustellen-Konto aufgeloest (' + grund + '): ' + (zurueck.length ? zurueck.join(', ') + ' zurueck ins Lager' : 'nichts passte mehr ins Lager')
+        + (verfallen.length ? ' - ' + verfallen.join(', ') + ' fanden keinen Platz mehr und sind verfallen' : '') + '.',
+        'ti-box', verfallen.length ? 'warn' : 'ok');
+    }
+    return true;
+  }
+  /* Was beim Entfernen des Warteschlangen-Eintrags `i` verloren ginge - oder null, wenn alles
+     zurueck ins Lager passt. Nur fuer die Rueckfrage: Die Rueckgabe selbst laeuft weiterhin
+     ueber baustelleFreigeben, damit es fuer den Rueckweg genau eine Stelle gibt. */
+  function baustelleKontoVerlust(i){
+    const rq = state.researchQueue || [];
+    if (!(i >= 0 && i < rq.length)) return null;
+    const stufen = {};
+    let schluessel = null;
+    for (let k = 0; k <= i; k++){
+      const key = rq[k];
+      const r = findeForschung(key);
+      if (!r) continue;
+      const stufe = (state.research[key]||0) + 1 + (stufen[key]||0);
+      stufen[key] = (stufen[key]||0) + 1;
+      if (k === i) schluessel = baustelleSchluessel(key, stufe);
+    }
+    if (!schluessel) return null;
+    const stand = baustelleStand(schluessel);
+    const cap = storageCap();
+    const passt = [], verlust = [];
+    for (const [res, menge] of Object.entries(stand)){
+      if (!(menge > 0)) continue;
+      const platz = Math.max(0, cap - (state.resources[res]||0));
+      const label = resDefFor(res).label || res;
+      passt.push(fmt(Math.floor(Math.min(menge, platz))) + ' ' + label);
+      if (menge - platz > 1) verlust.push(fmt(Math.floor(menge - platz)) + ' ' + label);
+    }
+    if (!verlust.length) return null;
+    return { passt: passt.join(', ') || 'nichts', verlust: verlust.join(', ') };
+  }
+  /* Alle Konten aufloesen, deren Posten nicht mehr in der Warteschlange steht. Laeuft im
+     Haupt-Tick und ist damit die Absicherung gegen die fuenfzehn Entfernungsstellen: Statt jede
+     einzelne anzufassen (und die naechste zu vergessen, die jemand spaeter dazubaut), wird der
+     Zustand abgeglichen. Dieselbe Antwort wie bei `astFreiePlaetze` - eine Quelle statt vieler
+     Aufrufer, die alle daran denken muessen. */
+  function baustelleAufraeumen(){
+    const konten = baustelleKonten();
+    const offen = Object.keys(konten);
+    if (!offen.length) return;
+    const gueltig = new Set();
+    const stufen = {};
+    for (const key of state.researchQueue||[]){
+      const r = findeForschung(key);
+      if (!r) continue;
+      const stufe = (state.research[key]||0) + 1 + (stufen[key]||0);
+      stufen[key] = (stufen[key]||0) + 1;
+      gueltig.add(baustelleSchluessel(key, stufe));
+    }
+    for (const sch of offen){
+      if (!gueltig.has(sch)) baustelleFreigeben(sch, 'Posten nicht mehr in der Warteschlange');
+    }
+  }
+
+  /* Der Zielposten wird je Takt hoechstens einmal ermittelt. Ohne den Zwischenspeicher liefe die
+     Suche sechsmal je Sekunde ueber die ganze Warteschlange und riefe dabei researchCostFor und
+     forschungUeberLager - dasselbe Argument wie bei storageCapCached direkt darueber. */
+  let _bstZiel = null, _bstZielAt = 0;
+  function baustelleZielCached(){
+    const now = Date.now();
+    if (_bstZiel !== null && (now - _bstZielAt) < 900) return _bstZiel.z;
+    _bstZiel = { z: baustelleZiel() };
+    _bstZielAt = now;
+    return _bstZiel.z;
+  }
+  function baustelleAbzweigen(res, rawGain){
+    const anteil = baustelleAnteil();
+    if (anteil <= 0) return rawGain;
+    const ziel = baustelleZielCached();
+    if (!ziel) return rawGain;
+    const offen = baustelleRest(ziel)[res];
+    if (!(offen > 0)) return rawGain;
+    // Nie mehr als der Posten kostet - das Konto ist kein zweites Lager (Entscheidung c).
+    const ab = Math.min(rawGain * anteil, offen);
+    if (!(ab > 0)) return rawGain;
+    const konten = baustelleKonten();
+    const stand = konten[ziel.schluessel] || (konten[ziel.schluessel] = {});
+    stand[res] = (stand[res]||0) + ab;
+    return rawGain - ab;
+  }
+  // Wie viel je Sekunde gerade abgezweigt wird - fuer die Ratenanzeige, damit sie den Abzweig
+  // NENNT statt weiter den vollen Wert zu behaupten (Punkt 6 der Checkliste).
+  function baustelleAbzweigRate(res, rate){
+    const anteil = baustelleAnteil();
+    if (anteil <= 0 || !(rate > 0)) return 0;
+    const ziel = baustelleZielCached();
+    if (!ziel) return 0;
+    const offen = baustelleRest(ziel)[res];
+    if (!(offen > 0)) return 0;
+    return Math.min(rate * anteil, offen);
+  }
+
   // Damit der Hinweis nicht jede Sekunde erneut im Protokoll steht (tryStartQueuedResearch laeuft
   // im Haupt-Tick): je Forschung+Stufe genau einmal melden.
   let lagerWandGemeldet = {};
@@ -29720,21 +29985,32 @@
       // sonst stünde die ganze Schlange still, bis man wieder beitritt.
       if (!r || (istAllianzForschung(key) && !inAllianz()) || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.splice(i,1); return true; }
       const cost = researchCostFor(r, curLvl+1);
-      const wand = forschungUeberLager(cost);
+      /* Gegen die RESTKOSTEN geprueft, nicht gegen die vollen (B4, 19.08.2026): Was auf dem
+         Baustellen-Konto dieses Postens liegt, ist bereits beiseitegelegt und muss nie mehr ins
+         Lager passen. Damit hoert ein Posten von selbst auf, "ueber der Wand" zu stehen, sobald
+         das Konto weit genug ist - ohne Sonderfall an dieser Stelle. */
+      const bstSchluessel = baustelleSchluessel(key, curLvl+1);
+      const restKosten = baustelleRestKosten(cost, bstSchluessel);
+      const wand = forschungUeberLager(restKosten);
       if (wand.length){
-        // Dauerhaft unbezahlbar: ueberspringen statt die Schlange anzuhalten. Einmal erklaeren,
-        // damit der Spieler weiss, dass er das Lager ausbauen muss - und nicht ratlos davorsteht.
+        /* Ueberspringen statt die Schlange anzuhalten - wer nichts anspart, soll nicht dastehen.
+           Die Meldung nennt seit B4 den AUSWEG: Ein Ladezustand ohne Entkommen ist eine
+           Falschaussage (Hausregel 35), und "kann nie starten" war ab dem Baustellen-Konto
+           schlicht nicht mehr wahr. */
         const merk = key+':'+(curLvl+1);
         if (!lagerWandGemeldet[merk]){
           lagerWandGemeldet[merk] = true;
           const t = wand.map(w => fmt(w.menge)+' '+(RES_DEFS.find(x=>x.key===w.res)||{label:w.res}).label).join(', ');
-          log(r.name+' (Stufe '+(curLvl+1)+') kostet '+t+' und übersteigt damit deine Lagerkapazität ('+fmt(wand[0].cap)+') - sie kann nie starten, solange dein Lager nicht größer ist. Die Warteschlange läuft ohne sie weiter.', 'ti-alert-triangle', 'warn');
+          const rat = baustelleAnteil() > 0
+            ? ' Dein Baustellen-Konto spart bereits darauf an - die Warteschlange läuft so lange ohne sie weiter.'
+            : ' Stell im Forschung-Tab einen Anteil fürs <strong>Baustellen-Konto</strong> ein, dann wird sie trotzdem bezahlbar. Bis dahin läuft die Warteschlange ohne sie weiter.';
+          log(r.name+' (Stufe '+(curLvl+1)+') kostet '+t+' und übersteigt damit deine Lagerkapazität ('+fmt(wand[0].cap)+').'+rat, 'ti-alert-triangle', 'warn');
         }
         continue;   // naechsten Eintrag versuchen
       }
       // Nur voruebergehend zu arm: hier bewusst ANHALTEN, nicht ueberspringen. Wer eine teure
       // Forschung nach vorne zieht, will auf sie warten - das ist die Bedeutung der Reihenfolge.
-      if (!canAfford(cost)) return false;
+      if (!canAfford(restKosten)) return false;
       state.researchQueue.splice(i,1);
       startResearch(key);
       return true;
@@ -30335,6 +30611,13 @@
        als einzige grosse Investition des Spiels nicht haltbar ist (Konzept 1.3). Eine Marke, die
        der Reset frisst, waere genau die Falle, die sie beheben soll. */
     const keepBastionMarks = state.bastionMarks;
+    /* Vom Baustellen-Konto ueberlebt der EINGESTELLTE ANTEIL, nicht das Guthaben (B4). Das
+       Guthaben haengt an einer Forschungsstufe, und die ist nach dem Reset weg - es zu bewahren
+       waere Guthaben ohne Posten. Der Anteil dagegen ist eine EINSTELLUNG, und eine still
+       zurueckgedrehte Einstellung ist genau die Sorte Aenderung, die ein Spieler zu Recht
+       meldet. Gefaehrlich ist er nicht: Liegt kein Posten ueber dem Lagerdeckel - im frischen
+       Lauf der Normalfall -, liefert baustelleZiel() null und es wird nichts abgezweigt. */
+    const keepBaustelleAnteil = baustelleAnteil();
     // Bugfix: skillTree wurde bisher ebenfalls bei jedem Prestige geleert, obwohl HELP_SECTIONS
     // 'fortschritt' wörtlich verspricht "Bleibt dauerhaft erhalten, auch über einen Prestige-Reset
     // hinweg" - dieselbe Fehlerart wie der schon behobene state.ascension-Bug direkt darüber. Da
@@ -30417,6 +30700,7 @@
       modules:keepModules||{}, moduleSlotLevel:keepModuleSlotLevel||{}, equippedModules:keepEquippedModules||{},
       shipModules:keepShipModules||{}, shipModuleSlotLevel:keepShipModuleSlotLevel||{}, equippedShipModules:keepEquippedShipModules||{},
       shipMarks:keepShipMarks||{}, bastionMarks:keepBastionMarks||{},
+      baustelle:{ anteil: keepBaustelleAnteil, konten:{} },
       player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now(),
       friends: keepFriends||[], compendiumClaimed: keepCompendium||{}, codexClaimed: keepCodex||{},
       /* Die Asteroiden-Lebenszaehler ueberleben BEIDE Resets, wie der Abgrund darunter. Grund ist
@@ -30644,6 +30928,9 @@
       prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
       streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
+      // Der eingestellte Anteil des Baustellen-Kontos ueberlebt auch den Aufstieg - dieselbe
+      // Begruendung wie beim Prestige: eine Einstellung, kein Guthaben.
+      baustelle:{ anteil: baustelleAnteil(), konten:{} },
       // Die Marke des T1-Deckel-Ausgleichs ueberlebt beide Resets. Nach einem Reset stehen die
       // Gebaeude zwar auf 0, es gaebe also nichts auszuzahlen - aber Pfade wie das Kryo-Archiv
       // koennen Bestaende retten, und eine Einmalzahlung, die von der Reihenfolge zweier fremder
@@ -30943,6 +31230,12 @@
 
   function addToQueue(planetKey, buildingKey){
     state.buildQueue = state.buildQueue || [];
+    /* Baustellen-Konto (B4). Bewusst NICHT in den Prestige-/Aufstiegs-Bewahrlisten: Ein Reset
+       setzt die Ressourcen ohnehin zurueck, und ein Guthaben, das ihn ueberlebt, waere ein Weg,
+       Rohstoffe ueber den Reset zu retten. Der Hilfetext sagt das ausdruecklich. */
+    if (!state.baustelle || typeof state.baustelle !== 'object') state.baustelle = { anteil: 0, konten: {} };
+    if (BAUSTELLE_ANTEILE.indexOf(state.baustelle.anteil) < 0) state.baustelle.anteil = 0;
+    if (!state.baustelle.konten || typeof state.baustelle.konten !== 'object') state.baustelle.konten = {};
     const bwGrenze = komfortGrenze('warteschlange');
     if (state.buildQueue.length >= bwGrenze){ log('Warteschlange ist voll (max. '+bwGrenze+').'+komfortMehrPlatzHinweis('warteschlange'), 'ti-alert-triangle'); return; }
     /* Dieselbe Sperre wie bei der Forschungs-Warteschlange, aus demselben Grund: processQueue wirft
@@ -38945,6 +39238,11 @@
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 28 also 15 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschung abbrechen', body:'Eine laufende Forschung lässt sich über den Knopf "Abbrechen" direkt unter der Fortschrittsanzeige vorzeitig stoppen - dabei gibt es bewusst nur <strong>50% der eingesetzten Ressourcen</strong> zurück (im Gegensatz zum Bau-Abbruch mit voller Rückerstattung), da Forschung sonst risikofrei neu gestartet werden könnte, sobald sich z.B. die Laboranzahl ändert. Danach lässt sich sofort eine andere Forschung beginnen.' },
       { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde. <strong>Zwei Fälle werden dabei unterschieden:</strong> Reichen die Ressourcen für den ersten Eintrag gerade nur <em>vorübergehend</em> nicht, wartet die Warteschlange auf ihn – die Reihenfolge, die du festgelegt hast, bleibt also gültig. Übersteigen seine Kosten dagegen deine <strong>Lagerkapazität</strong>, könnte er nie starten (über den Lagerdeckel hinaus lässt sich nichts ansammeln); ein solcher Eintrag wird deshalb <em>übersprungen</em>, damit er nicht die ganze Warteschlange dauerhaft anhält. Er bleibt an seinem Platz stehen und wird automatisch gestartet, sobald dein Lager groß genug ist – die Karte sagt dir währenddessen, welche Ressource fehlt. Relevant wird das vor allem bei den Ewigkeitsforschungen, deren Kosten je Stufe exponentiell wachsen.' },
+      /* Aus BAUSTELLE_ANTEILE ABGELEITET - die Tabelle steht rund 9.200 Zeilen weiter oben
+         (nachgemessen, Regel 38), der Zugriff beim Aufbau von HELP_SECTIONS ist also gueltig.
+         Eine von Hand getippte Liste wuerde beim naechsten Regler-Schritt stillschweigend
+         veralten - genau der wiederkehrende Fehler dieses Projekts. */
+      { title:'Baustellen-Konto: wenn eine Forschung mehr kostet, als dein Lager fasst', body:'Jede Forschungsstufe verlangt ihre Rohstoffe <strong>auf einmal</strong>. Ab einer gewissen Stufe liegen die Kosten über deiner <strong>Lagerkapazität</strong> - der Bestand kann diese Höhe also nie erreichen, und die Stufe wäre ohne Lagerausbau dauerhaft gesperrt. Bei den Ewigkeitsforschungen passiert das schon zwischen Stufe 15 und 18 von 999.<br><br>Das <strong>Baustellen-Konto</strong> löst genau das: Im Forschung-Tab unter der Warteschlange stellst du einen Anteil ein ('+BAUSTELLE_ANTEILE.filter(a=>a>0).map(a=>Math.round(a*100)+'%').join(', ')+'). Dieser Anteil deiner laufenden <strong>Rohstoffproduktion</strong> geht dann nicht ins Lager, sondern auf das Konto des Postens - und zwar automatisch, Sekunde für Sekunde, auch über den Lagerdeckel hinaus.<br><br><strong>Vier Dinge, die du wissen solltest:</strong><br>Es sammelt immer nur <strong>ein</strong> Posten: der erste Eintrag deiner Warteschlange, dessen Kosten über dem Lagerdeckel liegen. Alle anderen wären ohnehin bezahlbar.<br>Das Konto nimmt <strong>nie mehr an, als der Posten kostet</strong> - es ist kein zweites Lager, in dem sich beliebig horten ließe.<br>Nimmst du den Posten wieder aus der Warteschlange, kommt das Eingezahlte <strong>zurück ins Lager</strong>. Was dort nicht mehr hineinpasst, ist verloren - das Protokoll sagt dir beide Zahlen.<br>Die Ressourcenleiste zeigt den Abzweig <strong>getrennt an</strong> („+120/s · +40/s zur Baustelle"), damit die angezeigte Rate weiterhin das ist, was wirklich im Lager ankommt.<br><br>Der Posten wird dadurch <strong>nicht billiger</strong> - nur bezahlbar. Wer Zeit sparen will, baut weiterhin das Lager aus.' },
       { title:'Forschungs-Meilensteine', body:'Zehn Forschungsgruppen (Wirtschaft, Krieg, Logistik/Spionage, Diplomatie, Werkstoffe, Ausbau, Bergbau, Revier, Tiefenbohrung, Tier 3) sowie ein Gesamt-Meilenstein belohnen zusammenhängenden Fortschritt: erreichen alle Forschungen einer Gruppe gemeinsam die halbe bzw. volle Maximalstufe, gibt es Sternenessenz und Kredite. Die Essenz ist die einzige Währung, die jeden Prestige- und Aufstiegs-Reset überlebt - Forschungs-Fortschritt bleibt so auch über Neuanfänge hinweg wertvoll. <strong>Jeder Meilenstein ist einmalig:</strong> Einmal erreicht, bleibt er über Prestige und Aufstieg hinweg erreicht (wie Erfolge und Level-Belohnungen) und wird nach einem Neuanfang nicht ein zweites Mal ausgezahlt. Seit den sechs Gruppen ist <strong>jede Forschung mit Maximalstufe genau einer davon zugeordnet</strong>; keine fällt mehr durchs Raster. <strong>Werkstoffe</strong> folgen der langen Grundlagenkette Nanotechnologie → Quantenphysik → Hochenergiephysik → Fusionskern-Synthese → KI-Technologie → Metamaterial-Synthese → Singularitätsphysik samt Raffinerie-Optimierung; Stufe I verlangt die erste Hälfte, Stufe II die ganze Kette - und mit ihr die Singularitätsphysik, an der das gesamte Endspiel hängt (Ewigkeitsforschungen, Abgrund, Mythische Modulschmiede). <strong>Ausbau</strong> fasst die vier Forschungen zusammen, die bestehende Systeme vertiefen, statt neue zu eröffnen: Mondstabilität, Modultechnik, Slot-Miniaturisierung und Diplomatische Doktrin. Der Gesamt-Meilenstein "Vollständige Forschung" zählt die <strong>Ewigkeitsforschungen nicht mit</strong> - die haben per Definition keine Maximalstufe und wären sonst eine Bedingung, die niemand je erfüllen kann.' },
       { title:'Forschungsdauer: ein Langzeitziel', body:'Die komplette Forschung ('+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).length+' Techs mit Maximalstufe, '+RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).reduce((a,r)=>a+(r.maxLevel||1),0)+' Stufen, dazu '+RESEARCH_DEFS.filter(isEndlessResearch).length+' Ewigkeitsforschungen ohne Obergrenze) ist bewusst ein Projekt für Wochen, nicht für einen Nachmittag: Bei guter Laborausstattung (15+) dauert sie insgesamt rund <strong>einen Monat</strong>, ganz ohne Labore rund <strong>zwei Monate</strong>. Frühe Forschungsstufen bleiben dabei fast unverändert schnell (Stufe 1 in Sekunden) - erst ab den höheren Stufen jeder Forschung wächst die Dauer spürbar, das späte Spiel bleibt also ein echtes Langzeitziel statt an einem Wochenende erledigt zu sein.' },
       { title:'Forschungsbaum', body:'Jede Forschung wirkt spielerweit (nicht pro Planet) und schaltet ab bestimmten Stufen weitere Optionen frei, z.B. Doktrinen ab Zielerfassungssysteme (erweitert) Stufe 5 + Schildmatrix Stufe 5.' },
@@ -58073,8 +58371,17 @@
     const isFull = cap>0 && stock >= cap;
     const isNear = !isFull && pct >= RES_NEAR_FULL_PCT;
     const r = rate||0;
+    /* Was gerade aufs Baustellen-Konto abgezweigt wird, gehoert HIERHER (B4, 19.08.2026). Diese
+       Funktion ist per Kommentar die einzige Quelle des Ratentexts, und beide Renderpfade der
+       Ressourcenleiste holen ihren Zustand hier. Eine Rate, die weiter den vollen Wert zeigt,
+       waehrend ein Teil davon woanders hinflieszt, waere die klassische zweite Anzeigestelle -
+       und der Spieler wuerde zu Recht einen Fehlerbericht schreiben, weil im Lager weniger
+       ankommt als angekuendigt. Der Zweig steht bewusst VOR "Lager voll": Genau dann zweigt das
+       Konto noch ab, und "+0/s" waere dort schlicht falsch. */
+    const abzweig = typeof baustelleAbzweigRate === 'function' ? baustelleAbzweigRate(d.key, r) : 0;
     let rateHtml;
-    if (isFull && r > 0) rateHtml = '<span style="color:#e0a548;">+0/s (Lager voll)</span>';
+    if (abzweig > 0) rateHtml = '+'+fmt(Math.max(0, r-abzweig))+'/s <span class="pct" style="color:#5dcaa5;">· +'+fmt(abzweig)+'/s zur Baustelle</span>';
+    else if (isFull && r > 0) rateHtml = '<span style="color:#e0a548;">+0/s (Lager voll)</span>';
     else if (isNear) rateHtml = '+'+fmt(r)+'/s <span class="pct">· '+Math.round(pct)+'% – fast voll</span>';
     else rateHtml = '+'+fmt(r)+'/s'+(cap>0 ? ' <span class="pct">· '+Math.round(pct)+'%</span>' : '');
     return { pct, isFull, isNear, rateHtml,
@@ -58765,13 +59072,24 @@
       // Kennzeichnung stuende der Spieler vor einer Schlange, aus der stillschweigend ein Eintrag
       // uebersprungen wird, ohne zu erfahren warum.
       const queueWand = [];
+      // Was auf dem Baustellen-Konto des jeweiligen Eintrags liegt - je Eintrag null oder
+      // { stand, kosten }, damit die Zeile darunter den Fortschritt zeigen kann.
+      const queueKonto = [];
       let totalRQDurSec = 0; // Gesamt-Bauzeit der Warteschlange (Komfort-ETA)
       for (const key of rq){
         const r = findeForschung(key);
-        if (!r){ queueTargetLevels.push(null); queueWand.push(null); continue; }
+        if (!r){ queueTargetLevels.push(null); queueWand.push(null); queueKonto.push(null); continue; }
         const curLvl = rLevelSim[key] !== undefined ? rLevelSim[key] : (state.research[key]||0);
         const c = researchCostFor(r, curLvl+1);
-        const w = forschungUeberLager(c);
+        /* Gegen die RESTKOSTEN, genau wie tryStartQueuedResearch (B4, 19.08.2026). Vorher stand
+           hier die volle Summe - und damit haette die Karte weiter "Startet erst mit groesserem
+           Lager" behauptet, waehrend das Baustellen-Konto den Posten laengst bezahlbar macht.
+           Das ist die zweite Anzeigestelle, vor der Punkt 6 der Checkliste warnt: Die Mechanik
+           stimmte, die Karte behielt die alte Annahme. */
+        const schluesselQ = baustelleSchluessel(key, curLvl+1);
+        const restQ = baustelleRestKosten(c, schluesselQ);
+        queueKonto.push(baustelleKontoZeile(c, schluesselQ));
+        const w = forschungUeberLager(restQ);
         queueWand.push(w.length ? w : null);
         for (const [res,a] of Object.entries(c)) totalRQCost[res] = (totalRQCost[res]||0)+a;
         totalRQDurSec += researchDuration(r, curLvl+1);
@@ -58795,10 +59113,13 @@
             const nextLvl = queueTargetLevels[i];
             const wand = queueWand[i];
             const wandText = wand
-              ? `<div class="bmeta" style="color:#fac775; margin-top:2px; font-size:11px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Kostet ${wand.map(w => fmt(w.menge)+' '+((RES_DEFS.find(x=>x.key===w.res)||{label:w.res}).label)).join(', ')} – mehr als dein Lager fasst (${fmt(wand[0].cap)}). Startet erst mit größerem Lager; die Warteschlange läuft solange ohne sie weiter.</div>`
+              ? `<div class="bmeta" style="color:#fac775; margin-top:2px; font-size:11px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Kostet ${wand.map(w => fmt(w.menge)+' '+((RES_DEFS.find(x=>x.key===w.res)||{label:w.res}).label)).join(', ')} – mehr als dein Lager fasst (${fmt(wand[0].cap)}). ${baustelleAnteil() > 0 ? 'Das Baustellen-Konto spart darauf an.' : 'Stell unten einen Anteil fürs <strong>Baustellen-Konto</strong> ein, dann wird sie trotzdem bezahlbar.'} Die Warteschlange läuft solange ohne sie weiter.</div>`
               : '';
+            // Fortschritt des Baustellen-Kontos - dieselbe Zeile wie auf der Forschungskarte,
+            // aus derselben Quelle (baustelleKontoZeile), leer wenn nichts darauf liegt.
+            const ktoText = queueKonto[i] || '';
             return `<div class="card-row" style="padding:0.5rem 0.85rem;${wand?' border-color:rgba(250,199,117,0.45);':''}">
-              <div class="left" style="min-width:0;"><span class="lvl-pill">${i+1}</span><div style="min-width:0;"><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span>${wandText}</div></div>
+              <div class="left" style="min-width:0;"><span class="lvl-pill">${i+1}</span><div style="min-width:0;"><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span>${wandText}${ktoText}</div></div>
               <div style="display:flex; gap:4px;">
                 <button data-researchqueue-up="${i}" ${i===0?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach oben"><i class="ti ti-arrow-up" aria-hidden="true"></i></button>
                 <button data-researchqueue-down="${i}" ${i===rq.length-1?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach unten"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>
@@ -58808,6 +59129,43 @@
           }).join('')}
           ${Array.from({length: rqPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
         </div>
+        ${(() => {
+          /* Der Regler fuers Baustellen-Konto. Er steht HIER und nicht in einer eigenen Box: Die
+             Wand, gegen die er hilft, wird genau in dieser Liste sichtbar - und der Hinweis an
+             einem gesperrten Eintrag verweist woertlich auf "unten". Zwei Anzeigestellen mit
+             derselben Aussage waeren der Fehlertyp aus Punkt 6 der Checkliste. */
+          const anteil = baustelleAnteil();
+          const ziel = baustelleZielCached();
+          const knoepfe = BAUSTELLE_ANTEILE.map(a =>
+            `<button class="qty-btn ${anteil===a?'active':''}" data-baustelle-anteil="${a}">${a===0?'aus':Math.round(a*100)+'%'}</button>`).join('');
+          /* Drei Zustaende statt zwei (Regel 35): eingestellt und es sammelt etwas, eingestellt
+             und es gibt gerade nichts zu sammeln, oder aus. Der mittlere Fall ist der, den ein
+             Spieler sonst als kaputt meldet - der Regler steht, und trotzdem passiert nichts. */
+          let lage;
+          if (anteil <= 0){
+            lage = 'Aus. Kostet ein Posten der Warteschlange mehr, als dein Lager fasst, startet er nie – mit einem Anteil legst du ihn Stück für Stück beiseite.';
+          } else if (!ziel){
+            lage = 'Eingestellt, sammelt aber gerade nichts: Kein Posten der Warteschlange liegt über deinem Lagerdeckel. Deine Produktion läuft unverändert weiter.';
+          } else {
+            const rest = baustelleRest(ziel);
+            const stand = baustelleStand(ziel.schluessel);
+            const teile = Object.entries(ziel.kosten).map(([res, menge]) => {
+              const label = (RES_DEFS.find(x => x.key === res)||{label:res}).label;
+              return fmt(Math.floor(stand[res]||0)) + '/' + fmt(menge) + ' ' + label;
+            }).join(' · ');
+            const fehltNoch = Object.keys(rest).length;
+            lage = 'Sammelt für <strong>' + escapeHtml(ziel.name) + ' → Stufe ' + ziel.stufe + '</strong>: ' + teile
+              + (fehltNoch ? '' : ' – vollständig, der Posten startet beim nächsten freien Forschungsplatz.');
+          }
+          return `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; padding:0.6rem 0.85rem;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <span class="bname" style="font-size:12.5px;"><i class="ti ti-box" aria-hidden="true" style="color:#5dcaa5;"></i> Baustellen-Konto</span>
+              <div class="qty-select" style="margin-bottom:0;" role="group" aria-label="Anteil fürs Baustellen-Konto">${knoepfe}</div>
+            </div>
+            <div class="bmeta" style="font-size:11px;">${lage}</div>
+            <div class="bmeta" style="font-size:11px; opacity:0.8;">Der eingestellte Anteil der laufenden Rohstoffproduktion geht an den Posten statt ins Lager. Nimmst du ihn aus der Warteschlange, kommt das Eingezahlte zurück.</div>
+          </div>`;
+        })()}
       `);
     }
 
@@ -59412,7 +59770,11 @@
         const unlocked = techUnlocked(r);
         const cost = maxed ? {} : researchCostFor(r, lvl+1);
         const dur = maxed ? 0 : researchDuration(r, lvl+1);
-        const ok = drin && unlocked && !maxed && !state.activeResearch && canAfford(cost);
+        /* Gegen die RESTKOSTEN, nicht gegen die vollen (B4, 19.08.2026). Sonst bliebe der Knopf
+           grau, obwohl das Baustellen-Konto den Posten laengst bezahlbar gemacht hat - die
+           zweite Anzeigestelle, die die alte Annahme behaelt (Punkt 6 der Checkliste). */
+        const bstSchl = maxed ? '' : baustelleSchluessel(r.key, lvl+1);
+        const ok = drin && unlocked && !maxed && !state.activeResearch && canAfford(maxed ? {} : baustelleRestKosten(cost, bstSchl));
         const reqNames = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level)
           .map(req => (findAllianzForschung(req.key)||{}).name+' Stufe '+req.level).join(', ');
         const gesperrt = (!unlocked && lvl===0) || !drin;
@@ -59434,7 +59796,7 @@
                 <div class="bname">${r.name} <span class="lvl-pill">Lv. ${lvl}/${r.maxLevel}</span></div>
                 <div class="bmeta">${r.desc}${stand}</div>
                 ${schiffZeile}
-                ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+                ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost, bstSchl)}</div>${baustelleKontoZeile(cost, bstSchl)}` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
               </div>
             </div>
             ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
@@ -59487,7 +59849,9 @@
       const cost = maxed ? {} : researchCostFor(r, targetLevel);
       const dur = maxed ? 0 : researchDuration(r, targetLevel);
       const busy = !!state.activeResearch;
-      const ok = unlocked && !maxed && !busy && canAfford(cost);
+      /* Restkosten statt volle Kosten - dieselbe Begruendung wie eine Karte weiter oben. */
+      const bstSchl = maxed ? '' : baustelleSchluessel(r.key, targetLevel);
+      const ok = unlocked && !maxed && !busy && canAfford(maxed ? {} : baustelleRestKosten(cost, bstSchl));
       const reqNames = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level).map(req => (RESEARCH_DEFS.find(x=>x.key===req.key)||{}).name+' Stufe '+req.level).join(', ');
       const iconBox = (!unlocked && lvl===0) ? `<i class="ti ti-lock" aria-hidden="true" style="color:#6b6f85; font-size:18px;"></i>` : iconHtmlFor(r.key, 'ti-flask', '#c3bef5');
       const totalBonus = Math.round(lvl*r.effectPerLevel*100);
@@ -59505,7 +59869,7 @@
                 <summary>Details</summary>
                 <div class="bmeta">${r.desc}${bonusSuffix}</div>
               </details>
-              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost)}</div>` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
+              ${maxed ? '' : unlocked ? `<div class="bcost">${costHtml(cost)} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(dur)} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +8 Punkte${affordEtaHtml(cost, bstSchl)}</div>${baustelleKontoZeile(cost, bstSchl)}` : `<div class="bmeta" style="color:#6b6f85;">Benötigt: ${reqNames}</div>`}
             </div>
           </div>
           ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
@@ -63799,7 +64163,28 @@
       render(); save();
     });
     document.querySelectorAll('[data-researchqueue-remove]').forEach(btn => btn.onclick = () => {
-      state.researchQueue.splice(parseInt(btn.getAttribute('data-researchqueue-remove'),10), 1);
+      const i = parseInt(btn.getAttribute('data-researchqueue-remove'),10);
+      /* Rueckfrage, wenn auf diesem Posten ein Baustellen-Konto liegt, das beim Aufloesen NICHT
+         mehr vollstaendig ins Lager passt (B4, 19.08.2026). Das ist kein Sonderfall, sondern der
+         Normalfall: Ein Konto sammelt genau fuer einen Posten, dessen Kosten ueber dem Lager
+         liegen - kurz vor dem Ziel ist der Betrag also zwangslaeufig groesser als der Deckel.
+         Ohne Rueckfrage kostet ein Fehlgriff auf das kleine ✕ tagelanges Ansparen, und die
+         Erklaerung dafuer stuende nur im Protokoll, also nach der Tat. Dieselbe Abwaegung wie
+         beim Forschungsabbruch daneben, der seine 50%-Erstattung ebenfalls vorher ansagt. */
+      const kd = baustelleKontoVerlust(i);
+      if (kd && !confirm('Auf diesem Posten liegt ein Baustellen-Konto. Beim Entfernen kommt es zurück ins Lager – dort passen aber nur ' + kd.passt + '. Verloren gehen: ' + kd.verlust + '. Trotzdem entfernen?')) return;
+      state.researchQueue.splice(i, 1);
+      render(); save();
+    });
+    /* Der Anteil wird SOFORT wirksam - und der Zwischenspeicher des Zielpostens gehoert
+       zurueckgesetzt, sonst zeigte die Zeile darunter bis zu 0,9 s lang noch die alte Lage.
+       Ein Regler, der erst eine Sekunde spaeter etwas sagt, liest sich wie ein toter Knopf. */
+    document.querySelectorAll('[data-baustelle-anteil]').forEach(btn => btn.onclick = () => {
+      const a = parseFloat(btn.getAttribute('data-baustelle-anteil'));
+      if (BAUSTELLE_ANTEILE.indexOf(a) < 0) return;
+      baustelleKonten();
+      state.baustelle.anteil = a;
+      _bstZiel = null;
       render(); save();
     });
     document.querySelectorAll('[data-researchqueue-up]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-up'),10), -1));
@@ -64900,6 +65285,12 @@
       actualGains[r] = (state.resources[r]||0) - before;
     }
     if (tickAnteil > 0) processTier2Factories(tickAnteil);
+    /* Konten aufloesen, deren Posten die Warteschlange verlassen hat. Bewusst als ABGLEICH im
+       Takt und nicht als Aufruf an jeder Entfernungsstelle: Die Erkundung hat fuenfzehn Stellen
+       gezaehlt, an denen Warteschlangen geleert oder gekuerzt werden - eine davon zu vergessen
+       (oder die naechste, die jemand spaeter dazubaut) waere der Normalfall. Derselbe Ansatz wie
+       bei astFreiePlaetze: eine Quelle statt vieler Aufrufer, die alle daran denken muessen. */
+    baustelleAufraeumen();
     /* Die Uhr rueckt ERST JETZT um die eben verbuchte Sekunde vor - nach der Gutschrift, nicht
        davor. Das ist dieselbe Regel, die applyOfflineProgress fuer sich selbst aufgeschrieben hat
        ("erst gutschreiben, dann die Zeit als verbraucht markieren"), und im ersten Anlauf hat der
