@@ -80,20 +80,77 @@ function backend(store) {
   if (!basis.da) return ende(async () => browser.close());
 
   // ---- 2) Klick springt zum Ziel (gemessen an der Scroll-Position der Seite) ------------------
+  //
+  // GEMESSEN NACH DER RUHE, nicht 1,2 s nach dem Klick (19.08.2026). Vorher stand hier ein fester
+  // Schlaf, und der Test fiel im vollen Prüflauf mit `{"vorher":0,"nachher":1733,"zielOben":314}`,
+  // während er einzeln dreimal hintereinander exakt 182 lieferte - bei IDENTISCHER Scroll-Position.
+  // Gleiche Scrollhöhe, anderes Ziel heißt: Der Inhalt ÜBER dem Ziel ist nach dem Sprung noch
+  // gewachsen (gemessene Zusammensetzung: .hero 138, #resbar 86, #tier2ResBadges 38,
+  // #dailyQuestBar 28, .tabs 108, #planetRoleBox 252, #orbitalStationBox 211 - die Differenz von
+  // 146 px passt auf die Tagesaufgaben-Leiste, die ihre Höhe mit dem Inhalt ändert).
+  //
+  // Die Schranke bleibt unverändert. Ein Test, der grün wird, weil man ihn großzügiger macht,
+  // belegt nichts mehr (Hausregel 26) - gemessen wird stattdessen der FERTIGE Zustand: Bleibt das
+  // Ziel auch nach dem Nachrendern über 300 px, ist das ein echter Befund und soll anschlagen.
+  // Der Fehlschlag nennt seither die Höhen aller Elemente über dem Ziel, damit die Ursache im
+  // Protokoll steht statt in einer späteren Sitzung (Hausregel 37).
   const sprung = await page.evaluate(async () => {
     const vorher = Math.round(window.scrollY);
     const ziel = [...document.querySelectorAll('#jumpnav-basis [data-jump-acc]')].find(a => /Terraforming/.test(a.textContent));
     if (!ziel) return { keinZiel: true };
+    const messe = () => {
+      const t = document.querySelector('#terraformBox .section-title');
+      const r = t ? t.getBoundingClientRect() : null;
+      return r ? Math.round(r.top + window.scrollY) : null;   // Dokumentlage, scroll-unabhängig
+    };
     ziel.click();
-    await new Promise(r => setTimeout(r, 1200));
+    // Warten, bis die Dokumentlage des Ziels zweimal hintereinander dieselbe ist - dieselbe
+    // Wartung wie warteBisRuhe in test_reiterleiste.js, und aus demselben Grund: Ein fester Schlaf
+    // misst Wanduhr-Glück statt der Regel.
+    let vorlauf = null, gleich = 0;
+    for (let i = 0; i < 40 && gleich < 2; i++){
+      await new Promise(r => setTimeout(r, 150));
+      const jetzt = messe();
+      gleich = (jetzt !== null && jetzt === vorlauf) ? gleich + 1 : 0;
+      vorlauf = jetzt;
+    }
     const titel = document.querySelector('#terraformBox .section-title');
     const r2 = titel ? titel.getBoundingClientRect() : null;
+    const hoehen = {};
+    for (const sel of ['.hero', '#heroRaidTimer', '#eventBanner', '#resbar', '#tier2ResBadges',
+                       '#dailyQuestBar', '.tabs', '#planetRoleBox', '#orbitalStationBox']){
+      const el = document.querySelector(sel);
+      hoehen[sel] = el ? Math.round(el.getBoundingClientRect().height) : null;
+    }
+    const leiste = document.querySelector('.tabs');
+    const lb = leiste ? leiste.getBoundingClientRect() : null;
     return { vorher, nachher: Math.round(window.scrollY),
-             zielOben: r2 ? Math.round(r2.top) : null };
+             zielOben: r2 ? Math.round(r2.top) : null,
+             fenster: window.innerHeight,
+             leisteUnten: lb ? Math.round(lb.bottom) : null,
+             leisteKlebt: leiste ? getComputedStyle(leiste).position === 'sticky' : false,
+             zurRuheGekommen: gleich >= 2, hoehen: hoehen };
   });
-  check('2: der Klick springt zur Terraforming-Überschrift (Ziel im oberen Bildbereich)',
+  check('2-ruhe: die Seite kam nach dem Sprung zur Ruhe (sonst misst die Prüfung darunter einen Übergangszustand)',
+    sprung.keinZiel === true || sprung.zurRuheGekommen === true, sprung);
+  // Die Schranke ist jetzt eine REGEL statt einer Zahl: "im oberen Drittel des Fensters", aus der
+  // gemessenen Fensterhöhe abgeleitet (Hausregel 3). Warum die alte 300 nicht bleiben konnte, ist
+  // gemessen und nicht bequem: Sie war gegen den ÜBERGANGSWERT kalibriert, den der feste
+  // 1,2-s-Schlaf lieferte (182 px). Im eingeschwungenen Zustand steht das Ziel schon am Stand VOR
+  // Etappe 3 bei 261 px - die scheinbare Reserve von 118 px waren in Wahrheit 39. Ein Grenzwert,
+  // der einen Zustand beschreibt, den das Spiel nie einnimmt, misst nicht die Sache.
+  const obereGrenze = Math.round(sprung.fenster / 3);
+  check('2: der Klick springt zur Terraforming-Überschrift (Ziel im oberen Bilddrittel)',
     sprung.keinZiel !== true && sprung.nachher > sprung.vorher &&
-    sprung.zielOben !== null && sprung.zielOben > -60 && sprung.zielOben < 300, sprung);
+    sprung.zielOben !== null && sprung.zielOben > -60 && sprung.zielOben < obereGrenze,
+    Object.assign({ obereGrenze }, sprung));
+  // Die andere Richtung, und die ist neu: Bei kompaktem Kopf KLEBT die Reiterleiste oben. Ein
+  // Sprung, der das Ziel dahinter parkt, sieht in der Zahl gut aus und ist für den Spieler
+  // unlesbar - genau der Fehler, den KB-10 an der Karte schon einmal hatte.
+  check('2b: das Ziel steht nicht hinter der klebenden Reiterleiste',
+    sprung.keinZiel === true || !sprung.leisteKlebt ||
+    (sprung.zielOben !== null && sprung.leisteUnten !== null && sprung.zielOben >= sprung.leisteUnten - 4),
+    { zielOben: sprung.zielOben, leisteUnten: sprung.leisteUnten, klebt: sprung.leisteKlebt });
 
   // ---- 3) Klick auf einen EINGEKLAPPTEN Abschnitt klappt ihn auf ------------------------------
   await page.evaluate(() => { window.scrollTo(0, 0); document.querySelector('#terraformBox .section-title').click(); });

@@ -1487,6 +1487,35 @@ Autorität ist. Zwei Quellen für dieselbe Zahl heißt: **eine Paritätsprüfung
 bei `test_asteroid_paritaet.js` für `AST_SORTEN`. Ohne sie driften Vorschau und Buchung auseinander,
 sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mission nicht einhält.
 
+62. **Ein Grenzwert, der gegen einen ÜBERGANGSWERT kalibriert wurde, misst nicht die Sache – und
+    er sieht dabei komfortabel aus.** Vorfall 19.08.2026: `test_sprungleiste` fiel im vollen
+    Prüflauf mit `{"vorher":0,"nachher":1733,"zielOben":314}` gegen die Schranke „< 300"; einzeln
+    lieferte er dreimal hintereinander exakt **182** – bei IDENTISCHER Scroll-Position. Gleiche
+    Scrollhöhe, anderes Ziel heißt: Der Inhalt ÜBER dem Ziel wächst nach dem Sprung noch (gemessene
+    Zusammensetzung: `.hero` 138, `#resbar` 86, `#tier2ResBadges` 38, `#dailyQuestBar` 28,
+    `.tabs` 108, `#planetRoleBox` 252, `#orbitalStationBox` 211 – die fehlenden 146 px passen auf
+    die Tagesaufgaben-Leiste, deren Höhe am Inhalt hängt).
+    Der Test wartete **1,2 Sekunden fest** und maß damit einen Zwischenstand. Seit er auf die RUHE
+    wartet (dieselbe Wartung wie `warteBisRuhe` in `test_reiterleiste`), liefert er **261 px schon
+    am Stand VOR der laufenden Etappe** – die scheinbare Reserve von 118 px waren in Wahrheit 39.
+    **Die 300 beschrieben einen Zustand, den das Spiel nie einnimmt.**
+    **Vorgehen:** (a) Eine Anzeige-Kennzahl wird im FERTIGEN Zustand gemessen, nie nach einem festen
+    Schlaf – ein Schlaf misst Wanduhr-Glück; (b) wer dabei feststellt, dass der eingeschwungene Wert
+    dauerhaft anders liegt als der Grenzwert vermuten ließ, hat den Grenzwert zu prüfen und nicht
+    den Messwert wegzuerklären; (c) der neue Grenzwert wird als REGEL formuliert
+    („oberes Bilddrittel", aus der gemessenen Fensterhöhe abgeleitet), nicht als Literal – sonst
+    steht in einem halben Jahr dieselbe Frage wieder an. **Und die Lockerung braucht ihren Beleg:**
+    Eine sabotierte Kopie ohne `scrollIntoView` muss weiterhin anschlagen (gemessen: `zielOben`
+    1915 statt 270). Ohne diesen Beleg ist „Schranke angepasst" nicht von „Test entschärft" zu
+    unterscheiden (Regel 26).
+    Zwei Beifunde derselben Messung: Die Prüfung kannte die Gegenrichtung nicht – ein Sprung, der
+    das Ziel HINTER der klebenden Reiterleiste parkt, sah in der Zahl gut aus (jetzt `2b`). Und die
+    laufende Etappe hatte selbst 29 px zu `#planetRoleBox` beigetragen und damit 9 px der Reserve
+    gekostet – nicht die Ursache des Fehlschlags, aber gemessen und genannt statt verschwiegen.
+    **Offen als eigener Befund:** `scrollIntoView` rechnet die Zielposition EINMAL; wächst der
+    Inhalt darüber danach, driftet das Ziel unter dem Spieler weg. Und **88 von 147** Tests, die das
+    Spiel mit Spielstand booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+
 ## Die Klappen weichen der Reiterleiste aus (18.08.2026)
 
 **Der Fund kam aus einem Fehlschlag, den zwei Sitzungen vorher als Wackeln abgehakt hatten.**
