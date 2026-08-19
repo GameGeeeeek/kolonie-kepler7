@@ -74,6 +74,25 @@ const NPC_SYSTEME = (() => {
   return { normal, boss };
 })();
 
+/* Die Nest-Fixture für Prüfung 1b. Drei Völker, drei Stufen, alle im SELBEN System - das ist die
+   Lage, in der die drei Marker vor KB-17 übereinander lagen. Das System wird unten aus der echten
+   NPC-Liste genommen, nicht geraten (Hausregel 4). */
+let NEST_SYS = null;
+const NEST_FIXTURE_ROH = [
+  { id: 'kb17-a', volk: 'kryll',     stufe: 3, lp: 260000,  lpMax: 320000 },
+  { id: 'kb17-b', volk: 'vex',       stufe: 2, lp: 88000,   lpMax: 120000 },
+  { id: 'kb17-c', volk: 'verglueht', stufe: 5, lp: 3100000, lpMax: 4400000 }
+];
+let NEST_FIXTURE = [];
+function nestFixtureSetzen(sys){
+  NEST_SYS = sys;
+  const t = Date.now();
+  NEST_FIXTURE = NEST_FIXTURE_ROH.map(n => Object.assign({}, n, {
+    sys, seit: t - 7200000, letzteReifung: t - 3600000,
+    naechsterWurf: t + 8 * 3600000, naechsteWanderung: 0, beitraege: {}, schlaege: {}
+  }));
+}
+
 function backend(store) {
   return async r => {
     const req = r.request();
@@ -81,6 +100,13 @@ function backend(store) {
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
+    /* DREI Alien-Nester im ERSTEN NPC-System - sonst hätte Prüfung 1b keinen Gegenstand: Ohne zwei
+       gleichartige Marker in einem System ist "keine zwei Marker liegen aufeinander" trivial
+       erfüllt, und die Prüfung wäre aus dem falschen Grund grün (Regel 28/37). Genau diese Lage
+       hat den Fehler von KB-17 erzeugt. */
+    if (p === 'galaxy') return j({ npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null,
+      unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [],
+      alienNester: NEST_FIXTURE });
     if (p.startsWith('storage/')) {
       const k = decodeURIComponent(p.slice(8));
       if (req.method() === 'PUT') { try { store[k] = JSON.parse(req.postData() || '{}').value; } catch (e) {} return j({ ok: true }); }
@@ -105,13 +131,31 @@ async function messe(page) {
       return c ? Object.assign({ was: 'planet:' + g.getAttribute('data-planet') }, mitte(c)) : null;
     }).filter(Boolean);
 
+    /* Alien-Nester und Festung gehoeren MIT in die Markerliste (KB-17). Bis Phase 3 gab es nie
+       zwei gleichartige Marker in einem System, deshalb kannte dieser Test die Paarung
+       Marker x Marker gar nicht - und genau darin steckte der Fehler, den erst der Screenshot
+       gezeigt hat: drei Nester uebereinander, ihre Beschriftungen ineinander. */
     const marker = [];
-    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player]').forEach(g => {
+    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player], #galaxyMapSvg [data-map-nest], #galaxyMapSvg [data-map-festung]').forEach(g => {
       const kreise = [...g.querySelectorAll('circle')];
-      if (!kreise.length) return;
-      const gross = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
-      marker.push(Object.assign({ was: 'marker:' + (g.getAttribute('data-map-npc') || g.getAttribute('data-map-player')) }, mitte(gross)));
+      const poly = g.querySelector('polygon');
+      const bezug = kreise.length ? kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a)) : poly;
+      if (!bezug) return;
+      const name = g.getAttribute('data-map-npc') || g.getAttribute('data-map-player')
+        || (g.hasAttribute('data-map-nest') ? 'nest:' + g.getAttribute('data-map-nest') : 'festung');
+      marker.push(Object.assign({ was: 'marker:' + name }, mitte(bezug)));
     });
+    /* DIE PAARUNG, DIE GEFEHLT HAT. Gemessen werden die SICHTBAREN Radien gegeneinander - zwei
+       Marker duerfen sich nicht beruehren. Der pulsierende Hof zaehlt bewusst mit: Er ist Teil
+       dessen, was der Spieler als "dieser Marker" sieht (dieselbe Begruendung, mit der KB-13 den
+       Boss-Ring in den Mindestabstand aufgenommen hat). */
+    const markerPaare = [];
+    for (let i = 0; i < marker.length; i++) for (let j = i + 1; j < marker.length; j++) {
+      const a = marker[i], b = marker[j];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < a.r + b.r) markerPaare.push({ a: a.was, b: b.was,
+        abstand: +(d / proSektor).toFixed(1), noetig: +((a.r + b.r) / proSektor).toFixed(1) });
+    }
 
     const treffer = [];
     for (const sc of scheiben) for (const mk of marker) {
@@ -140,7 +184,7 @@ async function messe(page) {
         textAufScheibe.push({ text: t.text, auf: sc.was });
     }
     return { scheiben: scheiben.length, marker: marker.length, treffer, textPaare,
-             textAufScheibe, beschriftungen: boxen.length };
+             textAufScheibe, markerPaare, beschriftungen: boxen.length };
   });
 }
 
@@ -188,6 +232,8 @@ async function laufe(browser, store, viewport, mobil, systeme) {
 
   // Zwei gewöhnliche NPC-Systeme plus ALLE Boss-Systeme (größter Marker = harter Fall).
   const ziele = [...new Set([...NPC_SYSTEME.normal.slice(0, 2), ...NPC_SYSTEME.boss])];
+  // Die Nester in das erste Zielsystem legen - dort misst 1b dann wirklich etwas.
+  nestFixtureSetzen(ziele[0]);
   check('0-vorab: die NPC-Systemliste ließ sich aus NPCS lesen', ziele.length >= 3,
     { normal: NPC_SYSTEME.normal.length, boss: NPC_SYSTEME.boss.length, ziele });
 
@@ -209,6 +255,15 @@ async function laufe(browser, store, viewport, mobil, systeme) {
 
     const texte = offen.flatMap(e => e.textPaare.map(t => Object.assign({ system: e.system }, t)));
     check(`2 (${name}): keine zwei Beschriftungen überlappen sich`, texte.length === 0, texte.slice(0, 5));
+
+    /* 1b (KB-17): DIE PAARUNG, DIE GEFEHLT HAT. Bis Phase 3 gab es nie zwei gleichartige Marker in
+       einem System, also prüfte niemand Marker gegen Marker - der Schieber kannte nur Planeten und
+       Sonne. Gefunden hat den Fehler kein Test, sondern ein Blick auf das gerenderte Bild: drei
+       Alien-Nester lagen übereinander. Regel 53 in Reinform - wer eine Paarung nicht misst, hält
+       eine Verschiebung für eine Lösung. */
+    const markerTreffer = offen.flatMap(e => (e.markerPaare || []).map(t => Object.assign({ system: e.system }, t)));
+    check(`1b (${name}): keine zwei Marker liegen aufeinander`,
+      markerTreffer.length === 0, markerTreffer.slice(0, 5));
 
     // BEWUSST KEINE PRÜFUNG, sondern eine Zahl im Protokoll: Ob eine BESCHRIFTUNG über eine
     // fremde Scheibe ragt, hängt an der Textlänge, nicht an den Markerpositionen - "Deine Basis"

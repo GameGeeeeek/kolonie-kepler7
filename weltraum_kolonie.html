@@ -13499,9 +13499,24 @@
      liegt selbst bei 200 - ein zweiter Marker mit demselben festen Winkel laege exakt darauf, und
      nur der Kollisionsschieber traennte sie zufaellig (KB-13 hat genau diese Sorte Fehler behoben).
      Bahnmasse aus derselben Quelle wie alle Marker: kbOrbitRx(1). */
+  /* Die Nest-Bahn ist RUNDER als die Planetenbahn, und das ist der eigentliche Punkt (KB-17).
+     Gemessen fuer zwei bis vier Nester, Mindestabstand zweier Marker 43 Einheiten:
+
+       ry-Faktor 0,30 (die flache Planetenbahn), 44 Grad Schritt  ->  41 Einheiten   zu wenig
+       ry-Faktor 0,30, 60 Grad                                    ->  27 bei vieren  zu wenig
+       ry-Faktor 0,60, 72 Grad                                    ->  60 Einheiten   reicht
+
+     Auf einer flachen Bahn entsteht der Abstand fast nur aus der X-Differenz, und die ist bei
+     gleichen Winkelschritten ungleich - dazu ist der Kosinus symmetrisch, ein viertes Nest landet
+     also wieder neben dem ersten. Mehr Winkel allein loest das NICHT; erst eine rundere Bahn tut
+     es. Dieselbe Einsicht steckt schon in homeSlotXY, das aus genau diesem Grund einen KREIS statt
+     einer flachen Ellipse benutzt.
+     Am Handy ist die Planetenbahn ohnehin rund (kbOrbitMass().ry = 0,85) - dort wird die groessere
+     der beiden Zahlen genommen, damit die Nester nie FLACHER liegen als die Planeten. */
   function nestMarkerXY(index){
-    const rx = kbOrbitRx(1) * 0.918, ry = rx * kbOrbitMass().ry;
-    const rad = (340 - (index || 0) * 26) * Math.PI / 180;
+    const rx = kbOrbitRx(1) * 0.918;
+    const ry = rx * Math.max(0.60, kbOrbitMass().ry);
+    const rad = (340 - (index || 0) * 72) * Math.PI / 180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
   // Wann darf ich dieses Nest wieder beschiessen? Die Abklingzeit steht AM NEST und kommt mit dem
@@ -55785,19 +55800,36 @@
   // markerR ist der SICHTBARE Radius des Markers - Bosse tragen einen pulsierenden Ring bis r=19,
   // gewöhnliche NPCs und Spieler r=11. Ohne ihn blieb genau ein System übrig, in dem der Boss-Ring
   // noch die Scheibe berührte (gemessen: nyra, 26,3 von nötigen 27,7 Einheiten).
-  function kbMarkerFrei(pos, planeten, sonnenR, markerR){
+  /* `belegt` (KB-17, 19.08.2026): die bereits gesetzten Marker DIESES Systems, je Eintrag
+     { x, y, r }. Bis dahin kannte der Schieber nur Planeten und Sonne - zwei Marker konnten also
+     genau aufeinander liegen, und niemand schob sie auseinander. Aufgefallen ist es erst am
+     gerenderten Bild, nicht an einem Test: Drei Alien-Nester in einem System (Phase 3) lagen
+     uebereinander, ihre Beschriftungen ineinander. Die vorhandenen Pruefungen messen Marker gegen
+     PLANETENSCHEIBEN und Text gegen Text - die Paarung Marker x Marker gab es nicht, weil es bis
+     Phase 3 nie zwei gleichartige Marker in einem System gab (Regel 53: wer eine Paarung nicht
+     misst, haelt eine Verschiebung fuer eine Loesung).
+     Der Parameter ist optional - ein Aufrufer, der ihn weglaesst, verhaelt sich exakt wie vorher. */
+  function kbMarkerFrei(pos, planeten, sonnenR, markerR, belegt){
     const minSonne = 34*(sonnenR||1) + 20, schritt = kbMarkerSchritt();
     const minPlanet = Math.max(kbMarkerAbstand(), (markerR||11) + 14);
     const winkel = Math.atan2(pos.y-SUN_Y, pos.x-SUN_X);
     let radius = Math.hypot(pos.x-SUN_X, pos.y-SUN_Y);
     let p = pos;
-    for (let versuch=0; versuch<14; versuch++){
+    /* 24 statt 14 Versuche (KB-17). Am schmalen Kasten ist die Schrittweite nur 5 Einheiten
+       (kbOrbitMass().schritt 18 x 0,28), 14 Versuche reichten also fuer hoechstens 70 Einheiten -
+       zu wenig fuer einen grossen Marker wie die Alien-Koenigin, deren sichtbarer Hof allein 30
+       Einheiten misst. Gemessen: Sie blieb bei 32,1 statt der noetigen 41 stehen, weil die
+       Schleife auslief, nicht weil kein Platz da war. */
+    for (let versuch=0; versuch<24; versuch++){
       const zuNahSonne = radius < minSonne;
       const zuNahPlanet = (planeten||[]).some(pl => {
         const pp = planetOrbitXY(pl);
         return Math.hypot(p.x-pp.x, p.y-pp.y) < minPlanet;
       });
-      if (!zuNahSonne && !zuNahPlanet) break;
+      // Abstand zweier Marker: die SICHTBAREN Radien plus Luft fuer die Beschriftung darueber.
+      const zuNahMarker = (belegt||[]).some(b =>
+        Math.hypot(p.x-b.x, p.y-b.y) < ((markerR||11) + (b.r||11) + 8));
+      if (!zuNahSonne && !zuNahPlanet && !zuNahMarker) break;
       radius += schritt;
       p = { x: SUN_X + radius*Math.cos(winkel), y: SUN_Y + radius*Math.sin(winkel) };
     }
@@ -56180,6 +56212,10 @@
     if (!svg) return;
 
     const sysPlanets = PLANETS.filter(p=>p.system===activeSystem);
+    /* Alle in dieser Systemebene bereits gesetzten Marker - der Kollisionsschieber bekommt sie
+       mit, damit zwei Marker nicht aufeinander landen (KB-17). Jede Markerart traegt sich hier
+       ein; wer eine neue hinzufuegt, tut dasselbe. */
+    const platzierteMarker = [];
     const orbitsPresent = [...new Set(sysPlanets.map(p=>p.orbit||3))].sort((a,b)=>a-b);
     // Rohe Heimatposition als Fallback (z.B. Missionslinien, wenn das Heimatsystem gerade nicht
     // angezeigt wird) - wird unten durch die kollisionsvermeidende Position ersetzt, sobald das
@@ -56227,6 +56263,11 @@
         /* Schürfrecht-Ring (Konzept Abschn. 9, v8.489.0): eigenes Recht grün, fremdes rot.
            GESTRICHELT heißt unbewacht (keine Eskorte) - "ein unbewachtes Schürfrecht ist eine
            offene Einladung, und man sieht es auf der Karte". Durchgezogen = Eskorte steht. */
+        /* Auch ein Vorkommen belegt Platz - die spaeter gezeichneten Marker (Nester, NPCs,
+           Spieler) sollen ihm ausweichen (KB-17). Ohne diese Zeile beruehrte im gerenderten Bild
+           eine Brutkammer den Urmateriekern daneben. Der Schuerfrecht-Ring zaehlt mit, weil er
+           sichtbar dazugehoert. */
+        platzierteMarker.push({ x: pos.x, y: pos.y, r: r * (a.halter ? 1.45 : 1.15) });
         let ring = '';
         if (a.halter){
           const rr = (r*1.45).toFixed(1);
@@ -56258,6 +56299,11 @@
         const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
         const pos = asteroidPlatzXY(fest.platz);
         const r = 9;
+        /* Die Festung steht auf ihrem Guertelplatz und laeuft NICHT durch den Kollisionsschieber -
+           ihr Ort ist gegeben, nicht gewaehlt. Sie traegt sich hier trotzdem als belegt ein, damit
+           die spaeter gezeichneten Marker (Nester, NPCs, Spieler) ihr ausweichen. Ohne diese Zeile
+           koennte ein Nest genau auf der Bastion landen (KB-17). */
+        platzierteMarker.push({ x: pos.x, y: pos.y, r: r * 1.9 });
         const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
         const anteil = Math.max(0, Math.min(1, (fest.kern||0) / (fest.kernMax || st.kern || 1)));
         // Eine Zinnenform: Rechteck mit drei Zacken oben. Handgezeichnet aus Punkten, damit sie
@@ -56294,7 +56340,16 @@
         const stDef = nestStufeDef(nest.stufe);
         const koenigin = nest.stufe >= 5;
         const r = koenigin ? 15 : 11;
-        const coord = kbMarkerFrei(nestMarkerXY(i), sysPlanets, activeSunType.r, koenigin ? 20 : 13);
+        /* Der SICHTBARE Radius, nicht der Kern-Radius: Der pulsierende Hof laeuft bis r x 2,0
+           (siehe die animate-Werte unten). Genau dieselbe Ueberlegung steht am Schieber fuer den
+           Boss-Ring - und wer sie hier vergisst, bekommt am Handy einen Marker auf der
+           Planetenscheibe: Dort ist kbMarkerAbstand() nur 26 Einheiten (schritt 18 x 1,45), der
+           Deckel von 34 greift also nicht, und mit dem zu kleinen Radius blieb der Abstand unter
+           den noetigen 33 (gemessen: 28,4). Am PC fiel es nicht auf, weil dort schon der Deckel
+           von 34 reicht. */
+        const sichtR = r * 2.0;
+        const coord = kbMarkerFrei(nestMarkerXY(i), sysPlanets, activeSunType.r, sichtR, platzierteMarker);
+        platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
         const anteil = Math.max(0, Math.min(1, (nest.lp || 0) / Math.max(1, nest.lpMax || 1)));
         const b = r * 1.15;
         // Sechs leicht versetzte Punkte auf einem Kreis - eine Zelle, kein Zahnrad.
@@ -56385,7 +56440,8 @@
       // Der Schieber steht seit KB-13 als kbMarkerFrei() weiter oben und gilt für ALLE Marker -
       // die frühere Kopie an dieser Stelle war die einzige, und genau deshalb lagen NPC-Marker
       // nach KB-12 auf den Planeten.
-      const hc = kbMarkerFrei(homeSlotXY(myHomeSlot), sysPlanets, activeSunType.r);
+      const hc = kbMarkerFrei(homeSlotXY(myHomeSlot), sysPlanets, activeSunType.r, 11, platzierteMarker);
+      platzierteMarker.push({ x: hc.x, y: hc.y, r: 11 });
       homeMarkerPos = hc;
       const homeHasMoon = state.moons && state.moons.home;
       const hcx = hc.x.toFixed(1), hcy = hc.y.toFixed(1);
@@ -56488,7 +56544,8 @@
       `;
     }
     for (const pl of otherPlayersInSystem){
-      const coord = kbMarkerFrei(homeSlotXY(pl.slot), sysPlanets, activeSunType.r);
+      const coord = kbMarkerFrei(homeSlotXY(pl.slot), sysPlanets, activeSunType.r, 11, platzierteMarker);
+      platzierteMarker.push({ x: coord.x, y: coord.y, r: 11 });
       const cx = coord.x.toFixed(1), cy = coord.y.toFixed(1);
       // Spionage-Verzahnung (20.07.2026, "Fog-of-War-Layer"): liegt zu diesem Spieler eigene Aufklärung
       // vor, wird sie direkt am Kartenmarker eingeblendet (Intel-Ring + bekannter Verteidigungswert) -
@@ -56519,7 +56576,8 @@
       `;
     }
     for (const npc of NPCS.filter(n=>n.system===activeSystem && (!n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1))){
-      const coord = kbMarkerFrei(npcMarkerXY(), sysPlanets, activeSunType.r, npc.boss ? 19 : 11);
+      const coord = kbMarkerFrei(npcMarkerXY(), sysPlanets, activeSunType.r, npc.boss ? 19 : 11, platzierteMarker);
+      platzierteMarker.push({ x: coord.x, y: coord.y, r: npc.boss ? 19 : 11 });
       const npcColor = npc.boss ? '#f3aec6' : '#791f1f';
       inner += `
         <g class="planet-node" data-map-npc="${npc.id}" data-map-npcname="${npc.name.replace(/"/g,'')}">
