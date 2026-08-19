@@ -227,12 +227,37 @@ async function laufe(browser, store, viewport, mobil, systeme) {
   // dass alle drei Markerarten sie benutzen; ein vierter Markertyp ohne Schieber fällt damit auf
   // (Regel 43). Kommentare werden vorher geleert, weil die Erklärtexte den Aufruf zitieren
   // (Regel 33).
-  const OHNE_KOMMENTARE = S_OHNE_HISTORIE.replace(/^\s*\/\/.*$/gm, '');
+  /* KOMMENTARE VOLLSTAENDIG LEEREN, Zeilen- UND Blockkommentare. Der erste Entwurf entfernte nur
+     `//`-Zeilen; als der Nest-Marker (Phase 3) dazukam, zaehlte sein erklaerender BLOCK-Kommentar
+     als fuenfter "Aufruf" und die Pruefung fiel auf korrektem Code durch. Das ist Arbeitsregel 33
+     an genau dem Zaehler, vor dem sie warnt. */
+  const OHNE_KOMMENTARE = S_OHNE_HISTORIE
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
   const definitionen = OHNE_KOMMENTARE.split('function kbMarkerFrei').length - 1;
-  const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
   check('3a: der Kollisionsschieber existiert genau einmal', definitionen === 1, { definitionen });
-  check('3b: alle drei Markerarten (Heimatbasis, fremde Spieler, NPC) rufen ihn auf',
-    aufrufe === 3, { aufrufe, erwartet: 3 });
+  /* DIE ERWARTUNG IST EINE NAMENTLICHE LISTE, keine blanke Zahl (Arbeitsregel 33): Ein Zaehler
+     sagt beim Fehlschlag nicht, WELCHE Stelle dazugekommen ist, und eine Zahl ist ohnehin eine
+     Momentaufnahme. Geprueft wird die REGEL: Jede Markerart geht durch den Schieber, und es gibt
+     keine Aufrufstelle, die hier nicht benannt ist. Beide Richtungen zaehlen - verschwindet eine
+     erlaubte Stelle, ist das genauso ein Befund wie eine unbekannte neue (Regel 33). */
+  const ERLAUBTE_MARKER = [
+    { was: 'eigene Heimatbasis', muster: /kbMarkerFrei\(homeSlotXY\(myHomeSlot\)/ },
+    { was: 'fremde Spieler',     muster: /kbMarkerFrei\(homeSlotXY\(pl\.slot\)/ },
+    { was: 'NPCs',               muster: /kbMarkerFrei\(npcMarkerXY\(\)/ },
+    { was: 'Alien-Nester',       muster: /kbMarkerFrei\(nestMarkerXY\(/ }
+  ];
+  const fehlende = ERLAUBTE_MARKER.filter(m => !m.muster.test(OHNE_KOMMENTARE)).map(m => m.was);
+  const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
+  check('3b: JEDE bekannte Markerart ruft den Schieber auf',
+    fehlende.length === 0, { fehlende, erwartet: ERLAUBTE_MARKER.map(m => m.was) });
+  // Und keine unbenannte dazu: Ein neuer Markertyp muss hier eingetragen werden, sonst faellt er
+  // auf - genau der Zweck dieser Pruefung seit KB-13.
+  const unbenannt = aufrufe - ERLAUBTE_MARKER.length;
+  check('3b2: und es gibt keine unbenannte Aufrufstelle',
+    unbenannt === 0,
+    { aufrufeGesamt: aufrufe, benannt: ERLAUBTE_MARKER.length, ueberzaehlig: unbenannt,
+      zeilen: OHNE_KOMMENTARE.split('\n').map((z, i) => ({ z, i })).filter(x => x.z.includes('kbMarkerFrei(')).map(x => x.z.trim().slice(0, 90)) });
   check('3c: die alte, fest verdrahtete NPC-Bahn ist weg',
     !OHNE_KOMMENTARE.includes('const rx = 78, ry = 24;'), {});
 
