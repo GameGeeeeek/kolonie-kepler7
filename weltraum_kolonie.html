@@ -7104,8 +7104,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.577.0';
+  const VERSION = '8.578.0';
   const PATCHNOTES = [
+    { version:'8.578.0', date:'18.08.2026', changes:[
+      '<strong>Nachjustiert: die Schiffspreise steigen wieder.</strong> Mit v8.576.0 fiel die Mengenstaffelung weg – und große Flotten schwerer Schiffe wurden dadurch deutlich billiger, als beabsichtigt war. Die Grundpreise sind jetzt so gesetzt, dass eine Flotte in etwa das kostet, was sie vorher gekostet hat.',
+      'Konkret: <strong>100 Stück kosten 1,04-fach, 250 Stück 0,83-fach und 500 Stück 0,61-fach</strong> des früheren Gesamtpreises – gemessen als Median über alle 36 Schiffsklassen. Kleine Flotten bleiben also praktisch gleich teuer, große werden moderat günstiger. Genau das ist der Zweck des Wegfalls: Weiterbauen wird nicht mehr bestraft.',
+      'Der Grund für die Fehleinschätzung war ein Muster im alten Preisgefüge, das wir übersehen hatten: Schwere Schiffe kosteten dort je Angriffspunkt <strong>systematisch mehr</strong> als leichte. Die Neuberechnung hatte diesen Aufschlag eingeebnet; er ist jetzt wieder drin.',
+      'Jedes Schiff behält dabei sein bisheriges <strong>Mischungsverhältnis</strong> der Rohstoffe – es verschiebt sich also nicht, welcher Rohstoff ein Schiff begrenzt. Angehoben wurde nur die Höhe.',
+      'Unverändert bleiben die beiden Kernpunkte von v8.576.0: Der Stückpreis hängt <strong>nicht</strong> mehr vom Bestand ab, und große Flotten verlangen ab einer bestimmten Stückzahl weiterhin zusätzlich Tier-2-Material.'
+    ]},
     { version:'8.577.0', date:'19.08.2026', changes:[
       '<strong>Die acht Regionen der Karte haben jetzt eine Eigenschaft.</strong> Ihre Beschreibungen versprachen seit jeher welche – „ergiebige Gürtelbahnen", „reich an Anomalien", „voller Passagen" –, nur hatte der Sektor eines Planeten auf nichts im Spiel eine Auswirkung. Das ist jetzt eingelöst: <strong>Wispern-Drift +8% Produktion</strong>, <strong>Solmark-Reichweite +12% Expeditions-Ausbeute</strong>, <strong>Obsidian-Saum +12% Produktion</strong>, <strong>Meridian-Weiten −10% Flugzeit</strong>, <strong>Pulsar-Felder +10% Expeditionen</strong>, <strong>Ilyra-Tiefen −12% Flugzeit</strong>, <strong>Randmarken +15% Abgrundsplitter</strong>.',
       '<strong>Nur Boni, und der Kepler-Kern bleibt neutral.</strong> Die Wirkung greift rückwirkend für jede Kolonie, die du dort schon hast – du musst nichts umziehen und verlierst nirgends etwas. Im Heimatcluster, wo jeder anfängt, soll weder etwas locken noch abschrecken.',
@@ -20755,34 +20762,34 @@
     }
     return c;
   }
-  function shipCost(n){ return scaledShipCost({ erz: 40, energie: 30 }, 'ships', n); }
-  function cruiserCost(n){ return scaledShipCost({ erz: 100, kristalle: 40, deuterium: 20 }, 'cruisers', n); }
+  function shipCost(n){ return scaledShipCost({ energie: 100, erz: 75 }, 'ships', n); }
+  function cruiserCost(n){ return scaledShipCost({ erz: 150, kristalle: 50 }, 'cruisers', n); }
   // Wächter: reine Verteidigungsklasse (erstes Schiff mit echtem Schildwert, siehe shipDefenseContribution).
   // Erzlastig (Panzerung) statt kristall-/deuteriumlastig wie Angriffsschiffe.
-  function waechterCost(n){ return scaledShipCost({ erz: 190, kristalle: 18, deuterium: 17 }, 'waechter', n); }
-  function destroyerCost(n){ return scaledShipCost({ erz: 180, kristalle: 90, deuterium: 40 }, 'destroyers', n); }
-  function frachterCost(n){ return scaledShipCost({ erz: 110, energie: 70 }, 'frachter', n); }
-  function frachterGrossCost(n){ return scaledShipCost({ erz: 170, kristalle: 70, deuterium: 35 }, 'frachtergross', n); }
+  function waechterCost(n){ return scaledShipCost({ erz: 220, kristalle: 35, energie: 50 }, 'waechter', n); }
+  function destroyerCost(n){ return scaledShipCost({ erz: 250, kristalle: 110, deuterium: 35 }, 'destroyers', n); }
+  function frachterCost(n){ return scaledShipCost({ energie: 85, erz: 120 }, 'frachter', n); }
+  function frachterGrossCost(n){ return scaledShipCost({ erz: 990, kristalle: 500, deuterium: 250 }, 'frachtergross', n); }
   // 1,5x der Preis des Grossen Frachters fuer den doppelten Frachtraum - er MUSS je Ressource mehr
   // Ladung bringen, sonst baut ihn niemand: Zwei Grosse Frachter tragen dasselbe, sind doppelt so
   // schnell und geben obendrein Lager. Bezahlt wird der Vorteil mit der halben Geschwindigkeit.
-  function bergungsfrachterCost(n){ return scaledShipCost({ erz: 340, kristalle: 145, deuterium: 70 }, 'bergungsfrachter', n); }
-  function colonyShipCost(n){ return scaledShipCost({ erz: 120, kristalle: 50, deuterium: 25 }, 'colonyShips', n); }
-  function jaegerCost(n){ return scaledShipCost({ erz: 130, energie: 85 }, 'jaeger', n); }
-  function kometenjaegerCost(n){ return scaledShipCost({ erz: 55, kristalle: 45, deuterium: 19 }, 'kometenjaeger', n); }
-  function enterschiffCost(n){ return scaledShipCost({ erz: 590, kristalle: 100, deuterium: 70 }, 'enterschiff', n); }
-  function phantomschiffCost(n){ return scaledShipCost({ erz: 65, kristalle: 50, deuterium: 20 }, 'phantomschiff', n); }
-  function riftwaechterCost(n){ return scaledShipCost({ erz: 70, kristalle: 40, deuterium: 19 }, 'riftwaechter', n); }
-  function gesandtenschiffCost(n){ return scaledShipCost({ erz: 80, kristalle: 35, deuterium: 16 }, 'gesandtenschiff', n); }
-  function schuerfschiffCost(n){ return scaledShipCost({ erz: 290, energie: 190 }, 'schuerfschiff', n); }
-  function schlachtschiffCost(n){ return scaledShipCost({ erz: 550, kristalle: 190, deuterium: 160, antimaterie: 8 }, 'schlachtschiff', n); }
-  function spaeherCost(n){ return scaledShipCost({ kristalle: 13, deuterium: 30, energie: 45 }, 'spaeher', n); }
-  function spionageschiffCost(n){ return scaledShipCost({ kristalle: 25, deuterium: 55, energie: 85 }, 'spionageschiff', n); }
-  function carrierCost(n){ return scaledShipCost({ erz: 130, kristalle: 80, deuterium: 35 }, 'carrier', n); }
-  function bomberCost(n){ return scaledShipCost({ erz: 130, kristalle: 110, deuterium: 45 }, 'bomber', n); }
-  function superschlachtschiffCost(n){ return scaledShipCost({ erz: 1400, kristalle: 490, deuterium: 390, antimaterie: 55 }, 'superschlachtschiff', n); }
-  function recyclerCost(n){ return scaledShipCost({ erz: 170, energie: 110 }, 'recycler', n); }
-  function forscherCost(n){ return scaledShipCost({ kristalle: 15, deuterium: 35, energie: 50 }, 'forscher', n); }
+  function bergungsfrachterCost(n){ return scaledShipCost({ erz: 2000, kristalle: 990, deuterium: 500 }, 'bergungsfrachter', n); }
+  function colonyShipCost(n){ return scaledShipCost({ erz: 370, kristalle: 190, deuterium: 120 }, 'colonyShips', n); }
+  function jaegerCost(n){ return scaledShipCost({ erz: 130, energie: 80 }, 'jaeger', n); }
+  function kometenjaegerCost(n){ return scaledShipCost({ erz: 120, kristalle: 30, deuterium: 20 }, 'kometenjaeger', n); }
+  function enterschiffCost(n){ return scaledShipCost({ erz: 410, kristalle: 200, deuterium: 80 }, 'enterschiff', n); }
+  function phantomschiffCost(n){ return scaledShipCost({ erz: 300, kristalle: 160, deuterium: 65 }, 'phantomschiff', n); }
+  function riftwaechterCost(n){ return scaledShipCost({ erz: 270, kristalle: 150, deuterium: 75 }, 'riftwaechter', n); }
+  function gesandtenschiffCost(n){ return scaledShipCost({ erz: 220, kristalle: 110, energie: 85 }, 'gesandtenschiff', n); }
+  function schuerfschiffCost(n){ return scaledShipCost({ erz: 270, kristalle: 65, energie: 80 }, 'schuerfschiff', n); }
+  function schlachtschiffCost(n){ return scaledShipCost({ erz: 500, kristalle: 310, deuterium: 190, antimaterie: 10 }, 'schlachtschiff', n); }
+  function spaeherCost(n){ return scaledShipCost({ energie: 110, deuterium: 60 }, 'spaeher', n); }
+  function spionageschiffCost(n){ return scaledShipCost({ energie: 170, kristalle: 50, deuterium: 110 }, 'spionageschiff', n); }
+  function carrierCost(n){ return scaledShipCost({ erz: 630, kristalle: 380, deuterium: 250 }, 'carrier', n); }
+  function bomberCost(n){ return scaledShipCost({ erz: 270, kristalle: 150, deuterium: 75 }, 'bomber', n); }
+  function superschlachtschiffCost(n){ return scaledShipCost({ erz: 1900, kristalle: 1400, deuterium: 890, antimaterie: 150 }, 'superschlachtschiff', n); }
+  function recyclerCost(n){ return scaledShipCost({ erz: 200, energie: 110 }, 'recycler', n); }
+  function forscherCost(n){ return scaledShipCost({ energie: 190, deuterium: 150, kristalle: 75 }, 'forscher', n); }
   // ===== Tiefenflotte, Staffel I (28.07.2026, v8.337.0, Roadmap Phase 4a) =====
   // Bezahlt wird in BERGUNGSGUT - dem Werkstoff aus v8.333.0, der genau dafuer eingefuehrt wurde.
   // Bergungsgut liegt in state.abgrund.bergung und NICHT in state.resources; canAfford()/pay()
@@ -20818,7 +20825,7 @@
   function tiefenschiffKosten(key, n){
     return (TIEFENFLOTTE[key]||{}).bergung || 0;
   }
-  function leerenjaegerCost(n){ return scaledShipCost({ erz: 670, kristalle: 350, deuterium: 250, antimaterie: 20 }, 'leerenjaeger', n); }
+  function leerenjaegerCost(n){ return scaledShipCost({ erz: 3250, kristalle: 2350, deuterium: 1500, antimaterie: 370 }, 'leerenjaeger', n); }
   // ===== Allianzflotte (05.08.2026, Spieler-Wunsch) =====
   // Baukosten aus GRUNDSTOFFEN, nicht aus Tier-2 - das Gate dieser drei ist nicht die Fabrikkette,
   // sondern die Allianz selbst (Mitgliedschaft + Allianzforschung + Stufe der Gemeinsamen
@@ -20827,25 +20834,25 @@
   // Schlachtschiff ~16, Superschlachtschiff ~32, Leerenjäger/Tier-2 ~85-95): Die Paktkorvette liegt
   // mit ~41 bewusst im Mittelfeld (frühes Allianzschiff), der Bundeskreuzer mit ~94 auf
   // Leerenjäger-Niveau, das Sternenbanner mit ~138 darüber - es ist das Ziel des ganzen Baums.
-  function paktkorvetteCost(n){ return scaledShipCost({ erz: 120, kristalle: 90, deuterium: 40 }, 'paktkorvette', n); }
-  function bundeskreuzerCost(n){ return scaledShipCost({ erz: 1750, kristalle: 260, deuterium: 190, antimaterie: 17 }, 'bundeskreuzer', n); }
-  function sternenbannerCost(n){ return scaledShipCost({ erz: 2690, kristalle: 650, deuterium: 600, antimaterie: 100 }, 'sternenbanner', n); }
+  function paktkorvetteCost(n){ return scaledShipCost({ erz: 620, kristalle: 420, deuterium: 190 }, 'paktkorvette', n); }
+  function bundeskreuzerCost(n){ return scaledShipCost({ erz: 3000, kristalle: 2500, deuterium: 1150, antimaterie: 150 }, 'bundeskreuzer', n); }
+  function sternenbannerCost(n){ return scaledShipCost({ erz: 8100, kristalle: 6500, deuterium: 4250, antimaterie: 750 }, 'sternenbanner', n); }
   // Tier-2-Schiffe (19.07.2026, Spieler-Wunsch "Schiffe, die nur Tier-2-Ressourcen verlangen"):
   // Baukosten bestehen KOMPLETT aus raffinierten Ressourcen - die Fabrik-Kette selbst ist das Gate.
   // Wert-je-Angriff vorab gegen die bestehende Kurve gerechnet (Kreuzer ~18, Leerenjäger ~173
   // Marktwert/Angriffspunkt; diese drei liegen mit ~85-95 bewusst dazwischen).
-  function nanoklingeCost(n){ return scaledShipCost({ nanolegierungen: 140 }, 'nanoklinge', n); }
-  function quantenkreuzerCost(n){ return scaledShipCost({ quantenchips: 70, nanolegierungen: 70 }, 'quantenkreuzer', n); }
+  function nanoklingeCost(n){ return scaledShipCost({ nanolegierungen: 160 }, 'nanoklinge', n); }
+  function quantenkreuzerCost(n){ return scaledShipCost({ quantenchips: 75, nanolegierungen: 75 }, 'quantenkreuzer', n); }
   function fusionsdreadnoughtCost(n){ return scaledShipCost({ fusionskerne: 55, hochenergiekristalle: 75 }, 'fusionsdreadnought', n); }
   // Tier-2-"Hyperjäger/-bomber" (Spieler-Wunsch "aufgemotzte Jäger/Bomber mit Hyperraumantrieb, kein
   // Träger nötig"): gestaffelt - Hyperjäger ab Nanotechnologie, Hyperbomber ab Quantenphysik. Anders als
   // die regulären Jäger/Bomber (hangar-limitiert über Trägerschiffe) zählen sie DIREKT zum Kampf, dafür
   // teurer (Tier-2-Baukosten) und mit Antimaterie als Hyperraum-Treibstoff.
-  function hyperjaegerCost(n){ return scaledShipCost({ nanolegierungen: 75 }, 'hyperjaeger', n); }
+  function hyperjaegerCost(n){ return scaledShipCost({ nanolegierungen: 90 }, 'hyperjaeger', n); }
   function hyperbomberCost(n){ return scaledShipCost({ quantenchips: 90, nanolegierungen: 95 }, 'hyperbomber', n); }
   // Tier-2-Erweiterung "Synthese-Kette" (20.07.2026): zwei Apex-Schiffe aus den neuen Ressourcen.
-  function metamaterialtitanCost(n){ return scaledShipCost({ metamaterial: 25, hochenergiekristalle: 18 }, 'metamaterialtitan', n); }
-  function singularitaetsvernichterCost(n){ return scaledShipCost({ singularitaetskern: 13, fusionskerne: 20 }, 'singularitaetsvernichter', n); }
+  function metamaterialtitanCost(n){ return scaledShipCost({ metamaterial: 50, hochenergiekristalle: 35 }, 'metamaterialtitan', n); }
+  function singularitaetsvernichterCost(n){ return scaledShipCost({ singularitaetskern: 30, fusionskerne: 45 }, 'singularitaetsvernichter', n); }
   /* Der Kausalitätsbrecher (16.08.2026) - der ABNEHMER, ohne den Tier 3 nicht ausgeliefert worden
      wäre. Tier 2 ist nicht daran gescheitert, dass es zu schwer herzustellen war, sondern daran,
      dass niemand es abgenommen hat; eine dritte Stufe ohne Verbraucher wäre derselbe Fehler eine
@@ -20863,7 +20870,7 @@
   // fort, aber mit sehr hohem defWeight (2.5, sogar über dem reinen Verteidigungsspezialisten Wächter
   // mit 2.0) statt reiner Schadensmaximierung - "extrem hohe Hüllenpunkte" wird über diesen bereits
   // bestehenden Zäh-statt-Schaden-Dial abgebildet (siehe shipDefenseContribution).
-  function mondzerstoererCost(n){ return scaledShipCost({ erz: 12400, kristalle: 1360, deuterium: 1840, antimaterie: 400 }, 'mondzerstoerer', n); }
+  function mondzerstoererCost(n){ return scaledShipCost({ erz: 27500, kristalle: 20000, deuterium: 13500, antimaterie: 3500 }, 'mondzerstoerer', n); }
 
   // ===== Schiffs-Datenblatt (Grafik-Audit 24.07.2026, Entwurf C) =====
   // Rolle eines Schiffs, ABGELEITET aus schon vorhandenen Eigenschaften (atk/defWeight/speed) -

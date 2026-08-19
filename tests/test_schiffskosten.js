@@ -104,12 +104,7 @@ const werte = kampf.map(z => z.proAtk);
 const median = werte[Math.floor(werte.length/2)];
 
 // UNIKATE werden ausgenommen. Der Mondzerstörer (maxOwned:1) darf je Angriffspunkt teuer sein -
-// er ist nicht die Alternative zu 300 Jägern, sondern ein einmaliges Endspielziel. Lässt man ihn
-// drin, liegt die legitime Obergrenze so hoch, dass die Prüfung nichts mehr fängt: Er steht beim
-// 3,8-fachen des Medians, der kaputte Hyperjaeger stand beim 4,1-fachen - dazwischen passt keine
-// vertrauenswürdige Schranke. Ohne Unikate ist der teuerste reguläre Bau der Fusionsdreadnought
-// beim 2,9-fachen, und der Fehlerfall hebt sich klar ab (Gegenprobe: mit 210 Nanolegierungen
-// statt 75 schlägt 1b mit Faktor 4,09 an).
+// er ist nicht die Alternative zu 300 Jägern, sondern ein einmaliges Endspielziel.
 const unikate = new Set();
 {
   const ru = /key:'(\w+)'[^\n]*maxOwned:\s*\d+/g; let mu;
@@ -118,23 +113,65 @@ const unikate = new Set();
 check('1b-vorab: die Unikate sind als solche erkennbar', unikate.size >= 1,
   { unikate: [...unikate] });
 const regulaer = kampf.filter(z => !unikate.has(z.k));
-const teuerste = regulaer[regulaer.length-1], billigste = regulaer[0];
 
-check('1b-ausreisser oben: kein regulaeres Kampfschiff kostet je Angriffspunkt mehr als das 3,5-fache des Medians',
-  teuerste.proAtk <= median*3.5,
-  { teuerste: teuerste.k, jeAngriff: +teuerste.proAtk.toFixed(1), median: +median.toFixed(1),
-    faktor: +(teuerste.proAtk/median).toFixed(2) });
+// 1b misst die Abweichung von der KURVE, nicht vom Median - und das ist eine Korrektur.
+//
+// Der erste Entwurf verlangte "nicht mehr als das 3,5-fache des Medians". Das hat genau so lange
+// funktioniert, wie die Preise flach lagen. Als die schweren Klassen ihren Aufschlag zurückbekamen
+// (18.08.2026, Auftrag Sascha "Ändere das"), stieg der Median von 32,9 auf 48 - und derselbe
+// kaputte Hyperjäger, der vorher beim 4,09-fachen stand und anschlug, stand danach beim
+// 2,8-fachen und wäre durchgelaufen. **Eine Schranke, die relativ zum Median liegt, wandert mit
+// der Population mit: Wer alle Preise anhebt, entschärft sie, ohne es zu merken.**
+//
+// Gemessen wird deshalb gegen das Gesetz, dem die Preise folgen: Aufwand je Angriffspunkt wächst
+// mit der Schiffsgrösse (der alte Stand des Spiels trug es mit k=0,54, gemessen über alle
+// Kampf- UND Zivilschiffe). Der Exponent wird bei jedem Lauf neu aus den Daten gefittet, ist also
+// keine eingetippte Zahl - und ein einzelnes Schiff kann ihn kaum verschieben.
+function fitKurve(liste){
+  const n = liste.length;
+  const lx = liste.map(r => Math.log(r.atk)), ly = liste.map(r => Math.log(r.proAtk));
+  const sx = lx.reduce((a,b)=>a+b,0), sy = ly.reduce((a,b)=>a+b,0);
+  const sxx = lx.reduce((a,b)=>a+b*b,0), sxy = lx.reduce((a,b,i)=>a+b*ly[i],0);
+  const k = (n*sxy - sx*sy) / (n*sxx - sx*sx);
+  return { k, C: Math.exp((sy - k*sx)/n) };
+}
+// Schiffe, deren WERT nicht im Angriff liegt, gehoeren nicht auf eine Angriffs-Kurve.
+// Erkannt wird das datengetrieben am Verhaeltnis Punktegewicht zu Angriffswert, nicht an einer
+// Namensliste: Waechter (2,50) und Carrier (2,00) stehen deutlich abgesetzt, der naechste ist der
+// Kreuzer bei 1,25 - die Schranke 1,5 trennt mit Abstand nach beiden Seiten. Der Carrier traegt
+// seinen Wert in der Traegerkapazitaet, der Waechter in der Abwehr; beide lagen schon im ALTEN
+// Spiel weit ueber jeder Angriffs-Kurve (Carrier x5,07).
+const kurvenBasis = regulaer.filter(z => !gewichte[z.k] || gewichte[z.k]/z.atk < 1.5);
+check('1b-vorab-basis: die Kurve laesst die Schiffe aus, deren Wert nicht im Angriff liegt',
+  kurvenBasis.length >= regulaer.length - 4 && kurvenBasis.length >= 15,
+  { aufDerKurve: kurvenBasis.length, ausgenommen: regulaer.filter(z => gewichte[z.k] && gewichte[z.k]/z.atk >= 1.5).map(z => z.k) });
+const kurve = fitKurve(kurvenBasis);
+check('1b-vorab-kurve: der Preis steigt mit der Schiffsgrösse (Exponent > 0)',
+  kurve.k > 0.15 && kurve.k < 0.9, { exponent:+kurve.k.toFixed(3), C:+kurve.C.toFixed(2) });
+
+const abweichung = kurvenBasis.map(z => ({ k:z.k, ab: z.proAtk / (kurve.C * Math.pow(z.atk, kurve.k)) }))
+  .sort((a,b) => b.ab - a.ab);
+// Gemessene Schranke: der teuerste legitime Ausreisser ist der Carrier beim 2,69-fachen der
+// Kurve (sein Wert liegt in der Trägerkapazität, nicht im Angriff). Der kaputte Hyperjäger stand
+// beim 4,66-fachen. 3,5 liegt mit Abstand zu beiden Seiten - beidseitig gegengeprüft.
+check('1b-ausreisser: kein regulaeres Kampfschiff liegt mehr als das 3,5-fache ÜBER der Kurve',
+  abweichung[0].ab <= 3.5,
+  { teuerste: abweichung[0].k, faktor: +abweichung[0].ab.toFixed(2),
+    naechste: abweichung.slice(1,3).map(r => r.k+' x'+r.ab.toFixed(2)) });
+
+const billigste = regulaer[0];
 check('1c-ausreisser unten: kein Kampfschiff ist je Angriffspunkt billiger als ein Achtel des Medians',
   billigste.proAtk >= median/8,
   { billigste: billigste.k, jeAngriff: +billigste.proAtk.toFixed(1), median: +median.toFixed(1),
     faktor: +(billigste.proAtk/median).toFixed(2) });
 
-// Die Gesamtspreizung als eigene Prüfung: Sie war vor der Reform 91,1x und ist danach 22,1x.
-// Der Deckel von 35 lässt Bewegung zu, verbietet aber die Rückkehr zum alten Zustand.
-const spreizung = kampf[kampf.length-1].proAtk / kampf[0].proAtk;
-check('1d-spreizung: teuerstes zu billigstem Kampfschiff bleibt unter Faktor 35',
-  spreizung <= 35, { spreizung: +spreizung.toFixed(1),
-    teuerste: kampf[kampf.length-1].k, billigste: kampf[0].k });
+// KEINE Pruefung auf die Gesamtspreizung mehr - sie ist zweimal gewandert, ohne dass ein Fehler
+// vorlag. Nach der Einebnung stand sie bei 16,3x, nach der Wiederherstellung des Aufschlags fuer
+// schwere Klassen bei 22,5x, im alten Spiel bei 28,5x. Eine Zahl, deren Schranke bei jeder
+// legitimen Balance-Entscheidung nachgezogen werden muss, misst die Entscheidung und nicht den
+// Fehler - und der Aufschlag ist gewollt. Was sie fangen sollte (auseinanderlaufende, willkuerliche
+// Preise) faengt 1b ueber die Abweichung von der Kurve, und zwar schaerfer: Der teuerste Ausreisser
+// des ALTEN Stands lag dort beim 5,07-fachen.
 
 // KEIN Dominanz-Vergleich zwischen einzelnen Schiffen - bewusst, nach zwei gescheiterten
 // Entwuerfen. Der erste verglich Angriffswerte und meldete Carrier, Waechter und Enterschiff,
