@@ -49,6 +49,11 @@ const SPIELSTAND = JSON.stringify({
   allianceBase: { foundedAt: jetzt - 86400000, level: 2, system: 'kepler' },
   allianceSubTab: 'uebersicht', allianceContributed: {},
   battleStats: { wins: 0, losses: 0 }, xp: 3000, buffs: [], lastTick: jetzt,
+  // Ereignis-Uhren gepinnt (Hausregel 18): Bei fehlendem Feld ist nextPlanetEventCheck 0, der
+  // erste Check feuert dann GARANTIERT - und seine Meldung ueberschreibt in #log genau die Zeile,
+  // die dieser Test misst. Genau so ist er am 18.08.2026 im Suite-Lauf gefallen, einzeln blieb er
+  // gruen: Der Fehlschlag meldete "Neues Ereignis: Pluenderer-Crew angetroffen ...".
+  nextPlanetEventCheck: jetzt + 3600000, nextTraderCheck: jetzt + 3600000,
   colonyNames: {}, colonyNotes: {}, modules: {}, shipModules: {}, equippedShipModules: {}, moduleFragments: 0
 });
 
@@ -62,7 +67,27 @@ async function lauf(browser, schreibfehler){
     'alliance:TST:base': JSON.stringify({ foundedAt: jetzt - 86400000, level: 2, system: 'kepler', tag: 'TST', announcedLevel: 2 })
   };
   await page.route('**/api/**', backend(store, schreibfehler));
-  await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  await page.addInitScript(() => {
+    localStorage.setItem('kepler7_token', 'tok');
+    // MITSCHNITT statt Endstand (Hausregel 47, Nachtrag "#log"): #log hat keinen Stapel, es
+    // ueberschreibt sich mit jeder Meldung selbst. Die geprueften Aussagen lauten "die Zeile ist
+    // ERSCHIENEN" bzw. "sie ist NIE erschienen" - nicht "sie steht am Ende noch da". Beobachtet
+    // wird document.body, weil der Boot den Container einmal per innerHTML ersetzt; #log wird je
+    // Mutation frisch per id gelesen.
+    // addInitScript laeuft, BEVOR das Dokument existiert - ein sofortiges observe() wirft
+    // "parameter 1 is not of type 'Node'", der Mitschnitt bliebe leer und die Pruefung waere aus
+    // dem falschen Grund rot. Deshalb scharfstellen, sobald documentElement da ist; das passiert
+    // im ersten Tick und damit lange vor dem Spiel-Boot, der Mitschnitt bleibt also lueckenlos.
+    window.__logMit = [];
+    (function scharf(){
+      if (!document.documentElement) { setTimeout(scharf, 0); return; }
+      new MutationObserver(() => {
+        const el = document.getElementById('log');
+        const t = el ? (el.textContent || '').trim() : '';
+        if (t && window.__logMit[window.__logMit.length - 1] !== t) window.__logMit.push(t);
+      }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    })();
+  });
   await page.goto(FILE); await page.waitForTimeout(2600);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="allianz"]'); if (b) b.click(); });
@@ -83,7 +108,8 @@ async function lauf(browser, schreibfehler){
 
   const erg = await page.evaluate(() => {
     const raw = localStorage.getItem('kepler7_kepler7-save-v3');
-    return { log: (document.getElementById('log') || {}).textContent || '' };
+    return { log: (document.getElementById('log') || {}).textContent || '',
+             logMit: (window.__logMit || []).join(' || ') };
   });
   // Der Erz-Stand kommt aus dem GESPEICHERTEN Spielstand im Mock-Store: state ist nicht global,
   // und die Kopfzeilen-Anzeige waere nur indirekt. save() laeuft nach jedem Beitrag, der Wert im
@@ -100,7 +126,7 @@ async function lauf(browser, schreibfehler){
   // --- (a) Normalfall: Server nimmt an
   const ok = await lauf(browser, false);
   check('Beitrags-Schaltfläche gefunden', ok.knopf > 0 && ok.ausgeloest, { knopf: ok.knopf, ausgeloest: ok.ausgeloest });
-  check('a) Erfolgsmeldung erscheint', /beigetragen/.test(ok.log), ok.log.slice(0, 110));
+  check('a) Erfolgsmeldung erscheint', /beigetragen/.test(ok.logMit), ok.logMit.slice(-200));
   const contribKeys = Object.keys(ok.store).filter(k => k.includes(':contrib:'));
   check('a) der Beitrag steht im geteilten Dokument', contribKeys.length === 1, contribKeys);
   check('a) und zwar mit der gespendeten Menge',
@@ -110,9 +136,12 @@ async function lauf(browser, schreibfehler){
 
   // --- (b) Server lehnt ab: nichts darf verlorengehen und die Meldung muss ehrlich sein
   const nok = await lauf(browser, true);
-  check('b) KEINE Erfolgsmeldung bei abgelehntem Schreibvorgang', !/beigetragen/.test(nok.log), nok.log.slice(0, 140));
+  check('b) KEINE Erfolgsmeldung bei abgelehntem Schreibvorgang', !/beigetragen/.test(nok.logMit), nok.logMit.slice(-200));
+  // Das ist die Prüfung, die am 18.08.2026 in der Suite fiel und einzeln grün blieb: Sie las den
+  // ENDSTAND von #log, und dort stand längst eine spätere Meldung („Neues Ereignis: Plünderer-Crew
+  // angetroffen …"). Der Beleg im Fehlschlag zeigt jetzt den MITSCHNITT, nicht den Endstand.
   check('b) der Spieler wird auf den Fehlschlag hingewiesen',
-    /nicht an die Allianz übermittelt|nichts wurde abgebucht/.test(nok.log), nok.log.slice(0, 160));
+    /nicht an die Allianz übermittelt|nichts wurde abgebucht/.test(nok.logMit), nok.logMit.slice(-260));
   check('b) es wurde kein contrib-Dokument angelegt',
     Object.keys(nok.store).filter(k => k.includes(':contrib:')).length === 0,
     Object.keys(nok.store).filter(k => k.includes(':contrib:')));
