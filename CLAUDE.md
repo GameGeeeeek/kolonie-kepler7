@@ -1469,7 +1469,7 @@ wurde als dort.
 | **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Königin, Angriff | **fertig** – Backend #137, Frontend siehe unten |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | **fertig** – Backend #145, Frontend v8.585.0 |
 | **5** | Musterangriff-Zielart `alien-nest` | **fertig** – Backend #149, Frontend v8.590.0 |
-| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.594.0. Der `belagerungsplan` ist bewusst NICHT gebaut – Begründung unter „Offen aus Phase 6“ |
+| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.597.0. Der `belagerungsplan` ist bewusst NICHT gebaut – Begründung unter „Offen aus Phase 6“ |
 
 ### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
 
@@ -2381,6 +2381,36 @@ den laufenden Prüflauf entwertet, und keines gehört inhaltlich dazu.
    Produktentscheidung und gehört Sascha vorgelegt**, mit Optionen: die Wirkung umwidmen (eigene
    Verluste senken – liegt vollständig auf der ohnehin offenen Client-Seite, null Backend-Zeilen),
    oder den Gegenstand streichen und das im Patchnote sagen (wie beim Wochenpass).
+### Der Fundort-Knopf log bei Nest- und Festungsberichten (behoben 21.08.2026)
+
+`zeigeAsteroidFundort` kannte zwei Fälle: einen Bericht MIT Gürtelplatz und einen alten ohne. Nest-
+und Festungsberichte tragen aber **grundsätzlich keinen** `platz` – sie meinen ein Ziel im System,
+keinen Platz auf der Gürtelbahn. Beide stehen trotzdem in der Eignungsliste des Knopfes, fielen
+damit in den Altbestands-Zweig und meldeten über einen **minutenalten** Bericht: „Der Bericht
+stammt aus der Zeit vor dieser Anzeige und kennt nur das System."
+
+**Die Festungs-Hälfte war seit v8.569.0 live**, also drei Tage. Aufgefallen ist sie erst, als der
+Nest-Bericht denselben Knopf bekam und dieselbe Zeile erzeugte – ein zweiter Betroffener macht
+einen Einzelfall sichtbar, den man allein übersieht (dieselbe Familie wie Regel 52: die
+Einzelfall-Lösung ist der Hinweis, dass es weitere Betroffene gibt, hier in der Gegenrichtung).
+
+Behoben mit einem eigenen Zweig für **beide** Arten, der sagt, was den Spieler dort JETZT erwartet
+– dieselbe Ehrlichkeit, die der Vorkommen-Zweig darunter schon leistet: Nest steht noch (mit
+Lebenspunkten) bzw. ist gefallen oder weitergezogen; Festung steht noch (mit Kernanteil) bzw. der
+Gürtel ist wieder frei. Das Nest wird dabei **über sein Volk** gesucht, weil in einem System
+mehrere Nester stehen können und der Bericht genau eines meint.
+
+**Die übertragbare Frage, die hier gefehlt hat:** Wer eine neue Berichtsart in die Eignungsliste
+eines Knopfes aufnimmt, prüft, ob sie die Felder überhaupt trägt, auf die dieser Knopf sich stützt.
+Ein Knopf, der erscheint, aber nur den Rückfallzweig erreicht, ist keine Funktion mit Lücke – er
+ist eine Falschaussage.
+
+Wächter: `tests/test_fundort_knopf.js` Abschnitt 6 (8 Prüfungen). Er misst je Art **beide
+Richtungen** – Ziel steht noch und Ziel ist weg –, denn eine Meldung, die immer dasselbe sagt, wäre
+auch von einem festen Text erfüllt (Regel 61). Die Fixture kann dafür `galaxy` und `asteroid/field`
+injizieren; ohne Injektion bleibt es beim lokal erzeugten Gürtel, damit die Abbau-Fälle ihren
+ablesbaren Platz behalten (Regel 4). Beidseitig gegengeprüft: 19 Prüfungen in jeder Richtung, und
+am Stand davor fallen genau die sechs neuen Inhaltsprüfungen, jede mit der alten Zeile als Beleg.
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
@@ -2967,8 +2997,9 @@ sonst hätte die neue Zeile die ganze Bilanz stilllegen können).
 
 ### Was NOCH offen ist – gemessen, aber nicht behoben
 
-- **Wer als Schürfrecht-Halter angefochten wird, bekommt keinen Bericht.** Das ist die letzte
-  Stelle dieser Familie.
+**Nichts mehr aus der ursprünglichen Liste.** Der letzte Punkt (der angefochtene Schürfrecht-Halter)
+ist am 21.08.2026 mit v8.597.0 erledigt – und war beim Nachmessen viel mehr als eine Berichtslücke,
+siehe den eigenen Abschnitt „Wer sein Schürfrecht verteidigt" weiter unten.
 
 **KORREKTUR zur eigenen Liste:** Hier stand „wer ausgespäht wird (nur Postfach-Meldung)" als
 Lücke. Nachgemessen ist das **keine**: Die Verteidiger-Benachrichtigung läuft über
@@ -2985,6 +3016,168 @@ so gelassen.
 
 **Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
 Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.
+
+### Wer sein Schürfrecht verteidigt (21.08.2026, v8.597.0) – die Lücke war nicht der Text
+
+Der letzte offene Punkt der Berichts-Familie. Nachgemessen im Browser war er **zwei** Befunde, und
+der zweite ist der schwerere:
+
+**(1) Die Berichtslücke.** In BEIDEN Ausgängen gab es nur eine `log()`-Zeile – die überschreibt sich
+mit der nächsten Meldung selbst (Regel 47) und ist beim Offline-Nachholen ganz stummgeschaltet.
+Gemessen: `reports: []` in beiden Läufen. Das Postfach nennt den Vorgang zwar, aber es gibt ihn nur
+mit eigenem Server, es lässt sich wegwischen, und es nennt weder die verlorenen Schiffstypen noch,
+was übrig ist.
+
+**(2) Die Geisterflotte.** `asteroidEskortenSync()` überspringt jeden Platz, der nicht mehr mir
+gehört (`p.halter !== eigen`). Nach einer **verlorenen** Anfechtung gehört er dem Angreifer – der
+lokale Eskorten-Eintrag blieb also mit der vollständigen **Vorkampf**-Flotte stehen. Gemessen: 20
+Kreuzer stationiert, Recht verloren, das Kartenmenü bot „Gestrandete Eskorte zurückrufen (**20
+Schiffe**)" an, und ein Klick erzeugte eine `mining-recall`-Mission mit 20 Kreuzern – obwohl der
+Server sie in diesem Kampf vernichtet hatte (`gegnerVerlustAnteil = 1`, wenn der Angreifer gewinnt).
+**Ein verlorenes Schürfrecht kostete den Verteidiger damit keinen einzigen Schiffsverlust.** Wer
+nicht zurückrief, hatte stattdessen einen dauerhaft blockierten Flottenslot – und die einzige
+Meldung, die er dabei zu sehen bekam, war falsch: „Das Schürfrecht bleibt bestehen, ist aber
+unbewacht."
+
+**Die übertragbare Lehre, und sie ist der Kern dieser Etappe: Ein Zustand, den der Code nicht
+UNTERSCHEIDEN kann, existiert für ihn nicht.** Ein aufgegebenes Recht sieht im Felddokument genau
+wie ein verlorenes aus – Halter weg, `eskorte` weg, denn `/asteroid/release` löscht sie ebenfalls.
+Nur im ersten Fall stehen die Schiffe wirklich noch da, und das Kartenmenü bietet den Rückruf zu
+Recht an. Ein Fix, der die beiden Fälle **rät**, vernichtet im aufgegebenen Fall Schiffe – und das
+ist die teurere Richtung. Die Unterscheidung muss deshalb von dort kommen, wo sie **entsteht**:
+`vork.letzterKampf` (Backend #151), geschrieben in beiden Ausgängen der Anfechtung.
+
+**Vier Dinge, die man beim Anfassen wissen muss:**
+
+- **`asteroidVerteidigungBuchen()` ist die EINE Buchungsstelle** (Regel 43). Beide Wege gehen
+  hindurch: der Kampfvermerk und der **Rückfall** über die gemessene Differenz (alter Server, oder
+  ein Kampf von vor v8.597.0). Der Rückfall kennt weder Angreifer noch Ausgang – der Bericht sagt
+  dann „ein Angreifer", statt etwas zu behaupten.
+- **Der Vermerk-Zweig steht VOR dem Halter-Filter**, und genau darin liegt der Punkt: Im gemessenen
+  Fehlerfall gehört das Vorkommen jemand anderem. Dahinter wäre er wirkungslos.
+  `test_schuerfrecht_verteidigung` 0c prüft die REIHENFOLGE im Funktionsrumpf, nicht die
+  Anwesenheit.
+- **Zwei Wachen, beide nötig.** `kampfGebucht` verhindert die Doppelbuchung im **abgewehrten** Fall,
+  wo der Eintrag stehen bleibt; `zeit >= seit` schützt vor einem Vermerk, der **älter** ist als die
+  Stationierung – er hängt am Vorkommen und überlebt einen Besitzwechsel. Ohne die zweite würde eine
+  frisch stationierte Eskorte durch einen längst abgegoltenen Kampf dezimiert (Abschnitt 3 des
+  Wächters).
+- **Abgezogen wird nie mehr, als lokal wirklich steht.** Der Server kann einen älteren Bestand
+  kennen; die sichere Richtung ist die kleinere Zahl.
+
+**Der Hilfetext beschrieb die Anfechtung nur aus ANGREIFER-Sicht** („Verlierst du, behält der Halter
+sein Recht und du deine Überlebenden") – über die eigene Wache stand kein Wort. Der Abschnitt nennt
+jetzt beide Ausgänge, inklusive der unbequemen Zahl: Geht das Recht verloren, ist die Wache
+**vollständig** gefallen.
+
+**Die Auslieferungsreihenfolge ist hier gleichgültig** (anders als bei den Festungen, Regel 60):
+Backend allein live schreibt ein Feld, das niemand liest; Frontend allein live liest ein Feld, das es
+nicht gibt, der Zweig feuert nie, und der Rückfall über die Differenz arbeitet weiter wie bisher.
+Kein Schalter nötig.
+
+Wächter: `tests/test_schuerfrecht_verteidigung.js` (26 Prüfungen – Quelltext-Reihenfolge, gemessene
+Wirkung, gerenderte Berichtskarte, Kartenmenü und die Rückruf-Meldung). Gegenprobe gegen
+`origin/main` per `KEPLER_SPIELDATEI`: **16 rot bei identischen 26 Prüfnamen** (per `diff`
+verglichen, nicht gezählt – Regel 60), und `1e` zeigt den Vorfall wörtlich:
+`{"eintraege":["Gestrandete Eskorte zurückrufen (20 Schiffe)"]}`.
+
+**Ein Werkzeugfehler dabei, der Regel 28 belegt:** Der erste Entwurf las die gerenderten
+Berichtskarten und fand **keine** – der Mock legte den Bericht ohne `id` und `time` ab, die der echte
+Server in `addReport` ergänzt. Ohne Zeitstempel zeichnet der Client keine Datumszeile, und die
+Kartensuche des Tests fand nichts. Die Folgeprüfung „die Karte ist NICHT als Gewonnen markiert" war
+dadurch **grün über einer leeren Zeichenkette**. Seitdem steht vor jeder Kartenprüfung eine
+`*-vorab`-Zeile, die belegt, dass überhaupt eine Karte gezeichnet wurde. **Wer einen Server
+nachbaut, muss auch das nachbauen, was der echte Server ERGÄNZT – nicht nur, was er speichert.**
+
+**Und eine Verschärfung an `test_berichtspflicht` aus demselben Anlass:** Seine Erzeuger-Suche
+verlangte `type:` direkt hinter der öffnenden Klammer und übersah damit jeden `pushReport`-Aufruf mit
+umbrochenem Argumentobjekt – der neue Typ wurde als „Zweig ohne Erzeuger" gemeldet. Das ist derselbe
+Fehler, gegen den dieser Test gebaut ist, nur im Messwerkzeug: ein Muster, das eine SCHREIBWEISE
+kodiert statt der Sache (Regel 3/40). Wäre nur der Erzeuger dagewesen und der Zweig nicht, hätte
+`1a` den Fehlschlag **verschwiegen**. Er liest jetzt mehrzeilig, und `1-vorab2b` belegt, dass er die
+umbrochene Form wirklich findet – sonst erblindet er still, sobald jemand das Muster wieder verengt.
+
+### Ein erfolgreicher Bericht trug die Pille „Verloren" (21.08.2026, v8.597.0)
+
+**Spieler-Report Sascha mit Screenshot:** „warum wird der bericht als verloren markiert ich habe
+ressourcen abgebaut undzwar erfolgreich."
+
+`reportIsPositive()` urteilte am Ende allein nach `result` und akzeptierte nur `'win'` oder
+`'destroyed'`. **Eine Berichtsart, die gar kein `result` führt, fiel damit zwangsläufig auf
+„Verloren"** – roter Streifen, rote Pille, Warndreieck, und im Filter unter „Nur Rückschläge".
+Betroffen waren gemessen **vier** ausgelieferte Arten: `mining` (die häufigste Berichtsart des
+ganzen Spiels), `peilung`, `debris-cleared` und `deckelausgleich`. Auf dem Screenshot standen 38,0k
+Erz und 1,6k Antimaterie als Ertrag – und daneben „VERLOREN".
+
+**Derselbe Screenshot zeigte eine zweite Ausprägung:** Die KI-Abfangautomatik („Piraten vertrieben")
+trägt `result:'ki-intercept'` – ein Wert, den die Liste nicht kannte. `'escaped'` steht bewusst
+weiter nicht drin: Dort sind die Piraten mit der Beute weg, das *ist* ein Rückschlag.
+
+**Die Behebung ist nicht, vier Namen nachzutragen – die Regel wird umgedreht.** Eine von Hand
+geführte Positivliste ist genau die Fehlerklasse dieses Projekts (Regel 40); sie hätte beim nächsten
+neuen Berichtstyp erneut versagt. Seit v8.597.0 gilt: **Eine Berichtsart ohne Ergebnisbegriff ist
+kein Rückschlag.** Rot bekommt nur, wer nachweislich etwas verloren hat; die zwei Arten, die das
+ohne `result` tun (`pvp-fleet-loss`, `deckelkappung`), stehen namentlich in
+`REPORT_OHNE_ERGEBNIS_NEGATIV`. Eine künftige Art ist damit **automatisch richtig** eingefärbt statt
+automatisch falsch.
+
+**Drei Stellen, drei Wahrheiten – und die dritte hätte ich fast übersehen:**
+
+1. `reportIsPositive` – Pille, Streifenfarbe, Ergebnis-Filter. Die Regelumkehr.
+2. `REPORT_SPECIAL_GREEN_TYPES` – dort tragen die vier Arten jetzt **gar keine Pille**. Über einer
+   heimgekehrten Abbaufuhre ist auch „Gewonnen" schief; die Frage stellt sich dort nicht.
+3. **`const won`** (Z. 40352) – eine ZWEITE Wahrheit über „Erfolg", die nur `result` gegen
+   `'win'`/`'destroyed'` prüft. Sie steuert das Kartensymbol im Rückfall, und deshalb trug die
+   KI-Abfangautomatik weiterhin ein **Warndreieck** über vertriebenen Piraten. Der Rückfall benutzt
+   jetzt `positive`; `won` bleibt für die PvP-Titel („Sieg"/„Niederlage"), wo es wirklich um den
+   Kampfausgang geht. Gefunden hat es kein Lesen des Codes, sondern die Frage, warum der Screenshot
+   ein Warndreieck zeigt.
+
+Dazu haben `mining`, `peilung`, `debris-cleared` und die zwei Deckel-Arten jetzt **eigene
+Kartensymbole** statt Schild bzw. Warndreieck – alle fünf benutzen die Zeichner-Zweige im Text schon,
+sind also nachweislich im Icon-Subset. Und `const isSpecial` (Z. 40930) war **toter Code**: definiert,
+nirgends gelesen. Entfernt.
+
+**Der Wächter ist datengetrieben** (`test_berichtspflicht` Abschnitt 7): Er rechnet JEDE erzeugte
+Berichtsart durch die ausgeführte `reportIsPositive` und meldet, welche als Rückschlag gilt. Zwei
+Gegenproben, beide beidseitig gefahren – Regelumkehr zurück → `7a` mit 13 Namen; `ki-intercept` aus
+der Liste → `7c` mit `{"kiAbfang":false}`. Jede Gegenprobe führt die Liste der Prüfungen mit, die
+fallen MÜSSEN, und meldet `WERKZEUGFEHLER`, wenn eine grün bleibt (Regel 71).
+
+**Zwei eigene Werkzeugfehler beim Bau dieses Wächters, beide sofort gefangen:**
+
+- Der erste Entwurf las die `result`-Werte je Art aus einem **Fenster von 700 Zeichen** hinter dem
+  `pushReport`-Aufruf und meldete 21 Arten als „ohne Ergebnis" – darunter `moon-siege` und
+  `alliance-base-attack`, die sehr wohl eines tragen. Wörtlich der Fehler, der im Abschnitt direkt
+  darunter als Regel steht. **Das Fenster braucht es gar nicht:** Die Funktion selbst sagt, wer über
+  einen eigenen Zweig verfügt und wer generisch behandelt wird.
+- `asteroid-contest` wurde dabei als „falsch rot" gemeldet – ein Testartefakt, kein Befund: Die Art
+  hat einen eigenen Zweig über `gewonnen`, und der Test fütterte ein Objekt ohne dieses Feld. **Arten
+  mit eigenem Zweig gehören nicht zur Fehlerklasse** und werden ausgenommen.
+
+**Und ein Test musste angepasst werden, ohne ihn zu schwächen** (Regel 26/43): `test_raidbericht` 3a
+suchte die Wortform `r.result==='win' || r.result==='destroyed'` und fiel auf korrektem Code durch,
+als die Werte in die benannte Liste wanderten – eine festgenagelte SCHREIBWEISE (Regel 3). Er
+**führt** die Funktion jetzt aus und prüft die Eigenschaft, dazu die Gegenrichtung (`3a2`: ein
+verlorener Angriff bleibt negativ). Das fängt mehr als vorher, nicht weniger.
+
+### Ein GERATENES Fenster ist kein Scope (zweimal am 21.08.2026)
+
+Beim Nachmessen der ausgelieferten Datei zweimal derselbe Werkzeugfehler, beide Male fast als
+Befund weitergegeben:
+
+- `grep -c '} catch(e){}$'` über die **ganze** Spieldatei meldete 135 leere catch-Blöcke. Die
+  Aussage galt dem Weltboss; gescopt auf seinen Block ist sie eindeutig. Viele der 135 sind
+  legitim (`localStorage`-Zugriffe).
+- `S.slice(p, p+4000)` um `resolvePlayerAttackMission` meldete **0** Berichte. Die Funktion ist
+  **16.570** Zeichen lang — das Fenster endete vor den Aufrufstellen. Über die echte Klammertiefe
+  gemessen: 3.
+
+**Vorgehen:** Ein Block wird über seine **Grenze** geschnitten (Klammertiefe, Anker-Paar), nie über
+eine geschätzte Zeichenzahl — und der Anker selbst gehört geprüft (Regel 6). Ein `+4000` ist
+dieselbe Art Annahme wie ein eingetippter Erwartungswert (Regel 2): Es sieht nach Messung aus und
+ist eine Schätzung. Beide Male hat nur das Nachrechnen VOR dem Weitergeben den Fehlalarm
+verhindert (Regel 10).
 
 ### Die Kurzform für jede neue Angriffsart
 

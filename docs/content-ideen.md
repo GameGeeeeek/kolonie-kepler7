@@ -348,6 +348,70 @@ flache Vollfarbe mit einer helleren Facette, Striche 1,4–2,5 — der Stil steh
 zu behaupten (Hausregel 42: der erste Protomaterie-Entwurf wirkte wie eine Münze, der zweite war
 bei 20 px nicht von Erz zu unterscheiden — beides fiel nur am Bild auf).
 
+### 4.9 Bonuscodes im Admin-Bereich (Auftrag Sascha 21.08.2026)
+
+**Wortlaut:** „bonuscodes einführen ich will ab und zu mal bonuscodes posten wo die spieler kleine
+geschenke bekommen die codes sollen aber nur eine gewisse gültigkeit haben also max 1 mal pro
+account einlösbar und nur 1 woche etc aktiv am liebsten baust du mir das in den admin bereich ein."
+
+**Die Infrastruktur steht fast vollständig – gemessen, nicht vermutet:**
+
+| Baustein | Wo | Zustand |
+|---|---|---|
+| Admin-Oberfläche | `adminPanelOverlay` (Z. 2712), sichtbar nur für `gamegeeeeek` | da |
+| Admin-Wache im Backend | `isAdmin(req)` vor jeder der 10 `/api/admin/*`-Routen | da |
+| Geschenk ohne fremden Spielstand | `pushPendingReward(userId, reward)` → `__pendingRewards`, holt `claimPendingRewards` ab | da |
+| Einlöse-Endpunkt als Vorbild | `POST /api/referral/redeem` – „einmalig einlösbar pro Konto" | da |
+| Code-Verwaltung, Gültigkeit, Einlösesperre | – | **fehlt** |
+
+**Der eine Punkt, an dem das Vorbild NICHT kopiert werden darf:** `/api/referral/redeem` merkt sich
+die Einlösung in `save.referralRedeemed` – also **im Spielstand**, und der ist bauartbedingt
+klientenautoritativ. Wer das Feld in der Entwicklerkonsole löscht, löst erneut ein. Für +50 Kredite
+unter Freunden ist das verkraftbar; bei einem Code, der **öffentlich gepostet** wird, wäre es genau
+die Selbstbedienung, vor der die CLAUDE.md bei jedem Belohnungssystem warnt. **Die Einlösesperre
+gehört deshalb an das USER-Objekt** (`user.bonusCodes = { '<code>': <zeit> }`), wie
+`user.marktTag` und `user.staub` – dieselbe Entscheidung wie beim Kampfvermerk der Anfechtung, der
+aus demselben Grund am Vorkommen hängt und nicht im Spielstand.
+
+**Datenhaltung:** `db.bonusCodes` – ausdrücklich **nicht** `db.shared`, denn der generische
+Storage-Endpunkt ist für jeden eingeloggten Nutzer schreibbar, solange keine Sonderregel greift.
+`db.galaxy` ist das Vorbild: von außen gar nicht erreichbar.
+
+**Felder je Code** (der Auftrag nennt drei davon direkt):
+
+```js
+{ code:'STERNENSTAUB25', belohnung:{ credits:500, fragmente:2 },
+  gueltigAb:…, gueltigBis:…,        // "nur 1 Woche aktiv"
+  maxProKonto:1,                     // "max 1 mal pro account"
+  maxGesamt:0,                       // 0 = unbegrenzt; >0 fuer "die ersten 100"
+  eingeloest:0, angelegt:…, notiz:'TikTok 21.08.' }
+```
+
+`maxGesamt` steht nicht im Auftrag und ist trotzdem sinnvoll: Ein Code, der in einem fremden Forum
+landet, ist sonst nicht zu bremsen – eine Woche Laufzeit hilft dagegen nicht.
+
+**Sechs Dinge, die beim Bau zu beachten sind:**
+
+1. **Der Code muss ratbar-sicher sein.** Sechs Zeichen sind 2 Mrd. Möglichkeiten, aber ein
+   Skript probiert die in Stunden durch. Deshalb: Versuche je Konto deckeln (etwa 10/Tag, Muster
+   `user.marktTag`) und beim Anlegen eine Länge ab 8 Zeichen erzwingen.
+2. **Normalisieren beim Vergleich**, nicht beim Speichern: Großschreibung, Bindestriche und
+   Leerzeichen weg. Ein Spieler, der `sternen-staub25` tippt, hat den Code.
+3. **Die Belohnung geht über `pushPendingReward`**, nie über einen direkten Spielstand-Schreibvorgang
+   – sie kommt dann auch an, wenn der Spieler gerade offline ist, und das Wettrennen mit dem
+   Autosave entsteht gar nicht erst.
+4. **Keine „N Minuten eigene Produktion"-Formel** (CLAUDE.md, Bekannte Fallstricke): Bei starker
+   Wirtschaft explodiert sie. Feste Beträge oder Gegenstände.
+5. **Die Ablehnung muss den GRUND nennen** – abgelaufen, schon eingelöst, Kontingent erschöpft,
+   unbekannt. Ein pauschales „ungültig" macht aus einem abgelaufenen Code einen Fehlerbericht.
+6. **Der Eingabepfad für den Spieler** liegt am besten neben dem Einladungscode im Profil-Tab; die
+   Fläche und ihr Muster gibt es schon.
+
+**Umfang geschätzt:** Backend ein Endpunkt zum Einlösen plus drei Admin-Routen (anlegen, auflisten,
+deaktivieren), Frontend ein Eingabefeld und ein Abschnitt im Admin-Overlay. Beide Hälften sind
+einzeln auslieferbar, wenn das Frontend einen fehlenden Endpunkt sauber benennt (CLAUDE.md Regel 35)
+– **Backend zuerst**, sonst bietet das Spiel eine Eingabe an, die niemand einlösen kann.
+
 ## 5. Töpfe ohne Senke (alle vier nachgemessen, alle vier offen)
 
 | Topf | Gemessener Stand |

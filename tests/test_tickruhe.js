@@ -225,6 +225,61 @@ async function spiel(browser, zustand, zaehler){
     await ctx.close();
   }
 
+  // ------------------------------------ 4) Ereignis-Banner: steht still, waehrend die Restzeit laeuft
+  //
+  // GEMESSEN am 21.08.2026 (MutationObserver ueber alle zwoelf Reiter, Lauf mit ABSICHTLICH
+  // gesetztem Ereignis, damit das Banner nicht durch den ungepinnten Zufallsstreuer hereinkommt -
+  // Regel 70): Titel, Beschreibung und beide Knoepfe schrieben auf JEDEM Reiter jede Sekunde
+  // byte-identisch neu, zusammen 366 Byte je Tick. Das Banner steht minutenlang.
+  //
+  // Die Uhr laeuft hier BEWUSST weiter, anders als in Abschnitt 1. Der Inhalt der vier Elemente
+  // haengt gar nicht von der Zeit ab - eine laufende Uhr ist also die haertere Probe, und die
+  // Restzeit daneben liefert gleich den Beleg, dass ueberhaupt Ticks stattgefunden haben. Ohne
+  // ihn waere "keine Mutation" trivial erfuellbar, indem der Tick schlicht nicht laeuft.
+  for (const [fall, key] of [['mit Kosten', 'asteroid'], ['ohne Kosten', 'probe']]) {
+    const jetzt = Date.now();
+    const { page, ctx, errs } = await spiel(browser, {
+      activeEvent: { key, startTime: jetzt, expiresAt: jetzt + 3600000 }
+    });
+    await page.waitForTimeout(1500);
+    const STILL = ['eventBannerTitle','eventBannerDesc','eventOptA','eventOptB'];
+    const vorab = await page.evaluate(ids => {
+      const b = document.getElementById('eventBanner');
+      const sichtbar = !!(b && b.offsetParent !== null);
+      const inhalt = {};
+      for (const id of ids.concat(['eventBannerTimer'])) {
+        const el = document.getElementById(id);
+        inhalt[id] = el ? (el.textContent||'').length : -1;
+      }
+      return { sichtbar, inhalt };
+    }, STILL);
+    check('4-vorab (' + fall + '): das Banner steht sichtbar und alle Elemente haben Inhalt',
+      vorab.sichtbar && Object.values(vorab.inhalt).every(n => n > 0), vorab);
+
+    await page.evaluate(ids => {
+      window.__mut = {};
+      for (const id of ids.concat(['eventBannerTimer'])) {
+        window.__mut[id] = 0;
+        const el = document.getElementById(id);
+        if (el) new MutationObserver(m => { window.__mut[id] += m.length; })
+          .observe(el, { childList:true, subtree:true, characterData:true });
+      }
+    }, STILL);
+    await page.waitForTimeout(4200); // mindestens vier Sekunden-Ticks
+    const mut = await page.evaluate(() => window.__mut);
+
+    // Die Gegenrichtung ZUERST: Ohne laufende Restzeit ist die Stillstands-Pruefung wertlos.
+    check('4b (' + fall + '): die Restzeit laeuft weiter - es haben wirklich Ticks stattgefunden',
+      mut.eventBannerTimer > 0, mut);
+    const unruhig = STILL.filter(id => mut[id] > 0).map(id => id + '=' + mut[id]);
+    check('4a (' + fall + '): Titel, Beschreibung und beide Knoepfe schreiben nicht neu',
+      unruhig.length === 0, unruhig.length ? unruhig : mut);
+
+    const f4 = errs.filter(e=>!/favicon/i.test(e));
+    check('4 (' + fall + '): keine Konsolenfehler', f4.length === 0, f4.slice(0,3));
+    await ctx.close();
+  }
+
   await browser.close();
   return ende();
 })().catch(e => { console.error(e); process.exit(1); });

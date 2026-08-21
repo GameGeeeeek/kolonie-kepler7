@@ -41,7 +41,12 @@ function backend(store){ return async r => {
   // Das geteilte Feld gibt es hier bewusst NICHT (404): Dann erzeugt das Spiel den Guertel lokal und
   // deterministisch, und der Test kann den echten Platz aus dem Spielstand ABLESEN statt ihn zu
   // erfinden (Arbeitsregel 4). Ein erfundener Platz haette hier zwangslaeufig Fall 3 gemessen.
-  if (p === 'asteroid/field') return j({ error:'Cannot GET' }, 404);
+  // Wird ein Feld INJIZIERT (Festungs-Faelle), liefern wir es aus - sonst weiter 404, damit die
+  // Abbau-Faelle ihren lokal erzeugten, ablesbaren Guertel behalten.
+  if (p === 'asteroid/field') return store.__felder
+    ? j({ felder: store.__felder })
+    : j({ error:'Cannot GET' }, 404);
+  if (p === 'galaxy') return j(store.__galaxie || {});
   if (p.startsWith('storage/')){
     const k = decodeURIComponent(p.slice(8));
     if (req.method() === 'PUT'){ try { store[k] = JSON.parse(req.postData()||'{}').value; } catch(e){} return j({ ok:true }); }
@@ -68,8 +73,10 @@ function save(zusatz){
   }, zusatz));
 }
 
-async function spiel(browser, berichte, zusatz){
+async function spiel(browser, berichte, zusatz, welt){
   const store = { __berichte: berichte || [] };
+  if (welt && welt.galaxie) store.__galaxie = welt.galaxie;
+  if (welt && welt.felder) store.__felder = welt.felder;
   store[SAVE_KEY] = save(zusatz);
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:900,height:1200} }));
   const page = await ctx.newPage(); const errs = [];
@@ -239,6 +246,79 @@ async function knopfDruecken(page){
     const mitKnopf = treffer.filter(x => x.knopf).length;
     check('5: der Knopf steht am Anfechtungsbericht - und NICHT am Kampfbericht',
       treffer.length >= 2 && mitKnopf === 1, treffer);
+    await t.ctx.close();
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // 6) NEST- UND FESTUNGSBERICHTE. Beide stehen in der Eignungsliste des Knopfes, tragen aber
+  // KEINEN Guertelplatz - sie meinen ein Ziel im System. Ohne eigenen Zweig fielen sie in Fall 4
+  // ("kennt nur das System") und behaupteten damit ueber einen minutenalten Bericht, er stamme aus
+  // der Zeit vor dieser Anzeige. Die Festungs-Haelfte war seit v8.569.0 live.
+  // Gemessen wird wie ueberall hier die Protokollzeile - und je Fall BEIDE Richtungen, damit die
+  // Meldung nicht nur erscheint, sondern auch das Richtige sagt (Arbeitsregel 61).
+  const NESTSYS = 'chronos';
+  const nestBericht = { id:'r-nest-1', type:'nest-angriff', time: Date.now(), fleetName:'Testflotte',
+    system: NESTSYS, systemName: NESTSYS, volk:'vex', volkName:'Nomaden von Vex', stufe:3,
+    stufeName:'Schwarmstock', schaden:12000, gefallen:false, lp:260000, lpMax:400000,
+    anteil:0.3, teilnehmer:1, eigeneVerluste:{} };
+  const festBericht = { id:'r-fest-1', type:'festung-angriff', time: Date.now(), fleetName:'Testflotte',
+    system: NESTSYS, systemName: NESTSYS, stufe:'kastell', stufeName:'Kastell',
+    schaden:9000, gefallen:false, kern:150000, kernMax:250000, ziel:'kern',
+    anteil:0.3, teilnehmer:1, eigeneVerluste:{} };
+
+  // 6a/6b: Das Nest steht noch -> die Meldung nennt es samt Lebenspunkten.
+  {
+    const galaxie = { npcEmpireStrength:1, marketTrend:1, activePirateFaction:null,
+      unlockedAlienRaces:[], activeWar:null, collapsedSystems:{}, activeWormhole:null, news:[],
+      alienNester:[{ id:'n1', volk:'vex', sys:NESTSYS, stufe:3, lp:260000, lpMax:400000,
+        seit:Date.now()-3600000, letzteReifung:Date.now(), beitraege:{}, schlaege:{} }] };
+    const t = await spiel(browser, [nestBericht], null, { galaxie });
+    const k = await knopfDruecken(t.page);
+    check('6-vorab: der Knopf steht auch am Nest-Bericht', k.da === true);
+    const txt = await protokoll(t.page);
+    check('6a: der Nest-Bericht meldet NICHT mehr "aus der Zeit vor dieser Anzeige"',
+      !/Zeit vor dieser Anzeige/.test(txt), beleg(txt, /[^\n]*Zeit vor dieser Anzeige[^\n]*/));
+    check('6b: er sagt stattdessen, dass das Nest noch steht - mit Lebenspunkten',
+      /steht noch/.test(txt) && /Lebenspunkte/.test(txt), beleg(txt, /[^\n]*steht noch[^\n]*/));
+    await t.ctx.close();
+  }
+
+  // 6c: Gegenrichtung - kein Nest mehr im Galaxie-Zustand. Die Meldung muss etwas ANDERES sagen,
+  // sonst waere 6b auch von einem festen Text erfuellt.
+  {
+    const t = await spiel(browser, [nestBericht], null, { galaxie: { alienNester: [] } });
+    await knopfDruecken(t.page);
+    const txt = await protokoll(t.page);
+    check('6c: ist das Nest weg, sagt die Meldung genau das',
+      /kein Nest dieses Volkes mehr/.test(txt) && !/steht noch/.test(txt),
+      beleg(txt, /[^\n]*kein Nest[^\n]*/));
+    await t.ctx.close();
+  }
+
+  // 6d/6e: Dieselbe Paarung fuer die Festung. Das Feld wird hier INJIZIERT, weil festungFaktoren()
+  // aus state.asteroidFeld liest und der lokal erzeugte Guertel nie eine Festung enthaelt.
+  {
+    const felder = {}; felder[NESTSYS] = { plaetze:{}, festung:{ stufe:'kastell', kern:150000, kernMax:250000 } };
+    const t = await spiel(browser, [festBericht], null, { felder });
+    const k = await knopfDruecken(t.page);
+    check('6d-vorab: der Knopf steht auch am Festungs-Bericht', k.da === true);
+    const txt = await protokoll(t.page);
+    check('6d: der Festungs-Bericht meldet NICHT mehr "aus der Zeit vor dieser Anzeige"',
+      !/Zeit vor dieser Anzeige/.test(txt), beleg(txt, /[^\n]*Zeit vor dieser Anzeige[^\n]*/));
+    check('6e: er sagt stattdessen, dass die Festung noch steht - mit Kernanteil',
+      /steht noch/.test(txt) && /Kern/.test(txt), beleg(txt, /[^\n]*steht noch[^\n]*/));
+    await t.ctx.close();
+  }
+
+  // 6f: Gegenrichtung fuer die Festung - Feld ohne Festung.
+  {
+    const felder = {}; felder[NESTSYS] = { plaetze:{} };
+    const t = await spiel(browser, [festBericht], null, { felder });
+    await knopfDruecken(t.page);
+    const txt = await protokoll(t.page);
+    check('6f: ist die Festung weg, sagt die Meldung genau das',
+      /steht nicht mehr/.test(txt) && !/steht noch/.test(txt),
+      beleg(txt, /[^\n]*Festung[^\n]*/));
     await t.ctx.close();
   }
 

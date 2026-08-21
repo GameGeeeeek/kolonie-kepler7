@@ -68,8 +68,27 @@ check('2e: auch der Musterangriff führt Verbandsflotte, Beitrag und Verlust-Obj
   /type:'alliance-muster-attack'[^\n]*fleet: \(doc\.dispatch && doc\.dispatch\.totalComposition\)[^\n]*myComposition: contrib\.composition[^\n]*ownLostShips:/.test(JS));
 
 // ---- 3) 'destroyed' ist ein positiver Ausgang
-check('3a: reportIsPositive kennt destroyed',
-  /r\.result==='win' \|\| r\.result==='destroyed'/.test(funktionsRumpf('reportIsPositive')));
+/* Geprueft wird die REGEL, nicht die Schreibweise (Hausregel 3). Bis v8.597.0 stand hier eine
+   Textsuche nach `r.result==='win' || r.result==='destroyed'`; als die Werte in die benannte
+   Liste REPORT_ERGEBNIS_ERFOLG wanderten, fiel der Test auf korrektem Code durch. Die gepruefte
+   Eigenschaft - 'destroyed' ist ein positiver Ausgang - gilt unveraendert, also wird sie jetzt
+   AUSGEFUEHRT statt gelesen. Das faengt zugleich mehr: Wer den Wert aus der Liste nimmt, faellt
+   weiterhin auf. */
+let posFn = null, posBau = null;
+try {
+  const kA = JS.indexOf('  const REPORT_SPECIAL_GREEN_TYPES = [');
+  const fA = JS.indexOf('  function reportIsPositive(r){', kA);
+  const fE = JS.indexOf('\n  }', fA);
+  if (kA < 0 || fA < 0 || fE < 0) throw new Error('Anker nicht gefunden');
+  posFn = new Function('r', JS.slice(kA, fE + 4) + '\n return reportIsPositive(r);');
+} catch(e){ posBau = String(e.message || e); }
+check('3-bau: reportIsPositive laesst sich schneiden und ausfuehren', posBau === null, { posBau });
+check('3a: destroyed ist ein positiver Ausgang - ausgefuehrt, nicht gelesen',
+  !!posFn && posFn({ type:'alliance-base-attack', result:'destroyed' }) === true,
+  { destroyed: posFn && posFn({ type:'alliance-base-attack', result:'destroyed' }) });
+check('3a2: und die Gegenrichtung - ein verlorener Angriff bleibt negativ',
+  !!posFn && posFn({ type:'alliance-base-attack', result:'loss' }) === false,
+  { loss: posFn && posFn({ type:'alliance-base-attack', result:'loss' }) });
 check('3b: die Icon-Wahl (won) kennt destroyed',
   JS.includes("const won = r.result === 'win' || r.result === 'destroyed';"));
 
