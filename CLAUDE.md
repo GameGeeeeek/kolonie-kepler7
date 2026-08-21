@@ -1292,8 +1292,13 @@ Objekte" misst nur die Objekte, die die Fixture erzeugt** – wer so einen Sweep
 welche Objektarten unter seinen Bedingungen überhaupt entstehen können.
 
 - **KB-20c – die Allianzbasis kommt auf eine abgeleitete Bahn.** Nachgerechnet lag Sektor-x 165 bei
-  **18 von 69** Systemen ganz außerhalb des Ausschnitts und bei 23 weiteren angeschnitten (für
-  1280×800: sichtbar sind links der Sonne nur 160,6 Einheiten bei maxOrbit 5, nötig wären 208). Die
+  **18 von 69** Systemen ganz außerhalb des Ausschnitts und bei **37 weiteren** angeschnitten – nur
+  14 wären vollständig im Bild. (Unabhängig nachgerechnet: Links der Sonne sind
+  `kbOrbitRx(maxOrbit) + 34` Sektor-Einheiten sichtbar, bei maxOrbit 5 also 154; die Basis braucht
+  185 für ihre Mitte und 215 für ihren sichtbaren Modellrand von 30. Die Zahl hängt nicht am
+  Formfaktor, weil der Ausschnitt in Sektor-Einheiten gerechnet wird. **Hier stand zuerst „23
+  weitere" – die ließ sich beim Nachrechnen nicht reproduzieren und ist korrigiert**; Regel 41 gilt
+  auch für die eigenen Zahlen von gestern.) Die
   Basis hat auf der Karte **keine zweite Darstellung** – fällt sie aus dem Ausschnitt, ist sie für
   den Spieler weg. Behoben wie beim Portal: `kbOrbitRx(kbMaxOrbit) * 0,80` bei 205°, durch
   `kbMarkerFrei` geschoben, in `platzierteMarker` angemeldet. 0,80 statt 0,92 hält sie **innerhalb**
