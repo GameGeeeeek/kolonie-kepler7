@@ -7157,8 +7157,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.595.0';
+  const VERSION = '8.596.0';
   const PATCHNOTES = [
+    { version:'8.596.0', date:'21.08.2026', changes:[
+      '<strong>Das Ereignis-Banner schreibt sich nicht mehr jede Sekunde selbst neu.</strong> Solange ein Zufallsereignis läuft, steht sein Banner minutenlang oben auf dem Bildschirm – und der Titel, die Beschreibung und beide Auswahlknöpfe wurden dabei im Sekundentakt mit exakt demselben Inhalt neu gezeichnet, auf jedem Reiter. Gemessen waren das 366 Byte je Sekunde, die nichts bewirkt haben. Sie stehen jetzt still; die Restzeit daneben läuft unverändert weiter, weil sie sich ja wirklich jede Sekunde ändert.',
+      'Gefunden hat das keine Suche im Quelltext, sondern eine Messung über alle zwölf Reiter – dieselbe, die im August schon vierzig solcher Dauerschreiber aufgedeckt hat. Von denen ist nichts übrig; das Banner war der letzte Posten mit spürbarer Reichweite, weil es auf jedem Reiter mitläuft.'
+    ]},
     { version:'8.595.0', date:'21.08.2026', changes:[
       '<strong>Behoben: Der Knopf „Zeigen, wo das war" sagte bei Festungs- und Nest-Berichten die Unwahrheit.</strong> Er steht seit jeher an Abbau- und Anfechtungsberichten und springt dort auf den Gürtelplatz, an dem der Brocken lag. Mit den Asteroidenfestungen und den Alien-Nestern kam er an zwei Berichtsarten dazu, die gar keinen Gürtelplatz meinen – sie zielen auf etwas im System. Der Knopf sprang deshalb zwar richtig, meldete dazu aber: <em>„Der Bericht stammt aus der Zeit vor dieser Anzeige und kennt nur das System."</em> – über einen Bericht, der wenige Minuten alt war.',
       '<strong>Jetzt sagt er, was dich dort JETZT erwartet</strong>, genau wie beim Vorkommen: ob das Nest noch steht (mit seinen Lebenspunkten) oder gefallen bzw. weitergezogen ist, und ob die Festung noch steht (mit dem Anteil ihres Kerns) oder der Gürtel wieder frei ist. Stehen mehrere Nester im selben System, wird das aus deinem Bericht gesucht und kein beliebiges anderes.',
@@ -63968,15 +63972,27 @@
           eventBanner.style.display = 'block';
           document.getElementById('eventBannerIcon').className = 'ti '+def.icon;
           document.getElementById('eventBannerIcon').style.color = def.color||'#5dcaa5';
-          document.getElementById('eventBannerTitle').textContent = def.name;
-          document.getElementById('eventBannerDesc').textContent = def.desc;
+          // Tick-Ruhe (21.08.2026): Das Banner steht minutenlang und schrieb dabei auf JEDEM
+          // Reiter jede Sekunde denselben Inhalt neu - gemessen mit einem MutationObserver ueber
+          // alle zwoelf Reiter, 366 Byte je Tick auf Titel, Beschreibung und den beiden Knoepfen.
+          // Die Restzeit darunter aendert sich wirklich jede Sekunde und bleibt deshalb ungebremst.
+          setBoxText(document.getElementById('eventBannerTitle'), def.name);
+          setBoxText(document.getElementById('eventBannerDesc'), def.desc);
           const remain = Math.max(0, state.activeEvent.expiresAt - Date.now());
           document.getElementById('eventBannerTimer').textContent = fmtDuration(remain/1000);
           const optABtn = document.getElementById('eventOptA');
           const optBBtn = document.getElementById('eventOptB');
-          optABtn.innerHTML = def.optA.label + (def.optA.cost ? ' <span style="opacity:0.75;">('+costHtml(def.optA.cost)+')</span>' : '');
+          // Knopf A traegt NUR bei Kosten ein Element (den <span> mit der Kostenliste). Ohne
+          // Kosten ist sein Inhalt reiner Text - und setBoxHtml waere dort wirkungslos, weil seine
+          // zweite Bedingung (childElementCount) bei elementlosem Inhalt jeden Tick einen
+          // Neuaufbau erzwingt. Gemessen, nicht geschaetzt: von 60 Ereignissen ist genau eines so
+          // gebaut ('probe'). Der Wechsel zwischen beiden Zweigen ist gefahrlos - beim Rueckweg
+          // sorgt genau diese childElementCount-Bedingung dafuer, dass trotz gleicher Signatur
+          // neu aufgebaut wird.
+          if (def.optA.cost) setBoxHtml(optABtn, 'eventOptA', def.optA.label + ' <span style="opacity:0.75;">('+costHtml(def.optA.cost)+')</span>');
+          else setBoxText(optABtn, def.optA.label);
           optABtn.disabled = !!(def.optA.cost && !canAfford(def.optA.cost));
-          optBBtn.textContent = def.optB.label;
+          setBoxText(optBBtn, def.optB.label);
           optABtn.onclick = () => resolveEvent('A');
           optBBtn.onclick = () => resolveEvent('B');
         } else {
