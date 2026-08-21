@@ -2381,6 +2381,36 @@ den laufenden Prüflauf entwertet, und keines gehört inhaltlich dazu.
    Produktentscheidung und gehört Sascha vorgelegt**, mit Optionen: die Wirkung umwidmen (eigene
    Verluste senken – liegt vollständig auf der ohnehin offenen Client-Seite, null Backend-Zeilen),
    oder den Gegenstand streichen und das im Patchnote sagen (wie beim Wochenpass).
+### Der Fundort-Knopf log bei Nest- und Festungsberichten (behoben 21.08.2026)
+
+`zeigeAsteroidFundort` kannte zwei Fälle: einen Bericht MIT Gürtelplatz und einen alten ohne. Nest-
+und Festungsberichte tragen aber **grundsätzlich keinen** `platz` – sie meinen ein Ziel im System,
+keinen Platz auf der Gürtelbahn. Beide stehen trotzdem in der Eignungsliste des Knopfes, fielen
+damit in den Altbestands-Zweig und meldeten über einen **minutenalten** Bericht: „Der Bericht
+stammt aus der Zeit vor dieser Anzeige und kennt nur das System."
+
+**Die Festungs-Hälfte war seit v8.569.0 live**, also drei Tage. Aufgefallen ist sie erst, als der
+Nest-Bericht denselben Knopf bekam und dieselbe Zeile erzeugte – ein zweiter Betroffener macht
+einen Einzelfall sichtbar, den man allein übersieht (dieselbe Familie wie Regel 52: die
+Einzelfall-Lösung ist der Hinweis, dass es weitere Betroffene gibt, hier in der Gegenrichtung).
+
+Behoben mit einem eigenen Zweig für **beide** Arten, der sagt, was den Spieler dort JETZT erwartet
+– dieselbe Ehrlichkeit, die der Vorkommen-Zweig darunter schon leistet: Nest steht noch (mit
+Lebenspunkten) bzw. ist gefallen oder weitergezogen; Festung steht noch (mit Kernanteil) bzw. der
+Gürtel ist wieder frei. Das Nest wird dabei **über sein Volk** gesucht, weil in einem System
+mehrere Nester stehen können und der Bericht genau eines meint.
+
+**Die übertragbare Frage, die hier gefehlt hat:** Wer eine neue Berichtsart in die Eignungsliste
+eines Knopfes aufnimmt, prüft, ob sie die Felder überhaupt trägt, auf die dieser Knopf sich stützt.
+Ein Knopf, der erscheint, aber nur den Rückfallzweig erreicht, ist keine Funktion mit Lücke – er
+ist eine Falschaussage.
+
+Wächter: `tests/test_fundort_knopf.js` Abschnitt 6 (8 Prüfungen). Er misst je Art **beide
+Richtungen** – Ziel steht noch und Ziel ist weg –, denn eine Meldung, die immer dasselbe sagt, wäre
+auch von einem festen Text erfüllt (Regel 61). Die Fixture kann dafür `galaxy` und `asteroid/field`
+injizieren; ohne Injektion bleibt es beim lokal erzeugten Gürtel, damit die Abbau-Fälle ihren
+ablesbaren Platz behalten (Regel 4). Beidseitig gegengeprüft: 19 Prüfungen in jeder Richtung, und
+am Stand davor fallen genau die sechs neuen Inhaltsprüfungen, jede mit der alten Zeile als Beleg.
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
