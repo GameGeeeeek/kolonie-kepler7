@@ -2656,6 +2656,28 @@ Backend-PR gehört deshalb **vor** diesem gemerged, und danach die 401/404-Route
 (`POST /api/logout` muss 401 oder 200 liefern, nicht 404; mit einer erfundenen Route als
 Negativkontrolle und einer alten als Gegenkontrolle).
 
+**Die Bedingung ist seit dem 21.08.2026, 04:17 UTC erfüllt** – und die Wartezeit darauf betrug
+**44,5 Stunden** (siebter Deploy-Ausfall, Einzelheiten in der Backend-CLAUDE.md). Gemessen, mit
+beiden Kontrollen im selben Lauf:
+
+```
+POST /api/logout                 200   (neu mit #142)
+POST /api/musterattack/create    401   (alte Kontrollroute)
+POST /api/gibtesnicht            404   (Negativkontrolle)
+```
+
+**Belegt wurde dabei die WIRKUNG, nicht der Statuscode** (Arbeitsregel 61): Die Antwort trägt
+`Set-Cookie: kepler7_sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure` – und zwar **genau
+einmal**. Das ist der Fehler, den der eigene Test gefangen hatte (die Nachreichung schrieb erst
+eine frische Sitzung über 180 Tage und darüber deren Löschung), live gegengeprüft. Ein 200 allein
+hätte auch eine Route belegt, die gar nichts löscht.
+
+**Nebenbefund aus derselben Messung:** Das `Secure` steht da. Damit ist `req.secure` hinter dem
+nginx des Pi nachweislich korrekt – also genau die Entscheidung, die der erste Entwurf über
+`PUBLIC_URL.startsWith('https://')` falsch getroffen hätte (eine Fallunterscheidung über eine
+Konfiguration, die nur einen Wert annehmen KANN, ist keine). Sie ist damit nicht mehr nur
+begründet, sondern an der Produktion gemessen.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
