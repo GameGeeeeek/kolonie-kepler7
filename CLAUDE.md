@@ -1447,7 +1447,7 @@ Wächter: `tests/test_bastionsmarken.js` (48 Prüfungen, Quelltext + Backend-Par
 ausgeführtem Funktionsvergleich) und `tests/test_bastionsmarken_ui.js` (26 Prüfungen am
 gerenderten Spiel — Sichtbarkeit statt Existenz, Kauf, Abbruch, Wirkung je Anlagenklasse).
 
-## Aliens und Asteroidenfestungen (Konzept 18.08.2026, Phasen 0–3 fertig)
+## Aliens und Asteroidenfestungen (Konzept 18.08.2026, ALLE Phasen fertig)
 
 Auftrag Sascha: „Ich würde gerne noch aliens und asteroidenfestungen einführen die soll man auf der
 karte sehen und angreifen können entwickle ein detailiertes konzept", danach „Alles umsetzten".
@@ -1467,9 +1467,9 @@ wurde als dort.
 | **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
 | **2** | Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | **fertig** – Backend #133, Frontend siehe unten |
 | **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Königin, Angriff | **fertig** – Backend #137, Frontend siehe unten |
-| **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
-| **5** | die Königin, Musterangriff-Zielart | offen |
-| **6** | Feinschliff: Embleme, Kompendium, `belagerungsplan`, Vorbote | offen |
+| **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | **fertig** – Backend #145, Frontend v8.585.0 |
+| **5** | Musterangriff-Zielart `alien-nest` | **fertig** – Backend #149, Frontend v8.590.0 |
+| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.594.0. Der `belagerungsplan` ist bewusst NICHT gebaut – Begründung unter „Offen aus Phase 6“ |
 
 ### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
 
