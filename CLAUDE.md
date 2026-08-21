@@ -273,6 +273,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     `naechste-version.js` liest **alle** Versionen aus `origin/main` – die Konstante UND jeden
     Patchnotes-Eintrag. Genau daran ist es aufgefallen: v8.500.0 kam zusammen mit v8.501.0 in EINEM
     Commit, und wer nur die `VERSION`-Konstante ansieht, übersieht die erste.
+
+    **Nachtrag 21.08.2026 – DREI Kollisionen an einem Tag, und die umgedrehte Reihenfolge hat
+    keine davon verhindert.** Dieselbe Lieferung musste v8.598.0 → 8.599.0 → 8.600.0 → **8.601.0**
+    durchlaufen. Der Ablauf von oben wurde jedes Mal korrekt eingehalten: Nummer erst nach dem
+    grünen Lauf, `naechste-version.js` unmittelbar davor, Kollisionsprüfung als eigener Befehl.
+    Das ist auch nicht die Lücke – **die Lücke ist arithmetisch.** Ein voller Lauf dauert gemessen
+    45 bis 52 Minuten; wer die Nummer danach vergibt, hat trotzdem noch die Zeit für
+    `build-patchnotes.js`, `--nummer`, Commit und Merge offen. Liegt der Auslieferungstakt der
+    parallelen Sitzungen darunter, konvergiert es nicht.
+    **Was wirklich hilft, ist nicht eine weitere Regel, sondern die Größe des Fensters.** Drei
+    Möglichkeiten, alle drei am 21.08. durchgerechnet: (a) Nach dem grünen Lauf nur noch
+    umnummerieren und SOFORT mergen – das Fenster schrumpft auf die zwei Minuten von `--nummer`;
+    (b) den vollen Lauf VOR der letzten fremden Lieferung starten und nach einem Rebase nur den
+    gezielten Betroffenheits-Sweep plus `--nur-pflicht` fahren (Regel 40/58) – das kostet zwei
+    Minuten statt fünfzig, deckt aber nur die betroffenen Bereiche ab; (c) auf ein ruhiges Fenster
+    warten. **Gewählt wurde (a) plus (b):** Nach dem Rebase liefen erst die vier Tests der fremden
+    Lieferung einzeln (`test_belagerungsplan` 32, `test_herkunft` 33, `test_items` 25,
+    `test_protomaterie` 43 – alle grün), dann der volle Lauf, dann in EINEM Zug Nummer, `--nummer`,
+    Commit, Merge. Der Rebase selbst ist billig, solange man den überholten Nummern-Commit
+    **überspringt** statt seinen Konflikt aufzulösen (`git rebase --skip`) – die zwei Inhalts-
+    Commits liefen beide Male sauber durch.
+    **Und der Beleg gehört zu jedem Rebase, nicht nur zum ersten:** beide Seiten NACHZÄHLEN. Nach
+    dem dritten Aufsetzen: eigene Markierungen 8 von 8 (`MODUL_INVENTAR_KAUF_DECKEL` 5×,
+    `fuseIndexBauen` 4×, `rarRang` 8×), fremde 3 von 3 (`belagerungsplan` 14×, `kbRunderKasten` 9×),
+    alle sieben Testdateien byte-identisch zum Fernstand, CLAUDE.md um die 161 Zeilen der fremden
+    Doku gewachsen. Ohne diese Zählung ist „der Rebase lief sauber" eine Behauptung.
+
 24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
     Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
     gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
@@ -1105,6 +1132,21 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Befehl mit vorangestelltem `cd /home/user/kolonie-kepler7 &&`. Und bei einem Fehlschlag, der
     ALLE Tests gleichzeitig trifft, zuerst die erste Protokollzeile ansehen: Ein echter Fehler
     trifft selten sechs unabhängige Tests auf einmal.
+
+    **Nachtrag 21.08.2026 – schlimmer als hier steht: das Arbeitsverzeichnis überlebt den
+    BEFEHL.** Die Regel oben sagt „nicht in denselben Befehl"; gemessen wirkt ein `cd` in den
+    Nachbar-Klon auch in ALLEN FOLGENDEN Bash-Aufrufen weiter, weil das Werkzeug das
+    Arbeitsverzeichnis zwischen den Aufrufen behält. Konkret passiert: Ein `cd
+    ../kolonie-kepler7-backend` für einen Pull, drei Aufrufe später ein `grep` in `CLAUDE.md` –
+    und gelesen wurde die BACKEND-CLAUDE.md. Die Suche lieferte „nichts gefunden", was wie eine
+    fehlende Zielstelle aussieht und in Wahrheit die falsche Datei war. Verraten hat es allein die
+    Zeilenzahl (1.704 statt 4.316) – dieselbe Familie wie Regel 10 („hat der Melder die veraltete
+    `index.html` gelesen?"), nur beim eigenen Werkzeug.
+    **Vorgehen:** JEDER Befehl bekommt sein Verzeichnis vorangestellt (`cd /home/user/kolonie-kepler7
+    && …`), auch wenn der vorherige schon dort stand – und wer eine Suche in einer bekannten Datei
+    ins Leere laufen sieht, prüft ZUERST `pwd` und die Dateigröße, bevor er die Zielstelle für
+    verschwunden hält.
+
 58. **Nach einem Rebase auf einen fremden Stand prüft „mein Bereich ist nicht betroffen" genau das
     Falsche – der Fehler, den man sich EINHANDELT, liegt im fremden Teil.** Vorfall 18.08.2026:
     Bei KB-13, VT-1 und KB-15 wurde je nach einem Rebase argumentiert, die fremde Lieferung berühre
@@ -1212,7 +1254,7 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - **Neue Box mit `<input>`/`<textarea>`**, die von einem wiederkehrenden Trigger (Haupt-Tick, `setInterval`) neu gerendert wird: braucht von Anfang an `isTypingIn('boxId')`-Schutz, sonst verliert das Feld beim Tippen den Fokus.
 - **Jeder Bedienzustand, der NUR im DOM steckt, überlebt das Neuzeichnen nicht.** Der Haupt-Tick schreibt Boxen jede Sekunde per `innerHTML` neu – alles, was der Browser selbst verwaltet und was nicht im erzeugten HTML wieder mitgeschrieben wird, ist danach weg. Drei Ausprägungen, alle am 25.07.2026 als echte Spielerfehler aufgetreten: (a) **`<details>`** klappte nach einer Sekunde von selbst wieder zu (gesperrte Event-Schiff-Karten, Allianzbasis-Ausbaustufen, Teilnehmerlisten) → `data-keep-open="<schlüssel>"` + `detailsOpenAttr()`; (b) **`<select>`** sprang auf die erste Option zurück – beim Allianz-Raid sogar folgenschwer, weil der Startknopf `sel.value` erst im Moment des Klicks liest und der Raid dadurch still mit der Vorgabedauer statt der gewählten startete → `data-keep-value="<schlüssel>"` + `selectedAttrFor()`; (c) **waagerechte Scrollposition** der Wischleisten → `setHtmlPreservingScroll()` statt `innerHTML =` (bereits überall angewandt, wo `data-hscroll` mit Schlüssel vorkommt). `isTypingIn()` hilft hier nur halb: Es greift ausschließlich, solange das Element den Fokus hat – sobald man wegklickt, ist der Zustand wieder verloren (genau so war der Musterangriff-Fehler verdeckt). Beim Bau einer neuen Box also von Anfang an fragen: **Kann der Spieler hier etwas einstellen, das nirgends im erzeugten HTML wieder auftaucht?**
 - **BUILDING_DEFS mit `category:'defense'`**: `defVal`/`atkVal` müssen explizit gesetzt sein (mind. `0`), sonst kippt die globale Verteidigungsberechnung auf `NaN` (kein `||0`-Fallback an der Summierstelle).
-- **Wer einem BESTANDS-Gebäude nachträglich ein `maxLevel` gibt, braucht eine NEUE Kappungs-Marke** (16.08.2026, Labor-Deckel): `deckelKappung()` läuft einmalig je Marke; Bestandskonten tragen `deckelKappung2026`/`2026b` längst, mit einer alten Marke als Wache liefe die Kappung für das neue Gebäude dort nie – der Deckel „bedeutete für Bestandskonten nichts“, exakt der Spieler-Report, der zum zweiten Durchgang führte. Ablauf: nächste Marke (`2026c` → `2026d` …) als Wache setzen, alle älteren mitsetzen, die neue Marke in BEIDEN Reset-Bewahrlisten ergänzen (Suchbegriff `deckelKappung2026`) UND in der Abstreif-Liste von `tests/test_t1_deckel.js` (der Kommentar dort verlangt es wörtlich; vergessen = Test fälschlich rot, weil die Kappung im Fixture sofort zurückkehrt). Die Schleife selbst ist generisch und idempotent – neuer Code ist nicht nötig. Das Labor bekam bewusst maxLevel 25 OHNE `flachAb`: Abflachung senkt vorhandene Raten (das war Teil des Minen-Umbaus), ein reiner Deckel nicht.
+- **Wer einem BESTANDS-Gebäude nachträglich ein `maxLevel` gibt, braucht eine NEUE Kappungs-Marke** (16.08.2026, Labor-Deckel): `deckelKappung()` läuft einmalig je Marke; Bestandskonten tragen `deckelKappung2026`/`2026b` längst, mit einer alten Marke als Wache liefe die Kappung für das neue Gebäude dort nie – der Deckel „bedeutete für Bestandskonten nichts", exakt der Spieler-Report, der zum zweiten Durchgang führte. Ablauf: nächste Marke (`2026c` → `2026d` …) als Wache setzen, alle älteren mitsetzen, die neue Marke in BEIDEN Reset-Bewahrlisten ergänzen (Suchbegriff `deckelKappung2026`) UND in der Abstreif-Liste von `tests/test_t1_deckel.js` (der Kommentar dort verlangt es wörtlich; vergessen = Test fälschlich rot, weil die Kappung im Fixture sofort zurückkehrt). Die Schleife selbst ist generisch und idempotent – neuer Code ist nicht nötig. Das Labor bekam bewusst maxLevel 25 OHNE `flachAb`: Abflachung senkt vorhandene Raten (das war Teil des Minen-Umbaus), ein reiner Deckel nicht.
 - **Ein temporärer Fehler darf NIE zur Abmeldung führen – und das serverseitige Rate-Limit gilt für ALLE `/api`-Routen** (Spieler-Report Sascha 17.08.2026: „400 Mio im Markt verkaufen, irgendwann werde ich einfach ausgeloggt"). Die Kette, komplett gemessen: Der Markt-Sammelauftrag zerlegt in Tranchen zu `MARKET_MAX_PER_TRADE` (1 Mio) und feuerte sie **ohne Pause** – bei 400 Mio also 400 Anfragen in einer knappen halben Minute. `app.use('/api', globalApiRateLimit)` im Backend deckelt aber **240 Anfragen/Minute je Verbindung**, und zwar für alles: Handel, Speichern, Marktdaten, Bestenliste. Der 429 traf danach auch den 409-Zweig von `saveGameStateVersioned`, dessen Versions-Nachladen (`storageGet`) still auf localStorage zurückfällt und einen Wert **ohne** `version` liefert – dort stand `handleSaveConflict()`, also Token löschen und Abmelde-Dialog. **Zwei Lehren:** (a) Wer eine Schleife baut, die den Server anspricht, rechnet sie gegen dieses Limit (jetzt `MARKET_BULK_PAUSE_MS`, und ein 429 lässt warten statt abbrechen); (b) `handleSaveConflict()` gehört ausschließlich an den Fall „Server hat geantwortet und nennt beharrlich eine fremde Version" (drei erfolglose Nachladeversuche) – ein *gescheitertes* Nachladen ist kein Beleg für eine zweite Sitzung, dort meldet jetzt nur `notifySaveRejected`. `tests/test_marktlimit_abmeldung.js` prüft beide Richtungen; am Stand v8.540.0 fällt es mit `{"token":"WEG"}` und gemessenen 56 ms Anfrage-Abstand.
 - **Jede Flotte, die irgendwohin fliegt und wiederkommt, ist HIN UND ZURÜCK unterwegs – die Missionsdauer deckt beide Wege** (Auftrag Sascha, 17.08.2026). Die Regel gilt ab sofort für jede neue Missionsart, ohne Ausnahme: Wer eine Flotte losschickt, bekommt sie nicht am Ziel zurück, sondern zu Hause. Sauber gebaut ist das an der **Abbaumission** – sie ist das Vorbild: `flug` ist die Rundreise, `hinBis = jetzt + flug/2` die Ankunft, `abbauBis` das Ende der Arbeit, `endTime = flug + abbau` die Heimkehr; die Vorschau zeigt „Hinflug · Abbau · Rückflug (gesamt …)". Ebenso in Ordnung sind alle Arten, bei denen die Flotte für die volle `dur` weg ist und erst am `endTime` wieder zur Verfügung steht (Erkundung, Kolonisierung, NPC-Angriff, Spielerangriff, Spionage, Weltboss, Expedition). **Bewusst einwegig und deshalb KEIN Verstoß** sind Verlegungen (`relocate`) und das Stationieren an der Allianzbasis (`defend-base`, mit eigener `defend-base-return`-Mission für den Rückweg) sowie die Eskorte am Vorkommen – dort bleiben die Schiffe wirklich am Ziel. **Am 17.08.2026 verletzten genau zwei Arten die Regel – `intercept-pirates` und `void-rift`; beide sind seit v8.563.0 (18.08.2026) umgebaut und gelten jetzt als Vorbild für zeitkritische Missionen.**
 
@@ -4314,3 +4356,38 @@ lehrreichste:**
     in einer anderen Kodierung dasteht, ist die Familie aus Regel 32 (Literal gesucht, Rechenform
     übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
     das Werkzeug Sauberkeit, wo keine ist.
+
+## Vorarbeit: die Belohnungsvorschau des Allianz-Raids IST rechenbar (gemessen 21.08.2026)
+
+Auftrag Sascha: „allianz raid deutlich optisch aktraktiver gestalkten weniger text und vsl.
+belohnungen einblenden." Die Etappe ist noch nicht gebaut; hier steht nur, was die Vorabmessung
+ergeben hat – **und sie widerlegt meine eigene erste Einschätzung.**
+
+Notiert hatte ich, eine exakte Vorschau sei unmöglich, weil die Belohnung am Platz ALLER
+Teilnehmer hängt. Gemessen stimmt das nicht: `ranking` wird **beim Abflug** gebildet und nach
+Angriffskraft sortiert (`server.js`, `onTime.slice().sort((a,b) => (b.power||0) - (a.power||0))`),
+und dieselbe Liste wandert unverändert ins Wellen-Ergebnis, aus dem `/claim` den Platz liest. Damit
+stehen nach dem Versand **alle** Eingaben von `allianceRaidRewardFor` fest:
+
+| Eingabe | Woher im Frontend |
+|---|---|
+| `share` | eigene `power` / `doc.dispatch.totalPower` |
+| `platz` | Index in `doc.dispatch.ranking` |
+| `anzahl` | Länge derselben Liste |
+| `boss` | `ALLIANCE_RAID_BOSSE` liegt im Frontend (`beuteMult`, `schwerpunkt`) |
+| `level` | `doc.level` |
+| `destroyed` | **das Einzige, was offen ist** |
+
+Eine Vorschau ist deshalb kein Schätzwert mit Spanne, sondern ein **PAAR aus zwei exakten Werten**:
+„Boss überlebt" (Faktor 0,6, keine Antimaterie, keine Fragmente) und „Boss fällt" (Faktor 1,0).
+
+**Der Preis ist eine Kopie-Familie.** `allianceRaidRewardFor` müsste im Frontend nachgebaut werden –
+mit Paritätsprüfung als Pflicht, wie bei `FESTUNG_STUFEN` und `SHIP_SCORE_WEIGHTS`. Die Alternative
+ist ein Feld vom Server (ein Backend-PR, keine zweite Formel). Diese Wahl gehört Sascha vorgelegt,
+nicht still entschieden.
+
+**Zum Textumfang, gemessen statt geschätzt:** `renderAllianceRaidBox` ist 15.462 Zeichen über 166
+Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die zwei längsten sind
+der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
+die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
+TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.
