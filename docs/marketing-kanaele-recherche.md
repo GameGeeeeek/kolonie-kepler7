@@ -41,22 +41,49 @@ Pay-to-Win" (**geprüft**). Das ist das schärfste Werkzeug – siehe Abschnitt 
 
 ---
 
-## 2. Die Gastmodus-Frage entscheidet über drei Kanäle
+## 2. Die Einstiegshürde – gemessen, nicht geschätzt
 
-- **r/WebGames** beschreibt sich wörtlich als „web games with no downloads, signups, or plugins
-  required" (**geprüft**).
+**Entscheidung Sascha, 21.08.2026: Ein Gastmodus wird NICHT gebaut.** Der Abschnitt bleibt, weil
+die Hürde damit nicht verschwindet, sondern feststeht – und weil sie bestimmt, was jeder Kanal
+dieser Liste wert ist.
+
+**Was ein neuer Spieler tatsächlich durchlaufen muss** (gemessen an `server.js`, Registrierung und
+Login-Zweig, **geprüft**):
+
+1. Kommandantenname
+2. Passwort – mind. 8 Zeichen, wird gegen 2.122 bekannte Passwörter geprüft
+3. **E-Mail-Adresse – Pflicht** (`'E-Mail-Adresse ist erforderlich (für die Konto-Bestätigung).'`)
+4. Postfach öffnen
+5. **Bestätigungslink klicken** – ohne ihn antwortet der Login mit
+   `403 { needsVerification: true }`
+6. zurück zum Spiel, anmelden
+
+Erst dann läuft das Spiel. Das ist Double-Opt-In mit einem guten Grund – Zweitkonten sind bei PvP
+und einem Referral-System ein echtes Problem –, aber **Schritt 4 liegt außerhalb der Seite**, und
+das ist die härteste Stelle jeder Konversionskette.
+
+**Zwei Kanäle fallen dadurch weg**, und zwar an ihrer eigenen Regel, nicht an einer Einschätzung:
+
+- **r/WebGames** (142.000) beschreibt sich wörtlich als „web games with no downloads, **signups**,
+  or plugins required" (**geprüft**). Ein Spiel mit Pflichtregistrierung passt dort nicht.
 - **Show HN** schließt E-Mail-Anmeldungen ausdrücklich aus: „you have to have something for people
   to try out now" (**geprüft**).
-- **itch.io** verlangt für die Indexierung ein einbettbares Spiel (siehe Abschnitt 4).
 
-Der Solo-Modus existiert im Code (`useBackend()`), der Einstieg führt aber über „Kolonie gründen"
-bzw. „Anmelden". Ob man ohne Registrierung hineinkommt, ist **nicht abschließend geklärt**
-(**ungeprüft**) – der Begriff „Gastmodus" kommt im Quelltext nur dreimal vor, jedes Mal als
-Einschränkungshinweis beim Markt, nie als Einstiegsweg.
+**itch.io bleibt**, aber mit gedämpfter Erwartung: Die Indexierungsfrage dort hängt an der
+Einbettbarkeit (Abschnitt 4), nicht an der Registrierung. Wer auf itch.io stöbert, erwartet
+allerdings Sofort-Spielbarkeit – die Abbruchquote wird hoch sein.
 
-**Empfehlung:** Ein „Ohne Anmeldung ausprobieren"-Knopf, der in den Solo-Modus startet und später
-das Sichern per Registrierung anbietet. Öffnet drei Kanäle mit zusammen über 300.000 Mitgliedern.
-Der Aufwand ist nicht geschätzt und gehört vor dem Bau gemessen.
+**Was daraus folgt, ohne einen Gastmodus:** Die verbleibenden Kanäle müssen den Wegfall auffangen,
+also gewinnen Verzeichnisse und r/incremental_games an Gewicht. Und die Reihenfolge wird wichtiger,
+nicht unwichtiger: Ein Verzeichniseintrag lässt sich wiederholen und wirkt über den Backlink auch
+ohne Klick, ein Reddit-Beitrag ist ein einmaliger Schuss.
+
+**Ein Widerspruch, der unabhängig davon behoben gehört:** `weltraum-browsergame.html` sagt heute
+„Kein Client, kein Plugin, kein App-Store – Seite aufrufen, Kommandantennamen wählen, loslegen."
+Das stimmt nicht – ohne E-Mail und Bestätigungsklick legt niemand los. Das ist die klassische
+zweite Anzeigestelle mit der alten Annahme (Punkt 6 der Checkliste), nur auf einer Landingpage
+statt im Spiel, und es ist die erste Seite, die ein Besucher aus einem Verzeichnis sieht.
+Gemessen ist es die **einzige** Stelle mit dieser Zusage (**geprüft**).
 
 ---
 
@@ -75,7 +102,7 @@ aus Fachartikeln. **Vor jedem Beitrag die Regelseite selbst öffnen.**
 | r/MMORPG | 359.000 | +60k (20 %) | Flair „Self Promotion" existiert | 6 |
 | r/indiegames | 328.000 | +71k (28 %) | häufigster Flair ist „Promotion" | 8 |
 | r/incremental_games | 187.000 | +28k (18 %) | ja; **Referral-Links absolut verboten** | 10 |
-| r/WebGames | 142.000 | +14k (11 %) | erst nach Community-Zugehörigkeit | 9 |
+| r/WebGames | 142.000 | +14k (11 %) | **passt nicht mehr** – Sub schließt „signups" aus (Abschnitt 2) | – |
 | r/playmygame | 138.000 | – | dafür gebaut, Formvorgaben | 9 |
 | r/RealTimeStrategy | 102.000 | +20k (25 %) | Flairs „Self-Promo Video/Post" | 6 |
 | r/DestroyMyGame | 62.000 | +23k (57 %) | dafür gebaut | 5 |
@@ -328,7 +355,8 @@ Diese Liste gehört zum Ergebnis.
 - **Einige Portale nicht vollständig lesbar** (browsergames.fm blockt Abrufe, alphabetagamer.com
   antwortete mit Serverfehler).
 - **Suchvolumen nicht gemessen.**
-- **Der Gastmodus ist ungeklärt** – diese eine Frage entscheidet über drei Kanäle.
+- **Der Gastmodus ist verworfen** (Entscheidung Sascha, 21.08.2026). Die Einstiegskette ist
+  seitdem gemessen statt vermutet – siehe Abschnitt 2.
 
 ---
 
@@ -336,6 +364,8 @@ Diese Liste gehört zum Ergebnis.
 
 1. **Die siebzehn Verzeichniseinträge.** Ein Nachmittag, und das Sichtbarkeitsproblem aus
    Abschnitt 1 ist strukturell angegangen statt beklagt.
-2. **Den Gastmodus klären und ggf. bauen.** Öffnet r/WebGames, Show HN und itch.io gleichzeitig.
+2. **Den falschen Satz auf `weltraum-browsergame.html` korrigieren.** Er verspricht einen
+   Einstieg, den es nicht gibt – auf genau der Seite, auf der ein Besucher aus einem
+   Verzeichnis landet.
 3. **Den teilbaren Kampfbericht.** Der einzige Kanal dieser Liste, der mit jedem neuen Spieler
    stärker wird statt schwächer.
