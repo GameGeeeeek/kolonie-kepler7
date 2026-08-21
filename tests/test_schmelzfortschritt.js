@@ -25,12 +25,23 @@ const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
 // ---- 1) beide Inventare, EINE Zaehlung je Karte
+/* Seit dem Inventar-Deckel (21.08.2026) bekommt fuseAnzahl einen vorab gebauten Zaehler-Index
+   als drittes Argument. Geprueft wird deshalb die REGEL - die Karte zieht die Zahl EINMAL in
+   eine Variable und der Knopf liest genau diese - statt der alten Argumentliste (Hausregel 3).
+   Der Index selbst ist dabei nicht optional: ohne ihn liefe die Zaehlung je Karte ueber das
+   ganze Inventar, und genau das war der Vorfall. */
 check('1a: Standort-Karte zieht die Geschwister-Zahl in fuseAnz heraus',
-  JS.includes('const fuseAnz = fuseAnzahl(state.modules, instKey);') &&
+  /const fuseAnz = fuseAnzahl\(state\.modules, instKey(, \w+)?\);/.test(JS) &&
   JS.includes('const canFuse = fuseAnz >= MODULE_FUSE_COUNT'));
+check('1a2: und zwar mit dem vorab gebauten Zaehler-Index (nicht je Karte neu)',
+  /const fuseAnz = fuseAnzahl\(state\.modules, instKey, \w+\);/.test(JS)
+  && JS.includes('const fuseIdx = fuseIndexBauen(state.modules, false);'));
 check('1b: Klassen-Karte ebenso (fuseAnzS)',
-  JS.includes('const fuseAnzS = fuseAnzahl(state.shipModules, instKey);') &&
+  /const fuseAnzS = fuseAnzahl\(state\.shipModules, instKey(, \w+)?\);/.test(JS) &&
   JS.includes('const canFuseS = fuseAnzS >= MODULE_FUSE_COUNT'));
+check('1b2: Klassen-Karte ebenso mit Index',
+  /const fuseAnzS = fuseAnzahl\(state\.shipModules, instKey, \w+\);/.test(JS)
+  && JS.includes('const fuseIdxS = fuseIndexBauen(state.shipModules, true);'));
 check('1c: der Standort-Hinweis erscheint GENAU beim vorletzten Exemplar',
   JS.includes("${(fuseAnz === MODULE_FUSE_COUNT - 1 && nextRar && nextRar !== 'mythisch')?"));
 check('1d: der Klassen-Hinweis ebenso',
