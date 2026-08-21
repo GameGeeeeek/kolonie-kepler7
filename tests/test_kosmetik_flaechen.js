@@ -49,7 +49,7 @@ const OHNE = { namensfarbe: 'nf_standard', emblem: 'em_keins' };     // Gegenpro
 // Die Farbe wird NICHT eingetippt, sondern aus KOSMETIK_LOOK der Spieldatei gelesen (Regel 4:
 // Werte ablesen, nie raten - und der Test soll nicht falsch anschlagen, wenn der Farbton sich
 // aendert).
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+const SRC = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
 const JS = SRC.match(/<script>([\s\S]*)<\/script>/)[1];
 const LOOK_BLOCK = JS.slice(JS.indexOf('const KOSMETIK_LOOK = {'), JS.indexOf('};', JS.indexOf('const KOSMETIK_LOOK = {')));
 const goldFarbe = (LOOK_BLOCK.match(/nf_gold:\s*\{[^}]*farbe:'([^']+)'/) || [])[1];

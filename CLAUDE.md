@@ -2775,12 +2775,28 @@ still ignoriert. Beide Läufe lasen dieselbe echte Datei. Das ist wörtlich die 
 Korrektur zu Regel 14 — „eine still ignorierte Env-Variable sieht aus wie eine bestandene
 Gegenprobe".
 
-**Gemessen: 19 weitere Tests haben denselben Defekt** — sie binden `lib/umgebung` nicht ein und
-lesen `weltraum_kolonie.html` über einen eigenen Pfad
-(`grep -Ln "lib/umgebung" tests/test_*.js | xargs grep -l weltraum_kolonie.html`). Sie
-sind nicht falsch, aber sie sind gegen eine Kopie nicht prüfbar — wer dort eine Gegenprobe fährt,
-bekommt eine Bestätigung geschenkt. Behoben ist bisher nur `test_tiefenflotte.js`; der Rest ist
-offen und lohnt einen eigenen Durchgang.
+**ERLEDIGT am 21.08.2026 — und der Durchgang hat mehr gefunden, als hier stand.** An dieser
+Stelle stand: „Gemessen: 19 weitere Tests haben denselben Defekt … der Rest ist offen und lohnt
+einen eigenen Durchgang." Gefunden wurden **25**. Die ursprüngliche Suche
+(`grep -Ln "lib/umgebung" tests/test_*.js`) übersah sieben, die `lib/umgebung` sehr wohl einbinden
+und den Quelltext **trotzdem** fest verdrahtet lasen — die unangenehmere Hälfte: Bei einer
+Gegenprobe läuft der Browser auf der Kopie und die Quelltext-Prüfung auf dem Original. Der Test ist
+dann halb umgeleitet und sagt trotzdem nichts. **Wer nach dieser Fehlerklasse sucht, sucht nach der
+LESESTELLE (`path.join(__dirname, '..', 'weltraum_kolonie.html')`), nicht nach dem fehlenden
+`require`** — sonst findet er nur die Hälfte (Regel 40 an der Suche selbst).
+
+**Die Pfade liegen jetzt in `tests/lib/spieldatei.js`, nicht in `lib/umgebung.js`** — und das ist
+keine Ordnungsfrage: `require('./lib/umgebung')` zieht Playwright hoch, gemessen **282 ms** je
+Lauf. Genau deshalb hatten die reinen Quelltext-Tests ihren eigenen `path.join`; sie alle auf
+`umgebung` zu setzen hätte den Defekt behoben und dafür Sekunden Suite-Zeit für einen Browser
+verheizt, den sie nie starten. Das neue Modul kostet **1 ms** und lädt nachweislich kein Playwright.
+`lib/umgebung.js` bezieht seine Pfade von dort und reicht sie unverändert weiter — eine zweite
+Fassung derselben Pfadlogik wäre genau die zweite Wahrheit, gegen die das Ganze sich richtet.
+
+**Der Beleg gehört zur Umstellung, nicht daneben:** Für jeden der 25 Tests wurde ein Lauf gegen die
+echte Datei und einer gegen eine leere Kopie gefahren. Alle 25 liefern normal `EXIT=0`, umgeleitet
+`EXIT=1` und eine andere Ausgabe. Wäre die Ausgabe gleich, wäre die Env-Variable weiterhin still
+ignoriert worden — und genau das sieht aus wie eine bestandene Gegenprobe.
 
 **Dazu ein Fehler im eigenen Mess-Skript, gleiche Familie:** Die Gegenproben-Schleife schrieb
 `node … > log; ok=$(grep -c OK log); fl=$(grep -c FAIL log); echo "EXIT=$?"` — und `$?` war der

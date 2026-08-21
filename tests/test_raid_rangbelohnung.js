@@ -127,7 +127,9 @@ const ANTEILE = [22,16,13,11,9,8,7,6,5,3];
 
 // ---- 6) Regel 6: die Frontend-Texte behaupten den alten Top-Bonus nicht mehr
 {
-  const spiel = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+  // Pfad ueber die gemeinsame Quelle: sonst wird KEPLER_SPIELDATEI still ignoriert und eine
+  // Gegenprobe liest die ECHTE Datei (CLAUDE.md, Korrektur zu Regel 14).
+  const spiel = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
   // Der Hilfe-Abschnitt zum ALLIANZ-Raid darf den +50%-Top-Bonus nicht mehr versprechen. Der
   // WELTBOSS benutzt ihn weiterhin und ist bewusst ausgenommen - dort stimmt die Aussage.
   const a = spiel.indexOf("title:'Allianz-Raid'");

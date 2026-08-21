@@ -27,7 +27,7 @@ const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const SPIEL = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+const SPIEL = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
 const JS = SPIEL.match(/<script>([\s\S]*)<\/script>/)[1];
 
 // ---- 1) die Spanne ist benannt und wird auch benutzt

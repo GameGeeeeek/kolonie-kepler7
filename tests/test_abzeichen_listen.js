@@ -36,7 +36,7 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 // TEIL 1: eine Quelle, keine Kopien (statisch, Sekunden)
 // ============================================================================
 {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+  const src = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
   const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
   check('supporterPille() existiert', /function supporterPille\(/.test(js));

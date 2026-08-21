@@ -16,7 +16,10 @@
 const fs = require('fs');
 const path = require('path');
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
-const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
+// Pfad ueber die gemeinsame Quelle: Dieser Test bindet lib/umgebung ein und las die Datei
+// TROTZDEM fest verdrahtet - bei einer Gegenprobe laeuft der Browser dann auf der Kopie
+// und die Quelltext-Pruefung auf dem Original (CLAUDE.md, Korrektur zu Regel 14).
+const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
