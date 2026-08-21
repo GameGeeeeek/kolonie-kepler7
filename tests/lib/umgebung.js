@@ -10,6 +10,7 @@
 // mehr.
 const fs = require('fs');
 const path = require('path');
+const PFADE = require('./spieldatei');
 
 const WURZEL = path.resolve(__dirname, '..', '..');
 
@@ -57,18 +58,19 @@ const starteBrowser = (extra) => chromium.launch(Object.assign({}, STARTOPTIONEN
 // Prüflauf wertlos macht (Regel 14, Nachtrag vom 15.08.2026). CLAUDE.md beschrieb diesen Env-Weg
 // schon als vorhanden; er war es nicht. Gilt für alle Tests, die ihre Datei von hier beziehen -
 // Tests mit eigenem `path.join(__dirname, '..', ...)` bleiben davon unberührt.
-const SPIELDATEI = process.env.KEPLER_SPIELDATEI || path.join(WURZEL, 'weltraum_kolonie.html');
-const SPIEL_URL = 'file://' + SPIELDATEI;
+// Bezogen aus lib/spieldatei.js - das ist die EINE Quelle der Pfade. Hier stand bis zum
+// 21.08.2026 eine zweite, wortgleiche Fassung; der Kommentar in spieldatei.js behauptete schon
+// damals, umgebung beziehe sie von dort. Gemessen rechneten beide identisch, es war also
+// folgenlos - aber es war eine zweite Wahrheit mit einem Kommentar, der das Gegenteil sagt, und
+// wer spieldatei.js geaendert haette, haette diese Datei NICHT mitgeaendert.
+const SPIELDATEI = PFADE.SPIELDATEI;
+const SPIEL_URL = PFADE.SPIEL_URL;
 
 // --- Backend-Quelltext (optional)
 // Ein paar Tests vergleichen Frontend und Backend Zeile für Zeile (Konterrollen, Kampfphasen,
 // Flottenbalance). Liegt das Backend-Repo nicht daneben, überspringen sie sich selbst mit klarer
 // Meldung, statt fehlzuschlagen - der Frontend-Prüflauf soll ohne das zweite Repo durchlaufen.
-const SERVER_JS = ersterVorhandener([
-  process.env.KEPLER_BACKEND_SERVER,
-  path.join(WURZEL, '..', 'kolonie-kepler7-backend', 'server.js'),
-  '/workspace/kolonie-kepler7-backend/server.js'
-].filter(Boolean));
+const SERVER_JS = PFADE.SERVER_JS;
 
 // --- Kleine Prüf-Hilfe, damit alle Tests dieselbe Ausgabe erzeugen
 function pruefer() {

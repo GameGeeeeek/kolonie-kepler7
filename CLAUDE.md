@@ -1949,9 +1949,11 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     das Ziel HINTER der klebenden Reiterleiste parkt, sah in der Zahl gut aus (jetzt `2b`). Und die
     laufende Etappe hatte selbst 29 px zu `#planetRoleBox` beigetragen und damit 9 px der Reserve
     gekostet – nicht die Ursache des Fehlschlags, aber gemessen und genannt statt verschwiegen.
-    **Offen als eigener Befund:** `scrollIntoView` rechnet die Zielposition EINMAL; wächst der
-    Inhalt darüber danach, driftet das Ziel unter dem Spieler weg. Und **88 von 147** Tests, die das
-    Spiel mit Spielstand booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+    **Der Befund daraus ist am 21.08.2026 nachgemessen und behoben** – siehe den Abschnitt
+    „Das Bild bleibt still" weiter unten. Er war größer als hier notiert: Es driftet nicht nur ein
+    Sprungziel, sondern die Lesestelle JEDES Spielers, sobald ein Banner über ihm auftaucht oder
+    abläuft. Offen bleibt der zweite Halbsatz: **87 von 160** Tests, die das Spiel mit Spielstand
+    booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
 
 63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
     RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
@@ -2962,33 +2964,28 @@ eine Zeile, die sagt, was beim Fall zu holen ist.
 **`kartenFuellBalken(label, wert, max, farbe, tip)` ist die EINE Quelle für alle vier Balken**
 (Nest-Kern, Festungs-Kern, Schildkuppel, Geschütztürme). Fünf Entscheidungen darin:
 
-- **Dieselbe CSS-Klasse `.sstat` wie Schiffe und Verteidigungsanlagen** – dieselbe Entscheidung
-  wie bei VT-1, und `test_verteidigungsbalken` 5 prüft sie ausdrücklich („`.sstat` statt einer
-  zweiten Bildsprache").
-  **Aber die Wahl ist NICHT so eindeutig, wie dieser Satz allein klingt, und das gehört dazu:**
-  Gemessen benutzt das Spiel für Füllstände `.progress-outer`/`.progress-inner` an **60** Stellen,
-  `.sstat` nur an **drei** (Werft, Verteidigung, jetzt hier). Und ausgerechnet im NACHBAR-Kartenmenü
-  steht seit v8.512.0 schon ein Balken dieser Hausform: der Vorrat des Asteroiden. Für den Spieler
-  stehen damit **zwei Balkenformen im selben Menü-Typ**. Ausschlaggebend war die Zahl der Leisten:
-  Der Asteroid hat EINE (die Zeile darüber sagt, was sie meint), die Festung hat DREI, und drei
-  Leisten ohne Beschriftung sind nicht auseinanderzuhalten – `.progress-outer` hat kein Label-Feld.
-  **Der saubere Abschluss wäre, den Asteroiden-Vorrat ebenfalls auf `kartenFuellBalken` zu ziehen**
-  (Label „Vorrat", Zahlenzeile bleibt) – dann gibt es im Kartenmenü EINE Form. Das ist bewusst NICHT
-  Teil dieser Etappe: `test_asteroiden_info` und `test_flottenkarten` lesen den vorhandenen Balken,
-  die Umstellung braucht also eigene Messungen statt eines Anhängsels. Wer sie angeht, prüft zuerst
-  diese zwei Tests.
+- **Die CSS-Klasse war zuerst `.sstat` (die Kennwertform der Werft) – das war falsch und ist mit
+  GR-3 korrigiert.** Der Absatz bleibt hier stehen, weil die Fehlerfamilie wiederkehrt: Ich hatte
+  „dieselbe Klasse wie Werft und Verteidigung" als Vorteil verbucht (VT-1-Präzedenz) und dabei die
+  falsche Frage beantwortet. Ein Lebenspunkte-Rest ist kein Kennwert-VERGLEICH, sondern ein
+  FÜLLSTAND – und für die zeichnet das Spiel gemessen an **60** Stellen `.progress-outer`, an nur
+  **drei** `.sstat`. Die nächste dieser 60 stand im SELBEN Kartenmenü direkt nebenan (der
+  Asteroiden-Vorrat seit v8.512.0). Einzelheiten unter GR-3.
 - **Der Unterschied VERGLEICH gegen FÜLLSTAND steht im Titel, nicht im Balken.** Bei Schiffen misst
   ein Balken den Wert *im Verhältnis zur besten Klasse der Flotte*, hier den Rest eines einzelnen
   Objekts. Gleiche Bildsprache, andere Bedeutung – der Tooltip sagt es („nicht ein Vergleich mit
   anderen Nestern").
-- **Rechts steht der Prozentwert, nicht die absolute Zahl.** Das `.v`-Feld ist 30 px breit; „260.0k"
-  passt dort nicht, und die absolute Zahl steht ohnehin in der Zeile darüber.
+- **Der Prozentwert stand zuerst rechts IM Balken** (das `.v`-Feld ist 30 px breit, „260.0k" passt
+  dort nicht). Seit GR-3 steht er in der Zeile darüber – dem Muster, das die Angriffs-Vorschau
+  schon immer hatte.
 - **Die Farbe wird GEPRÜFT, nicht durchgereicht** (`/^#[0-9a-fA-F]{3,8}$/`, sonst der Violett-Ton
   des Spiels). Sie kommt aus `ALIEN_VOELKER`/`FESTUNG_STUFEN`/`FESTUNG_BAUTEILE` und geht in ein
   `style`-Attribut – dieselbe Lehre wie bei GR-1, wo alle 40 Farben des Portal-Entwurfs durch eine
   Tabelle liefen, die bei einer unbekannten Farbe abbricht.
-- **Das Label heißt „Rest", nicht „Kern" oder „Nest".** Der erste Entwurf doppelte damit den
-  Zeilentext direkt darüber – aufgefallen am gerenderten Text, nicht am Code (Regel 42).
+- **Das Label hieß „Rest" – und genau daran ist die ganze Formwahl gescheitert.** Der erste
+  Entwurf hatte „Kern"/„Nest" und doppelte damit die Zeile darüber; „Rest" löste die Doppelung und
+  machte das Label dafür nichtssagend. Im gerenderten Bild stand es dreimal untereinander. Siehe
+  GR-3.
 
 **Die Belohnungszahlen sind aus `server.js` herübergekommen** – `NEST_STUFEN` trägt jetzt
 `kampfpunkte`/`xp`/`credits`, `FESTUNG_STUFEN` `kampfpunkte`. **`punkte` bewusst NICHT:** Das ist
@@ -3042,6 +3039,65 @@ der Fehlschlag-Beleg den Treffer mit ausgibt – ein Test, der nur „grün" mel
 steht seit dem 06.08.2026 wörtlich in diesem Dokument, samt Exit-Code. **Kein `pkill` mit einem
 Muster, das die eigenen Werkzeuge selbst enthalten können** – hängende Prozesse werden über `ps`
 identifiziert und einzeln über ihre PID beendet, oder man lässt sie laufen.
+
+## GR-3: eine Balkenform im Kartenmenü – und wie ich die falsche gewählt hatte (21.08.2026)
+
+GR-2 hatte den Füllbalken in der `.sstat`-Kennwertform der Werft gezeichnet. GR-3 stellt ihn auf
+die **Hausform `.progress-outer`** um, zieht den **Asteroiden-Vorrat auf dieselbe Funktion** und
+schreibt den Prozentwert in die **Zeile über** dem Balken. Damit gibt es im Kartenmenü eine Form
+statt zweier, und `kartenFuellBalken()` ist die eine Quelle für alle fünf Balken.
+
+**Gefunden hat es der Screenshot, nicht der Test** (Regel 42, zum wiederholten Mal). Die Wächter
+aus GR-2 maßen den Füllanteil und waren grün; im Bild stand das Label aber **dreimal
+untereinander „REST"** – es trennte die drei Leisten also gar nicht. Und genau „drei Leisten ohne
+Label sind nicht unterscheidbar" war mein einziges Argument für die schmale Form gewesen. Das
+Argument war nicht falsch angewandt, es war **von meinem eigenen Code widerlegt**, und ich hatte
+das Bild nach dem Label-Wechsel nicht noch einmal angesehen.
+
+**Die Messung, die die Entscheidung trägt:** `.progress-outer` steht an **60** Stellen der Datei,
+`.sstat` an **drei**. Für einen FÜLLSTAND ist die Hausform also die etablierte Antwort; `.sstat`
+bleibt, wo ein Balken einen VERGLEICH zeigt (Anteil am stärksten Wert der Klasse) – Werft und
+Verteidigung. Wer das verwechselt, liest einen kurzen Balken als „schwache Anlage" statt als
+„fast zerstört", und deshalb sind es weiterhin zwei Formen und nicht eine über alles.
+
+**Der Beleg, den ich bei GR-2 schlicht nicht gesucht hatte:** Die **Angriffs-Vorschau** schreibt
+den Prozentwert seit jeher in die Zeile – `Kern 900.0k von 1.20M (75%)`, und bei den Bauteilen
+ebenso (`weltraum_kolonie.html` Z. 14684/14722/14760). GR-3 erfindet also kein Muster, sondern
+bringt das Kartenmenü auf das, was zwei Bildschirme weiter längst steht. Aufgefallen ist das erst,
+als eine Sabotage-Wache mit `count == 1` abbrach, weil derselbe Ausdruck **zweimal** vorkam
+(Hausregel 16 hat hier nicht nur einen Fehlgriff verhindert, sondern einen Befund geliefert).
+
+**Drei Varianten wurden gebaut, gerendert und vorgelegt**, bevor eine ausgeliefert wurde – Sascha
+hat C gewählt:
+
+| Variante | Form | warum nicht |
+|---|---|---|
+| A | `.sstat` mit sprechenden Labels (KERN/SCHILD/TÜRME) | das Label wiederholt die Zeile darüber, und zwei Formen bleiben |
+| B | Hausform ohne Prozent | der Prozentwert fällt ersatzlos weg |
+| **C** | **Hausform + Prozent in der Zeile** | **gewählt: eine Form, keine Doppelung, nichts verloren** |
+
+**Der Asteroid sieht nach der Umstellung byte-genau gleich aus** (Screenshot vorher/nachher
+verglichen) – er hat ja schon vorher diese Form gezeichnet, jetzt nur nicht mehr mit eigenem
+Markup. Das ist die Zusage der Umstellung: eine Quelle, kein sichtbarer Bruch.
+
+**Die Wächter sind mitgezogen und dabei SCHÄRFER geworden** (Hausregel 43, nicht „passend
+gemacht"): Sie messen weiter den Füllanteil, jetzt aber zusätzlich, dass die **Prozentzahl der
+Zeile zum gezeichneten Balken passt** (`6b2`, `7b2`). Das ist eine Fehlerklasse, die es vor GR-3
+gar nicht geben konnte – die Zahl stand ja im Balken selbst. Belegt durch eine eigene Sabotage:
+Mit einer Zeile, die immer „50 %" sagt, fallen **genau** `6b2` und `7b2` und sonst nichts.
+
+Drei Gegenproben, alle beidseitig, identische Prüflisten (27 bzw. 47 Prüfungen in jeder Richtung):
+
+| Sabotage | fällt | Beleg |
+|---|---|---|
+| Zeile sagt immer 50 % | `6b2` / `7b2` | `{"zeilenProzent":[50,50,50],"balkenAnteile":[0.75,0.5,0.25]}` |
+| Balken misst nicht | `6b` `6c` / `7b` | `{"gemessen":[0.5,0.5,0.5]}` |
+| kein Balken | `6-vorab` `6a` / `7-vorab` `7a` | `{"anzahl":0}` |
+
+**Die übertragbare Lehre steht nicht in der Formwahl, sondern im Ablauf:** Ich hatte das Label
+nach dem ersten Screenshot von „Kern" auf „Rest" geändert – und das Bild danach nicht erneut
+angesehen. Eine Änderung an genau der Eigenschaft, die eine Gestaltungsentscheidung trägt, verlangt
+denselben Blick noch einmal (Regel 48, hier auf eine Anzeige statt auf eine Messung angewandt).
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
@@ -4516,3 +4572,44 @@ Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die 
 der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
 die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
 TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.
+
+## Das Bild bleibt still, wenn sich Unsichtbares darüber ändert (21.08.2026)
+
+**Der Befund, im Browser gemessen und nicht aus dem Quelltext geschlossen:** Ändert etwas
+**vollständig oberhalb des Sichtfensters** seine Höhe, rutscht alles darunter unter dem Leser weg.
+Die Seite scrollt dabei gar nicht – `scrollY` bleibt unverändert, der Inhalt bewegt sich. Gemessene
+Auslöser: Ereignis-Banner **138 px**, Reiter-Hinweisleiste **166–302 px**, Tagesaufgaben-Leiste bis
+zu **146 px** Höhenänderung. Ein Sprungziel wanderte dadurch von `top:128` auf **`top:−30`**, also
+teilweise aus dem Bild.
+
+**Die eingebaute Scroll-Verankerung des Browsers greift hier NICHT** – und das ist der Teil, der
+zuerst nachgemessen gehört, bevor jemand eine eigene baut: `overflow-anchor` steht auf der ganzen
+Kette (`#eventBanner` → `#game-root` → `body` → `html`) auf `auto`, es schaltet sie also nichts ab.
+Trotzdem glich das Ausblenden eines 138-px-Banners bei `scrollY` 1500 exakt **0 px** aus.
+
+**`bildRuhigHalten()` misst EINE Zahl statt vieler Beobachter:** die Dokumentlage der Lesekante
+(`.tab-panel.active`). Das ist genau „wie viel Inhalt steht über dem Lesebereich" – egal, welches
+Banner sich geändert hat und ob per `display`, per Inhalt oder per Media-Query. Ein
+`ResizeObserver` je Banner hätte eine Falle: Ein `display:none`-Element hat sein Rechteck bei 0/0,
+seine alte Lage ist damit weg, und die Entscheidung „lag es über dem Bild?" nicht mehr zu treffen.
+
+**Was bewusst NICHT ausgeglichen wird: alles Sichtbare** (Entscheidung Sascha). Liegt die Lesekante
+im Bild, sieht der Spieler die Änderung passieren – ein Scroll-Ausgleich wäre dort selbst der
+Sprung, den die Funktion verhindern soll. Gemessen: bei sichtbarer Änderung `scrollAusgleich: 0`,
+bei unsichtbarer `−172`.
+
+**Drei Dinge, die man beim Anfassen wissen muss:**
+
+- **Der Aufruf steht HINTER `klappenFrei()` in `render()`**, also hinter allen Kopf-Eingriffen
+  desselben Takts. Weiter vorne kennte er die Bannerhöhe dieses Takts noch nicht und glich erst
+  eine Sekunde später aus – dieselbe Reihenfolge-Überlegung wie bei `klappenFrei` selbst.
+- **Der Reiterwechsel muss ausgenommen sein.** Ein anderes Panel hat eine andere Dokumentlage; ein
+  Ausgleich darauf wäre ein erfundener Sprung. Deshalb merkt sich die Funktion das Panel-Element
+  und setzt beim Wechsel nur neu an (`test_bildruhe` Abschnitt 3).
+- **`scrollBy` lässt die Dokumentlage unverändert** (`r.top` fällt um d, `scrollY` steigt um d) –
+  der gemerkte Wert bleibt danach gültig und muss nicht nachgeführt werden.
+
+Wächter: `tests/test_bildruhe.js` (9 Prüfungen). Er misst das **Paar**: unsichtbare Änderung → Bild
+steht (Drift 0, Ausgleich über `scrollY`), sichtbare Änderung → **nichts** wird gescrollt. Ohne die
+zweite Hälfte wäre ein viel zu breiter Ausgleich grün. Beidseitig gegengeprüft: am Stand davor
+fallen genau `1a` und `1b` mit `{"drift":-172,"scrollAusgleich":0}`, bei identischen Prüfnamen.
