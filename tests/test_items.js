@@ -117,11 +117,23 @@ const itemBlock = block('ITEM_DEFS');
 // uebrigen 15 wurden von allen folgenden Pruefungen stillschweigend uebersprungen. Jetzt wird am
 // Eintragsanfang getrennt und in jedem Stueck einzeln gesucht.
 const stuecke = itemBlock.split(/\n\s*\{ key:'/).slice(1);
+function descAus(st){
+  const m = st.match(/desc:\s*'([\s\S]*?)'\s*,\s*(?:chance|rarity|craftOnly|eventKey|quelle|icon|activate|forKey|effect)\s*:/);
+  if (!m) return '';
+  // '+ausdruck+' -> ein Platzhalter. Alles andere bleibt, wie es dasteht.
+  return m[1].replace(/'\s*\+[\s\S]*?\+\s*'/g, '42');
+}
 const items = stuecke.map(st => ({
   key: (st.match(/^([a-z_0-9]+)'/)||[])[1],
   name: (st.match(/name:'([^']+)'/)||[])[1],
   icon: (st.match(/icon:'([^']+)'/)||[])[1],
-  desc: (st.match(/desc:'([^']*)'/)||[])[1] || '',
+  /* Die desc kann eine ZUSAMMENGESETZTE Zeichenkette sein ("… rund '+Math.round(X*100)+'% …").
+     Seit v8.599.0 leitet der Belagerungsplan seine Prozentzahl aus der Konstante ab, statt sie
+     einzutippen (Arbeitsregel 38) - der alte Ausdruck `desc:'([^']*)'` schnitt am ersten
+     Apostroph ab und meldete einen unvollstaendigen Satz, den es gar nicht gab. Gelesen wird
+     deshalb bis zum naechsten FELD, und die eingesetzten Teile werden durch ihren Platzhalter
+     ersetzt: Geprueft werden Laenge und Schlusszeichen, nicht der eingesetzte Wert. */
+  desc: descAus(st),
   rarity: (st.match(/rarity:'([a-z]+)'/)||[])[1] || null,
   hatAktion: /activate:\s*\(\)\s*=>/.test(st)
 })).filter(i => i.key);
