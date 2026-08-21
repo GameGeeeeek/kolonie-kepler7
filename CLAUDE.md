@@ -4100,6 +4100,41 @@ nginx des Pi nachweislich korrekt – also genau die Entscheidung, die der erste
 Konfiguration, die nur einen Wert annehmen KANN, ist keine). Sie ist damit nicht mehr nur
 begründet, sondern an der Produktion gemessen.
 
+## Die Flottenverteidigung sagte im Kampf etwas anderes als auf dem Bildschirm (21.08.2026)
+
+Beim Vorbereiten von Teil A des Beute-Konzepts (Set-Boni für die Schiffsklassen-Module) war die
+Frage, ob die neuen Sets auf `atk`/`hull`/`shield` wirken dürfen. Das Konzept sagt, alle drei gingen
+in die Kampfkraft. **Gemessen stimmt das nur für `atk`** — und beim Nachmessen fielen vier
+Abweichungen zwischen `shipDefenseContribution()` hier und `computeDefensePower()` im Backend auf.
+
+Die vollständige Begründung, die Zahlen und die Entscheidung stehen in der **Backend-CLAUDE.md**
+unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zählt:
+
+- **Das Frontend gilt** (Entscheidung Sascha). Seine vier Konstruktionen sind im Quelltext
+  begründet, die Server-Vereinfachungen waren erfunden. Der Server ist auf das Frontend
+  angeglichen, nicht umgekehrt — an `shipDefenseContribution` ändert sich **nichts**.
+- **`hull` und `shield` sind ab jetzt PvP-relevant.** Bis hierher waren sie faktisch
+  klientenseitig, weil der Server sie gar nicht las. Wer an ihnen etwas ändert, ändert damit einen
+  server-autoritativen Kampfwert und muss die Backend-Kopie mitpflegen — dieselbe Kopie-Familie wie
+  `SHIP_SCORE_WEIGHTS`/`computeScoreServer`.
+- **Die Synergien sind die Wache.** `SHIP_SYNERGY_DEFS` trägt gemessen ausschließlich
+  `speed`/`fuel`/`cargo`; nur deshalb darf der Server sie ignorieren. **Wer dort je eine auf
+  `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
+  3a schlägt sonst an.
+
+Wächter: `tests/test_schiffsmodul_paritaet.js` (22 Prüfungen, vier Gegenproben — jede speist eine
+der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 22 gelaufenen
+Prüfungen).
+
+**Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
+Bausteinliste war eine Liste von 21 benannten Blöcken. Die Gegenprobe zur Schild-Basis baute
+`shipShield()` wieder ein, das darin fehlte — der Test brach am Aufbau ab statt an der geprüften
+Zeile, fuhr **14 statt 22** Prüfungen, und die Sabotage sah dadurch grün aus (Regel 34). Gefangen
+hat es nur die `WERKZEUGFEHLER`-Wache des Messskripts (Regel 71). Der Sammler holt seither
+Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektliteral und IIFE)
+und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
+geschrumpft.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
