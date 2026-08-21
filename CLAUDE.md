@@ -362,6 +362,29 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     ausgeben lassen – und die Gegenrichtung mitprüfen (verschwindet eine erlaubte Stelle, ist das
     genauso ein Befund wie eine neue).
 
+    **Nachtrag 21.08.2026 – dieselbe Falle, und die Behebung von damals reichte an zwei Stellen
+    nicht.** `test_kartenmarker` 3b zählte die Aufrufe von `kbMarkerFrei(` und verlangte genau 3.
+    Ein völlig legitimer vierter Marker (das Alien-Nest) ließ ihn auf **5** springen. Zwei Gründe,
+    und beide sind übertragbar:
+    (a) **Die Kommentar-Leerung kannte nur `//`-Zeilen.** Der neue Erklärtext daneben ist ein
+    `/* */`-Block und zitiert den Aufruf – also genau der Fall, gegen den die Leerung gebaut war,
+    nur in der anderen Kommentarform. Wer Kommentare vor dem Zählen leert, leert **beide** Formen.
+    (b) **Die Meldung lautete `{"aufrufe":5}`** – dieselbe nichtssagende Zahl wie beim ersten Mal.
+    **Die eigentliche Lehre ist aber, dass „Kommentare leeren und namentlich auflisten" hier nur
+    das Symptom kuriert hätte.** Eine Liste der erlaubten Aufrufer muss bei jeder neuen Markerart
+    nachgezogen werden – sie zählt weiterhin, nur eleganter. Geprüft wird seither die URSACHE:
+    *Wer eine Markerposition bildet (`homeSlotXY`, `npcMarkerXY`), muss sie durch den Schieber
+    schicken.* Damit darf die Zahl der Markerarten wachsen, ohne dass jemand den Test anfasst, und
+    eine NEUE Art ohne Schieber fällt trotzdem auf – auch wenn niemand an sie gedacht hat
+    (Regel 40). Die zwei Stellen, die bewusst eine rohe Position bilden und dabei keinen Marker
+    zeichnen (Missionslinie, Heimat-Rückfall), stehen NAMENTLICH mit Grund in einer Ausnahmeliste,
+    und ihr Verschwinden ist eine eigene Prüfung.
+    **Und ein Werkzeugfehler in der ersten Fassung meiner eigenen Behebung:** Der Fehlschlag gab
+    die Zeilennummer aus – aber aus dem BEREINIGTEN Text, aus dem Patchnotes-Block und
+    Blockkommentare entfernt sind. Gemessen zeigte sie auf 45784, die Zeile steht in der Datei auf
+    56197. **Eine falsche Zeilennummer ist schlechter als keine**, weil sie die Fehlersuche an eine
+    konkrete falsche Stelle schickt; ausgegeben wird jetzt der Zeileninhalt, der greppbar ist.
+
 35. **Ein Ladezustand, aus dem es kein Entkommen gibt, ist eine Falschaussage – er behauptet, es
     gehe gleich weiter.** Vorfall 15.08.2026: Der neue Abschnitt „Aussehen" zeigte „Lädt…", solange
     der Katalog fehlte, und rief den Abruf erneut auf. Antwortete der Server dauerhaft nicht, stand
@@ -1360,9 +1383,9 @@ wurde als dort.
 | **0c** | den vestigialen `db.galaxy.worldBoss` entfernen | **fertig**, Backend #125 |
 | **1** | Festungen ohne Bauteile: Entstehen, Blockade, Hort, Angriffsmission, Karte | **fertig** – Backend #126/#131/#132, Frontend v8.569.0 |
 | **2** | Schildkuppel, Geschütztürme, Zielwahl, Rollenfaktoren | **fertig** – Backend #133, Frontend siehe unten |
-| **3** | Nester Stufe 1–4: Reifen, Ausbreiten, Völker-Eigenarten | offen |
-| **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | offen |
-| **5** | die Königin, Musterangriff-Zielart | offen |
+| **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Völker-Eigenarten, Königin | **fertig** – Backend #137, scharf seit #143, Frontend siehe unten |
+| **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | Backend #145 **fertig**, Frontend offen |
+| **5** | Verbandsangriff auf ein Nest (Musterangriff-Zielart) | Backend #149 **fertig**, Frontend offen |
 | **6** | Feinschliff: Embleme, Kompendium, `belagerungsplan`, Vorbote | offen |
 
 ### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
@@ -1633,6 +1656,111 @@ PC-Gegenrichtung). Beidseitig gegengeprüft: am Stand davor fallen genau die dre
 Ereignis"-Prüfungen, bei identischer Prüfungszahl.
 `test_reiterleiste.js` pinnt seither seine Ereignis-Uhren (Regel 18) und misst wieder nur seinen
 eigenen Gegenstand; der Bannerfall hat jetzt seinen eigenen, deterministischen Wächter.
+
+### Was die Frontend-Phase 3 gebracht hat (Alien-Nester) – und die vier Funde dabei
+
+Gebaut wurde: der Kartenknoten (sechseckige Wabe mit Puls-Ring in der Volksfarbe plus LP-Balken,
+`data-map-nest`), das Kartenmenü (`nestMapMenu` – Stufe, Volk, LP, Schwäche, Wander-Warnung,
+Angriffs-Eintrag mit Grund bei Sperre), die Angriffsmission (`oeffneNestAngriff`/`sendNestMission`,
+**Form A**), ihre Auflösung (`nestAufloesen`), der Bericht und der Hilfe-Abschnitt „Alien-Nester".
+Wächter: `tests/test_nest_ui.js` (22 Prüfungen am gerenderten Spiel) und
+`tests/test_nest_paritaet.js` (11 Prüfungen Tabellen-Parität gegen `server.js`).
+
+**Die Frontend-Kopie führt bewusst KEINE Lebenspunkte je Stufe.** `ALIEN_VOELKER` und
+`NEST_STUFEN` tragen nur, was die Vorschau wirklich braucht – Name, Schwäche, Farbe, Wanderflag.
+Der Unterschied zur Festung ist der Grund: `FESTUNG_STUFEN.kern` MUSS im Frontend liegen, weil
+`abbauPlan()` die Drosselung **vor** dem Serveraufruf zeigen können muss. Ein Nest dagegen liefert
+`lp`/`lpMax` mit dem Felddokument mit, und sie hängen zusätzlich am Volk (`lpFaktor`) – eine Kopie
+wäre eine zweite Zahl neben der echten, ohne dass irgendjemand sie braucht.
+`test_nest_paritaet` 6a prüft diese Abwesenheit ausdrücklich, damit sie niemand „vervollständigt".
+
+**Die Schwäche wird in ZWEI Schreibweisen geführt, und das ist kein Versehen.** `SHIP_DEFS` kennt
+den Zerstörer als `destroyers`, `server.js` als `destroyer` (dasselbe bei `cruisers`/`cruiser`).
+Das Frontend muss die SHIP_DEFS-Schreibweise nehmen, sonst findet `nestTrifftSchwaeche` die Klasse
+in der Flotte nicht; der Paritätstest trägt die Abbildung deshalb als benannte Tabelle statt eines
+stillen `.replace(/s$/,'')` – eine Endungsregel hätte beim nächsten Volk mit einer Klasse ohne `s`
+still das Falsche getan.
+
+**Der Knoten liegt auf derselben Bahn wie jeder andere Marker** – `kbMarkerFrei(npcMarkerXY(), …)`,
+also die EINE Quelle aus KB-13 (Regel 52). Eine eigene Bahn hätte exakt die Kollisionen erzeugt,
+die diese Funktion seit KB-13 auflöst, und zwar an einem Formfaktor, den man beim Bauen nicht
+ansieht.
+
+**Vier Funde, drei davon von Tests, einer vom Anzeigestellen-Durchgang:**
+
+1. **Die Klick-Verdrahtung lag im `forEach` der FESTUNGS-Knoten.** Syntaktisch einwandfrei, und
+   solange in einem System beides steht, funktioniert sie sogar – in jedem System mit Nest und
+   ohne Festung wäre der Knoten tot gewesen. Dazu fehlte ihr die `galaxyMapDidDrag`-Wache, die
+   jeder andere Kartenknoten trägt: Ohne sie öffnet ein ZIEHEN der Karte das Menü, sobald der
+   Zeiger zufällig auf dem Nest loslässt.
+2. **Der Knopf „Zeigen, wo das war" hätte bei Nest-Berichten GELOGEN.** Ein Nest-Bericht hat kein
+   `platz` (es sitzt nicht auf einem Gürtelplatz), fiel damit in den Altbestands-Zweig und meldete
+   „Der Bericht stammt aus der Zeit vor dieser Anzeige und kennt nur das System" – eine
+   Falschaussage über einen Bericht, der Minuten alt ist. Eigener Zweig, der stattdessen sagt, was
+   den Spieler dort JETZT erwartet (Nest steht noch mit x % LP / ist gefallen oder weitergezogen)
+   – dieselbe Ehrlichkeit wie beim Vorkommen. Gefunden hat das der Anzeigestellen-Durchgang, kein
+   Test.
+3. **Die Missionstyp-Liste steht ZWEIMAL in der Datei** (Missionskarte und Flottenleiste) – der
+   Befund aus Phase 1 hat sich wortgleich wiederholt. Wer nur eine pflegt, bekommt eine Mission,
+   die in der Flottenleiste als **„Erkundungsziel"** steht, weil der generische Zweig
+   `PLANETS.find(p => p.id === m.targetId)` sucht.
+4. **Der Testrahmen selbst hat zwei Prüfungen falsch grün gemacht.** Ein
+   `document.body.textContent`-Rückfall zog den **Quelltext des Inline-Skriptblocks** mit ein –
+   darin steht jede gesuchte Zeichenkette natürlich, also fanden 4a und 4b ihre Erwartung
+   unabhängig davon, was die Vorschau zeigte. Aufgefallen ist es nur an `4c`, das die beiden
+   Vorschauen GEGENEINANDER hält (mit und ohne Zerstörer müssen sie etwas Verschiedenes sagen) –
+   und das ging genau deshalb rot. Das ist Regel 61 in der Testrahmen-Variante: Die
+   Etikett-Prüfungen waren erfüllt, die Wirkungs-Prüfung nicht.
+
+**Ein Nest muss AUFFINDBAR sein, sonst ist es nicht gebaut.** Ein Nest steht in einem von 69
+Systemen, und die Sektoransicht zeigte davon nichts – gemessen: `sektorAnsichtBauen` zieht seine
+Knoten-Extras ausschließlich aus `karteSystemBadges()`, und dort gab es keinen Eintrag. Der
+einzige Weg zum Nest wäre gewesen, jedes System einzeln aufzuklappen, also genau der Weg, über
+den es schon einen Spieler-Report gibt („system nach system durchsucht", KB-9). Das Abzeichen
+(🥚, Tooltip nennt Stufe, Volk und Lebenspunkte) steht deshalb in `karteSystemBadges` und nicht im
+Sektor-Renderer: Das ist die EINE Quelle für beide Renderer (Regel 44), und die Regions-Übersicht
+aggregiert sie seit KB-5 automatisch mit. Bewusst **nicht** dasselbe Symbol wie das 👽 daneben –
+das meldet ein *gesichtetes Volk* (ein Ereignis), nicht ein angreifbares Ziel; ein gemeinsames
+Zeichen wäre in beide Richtungen eine Falschaussage. Gemessen wird im Test die SICHTBARKEIT
+(14×13 px im gerenderten Sektor), nicht die Existenz im Markup (Regel 55).
+
+**Derselbe Befund gilt für die ASTEROIDENFESTUNG, und er ist bewusst NICHT mitbehoben.** Sie hat
+seit Phase 1 kein Abzeichen und ist damit genauso nur durch Aufklappen zu finden. Das ist eine
+Änderung an einer ausgelieferten Funktion und an der optischen Dichte der Karte – und Kartendichte
+war schon einmal ein eigener Report (KB-5b, „müllten die Systemebene zu"). Die Entscheidung gehört
+deshalb Sascha, nicht einer stillen Zeile in einem Nest-PR. Wer sie trifft: Es ist EINE Zeile in
+`karteSystemBadges`, direkt neben der des Nests.
+
+**Was das Frontend NICHT selbst entscheidet:** Schaden, Schwächenfaktor, Abklingzeit, Bergung und
+Zerfall des Schwarms liegen vollständig beim Server. Die Vorschau rechnet nichts nach, sie NENNT
+nur, was gilt (Regel 61 in der Gegenrichtung: Der Faktor ×1,25 im Menü ist ein Spiegel von
+`ALIEN_SCHWAECHE_MULT`, kein zweiter Rechenweg). Der `verpasst`-Zweig ist die einzige Stelle, an
+der der Client eine Antwort auslegt – und er tut dabei nur das, was die Backend-Entscheidung 4
+verlangt: Flotte vollzählig zurück, und das Protokoll nennt den GRUND statt still „ok" zu melden.
+
+**Der Schalter stand beim Bau dieses Frontends SCHON auf `true`, und das ist die Lehre dieser
+Etappe.** Geplant war der Ablauf aus Regel 60: Backend liefert stumm, der Frontend-PR legt
+`NEST_SPAWN_AKTIV` um. Tatsächlich hat das Backend ihn selbst umgelegt (#143, unmittelbar nach
+#137) – gemessen beim Pflicht-`git fetch` des Nachbar-Klons, der **8 Commits zurückstand**
+(Regel 22, das sechste Mal). Seither entstehen Nester auf dem Server, während das ausgelieferte
+Frontend sie **gar nicht zeichnet**: `galaxyCache.alienNester` kam mit jedem Galaxie-Abruf mit und
+lief ins Leere.
+
+Der Schaden ist die harmlose Sorte – **keine falsche Zahl**, nur eine unsichtbare Mechanik, also
+Schadensklasse (a) wie beim Kosmetik-Katalog. Genau deshalb ist er trotzdem eine Regel-60-Verletzung
+und keine Lappalie: Dass es harmlos ausging, war Zufall der Bauart und keine Entscheidung. Wer einen
+Schalter als Auslieferungs-Reihenfolge baut, legt ihn im **Frontend-PR** um – ein Backend-PR, der
+seinen eigenen Schalter kippt, hat den Schalter abgeschafft, nicht benutzt.
+
+**Für die Reihenfolge heißt das hier: Dieses Frontend ist die Aufholung, nicht der Auftakt.** Es
+kann und soll allein gemerged werden; ein Schalter ist nicht mehr umzulegen.
+
+**Und eine Feststellung zum Nachbar-Klon, weil sie den Paritätstest betraf:** Der Klon stand auf
+#141, die Tabellen von #137 waren also enthalten – der Test hat nie gegen einen Stand OHNE Phase 3
+gemessen. Nachgeholt wurde er trotzdem gegen den frischen Stand, und `git diff a48bd0c 9b0bb32 --
+server.js` belegt, dass Phase 4 und 5 an `ALIEN_VOELKER`/`NEST_STUFEN` **keine Zeile** geändert
+haben (nur die Kampfauflösung wurde für den Verbandsangriff herausgezogen). „War wahrscheinlich
+nicht betroffen" wäre hier keine Aussage gewesen (Regel 58).
 
 ## Sektor-Eigenschaften (Etappe 3, 18.08.2026)
 

@@ -224,15 +224,54 @@ async function laufe(browser, store, viewport, mobil, systeme) {
   // ---- 3) EIN Schieber, nicht mehrere Kopien --------------------------------------------------
   // Der Schieber existierte vor KB-13 als einzige Kopie an der Heimatbasis - genau deshalb hatten
   // NPCs und fremde Spieler ihn nie. Diese Prüfung hält fest, dass es bei EINER Quelle bleibt und
-  // dass alle drei Markerarten sie benutzen; ein vierter Markertyp ohne Schieber fällt damit auf
-  // (Regel 43). Kommentare werden vorher geleert, weil die Erklärtexte den Aufruf zitieren
-  // (Regel 33).
-  const OHNE_KOMMENTARE = S_OHNE_HISTORIE.replace(/^\s*\/\/.*$/gm, '');
+  // dass JEDE gezeichnete Markerart sie benutzt.
+  //
+  // 21.08.2026 umgebaut, weil sie das SYMPTOM zählte statt die URSACHE zu prüfen (Regel 33/40):
+  // Sie verlangte genau 3 Aufrufe. Ein völlig legitimer vierter Marker (das Alien-Nest) ließ sie
+  // auf 5 springen - vier echte Aufrufe plus ein /* */-Kommentar, der den Aufruf zitiert, denn
+  // geleert wurden nur //-Zeilen. Und die Meldung `{"aufrufe":5}` sagte nicht, WELCHE Zeile
+  // dazugekommen war.
+  //
+  // Geprüft wird jetzt die Regel dahinter: Wer eine Markerposition bildet (`homeSlotXY`,
+  // `npcMarkerXY`), muss sie durch den Schieber schicken. Damit fällt eine NEUE Markerart ohne
+  // Schieber auf, ohne dass jemand an sie gedacht haben muss - und die Zahl der Markerarten darf
+  // wachsen, ohne dass diese Prüfung nachgezogen werden muss.
+  const OHNE_KOMMENTARE = S_OHNE_HISTORIE
+    .replace(/\/\*[\s\S]*?\*\//g, '')      // Blockkommentare - hier stand der neue Zitat-Treffer
+    .replace(/^\s*\/\/.*$/gm, '');         // Zeilenkommentare
+
   const definitionen = OHNE_KOMMENTARE.split('function kbMarkerFrei').length - 1;
-  const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
   check('3a: der Kollisionsschieber existiert genau einmal', definitionen === 1, { definitionen });
-  check('3b: alle drei Markerarten (Heimatbasis, fremde Spieler, NPC) rufen ihn auf',
-    aufrufe === 3, { aufrufe, erwartet: 3 });
+
+  // Zwei Stellen bilden bewusst eine ROHE Position und zeichnen dabei keinen Marker. Sie stehen
+  // NAMENTLICH hier, mit Grund - eine pauschale Ausnahme hätte den nächsten echten Fall gedeckt.
+  const ROH_ERLAUBT = [
+    { name: 'missionMapZiel (Missionslinie, kein Marker)', muster: /return \{ system: npc\.system, pos: npcMarkerXY\(\) \}/ },
+    { name: 'homeMarkerPos (Rückfall, wird unten ersetzt)', muster: /let homeMarkerPos = homeSlotXY\(myHomeSlot\)/ }
+  ];
+
+  // Bewusst OHNE Zeilennummer: OHNE_KOMMENTARE hat den Patchnotes-Block und die Blockkommentare
+  // entfernt, seine Nummern zeigen also woandershin als die Datei (gemessen 45784 statt 56197).
+  // Eine falsche Nummer schickt die Fehlersuche an die falsche Stelle - der Zeileninhalt steht
+  // hier stattdessen wörtlich und ist greppbar.
+  const stellen = OHNE_KOMMENTARE.split('\n')
+    .map(z => z.trim())
+    .filter(z => /homeSlotXY\(|npcMarkerXY\(/.test(z))
+    .filter(z => !/^function (homeSlotXY|npcMarkerXY)\(/.test(z));
+
+  const ungeschuetzt = stellen.filter(z =>
+    !z.includes('kbMarkerFrei(') && !ROH_ERLAUBT.some(a => a.muster.test(z)));
+
+  check('3b: jede gezeichnete Markerposition läuft durch den Schieber',
+    ungeschuetzt.length === 0,
+    { ungeschuetzt: ungeschuetzt.map(z => z.slice(0, 120)), geprueft: stellen.length });
+
+  // Gegenrichtung (Regel 33): Verschwindet eine der beiden benannten Ausnahmen, ist das genauso
+  // ein Befund - dann stimmt die Begründung oben nicht mehr mit dem Code überein.
+  const fehlendeAusnahme = ROH_ERLAUBT.filter(a => !a.muster.test(OHNE_KOMMENTARE)).map(a => a.name);
+  check('3b2: beide benannten Roh-Ausnahmen gibt es noch',
+    fehlendeAusnahme.length === 0, { fehlendeAusnahme });
+
   check('3c: die alte, fest verdrahtete NPC-Bahn ist weg',
     !OHNE_KOMMENTARE.includes('const rx = 78, ry = 24;'), {});
 
