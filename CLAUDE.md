@@ -1949,9 +1949,11 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     das Ziel HINTER der klebenden Reiterleiste parkt, sah in der Zahl gut aus (jetzt `2b`). Und die
     laufende Etappe hatte selbst 29 px zu `#planetRoleBox` beigetragen und damit 9 px der Reserve
     gekostet – nicht die Ursache des Fehlschlags, aber gemessen und genannt statt verschwiegen.
-    **Offen als eigener Befund:** `scrollIntoView` rechnet die Zielposition EINMAL; wächst der
-    Inhalt darüber danach, driftet das Ziel unter dem Spieler weg. Und **88 von 147** Tests, die das
-    Spiel mit Spielstand booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+    **Der Befund daraus ist am 21.08.2026 nachgemessen und behoben** – siehe den Abschnitt
+    „Das Bild bleibt still" weiter unten. Er war größer als hier notiert: Es driftet nicht nur ein
+    Sprungziel, sondern die Lesestelle JEDES Spielers, sobald ein Banner über ihm auftaucht oder
+    abläuft. Offen bleibt der zweite Halbsatz: **87 von 160** Tests, die das Spiel mit Spielstand
+    booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
 
 63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
     RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
@@ -4516,3 +4518,44 @@ Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die 
 der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
 die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
 TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.
+
+## Das Bild bleibt still, wenn sich Unsichtbares darüber ändert (21.08.2026)
+
+**Der Befund, im Browser gemessen und nicht aus dem Quelltext geschlossen:** Ändert etwas
+**vollständig oberhalb des Sichtfensters** seine Höhe, rutscht alles darunter unter dem Leser weg.
+Die Seite scrollt dabei gar nicht – `scrollY` bleibt unverändert, der Inhalt bewegt sich. Gemessene
+Auslöser: Ereignis-Banner **138 px**, Reiter-Hinweisleiste **166–302 px**, Tagesaufgaben-Leiste bis
+zu **146 px** Höhenänderung. Ein Sprungziel wanderte dadurch von `top:128` auf **`top:−30`**, also
+teilweise aus dem Bild.
+
+**Die eingebaute Scroll-Verankerung des Browsers greift hier NICHT** – und das ist der Teil, der
+zuerst nachgemessen gehört, bevor jemand eine eigene baut: `overflow-anchor` steht auf der ganzen
+Kette (`#eventBanner` → `#game-root` → `body` → `html`) auf `auto`, es schaltet sie also nichts ab.
+Trotzdem glich das Ausblenden eines 138-px-Banners bei `scrollY` 1500 exakt **0 px** aus.
+
+**`bildRuhigHalten()` misst EINE Zahl statt vieler Beobachter:** die Dokumentlage der Lesekante
+(`.tab-panel.active`). Das ist genau „wie viel Inhalt steht über dem Lesebereich" – egal, welches
+Banner sich geändert hat und ob per `display`, per Inhalt oder per Media-Query. Ein
+`ResizeObserver` je Banner hätte eine Falle: Ein `display:none`-Element hat sein Rechteck bei 0/0,
+seine alte Lage ist damit weg, und die Entscheidung „lag es über dem Bild?" nicht mehr zu treffen.
+
+**Was bewusst NICHT ausgeglichen wird: alles Sichtbare** (Entscheidung Sascha). Liegt die Lesekante
+im Bild, sieht der Spieler die Änderung passieren – ein Scroll-Ausgleich wäre dort selbst der
+Sprung, den die Funktion verhindern soll. Gemessen: bei sichtbarer Änderung `scrollAusgleich: 0`,
+bei unsichtbarer `−172`.
+
+**Drei Dinge, die man beim Anfassen wissen muss:**
+
+- **Der Aufruf steht HINTER `klappenFrei()` in `render()`**, also hinter allen Kopf-Eingriffen
+  desselben Takts. Weiter vorne kennte er die Bannerhöhe dieses Takts noch nicht und glich erst
+  eine Sekunde später aus – dieselbe Reihenfolge-Überlegung wie bei `klappenFrei` selbst.
+- **Der Reiterwechsel muss ausgenommen sein.** Ein anderes Panel hat eine andere Dokumentlage; ein
+  Ausgleich darauf wäre ein erfundener Sprung. Deshalb merkt sich die Funktion das Panel-Element
+  und setzt beim Wechsel nur neu an (`test_bildruhe` Abschnitt 3).
+- **`scrollBy` lässt die Dokumentlage unverändert** (`r.top` fällt um d, `scrollY` steigt um d) –
+  der gemerkte Wert bleibt danach gültig und muss nicht nachgeführt werden.
+
+Wächter: `tests/test_bildruhe.js` (9 Prüfungen). Er misst das **Paar**: unsichtbare Änderung → Bild
+steht (Drift 0, Ausgleich über `scrollY`), sichtbare Änderung → **nichts** wird gescrollt. Ohne die
+zweite Hälfte wäre ein viel zu breiter Ausgleich grün. Beidseitig gegengeprüft: am Stand davor
+fallen genau `1a` und `1b` mit `{"drift":-172,"scrollAusgleich":0}`, bei identischen Prüfnamen.

@@ -7190,8 +7190,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.602.0';
+  const VERSION = '8.603.0';
   const PATCHNOTES = [
+    { version:'8.603.0', date:'21.08.2026', changes:[
+      '<strong>Die Seite ruckt nicht mehr unter dir weg, wenn oben ein Banner auftaucht oder abläuft.</strong> Bisher galt: Läuft weit über deiner Lesestelle ein Ereignis-Banner ab, verschwinden dessen 138 Pixel – und alles darunter rutscht um genau diesen Betrag nach oben. Die Seite scrollt dabei nicht, der Inhalt wandert. Wer gerade eine Zeile las, las danach eine andere; ein angesprungener Abschnitt konnte sogar halb aus dem Bild rutschen.',
+      'Das Spiel gleicht solche Höhenänderungen jetzt aus – aber <strong>nur, wenn sie komplett außerhalb deines Bildschirmausschnitts liegen</strong>. Siehst du das Banner selbst, bleibt alles wie es war: Dort wäre ein Ausgleich genau der Sprung, den er verhindern soll. Betroffen waren neben dem Ereignis-Banner auch die Reiter-Hinweisleiste (bis 302 Pixel) und die Tagesaufgaben-Leiste (bis 146).',
+      'Der Browser hat für so etwas eine eingebaute Funktion – nachgemessen greift sie auf dieser Seite nicht: Ein ausgeblendetes 138-Pixel-Banner glich exakt 0 Pixel aus. Deshalb macht das Spiel es jetzt selbst.'
+    ]},
 { version:'8.602.0', date:'21.08.2026', changes:[
       '<strong>Das Kartenmenü eines Alien-Nestes und einer Asteroidenfestung zeigt den Rest der Lebenspunkte jetzt als Balken</strong> – in derselben Bildsprache wie die Kennwerte in Werft und Verteidigung. Die Festung bekommt einen Balken je Bauteil (Kern, Schildkuppel, Geschütztürme); du siehst also auf einen Blick, wo sie am dünnsten steht, statt drei Zahlenpaare vergleichen zu müssen.',
       '<strong>Und du siehst endlich, was ein Ziel überhaupt einbringt.</strong> Das Nest-Menü nannte die Bergung bisher mit keinem Wort – jetzt steht dort, wie viele Kampfpunkte, wie viel Erfahrung und wie viele Kredite beim Fall verteilt werden. Die Hort-Zeile der Festung führt die Kampfpunkte mit auf. Beide Zeilen sagen dazu, dass nach Schadensanteil geteilt wird: Wer ein Drittel des Schadens getragen hat, bekommt ein Drittel.',
@@ -60560,6 +60565,47 @@
   const KLAPPE_LUFT = 6;        // Mindestabstand zur Leiste in px
   const KLAPPE_MIN_UNTEN = 8;   // so nah darf eine Klappe hoechstens an die Fensterunterkante
   let _klappenLage = '';
+  // Bild ruhig halten (21.08.2026, Auftrag Sascha nach eigener Messung).
+  //
+  // ANLASS, gemessen im Browser: Aendert etwas VOLLSTAENDIG oberhalb des Sichtfensters seine
+  // Hoehe, rutscht alles darunter unter dem Leser weg - die Seite scrollt dabei gar nicht, der
+  // Inhalt bewegt sich. Das Ereignis-Banner ist 138 px hoch, die Reiter-Hinweisleiste 166-302,
+  // und die Tagesaufgaben-Leiste aendert ihre Hoehe je nach Inhalt um bis zu 146. Ein
+  // Sprungziel wanderte dadurch von top:128 auf top:-30, also teilweise aus dem Bild.
+  //
+  // Die eingebaute Scroll-Verankerung des Browsers greift hier NICHT - gemessen, nicht vermutet:
+  // `overflow-anchor` steht auf der ganzen Kette (#eventBanner -> #game-root -> body -> html)
+  // auf 'auto', es schaltet sie also nichts ab, und trotzdem glich das Ausblenden eines 138-px-
+  // Banners bei scrollY 1500 exakt 0 px aus.
+  //
+  // WIE gemessen wird: EINE Zahl statt vieler Beobachter. Die Dokumentlage der Lesekante
+  // (.tab-panel.active) ist genau "wie viel Inhalt steht ueber dem Lesebereich" - egal, welches
+  // Banner sich geaendert hat und ob per display, per Inhalt oder per Media-Query. Ein
+  // ResizeObserver je Banner haette eine Falle: Ein display:none-Element hat sein Rechteck bei
+  // 0/0, seine alte Lage ist damit weg, und die Entscheidung "lag es ueber dem Bild?" nicht mehr
+  // zu treffen.
+  //
+  // WAS bewusst NICHT ausgeglichen wird: alles Sichtbare. Liegt die Lesekante im Bild, sieht der
+  // Spieler die Aenderung passieren - ein Scroll-Ausgleich waere dort selbst der Sprung, den
+  // diese Funktion verhindern soll (Entscheidung Sascha, 21.08.2026).
+  let bildAnkerPanel = null, bildAnkerLage = null;
+  function bildRuhigHalten(){
+    const panel = document.querySelector('.tab-panel.active');
+    if (!panel){ bildAnkerPanel = null; bildAnkerLage = null; return; }
+    const r = panel.getBoundingClientRect();
+    const lage = Math.round(r.top + window.scrollY);
+    // Reiterwechsel: ein anderes Panel hat eine andere Dokumentlage - das ist kein Kopfwachstum,
+    // und ein Ausgleich darauf waere ein erfundener Sprung.
+    if (bildAnkerPanel !== panel){ bildAnkerPanel = panel; bildAnkerLage = lage; return; }
+    if (bildAnkerLage === null){ bildAnkerLage = lage; return; }
+    const d = lage - bildAnkerLage;
+    bildAnkerLage = lage;
+    if (!d) return;
+    // Nur wenn die Lesekante VORHER wie NACHHER ueber der Fensterkante lag, hat sich
+    // ausschliesslich Unsichtbares bewegt. scrollBy laesst die Dokumentlage unveraendert
+    // (r.top faellt um d, scrollY steigt um d), bildAnkerLage bleibt also gueltig.
+    if (r.top <= 0 && r.top - d <= 0) window.scrollBy(0, d);
+  }
   function klappenFrei(){
     const klappen = document.querySelectorAll('.edge-tab');
     if (!klappen.length) return;
@@ -65043,6 +65089,7 @@
        Sekunde lang tote Reiter, fuer einen Test ein Rennen. Der Aufruf ist billig: Er faellt
        ueber seine Signatur sofort wieder heraus, solange die Leiste steht, wo sie stand. */
     klappenFrei();
+    bildRuhigHalten();
 
     const avatarEl = document.getElementById('avatarInitials');
     if (avatarEl){
