@@ -53,12 +53,24 @@ const zEnde = zRest.indexOf('\n  function ', 200);
 check('1-anker2: Blockende gefunden', zEnde > 0, { laenge: zEnde });
 const ZEICHNER = (zA > 0 && zEnde > 0) ? zRest.slice(0, zEnde) : '';
 
-const erzeugt = [...new Set((OHNE_HISTORIE.match(/pushReport\(\{ *type: *'[a-z0-9-]+'/g) || [])
-  .map(t => t.split("'")[1]))].sort();
+/* Die Erzeuger-Suche liest MEHRZEILIG (21.08.2026). Der erste Entwurf verlangte `type:` direkt
+   hinter der oeffnenden Klammer und uebersah damit jeden Aufruf, dessen Argumentobjekt umbrochen
+   ist - aufgefallen an 'asteroid-verteidigung', das dadurch als "Zweig ohne Erzeuger" gemeldet
+   wurde. Das ist derselbe Fehler, gegen den dieser Test gebaut ist, nur im Messwerkzeug: Ein
+   Muster, das eine SCHREIBWEISE kodiert statt der Sache (Hausregel 3/40). Waere nur der Erzeuger
+   dagewesen und der Zweig nicht, haette 1a den Fehlschlag verschwiegen. */
+const erzeugt = [...new Set([...OHNE_HISTORIE.matchAll(/pushReport\(\s*\{[\s\S]{0,120}?\btype: *'([a-z0-9-]+)'/g)]
+  .map(m => m[1]))].sort();
 const gezeichnet = new Set((ZEICHNER.match(/r\.type *=== *'[a-z0-9-]+'/g) || []).map(t => t.split("'")[1]));
 
 check('1-vorab: es werden ueberhaupt Berichtsarten erzeugt', erzeugt.length >= 15, { anzahl: erzeugt.length });
 check('1-vorab2: der Zeichner kennt ueberhaupt Arten', gezeichnet.size >= 15, { anzahl: gezeichnet.size });
+/* Der Detektor muss BELEGEN, dass er die mehrzeilige Form findet - sonst erblindet er still,
+   sobald jemand das Muster wieder verengt (dieselbe Wache wie `1j-quelle` in test_rundflug). */
+const mehrzeilig = [...OHNE_HISTORIE.matchAll(/pushReport\(\s*\{[^\n]*\n[\s\S]{0,120}?\btype: *'([a-z0-9-]+)'/g)].map(m => m[1]);
+check('1-vorab2b: die Suche findet auch UMBROCHENE pushReport-Aufrufe',
+  mehrzeilig.length >= 1 && mehrzeilig.every(t => erzeugt.includes(t)),
+  { gefunden: [...new Set(mehrzeilig)] });
 
 const ohneZweig = erzeugt.filter(t => !gezeichnet.has(t));
 check('1a: JEDE erzeugte Berichtsart hat einen Zeichner-Zweig', ohneZweig.length === 0, { ohneZweig });
@@ -300,6 +312,73 @@ const felder = t => ({
   // die ganze Bilanz stillgelegt (Hausregel 33).
   check('6b: echter Sieg und echte Niederlage zaehlen weiterhin',
     bilanzUrteile !== null && bilanzUrteile.echterSieg === 'win' && bilanzUrteile.echteNiederlage === 'loss', { bilanzUrteile });
+
+  /* ---- Abschnitt 7: KEIN erfolgreicher Bericht traegt die Pille "Verloren" ------------------
+     ANLASS (Spieler-Report Sascha, 21.08.2026, mit Screenshot): "warum wird der bericht als
+     verloren markiert ich habe ressourcen abgebaut undzwar erfolgreich".
+     reportIsPositive urteilte am Ende allein nach `result` und akzeptierte nur eine kurze Liste
+     von Werten. Eine Berichtsart, die gar kein `result` fuehrt - und das sind die MEISTEN
+     Nicht-Kampf-Arten -, fiel damit zwangslaeufig auf "Verloren": roter Streifen, Warndreieck,
+     Pille, und im Filter unter "Nur Rueckschlaege". Betroffen waren vier ausgelieferte Arten,
+     darunter `mining`, die haeufigste des ganzen Spiels.
+
+     DATENGETRIEBEN (Hausregel 40): Der Abschnitt rechnet JEDE erzeugte Berichtsart durch, mit den
+     `result`-Werten, die im Quelltext WIRKLICH vorkommen - nicht mit erfundenen. Eine kuenftige
+     Art faellt damit auf, ohne dass jemand an sie gedacht haben muss. */
+  let posFn = null, posBau = null;
+  try {
+    const kA = OHNE_HISTORIE.indexOf('  const REPORT_SPECIAL_GREEN_TYPES = [');
+    const fA = OHNE_HISTORIE.indexOf('  function reportIsPositive(r){', kA);
+    const fE = OHNE_HISTORIE.indexOf('\n  }', fA);
+    if (kA < 0 || fA < 0 || fE < 0) throw new Error('Anker nicht gefunden');
+    posFn = new Function('r', OHNE_HISTORIE.slice(kA, fE + 4) + '\n return reportIsPositive(r);');
+  } catch(e){ posBau = String(e.message || e); }
+  check('7-bau: reportIsPositive laesst sich samt seiner Listen schneiden und ausfuehren',
+    posBau === null, { posBau });
+
+  if (posFn){
+    /* Arten mit EIGENEM Zweig in reportIsPositive entscheiden selbst (asteroid-contest ueber
+       `gewonnen`, asteroid-verteidigung ueber `rechtWeg`, festung-angriff pauschal) - sie sind
+       bewusst behandelt und gehoeren nicht zur Fehlerklasse. Betroffen ist, wer durch die
+       GENERISCHE Regel faellt.
+       Der erste Entwurf hat stattdessen versucht, die `result`-Werte je Art aus einem Fenster von
+       700 Zeichen hinter dem pushReport-Aufruf zu lesen - und meldete 21 Arten als "ohne
+       Ergebnis", darunter moon-siege und alliance-base-attack, die sehr wohl eines tragen. Genau
+       der Werkzeugfehler, der in der CLAUDE.md unter "Ein GERATENES Fenster ist kein Scope"
+       steht. Hier braucht es das Fenster gar nicht: Die Funktion selbst sagt, wer generisch ist. */
+    const posBlock = OHNE_HISTORIE.slice(OHNE_HISTORIE.indexOf('  function reportIsPositive(r){'),
+                                         OHNE_HISTORIE.indexOf('\n  }', OHNE_HISTORIE.indexOf('  function reportIsPositive(r){')));
+    const eigenerZweig = new Set([...posBlock.matchAll(/r\.type === '([a-z0-9-]+)'/g)].map(m => m[1]));
+    const generisch = erzeugt.filter(a => !eigenerZweig.has(a));
+    check('7-vorab: es gibt Arten, ueber die allein die generische Regel entscheidet',
+      generisch.length >= 10 && eigenerZweig.size >= 3,
+      { generisch: generisch.length, mitEigenemZweig: [...eigenerZweig] });
+
+    // Die zwei, die auch OHNE `result` ein Rueckschlag sind. Steht die Liste im Spiel anders da,
+    // ist das ein Befund - nicht ein Grund, hier nachzuziehen.
+    const NEGATIV_OHNE_ERGEBNIS = ['pvp-fleet-loss','deckelkappung'];
+    const falschRot = generisch.filter(a => !NEGATIV_OHNE_ERGEBNIS.includes(a) && posFn({ type:a }) !== true);
+    check('7a: keine Art ohne Ergebnisbegriff gilt als Rueckschlag - ausser den zwei benannten',
+      falschRot.length === 0,
+      { falschRot, hinweis: 'sie truegen Pille "Verloren", roten Streifen und stuenden im Filter "Nur Rueckschlaege"' });
+
+    // Gegenrichtung (Hausregel 33): Waere pauschal alles gruen, faenge 7a nichts mehr.
+    const falschGruen = NEGATIV_OHNE_ERGEBNIS.filter(a => posFn({ type:a }) !== false);
+    check('7b: ein echter Verlust bleibt rot - es ist nicht pauschal alles gruen',
+      falschGruen.length === 0, { falschGruen });
+
+    // Die zwei gemeldeten Faelle namentlich, mit den Feldern aus dem Screenshot.
+    const gemeldet = {
+      abbaumission: posFn({ type:'mining', sorte:'pechblende', groesse:'brocken', ladung:30500 }),
+      kiAbfang: posFn({ type:'pirate-debris-raid', result:'ki-intercept' })
+    };
+    check('7c: die gemeldeten Faelle sind Erfolge - Abbaumission und KI-Abfangautomatik',
+      gemeldet.abbaumission === true && gemeldet.kiAbfang === true, gemeldet);
+    // Und der Ausgang derselben Art, der WIRKLICH ein Rueckschlag ist: die Piraten sind weg.
+    check('7d: dieselbe Art mit dem Ausgang "entkommen" bleibt ein Rueckschlag',
+      posFn({ type:'pirate-debris-raid', result:'escaped' }) === false,
+      { escaped: posFn({ type:'pirate-debris-raid', result:'escaped' }) });
+  }
 
   await ctx4.close();
   await ctx3.close();
