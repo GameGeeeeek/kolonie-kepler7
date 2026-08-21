@@ -7190,8 +7190,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.601.0';
+  const VERSION = '8.602.0';
   const PATCHNOTES = [
+{ version:'8.602.0', date:'21.08.2026', changes:[
+      '<strong>Das Kartenmenü eines Alien-Nestes und einer Asteroidenfestung zeigt den Rest der Lebenspunkte jetzt als Balken</strong> – in derselben Bildsprache wie die Kennwerte in Werft und Verteidigung. Die Festung bekommt einen Balken je Bauteil (Kern, Schildkuppel, Geschütztürme); du siehst also auf einen Blick, wo sie am dünnsten steht, statt drei Zahlenpaare vergleichen zu müssen.',
+      '<strong>Und du siehst endlich, was ein Ziel überhaupt einbringt.</strong> Das Nest-Menü nannte die Bergung bisher mit keinem Wort – jetzt steht dort, wie viele Kampfpunkte, wie viel Erfahrung und wie viele Kredite beim Fall verteilt werden. Die Hort-Zeile der Festung führt die Kampfpunkte mit auf. Beide Zeilen sagen dazu, dass nach Schadensanteil geteilt wird: Wer ein Drittel des Schadens getragen hat, bekommt ein Drittel.',
+      'Unter der Haube: Die Belohnungszahlen standen bisher nur im Server. Damit sie im Menü stehen können, führt das Spiel sie jetzt selbst – und die zwei Prüfungen, die Spiel und Server gegeneinander halten, vergleichen seit dieser Fassung <em>jedes</em> Feld dieser Tabellen statt einer von Hand gepflegten Liste. Eine Zahl, die künftig dazukommt, ist damit automatisch mit abgesichert.'
+    ] },
 { version:'8.601.0', date:'21.08.2026', changes:[
       '<strong>Behoben: Nach einem Massenkauf von Modul-Blaupausen stand das Spiel, sobald man ins Inventar wollte.</strong> Kein Ladefehler, kein Wackeln – es stand wirklich. Gemessen brauchte der Modul-Reiter bei 4.000 Modulen <strong>30,6 Sekunden</strong> bis zur ersten Karte, bei 20.000 waren es <strong>acht Minuten</strong>; mitten darin lag eine einzelne Blockade von 15 Sekunden, in der der Browser auf gar nichts mehr reagierte. Jetzt sind es 0,16 bzw. 0,21 Sekunden. (Spieler-Report Sascha.)',
       'Die Ursache lag an einer Stelle, an der man sie nicht vermutet: <strong>gekaufte Module stapeln sich nicht.</strong> Seit jedes gefundene Modul seinen eigenen Hauptwert-Wurf und eigene Zweitwerte würfelt, ist praktisch jedes Exemplar ein Einzelstück – 20.000 Blaupausen sind also 20.000 Einträge im Inventar, nicht ein Stapel mit „×20000". Und jede Karte dieser Liste zählte ihre Verschmelz-Geschwister, indem sie das <em>gesamte</em> Inventar durchging. Bei 20.000 Karten waren das 400 Millionen Vergleiche – jede Sekunde neu.',
@@ -13637,9 +13642,9 @@
      `kern` fuer die Kartenanzeige, `name` fuer die Texte. Hort-Raten und Abklingzeiten bleiben
      beim Server - was er allein entscheidet, gehoert nicht in eine zweite Tabelle. */
   const FESTUNG_STUFEN = {
-    schanze:      { name:'Schanze',      kern:30000,   blockade:0.25, proto:0.50, verlust:0.06, farbe:'#c98f5a' },
-    kastell:      { name:'Kastell',      kern:250000,  blockade:0.40, proto:0.75, verlust:0.09, farbe:'#b06c9a' },
-    sternenfeste: { name:'Sternenfeste', kern:1200000, blockade:0.55, proto:1.00, verlust:0.12, farbe:'#e0a548' }
+    schanze:      { name:'Schanze',      kern:30000,   blockade:0.25, proto:0.50, verlust:0.06, kampfpunkte:15, farbe:'#c98f5a' },
+    kastell:      { name:'Kastell',      kern:250000,  blockade:0.40, proto:0.75, verlust:0.09, kampfpunkte:40, farbe:'#b06c9a' },
+    sternenfeste: { name:'Sternenfeste', kern:1200000, blockade:0.55, proto:1.00, verlust:0.12, kampfpunkte:90, farbe:'#e0a548' }
   };
   const FESTUNG_GERAEUMT_BONUS = 0.15;     // +15 % Ladung, 24 h nach dem Fall (Spiegel von server.js)
   /* ===== Die drei Bauteile (Phase 2) - Spiegel von FESTUNG_BAUTEILE in server.js ===============
@@ -13677,13 +13682,19 @@
     verglueht: { name:'Die Verglühten',     schwaeche:'schlachtschiff', reifeStd:8,  wandert:false, farbe:'#e0765a',
                  art:'verstrahlt sein Umfeld' }
   };
+  /* Die drei Belohnungsfelder sind eine KOPIE aus server.js (GR-2) - dieselbe Familie wie lp.
+     Sie stehen hier, damit das Kartenmenue sagen kann, was ein Schlag ueberhaupt einbringt; ohne
+     sie waere jede Zahl dort erfunden (Regel 59: etwas behaupten, was kein Code einloest).
+     'punkte' bleibt bewusst draussen - das ist die Stufengewichtung fuers Tauziehen der Wehrkraft
+     (Phase 4), die im Frontend nirgends erscheint. Ein Feld, das keine Anzeigestelle hat, waere
+     hier toter Ballast, den die Paritaetspruefung mitschleppen muesste. */
   const NEST_STUFEN = [
     null,
-    { name:'Sporenherd',   lp:40000 },
-    { name:'Brutkammer',   lp:120000 },
-    { name:'Schwarmstock', lp:400000 },
-    { name:'Hochnest',     lp:1200000 },
-    { name:'Königin',      lp:4000000 }
+    { name:'Sporenherd',   lp:40000,   kampfpunkte:15,   xp:120,  credits:400 },
+    { name:'Brutkammer',   lp:120000,  kampfpunkte:45,   xp:360,  credits:1200 },
+    { name:'Schwarmstock', lp:400000,  kampfpunkte:130,  xp:1000, credits:3500 },
+    { name:'Hochnest',     lp:1200000, kampfpunkte:380,  xp:3000, credits:10000 },
+    { name:'Königin',      lp:4000000, kampfpunkte:1200, xp:9000, credits:30000 }
   ];
   const NEST_ABKLING_STD = 4;
   /* Die Abklingzeit der Asteroidenfestung stand bis zum 21.08.2026 als eingetippte 6 an FUENF
@@ -13717,6 +13728,25 @@
   }
   function nestVolk(v){ return ALIEN_VOELKER[v] || { name: v || 'Unbekanntes Volk', schwaeche:null, reifeStd:8, wandert:false, farbe:'#8fd694', art:'' }; }
   function nestStufeDef(n){ return NEST_STUFEN[Math.max(1, Math.min(5, n || 1))]; }
+  /* Was ein gestuerztes Nest einbringt - EINE Quelle fuer Kartenmenue und Angriffsvorschau (GR-2).
+     Die Zahlen sind die Vollbetraege der Stufe; ausgezahlt wird davon der Anteil, den die eigene
+     Flotte am Schaden hatte (server.js rechnet st.kampfpunkte mal anteil, ebenso xp und credits).
+     Genau deshalb steht 'nach deinem Schadensanteil geteilt' fest im Text und nicht als Zusatz,
+     den man weglassen kann: Ohne ihn verspricht die Zeile den vollen Betrag, und der Spieler
+     bekaeme regelmaessig weniger als angekuendigt - die Sorte stiller Verschlechterung, gegen die
+     dieses Projekt seine Anzeigestellen schuetzt.
+     Ein Nest fuehrt keine Rohstoff-SORTE (es ist kein Asteroid) - deshalb drei feste Posten statt
+     einer Liste wie beim Hort der Festung. */
+  function nestBergungZeile(stDef){
+    if (!stDef) return '';
+    const teile = [];
+    if (stDef.kampfpunkte > 0) teile.push(fmt(stDef.kampfpunkte) + ' Kampfpunkte');
+    if (stDef.xp > 0)          teile.push(fmt(stDef.xp) + ' Erfahrung');
+    if (stDef.credits > 0)     teile.push(fmt(stDef.credits) + ' Kredite');
+    if (!teile.length) return '';
+    return '<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Bergung: '
+      + escapeHtml(teile.join(' · ')) + ' – beim Fall nach Schadensanteil geteilt</div>';
+  }
   // Nur lesend, wie asteroidenImSystem: Der Render darf keinen Zustand aendern.
   function nesterImSystem(sysId){
     return (galaxyCache.alienNester || []).filter(n => n && n.sys === sysId);
@@ -21681,6 +21711,34 @@
       + row('Vert.', dv, m.def, '#7f77dd', 'Verteidigungspunkte je Stufe')
       + row('Schild', sh, m.shield, '#5ce1ff', 'Schildpunkte je Stufe (40% der Verteidigung, zählt zusätzlich)')
       + '</div>';
+  }
+  /* GR-2: Ein FUELLSTANDS-Balken fuer die Kartenmenues (Nest-Lebenspunkte, Festungs-Kern und
+     ihre Bauteile). Bis hierher stand dort nur eine Zahl mit Prozentwert in Klammern - lesbar,
+     aber nicht auf einen Blick erfassbar, und die Festung listete gleich vier solcher Zeilen
+     untereinander.
+     Er nutzt bewusst DIESELBE .sstat-Bildsprache wie Schiffe und Verteidigungsanlagen. Eine
+     zweite Balken-Klasse waere die typische zweite Anzeigestelle, die beim naechsten Umbau
+     auseinanderlaeuft - VT-1 hat das fuer die Verteidigungskarten ausdruecklich so entschieden.
+     DER UNTERSCHIED ZU defenseStatBarsHtml/shipStatBarsHtml STEHT IM TITEL und muss dort stehen
+     bleiben: Dort misst der Balken einen VERGLEICH (Anteil am staerksten Wert der Klasse), hier
+     einen FUELLSTAND (was von einem Ziel noch steht). Gleiche Form, andere Bezugsgroesse - wer das
+     verwechselt, liest einen kurzen Balken als "schwache Anlage" statt als "fast zerstoert".
+     Rechts steht der PROZENTWERT, nicht die absolute Zahl: .v ist 30 px breit, "1.200.000" passt
+     dort nicht. Die genauen Zahlen bleiben in der Textzeile daneben - der Balken beantwortet
+     "wie viel steht noch", die Zeile "wie viel genau".
+     Die Farbe wird geprueft statt durchgereicht. Sie kommt heute aus zwei Frontend-Tabellen
+     (ALIEN_VOELKER, FESTUNG_BAUTEILE), also aus dem Haus - aber ein Attributwert ohne Pruefung ist
+     genau die Stelle, an der ein spaeterer Serverwert das Markup aufbricht (bei GR-1 ist mir das
+     mit dem Systemnamen im data-Attribut passiert). */
+  function kartenFuellBalken(label, wert, max, farbe, tip){
+    const m = Math.max(1, max || 0);
+    const w = Math.max(0, Math.min(m, wert || 0));
+    const pct = (w / m) * 100;
+    const col = /^#[0-9a-fA-F]{3,8}$/.test(String(farbe || '')) ? farbe : '#7f77dd';
+    return '<div class="sstat" style="margin-top:3px;" title="' + escapeHtml(tip || '') + '">'
+      + '<span class="k">' + escapeHtml(String(label)) + '</span>'
+      + '<span class="tr"><i style="width:' + pct.toFixed(1) + '%; background:' + col + ';"></i></span>'
+      + '<span class="v">' + Math.round(pct) + '%</span></div>';
   }
   // Vier Kennwerte als beschriftete Mikro-Balken statt einer Fliesstext-Zeile mit Mitteldots.
   //
@@ -59046,7 +59104,10 @@
       : (nest.stufe >= 5 ? '<div class="bmeta"><i class="ti ti-trophy" aria-hidden="true"></i> Fällt sie, zerfällt der ganze Schwarm dieses Volkes.</div>' : '');
     openKarteMenu(ev, v.name + ' – ' + stDef.name, 'Alien-Nest',
       eintraege,
-      `<div class="bmeta"><i class="ti ti-alien" aria-hidden="true" style="color:${v.farbe};"></i> Lebenspunkte <strong>${fmt(Math.round(nest.lp||0))}</strong> von ${fmt(nest.lpMax||0)} (${Math.round(anteil*100)}%)</div>`
+      `<div class="bmeta"><i class="ti ti-alien" aria-hidden="true" style="color:${v.farbe};"></i> Lebenspunkte <strong>${fmt(Math.round(nest.lp||0))}</strong> von ${fmt(nest.lpMax||0)}</div>`
+      + kartenFuellBalken('Rest', nest.lp||0, nest.lpMax||0, v.farbe,
+          'Wie viel vom Nest noch steht - nicht ein Vergleich mit anderen Nestern.')
+      + nestBergungZeile(stDef)
       + (v.schwaeche ? `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Wirksam dagegen: <strong>${escapeHtml(nestSchwaecheName(v.schwaeche))}</strong> im Verband</div>` : '')
       + (v.art ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> ${escapeHtml(v.art.charAt(0).toUpperCase() + v.art.slice(1))}.</div>` : '')
       + reifText
@@ -59086,7 +59147,9 @@
     if ((fest.hortProto||0) > 0) hort.push(fmt(Math.floor(fest.hortProto)) + ' Protomaterie');
     openKarteMenu(ev, st.name, 'Asteroidenfestung',
       eintraege,
-      `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)} (${Math.round(anteil*100)}%)</div>`
+      `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)}</div>`
+      + kartenFuellBalken('Rest', fest.kern||0, kernMax, st.farbe,
+          'Wie viel vom Kern noch steht - faellt er, faellt die Festung.')
       + `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true"></i> Drosselt im ganzen System: Abbau &minus;${Math.round(st.blockade*100)}%, Protomaterie &minus;${Math.round(st.proto*100)}%</div>`
       + Object.keys(FESTUNG_BAUTEILE).map(k => {
           const t = fest.bauteile && fest.bauteile[k];
@@ -59094,10 +59157,12 @@
           const spec = FESTUNG_BAUTEILE[k];
           const pct = Math.max(0, Math.min(100, Math.round(((t.lp||0) / Math.max(1, t.lpMax||1)) * 100)));
           return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true" style="color:${spec.farbe};"></i> `
-               + `${escapeHtml(spec.name)}: ${(t.lp||0) > 0 ? `<strong>${fmt(Math.round(t.lp))}</strong> von ${fmt(t.lpMax||0)} (${pct}%)` : '<strong>zerstört</strong>'}`
-               + `${(t.lp||0) > 0 ? ' – ' + escapeHtml(spec.wirkung) : ''}</div>`;
+               + `${escapeHtml(spec.name)}: ${(t.lp||0) > 0 ? `<strong>${fmt(Math.round(t.lp))}</strong> von ${fmt(t.lpMax||0)}` : '<strong>zerstört</strong>'}`
+               + `${(t.lp||0) > 0 ? ' – ' + escapeHtml(spec.wirkung) : ''}</div>`
+               + ((t.lp||0) > 0 ? kartenFuellBalken('Rest', t.lp||0, t.lpMax||0, spec.farbe,
+                   'Wie viel von diesem Bauteil noch steht.') : '');
         }).join('')
-      + (hort.length ? `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Hort: ${escapeHtml(hort.join(' · '))} – beim Fall nach Schadensanteil geteilt</div>` : ''));
+      + `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Hort: ${hort.length ? escapeHtml(hort.join(' · ')) + ' · ' : ''}${fmt(st.kampfpunkte)} Kampfpunkte – beim Fall nach Schadensanteil geteilt</div>`);
   }
   function asteroidMapMenu(ev, sysId, platz){
     const a = asteroidAn(sysId, platz);
