@@ -304,6 +304,50 @@ hergibt: eine Zielart auf einer fertigen Maschine.
 
 ---
 
+### 4.8 Kredit-Shop und Handelsrouten tragen Fremd-Symbole statt eigener (Auftrag Sascha 21.08.2026, zwei Screenshots)
+
+Elf Flächen, die der Spieler ständig sieht, stehen auf generischen Tabler-Glyphen — während das
+Spiel **352 handgezeichnete Symbole** in `ICONS` führt. Hausregel 7 sagt es ausdrücklich: ein
+eigenes Icon gehört dazu, der `ti-*`-Weg ist der Notnagel. Gemessen am Stand v8.588.0:
+
+**`CREDIT_SHOP` (8 Posten):**
+
+| Posten | heute | woran es hakt |
+|---|---|---|
+| Produktions-Schub | `ti-bolt` | passt |
+| Schildgenerator-Miete | `ti-shield` | passt |
+| Tiefenaufkäufer | `ti-infinity` | ∞ sagt nichts über einen Aufkäufer |
+| Söldnerflotte | `ti-sword` | ein Schwert ist keine Flotte |
+| Modul-Blaupause | `ti-box` | eine Kiste ist keine Blaupause |
+| Schiffsklassen-Blaupause | `ti-truck` | ein **LKW** für eine Schiffs-Blaupause |
+| Elite-Schiffsklassen-Blaupause | `ti-award` | Pokal ≠ Blaupause; und nicht von der normalen unterscheidbar |
+| Modulfragment-Lieferung | `ti-atom-2` | ein Atom ist kein Fragment-Paket |
+
+**`ROUTE_TYPES` (3 Arten):**
+
+| Art | heute | woran es hakt |
+|---|---|---|
+| Markt-Verkaufsroute | `ti-truck` | **dasselbe Symbol wie die Schiffsklassen-Blaupause** |
+| Veredelungsroute | `ti-box` | **dasselbe Symbol wie die Modul-Blaupause** |
+| Kredit-Route | `ti-diamond` | ein Diamant sagt nichts über Kredite |
+
+**Der eigentliche Befund sind die zwei Doppelbelegungen.** `ti-box` und `ti-truck` stehen je
+zweimal für Dinge, die nichts miteinander zu tun haben — ein Symbol mit zwei Bedeutungen ist
+dieselbe Fehlerklasse, aus der bei E1 die Entscheidung „🎯 statt ⚔️" kam (das Schwerter-Zeichen war
+an den Fraktionskrieg vergeben).
+
+**Dazu ein zweiter, unabhängiger Punkt aus dem Routen-Screenshot:** Drei gleichzeitig laufende
+Kredit-Routen sehen **vollständig identisch** aus — gleiches Symbol, gleicher Titel, gleicher
+Ertragstext, gleiche Frachterzahl. Wer eine davon auflösen will, kann nicht erkennen, welche er
+trifft. Das ist kein Symbol-, sondern ein Unterscheidbarkeits-Problem und braucht eine eigene
+Antwort (laufende Nummer, Standort, oder Startzeit an der Karte).
+
+**Umfang:** Neun neue handgezeichnete SVGs im `ICONS`-Hausstil (viewBox `0 0 42 42` bei 20 px,
+flache Vollfarbe mit einer helleren Facette, Striche 1,4–2,5 — der Stil steht als Kommentar bei
+`RES_ICONS`). Danach `node check-icons.js`, und jedes Symbol einmal **gerendert ansehen** statt es
+zu behaupten (Hausregel 42: der erste Protomaterie-Entwurf wirkte wie eine Münze, der zweite war
+bei 20 px nicht von Erz zu unterscheiden — beides fiel nur am Bild auf).
+
 ## 5. Töpfe ohne Senke (alle vier nachgemessen, alle vier offen)
 
 | Topf | Gemessener Stand |
