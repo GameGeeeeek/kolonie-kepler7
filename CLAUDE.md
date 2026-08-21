@@ -1309,8 +1309,9 @@ welche Objektarten unter seinen Bedingungen überhaupt entstehen können.
 - **KB-20d – die Schranke misst die ZIELhöhe, nicht die aktuelle.** Ohne das entschieden Kastenhöhe
   und Zeichnung getrennt: Bei einem breiten, flachen Fenster (ab 1472 px Breite) bekam der Kasten
   die volle Sektor-Höhe, während die Zeichnung flach blieb. Gemessen bei 1920×804: Kasten 1258×629,
-  Verhältnis exakt 0,500, Füllung 0,351 – **zwei Pixel Fensterhöhe mehr kippten die Darstellung um
-  47 %**. `kbRunderKasten()` misst deshalb `max(480, innerHeight − 175)` gegen die gemessene
+  Verhältnis exakt 0,500, Füllung 0,351 – **zwei Pixel Fensterhöhe mehr kippen die Zeichnung von
+  flach auf rund** (die zunächst notierten „47 %" hielten 0,351 gegen eine Füllung aus einem
+  ANDEREN Viewport und waren damit keine Messung, sondern eine Mischung zweier). `kbRunderKasten()` misst deshalb `max(480, innerHeight − 175)` gegen die gemessene
   Kastenbreite (kein Zirkelschluss: die Breite hängt nicht an der Höhe), hat einen 200-ms-Zwischen-
   speicher (es läuft ~677-mal je Kartenaufbau) und behält bei einem VERSTECKTEN Reiter den zuletzt
   gültigen Stand, statt eine Antwort zu erfinden. `kbSystemKastenHoehe()` gibt die volle
