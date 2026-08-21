@@ -15,7 +15,7 @@ wäre genau die zweite Anzeigestelle, die dieses Projekt sonst überall vermeide
 | Was | Warum | Stand |
 |---|---|---|
 | **E-Mail-Adresse auf `@gamegeeeeek.de`** | `browsermmorpg.com` verlangt sie ausdrücklich und **prüft das Domain-Eigentum** („Must be reachable — we verify ownership"). Auch für die Anschreiben ist ein Domain-Absender glaubwürdiger als eine Freemail-Adresse. | **offen** – im Repo steht keine; das Impressum leitet bewusst zu einem Impressum-Dienst weiter |
-| **Ein Screenshot-Satz** | Fast jedes Verzeichnis will mindestens ein Bild. | offen |
+| **Ein Screenshot-Satz** | Fast jedes Verzeichnis will mindestens ein Bild. | **erledigt** – `node marketing-screenshots.js` erzeugt fünf Bilder (Basis, Sektorkarte, Forschung, Flotte, Verteidigung) aus dem aktuellen Stand nach `presse-bilder/`. Je ~2 MB in 3200×1800; wo ein Verzeichnis kleiner verlangt, vorher verkleinern. |
 | **Die Einstiegshürde** | Siehe Abschnitt 5 – sie entscheidet, wie viel jeder Eintrag überhaupt bringt. | **offen** |
 
 ---
