@@ -3016,6 +3016,24 @@ so gelassen.
 **Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
 Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.
 
+### Ein GERATENES Fenster ist kein Scope (zweimal am 21.08.2026)
+
+Beim Nachmessen der ausgelieferten Datei zweimal derselbe Werkzeugfehler, beide Male fast als
+Befund weitergegeben:
+
+- `grep -c '} catch(e){}$'` über die **ganze** Spieldatei meldete 135 leere catch-Blöcke. Die
+  Aussage galt dem Weltboss; gescopt auf seinen Block ist sie eindeutig. Viele der 135 sind
+  legitim (`localStorage`-Zugriffe).
+- `S.slice(p, p+4000)` um `resolvePlayerAttackMission` meldete **0** Berichte. Die Funktion ist
+  **16.570** Zeichen lang — das Fenster endete vor den Aufrufstellen. Über die echte Klammertiefe
+  gemessen: 3.
+
+**Vorgehen:** Ein Block wird über seine **Grenze** geschnitten (Klammertiefe, Anker-Paar), nie über
+eine geschätzte Zeichenzahl — und der Anker selbst gehört geprüft (Regel 6). Ein `+4000` ist
+dieselbe Art Annahme wie ein eingetippter Erwartungswert (Regel 2): Es sieht nach Messung aus und
+ist eine Schätzung. Beide Male hat nur das Nachrechnen VOR dem Weitergeben den Fehlalarm
+verhindert (Regel 10).
+
 ### Die Kurzform für jede neue Angriffsart
 
 1. **Jeder** Ausgang schreibt `pushReport` – auch „kein Kampf", „abgelehnt", „Ziel weg". Der
