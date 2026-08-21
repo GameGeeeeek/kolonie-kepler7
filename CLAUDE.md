@@ -1702,7 +1702,7 @@ wurde als dort.
 | **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Königin, Angriff | **fertig** – Backend #137, Frontend siehe unten |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | **fertig** – Backend #145, Frontend v8.585.0 |
 | **5** | Musterangriff-Zielart `alien-nest` | **fertig** – Backend #149, Frontend v8.590.0 |
-| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.597.0. Der `belagerungsplan` ist bewusst NICHT in seiner Konzept-Fassung gebaut – Begründung und die gewählte Wirkung unter „Der `belagerungsplan` – entschieden am 21.08.2026“ |
+| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.597.0. Der `belagerungsplan` folgte am 21.08.2026 mit v8.600.0, mit **umgewidmeter** Wirkung – Begründung im eigenen Abschnitt |
 
 ### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
 
@@ -2584,7 +2584,7 @@ Vorab-Prüfung (`2-vorab`) belegt, dass das Leeren gegriffen hat.
 ## Ein Gegenstand wird nur verbraucht, wenn er WIRKT (21.08.2026)
 
 Zwei der drei offenen Punkte aus Phase 6 sind damit erledigt; der dritte (`belagerungsplan`) ist
-entschieden und steht unten.
+noch am selben Tag gefolgt und steht unten.
 
 ### Der ausgelieferte Datenverlust in `activateItem`
 
@@ -2650,6 +2650,119 @@ historischer Befund, keine ableitbare Tabelle. Ein **vierzehnter** fällt dort n
 bewusst benannte Grenze und steht als Kommentar im Test, damit niemand den Anspruch für breiter
 hält, als er ist.
 
+### Sechs Abgrund-Gegenstände fielen aus ganz gewöhnlicher Erkundung (behoben 21.08.2026)
+
+Gefunden beim Nachmessen der Fundwege für den Belagerungsplan, also nebenbei – und es war ein
+**ausgelieferter** Fehler.
+
+`checkMissions` hat zwei Fundstellen für Gegenstände. Die **Expedition** zieht über
+`fundPool(ITEM_DEFS)`, und ihr Kommentar sagt die Regel wörtlich: „Expeditionen sind eine NORMALE
+Fundquelle und dürfen deshalb keine Abgrund-Gegenstände ausschütten." Die **Erkundung** daneben –
+älter, im selben `checkMissions` – iterierte roh über das volle Array. Gemessen:
+
+| | |
+|---|---|
+| `ITEM_DEFS` gesamt | 30 |
+| roher Zweig zog daraus | 29 |
+| `fundPool()` zieht daraus | 23 |
+| **fielen zu Unrecht** | `ab_tiefenlot`, `ab_bannspule`, `ab_rueckholanker`, `ab_sternenkarte`, `ab_waechterruf`, **`ab_grundberuehrung` (mythisch)** |
+
+Erwartungswert **0,176 je Funddurchlauf** – während `grantAbgrundItem()` dieselben Stücke eigens
+nach Seltenheit gewichtet, ausdrücklich damit „die Grundberührung ein Ereignis bleibt, kein
+regelmäßiger Ertrag". Die Absicht war also nicht nur dokumentiert, sie war **daneben umgesetzt**.
+
+**Mitgenommen: die zweite rohe Ziehung im selben Zweig.** `for (const ri of RARE_ITEMS)` steht
+zwei Zeilen darunter. Heute ändert die Umstellung dort **nichts** – gemessen trägt kein Eintrag
+eine fremde Herkunft, und den einen mit `chance:0` (`leerensplitter`) fängt `Math.random() < 0`
+ohnehin ab. Sie ist trotzdem umgestellt, weil damit die Regel „kein Fundtopf zieht roh"
+**ausnahmslos** wird – und erst eine ausnahmslose Regel lässt sich als Prüfung schreiben.
+
+**Die Lehre betrifft den WÄCHTER, nicht den Code.** `test_herkunft.js` hatte für genau diese
+Fehlerklasse einen Abschnitt B – und der nannte die Expedition **beim Namen**. Eine namensbasierte
+Prüfung findet nur, woran man schon gedacht hat (Regel 40); die ältere Fundstelle nebenan konnte
+ihr gar nicht auffallen. Sie verbietet jetzt die **FORM** (`for (… of ITEM_DEFS)` und
+`RARE_ITEMS[Math.floor`), kennt keinen einzigen Namen mehr, und eine neue Fundstelle fällt auf,
+ohne dass jemand an sie gedacht haben muss. Dazu `B-vorab`, das belegt, dass der Ausdruck die
+verbotene Form überhaupt erkennt – sonst wäre die Prüfung auch dann grün, wenn er nichts mehr
+trifft (Regel 71).
+
+**Und der Test las seine Datei über einen fest verdrahteten Pfad** – der Defekt, den die
+Arbeitsregeln unter „Korrektur 15.08.2026" als Falle beschreiben und von dem 19 weitere Tests
+betroffen sind. Ohne die Umstellung auf `lib/umgebung` hätte die Gegenprobe die echte Datei
+gelesen und wäre grün gewesen. Jetzt fällt sie am alten Stand mit den zwei Zeilennummern im Beleg:
+`["Zeile 47804: for (const item of ITEM_DEFS){", "Zeile 47815: for (const ri of RARE_ITEMS){"]`.
+
+**Derselbe Defekt hat am selben Tag ein zweites Mal zugeschlagen, in `test_items.js`** – und
+diesmal beim Versuch, eine Gegenprobe zu fahren, die es zu widerlegen galt. Auch dort ist der
+Pfad jetzt auf `lib/umgebung` umgestellt. **Die Reihenfolge der Diagnose ist die eigentliche
+Lehre:** Die erste Sabotage blieb grün, der Verdacht fiel sofort auf die Env-Variable (weil sie
+gerade zum zweiten Mal genau so ausgefallen war) – gemessen war die Umleitung danach aber
+nachweislich angekommen, und schuld war meine **zu schwache Sabotage** (sie ersetzte nur den
+ersten Satz, der Rest der Beschreibung stand noch da). Ein bestätigter erster Verdacht ist nicht
+automatisch die Ursache; erst die Messung *„was liest der Parser eigentlich?"* hat es geklärt.
+
+### Meine eigene „strukturelle" Behebung war eine Namensliste in Verkleidung (21.08.2026)
+
+Zweimal am selben Tag ist `test_protomaterie` 8b-bau gefallen, und beim zweiten Mal war **meine
+Behebung des ersten Males** die Ursache.
+
+`8b-bau` setzt den Hilfe-Eintrag aus der Spieldatei zusammen und führt ihn aus. Dafür müssen die
+Konstanten, aus denen der Text seine Zahlen ableitet, im Geltungsbereich stehen.
+
+1. **Erster Fall:** `FESTUNG_ABKLING_STD` kam dazu, der Hilfetext leitete daraus ab, die dort
+   eingetippte **Namensliste** kannte ihn nicht → `"FESTUNG_ABKLING_STD is not defined"`.
+2. **Behebung:** geschnitten wurde fortan „über die FORM" – `/\n  const FESTUNG_[A-Z_]+ = /`.
+3. **Zweiter Fall, Stunden später:** `BELAGERUNGSPLAN_SENKUNG` kam dazu, derselbe Fehlschlag stand
+   wieder da, nur mit einem anderen Namen darin.
+
+**Ein Namenspräfix ist keine Form.** `FESTUNG_[A-Z_]+` fängt jede künftige `FESTUNG_*`-Konstante
+und keine einzige andere – das ist wörtlich der Nachtrag zu Arbeitsregel 40 („ein Muster, das eine
+einzelne Schreibweise kodiert, ist eine namensbasierte Suche in Verkleidung"), nur dass ich es
+selbst gebaut habe, während ich glaubte, die Fehlerklasse zu schließen. Die Prüffrage dagegen
+lautet: *Welche Eigenschaft brauche ich wirklich?* Antwort: „die Konstanten, die dieser Text
+BENUTZT" – und die kann man aus dem Text selbst lesen, statt sie zu benennen.
+
+**Behoben ohne einen einzigen Namen:** Die Bezeichner werden aus dem geschnittenen Hilfe-Eintrag
+gesammelt, ihre Deklarationen aus der Datei geschnitten, und das transitiv wiederholt (was diese
+Deklarationen ihrerseits brauchen). Was der Kopf ohnehin mitgibt, steht in `schonDa` – sonst
+stünde eine Deklaration doppelt im Text (`has already been declared`).
+
+**Die Gegenprobe belegt die KLASSE, nicht nur den Anlassfall** (Regel 40 Nachtrag: die eigene
+Anlassfamilie einspeisen). Gemessen an einer Kopie mit einer frei erfundenen, fremd benannten
+Konstante (`ZIERWERT_PROBE`) im Festungs-Hilfetext:
+
+| | alte Regel | neue Regel |
+|---|---|---|
+| echte Datei (`BELAGERUNGSPLAN_SENKUNG`) | `… is not defined` | grün |
+| Kopie (`ZIERWERT_PROBE`) | `ZIERWERT_PROBE is not defined` | grün |
+
+**Und ein Werkzeugfehler dabei, der die Gegenprobe fast entwertet hätte:** Der erste Versuch fuhr
+die alte Fassung aus `/tmp` – dort löst `require('./lib/umgebung')` nicht auf, der Lauf starb mit
+`Cannot find module` und meldete **0 Prüfungen**. Das sah aus wie „die alte Regel ist grün".
+Dieselbe Familie wie Regel 56/61: Ein Prüflauf aus dem falschen Verzeichnis misst nicht den alten
+Stand, sondern gar nichts. Die Kopie liegt seither in `tests/` und wird danach entfernt.
+Die Prüfungszahlen der beiden Läufe unterscheiden sich übrigens legitim (40 gegen 43): Fällt
+`8b-bau`, laufen `8c`/`8d`/`8e` nicht – das ist genau erklärbar und kein verdeckter Abbruch
+(Regel 34).
+
+### Ein abgeleiteter Text braucht einen Parser, der Ableitungen lesen kann (21.08.2026)
+
+Die Beschreibung des Belagerungsplans leitet ihre Prozentzahl aus `BELAGERUNGSPLAN_SENKUNG` ab,
+statt sie einzutippen (Reihenfolge vorher gemessen, Regel 38: Konstante bei Zeichen 2.055.030,
+`ITEM_DEFS` bei 4.914.443). Damit war sie die **erste** zusammengesetzte `desc` im ganzen Block –
+gemessen: 0 von 30 vorher.
+
+`test_items.js` las sie mit `desc:'([^']*)'` und schnitt deshalb am ersten Apostroph ab, den die
+Verkettung mitbringt. Der Test meldete „unvollständiger Beschreibungssatz" für einen Satz, der
+vollständig dasteht.
+
+**Die bequeme Lösung wäre gewesen, die Zahl wieder einzutippen.** Richtig ist das Gegenteil
+(Regel 43): Der Parser liest jetzt bis zum **nächsten Feld** und ersetzt eingesetzte Ausdrücke
+durch einen Platzhalter – geprüft werden Länge und Schlusszeichen, nicht der eingesetzte Wert.
+Damit kann jede künftige abgeleitete Beschreibung gelesen werden, und der Test ist **stärker** als
+vorher, nicht nachgiebiger. Beidseitig gegengeprüft an zwei Sabotagen auf genau dieser
+zusammengesetzten Beschreibung: zu kurz → rot, ohne Schlusszeichen → rot, echter Stand → grün.
+
 ### Die Festungs-Abklingzeit ist eine Konstante geworden
 
 `FESTUNG_ABKLING_STD = 6` steht jetzt neben `NEST_ABKLING_STD = 4`. Sie hatte **fünf** lebende
@@ -2701,10 +2814,11 @@ Vier Dinge sind dabei schiefgegangen, jedes eine Regel dieses Dokuments in Aktio
    vorher; **wer eine Prüfung über eine Menge formuliert, die es am Vergleichsstand nicht gibt,
    prüft sonst nur, dass sie fehlt.**
 
-### Der `belagerungsplan` – entschieden am 21.08.2026 (Sascha)
+### Der `belagerungsplan` – entschieden und gebaut am 21.08.2026 (v8.600.0)
 
-Vorgelegt mit drei Optionen, gewählt: **die Wirkung umwidmen.** Statt eines Extraschlags senkt der
-Plan die **eigenen Verluste** des nächsten Festungsschlags.
+Vorgelegt mit drei Optionen, gewählt von Sascha: **die Wirkung umwidmen.** Statt eines Extraschlags
+senkt der Plan die **eigenen Verluste** des nächsten Festungsschlags um
+`BELAGERUNGSPLAN_SENKUNG` (40 %).
 
 Der Grund, warum die Konzept-Fassung nicht gebaut wird, bleibt als Messung wichtig: Der Hort ist
 streng nullsummig (`anteil = schaden/summe`, `if (!(anteil > 0)) continue;`). Ein Extraschlag
@@ -2715,9 +2829,56 @@ genannte Spielstand-Feld `festungLetzterSchlag` gibt es seit Phase 1 nicht mehr.
 
 Die gewählte Wirkung nimmt niemandem etwas weg: **Verluste bucht ohnehin der Client** (das ist die
 dokumentierte Arbeitsteilung des Festungsschlags – der Server schreibt den Spielstand des
-Angreifers nicht), der Hort bleibt unberührt, und es braucht **null Backend-Zeilen**. Beim Umsetzen
-gehört der Name mitgezogen: „Belagerungsplan" trägt die neue Wirkung dem Sinn nach, die
-Beschreibung muss sie aber ausdrücklich nennen.
+Angreifers nicht), der Hort bleibt unberührt, und es braucht **null Backend-Zeilen**.
+
+**Fünf Entscheidungen aus dem Bau, jede vorher gemessen:**
+
+- **Die Vormerkung reist in der MISSION mit** (`m.belagerungsplan`), nicht als Zustandsflagge.
+  Verbraucht wird sie beim **Start**, wie die vier Abgrund-Vormerkungen, deren Kopfkommentar den
+  Grund festhält („sonst könnte ein verlorener Kampf sie zurückgeben"). Hier kommt ein zweiter
+  Grund dazu, den die Tauchgänge nicht haben: Es können **zwei Festungsschläge gleichzeitig
+  fliegen**. Eine Flagge, die erst bei der Auflösung gelesen wird, wirkte beim falschen Schlag oder
+  bei beiden.
+- **Kam gar kein Kampf zustande, kommt der Plan ZURÜCK.** Das ist kein Widerspruch zur Regel oben:
+  Ein verlorener Kampf ist ein Kampf, der Plan hat gewirkt. Der `angriffOhneKampf`-Zweig dagegen
+  kostet nach eigener Ansage **nichts** – ein Gegenstand, der dort verschwände, wäre genau der
+  Fehler, der Stunden vorher für dreizehn Gegenstände behoben wurde (v8.598.0).
+- **Der Bericht bekommt `verluste`, nicht `daten.eigeneVerluste`.** Sonst nennte er die
+  ungekürzte Serverzahl, während eine andere gebucht wird – die klassische zweite Anzeigestelle
+  (Punkt 6). Ohne Plan sind beide identisch; der Unterschied entsteht erst mit ihm, und genau dann
+  fällt so etwas niemandem auf.
+- **Die Vorschau RECHNET ihn ein, statt ihn zu nennen** (Regel 61) und stellt die ungekürzte Spanne
+  als Gegenrechnung daneben. Gemessen: 12–18 % ohne, 7–11 % mit Plan. Eine Zeile „Plan aktiv" neben
+  einer unveränderten Spanne wäre das Etikett statt der Wirkung – und der Spieler könnte nicht
+  sehen, was der Plan ihm bringt.
+- **Herkunft NORMAL, also der reguläre Fundtopf.** Der Hort der Festung schied aus: Er läuft über
+  `pushPendingReward` im Backend, und die gewählte Fassung sollte ja gerade ohne Backend-Zeilen
+  auskommen. Ein klientenseitiger Wurf im `festung`-Zweig von `claimPendingRewards` wäre gegangen,
+  hätte aber eine **Farm-Lücke** geöffnet: Gemessen fällt eine Schanze (Kern 30.000) für ein
+  Endspiel-Konto in **einem** Schlag, eine Sternenfeste (1,2 Mio) braucht fünf – wer die Chance an
+  den FALL hängt, farmt Schanzen. Jede Gegenmaßnahme wäre eine neue, erfundene Zahlentabelle
+  gewesen. Der reguläre Topf braucht keine: 0,012 ist exakt die Chance der drei anderen epischen
+  Gegenstände.
+
+**Ein Fund des eigenen Wächters, und er ist der Wert musterbasierter Tests in Reinform:**
+`test_iconabdeckung` 10 meldete `ti-list-details → tiefenkarte, belagerungsplan` – das gewählte
+Symbol war längst vergeben. Umgestellt auf `ti-building-fortress` (frei, im Subset, und dieselbe
+Bildsprache wie der Festungsbericht). **Kein `grep` hätte das gefunden**, weil man nach der
+Kollision erst sucht, wenn man sie vermutet.
+
+Wächter: `tests/test_belagerungsplan.js` (32 Prüfungen – Quelltext-Verdrahtung, Aktivierung über
+den Spielerweg, zwei **Paar-Messungen** und der Kein-Kampf-Zweig). Gegenprobe gegen `origin/main`
+per `KEPLER_SPIELDATEI`: **25 rot bei identischen 32 Prüfnamen** (per `diff` verglichen, nicht
+gezählt – Regel 60). Die zwei Paar-Messungen sind der Kern: Vorschau und gebuchte Verluste werden
+je zweimal mit **identischer Serverantwort** gefahren, nur die Vormerkung unterscheidet die Läufe –
+der Anker liegt damit außerhalb der geprüften Rechnung (Regel 62). Gemessen: 80 gegen 88 von 100
+Kreuzern übrig.
+
+**Und ein Fehlgriff beim Bau des Tests, den seine eigene Vorab-Prüfung gefangen hat:** Nach der
+Aktivierung stand die Gegenstandskarte noch offen; der zweite Toggle-Klick klappte sie **zu**, der
+Aktivieren-Knopf war weg, und „der zweite Versuch verbraucht nichts" war aus dem falschen Grund
+grün (Regel 28) – exakt derselbe Fehlgriff wie in `test_gegenstand_verbrauch` einen Tag vorher. Der
+Test sieht jetzt erst nach und klappt nur bei Bedarf auf.
 
 ### Der Fundort-Knopf log bei Nest- und Festungsberichten (behoben 21.08.2026)
 

@@ -159,6 +159,38 @@ check('B: der Expeditions-Itempool laeuft ueber fundPool',
 check('B: waehrend eines Beute-Events kommen die Event-Gegenstaende weiterhin dazu',
   /activeLootEvent \? fundPool\(EVENT_ITEM_DEFS, \{ event:true \}\)/.test(js));
 
+/* Der Fund vom 21.08.2026, und der Grund, warum die zwei Pruefungen darueber nicht genuegten:
+   Sie nennen die Expedition BEIM NAMEN. Die ERKUNDUNG daneben - eine zweite, aeltere Fundstelle
+   im selben checkMissions - zog die ganze Zeit roh aus dem vollen Array. Gemessen fielen dadurch
+   SECHS Abgrund-Gegenstaende aus ganz gewoehnlicher Erkundung, bis hinauf zur mythischen
+   Grundberuehrung (Erwartungswert 0,176 je Funddurchlauf) - waehrend grantAbgrundItem() sie
+   eigens nach Seltenheit gewichtet, damit die Grundberuehrung ein Ereignis bleibt.
+   Eine namensbasierte Pruefung findet nur, woran man schon gedacht hat (Arbeitsregel 40). Diese
+   hier kennt keine Namen: Sie verbietet die FORM. Gemessen war der Bestand vorher zwei rohe
+   Stellen (ITEM_DEFS und RARE_ITEMS, beide im Erkundungszweig), heute null - eine neue Fundstelle
+   faellt damit auf, ohne dass jemand an sie gedacht haben muss.
+   `.find(` bleibt erlaubt: Das ist ein Nachschlagen ueber den Schluessel, keine Ziehung. */
+const ZIEH_ARRAYS = ['ITEM_DEFS', 'EVENT_ITEM_DEFS', 'RARE_ITEMS'];
+const rohForm = new RegExp(
+  'for\\s*\\(\\s*(?:const|let|var)\\s+\\w+\\s+of\\s+(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\)'
+  + '|(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\[\\s*Math\\.floor');
+const roheZiehungen = zeilenVon(js)
+  .map((z, i) => ({ z, nr: i + 1 }))
+  .filter(x => !x.z.trim().startsWith('//') && rohForm.test(x.z))
+  .map(x => 'Zeile ' + x.nr + ': ' + x.z.trim().slice(0, 100));
+check('B: KEINE Fundstelle iteriert oder indiziert ein Gegenstands-Array roh',
+  roheZiehungen.length === 0, roheZiehungen);
+// Und die Gegenrichtung: Die Form muss ueberhaupt erkennbar sein. Ohne diese Zeile waere die
+// Pruefung darueber auch dann gruen, wenn der regulaere Ausdruck gar nichts mehr trifft
+// (Arbeitsregel 71 - eine Wache, die sagt, was sie findet, statt nur zu schweigen).
+check('B-vorab: die verbotene Form wird ueberhaupt erkannt',
+  rohForm.test('for (const item of ITEM_DEFS){') && rohForm.test('RARE_ITEMS[Math.floor(x)]')
+  && !rohForm.test('for (const item of fundPool(ITEM_DEFS)){'));
+// Positiv: die zwei Fundstellen des Erkundungszweigs laufen wirklich ueber den Filter.
+check('B: der Erkundungszweig zieht Gegenstaende UND seltene Materialien ueber fundPool',
+  /for \(const item of fundPool\(ITEM_DEFS\)\)/.test(js)
+  && /for \(const ri of fundPool\(RARE_ITEMS\)\)/.test(js));
+
 // ---- C) Die Sperre traegt echten Inhalt ----
 // Bis v8.333.0 stand hier "noch traegt kein Eintrag quelle:'abgrund'" - Phase 0 war reine
 // Infrastruktur. Seit v8.334.0 gibt es die ersten Abgrund-Module, und damit dreht sich die Pruefung

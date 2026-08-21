@@ -336,46 +336,72 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
       const fmtZahl = schneide('  function fmt(');
       const zeitTabellen = (S.match(/  const ABBAU_(MIND|DECKEL)_SEK = \{[^}]*\};/g) || []).join('\n') + '\n'
         + (S.match(/  const ABBAU_BOHRUNG_JE_STUFE = [^;]*;/) || [''])[0] + '\n';
+      const eintrag = S.slice(vonH, bisH + E.length).replace(/,\s*$/, '');
+      /* Der Hilfetext leitet seine Zahlen aus Konstanten der Spieldatei ab. Sie werden AUS DER
+         DATEI geschnitten und mitgegeben - nicht durch einen Platzhalter ersetzt (Arbeitsregel 36):
+         Ein nachgebauter Wert prueft nicht mehr das Spiel, sondern den Nachbau.
+
+         ZWEIMAL IST HIER EINE NAMENSLISTE GEFALLEN, und beim zweiten Mal war es meine eigene
+         Behebung des ersten Males - beide am 21.08.2026:
+           * Erst kam FESTUNG_ABKLING_STD dazu, der Hilfetext leitete daraus ab, die eingetippte
+             Liste kannte den Namen nicht: 8b-bau meldete "FESTUNG_ABKLING_STD is not defined".
+           * Die Behebung schnitt daraufhin ueber die "FORM" /const FESTUNG_[A-Z_]+/. Das ist ein
+             NAMENSPRAEFIX, also eine namensbasierte Suche in Verkleidung (Nachtrag zu Arbeitsregel
+             40) - sie faengt jede neue FESTUNG_*-Konstante und keine einzige andere. Mit
+             BELAGERUNGSPLAN_SENKUNG stand derselbe Fehlschlag wieder da, nur mit anderem Namen.
+
+         Die Regel kennt deshalb GAR KEINE Namen mehr: Gesammelt wird, was der Hilfe-Eintrag
+         WIRKLICH BENUTZT, und transitiv das, was diese Deklarationen ihrerseits brauchen. Jede
+         kuenftige Konstante ist damit automatisch dabei, egal wie sie heisst. */
+      const deklaration = (name) => {
+        const marke = '\n  const ' + name + ' = ';
+        const von = S.indexOf(marke);
+        if (von < 0) return null;
+        const zeilenende = S.indexOf('\n', von + 1);
+        const ersteZeile = S.slice(von + 1, zeilenende);
+        // Einzeilig? Dann ist die Deklaration hier zu Ende.
+        if (/;\s*(\/\/.*)?$/.test(ersteZeile)) return ersteZeile;
+        /* Sonst bis "\n  };" - und der Endanker gehoert selbst geprueft (Arbeitsregel 6):
+           FESTUNG_KERN_ROLLE ist ein EINZEILIGES Objekt, ein stures Suchen fand erst 1.786 Zeichen
+           spaeter einen Treffer und verschluckte dabei die naechste Deklaration, die danach ZWEIMAL
+           im Text stand ("has already been declared"). */
+        const bis = S.indexOf('\n  };', von);
+        if (bis < 0) return null;
+        const block = S.slice(von + 1, bis + 5);
+        return (block.match(/\n  const [A-Z][A-Z0-9_]* = /g) || []).length ? null : block;
+      };
+      /* Was der Kopf oben schon mitgibt, darf die Huelle nicht ein ZWEITES Mal schneiden - sonst
+         steht die Deklaration doppelt im Text ("has already been declared"). BUILDING_DEFS gehoert
+         dazu: Es wird als ganzer Block mitgegeben, und ein Hilfetext, der es erwaehnt, riesse den
+         Aufbau sonst genau so. */
+      const schonDa = new Set(['PROTOMATERIE_JE_FUHRE', 'PROTOMATERIE_LAGER_BASIS',
+        'PROTOMATERIE_LAGER_JE_AUFBEREITUNG', 'ABBAU_MIND_SEK', 'ABBAU_DECKEL_SEK',
+        'ABBAU_BOHRUNG_JE_STUFE', 'BUILDING_DEFS']);
+      const gefunden = new Map();
+      let offen = [eintrag];
+      for (let runde = 0; runde < 5 && offen.length; runde++){
+        const naechste = [];
+        for (const stueck of offen){
+          for (const n of new Set(stueck.match(/\b[A-Z][A-Z0-9_]{2,}\b/g) || [])){
+            if (schonDa.has(n) || gefunden.has(n)) continue;
+            const d = deklaration(n);
+            if (!d) continue;
+            gefunden.set(n, d);
+            naechste.push(d);
+          }
+        }
+        offen = naechste;
+      }
+      // In DATEIREIHENFOLGE: Eine Konstante, die eine andere benutzt, steht dahinter.
+      const abgeleitete = [...gefunden.entries()]
+        .sort((a, b) => S.indexOf('\n  const ' + a[0] + ' = ') - S.indexOf('\n  const ' + b[0] + ' = '))
+        .map(e => e[1]).join('\n');
       const kopf = S.slice(vonBD, bisBD + 5) + '\n'
         + fmtDur + fmtZahl + zeitTabellen
         + '  const PROTOMATERIE_JE_FUHRE = ' + JSON.stringify(K.fuhre) + ';\n'
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
         + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n'
-        /* Seit den Asteroidenfestungen leitet der Hilfetext aus den FESTUNG_*-Konstanten ab. Sie
-           werden AUS DER DATEI geschnitten und mitgegeben - nicht durch einen Platzhalter ersetzt
-           (Arbeitsregel 36): Ein nachgebauter Wert prueft nicht mehr das Spiel, sondern den Nachbau.
-
-           HIER STAND EINE NAMENSLISTE, und sie ist am 21.08.2026 genau so gefallen, wie
-           Arbeitsregel 40 es vorhersagt: FESTUNG_ABKLING_STD kam neu dazu, der Hilfetext leitete
-           daraus ab, die Liste kannte den Namen nicht - und 8b-bau meldete
-           "FESTUNG_ABKLING_STD is not defined". Kein Fehler im Spiel, sondern eine Liste, die
-           gepflegt werden musste und es nicht wurde. Geschnitten wird deshalb ueber die FORM.
-
-           UND DIE FORM IST NICHT DIE KLAMMER. Der erste Anlauf teilte nach "= {" auf und
-           schnitt jedes Objekt bis "\n  };". FESTUNG_KERN_ROLLE ist aber ein EINZEILIGES Objekt
-           ({ min:..., max:... };) - der Anker fand erst 1.786 Zeichen spaeter einen Treffer und
-           verschluckte dabei die Deklaration von FESTUNG_BAUTEIL_BEITRAG, die dadurch ZWEIMAL im
-           zusammengesetzten Text stand ("has already been declared"). Das ist Arbeitsregel 6:
-           Ein Slice mit indexOf-Endanker muss pruefen, dass er den RICHTIGEN Anker trifft.
-           Entschieden wird deshalb danach, ob die Deklaration auf IHRER ZEILE endet. */
-        + (() => {
-            const stuecke = [];
-            for (const m of S.matchAll(/\n  const FESTUNG_[A-Z_]+ = /g)){
-              const von = m.index + 1;
-              const zeilenende = S.indexOf('\n', von);
-              const ersteZeile = S.slice(von, zeilenende);
-              if (/;\s*(\/\/.*)?$/.test(ersteZeile)){ stuecke.push(ersteZeile); continue; }  // einzeilig
-              const bis = S.indexOf('\n  };', von);
-              if (bis < 0) continue;
-              const block = S.slice(von, bis + 5);
-              // Der Anker gehoert selbst geprueft: Trifft er zu spaet, steht eine fremde
-              // Deklaration mit im Block - genau der Fehlgriff von oben.
-              if ((block.match(/const FESTUNG_[A-Z_]+ = /g) || []).length !== 1) continue;
-              stuecke.push(block);
-            }
-            return stuecke.join('\n') + '\n';
-          })();
-      const eintrag = S.slice(vonH, bisH + E.length).replace(/,\s*$/, '');
+        + abgeleitete + '\n';
       txt = new Function(kopf + 'return (' + eintrag + ').body;')();
     } catch (e) { fehler = e.message; }
     check('8b-bau: der Hilfe-Eintrag lässt sich zusammensetzen', typeof txt === 'string', fehler);
