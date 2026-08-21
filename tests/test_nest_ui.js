@@ -38,10 +38,13 @@ const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
 const NEST_ID = 'nest-test-1';
 
-function nest(){
-  return { id: NEST_ID, volk:'kryll', sys:SYS, stufe:3, lp:260000, lpMax:400000,
+function nest(opt){
+  /* Die Ueberschreibungen sind die Messvorrichtung fuer Abschnitt 6: ZWEI Laeufe, die sich nur in
+     Stufe und Lebenspunkten unterscheiden, muessen einen anderen Balken und andere Bergungszahlen
+     zeigen. Ein Lauf allein waere auch von einem fest verdrahteten Balken erfuellt (Regel 61). */
+  return Object.assign({ id: NEST_ID, volk:'kryll', sys:SYS, stufe:3, lp:260000, lpMax:400000,
     seit: Date.now() - 7200000, letzteReifung: Date.now() - 3600000,
-    naechsterWurf: Date.now() + 8*3600*1000, naechsteWanderung: 0, beitraege:{}, schlaege:{} };
+    naechsterWurf: Date.now() + 8*3600*1000, naechsteWanderung: 0, beitraege:{}, schlaege:{} }, opt || {});
 }
 
 function backend(store, opt){
@@ -53,7 +56,7 @@ function backend(store, opt){
     if (p === 'me') return j({ userId:'u', username:'A', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
     if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, activePirateFaction:null,
       unlockedAlienRaces:[], activeWar:null, collapsedSystems:{}, activeWormhole:null, news:[],
-      alienNester: opt.ohneNest ? [] : [nest()] });
+      alienNester: opt.ohneNest ? [] : [nest(opt.nest)] });
     if (p === 'asteroid/field') return j({ systeme:[SYS], felder:{ [SYS]: { plaetze:{} } } });
     if (p === 'alien/nest-angriff'){
       let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch(e){}
@@ -96,6 +99,36 @@ async function tab(browser, startSave, opt){
     }
   });
   return { ctx, page, errs, store, stand: () => JSON.parse(store[SAVE_KEY] || '{}') };
+}
+/* Misst die Fuellbalken des offenen Kartenmenues. Gemessen wird die SICHTBARE Geometrie
+   (Regel 55: „im DOM vorhanden" ist nicht „fuer den Spieler sichtbar") und der Anteil, den die
+   Fuellung von ihrer Schiene einnimmt - nicht das style-Attribut, das auch dann dastuende, wenn
+   eine CSS-Regel den Balken flachlegt. */
+async function balkenMessen(page){
+  return page.evaluate(() => {
+    const m = document.querySelector('.kmenu');
+    if (!m) return { menue:false, balken:[], text:'' };
+    const balken = [...m.querySelectorAll('.sstat')].map(b => {
+      const schiene = b.querySelector('.tr'), fuell = b.querySelector('.tr i');
+      const rs = schiene ? schiene.getBoundingClientRect() : null;
+      const rf = fuell ? fuell.getBoundingClientRect() : null;
+      const rb = b.getBoundingClientRect();
+      return {
+        label: (b.querySelector('.k')||{}).textContent || '',
+        wert: (b.querySelector('.v')||{}).textContent || '',
+        hoehe: Math.round(rb.height),
+        schienenBreite: rs ? Math.round(rs.width) : 0,
+        fuellBreite: rf ? Math.round(rf.width) : 0,
+        anteil: (rs && rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
+        imGriff: !!b.closest('details') && !(b.closest('details')||{}).open
+      };
+    });
+    /* Die Meta-Zeilen kommen als EIGENE Elemente zurueck, nicht als Ausschnitt aus dem
+       Fliesstext: Ein Zeichenfenster wie /Bergung:.{0,120}/ ist eine Schaetzung, keine Grenze -
+       es laeuft in die Nachbarzeile hinein und macht jeden Vergleich unscharf. */
+    const zeilen = [...m.querySelectorAll('.bmeta')].map(d => (d.textContent || '').trim());
+    return { menue:true, balken, zeilen, text: m.textContent || '' };
+  });
 }
 async function aufKarte(t){
   await t.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
@@ -155,6 +188,7 @@ async function aufKarte(t){
     { text: (menue.text||'').slice(0, 300) });
   check('2c: und trägt den Angriffs-Eintrag', /Nest angreifen/.test(menue.text),
     { text: (menue.text||'').slice(0, 300) });
+  const bA = await balkenMessen(t1.page);
 
   // ---- 3) Die Vorschau MISST die Schwäche ------------------------------------------------------
   await t1.page.evaluate(() => {
@@ -221,6 +255,45 @@ async function aufKarte(t){
     { auszugOhne: (vorOhne.txt||'').slice(0, 500),
       hinweis: 'gleiche Aussage wie mit Jaegern heisst: die Vorschau misst nicht, sie behauptet' });
   await t2.ctx.close();
+
+  /* ---- 6) Der Fuellbalken und die Bergungszeile (GR-2) --------------------------------------
+     Gemessen wird die WIRKUNG, nicht die Beschriftung (Regel 61): Ein zweiter Lauf mit einer
+     anderen Stufe und einem anderen Lebenspunkte-Stand muss einen ANDEREN Balken und ANDERE
+     Bergungszahlen zeigen. Ein einzelner Lauf waere auch von einem fest verdrahteten Balken und
+     einem festen Text erfuellt. Der Anteil wird zusaetzlich gegen die Zahlen der FIXTURE gehalten
+     - ein Anker von ausserhalb der Rechnung des Spiels (Regel 62). */
+  const t4 = await tab(browser, fixture(true), { nest: { stufe:1, lp:4000, lpMax:40000 } });
+  await t4.page.waitForTimeout(2500);
+  await aufKarte(t4);
+  await t4.page.evaluate(() => { const n = document.querySelector('[data-map-nest]'); if (n) n.dispatchEvent(new MouseEvent('click', {bubbles:true})); });
+  await t4.page.waitForTimeout(500);
+  const bB = await balkenMessen(t4.page);
+  await t4.ctx.close();
+
+  const restA = (bA.balken||[]).find(b => /Rest/.test(b.label));
+  const restB = (bB.balken||[]).find(b => /Rest/.test(b.label));
+  check('6-vorab: beide Laeufe haben ein offenes Kartenmenü mit einem Rest-Balken',
+    bA.menue && bB.menue && !!restA && !!restB,
+    { menueA: bA.menue, menueB: bB.menue, labelA: (bA.balken||[]).map(b=>b.label), labelB: (bB.balken||[]).map(b=>b.label) });
+  check('6a: der Balken ist SICHTBAR und nicht hinter dem Details-Griff',
+    !!restA && restA.hoehe > 0 && restA.schienenBreite > 10 && !restA.imGriff, restA);
+  check('6b: seine Fuellung entspricht dem Lebenspunkte-Anteil der Fixture (65 %)',
+    !!restA && restA.anteil !== null && Math.abs(restA.anteil - 260000/400000) < 0.05,
+    { gemessen: restA && restA.anteil, erwartet: +(260000/400000).toFixed(3), wertText: restA && restA.wert });
+  check('6c: ein anderer Stand ergibt einen ANDEREN Balken (10 % statt 65 %)',
+    !!restA && !!restB && restB.anteil !== null && Math.abs(restB.anteil - 4000/40000) < 0.05
+      && Math.abs(restA.anteil - restB.anteil) > 0.2,
+    { anteilA: restA && restA.anteil, anteilB: restB && restB.anteil,
+      hinweis: 'gleicher Anteil in beiden Laeufen heisst: der Balken misst nicht, er steht nur da' });
+
+  const bergA = (bA.zeilen || []).find(z => /^Bergung:/.test(z)) || '';
+  const bergB = (bB.zeilen || []).find(z => /^Bergung:/.test(z)) || '';
+  check('6d: das Kartenmenü nennt die Bergung samt Verteilungsregel',
+    /Bergung:/.test(bergA) && /Kampfpunkte/.test(bergA) && /Schadensanteil/.test(bergA), { zeile: bergA });
+  check('6e: und sie haengt an der STUFE - eine andere Stufe nennt andere Zahlen',
+    !!bergA && !!bergB && bergA !== bergB,
+    { stufe3: bergA, stufe1: bergB,
+      hinweis: 'gleiche Zeile bei verschiedenen Stufen heisst: die Zahlen sind fest verdrahtet' });
 
   // ---- 1c) Gegenrichtung: kein Nest im Galaxie-Zustand ------------------------------------------
   const t3 = await tab(browser, fixture(true), { ohneNest: true });

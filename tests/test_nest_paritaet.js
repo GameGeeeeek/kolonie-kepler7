@@ -73,13 +73,29 @@ const bS = fuehreAus(block(BACK, 'const NEST_STUFEN = [', '\n];'), 'NEST_STUFEN'
 check('3a: beide Stufen-Tabellen sind lesbar und ausführbar', !!fS && !!bS, { front: !!fS, back: !!bS });
 if (fS && bS){
   check('3a2: gleich viele Stufen', fS.length === bS.length, { front: fS.length, back: bS.length });
+  /* DATENGETRIEBEN statt Namensliste (GR-2): Hier standen 'name' und 'lp' fest im Code - ein
+     neues Feld waere damit stillschweigend ungeprueft geblieben, und genau das stand an, als die
+     Belohnungszahlen (kampfpunkte/xp/credits) aus server.js herueberkamen. Verglichen wird jetzt
+     JEDES Feld, das die Frontend-Tabelle fuehrt; das Backend darf mehr haben (punkte ist die
+     Stufengewichtung fuers Tauziehen und hat im Frontend keine Anzeigestelle), das Frontend aber
+     nichts, was dort fehlt oder abweicht. Ein vierter Wert ist damit automatisch mitgeprueft,
+     ohne dass jemand an ihn gedacht haben muss (Hausregel 40). */
   const ab = [];
+  const felder = new Set();
+  for (let i = 1; i < fS.length; i++) if (fS[i]) Object.keys(fS[i]).forEach(k => felder.add(k));
   for (let i = 1; i < Math.min(fS.length, bS.length); i++){
     if (!fS[i] || !bS[i]) { ab.push({ stufe: i, front: fS[i], back: bS[i] }); continue; }
-    if (fS[i].name !== bS[i].name) ab.push({ stufe: i, feld: 'name', front: fS[i].name, back: bS[i].name });
-    if (fS[i].lp !== bS[i].lp) ab.push({ stufe: i, feld: 'lp', front: fS[i].lp, back: bS[i].lp });
+    for (const feld of felder){
+      if (!(feld in fS[i])) continue;
+      if (!(feld in bS[i])) { ab.push({ stufe: i, feld, front: fS[i][feld], back: 'FEHLT im Backend' }); continue; }
+      if (fS[i][feld] !== bS[i][feld]) ab.push({ stufe: i, feld, front: fS[i][feld], back: bS[i][feld] });
+    }
   }
-  check('3b: Name und Lebenspunkte stimmen je Stufe überein', ab.length === 0, ab);
+  check('3b-vorab: die Frontend-Tabelle fuehrt die Felder, die geprueft werden sollen',
+    felder.has('name') && felder.has('lp') && felder.has('kampfpunkte') && felder.has('xp') && felder.has('credits'),
+    { gemesseneFelder: [...felder] });
+  check('3b: JEDES Feld der Frontend-Tabelle stimmt je Stufe mit dem Backend überein',
+    ab.length === 0, { abweichungen: ab, geprueft: [...felder] });
 }
 
 // ---- 4) Die Abklingzeit --------------------------------------------------------------------

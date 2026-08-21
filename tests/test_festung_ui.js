@@ -498,6 +498,52 @@ async function aufKarte(t){
     { auszug: (z8.txt||'').slice(0, 600) });
   await t8.ctx.close();
 
+  /* ---- 7) Die Fuellbalken und die Hortzeile (GR-2) -------------------------------------------
+     Dieselbe Messvorrichtung wie in test_nest_ui Abschnitt 6, hier mit DREI Balken auf einmal:
+     Kern, Schild und Tuerme. Die Fixture gibt ihnen absichtlich drei VERSCHIEDENE Anteile
+     (75 / 50 / 25 %) - damit belegt der Lauf, dass jeder Balken SEINEN Wert misst und nicht alle
+     denselben. Ein Lauf mit gleichen Anteilen waere auch von drei identischen Balken erfuellt
+     (Regel 61). Die Meta-Zeilen kommen als eigene Elemente zurueck, nicht als Zeichenfenster aus
+     dem Fliesstext: Ein `.{0,120}` ist eine Schaetzung und laeuft in die Nachbarzeile. */
+  const t9 = await tab(browser, fixture(),
+    { feld: feld(true, { schild: { lp:240000, lpMax:480000 }, tuerme: { lp:75000, lpMax:300000 } }) });
+  await t9.page.waitForTimeout(2500);
+  await aufKarte(t9);
+  await t9.page.evaluate(() => { const n = document.querySelector('[data-map-festung]'); if (n) n.dispatchEvent(new MouseEvent('click', {bubbles:true})); });
+  await t9.page.waitForTimeout(500);
+  const mess9 = await t9.page.evaluate(() => {
+    const m = document.querySelector('.kmenu');
+    if (!m) return { menue:false, balken:[], zeilen:[] };
+    const balken = [...m.querySelectorAll('.sstat')].map(b => {
+      const schiene = b.querySelector('.tr'), fuell = b.querySelector('.tr i');
+      const rs = schiene ? schiene.getBoundingClientRect() : null;
+      const rf = fuell ? fuell.getBoundingClientRect() : null;
+      return {
+        wert: (b.querySelector('.v')||{}).textContent || '',
+        hoehe: Math.round(b.getBoundingClientRect().height),
+        anteil: (rs && rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
+        imGriff: !!b.closest('details') && !(b.closest('details')||{}).open
+      };
+    });
+    return { menue:true, balken, zeilen: [...m.querySelectorAll('.bmeta')].map(d => (d.textContent||'').trim()) };
+  });
+  await t9.ctx.close();
+
+  check('7-vorab: das Kartenmenü ist offen und trägt DREI Balken (Kern, Schild, Türme)',
+    mess9.menue && mess9.balken.length === 3, { anzahl: mess9.balken.length, balken: mess9.balken });
+  check('7a: alle drei sind SICHTBAR und nicht hinter dem Details-Griff',
+    mess9.balken.length === 3 && mess9.balken.every(b => b.hoehe > 0 && !b.imGriff), mess9.balken);
+  /* Erwartet aus der FIXTURE, nicht aus der Rechnung des Spiels (Regel 62): 900.000/1.200.000,
+     240.000/480.000, 75.000/300.000. */
+  const erwartet9 = [900000/1200000, 240000/480000, 75000/300000];
+  check('7b: jeder Balken zeigt SEINEN eigenen Anteil (75 / 50 / 25 %)',
+    mess9.balken.length === 3 && mess9.balken.every((b, i) => b.anteil !== null && Math.abs(b.anteil - erwartet9[i]) < 0.05),
+    { gemessen: mess9.balken.map(b => b.anteil), erwartet: erwartet9.map(x => +x.toFixed(3)),
+      hinweis: 'drei gleiche Anteile heissen: die Balken messen nicht, sie stehen nur da' });
+  const hort9 = (mess9.zeilen || []).find(z => /^Hort:/.test(z)) || '';
+  check('7c: die Hortzeile nennt die Kampfpunkte samt Verteilungsregel',
+    /Kampfpunkte/.test(hort9) && /Schadensanteil/.test(hort9), { zeile: hort9 });
+
   await browser.close();
   ende();
 })();

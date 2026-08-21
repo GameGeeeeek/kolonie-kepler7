@@ -2911,6 +2911,96 @@ injizieren; ohne Injektion bleibt es beim lokal erzeugten Gürtel, damit die Abb
 ablesbaren Platz behalten (Regel 4). Beidseitig gegengeprüft: 19 Prüfungen in jeder Richtung, und
 am Stand davor fallen genau die sechs neuen Inhaltsprüfungen, jede mit der alten Zeile als Beleg.
 
+## GR-2: Lebenspunkte als Balken, Belohnungen als Zeile (21.08.2026)
+
+Nest- und Festungsmenü nannten ihre Lebenspunkte nur als Zahlenpaar („260.0k von 400.0k") und das
+Nest-Menü **keine einzige** mögliche Belohnung. Beides ist jetzt da: ein Füllbalken je Leiste und
+eine Zeile, die sagt, was beim Fall zu holen ist.
+
+**`kartenFuellBalken(label, wert, max, farbe, tip)` ist die EINE Quelle für alle vier Balken**
+(Nest-Kern, Festungs-Kern, Schildkuppel, Geschütztürme). Fünf Entscheidungen darin:
+
+- **Dieselbe CSS-Klasse `.sstat` wie Schiffe und Verteidigungsanlagen** – dieselbe Entscheidung
+  wie bei VT-1, und `test_verteidigungsbalken` 5 prüft sie ausdrücklich („`.sstat` statt einer
+  zweiten Bildsprache").
+  **Aber die Wahl ist NICHT so eindeutig, wie dieser Satz allein klingt, und das gehört dazu:**
+  Gemessen benutzt das Spiel für Füllstände `.progress-outer`/`.progress-inner` an **60** Stellen,
+  `.sstat` nur an **drei** (Werft, Verteidigung, jetzt hier). Und ausgerechnet im NACHBAR-Kartenmenü
+  steht seit v8.512.0 schon ein Balken dieser Hausform: der Vorrat des Asteroiden. Für den Spieler
+  stehen damit **zwei Balkenformen im selben Menü-Typ**. Ausschlaggebend war die Zahl der Leisten:
+  Der Asteroid hat EINE (die Zeile darüber sagt, was sie meint), die Festung hat DREI, und drei
+  Leisten ohne Beschriftung sind nicht auseinanderzuhalten – `.progress-outer` hat kein Label-Feld.
+  **Der saubere Abschluss wäre, den Asteroiden-Vorrat ebenfalls auf `kartenFuellBalken` zu ziehen**
+  (Label „Vorrat", Zahlenzeile bleibt) – dann gibt es im Kartenmenü EINE Form. Das ist bewusst NICHT
+  Teil dieser Etappe: `test_asteroiden_info` und `test_flottenkarten` lesen den vorhandenen Balken,
+  die Umstellung braucht also eigene Messungen statt eines Anhängsels. Wer sie angeht, prüft zuerst
+  diese zwei Tests.
+- **Der Unterschied VERGLEICH gegen FÜLLSTAND steht im Titel, nicht im Balken.** Bei Schiffen misst
+  ein Balken den Wert *im Verhältnis zur besten Klasse der Flotte*, hier den Rest eines einzelnen
+  Objekts. Gleiche Bildsprache, andere Bedeutung – der Tooltip sagt es („nicht ein Vergleich mit
+  anderen Nestern").
+- **Rechts steht der Prozentwert, nicht die absolute Zahl.** Das `.v`-Feld ist 30 px breit; „260.0k"
+  passt dort nicht, und die absolute Zahl steht ohnehin in der Zeile darüber.
+- **Die Farbe wird GEPRÜFT, nicht durchgereicht** (`/^#[0-9a-fA-F]{3,8}$/`, sonst der Violett-Ton
+  des Spiels). Sie kommt aus `ALIEN_VOELKER`/`FESTUNG_STUFEN`/`FESTUNG_BAUTEILE` und geht in ein
+  `style`-Attribut – dieselbe Lehre wie bei GR-1, wo alle 40 Farben des Portal-Entwurfs durch eine
+  Tabelle liefen, die bei einer unbekannten Farbe abbricht.
+- **Das Label heißt „Rest", nicht „Kern" oder „Nest".** Der erste Entwurf doppelte damit den
+  Zeilentext direkt darüber – aufgefallen am gerenderten Text, nicht am Code (Regel 42).
+
+**Die Belohnungszahlen sind aus `server.js` herübergekommen** – `NEST_STUFEN` trägt jetzt
+`kampfpunkte`/`xp`/`credits`, `FESTUNG_STUFEN` `kampfpunkte`. **`punkte` bewusst NICHT:** Das ist
+die Stufengewichtung fürs Tauziehen der Weltlage (Phase 4) und hat im Frontend keine
+Anzeigestelle – ein Feld, das nur mitkopiert wird, ist die Sorte Zahl, die später jemand für
+benutzt hält (Regel 59).
+
+**„Hort" bleibt „Hort", und das ist eine Entscheidung gegen die eigene Formulierung.** Der erste
+Entwurf schrieb „Beim Fall zu holen:" und riss `test_festung_ui` 2b. Gemessen steht „Hort" 25-mal
+in der Datei, mehrfach in `HELP_SECTIONS` – es ist der etablierte Begriff. Angepasst wurde der
+TEXT, nicht der Wächter (dieselbe Abwägung wie bei TX-1: Regel 3 gegen Regel 26, und hier lag der
+Fall auf der Seite des Wächters).
+
+### Die eigentliche strukturelle Änderung: beide Paritätstests sind datengetrieben
+
+`test_nest_paritaet` 3b verglich `name` und `lp` als **Namensliste**, `test_festung_paritaet` 2a
+`kern`, `blockade` und `proto`. Ein neu übernommenes Feld wäre damit stillschweigend ungeprüft
+geblieben – genau der Fall, der mit den Belohnungszahlen anstand. Beide vergleichen jetzt **jedes
+Feld, das die Frontend-Tabelle führt**; das Backend darf mehr haben (`punkte`, `hortStd`,
+`fernBis`), das Frontend aber nichts, was dort fehlt oder abweicht. `farbe` ist namentlich
+ausgenommen und reine Frontend-Kosmetik. Ein fünftes Feld ist damit automatisch mitgeprüft, ohne
+dass jemand an es gedacht haben muss (Regel 40).
+
+Gegenproben, beide beidseitig gefahren, identische Prüflisten per `diff` verglichen (Regel 60):
+Backend-Kopie mit `kampfpunkte: 16` statt 15 → genau `3b` bzw. `2a` fallen, mit dem sprechenden
+Beleg `{"stufe":1,"feld":"kampfpunkte","front":15,"back":16}`. 12 bzw. 26 Prüfungen in jeder
+Richtung.
+
+### Die Wächter messen die WIRKUNG, nicht die Anwesenheit
+
+`test_nest_ui` Abschnitt 6 und `test_festung_ui` Abschnitt 7 fahren je ZWEI Läufe, die sich nur im
+Lebenspunkte-Stand bzw. in der Stufe unterscheiden. Gemessen wird die **sichtbare Geometrie** – der
+Anteil, den die Füllung von ihrer Schiene einnimmt –, nicht das `style`-Attribut, das auch dann
+dastünde, wenn eine CSS-Regel den Balken flachlegt (Regel 55). Die Festungs-Fixture gibt den drei
+Balken absichtlich drei VERSCHIEDENE Anteile (75/50/25 %): Ein Lauf mit gleichen Werten wäre auch
+von drei identischen Balken erfüllt.
+
+Drei Gegenproben an sabotierten Kopien, jede mit der Liste der Prüfungen, die fallen MÜSSEN
+(Regel 71): fester Anteil 50 % → `6b`/`6c`/`7b`; Balken abgeschaltet → `6-vorab`/`6a`/`7-vorab`/`7a`;
+Bergungszeile abgeschaltet → `6d`/`6e`.
+
+**Ein Werkzeugfehler im eigenen neuen Test, gefangen am Beleg:** Die Bergungszeile wurde zuerst per
+`/Bergung:[^]{0,120}/` aus dem Fließtext des Menüs geschnitten – ein **geratenes Zeichenfenster**,
+das sichtbar in die Nachbarzeile lief („… geteilt Wirksam dagegen: Jäger im Verba"). Das ist
+wörtlich die Regel, die einen Abschnitt weiter oben steht („Ein GERATENES Fenster ist kein Scope"),
+im selben Atemzug verletzt. Gegriffen wird jetzt das `.bmeta`-ELEMENT. Aufgefallen ist es nur, weil
+der Fehlschlag-Beleg den Treffer mit ausgibt – ein Test, der nur „grün" meldet, hätte es verdeckt.
+
+**Und Regel 15 hat sich zum zweiten Mal bestätigt, mit demselben Exit-Code:** Ein `pkill -f 'node
+-c'` gegen einen eigenen hängengebliebenen Hilfsbefehl traf die eigene Shell (Exit 144). Die Regel
+steht seit dem 06.08.2026 wörtlich in diesem Dokument, samt Exit-Code. **Kein `pkill` mit einem
+Muster, das die eigenen Werkzeuge selbst enthalten können** – hängende Prozesse werden über `ps`
+identifiziert und einzeln über ihre PID beendet, oder man lässt sie laufen.
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit

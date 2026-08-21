@@ -17,9 +17,12 @@
 //   1. Beide Seiten kennen dieselben Stufen-SCHLÜSSEL. Schickt der Server eine Stufe, die das
 //      Frontend nicht kennt, fällt `festungFaktoren` auf die Schanze zurück - der Spieler sähe
 //      dann eine Drosselung von 25 %, während der Server 55 % abzieht.
-//   2. Die drei Zahlen, die BEIDE Seiten benutzen, stimmen je Stufe überein:
-//      `blockade` (Ladungskürzung), `proto` (Protomaterie-Drosselung) und `kern` (Lebenspunkte,
-//      die das Kartenmenü als Balken zeigt).
+//   2. JEDES Feld der Frontend-Tabelle stimmt je Stufe mit dem Backend überein - datengetrieben,
+//      nicht als Namensliste (GR-2, 21.08.2026). Heute sind das `kern`, `blockade`, `proto`,
+//      `verlust`, `kampfpunkte` und der Name; `farbe` ist reine Frontend-Kosmetik und namentlich
+//      ausgenommen. Ein kuenftiges Feld ist automatisch mitgeprueft, ohne dass jemand daran
+//      denken muss - vorher standen genau drei Namen im Code, und die Belohnungszahlen waeren
+//      stillschweigend ungeprueft geblieben.
 //   3. Der Geräumt-Bonus steht auf beiden Seiten gleich.
 //   4. Der Server SCHICKT den Protomaterie-Faktor wirklich mit (`protoBlockade` in der Antwort von
 //      /api/asteroid/mine) - ohne dieses Feld wäre die Drosselung nicht umsetzbar, weil die
@@ -77,11 +80,16 @@ if (!F || !B) return ende();
   for (const k of Object.keys(B)){
     const fs_ = F[k], bs = B[k];
     if (!fs_) continue;
-    for (const feld of ['blockade', 'proto', 'kern']){
+    /* DATENGETRIEBEN statt Namensliste (GR-2) - siehe die ausfuehrliche Begruendung in
+       test_nest_paritaet 3b. 'farbe' ist reine Frontend-Kosmetik und steht deshalb NAMENTLICH als
+       Ausnahme: Das Backend kennt sie nicht, und eine Abweichung waere dort kein Befund. Ein
+       kuenftiges Feld, das nicht in dieser Liste steht, wird dagegen automatisch mitgeprueft. */
+    for (const feld of Object.keys(F[k]).filter(x => x !== 'farbe')){
       if (fs_[feld] !== bs[feld]) abweichung.push({ stufe: k, feld, front: fs_[feld], back: bs[feld] });
     }
   }
-  check('2a: blockade, proto und kern stimmen je Stufe überein', abweichung.length === 0, abweichung);
+  check('2a: JEDES Feld der Frontend-Tabelle stimmt je Stufe mit dem Backend überein',
+    abweichung.length === 0, { abweichungen: abweichung, geprueft: Object.keys(F.schanze || {}).filter(x => x !== 'farbe') });
   // Und die NAMEN, weil das Frontend sie dem Spieler zeigt ("Sternenfeste im System").
   const namen = Object.keys(B).filter(k => F[k] && F[k].name !== B[k].name)
     .map(k => ({ stufe: k, front: F[k].name, back: B[k].name }));
