@@ -2196,6 +2196,192 @@ war damit trivial erfüllt. Und `4b` suchte „Königin" im ganzen Box-Markup, w
 Einleitungstext steht; gescopt auf das Auswahlfeld und über den **Spielerweg** gewählt (Auswahl
 setzen, `change` auslösen) misst es die Liste wirklich.
 
+## Zwei PvE-Meilensteine, zwei Sammlungen, ein Vorbote (Phase 6, Frontend, 21.08.2026)
+
+Die letzte Phase der Asteroidenfestungen/Alien-Nester. Gebaut wurde wenig; **gefunden wurde viel**,
+und das ist der eigentliche Inhalt dieses Abschnitts.
+
+**Gebaut:** die zwei `KOSMETIK_LOOK`-Einträge zu `em_festungsbrecher`/`em_schwarmbrecher`, die zwei
+`kosmetikBedingungText`-Zweige (`festungen`/`koeniginnen`), zwei Kompendium-Kategorien
+(Asteroidenfestungen, Alien-Völker), ein Vorbote auf Stufe 13, und `state.festungTypen`/
+`state.nestVoelker` in **beiden** Reset-Bewahrlisten. Die Zähler der EMBLEME liegen serverseitig
+(`user.pveKills`), die Kompendium-Sammlungen im Spielstand – der Unterschied ist Absicht: Ein
+Emblem steht in der Bestenliste, also auf einer Fläche, die allen gehört; eine Sammlung ist
+persönlich.
+
+**Eingeordnet statt behauptet** (die Prüfung hat die Frage gestellt, die Messung hat sie
+beantwortet): `festungen`/`koeniginnen` liegen mit `kauf` und `abgewehrt` am **Nutzerobjekt** –
+der stärksten Verankerung, die `kosmetikBedingungErfuellt` kennt. **Sechs** bestehende Bedingungen
+(`prestige`, `aufstieg`, `kampfpunkte`, `abgrund`, `erfolge`, `bosse`) lesen dagegen direkt aus dem
+klientenautoritativen Spielstand. Dass die zugrundeliegende Flottenkraft aus dem Spielstand kommt,
+ist die dokumentierte Projektgrenze und kein neues Loch – die zwei neuen Wege sind besser verankert
+als sechs vorhandene.
+
+### Die sechs Funde – drei beim Lesen des eigenen Diffs, drei aus der adversarischen Prüfung
+
+**1. Zwei erfundene Begründungen in Kommentaren.** Beide behaupteten, `FESTUNG_STUFEN` sei „ein
+Array mit führendem null". Gemessen: ein Objekt mit drei benannten Schlüsseln, `ALIEN_VOELKER`
+eines mit vier. Dieselbe Familie wie die erfundene Wander-Begründung aus Phase 4 – ein Kommentar,
+der beim nächsten Lesen als REGEL gelesen wird.
+
+**2. Zwei Namensräume für dieselbe Sammlung.** `state.festungTypen` sammelte den ANZEIGENAMEN
+(`r.stufeName`), `total()` zählte die SCHLÜSSEL – während `nestVoelker` daneben schon richtig
+`r.volk` benutzte. Die Zahl stimmte zufällig (drei zu drei); eine spätere Umbenennung hätte `have`
+über `total` steigen lassen. Beide sammeln jetzt Schlüssel.
+
+**3. Der Kompendium-Hilfetext log seit v8.343.0 – und ein Test nagelte die Lüge fest.** Er sagte
+„in **acht** Kategorien" und zählte acht namentlich auf; `COMPENDIUM_CATS` führt **13**.
+`test_kompendium.js` prüfte wörtlich `/… in acht Kategorien/` – wer den Text hätte richtigstellen
+wollen, wäre von genau dieser Prüfung zurückgepfiffen worden. Das ist **Arbeitsregel 68** in
+Reinform, und der Text hat den Fehler durch drei Auslieferungen getragen (Reliquien/Konstellationen
+→ 10, Unikate → 11, Phase 6 → 13).
+Behoben nicht mit einer korrigierten Ziffer, sondern **gerechnet**: `'+COMPENDIUM_CATS.length+'`
+und die Namen aus `COMPENDIUM_CATS.map(...)`. Reihenfolge vorher gemessen, nicht geschätzt
+(Regel 38): `COMPENDIUM_CATS` steht bei Zeichen 2.441.037, `HELP_SECTIONS` bei 3.985.418 – die
+Ableitung im Array-Literal ist gedeckt. Der Ausdruck steht zusätzlich in der `gerechnet`-Liste von
+`test_zaehlangaben.js`, damit die Ziffer nicht zurückkehrt.
+
+**4. Eine DRITTE Anzeigestelle, und die älteste.** Über `#compendiumBox` steht eine statische
+Einleitungszeile im Markup – sie zählte die **ursprünglichen fünf** Kategorien auf und hinkt damit
+seit v8.298 hinterher. Gefunden nicht im Quelltext, sondern am **gerenderten** Spiel (Regel 42).
+Statisches Markup kann nicht aus der Tabelle ableiten; sie zählt deshalb gar nicht mehr auf. Die
+Beschreibung jeder Kategorie steht ohnehin in ihrer eigenen Zeile – der Renderer gibt `cat.name`
+UND `cat.desc` aus.
+
+**5. Der Vorbote auf Stufe 12 hätte den Abgrund-Hinweis gelöscht.** Auf Stufe 12 feuert in `addXp()`
+der fest verdrahtete Abgrund-Vorbote, und `maybeShowVorbote()` läuft im SELBEN synchronen Block
+unmittelbar danach. **`#log` hat keinen Stapel** (Nachtrag zu Regel 47): Die zuerst geschriebene
+Erklärung wäre weg, bevor sie jemand liest – und `state.abgrundVorbote` stünde trotzdem auf `true`,
+der Hinweis käme also **nie wieder**. Der Festungs-Vorbote liegt deshalb auf **13**.
+Bezeichnend: Der Kopfkommentar der Tabelle kannte die Regel längst („je Levelaufstieg höchstens
+EINER – sonst schlagen zwei Toasts gleichzeitig auf und beide gehen unter"), aber nur für zwei
+VORBOTEN untereinander, nicht gegen die fest verdrahteten Hinweise daneben. Er sagt das jetzt.
+
+**6. Ein ausgelieferter DATENVERLUST, älter als Phase 6.** `claimPendingRewards()` hat kein
+abschließendes `save()`; jeder Zweig speichert selbst. Von den acht riefen **genau zwei** keines –
+`festung` (seit v8.569.0) und `alien-nest` (seit v8.582.0). Warum das Verlust ist und nicht
+Schlamperei: `POST /api/pending-rewards/claim` macht serverseitig `list.shift()` **und** `saveDb()`.
+Die Belohnung ist in dem Moment, in dem der Client sie hält, aus der Warteschlange verschwunden –
+es gibt keinen zweiten Versuch. Wer den Reiter schließt, bevor ein anderes Ereignis speichert,
+verliert Hort, Protomaterie, Kampfpunkte, Erfahrung und Kredite endgültig. Und
+`claimPendingRewards()` läuft **beim Start des Spiels** – genau dann, wenn jemand kurz reinsieht.
+
+**7. Die Einleitungszeile der Kosmetik-Box zählte die Freischaltwege auf** („Prestige, Aufstieg,
+Kampfpunkte, Rekordtiefe, Erfolge, Sektor-Bosse und abgewehrte Angriffe") und kannte die zwei neuen
+nicht. Dieselbe Fehlerklasse wie 3 und 4, in derselben Lieferung zum **dritten** Mal. Sie nennt
+jetzt nur noch die drei stabilen Oberbegriffe (Fortschritt / Unterstützer-Rang / Sternenstaub);
+was ein einzelnes Stück verlangt, steht bei ihm selbst.
+
+### Die Wächter
+
+- `tests/test_levelvorboten.js` (8 Prüfungen) – liest BEIDE Quellen aus der Spieldatei, die
+  VORBOTEN-Tabelle und die fest verdrahteten `after >= N`-Zweige mit `log()`, und hält sie
+  gegeneinander. Beidseitig gegengeprüft: der Anlassfall (Vorbote zurück auf 12) reißt `3`, zwei
+  Vorboten auf derselben Stufe reißen `3b`, bei identischen Prüflisten.
+- `tests/test_belohnungen_speichern.js` (6 Prüfungen) – prüft JEDEN Zweig von
+  `claimPendingRewards`, nicht eine Namensliste; ein neunter Belohnungstyp ist automatisch dabei.
+  Gegenprobe am Stand vor der Behebung: `{"ohneSave":["festung","alien-nest"]}`.
+- `test_kompendium.js` 5a/5b/5c/5d/5d2, `test_zaehlangaben.js` (Kompendium-Stelle),
+  `test_kosmetik_paritaet.js` 7/7b – alle beidseitig gegengeprüft.
+
+**Eine Lehre über den eigenen Wächter, die fast durchgerutscht wäre:** Die erste Gegenprobe zu
+`test_belohnungen_speichern` benannte nur `alien-nest` statt beider Zweige. Grund: Mein
+Erklärkommentar im Festungs-Zweig **zitiert** den Aufruf („die EINZIGEN der acht ohne save()"), und
+die rohe Textsuche sah ihn als vorhanden an. Das ist **Arbeitsregel 33** wörtlich, hier an einem
+Test, der einen Datenverlust bewacht. Kommentare werden jetzt vor dem Suchen geleert, und eine
+Vorab-Prüfung (`2-vorab`) belegt, dass das Leeren gegriffen hat.
+
+72. **Eine Einleitungszeile, die aufzählt, was direkt darunter ohnehin Zeile für Zeile steht, ist
+    eine zweite Anzeigestelle mit Ablaufdatum.** Vorfall 21.08.2026, **dreimal in einer einzigen
+    Lieferung**: der Kompendium-Hilfetext („acht Kategorien" bei 13), die statische Zeile über
+    `#compendiumBox` (fünf bei 13) und die Einleitung der Kosmetik-Box (sieben Freischaltwege bei
+    neun). Alle drei zählten auf, was der Renderer darunter je Zeile mit `name` UND `desc` ausgibt.
+    Keine der drei ist je nachgezogen worden – über v8.298, v8.343.0, v8.464.0 und drei
+    Aliens-Phasen hinweg.
+    **Vorgehen:** (a) Vor jedem neuen Eintrag in einer Tabelle, die gerendert wird, die Umgebung
+    nach Aufzählungen derselben Tabelle absuchen – nicht nur nach dem Konstantennamen, sondern nach
+    Zahlwörtern und nach den NAMEN der bestehenden Einträge; (b) steht die Aufzählung in JS und die
+    Tabelle davor, wird sie ABGELEITET (`'+TABELLE.length+'`, `TABELLE.map(...)`) – Reihenfolge
+    vorher messen (Regel 38); (c) steht sie in statischem Markup, kann sie nicht ableiten – dann
+    ersatzlos entzählen, denn eine handgepflegte Kopie neben der Liste wird immer wieder falsch;
+    (d) den Ausdruck in die `gerechnet`-Liste von `test_zaehlangaben.js` eintragen, damit die Ziffer
+    nicht zurückkehrt.
+73. **Ein Codepfad, der eine Belohnung entgegennimmt, die der Server beim Ausliefern LÖSCHT, muss
+    sie sofort speichern – und „die anderen Zweige tun es ja" ist kein Beleg.** Vorfall 21.08.2026:
+    Zwei von acht Zweigen in `claimPendingRewards()` riefen kein `save()`; die Funktion hat kein
+    abschließendes. Der Server hatte die Belohnung zu dem Zeitpunkt bereits per `list.shift()` +
+    `saveDb()` entfernt – ein zweiter Versuch existiert nicht. Beide Zweige waren die neuesten
+    (v8.569.0 und v8.582.0), beide wurden aus einem Nachbarn kopiert, der sein `save()` weiter unten
+    stehen hatte.
+    **Vorgehen:** Bei jedem Ergebnis, das von einer serverseitigen WARTESCHLANGE kommt, zuerst
+    nachsehen, ob der Server es beim Ausliefern verbraucht. Wenn ja, ist das Speichern Teil des
+    Empfangens und keine Fleißarbeit – und die Prüfung darauf gehört datengetrieben über ALLE
+    Zweige, nicht als Namensliste (Regel 40).
+
+74. **Eine adversarische Prüfung, die den Arbeitsbaum liest, während der Autor ihn korrigiert,
+    misst ein bewegliches Ziel – und ihr „widerlegt"-Fach mischt danach zwei völlig verschiedene
+    Dinge.** Vorfall 21.08.2026: Eine Prüfung mit 44 Agenten (sechs Blickwinkel, je Befund zwei
+    Skeptiker) meldete am Ende **19 Befunde, 0 bestätigt**. Das las sich wie „am Änderungssatz war
+    nichts". Tatsächlich hatte ich vier davon während der laufenden Prüfung behoben – darunter
+    einen ausgelieferten **Datenverlust** –, und der Skeptiker schrieb das sogar hin: *„Der Befund
+    hält am geprüften Arbeitsstand NICHT mehr stand – er ist dort bereits behoben. Wichtig für die
+    Einordnung: Er war inhaltlich RICHTIG, nicht falsch."*
+    Wer nur das Fach zählt statt die Begründungen zu lesen, zieht daraus den genau falschen
+    Schluss – und schlimmer: Beim nächsten Mal lässt er die Prüfung weg, weil sie ja „nichts
+    gefunden" hat.
+    **Vorgehen:** (a) Entweder die Prüfung gegen eine eingefrorene KOPIE laufen lassen
+    (`KEPLER_SPIELDATEI` auf einen Schnappschuss), dann ist das Ergebnis eindeutig; (b) oder – wenn
+    parallel gearbeitet wird, was der Normalfall ist – die BEGRÜNDUNGEN lesen, nicht die Bilanz.
+    Ein Urteil „widerlegt" hat mindestens drei Bedeutungen: *war nie ein Problem*, *ist eine
+    dokumentierte Absicht*, und *war ein Problem und ist schon behoben*. Nur die ersten beiden
+    entlasten. (c) Ein Befund, den man selbst am Code nachgemessen hat, steht über jedem Urteil
+    einer Prüfung – die Messung ist der Beleg, das Urteil nur eine zweite Meinung (Regel 10 in
+    beide Richtungen gelesen).
+    **Was die Prüfung in dieser Sitzung wirklich geleistet hat**, gemessen statt behauptet: Sie
+    hat drei echte Fehler geliefert, die ich beim eigenen Durchgang übersehen hatte – den
+    Datenverlust in `claimPendingRewards`, die Vorboten-Kollision auf Stufe 12 und die
+    Aufzählung in der Kosmetik-Box. Und ihre Skeptiker haben zwei meiner eigenen neuen Texte
+    verteidigt, die ich sonst womöglich „vorsichtshalber" abgeschwächt hätte: Der erzählerische
+    Halbsatz im Vorboten ist Genre (alle fünf Vorboten mischen Weltfiktion mit harten Zahlen, und
+    die ZAHLEN stimmen), und „vier bis sieben Schläge" liegt nach Nachrechnung MIT den
+    Phase-2-Bauteilen (Schild 12.000 LP, Türme 7.500, Kern-Durchlass 0,35) am unteren Rand der
+    Wirklichkeit statt darüber. **Eine Prüfung, die auch das Richtige verteidigt, ist mehr wert
+    als eine, die nur Fehler zählt.**
+
+## Offen aus Phase 6 – gemessen, nicht behoben (21.08.2026)
+
+Drei Dinge liegen belegt vor und sind bewusst NICHT in die Phase-6-Lieferung gerutscht; jedes hätte
+den laufenden Prüflauf entwertet, und keines gehört inhaltlich dazu.
+
+1. **`activateItem` bucht ab, BEVOR die Wirkung läuft – vier Gegenstände gehen dabei still
+   verloren.** Gemessen: `ab_bannspule` (selten), `ab_rueckholanker` (episch), `ab_waechterruf`
+   (legendär) und `ab_grundberuehrung` (**mythisch**, die seltenste Stufe des Spiels) geben `null`
+   zurück, wenn ihre Vormerkung schon steht bzw. kein Tauchgang läuft. `escapeHtml(null)` liefert
+   `''` – der Spieler sieht eine **leere Protokollzeile**, sein Exemplar ist weg. Alle vier geben
+   `null` als ALLERERSTE Anweisung zurück, bevor sie etwas verändern; die 33 übrigen
+   `activate()`-Funktionen liefern immer eine Zeichenkette. Der Umbau ist damit gefahrlos: erst
+   wirken lassen, nur bei Wirkung abbuchen, und statt `null` ein `{ fehler: '<Grund>' }`
+   zurückgeben, damit die Meldung den Grund nennt. Wächter dazu: jede `activate()` darf keinen
+   stummen Ausgang haben – datengetrieben über BEIDE Gegenstandstabellen, denn die Prüfung hatte
+   zwei genannt und die Messung fand vier.
+2. **Die Festungs-Abklingzeit steht als eingetippte Zahl da**, während das Nest daneben
+   `NEST_ABKLING_STD = 4` hat. Live betroffen ist der Hilfetext (die Patchnotes-Fundstelle ist
+   unveränderliche Historie), dazu seit Phase 6 die Vorboten-Zeile. Eine Konstante
+   `FESTUNG_ABKLING_STD = 6` neben `NEST_ABKLING_STD` (Zeile ~13607, also weit vor beiden
+   Lesestellen – Regel 38 geprüft) räumt das auf. Die Zahl ist heute richtig; es ist eine
+   Wartbarkeits-, keine Wahrheitsfrage.
+3. **Der `belagerungsplan` lässt sich so, wie das Konzept ihn beschreibt, NICHT bauen.** Seine dort
+   beschriebene Wirkung („setzt die Abklingzeit zurück") gäbe dem Besitzer einen Extraschlag – der
+   Hort ist aber streng nullsummig (`anteil = schaden/summe`, `if (!(anteil > 0)) continue;`). Ein
+   Extraschlag **addiert nichts, er verschiebt**: gerechnet an einer Sternenfeste 180.000 T1,
+   96 Protomaterie und 18 Kampfpunkte, die von benannten Mitstreitern zum Planbesitzer wandern.
+   Dazu ist die Fairness-Begründung im Konzept (`konzept.md` 1166–1168, „er stapelt sich nicht")
+   nachweislich falsch, und das dort genannte Spielstand-Feld `festungLetzterSchlag` (1177) gibt es
+   seit Phase 1 nicht mehr – die Sperre liegt an der Festung. **Das ist eine
+   Produktentscheidung und gehört Sascha vorgelegt**, mit Optionen: die Wirkung umwidmen (eigene
+   Verluste senken – liegt vollständig auf der ohnehin offenen Client-Seite, null Backend-Zeilen),
+   oder den Gegenstand streichen und das im Patchnote sagen (wie beim Wochenpass).
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
