@@ -39903,7 +39903,7 @@
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
@@ -39928,6 +39928,12 @@
        "Verloren", weil `result` fehlt; genau die Falle, die der Kommentar darunter fuer
        'destroyed' beschreibt. */
     if (r.type === 'festung-angriff') return true;
+    /* Mondbelagerung, VERTEIDIGER-Seite: Hier heisst `destroyed`, dass MEIN Mond weg ist - das
+       Gegenteil der Bedeutung, die die generische Zeile unten annimmt ('zerstoerte GEGNERISCHE
+       Basis - der beste Ausgang'). Ohne diese Zeile stand gemessen 'Gewonnen' ueber dem Verlust
+       einer Kolonie und 'Verloren' ueber einer geglueckten Abwehr - in BEIDE Richtungen falsch.
+       Die Zeile steht deshalb VOR der generischen Regel, wie die zwei Zweige darueber. */
+    if (r.type === 'moon-siege-defense') return r.result === 'survived';
     if (r.type === 'nest-angriff') return true;
     // 'destroyed' (zerstoerte gegnerische Basis - der beste Ausgang) galt hier bis v8.430.0 als
     // negativ: rote Karte, "Verloren"-Pille. battleCardData hatte den Fall laengst richtig, diese
@@ -40226,6 +40232,28 @@
         body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+escapeHtml(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+escapeHtml(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
         if (r.lostText) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine stationierten Verluste: '+r.lostText;
         body += '<br>Details und Reparatur im Allianz-Tab.';
+      } else if (r.type === 'moon-siege'){
+        /* Bis v8.585.0 hatte KEINE der beiden Mondbelagerungs-Arten einen Zweig hier - und die
+           Kette endet ohne Abschluss-`else`. `title` und `body` blieben also auf '', gemessen
+           eine Karte mit 22 Zeichen: nur Ergebnis-Pille und Datum. Ein Angriff auf einen fremden
+           SPIELER, und der Bericht darueber sagte gar nichts. */
+        title = (r.result==='destroyed'?'💥 ':'⚔ ')+'Mondbelagerung gegen '+escapeHtml(r.targetPlayerName||'Unbekannt');
+        body = '<strong>'+(r.result==='destroyed'
+          ? escapeHtml(r.targetMoonName||'Der Mond')+' wurde ZERSTÖRT.'
+          : 'Die Belagerung von '+escapeHtml(r.targetMoonName||'dem Mond')+' wurde abgewehrt.')+'</strong>';
+        if (typeof r.chancePct === 'number') body += '<br>Erfolgschance war '+r.chancePct+'%.';
+        if (r.battlePoints) body += '<br>+'+fmt(r.battlePoints)+' Kampfpunkte.';
+        if (r.fromPlanet) body += '<br><span class="bmeta">Gestartet von '+escapeHtml(r.fromPlanet)+'</span>';
+      } else if (r.type === 'moon-siege-defense'){
+        /* Die VERTEIDIGER-Seite. `result:'destroyed'` heisst hier, dass MEIN Mond weg ist -
+           das Gegenteil von 'destroyed' bei alliance-base-attack. Siehe reportIsPositive. */
+        title = (r.result==='destroyed'?'💥 ':'🛡 ')+'Angriff auf DEINEN Mond';
+        body = '<strong>'+(r.result==='destroyed'
+          ? escapeHtml(r.moonName||'Dein Mond')+' wurde von '+escapeHtml(r.attackerName||'einem Angreifer')+' ZERSTÖRT und ist dauerhaft verloren.'
+          : escapeHtml(r.moonName||'Dein Mond')+' hat den Mondzerstörer von '+escapeHtml(r.attackerName||'einem Angreifer')+' überstanden.')+'</strong>';
+        body += '<br>'+(r.result==='destroyed'
+          ? 'Ein Mondschildgenerator senkt die Erfolgschance künftiger Belagerungen.'
+          : 'Deine Verteidigung hat gehalten – es sind keine Schiffe verloren gegangen.');
       } else if (r.type === 'alliance-raid'){
         // Klassischer Kampfbericht fuer den Allianz-Raid (v8.430.0, Wunsch Sascha). Besonderheiten:
         // r.fleet ist die GEMEINSAME Verbandsflotte aller Teilnehmer (Server-aggregiert beim Abflug),
@@ -52030,7 +52058,13 @@
           // if(encountered)-Block sichtbar und für den Bericht verloren - jetzt in beiden pushReport()-
           // Aufrufen unten als konkrete Zahlen (Gegnerstärke, Erfolgschance) verfügbar, analog zu den
           // bereits vorhandenen NPC-Kampfberichten (attackPower vs. defensePower, Chance in %).
-          let enemyPower = 0, ratio = 1, schwerVerlustAnteil = 0, forscherGerettet = false;
+          // pVerlustfrei gehoert in DIESE Zeile und nicht in den Block darunter (19.08.2026):
+          // Der Wert reist in den Bericht, und die drei Berichtsstellen liegen in GESCHWISTER-
+          // Bloecken von `if (encountered)`. Als `const` im Block war er dort nicht sichtbar -
+          // jede Expedition MIT Begegnung starb an `ReferenceError: pVerlustfrei is not defined`,
+          // mitten in checkMissions. Gemessen (v8.525.0 bis v8.585.0): Begegnung -> kein Bericht,
+          // ohne Begegnung -> Bericht. enemyPower und ratio stehen aus genau demselben Grund hier.
+          let enemyPower = 0, ratio = 1, schwerVerlustAnteil = 0, forscherGerettet = false, pVerlustfrei = 0;
           if (encountered){
             // Balance-Überarbeitung 25.07.2026 (Spieler-Report "man verliert so viel Schiffe, das ist
             // abnormal"). Nachgerechnet an der alten Formel: P(Totalverlust|Begegnung) war
@@ -52057,7 +52091,7 @@
             // pSchwer+pGeschwaecht, bei Gleichstand sind das 62,5% verlustfrei, nicht 50%. Hier
             // gerechnet und nicht im Bericht, weil peilungAktiv sich beim Ausloesen verbraucht -
             // spaeter waere der Wert nicht mehr rekonstruierbar.
-            const pVerlustfrei = Math.max(0, 1 - pSchwer - pGeschwaecht);
+            pVerlustfrei = Math.max(0, 1 - pSchwer - pGeschwaecht);
             const roll = Math.random();
             // Rueckzugs-Option (25.07.2026, Inhaltspaket 4/5): beim START festgelegt und in der
             // Mission eingebacken, damit ein spaeteres Umlegen des Schalters unterwegs befindliche

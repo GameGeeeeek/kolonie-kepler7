@@ -2558,6 +2558,144 @@ ein 7-Zeichen-Passwort mit klarem Grund ab; geht das Frontend zuerst, blockt die
 das der Server genommen hätte. Beides ist verständlich, keines ist still. Ein Schalter ist deshalb
 nicht nötig – die zwei PRs gehören trotzdem zusammen gemerged, damit die Paritätsprüfung nicht gegen
 die alte Zahl läuft.
+## Jeder Angriff schreibt einen Bericht, den der Spieler SIEHT und VERSTEHT (Auftrag 19.08.2026)
+
+**Wortlaut: „für alle angriffe egal ob auf alien spieler bastionen bericht verfassen das der
+spieler nachvollziehen kann was geschehen ist prüfe ob überall vorhanden."**
+
+Die Regel gilt ab sofort für **jede** neue Angriffs- oder Kampfart, ohne Ausnahme. Und sie hat drei
+Hälften, weil ein Bericht an drei verschiedenen Stellen ausfallen kann – alle drei sind am
+19.08.2026 real gemessen worden:
+
+1. **Er entsteht gar nicht.** Ein Codepfad ohne `pushReport`. Typisch sind nicht der Sieg und die
+   Niederlage, sondern die *unauffälligen* Ausgänge: Server nicht erreichbar, Ziel schon gefallen,
+   Abklingzeit, Anfängerschutz, Nest weitergezogen. Die tragen im Bestand oft nur ein `log()` –
+   und **`#log` hat keinen Stapel, es überschreibt sich mit der nächsten Meldung selbst**. Eine
+   Erklärung, die nur dort steht, ist für den Spieler nach Sekunden weg (dieselbe Messung wie in
+   Regel 47). Ein Toast hält drei Einträge und ist genauso wenig ein Ersatz.
+2. **Er wird nicht gezeichnet.** `renderReportsBox` ist eine `if/else if`-Kette über `r.type` –
+   **ohne Abschluss-`else`**. `title` und `body` starten auf `''`; eine Art ohne Zweig ergibt also
+   eine Karte, die nur Ergebnis-Pille und Datum trägt. Gemessen: **22 Zeichen**.
+3. **Er sagt nichts oder das Falsche.** Ein Zweig, der den Hergang nicht nennt – oder, schlimmer,
+   ihn umdreht.
+
+### Der Anlass, dreimal gemessen im Browser
+
+`moon-siege` und `moon-siege-defense` – der Mondzerstörer, also ein Angriff auf einen **Spieler** –
+waren die einzigen zwei erzeugten Berichtsarten **ohne Zeichner-Zweig**. Gemessen an einer Fixture
+mit je einem Bericht:
+
+| Bericht | vorher | nachher |
+|---|---|---|
+| ich zerstöre einen fremden Mond | „Gewonnen", 22 Zeichen | 146 Zeichen |
+| **mein** Mond wurde zerstört | „**Gewonnen**", 22 Zeichen | „Verloren", 189 Zeichen |
+| mein Mond wurde verteidigt | „**Verloren**", 22 Zeichen | „Gewonnen", 184 Zeichen |
+
+**Die zweite Zeile ist der eigentliche Fehler und eine Lehre für sich.** `reportIsPositive`
+behandelt `result === 'destroyed'` seit v8.430.0 pauschal als Erfolg; der Kommentar dort sagt
+ausdrücklich „zerstörte **gegnerische** Basis – der beste Ausgang". Für `alliance-base-attack` ist
+das richtig. Beim VERTEIDIGER der Mondbelagerung heißt dasselbe Wort das Gegenteil – die Karte
+meldete „Gewonnen" über dem dauerhaften Verlust einer Kolonie und „Verloren" über einer geglückten
+Abwehr, also in **beide** Richtungen falsch. **Übertragbar: Ein Zustandswort, das global
+interpretiert wird, muss an jeder Stelle dieselbe Bedeutung haben – wer eine Verteidiger-Sicht
+einführt, prüft jedes solche Wort einzeln.** Die Ausnahme steht deshalb VOR der generischen Zeile,
+wie die zwei Zweige darüber.
+
+Dazu fielen **drei** Kampf-Berichtsarten aus der Kategorie „Kämpfe" und landeten über den Rückfall
+unter „Sonstiges" (`moon-siege`, `moon-siege-defense`, `pvp-fleet-loss`) – gemessen zeigte der
+Kampf-Filter **2 von 5**, jetzt 6 von 6.
+
+### Der schwerste Fund war kein fehlender Bericht, sondern ein ABSTURZ
+
+`const pVerlustfrei` stand innerhalb von `if (encountered){ … }`, die drei Berichtsstellen
+(`withdrawn`, `destroyed`, `weakened`/`defended`) liegen in **Geschwister**-Blöcken. `const` ist
+block-scoped – **jede Expedition mit Feindbegegnung** starb also an
+`ReferenceError: pVerlustfrei is not defined`, mitten in `checkMissions`.
+
+Gemessen im echten Spiel, zwei Läufe mit identischer Fixture bis auf ein Feld:
+
+```
+encounterChance 1 → berichte: []                 + ReferenceError im Spielstand-Lade-Handler
+encounterChance 0 → berichte: ["expedition/success"]
+```
+
+Live seit **v8.525.0 (16.08.2026)**, also drei Tage. Der Schaden reicht über den fehlenden Bericht
+hinaus: Die fällige Mission wird VOR der Auflösungsschleife aus `fleet.missions` gefiltert, die
+Expedition ist danach also ersatzlos weg; Verluste und teils sogar Beute sind zu dem Zeitpunkt
+bereits gebucht. Und weil kein `try/catch` im Pfad liegt, bricht der Rest des Tick-Durchlaufs ab.
+
+**Drei Lehren, jede über den Einzelfall hinaus:**
+- **Der Syntax-Check findet das NICHT** – `new Function` parst nur und führt nie aus. Das ist
+  Regel 38 in einer neuen Ausprägung: dort die temporale Todeszone, hier der Blockscope.
+- **Wer einen Wert in einem `if`-Block berechnet, der in einem GESCHWISTER-Block gelesen wird,
+  deklariert ihn eine Ebene höher** – genau dort, wo `enemyPower`, `ratio` und
+  `schwerVerlustAnteil` schon stehen. Die richtige Zeile stand direkt daneben.
+- **Gefunden hat es kein Lesen des Codes, sondern der PAAR-Lauf** (mit/ohne Begegnung). Ein
+  einzelner Lauf ohne Begegnung war grün und sah vollständig aus.
+
+### Der Wächter: `tests/test_berichtspflicht.js`
+
+**Datengetrieben, nicht namensbasiert** (Regel 40) – er liest ALLE `pushReport({ type:'X'` aus der
+Spieldatei und hält sie gegen die Zweige des Zeichners und gegen `REPORT_CATEGORIES`. Eine künftige
+Angriffsart ohne Zeichner-Zweig fällt damit auf, **ohne dass jemand an sie gedacht haben muss**.
+15 Prüfungen:
+
+- `1a` jede erzeugte Art hat einen Zeichner-Zweig · `1b` die Gegenrichtung (ein Zweig ohne
+  Erzeuger ist toter Code; die sieben serverseitig erzeugten Arten stehen namentlich als
+  Ausnahme, damit ihr Wegfall auffällt).
+- `1c` jede **Kampf**-Berichtsart steht in einer Kategorie. Was ein Kampfbericht ist, wird aus den
+  DATEN abgeleitet (der Zweig spricht von Verlusten, Angreifer, zerstört, abgewehrt), nicht als
+  Namensliste geführt.
+- `2` **im gerenderten Spiel**: je erzeugter Art ein synthetischer Bericht, und jede Karte muss
+  außer Pille und Datum etwas tragen. Die Fixture ist bewusst GENERISCH – ein Zweig, der bei
+  fehlenden Feldern eine leere Karte baut, ist selbst ein Befund.
+- `3`/`3b` das PAAR der Verteidiger-Sicht (zerstört ≠ Sieg, verteidigt = Sieg). Jede Hälfte allein
+  wäre auch bei komplett fehlender Einfärbung erfüllt.
+
+**Die Schranke von Abschnitt 2 ist die zweite Lehre dieses Tests.** Der erste Entwurf verlangte eine
+Mindest-ZEICHENZAHL (40, weil die leere Karte 22 trägt) und schlug prompt bei `random-event` an –
+einer völlig korrekten, nur kurzen Karte. Das war eine Momentaufnahme (Regel 3). Gemessen wird jetzt
+die REGEL: *Was bleibt übrig, wenn man Ergebnis-Pille und Zeitstempel abzieht?* Bei der leeren Karte
+ist das exakt nichts, bei jeder sprechenden etwas. Der Fehlschlag gibt zusätzlich je Art die
+Inhaltslänge aus (Regel 37), damit die Ursache im Protokoll steht statt in einer späteren Sitzung.
+
+Gegenprobe gegen den ausgelieferten Stand: **5 rot bei identischen 15 Prüfnamen** (per `diff`
+verglichen, nicht gezählt – Regel 60), und jede benennt ihren Fall: `["moon-siege",
+"moon-siege-defense"]`, `["pvp-fleet-loss"]`, `["Gewonnen","Verloren"]`.
+
+### Was NOCH offen ist – gemessen, aber nicht behoben
+
+Ein Prüf-Durchgang über alle Angriffsarten hat weitere Lücken der Klasse (1) bestätigt. Sie stehen
+hier namentlich, damit sie nicht verlorengehen; keine davon ist ein Absturz, alle sind
+„der Spieler erfährt den Grund nicht":
+
+- **`worldboss`**: leerer `catch(e){}` um die ganze Auflösung – bei Netzabbruch verschwindet die
+  Mission spurlos, ohne Bericht, ohne `log`, ohne Toast. Dazu zwei weitere Zweige ohne Bericht
+  (zu spät angekommen, Server lehnt ab).
+- **`nest-angriff` / `festung-angriff` / `asteroid-contest`**: Ausgang „verpasst", „schon
+  gefallen", „Abklingzeit", „Server nicht erreichbar" – je nur `log()`. Und der präzise Fehlertext
+  des Servers wird dabei weggeworfen.
+- **`attack-player`** hat drei Ausgänge, die die Flotte ohne Bericht heimschicken;
+  **`attack-alliance-base`** schweigt bei Netzfehler und Serverablehnung.
+- **`faction-attack`** erzeugt überhaupt keinen Bericht – nur eine `log()`-Zeile.
+- **Verteidiger-Seiten ohne Bericht**: wer ausgespäht wird (nur Postfach-Meldung, während das
+  Störmanöver daneben einen echten Bericht erzeugt) und wer als Schürfrecht-Halter angefochten wird.
+- **`battleOutcomeOf` kennt `moon-siege` nicht** – eine gewonnene Mondbelagerung zählt nicht in die
+  Kampf-Bilanz.
+
+**Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
+Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.
+
+### Die Kurzform für jede neue Angriffsart
+
+1. **Jeder** Ausgang schreibt `pushReport` – auch „kein Kampf", „abgelehnt", „Ziel weg". Der
+   Bericht nennt den **Grund**.
+2. Der Berichtstyp braucht einen **Zweig in `renderReportsBox`** und einen Eintrag in
+   `REPORT_CATEGORIES`.
+3. Der Zweig nennt: mit welcher Flotte, gegen was, mit welchem Ausgang, welche Verluste, welche
+   Beute – und **warum** es so ausging.
+4. Bei einer VERTEIDIGER-Sicht: `reportIsPositive` prüfen, bevor man sich auf `result` verlässt.
+
 ## Rückfragen: immer mit Auswahlmöglichkeiten (Wunsch Sascha, 18.08.2026)
 
 **Wortlaut des Auftrags: „wenn du fragen hast gib mir immer auswahlmöglichkeit".**
