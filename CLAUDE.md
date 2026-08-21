@@ -2355,38 +2355,67 @@ entschieden und steht unten.
 
 ### Der ausgelieferte Datenverlust in `activateItem`
 
-`activateItem` buchte das Exemplar ab, **bevor** `item.activate()` lief. Datengetrieben über
-**beide** Gegenstandstabellen gemessen: 37 Einträge mit `activate()`, davon **vier** mit einem
-stummen Ausgang – sie geben `null` zurück, wenn ihre Vormerkung schon steht bzw. gar kein
-Tauchgang läuft:
+`activateItem` buchte das Exemplar ab, **bevor** `item.activate()` lief. Der erste Durchgang fand
+**vier** Gegenstände, die `null` zurückgeben, wenn sie nichts bewirken können — und damit eine
+**leere Protokollzeile** erzeugten (`escapeHtml(null)` liefert `''`, ausgeführt gemessen). Behoben
+durch Umdrehen der Reihenfolge: erst wirken lassen, nur bei Wirkung abbuchen, statt `null` ein
+`{ fehler: '<Grund>' }`.
 
-| Gegenstand | Seltenheit | Grund für den Nicht-Wirkungs-Fall |
+**Der zweite Durchgang hat die Familie verdreifacht — und das ist die eigentliche Lehre.** Eine
+adversarische Prüfung gegen den eingefrorenen Änderungssatz meldete, dass **neun weitere**
+Gegenstände genau dasselbe tun, nur unauffälliger: Sie melden ihre Nicht-Wirkung als **ganz
+normalen Text** und werden deshalb ebenso verbraucht. Nachgemessen stimmt das:
+
+| Gegenstand | Seltenheit | was er meldete, während er verschwand |
 |---|---|---|
-| `ab_bannspule` | selten | eine Spule ist bereits geladen |
-| `ab_rueckholanker` | episch | es läuft gar kein Tauchgang |
-| `ab_waechterruf` | legendär | ein Ruf ist bereits abgesetzt |
-| `ab_grundberuehrung` | **mythisch** | eine Grundberührung ist bereits vorgemerkt |
+| `forschungsboost` | selten | „verpufft wirkungslos" |
+| `baubeschleuniger` | ungewöhnlich | „verpufft wirkungslos" |
+| `bergungsdrohnen` | ungewöhnlich | „kehren unverrichteter Dinge zurück" |
+| `sternenkartenkopie` | selten | „wird archiviert, ohne etwas hinzuzufügen" |
+| `umschulungsbefehl` | selten | „löse zuerst den vorhandenen ein" |
+| `forschungsdurchbruch` | **mythisch** | „wandert ins Archiv und wartet auf seinen Moment" |
+| `urwerkzeug` | **mythisch** | „findet nichts, woran es arbeiten könnte" |
+| `werftkommando` | **mythisch** | „rückt unverrichteter Dinge ab" |
+| `ab_sternenkarte` | episch | „Die Karte bleibt leer" |
 
-`escapeHtml(null)` liefert `''` – **ausgeführt gemessen, nicht aus dem Quelltext geschlossen**.
-Der Spieler sah also eine **leere Protokollzeile**, während sein Exemplar verschwunden war. Bei
-einem mythischen Stück ist das der teuerste stille Verlust, den dieses Spiel kennt.
+**Zwei dieser Texte waren obendrein eine Falschaussage:** „wird archiviert" und „wandert ins Archiv
+und wartet auf seinen Moment" behaupten eine Aufbewahrung, die es nicht gibt — das Exemplar war
+weg. Und `umschulungsbefehl` verspricht in seiner eigenen `desc` wörtlich **„Bleibt liegen, bis du
+sie einlöst"**, während der zweite genau dabei vernichtet wurde.
 
-**Behoben, indem die Reihenfolge umgedreht wird**, nicht durch vier Einzelkorrekturen: erst wirken
-lassen, nur bei Wirkung abbuchen. Der Umbau ist gefahrlos, weil alle vier `null` als **allererste**
-Anweisung liefern, bevor sie irgendetwas verändern – die 33 übrigen geben unverändert eine
-Zeichenkette zurück und merken von alldem nichts.
+**Die übertragbare Lehre: Ich hatte den MECHANISMUS behoben, nicht die KLASSE.** `return null` war
+die auffällige Hälfte (leere Zeile), der gewöhnliche Text die unauffällige — und beide Hälften
+kosten dasselbe. Wer einen Fehler an seiner Erscheinungsform erkennt, findet nur die Fälle, die
+sich gleich erscheinen. Die Frage muss lauten *„was ist hier eigentlich falsch?"* (ein Exemplar
+verschwindet ohne Gegenleistung), nicht *„wie sah es aus?"*.
+
+Alle dreizehn tragen jetzt die `{ fehler }`-Form, jeder Grund ist ein ganzer Satz und sagt
+ausdrücklich, dass das Exemplar erhalten bleibt.
 
 **Drei Entscheidungen, die man beim Anfassen kennen muss:**
 
-- **`{ fehler: '<Grund>' }` statt `null`.** Eine Form, die sonst niemand benutzt; damit nennt die
-  Meldung den Grund statt einer Sammelauskunft. Jeder Grund ist ein ganzer Satz und sagt
-  ausdrücklich, dass das Exemplar erhalten bleibt – ohne diesen Halbsatz weiß der Spieler nicht,
-  ob sein Stück noch da ist, und genau das war der Schaden.
+- **`{ fehler: '<Grund>' }` statt `null`.** Eine Form, die sonst niemand benutzt.
 - **Ein zweiter Zweig fängt ein blankes falsy ab.** Wer künftig eine `activate()` ohne Rückgabe
-  baut, verliert dadurch kein Exemplar mehr, sondern bekommt eine benannte Meldung. Der nächste
-  Fall dieser Familie ist damit gedeckt, ohne dass jemand an ihn gedacht haben muss.
+  baut, verliert dadurch kein Exemplar mehr.
 - **Beide Meldungen sind `wichtig` markiert** (Arbeitsregel 47): Der Toast-Stapel hält nur drei,
   und eine Erklärung, warum gerade NICHTS passiert ist, darf nicht als erste verdrängt werden.
+
+### Was der Wächter abdeckt — und was ausdrücklich nicht
+
+Der stumme Ausgang (`return null` / `return;` / `return false`) ist **strukturell** erkennbar, mit
+null Fehlalarmen. Die Nicht-Wirkung als gewöhnlicher Text ist es **nicht** — und beide naheliegenden
+Wege sind gemessen untauglich:
+
+- **Über die WORTWAHL** (kein/nicht/bereits/leer): meldet den `umschulungsbefehl` als Fehler, dessen
+  **Erfolgs**meldung „kostet dich nichts" lautet.
+- **Über die STRUKTUR** („Rückgabe vor der ersten Zustandsänderung"): liefert 23 Treffer, von denen
+  die meisten legitime Erfolgs- und Auskunftsmeldungen sind.
+
+Deshalb steht daneben eine **benannte Regressionsliste** der dreizehn — dasselbe Mittel wie die acht
+Schiffsklassen in `test_werft_massenflotten`, und aus demselben Grund: Die Liste ist ein
+historischer Befund, keine ableitbare Tabelle. Ein **vierzehnter** fällt dort nicht auf; das ist die
+bewusst benannte Grenze und steht als Kommentar im Test, damit niemand den Anspruch für breiter
+hält, als er ist.
 
 ### Die Festungs-Abklingzeit ist eine Konstante geworden
 

@@ -341,19 +341,40 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
         + '  const PROTOMATERIE_JE_FUHRE = ' + JSON.stringify(K.fuhre) + ';\n'
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
         + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n'
-        /* Seit den Asteroidenfestungen leitet der Hilfetext aus FESTUNG_STUFEN, FESTUNG_BAUTEILE
-           und FESTUNG_KERN_ROLLE ab. Alle drei werden AUS DER DATEI geschnitten und mitgegeben -
-           nicht durch einen Platzhalter ersetzt (Arbeitsregel 36): Ein nachgebauter Wert prueft
-           nicht mehr das Spiel, sondern den Nachbau. Die Liste ist bewusst eine Schleife: Kommt
-           eine weitere Tabelle dazu, ist es ein Name mehr und keine vierte Kopie desselben
-           Schnittmusters. */
-        + ['FESTUNG_STUFEN', 'FESTUNG_BAUTEILE'].map(n => {
-            const v = S.indexOf('  const ' + n + ' = {');
-            const b = v < 0 ? -1 : S.indexOf('\n  };', v);
-            return (v >= 0 && b > v) ? S.slice(v, b + 5) + '\n' : '';
-          }).join('')
-        + ['FESTUNG_GERAEUMT_BONUS', 'FESTUNG_KERN_ROLLE', 'FESTUNG_BAUTEIL_BEITRAG']
-            .map(n => (S.match(new RegExp('  const ' + n + ' = [^;]*;')) || [''])[0] + '\n').join('');
+        /* Seit den Asteroidenfestungen leitet der Hilfetext aus den FESTUNG_*-Konstanten ab. Sie
+           werden AUS DER DATEI geschnitten und mitgegeben - nicht durch einen Platzhalter ersetzt
+           (Arbeitsregel 36): Ein nachgebauter Wert prueft nicht mehr das Spiel, sondern den Nachbau.
+
+           HIER STAND EINE NAMENSLISTE, und sie ist am 21.08.2026 genau so gefallen, wie
+           Arbeitsregel 40 es vorhersagt: FESTUNG_ABKLING_STD kam neu dazu, der Hilfetext leitete
+           daraus ab, die Liste kannte den Namen nicht - und 8b-bau meldete
+           "FESTUNG_ABKLING_STD is not defined". Kein Fehler im Spiel, sondern eine Liste, die
+           gepflegt werden musste und es nicht wurde. Geschnitten wird deshalb ueber die FORM.
+
+           UND DIE FORM IST NICHT DIE KLAMMER. Der erste Anlauf teilte nach "= {" auf und
+           schnitt jedes Objekt bis "\n  };". FESTUNG_KERN_ROLLE ist aber ein EINZEILIGES Objekt
+           ({ min:..., max:... };) - der Anker fand erst 1.786 Zeichen spaeter einen Treffer und
+           verschluckte dabei die Deklaration von FESTUNG_BAUTEIL_BEITRAG, die dadurch ZWEIMAL im
+           zusammengesetzten Text stand ("has already been declared"). Das ist Arbeitsregel 6:
+           Ein Slice mit indexOf-Endanker muss pruefen, dass er den RICHTIGEN Anker trifft.
+           Entschieden wird deshalb danach, ob die Deklaration auf IHRER ZEILE endet. */
+        + (() => {
+            const stuecke = [];
+            for (const m of S.matchAll(/\n  const FESTUNG_[A-Z_]+ = /g)){
+              const von = m.index + 1;
+              const zeilenende = S.indexOf('\n', von);
+              const ersteZeile = S.slice(von, zeilenende);
+              if (/;\s*(\/\/.*)?$/.test(ersteZeile)){ stuecke.push(ersteZeile); continue; }  // einzeilig
+              const bis = S.indexOf('\n  };', von);
+              if (bis < 0) continue;
+              const block = S.slice(von, bis + 5);
+              // Der Anker gehoert selbst geprueft: Trifft er zu spaet, steht eine fremde
+              // Deklaration mit im Block - genau der Fehlgriff von oben.
+              if ((block.match(/const FESTUNG_[A-Z_]+ = /g) || []).length !== 1) continue;
+              stuecke.push(block);
+            }
+            return stuecke.join('\n') + '\n';
+          })();
       const eintrag = S.slice(vonH, bisH + E.length).replace(/,\s*$/, '');
       txt = new Function(kopf + 'return (' + eintrag + ').body;')();
     } catch (e) { fehler = e.message; }

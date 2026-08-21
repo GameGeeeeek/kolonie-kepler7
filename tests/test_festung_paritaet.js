@@ -228,9 +228,39 @@ if (!F || !B) return ende();
     { frontStunden: fStd, backStunden: bStd });
   /* Und die Gegenrichtung, sonst wäre die Konstante ein Denkmal: Sie muss auch BENUTZT werden.
      Eine eingeführte Konstante, die niemand liest, während die alte Ziffer weiterlebt, ist genau
-     die zweite Anzeigestelle, gegen die dieser Umbau gebaut ist (Arbeitsregel 59). */
-  const leser = (FRONT.match(/FESTUNG_ABKLING_STD/g) || []).length;
-  check('6b: die Konstante wird auch gelesen, nicht nur definiert', leser >= 5, { fundstellen: leser });
+     die zweite Anzeigestelle, gegen die dieser Umbau gebaut ist (Arbeitsregel 59).
+
+     HIER STAND `leser >= 5` ÜBER ALLE Fundstellen – also inklusive der DEFINITION. Bei sechs
+     Vorkommen (1 Definition + 5 Leser) durfte damit genau einer still auf die alte Ziffer
+     zurückfallen, ohne dass etwas anschlug. Gezählt wird deshalb ohne die Definition. */
+  const alleFund = (FRONT.match(/FESTUNG_ABKLING_STD/g) || []).length;
+  const definition = (FRONT.match(/const FESTUNG_ABKLING_STD = /g) || []).length;
+  const leser = alleFund - definition;
+  check('6b: die Konstante hat mindestens fünf LESER (die Definition zählt nicht mit)',
+    definition === 1 && leser >= 5, { alleFund, definition, leser });
+  /* Und die eine Fundstelle, die nicht nur anzeigt, sondern ENTSCHEIDET, wird namentlich
+     verlangt: Fällt ausgerechnet die Sperre auf eine eingetippte Ziffer zurück, zeigt die Karte
+     den Schlag als frei an, während der Server mit 403 antwortet – der Spieler schickt dann eine
+     Flotte los, die zurückprallt. Ein reiner Zähler kann das nicht von einem Anzeigetext
+     unterscheiden. */
+  /* KOMMENTARE MÜSSEN VORHER WEG (Arbeitsregel 33). Der Erklärkommentar an der Konstante ZITIERT
+     die alte Zeile `meinLetzter + 6*3600*1000`, um zu sagen, was behoben wurde – die rohe
+     Textsuche sah sie dadurch als noch vorhanden an, und 6c fiel auf korrektem Code durch.
+     Genau dieselbe Falle hat in derselben Lieferung schon test_belohnungen_speichern erwischt. */
+  const ohneKommentare = FRONT
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/^([^'"\n]*?)\/\/[^\n]*$/gm, (m, vor) => vor + ' '.repeat(m.length - vor.length));
+  // Und die Leerung belegt sich selbst - sonst prüfte 6c am Ende nur, dass nichts gegriffen hat.
+  check('6c-vorab: das Leeren der Kommentare hat gegriffen',
+    ohneKommentare.length === FRONT.length && ohneKommentare !== FRONT
+      && /meinLetzter \+ 6\*3600\*1000/.test(FRONT)
+      && !/meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare),
+    { zitatImKommentar: /meinLetzter \+ 6\*3600\*1000/.test(FRONT) });
+  check('6c: auch die SPERRE im Kartenmenü rechnet mit der Konstante, nicht mit einer Ziffer',
+    /meinLetzter \+ FESTUNG_ABKLING_STD\*3600\*1000/.test(ohneKommentare)
+      && !/meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare),
+    { mitKonstante: /meinLetzter \+ FESTUNG_ABKLING_STD\*3600\*1000/.test(ohneKommentare),
+      mitZiffer: /meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare) });
 }
 
 ende();

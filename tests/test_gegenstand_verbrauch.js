@@ -47,19 +47,26 @@ check('1a: die Wirkung laeuft VOR der Abbuchung',
 // Der Rueckkehr-Zweig muss ZWISCHEN Wirkung und Abbuchung liegen. Nur "es gibt ein return"
 // zu verlangen waere wertlos - `if (!item) return;` steht ganz oben und wuerde trivial passen.
 const zwischen = (iWirkung > 0 && iAbbuchung > iWirkung) ? fn.slice(iWirkung, iAbbuchung) : '';
+/* Gemessen wird der Zweig SELBST, nicht seine Nachbarschaft: Ein Muster der Form
+   "erg.fehler ... irgendwann return;" ist auch dann erfuellt, wenn das return zum NAECHSTEN
+   Zweig gehoert und der Fehlerzweig gar keines hat. Verlangt ist deshalb, dass der Rumpf des
+   if-Zweigs mit einem return endet - ohne dazwischenliegende weitere geschweifte Klammer. */
 check('1b: der Fehler-Zweig kehrt zurueck, BEVOR abgebucht wird',
-  /erg\s*&&\s*erg\.fehler[\s\S]{0,160}return;/.test(zwischen), zwischen.slice(0, 200));
+  /if \(erg && erg\.fehler\)\{[^{}]*return;[^{}]*\}/.test(zwischen), zwischen.slice(0, 220));
 check('1c: auch ein blankes falsy kostet kein Exemplar (der naechste solche Fall ist gedeckt)',
   /if\s*\(!erg\)[\s\S]{0,200}return;/.test(zwischen));
 
 // ------------------------------------------------- 2) kein stummer Ausgang, ueber BEIDE Tabellen
-// Die Tabellen enden mit DREI Leerzeichen ("   ];"), nicht mit zweien - ein Endanker '\n  ];'
-// greift daneben und liefert einen zu langen Block (Arbeitsregel 6). Deshalb per Regex auf eine
-// Zeile, die NUR aus Leerraum + "];" besteht, und der Block wird gegengeprueft.
+// DER ENDANKER IST DIE HEIKLE STELLE (Arbeitsregel 6). Die Tabellen enden mit DREI Leerzeichen
+// ("   ];"), nicht mit zweien - ein '\n  ];' greift daneben. Ein '\n\s*];' waere die andere
+// Uebertreibung: Es passt auf JEDE Einrueckung und koennte damit ein mehrzeiliges Array INNERHALB
+// eines Eintrags treffen. Der Block waere dann zu kurz, die restlichen Gegenstaende faelen still
+// aus der Messung. Gemessen ist beides heute deckungsgleich (24.132 / 3.486 Zeichen), aber die
+// Gefahr ist echt - deshalb der Mittelweg: ein bis vier Leerzeichen (Modulebene), nie tiefer.
 function tabelle(name){
   const a = JS.indexOf('const ' + name + ' = [');
   if (a < 0) return null;
-  const m = /\n\s*\];/.exec(JS.slice(a));
+  const m = /\n {1,4}\];/.exec(JS.slice(a));
   if (!m) return null;
   return JS.slice(a, a + m.index);
 }
@@ -67,11 +74,12 @@ const bloecke = ['ITEM_DEFS', 'EVENT_ITEM_DEFS'].map(n => ({ name: n, txt: tabel
 check('2-anker: beide Gegenstandstabellen gefunden UND sauber begrenzt',
   bloecke.every(b => b.txt && b.txt.length > 500 && b.txt.length < 60000),
   bloecke.map(b => b.name + '=' + (b.txt ? b.txt.length : 'null')));
-// Der Endanker gehoert selbst geprueft: Griffe er zu weit, staende die naechste Tabelle mit drin.
-check('2-anker2: kein Block enthaelt den Anfang einer fremden Tabelle',
-  bloecke.every(b => b.txt && !/const [A-Z_]+ = \[/.test(b.txt.slice(20))));
+// Griffe der Anker zu WEIT, staende eine fremde Deklaration der Modulebene mit im Block.
+check('2-anker2: kein Block enthaelt eine fremde Deklaration der Modulebene',
+  bloecke.every(b => b.txt && !/\n  const [A-Z_]/.test(b.txt.slice(20))));
 
 const stumm = [];
+const mitFehlerform = new Set();
 let mitAktivierung = 0;
 for (const b of bloecke){
   if (!b.txt) continue;
@@ -83,13 +91,54 @@ for (const b of bloecke){
     const ia = teil.indexOf('activate');
     if (ia < 0) continue;
     mitAktivierung++;
-    if (/return\s+null\s*;|return\s*;|return\s+undefined|return\s+false\s*;/.test(teil.slice(ia)))
+    const akt = teil.slice(ia);
+    /* Erfasst wird jede FALSY-Rueckgabe, nicht nur `null`. Der leere String gehoert ausdruecklich
+       dazu: Er ist falsy, landet also im "hat nichts bewirkt"-Zweig - und der bucht NICHT ab.
+       Das ist die Gegenrichtung des behobenen Fehlers und waere schlimmer als er: Der Gegenstand
+       waere unbegrenzt oft nutzbar, obwohl er jedes Mal wirkt. Ebenso `return 0`. */
+    if (/return\s+(null|undefined|false|0|''|""|``)\s*[;}]|return\s*[;}]/.test(akt))
       stumm.push(b.name + ':' + eintraege[i][1]);
+    if (/return \{ fehler:/.test(akt)) mitFehlerform.add(eintraege[i][1]);
   }
 }
-check('2-vorab: es wurden ueberhaupt activate()-Funktionen gefunden', mitAktivierung >= 30, mitAktivierung);
-check('2: kein Gegenstand endet stumm - jeder Nicht-Wirkungs-Fall nennt seinen Grund',
+// Griffe der Anker zu KURZ, faenden sich zu wenige Eintraege - und die Messung waere still
+// unvollstaendig statt rot. Deshalb eine Untergrenze, die nah am gemessenen Stand liegt.
+check('2-vorab: es wurden ueberhaupt activate()-Funktionen gefunden (Anker nicht zu kurz)',
+  mitAktivierung >= 35, mitAktivierung);
+
+// WAS DIESE PRUEFUNG ABDECKT - und was nicht, ehrlich benannt:
+// Sie faengt den STUMMEN Ausgang (return null / return; / return false), also den Fall, in dem
+// der Spieler eine LEERE Protokollzeile sah. Das ist strukturell erkennbar und hat null
+// Fehlalarme.
+// Sie faengt NICHT den Fall, dass eine activate() ihre Nicht-Wirkung als ganz normalen Text
+// meldet - der sieht im Quelltext genauso aus wie eine Erfolgsmeldung. Gemessen am 21.08.2026:
+// Ein Versuch, das ueber die WORTWAHL zu erkennen, meldete den Umschulungsbefehl als Fehler,
+// dessen ERFOLGSmeldung "kostet dich nichts" lautet; ein Versuch ueber die STRUKTUR ("Rueckgabe
+// vor der ersten Zustandsaenderung") lieferte 23 Treffer, von denen die meisten legitime
+// Erfolgs- und Auskunftsmeldungen waren. Beide Wege sind damit als Wachter untauglich.
+check('2: kein Gegenstand endet STUMM - keine falsy Rueckgabe in einer activate()',
   stumm.length === 0, { stumm });
+
+// Deshalb daneben eine benannte REGRESSIONSLISTE - dasselbe Mittel wie die acht Schiffsklassen in
+// test_werft_massenflotten, und aus demselben Grund: Die Liste ist ein historischer Befund, keine
+// Tabelle, die sich ableiten liesse. Am 21.08.2026 gemessen: DREIZEHN Gegenstaende melden eine
+// Nicht-Wirkung. Vier taten es stumm (oben), NEUN als gewoehnlichen Text - darunter drei
+// MYTHISCHE. Alle dreizehn tragen jetzt die {fehler}-Form. Faellt einer davon auf eine rohe
+// Zeichenkette zurueck, wird sein Exemplar wieder fuer nichts verbraucht, und diese Zeile meldet
+// es. Ein VIERZEHNTER faellt hier nicht auf - das ist die bewusste Grenze dieses Waechters.
+const MELDEN_NICHT_WIRKUNG = [
+  'forschungsboost', 'baubeschleuniger', 'bergungsdrohnen', 'sternenkartenkopie',
+  'umschulungsbefehl', 'forschungsdurchbruch', 'urwerkzeug', 'werftkommando', 'ab_sternenkarte',
+  'ab_bannspule', 'ab_rueckholanker', 'ab_waechterruf', 'ab_grundberuehrung',
+];
+const ohneForm = MELDEN_NICHT_WIRKUNG.filter(k => !mitFehlerform.has(k));
+check('2b: jeder bekannte Nicht-Wirkungs-Fall benutzt die {fehler}-Form',
+  ohneForm.length === 0, { ohneForm, gefunden: mitFehlerform.size });
+// Die Gegenrichtung (Arbeitsregel 33): Verschwindet ein Eintrag aus der Liste, weil jemand die
+// Meldung entfernt hat, ist das genauso ein Befund wie ein neuer stummer Ausgang.
+check('2c: die Regressionsliste ist vollstaendig abgedeckt und nicht geschrumpft',
+  mitFehlerform.size >= MELDEN_NICHT_WIRKUNG.length,
+  { erwartet: MELDEN_NICHT_WIRKUNG.length, gefunden: mitFehlerform.size });
 
 // ---------------------------------------------------------------- 3) die Gruende sind Saetze
 const gruende = [...JS.matchAll(/return \{ fehler: '([^']+)' \}/g)].map(m => m[1]);
@@ -164,14 +213,25 @@ function save(zusatz){
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
     .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }));
 
+  /* JEDER Klick laeuft ueber diesen Helfer. Ohne ihn beendet ein fehlender Selektor den Lauf mit
+     einer einzigen Zeile, und die Pruefungen dahinter laufen NIE - der rote Exit-Code saehe aus
+     wie eine gelungene Messung (Arbeitsregel 34). So wird der Fehlgriff eine benannte Pruefung. */
+  let klickFehler = null;
+  const klick = async (sel) => {
+    const da = await page.evaluate(s => { const el = document.querySelector(s); if (!el) return false; el.click(); return true; }, sel);
+    if (!da && !klickFehler) klickFehler = sel;
+    return da;
+  };
+
+
   // Spielerweg: Reiter -> Karte aufklappen -> Aktivieren. Nie activateItem direkt aufrufen -
   // die Funktion lebt im Modulscope und ist von aussen gar nicht erreichbar (Arbeitsregel 47).
   // Geklickt wird ueber das Element selbst statt ueber den Zeiger: Die Reiterleiste ist klebend
   // und wird von der Klappen-Ausweichlogik ueberlagert - page.click() lief in den Timeout, obwohl
   // der Knopf da war. Der Handler ist derselbe, der Spielerweg damit gewahrt.
-  await page.evaluate(() => document.querySelector('[data-tab="fortschritt"]').click());
+  await klick('[data-tab="fortschritt"]');
   await page.waitForTimeout(900);
-  await page.evaluate(() => document.querySelector('[data-item-toggle="ab_bannspule"]').click());
+  await klick('[data-item-toggle="ab_bannspule"]');
   await page.waitForTimeout(700);
 
   // Der Bestand wird auf der KARTE abgelesen, also dort, wo der Spieler ihn sieht.
@@ -186,7 +246,7 @@ function save(zusatz){
   check('4-vorab: die Karte ist aufgeklappt und zeigt zwei Exemplare',
     knopfDa === true && vorher === 2, { knopfDa, vorher });
 
-  await page.evaluate(() => document.querySelector('[data-item-activate="ab_bannspule"]').click());
+  await klick('[data-item-activate="ab_bannspule"]');
   await page.waitForTimeout(900);
   const nachErster = await bestand();
   const log1 = await page.evaluate(() => (window.__logZeilen||[]).slice());
@@ -203,12 +263,12 @@ function save(zusatz){
      Deshalb wird hier nur AUFGEKLAPPT, wenn es noetig ist, und die Anwesenheit des Knopfes ist
      eine eigene, benannte Pruefung - eine Messung, die nichts anklickt, darf nicht gruen sein. */
   if (!await page.evaluate(() => !!document.querySelector('[data-item-activate="ab_bannspule"]'))){
-    await page.evaluate(() => document.querySelector('[data-item-toggle="ab_bannspule"]').click());
+    await klick('[data-item-toggle="ab_bannspule"]');
     await page.waitForTimeout(500);
   }
   const knopfDa2 = await page.evaluate(() => !!document.querySelector('[data-item-activate="ab_bannspule"]'));
   check('4-vorab2: der Aktivieren-Knopf steht fuer den zweiten Versuch bereit', knopfDa2 === true, { knopfDa2 });
-  await page.evaluate(() => document.querySelector('[data-item-activate="ab_bannspule"]').click());
+  await klick('[data-item-activate="ab_bannspule"]');
   await page.waitForTimeout(900);
   const nachZweiter = await bestand();
   const log2 = await page.evaluate(() => (window.__logZeilen||[]).slice());
@@ -222,6 +282,7 @@ function save(zusatz){
     neue.some(z => /bereits vorgemerkt/.test(z) && /bleibt dir erhalten/.test(z)),
     { neueZeilen: neue });
 
+  check('4-schluss: jeder Klick hat sein Ziel getroffen', klickFehler === null, { verfehlt: klickFehler });
   await ctx.close(); await browser.close();
   ende();
 })().catch(e => { console.log('FAIL - unerwarteter Fehler | ' + String(e && e.message).slice(0,200)); process.exit(1); });
