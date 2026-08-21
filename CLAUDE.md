@@ -2348,39 +2348,115 @@ Vorab-Prüfung (`2-vorab`) belegt, dass das Leeren gegriffen hat.
     Wirklichkeit statt darüber. **Eine Prüfung, die auch das Richtige verteidigt, ist mehr wert
     als eine, die nur Fehler zählt.**
 
-## Offen aus Phase 6 – gemessen, nicht behoben (21.08.2026)
+## Ein Gegenstand wird nur verbraucht, wenn er WIRKT (21.08.2026)
 
-Drei Dinge liegen belegt vor und sind bewusst NICHT in die Phase-6-Lieferung gerutscht; jedes hätte
-den laufenden Prüflauf entwertet, und keines gehört inhaltlich dazu.
+Zwei der drei offenen Punkte aus Phase 6 sind damit erledigt; der dritte (`belagerungsplan`) ist
+entschieden und steht unten.
 
-1. **`activateItem` bucht ab, BEVOR die Wirkung läuft – vier Gegenstände gehen dabei still
-   verloren.** Gemessen: `ab_bannspule` (selten), `ab_rueckholanker` (episch), `ab_waechterruf`
-   (legendär) und `ab_grundberuehrung` (**mythisch**, die seltenste Stufe des Spiels) geben `null`
-   zurück, wenn ihre Vormerkung schon steht bzw. kein Tauchgang läuft. `escapeHtml(null)` liefert
-   `''` – der Spieler sieht eine **leere Protokollzeile**, sein Exemplar ist weg. Alle vier geben
-   `null` als ALLERERSTE Anweisung zurück, bevor sie etwas verändern; die 33 übrigen
-   `activate()`-Funktionen liefern immer eine Zeichenkette. Der Umbau ist damit gefahrlos: erst
-   wirken lassen, nur bei Wirkung abbuchen, und statt `null` ein `{ fehler: '<Grund>' }`
-   zurückgeben, damit die Meldung den Grund nennt. Wächter dazu: jede `activate()` darf keinen
-   stummen Ausgang haben – datengetrieben über BEIDE Gegenstandstabellen, denn die Prüfung hatte
-   zwei genannt und die Messung fand vier.
-2. **Die Festungs-Abklingzeit steht als eingetippte Zahl da**, während das Nest daneben
-   `NEST_ABKLING_STD = 4` hat. Live betroffen ist der Hilfetext (die Patchnotes-Fundstelle ist
-   unveränderliche Historie), dazu seit Phase 6 die Vorboten-Zeile. Eine Konstante
-   `FESTUNG_ABKLING_STD = 6` neben `NEST_ABKLING_STD` (Zeile ~13607, also weit vor beiden
-   Lesestellen – Regel 38 geprüft) räumt das auf. Die Zahl ist heute richtig; es ist eine
-   Wartbarkeits-, keine Wahrheitsfrage.
-3. **Der `belagerungsplan` lässt sich so, wie das Konzept ihn beschreibt, NICHT bauen.** Seine dort
-   beschriebene Wirkung („setzt die Abklingzeit zurück") gäbe dem Besitzer einen Extraschlag – der
-   Hort ist aber streng nullsummig (`anteil = schaden/summe`, `if (!(anteil > 0)) continue;`). Ein
-   Extraschlag **addiert nichts, er verschiebt**: gerechnet an einer Sternenfeste 180.000 T1,
-   96 Protomaterie und 18 Kampfpunkte, die von benannten Mitstreitern zum Planbesitzer wandern.
-   Dazu ist die Fairness-Begründung im Konzept (`konzept.md` 1166–1168, „er stapelt sich nicht")
-   nachweislich falsch, und das dort genannte Spielstand-Feld `festungLetzterSchlag` (1177) gibt es
-   seit Phase 1 nicht mehr – die Sperre liegt an der Festung. **Das ist eine
-   Produktentscheidung und gehört Sascha vorgelegt**, mit Optionen: die Wirkung umwidmen (eigene
-   Verluste senken – liegt vollständig auf der ohnehin offenen Client-Seite, null Backend-Zeilen),
-   oder den Gegenstand streichen und das im Patchnote sagen (wie beim Wochenpass).
+### Der ausgelieferte Datenverlust in `activateItem`
+
+`activateItem` buchte das Exemplar ab, **bevor** `item.activate()` lief. Datengetrieben über
+**beide** Gegenstandstabellen gemessen: 37 Einträge mit `activate()`, davon **vier** mit einem
+stummen Ausgang – sie geben `null` zurück, wenn ihre Vormerkung schon steht bzw. gar kein
+Tauchgang läuft:
+
+| Gegenstand | Seltenheit | Grund für den Nicht-Wirkungs-Fall |
+|---|---|---|
+| `ab_bannspule` | selten | eine Spule ist bereits geladen |
+| `ab_rueckholanker` | episch | es läuft gar kein Tauchgang |
+| `ab_waechterruf` | legendär | ein Ruf ist bereits abgesetzt |
+| `ab_grundberuehrung` | **mythisch** | eine Grundberührung ist bereits vorgemerkt |
+
+`escapeHtml(null)` liefert `''` – **ausgeführt gemessen, nicht aus dem Quelltext geschlossen**.
+Der Spieler sah also eine **leere Protokollzeile**, während sein Exemplar verschwunden war. Bei
+einem mythischen Stück ist das der teuerste stille Verlust, den dieses Spiel kennt.
+
+**Behoben, indem die Reihenfolge umgedreht wird**, nicht durch vier Einzelkorrekturen: erst wirken
+lassen, nur bei Wirkung abbuchen. Der Umbau ist gefahrlos, weil alle vier `null` als **allererste**
+Anweisung liefern, bevor sie irgendetwas verändern – die 33 übrigen geben unverändert eine
+Zeichenkette zurück und merken von alldem nichts.
+
+**Drei Entscheidungen, die man beim Anfassen kennen muss:**
+
+- **`{ fehler: '<Grund>' }` statt `null`.** Eine Form, die sonst niemand benutzt; damit nennt die
+  Meldung den Grund statt einer Sammelauskunft. Jeder Grund ist ein ganzer Satz und sagt
+  ausdrücklich, dass das Exemplar erhalten bleibt – ohne diesen Halbsatz weiß der Spieler nicht,
+  ob sein Stück noch da ist, und genau das war der Schaden.
+- **Ein zweiter Zweig fängt ein blankes falsy ab.** Wer künftig eine `activate()` ohne Rückgabe
+  baut, verliert dadurch kein Exemplar mehr, sondern bekommt eine benannte Meldung. Der nächste
+  Fall dieser Familie ist damit gedeckt, ohne dass jemand an ihn gedacht haben muss.
+- **Beide Meldungen sind `wichtig` markiert** (Arbeitsregel 47): Der Toast-Stapel hält nur drei,
+  und eine Erklärung, warum gerade NICHTS passiert ist, darf nicht als erste verdrängt werden.
+
+### Die Festungs-Abklingzeit ist eine Konstante geworden
+
+`FESTUNG_ABKLING_STD = 6` steht jetzt neben `NEST_ABKLING_STD = 4`. Sie hatte **fünf** lebende
+Fundstellen als eingetippte Ziffer – vier Anzeigen und, schwerer wiegend, **die Sperre selbst**
+(`meinLetzter + 6*3600*1000` im Kartenmenü, also die Entscheidung, ob der Angriffs-Eintrag
+überhaupt anklickbar ist). Das war nicht bloß Kosmetik: Die Zahl ist eine **Kopie von
+`FESTUNG_ABKLING_MS` aus `server.js`**. Liefen die zwei auseinander, zeigte die Karte den Schlag
+als frei an und `/api/festung/angriff` antwortete mit 403 – oder umgekehrt sperrte das Frontend
+etwas, das der Server längst erlaubt.
+
+Reihenfolge vorher **gemessen**, nicht geschätzt (Regel 38): Alle fünf Leser stehen hinter der
+Konstante; der Hilfetext-Treffer, den `indexOf` zuerst fand, war ein **Patchnote** und nicht der
+Hilfetext – die echte Fundstelle liegt 3,3 Mio Zeichen weiter hinten.
+
+Wächter: `test_festung_paritaet.js` 6-anker/6a/6b (Wert gegen Wert, Stunden gegen Millisekunden –
+ein Textvergleich fiele hier zwangsläufig durch und wäre kein Befund) und die `gerechnet`-Liste von
+`test_zaehlangaben.js`, damit die Ziffer im Hilfetext nicht zurückkehrt.
+
+### Der Wächter und die vier Fallen beim Bauen
+
+`tests/test_gegenstand_verbrauch.js` (17 Prüfungen, Gegenprobe beidseitig: **9 rot** am
+ausgelieferten Stand bei identischer Prüfliste). Er misst die Regel im Quelltext UND die
+**Wirkung im echten Spiel**: dieselbe Bannspule zweimal aktiviert, Bestand von der Karte
+abgelesen. Am alten Stand steht dort nach dem zweiten Klick `null` – die Zeile verschwindet ganz,
+weil der Bestand auf 0 fällt.
+
+Vier Dinge sind dabei schiefgegangen, jedes eine Regel dieses Dokuments in Aktion:
+
+1. **Der Endanker war falsch.** Beide Gegenstandstabellen enden mit **drei** Leerzeichen
+   (`   ];`), nicht mit zweien. Ein `indexOf('\n  ];')` greift daneben und liefert einen zu langen
+   Block (Regel 6). Der Test schneidet jetzt per Regex auf eine Zeile, die nur aus Leerraum und
+   `];` besteht – und prüft zusätzlich, dass im Block keine fremde Tabelle anfängt.
+2. **Der Spielstand-Schlüssel war geraten** (Regel 4). Im Solo-Betrieb heißt er
+   `kepler7_` + `kepler7-save-v3`; ich hatte den blanken Namen aus einem Test kopiert, der ihn über
+   die Backend-Route ausliefert. Das Spiel startete daraufhin **frisch** (gemessen: Credits 0, Erz
+   10/800), und das leere Inventar sah wie ein Befund aus. **Und die Korrektur allein reichte
+   nicht:** `storageGet` kehrt bei einer 404-Antwort des Backends ausdrücklich ZURÜCK
+   (`if (res.status === 404) return null;`), statt auf den lokalen Speicher durchzufallen – wer
+   alle `/api/`-Aufrufe pauschal auf 404 legt, bekommt nie einen geladenen Spielstand. Der Test
+   serviert ihn deshalb über die geroutete Storage-Antwort.
+3. **Eine Prüfung war aus dem falschen Grund grün** (Regel 28). Mein zweiter Toggle-Klick hat die
+   Karte wieder ZUGEKLAPPT, der Aktivieren-Knopf war weg, und `if (b) b.click()` tat nichts –
+   „das Exemplar bleibt liegen" war damit trivial erfüllt. Gemeldet hat es nur die Prüfung
+   daneben, die den GRUND im Protokoll verlangt. Seither ist die Anwesenheit des Knopfes eine
+   eigene, benannte Vorab-Prüfung: **eine Messung, die nichts anklickt, darf nicht grün sein.**
+4. **Zwei Prüfungen waren in der ersten Gegenprobe vacuous grün**, weil `every` über eine leere
+   Liste trivial wahr ist – am alten Stand gibt es ja gar keine Gründe. Sie verlangen jetzt zuerst
+   einen WERT, dann die Beziehung. Genau derselbe Befund wie beim `/api/health`-Test zwei Tage
+   vorher; **wer eine Prüfung über eine Menge formuliert, die es am Vergleichsstand nicht gibt,
+   prüft sonst nur, dass sie fehlt.**
+
+### Der `belagerungsplan` – entschieden am 21.08.2026 (Sascha)
+
+Vorgelegt mit drei Optionen, gewählt: **die Wirkung umwidmen.** Statt eines Extraschlags senkt der
+Plan die **eigenen Verluste** des nächsten Festungsschlags.
+
+Der Grund, warum die Konzept-Fassung nicht gebaut wird, bleibt als Messung wichtig: Der Hort ist
+streng nullsummig (`anteil = schaden/summe`, `if (!(anteil > 0)) continue;`). Ein Extraschlag
+**addiert nichts, er verschiebt** – gerechnet an einer Sternenfeste 180.000 Erz, 96 Protomaterie
+und 18 Kampfpunkte, die von benannten Mitstreitern zum Planbesitzer wandern. Die Fairness-
+Begründung im Konzept („er stapelt sich nicht") ist damit nachweislich falsch, und das dort
+genannte Spielstand-Feld `festungLetzterSchlag` gibt es seit Phase 1 nicht mehr.
+
+Die gewählte Wirkung nimmt niemandem etwas weg: **Verluste bucht ohnehin der Client** (das ist die
+dokumentierte Arbeitsteilung des Festungsschlags – der Server schreibt den Spielstand des
+Angreifers nicht), der Hort bleibt unberührt, und es braucht **null Backend-Zeilen**. Beim Umsetzen
+gehört der Name mitgezogen: „Belagerungsplan" trägt die neue Wirkung dem Sinn nach, die
+Beschreibung muss sie aber ausdrücklich nennen.
+
 ### Der Fundort-Knopf log bei Nest- und Festungsberichten (behoben 21.08.2026)
 
 `zeigeAsteroidFundort` kannte zwei Fälle: einen Bericht MIT Gürtelplatz und einen alten ohne. Nest-

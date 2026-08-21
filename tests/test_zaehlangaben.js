@@ -65,6 +65,11 @@ const gerechnet = [
      Richtigstellung blockiert (Arbeitsregel 68). Beides ist behoben; hier steht der Ausdruck,
      damit die Ziffer nicht zurueckkehrt. */
   ["Kompendium-Kategorien", "'+COMPENDIUM_CATS.length+' Kategorien"],
+  /* Ebenfalls am 21.08.2026 dazu: Die Abklingzeit der Asteroidenfestung stand als eingetippte 6
+     an fuenf Stellen - vier Anzeigen UND der Sperre selbst. Sie ist eine Kopie von
+     FESTUNG_ABKLING_MS aus server.js (test_festung_paritaet 6a haelt beide zusammen); hier steht
+     der Ausdruck, damit die Ziffer im Hilfetext nicht zurueckkehrt. */
+  ["Festungs-Abklingzeit", "Abklingzeit von ' + FESTUNG_ABKLING_STD + ' Stunden"],
 ];
 for (const [was, ausdruck] of gerechnet){
   const da = ausdruck instanceof RegExp ? ausdruck.test(src) : src.includes(ausdruck);
