@@ -308,6 +308,73 @@ Ressourcen nur über HTTPS (wir haben genau eine, den Link aufs Spiel) und keine
   englischsprachiger Besucher, der es erst nach dem Klick merkt, geht sofort wieder. Eine
   Absprungrate schadet dem Eintrag mehr, als der zusätzliche Klick nützt.
 
+#### Beschreibungstext für das itch.io-Feld
+
+**Reiner Text, keine HTML-Tags** — itch.io hat einen Rich-Text-Editor, kein HTML-Feld. Die
+HTML-Fassung aus Abschnitt 2 („Lang") würde dort ihre Tags sichtbar mit ausgeben.
+
+**Deutsch zuerst, Englisch darunter, und das ist eine Entscheidung:** Das Spiel IST deutsch, also
+gehört die deutsche Fassung nach oben. Der englische Block darunter ist keine Übersetzung, sondern
+eine Vorwarnung in vier Sätzen — ein internationaler Besucher soll in fünf Sekunden wissen, woran er
+ist, statt es nach dem Klick zu merken. Dieselbe Begründung wie beim `german`-Tag.
+
+```
+Kolonie Kepler-7 ist ein Weltraum-Aufbauspiel, das komplett im Browser läuft. Kein Download, kein
+Plugin, kein Konto bei einem Store. Dein Spielstand liegt auf dem Server – du spielst am Rechner
+weiter, was du unterwegs am Handy begonnen hast.
+
+AUFBAUEN
+
+Du startest mit einem Planeten. Energie versorgt alles Weitere, Erz, Kristalle und Deuterium sind
+die Grundstoffe, Antimaterie und Forschungspunkte öffnen später die anspruchsvollen Zweige. Jede
+Gebäudestufe kostet mehr und dauert länger – die Frage ist nie, was du bauen kannst, sondern was
+zuerst. Weiter hinten wartet eine zweite Wirtschaftsstufe: Nanolegierungen, Quantenchips und
+Fusionskerne aus eigenen Fabriken.
+
+FORSCHEN UND FLOTTEN AUFSTELLEN
+
+Der Forschungsbaum reicht von besseren Solarzellen bis zu Leerentechnologie und
+Singularitätsphysik – und läuft weiter, während du offline bist. Über zwanzig Schiffstypen decken
+Erkundung, Fracht und Kampf ab, mit Konterrollen: Eine reine Masse eines Typs ist selten die beste
+Antwort.
+
+EINE GETEILTE GALAXIE
+
+Alle Spieler bewegen sich in derselben Galaxie. Jeden Montag kommen neue Sternsysteme dazu. Vier
+NPC-Fraktionen besitzen eigene Gebiete, erweitern sie selbstständig und führen untereinander Krieg –
+das läuft auf dem Server weiter, auch wenn niemand zusieht. Dazu Asteroidenfestungen und
+Alien-Nester als gemeinsame Ziele, Allianzen mit eigener Basis, und Weltbosse, die eine einzelne
+Flotte nicht bezwingt.
+
+KOSTENLOS HEISST HIER KOSTENLOS
+
+Keine Abos, keine Lootboxen, keine Bezahlvorteile. Wer freiwillig spendet, bekommt Titel und
+Farbschemata – keinen Vorteil in Kampf, Produktion oder Bestenliste. Auf der Seite läuft kein
+Tracking und keine Werbung. Neue Konten haben vier Tage Anfängerschutz.
+
+Das Spiel läuft auf einem Raspberry Pi bei mir zu Hause. Entwickelt von einer Person, fast täglich
+aktualisiert – die Patchnotes sind öffentlich.
+
+---
+
+PLEASE NOTE: THE GAME IS IN GERMAN
+
+Kolonie Kepler-7 is a space colony builder that runs entirely in the browser – no client, no
+plugin, same save on desktop and mobile. The interface and all texts are German only.
+
+Build up a colony across six resources, work through a research tree from solar panels to
+singularity physics, and field more than twenty ship classes with counter roles. All players share
+one galaxy: new star systems appear every Monday, four NPC factions wage war on each other, and
+alliances team up against world bosses. Production continues while you are offline.
+
+No subscriptions, no loot boxes, no paid advantages – donations only unlock cosmetics. No tracking,
+no ads. New accounts get four days of beginner protection.
+```
+
+**Zwei Sätze, die bewusst drinstehen:** „läuft auf einem Raspberry Pi bei mir zu Hause" und „von
+einer Person entwickelt" — auf itch.io ist das kein Makel, sondern genau das, wofür die Plattform
+da ist. Auf einem kommerziellen MMO-Verzeichnis wäre es fehl am Platz und steht dort deshalb nicht.
+
 **Der Vorbehalt bleibt und gehört benannt:** Ob itch.io die Startkarte als vollwertiges
 HTML5-Spiel indexiert, ist **nicht bestätigt**. Ein Admin-Zitat sagt über Seiten, die im Kern ein
 externer Link sind: „it may not match our community guidelines so you may not get indexed in our
