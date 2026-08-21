@@ -47,8 +47,17 @@ const DEFS = {
   // Reliquien und Konstellationen (v8.343.0). Wie bei den anderen Listen mit der ECHTEN Laenge
   // aus der Spieldatei, damit total() plausibel ist statt frei erfunden.
   ABGRUND_RELIKTE: liste(laenge('ABGRUND_RELIKTE'), 'rel'),
-  ABGRUND_KONSTELLATIONEN: liste(laenge('ABGRUND_KONSTELLATIONEN'), 'kon')
+  ABGRUND_KONSTELLATIONEN: liste(laenge('ABGRUND_KONSTELLATIONEN'), 'kon'),
+  /* Festungen und Voelker (Phase 6). Beide Tabellen sind OBJEKTE, keine Listen wie die
+     Eintraege darueber - die Attrappen bilden das nach, damit total() (Object.keys(...).length)
+     dieselbe Zahl liefert wie im Spiel. Die Schluessel werden aus der Spieldatei gelesen, nicht
+     getippt: sonst waere die Erwartung eine zweite Wahrheit neben der Tabelle. */
+  FESTUNG_STUFEN: Object.fromEntries((((src.match(/const FESTUNG_STUFEN = \{[\s\S]*?\n  \};/) || [''])[0]).match(/^\s{4}[a-z]+: *\{/gm) || []).map((m, i) => [m.trim().replace(/: *\{/, ''), { name: 'st' + i }])),
+  ALIEN_VOELKER: Object.fromEntries((((src.match(/const ALIEN_VOELKER = \{[\s\S]*?\n  \};/) || [''])[0]).match(/^\s{4}[a-z]+: *\{/gm) || []).map((m, i) => [m.trim().replace(/: *\{/, ''), { name: 'v' + i }]))
 };
+check('Bestandszahlen Festungen/Voelker gelesen',
+  Object.keys(DEFS.FESTUNG_STUFEN).length >= 3 && Object.keys(DEFS.ALIEN_VOELKER).length >= 4,
+  { festungStufen: Object.keys(DEFS.FESTUNG_STUFEN).length, voelker: Object.keys(DEFS.ALIEN_VOELKER).length });
 check('Bestandszahlen Abgrund gelesen',
   DEFS.ABGRUND_RELIKTE.length > 0 && DEFS.ABGRUND_KONSTELLATIONEN.length > 0,
   { relikte:DEFS.ABGRUND_RELIKTE.length, konstellationen:DEFS.ABGRUND_KONSTELLATIONEN.length });
@@ -81,18 +90,30 @@ function baue(state){
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
     'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
-    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs',
+    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs', 'FESTUNG_STUFEN', 'ALIEN_VOELKER',
     bmtQuelle + '\n' + block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
     DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets,
     BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems,
-    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN, unikatDefs);
+    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN, unikatDefs, DEFS.FESTUNG_STUFEN, DEFS.ALIEN_VOELKER);
   return ctx.CATS;
 }
 
 // ---------------------------------------------------------------- 1) Form
 const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{}, abgrund:{ relikte:{}, konstGesehen:{} } };
 const cats = baue(leerState);
-check('1: elf Kategorien', cats.length === 11, cats.length);
+/* Namentlich statt gezaehlt (Arbeitsregel 33): Eine blanke Zahl sagt beim Fehlschlag nicht, WELCHE
+   Kategorie dazugekommen oder verschwunden ist - und beides ist ein Befund. Verschwindet eine,
+   verlieren Spieler eine abgeschlossene Sammlung; kommt eine dazu, ohne dass es jemand wollte,
+   faellt es hier auf. */
+const ERWARTETE_KATEGORIEN = ['planets','systems','bosses','factions','achievements','ships','modules',
+  'buildings','relikte','konstellationen','unikate','festungen','voelker'];
+{
+  const ist = cats.map(c => c.key).sort();
+  const soll = ERWARTETE_KATEGORIEN.slice().sort();
+  const fehlend = soll.filter(k => ist.indexOf(k) < 0);
+  const ueberzaehlig = ist.filter(k => soll.indexOf(k) < 0);
+  check('1: genau die erwarteten Kategorien', !fehlend.length && !ueberzaehlig.length, { fehlend, ueberzaehlig });
+}
 check('1: jede Kategorie hat ein Icon aus der Whitelist',
   cats.every(c => whitelist.has(c.icon)), cats.filter(c => !whitelist.has(c.icon)).map(c => c.key + '=' + c.icon));
 check('1: jede Kategorie hat Name, Beschreibung und Belohnung',
@@ -116,6 +137,8 @@ const vollState = {
   abgrund:{ relikte:{}, konstGesehen:{} }
 };
 DEFS.ABGRUND_RELIKTE.forEach(r => { vollState.abgrund.relikte[r.key] = true; });
+vollState.festungTypen = vollState.festungTypen || {};
+vollState.nestVoelker = vollState.nestVoelker || {};
 DEFS.ABGRUND_KONSTELLATIONEN.forEach(k => { vollState.abgrund.konstGesehen[k.key] = true; });
 DEFS.PLANETS.forEach(p => { vollState.discovered[p.id] = true; });
 DEFS.ACHIEVEMENTS.forEach(a => { vollState.achievements[a.key] = true; });
@@ -133,6 +156,12 @@ DEFS.UNIKATE.forEach((u, i) => {
   if (i % 2 === 0) vollState.modules[u.key + ':exotisch:1:w110'] = 1;
   else vollState.equippedModules.home.push(u.key + ':exotisch:1:w110');
 });
+/* Festungen und Voelker (Phase 6). Die Sammlung zaehlt ARTEN, und der Spielstand fuehrt sie als
+   Mengen von SCHLUESSELN - genau der Namensraum, den total() zaehlt. Gefuellt wird aus den
+   ATTRAPPEN, nicht aus getippten 3 und 4: Kaeme eine vierte Ausbaustufe dazu, muesste dieser Block
+   sonst von Hand nachgezogen werden, und die Luecke fiele erst beim naechsten Fehlschlag auf. */
+Object.keys(DEFS.FESTUNG_STUFEN).forEach(k => { vollState.festungTypen[k] = true; });
+Object.keys(DEFS.ALIEN_VOELKER).forEach(v => { vollState.nestVoelker[v] = true; });
 fehler = [];
 const vollCats = baue(vollState);
 const vollWerte = vollCats.map(c => { try { return { key:c.key, have:c.have(), total:c.total() }; } catch(e){ fehler.push(c.key+': '+e.message); return null; } });
@@ -164,8 +193,54 @@ check('4u: mit vollem Bestand sind alle abgehakt - auch das EINGEBAUTE',
   { zeile: uniVoll.desc(), have: uniVoll.have() });
 
 // ---------------------------------------------------------------- 5) Hilfe mitgezogen
-check('5: die Hilfe nennt acht Kategorien', /Kompendium deinen Sammel-Fortschritt über die ganze Galaxie in acht Kategorien/.test(src));
-check('5: und beschreibt die drei neuen', /Schiffsregister/.test(src) && /Modulkabinett/.test(src) && /Gebäudearchiv/.test(src));
+/* 5) Die Hilfe RECHNET ihre Anzahl, statt sie zu behaupten.
+   Bis zum 21.08.2026 stand hier eine feste Zahl - und diese Pruefung hat sie FESTGENAGELT: Der
+   Hilfetext sagte "in acht Kategorien" und zaehlte acht namentlich auf, waehrend COMPENDIUM_CATS
+   gemessen 13 fuehrte und der Reiter auch 13 zeichnete. Er log damit seit v8.343.0 (Reliquien,
+   Konstellationen), v8.464.0 (Unikate) und zuletzt Phase 6 (Asteroidenfestungen, Alien-Voelker).
+   Wer den Text haette richtigstellen wollen, waere von genau dieser Pruefung zurueckgepfiffen
+   worden - sie war nicht der Waechter, sondern der Grund, warum niemand hingesehen hat
+   (Arbeitsregel 68).
+   Geprueft wird deshalb die REGEL statt der Momentaufnahme: Die Stelle muss aus COMPENDIUM_CATS
+   ableiten. Eine Ziffer kann so nicht zurueckkehren, und eine 14. Kategorie ist automatisch
+   mitgezaehlt. Denselben Ausdruck haelt tests/test_zaehlangaben.js zusaetzlich fest. */
+const hilfeVon = src.indexOf("const HELP_SECTIONS = [");
+const kompVon = src.indexOf("{ title:'Galaktisches Kompendium'", hilfeVon < 0 ? 0 : hilfeVon);
+const kompBis = kompVon < 0 ? -1 : src.indexOf("\n      { title:'", kompVon + 10);
+check('5-anker: der Kompendium-Hilfeeintrag laesst sich schneiden (sonst waeren 5a/5b vacuous)',
+  hilfeVon >= 0 && kompVon > hilfeVon && kompBis > kompVon, { hilfeVon, kompVon, kompBis });
+const kh = (kompVon >= 0 && kompBis > kompVon) ? src.slice(kompVon, kompBis) : '';
+check('5a: die Hilfe RECHNET die Anzahl der Kategorien, statt eine Ziffer zu nennen',
+  kh.indexOf("'+COMPENDIUM_CATS.length+' Kategorien") >= 0, kh.slice(0, 200));
+check('5b: und nennt sie aus derselben Tabelle, statt sie abzuschreiben',
+  /COMPENDIUM_CATS\.map\(c=>'<strong>'\+c\.name\+'<\/strong>'\)/.test(kh), kh.slice(0, 200));
+/* Die drei Besitz-Kategorien stehen weiterhin NAMENTLICH im Text - vorher hiess es dort "die
+   letzten drei", was still von der Reihenfolge des Arrays abhing. Verschiebt sie jemand, waere
+   der Satz falsch geworden, ohne dass eine Pruefung angeschlagen haette. */
+check('5c: die drei Besitz-Kategorien sind namentlich genannt, nicht ueber ihre Position',
+  /Schiffsregister/.test(kh) && /Modulkabinett/.test(kh) && /Gebäudearchiv/.test(kh)
+    && !/letzten drei/.test(kh));
+/* 5d) Die DRITTE Anzeigestelle, gefunden am 21.08.2026 beim Nachmessen des gerenderten Spiels.
+   Ueber #compendiumBox steht eine statische Einleitungszeile im Markup - und die zaehlte die
+   URSPRUENGLICHEN FUENF Kategorien auf ("entdeckte Welten, bereiste Systeme, besiegte Bosse,
+   kennengelernte Fraktionen und freigeschaltete Erfolge"), waehrend der Reiter direkt darunter
+   dreizehn zeichnete. Sie hinkte damit noch laenger hinterher als der Hilfetext, und zwar seit
+   v8.298.
+   Sie ist statisches Markup und kann NICHT aus COMPENDIUM_CATS ableiten - eine Aufzaehlung dort
+   ist strukturell zum Veralten verurteilt. Geprueft wird deshalb, dass dort gar nicht mehr
+   aufgezaehlt wird: kein Kategoriename, und kein Dreier-Muster "a, b, ... und c". Die
+   Beschreibung jeder Kategorie steht ohnehin in ihrer eigenen Zeile, der Renderer gibt
+   cat.name UND cat.desc aus. */
+{
+  const notizVon = src.indexOf("class=\"lb-note\"", src.indexOf("data-sec=\"kompendium\""));
+  const notizBis = notizVon < 0 ? -1 : src.indexOf('</div>', notizVon);
+  check('5d-anker: die Einleitungszeile ueber dem Kompendium laesst sich schneiden',
+    notizVon > 0 && notizBis > notizVon, { notizVon, notizBis });
+  const notiz = (notizVon > 0 && notizBis > notizVon) ? src.slice(notizVon, notizBis) : '';
+  const genannt = cats.map(c => c.name).filter(n => notiz.indexOf(n) >= 0);
+  check('5d: die Einleitungszeile nennt keine einzelne Kategorie', !genannt.length, genannt);
+  check('5d2: und zaehlt auch nicht beschreibend auf', !/,[^.]*,[^.]*\bund\b/.test(notiz), notiz.slice(0, 200));
+}
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);

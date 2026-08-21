@@ -58,6 +58,13 @@ const gerechnet = [
   ["Standort-Modultypen", "'+MODULE_DEFS.length+' Typen"],
   ["Schiffsklassen", "'+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots"],
   ["Fraktions-Auftragsarten", "Object.values(FACTION_QUEST_POOLS).map(p=>p.length)"],
+  /* Dazugekommen am 21.08.2026, und der Anlass ist ein Lehrstueck fuer genau diese Liste: Der
+     Kompendium-Hilfetext nannte "acht Kategorien" und zaehlte acht namentlich auf, waehrend
+     COMPENDIUM_CATS gemessen 13 fuehrte - er log seit v8.343.0 unbemerkt. Schlimmer noch: Eine
+     Pruefung in tests/test_kompendium.js hielt die Ziffer ausdruecklich fest und haette jede
+     Richtigstellung blockiert (Arbeitsregel 68). Beides ist behoben; hier steht der Ausdruck,
+     damit die Ziffer nicht zurueckkehrt. */
+  ["Kompendium-Kategorien", "'+COMPENDIUM_CATS.length+' Kategorien"],
 ];
 for (const [was, ausdruck] of gerechnet){
   const da = ausdruck instanceof RegExp ? ausdruck.test(src) : src.includes(ausdruck);
