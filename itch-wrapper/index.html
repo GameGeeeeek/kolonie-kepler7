@@ -84,9 +84,13 @@ h1{
   color:var(--tinte); user-select:all; word-break:break-all;
 }
 .adresse .etikett{
-  display:block; font-family:inherit; font-size:11px; letter-spacing:.1em;
+  display:block; font-size:11px; letter-spacing:.1em;
   text-transform:uppercase; color:var(--tinte-weich); margin-bottom:5px;
   font-family:system-ui,sans-serif;
+  /* word-break:break-all steht am Elternteil, damit die lange URL umbrechen KANN. Das
+     Etikett erbt es und zerlegte am Handy "ADRESSE" zu "ADR ESSE" - nur im gerenderten
+     Bild zu sehen, im Quelltext unauffällig. Umbrüche gehören hier zwischen die Wörter. */
+  word-break:normal; overflow-wrap:break-word;
 }
 @media (max-width:520px){ .karte{padding:26px 22px 22px;} }
 </style>
@@ -177,16 +181,31 @@ h1{
 // Ein sandboxed iframe OHNE allow-popups blockiert target="_blank" stillschweigend - der Spieler
 // klickt und nichts passiert. Deshalb: Klick abfangen, Erfolg prüfen, und wenn nichts aufging,
 // die Adresse gross und kopierbar anbieten statt den Klick ins Leere laufen zu lassen.
-document.getElementById('starten').addEventListener('click', function (e) {
-  var w = null;
-  try { w = window.open('https://www.gamegeeeeek.de/', '_blank', 'noopener'); } catch (err) { w = null; }
-  if (w) { e.preventDefault(); return; }
-  // window.open blockiert: den normalen Link weiterlaufen lassen und den Hinweis verschärfen.
-  var h = document.getElementById('warum');
-  h.textContent = 'Dieses Fenster darf keine neuen Tabs öffnen. Ruf die Adresse unten direkt auf – '
-                + 'ein Klick darauf markiert sie zum Kopieren.';
-  h.style.color = '#F09849';
-});
+// HIER STAND EINMAL EIN window.open-ABFANG - er ist bewusst ENTFERNT (21.08.2026).
+//
+// Der Entwurf rief window.open(ziel, '_blank', 'noopener') auf und wollte am Rueckgabewert
+// erkennen, ob der Tab aufging; bei null erschien eine Warnung. Gemessen in Chromium:
+//
+//   window.open(u, '_blank', 'noopener')  ->  null        (auch bei ERFOLG)
+//   window.open(u, '_blank')              ->  Fensterobjekt
+//
+// Das ist kein Fehler des Browsers, sondern die Spezifikation: Mit noopener wird die
+// Opener-Beziehung gekappt, es gibt also nichts zurueckzugeben. Folge: Die Erfolgs-
+// verzweigung war TOTER CODE, und die Warnung "Dieses Fenster darf keine neuen Tabs
+// oeffnen" erschien bei JEDEM Klick - auch wenn der Tab einwandfrei aufging. Eine
+// Anzeigeflaeche, die immer etwas Unwahres behauptet.
+//
+// Zweitens lief e.preventDefault() dadurch nie, also feuerten JS-Aufruf UND nativer Link
+// nebeneinander: zwei Oeffnungsversuche fuer einen Klick.
+//
+// Drittens ist der nackte Link ohnehin der zuverlaessigere Weg - Pop-up-Blocker sperren
+// script-initiiertes window.open, nicht die vom Nutzer geklickte Verknuepfung.
+//
+// Der Auffangweg fuer den Fall, dass gar nichts passiert (itch.io bettet Spiele in ein
+// sandboxed iframe ein; ohne allow-popups wird auch ein target="_blank"-Link still
+// verworfen), braucht keine Erkennung: Die Adresse steht dauerhaft sichtbar darunter,
+// traegt user-select:all und ist mit einem Klick markiert. Ein Satz, der immer stimmt,
+// ist besser als eine Erkennung, die sich irren kann.
 </script>
 </body>
 </html>

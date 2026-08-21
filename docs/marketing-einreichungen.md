@@ -269,7 +269,51 @@ darüber, *was* dort überhaupt gelistet werden darf. **Übertragbar für die re
 Vor dem Ausfüllen erst prüfen, welche ART von Eintrag die Seite sammelt — nicht nur, ob sie ein
 Formular hat.**
 
----
+### itch.io — **kostenlos, HTML5-Projekt**
+
+An der itch.io-Dokumentation geprüft (21.08.2026). Die Startkarte liegt fertig gepackt vor;
+`itch-wrapper/README.md` erklärt, warum sie **kein iframe** ist.
+
+**Technische Grenzen** (verbatim aus der Doku): entpackt höchstens 500 MB, eine Einzeldatei
+höchstens 200 MB, höchstens 1.000 Dateien, Dateiname samt Pfad höchstens 240 Zeichen. Unser
+ZIP: **eine Datei, 4,4 kB**. Dazu zwei Regeln, die wir einhalten und die gemessen sind: externe
+Ressourcen nur über HTTPS (wir haben genau eine, den Link aufs Spiel) und keine absoluten Pfade.
+
+| Feld | Wert |
+|---|---|
+| Title | `Kolonie Kepler-7` |
+| Short description | `Weltraum-Aufbauspiel im Browser: Kolonie ausbauen, Flotte aufstellen, geteilte Galaxie. Kein Pay-to-Win. Auf Deutsch.` |
+| Classification | **Game** |
+| Kind of project | **HTML** („play in browser") |
+| Release status | **Released** |
+| Pricing | **No payments** |
+| Uploads | `kolonie-kepler-7-itch.zip`, Haken bei **„This file will be played in the browser"** |
+| Embed | **Embed in page**, Breite `960`, Höhe `600` |
+| Mobile friendly | **an** (die Karte ist am Hochformat gemessen) |
+| Fullscreen button | **aus** – eine Startkarte braucht keinen |
+| Genre | **Strategy** |
+| Tags | `browser`, `space`, `idle`, `incremental`, `multiplayer`, `strategy`, `management`, `german`, `no-pay-to-win`, `4x` (itch.io erlaubt **bis zu 10**) |
+| Cover image | `presse-bilder/itch-cover.png` (630×500 – erzeugt mit `node itch-wrapper/cover-bauen.js`) |
+| Screenshots | 3–5 aus `presse-bilder/` (`node marketing-screenshots.js`) |
+| Visibility | erst **Draft**, dann **Public** |
+
+**Drei Feldwerte mit Begründung, weil der naheliegende falsch wäre:**
+
+- **Pricing „No payments", nicht „Donate".** Das Spiel nimmt Spenden über Ko-fi entgegen, aber
+  nicht über itch.io – ein Spendenknopf dort führte ins Leere bzw. an eine Kasse, die nichts mit
+  dem Spiel zu tun hat.
+- **Release status „Released", nicht „In development".** Das Spiel läuft seit Juli 2026 mit
+  Spielern. „In development" senkt die Erwartung und damit den Klick, ohne etwas zu gewinnen.
+- **`german` gehört in die Tags.** Die Startkarte sagt es, die Beschreibung sagt es – und ein
+  englischsprachiger Besucher, der es erst nach dem Klick merkt, geht sofort wieder. Eine
+  Absprungrate schadet dem Eintrag mehr, als der zusätzliche Klick nützt.
+
+**Der Vorbehalt bleibt und gehört benannt:** Ob itch.io die Startkarte als vollwertiges
+HTML5-Spiel indexiert, ist **nicht bestätigt**. Ein Admin-Zitat sagt über Seiten, die im Kern ein
+externer Link sind: „it may not match our community guidelines so you may not get indexed in our
+search and browse pages." Das Risiko ist asymmetrisch – schlimmstenfalls bleibt der Eintrag
+un-indexiert, also genau der Zustand, den ein reiner Link ohnehin gehabt hätte. Deshalb erst als
+**Draft** anlegen und ansehen, bevor er öffentlich wird.
 
 ## 5. Was die Einträge wert sind – die offene Frage
 
