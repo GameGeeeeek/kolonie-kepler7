@@ -43,12 +43,22 @@ const NPC_SYSTEME = (() => {
     .map(z => (z.match(/system:'([a-z0-9_]+)'/i) || [])[1]).filter(Boolean))];
 })();
 
+// Drei Alien-Nester im Heimatsystem - so viele setzt Phase 3 hoechstens je System. OHNE sie waere
+// die KB-19-Erweiterung dieses Waechters vacuous: Er koennte die neuen Objektarten zwar sehen, im
+// Fixture kaeme aber keine vor, und die Gegenprobe am alten Stand bliebe gruen (genau so gemessen).
+const NESTER = [
+  { id: 'n1', sys: 'kepler', volk: 'Vex-Nomaden', stufe: 3, lp: 90000, lpMax: 120000 },
+  { id: 'n2', sys: 'kepler', volk: 'Vex-Nomaden', stufe: 2, lp: 40000, lpMax: 40000 },
+  { id: 'n3', sys: 'kepler', volk: 'Vex-Nomaden', stufe: 1, lp: 20000, lpMax: 40000 }
+];
+
 function backend(store) {
   return async r => {
     const req = r.request();
     const p = req.url().split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
+    if (p === 'galaxy') return j({ alienNester: NESTER });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
     if (p.startsWith('storage/')) {
       const k = decodeURIComponent(p.slice(8));
@@ -71,8 +81,18 @@ async function messe(page) {
     const schneidet = (a, c) => Math.min(a.r, c.r) - Math.max(a.l, c.l) > 1 && Math.min(a.b, c.b) - Math.max(a.t, c.t) > 1;
 
     // Scheiben und Marker über ihre BENANNTE Rolle greifen, nie über den Radius (Regel 51).
+    //
+    // KB-19: Hier stand DIESELBE Namensliste aus drei Selektoren wie im Spielcode - und damit hatte
+    // dieser Waechter exakt denselben blinden Fleck wie die Funktion, die er bewacht: Asteroiden,
+    // Alien-Nester und Asteroidenfestungen kamen erst nach KB-16 dazu, keiner von beiden kannte
+    // sie, und ein Planetenname auf einer Nest-Scheibe konnte deshalb gar nicht auffallen (im
+    // gerenderten Bild gemessen: "Vesna" lag auf einem Nest). Eine Pruefung, die die Namensliste
+    // der Implementierung SPIEGELT, erbt deren Luecke - sie kann nur finden, woran schon jemand
+    // gedacht hat (Regel 40). Gegriffen wird deshalb ueber die Klasse, die alle sechs Kartenobjekte
+    // tragen; eine neue Markerart ist damit automatisch mitgeprueft.
+    const OBJEKTE = '.planet-node';
     const objekte = [];
-    svg.querySelectorAll('.planet-node[data-planet], [data-map-npc], [data-map-player]').forEach(g => {
+    svg.querySelectorAll(OBJEKTE).forEach(g => {
       let el = g.querySelector('image') || g.querySelector('circle.body');
       if (!el) {
         const kreise = [...g.querySelectorAll('circle')];
@@ -81,26 +101,40 @@ async function messe(page) {
       if (!el) return;
       const k = kasten(el);
       if (!k.w) return;
-      objekte.push(Object.assign({ g, was: g.getAttribute('data-planet') || g.getAttribute('data-map-npc') || g.getAttribute('data-map-player'),
-                                   istPlanet: !!g.getAttribute('data-planet') }, k));
+      const was = g.getAttribute('data-planet') || g.getAttribute('data-map-npc')
+               || g.getAttribute('data-map-player') || g.getAttribute('data-map-nest')
+               || (g.hasAttribute('data-map-festung') ? 'festung' : null)
+               || g.getAttribute('data-map-asteroid');
+      objekte.push(Object.assign({ g, was, istPlanet: !!g.getAttribute('data-planet') }, k));
     });
 
     const texte = [];
     svg.querySelectorAll('text.planet-label').forEach(t => {
       const k = kasten(t);
       if (!k.w) return;
-      const eigen = t.closest('.planet-node[data-planet], [data-map-npc], [data-map-player]');
+      const eigen = t.closest(OBJEKTE);
       const eigenO = eigen ? objekte.find(o => o.g === eigen) : null;
       texte.push(Object.assign({ text: (t.textContent || '').trim().slice(0, 28),
                                  eigen: eigenO ? eigenO.was : null,
                                  abstandZumEigenen: eigenO ? Math.hypot(k.x - eigenO.x, k.y - eigenO.y) / proSektor : null }, k));
     });
 
-    const aufScheibe = [], textPaare = [], markerAufScheibe = [];
+    const aufScheibe = [], aufMarker = [], textPaare = [], markerAufScheibe = [];
     for (const t of texte) for (const o of objekte) {
       if (!o.istPlanet) continue;
       const box = { l: o.x - o.rad, r: o.x + o.rad, t: o.y - o.rad, b: o.y + o.rad };
       if (schneidet(t, box)) aufScheibe.push({ text: t.text, auf: o.was });
+    }
+    // KB-19: die GEGENRICHTUNG - ein fremder Name auf einem NICHT-Planeten (Alien-Nest,
+    // Asteroidenfestung, Asteroid, NPC, fremder Spieler). Genau die hat der Entflechter bis KB-19
+    // nicht gekannt, und genau die hat dieser Waechter bis dahin auch nicht gemessen: Die Schleife
+    // darueber steigt bei `!o.istPlanet` aus. Ohne diese zweite Schleife blieb die Gegenprobe zu
+    // KB-19 gruen, obwohl im gerenderten Bild "Vesna" auf einer Nest-Scheibe lag (gemessen).
+    for (const t of texte) for (const o of objekte) {
+      if (o.istPlanet) continue;
+      if (t.eigen !== null && t.eigen === o.was) continue;   // das eigene Objekt zaehlt nicht
+      const box = { l: o.x - o.rad, r: o.x + o.rad, t: o.y - o.rad, b: o.y + o.rad };
+      if (schneidet(t, box)) aufMarker.push({ text: t.text, auf: o.was });
     }
     for (let i = 0; i < texte.length; i++) for (let j = i + 1; j < texte.length; j++) {
       if (schneidet(texte[i], texte[j])) textPaare.push({ a: texte[i].text, b: texte[j].text });
@@ -113,7 +147,7 @@ async function messe(page) {
     // Größter Abstand eines Labels zu SEINEM Objekt - die Kennzahl für die Zuordnung.
     const weiteste = texte.filter(t => t.abstandZumEigenen !== null)
       .sort((a, b) => b.abstandZumEigenen - a.abstandZumEigenen)[0] || null;
-    return { texte: texte.length, aufScheibe, textPaare, markerAufScheibe,
+    return { texte: texte.length, aufScheibe, aufMarker, textPaare, markerAufScheibe,
              weiteste: weiteste ? { text: weiteste.text, eigen: weiteste.eigen, abstand: +weiteste.abstandZumEigenen.toFixed(1) } : null };
   });
 }
@@ -129,7 +163,12 @@ async function messe(page) {
     research: {}, fleet: { jaeger: 100, missions: [] }, colonies: {}, activeBasePlanet: 'home',
     player: { id: 'u', name: 'A' }, xp: 52000, credits: 184000, buffs: [], lastTick: now,
     colonyNames: {}, colonyNotes: {},
-    nextPlanetEventCheck: now + 3600000   // Ereignis-Uhr pinnen (Hausregel 18)
+    // Asteroidenfestung im Heimatsystem - die zweite der drei Objektarten, die KB-16 noch nicht
+    // kannte (die dritte, Asteroiden, entsteht im Guertelsystem von selbst).
+    asteroidFeld: { kepler: { festung: { stufe: 2, kern: 200000, kernMax: 250000,
+                    hort: { sorte: 'urmaterie', menge: 5000, protomaterie: 40 } } } },
+    nextPlanetEventCheck: now + 3600000,  // Ereignis-Uhr pinnen (Hausregel 18)
+    nextTraderCheck: now + 3600000
   });
 
   check('0-vorab: die NPC-Systeme ließen sich aus NPCS lesen', NPC_SYSTEME.length >= 6,
@@ -186,12 +225,31 @@ async function messe(page) {
     // Sie wird NAMENTLICH zugelassen, nicht pauschal weggelassen: Jeder andere Fall - auch ein
     // zweiter im selben System - schlägt weiterhin an (Regel 33: erlaubte Stellen als Musterliste,
     // nie als blanke Zahl).
-    const BEKANNT = [{ system: 'kepler', text: 'Deine Basis', auf: 'rhea' }];
+    // Namentlich hinterlegte Faelle, nie pauschal ausgeblendet - jeder andere schlaegt an.
+    //
+    // 'Schwarmstock' auf 'vesna' kam mit KB-19 dazu, als drei Alien-Nester ins Fixture gingen, und
+    // ist GEMESSEN kein Fehler, sondern die Abwaegung aus KB-16: Alle drei Nest-Namen sitzen bei
+    // dy = -20,3 an ihrer natuerlichen Stelle ueber dem Marker; 'Sporenherd' wich um dx = 8
+    // seitlich aus, 'Schwarmstock' fand innerhalb des Deckels (21 senkrecht, danach 12 seitlich)
+    // keinen freien Platz und bleibt deshalb an seinem eigenen Objekt stehen. Eine ueberlappende
+    // Beschriftung ist ehrlicher als eine, die beim falschen Planeten steht - genau deshalb gibt
+    // es den Deckel. Wer ihn anhebt, prueft zuerst Abschnitt 4 (Abstand zum EIGENEN Objekt).
+    const BEKANNT = [
+      { system: 'kepler', text: 'Deine Basis', auf: 'rhea' },
+      { system: 'kepler', text: 'Schwarmstock', auf: 'vesna' }
+    ];
     const alleTreffer = offen.flatMap(e => e.aufScheibe.map(x => Object.assign({ system: e.system }, x)));
     const aufScheibe = alleTreffer.filter(t =>
       !BEKANNT.some(b => b.system === t.system && b.text === t.text && b.auf === t.auf));
     check(`1 (${name}): keine Beschriftung liegt auf einer fremden Planetenscheibe`,
       aufScheibe.length === 0, { neu: aufScheibe.slice(0, 6), bekannteAusnahmen: alleTreffer.length - aufScheibe.length });
+
+    // KB-19: kein Name auf einer Nest-/Festungs-/Asteroiden-/Marker-Scheibe. Bewusst OHNE
+    // Ausnahmeliste - hier ist bislang kein Fall bekannt, und ein leerer Deckel ist ehrlicher als
+    // eine vorsorglich geoeffnete Tuer.
+    const aufMarker = offen.flatMap(e => e.aufMarker.map(x => Object.assign({ system: e.system }, x)));
+    check(`1b (${name}): keine Beschriftung liegt auf einem fremden Marker (Nest, Festung, Asteroid, NPC)`,
+      aufMarker.length === 0, aufMarker.slice(0, 6));
 
     const paare = offen.flatMap(e => e.textPaare.map(x => Object.assign({ system: e.system }, x)));
     check(`2 (${name}): das Ausweichen erzeugt keine Text-auf-Text-Kollision`,
