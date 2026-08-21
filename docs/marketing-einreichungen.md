@@ -111,11 +111,30 @@ nützt.
 
 ### Max. 250 Zeichen
 
-> Browser-based space empire builder (German language). Expand your colony, research technologies,
-> build fleets and share one galaxy with all players. Idle progress continues offline. Free, no
-> download, no pay-to-win.
+> Browser-based space empire builder, in German. Expand your colony, research technologies, build
+> fleets and share one galaxy with every other player. Production keeps running while you are
+> offline. Free, no download, no pay-to-win.
 
-*(215 Zeichen)*
+*(230 Zeichen – die Grenze bei browsermmorpg.com liegt bei 250, reiner Text ohne Zeilenumbrüche)*
+
+### Lang, englisch (für das Feld „Long description" bei browsermmorpg.com – HTML erlaubt, keine Skripte)
+
+```html
+<h2>A space empire that runs in your browser</h2>
+<p>Kolonie Kepler-7 needs no client and no plugin. Your save lives on the server, so you continue on your desktop what you started on your phone. <strong>The game is in German.</strong></p>
+
+<h3>Build</h3>
+<p>You start with a single planet. Energy powers everything else; ore, crystals and deuterium are the raw materials; antimatter and research points open the demanding branches later. Every building level costs more and takes longer, so the question is never what you can build, but what you build first. Further out, a second economy tier waits: nano alloys, quantum chips and fusion cores are manufactured in dedicated factories and unlock the strongest ships and defences.</p>
+
+<h3>Research and fleets</h3>
+<p>The research tree runs from better solar panels to void technology and singularity physics, and it keeps progressing while you are away. More than twenty ship classes cover scouting, freight and combat — with counter roles, so massing a single type is rarely the best answer.</p>
+
+<h3>One shared galaxy</h3>
+<p>Every player moves through the same galaxy, and new star systems appear every Monday. Four NPC factions hold their own territory, expand on their own and wage war on each other — that continues on the server whether anyone is watching or not. Asteroid fortresses and alien nests are shared targets, alliances build a joint base, and world bosses cannot be brought down by a single fleet.</p>
+
+<h3>Free means free</h3>
+<p>No subscriptions, no loot boxes, no paid advantages. Donations unlock titles and colour schemes — never an edge in combat, production or the leaderboard. No tracking and no ads. New accounts get four days of beginner protection.</p>
+```
 
 ### Mittel
 

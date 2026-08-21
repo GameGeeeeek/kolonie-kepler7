@@ -37,7 +37,11 @@ function spielstand() {
     // bei diesen Gebäudestufen rund 20.3k je Grundstoff.
     resources: { energie: 12400, erz: 13800, kristalle: 9100, deuterium: 6400, antimaterie: 2900, forschungspunkte: 7300 },
     buildings: { solar: 24, mine: 22, kristallmine: 20, deuteriumsynth: 18, labor: 16, lager: 30, werft: 16, roboter: 14 },
-    research: { rlaser: 8, rschild: 7, rantrieb: 9, rspionage: 6 },
+    // Die drei Freischalt-Forschungen sind PFLICHT, nicht Deko: Ohne sie steht auf dem
+    // Verteidigungs-Bild jede einzelne Anlage auf "gesperrt" - acht Schlösser untereinander,
+    // und das war der erste Entwurf. Schlüssel gemessen aus RESEARCH_DEFS, nicht geraten.
+    research: { rlaser: 8, rschild: 7, rantrieb: 9, rspionage: 6,
+                rpanzer: 6, rschildmatrix: 5, rnanotech: 4 },
     fleet: { jaeger: 140, cruisers: 46, destroyers: 18, frachter: 30, missions: [] },
     colonies: {}, activeBasePlanet: 'home', player: { id: 'u', name: 'Kommandant', avatarKey: null },
     xp: 1.4e6, credits: 8e5, buffs: [], lastTick: jetzt, colonyNames: {}, modules: {}, shipModules: {},
@@ -71,7 +75,7 @@ const MOTIVE = [
   { datei: 'basis',        reiter: 'basis',        titel: 'Kolonie und Ausbau' },
   { datei: 'galaxie',      reiter: 'karte',        titel: 'Die geteilte Galaxie', scrollZu: '#galaxyMapSvg' },
   { datei: 'forschung',    reiter: 'forschung',    titel: 'Forschungsbaum',       scrollZu: '#research' },
-  { datei: 'flotte',       reiter: 'flotte',       titel: 'Werft und Flotte' },
+  { datei: 'flotte',       reiter: 'flotte',       titel: 'Werft und Flotte',    scrollZu: '#fleetSubWerft' },
   { datei: 'verteidigung', reiter: 'verteidigung', titel: 'Verteidigungsanlagen', scrollZu: '#defenseBuildings' },
 ];
 
