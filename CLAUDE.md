@@ -2751,14 +2751,46 @@ Weltboss-`catch` verschluckt nichts mehr — geprüft wird die URSACHE, nicht di
 `5`/`5b` gemessen im Spiel (die Karte nennt den Grund UND gilt nicht als Niederlage). Gegenprobe
 gegen v8.588.0: **6 rot bei identischen 23 Prüfnamen**.
 
+### Dritte Etappe: die fünf letzten Angreifer-Stellen — und der Nebeneffekt, der fast durchrutschte
+
+`resolvePlayerAttackMission` (drei Ausgänge: Ziel unter Schutzschild, Server lehnt ab, Verbindung
+weg) und der Allianzbasis-Angriff (zwei: Verbindung weg, Server lehnt ab) laufen jetzt ebenfalls
+über `angriffOhneKampf`. Alle fünf hingen an `showLog !== false` — beim **Offline-Nachholen**
+erfuhr der Spieler dort also gar nichts.
+
+**Der Nebeneffekt ist die eigentliche Lehre dieser Etappe.** Ein `keinKampf`-Bericht vom Typ
+`player-attack` fällt in `battleOutcomeOf` auf die Zeile
+
+```js
+if (r.type === 'npc-attack' || r.type === 'player-attack') return r.result === 'win' ? 'win' : 'loss';
+```
+
+— ein am Schutzschild **abgeprallter** Angriff wäre also als **Niederlage** in die Kampf-Bilanz
+gewandert. Gemessen an der ausgeführten Funktion: alter Stand `abgeprallt: "loss"`, neuer Stand
+`abgeprallt: null`. `if (r.keinKampf) return null;` steht deshalb ganz vorn, aus demselben Grund wie
+das `'escaped'` der Piraten sechs Zeilen darunter: **kein Kampf ist kein Ausgang.**
+
+Das ist Punkt 6 der Checkliste in seiner unangenehmsten Form: Nicht eine Anzeigestelle behielt die
+alte Annahme, sondern eine **Auswertung**, die einen neuen Zustand nach einer Regel beurteilte, die
+für ihn nie gedacht war. Wer ein neues Zustandsfeld einführt (`keinKampf`, `verpasst`, …), sucht
+deshalb jede Funktion, die nach `result`/`type` urteilt — nicht nur jede, die zeichnet.
+
+Wächter: Abschnitt 6 des Berichtspflicht-Tests, **ausgeführt** statt gegreppt (Hausregel 43) und
+mit der Gegenrichtung als eigener Zeile (`6b`: echter Sieg und echte Niederlage zählen weiterhin —
+sonst hätte die neue Zeile die ganze Bilanz stilllegen können).
+
 ### Was NOCH offen ist – gemessen, aber nicht behoben
 
-- **`attack-player`** hat drei Ausgänge, die die Flotte ohne Bericht heimschicken;
-  **`attack-alliance-base`** schweigt bei Netzfehler und Serverablehnung. Beide sind
-  strukturgleich zu den neun oben — `angriffOhneKampf` steht bereit, es fehlt nur der Aufruf.
-- **Verteidiger-Seiten ohne Bericht**: wer ausgespäht wird (nur Postfach-Meldung, während das
-  Störmanöver daneben einen echten Bericht erzeugt) und wer als Schürfrecht-Halter angefochten
-  wird.
+- **Wer als Schürfrecht-Halter angefochten wird, bekommt keinen Bericht.** Das ist die letzte
+  Stelle dieser Familie.
+
+**KORREKTUR zur eigenen Liste:** Hier stand „wer ausgespäht wird (nur Postfach-Meldung)" als
+Lücke. Nachgemessen ist das **keine**: Die Verteidiger-Benachrichtigung läuft über
+`storageSet('spyping:'+targetId, …)` **und eine eigene, abschaltbare Web-Push-Kategorie**. Der
+Spieler wird also benachrichtigt — nur nicht per Bericht, und das ist eine Gestaltungsentscheidung,
+keine stille Lücke. Der Eintrag stammte aus einem Prüf-Durchgang, dessen Urteil am Wochenlimit
+ausgefallen war; ich hatte ihn als „ungeprüft" markiert und trotzdem in der Liste geführt. **Ein
+ungeprüfter Befund gehört nicht in dieselbe Aufzählung wie ein gemessener** (Regel 10).
 
 **Ausdrücklich KEINE Lücke sind die Start-Prüfungen** (`sendAllianceBaseAttack` &Co.: „nicht genug
 Treibstoff", „alle Kampfschiffe im Einsatz", „Abklingzeit"). Dort ist die Flotte nie geflogen — ein

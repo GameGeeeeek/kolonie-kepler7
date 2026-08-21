@@ -259,6 +259,49 @@ const felder = t => ({
   check('5b: kein Kampf gilt NICHT als Niederlage', alsVerlust.length === 0,
     { alsVerlust: alsVerlust.map(t => t.slice(0, 60)) });
 
+  // ---- Abschnitt 6: ein abgeprallter Angriff zaehlt NICHT als verlorener Kampf ---------------
+  //
+  // Der Nebeneffekt, der beim Erweitern auf attack-player fast durchgerutscht waere: Ein
+  // `keinKampf`-Bericht vom Typ `player-attack` faellt in `battleOutcomeOf` auf die Zeile
+  //   if (r.type === 'npc-attack' || r.type === 'player-attack') return r.result === 'win' ? 'win' : 'loss';
+  // und haette einen am Schutzschild abgeprallten Angriff als NIEDERLAGE in die Kampf-Bilanz
+  // geschrieben. Gemessen wird die WIRKUNG (der Zaehler bewegt sich nicht), nicht die Zeile.
+  const bilanz = [
+    { id:'b1', time:Date.now(), type:'player-attack', keinKampf:true, ziel:'Gegner',
+      grund:'Das Ziel stand unter Angriffs-Schutzschild – der Angriff prallte ab.' }
+  ];
+  const ctx4 = await browser.newContext({ viewport:{ width:1100, height:1400 } });
+  const page4 = await ctx4.newPage();
+  await page4.route('**/api/**', backend(bilanz));
+  await page4.addInitScript(() => { localStorage.setItem('kepler7_token','tok'); });
+  await page4.goto(SPIEL_URL);
+  await page4.waitForTimeout(2500);
+
+  // Der Block wird aus der Spieldatei geschnitten und AUSGEFUEHRT - "der Code sieht richtig aus"
+  // ist kein Beleg (Hausregel 43). Der Aufbau liegt in try/catch und meldet sich als eigene,
+  // benannte Pruefung, statt den Testlauf zu beenden (Hausregel 34).
+  let bilanzUrteile = null, bauFehler = null;
+  try {
+    const a = OHNE_HISTORIE.indexOf('  function battleOutcomeOf(r){');
+    const b = OHNE_HISTORIE.indexOf('\n  }', a);
+    const rumpf = OHNE_HISTORIE.slice(a, b + 4);
+    const fn = new Function('return (' + rumpf.trim().replace(/^function /, 'function ') + ')')();
+    bilanzUrteile = {
+      abgeprallt: fn({ type:'player-attack', keinKampf:true }),
+      echterSieg: fn({ type:'player-attack', result:'win' }),
+      echteNiederlage: fn({ type:'player-attack', result:'loss' })
+    };
+  } catch(e){ bauFehler = String(e.message || e); }
+
+  check('6-bau: battleOutcomeOf laesst sich schneiden und ausfuehren', bauFehler === null, { bauFehler });
+  check('6: ein abgeprallter Angriff zaehlt gar nicht in die Kampf-Bilanz',
+    bilanzUrteile !== null && bilanzUrteile.abgeprallt === null, { bilanzUrteile });
+  // Gegenrichtung: Die echten Ausgaenge muessen unveraendert zaehlen, sonst haette die neue Zeile
+  // die ganze Bilanz stillgelegt (Hausregel 33).
+  check('6b: echter Sieg und echte Niederlage zaehlen weiterhin',
+    bilanzUrteile !== null && bilanzUrteile.echterSieg === 'win' && bilanzUrteile.echteNiederlage === 'loss', { bilanzUrteile });
+
+  await ctx4.close();
   await ctx3.close();
   await ctx.close(); await ctx2.close(); await browser.close();
   await ende();
