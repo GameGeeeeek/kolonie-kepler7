@@ -514,14 +514,16 @@ async function aufKarte(t){
   const mess9 = await t9.page.evaluate(() => {
     const m = document.querySelector('.kmenu');
     if (!m) return { menue:false, balken:[], zeilen:[] };
-    const balken = [...m.querySelectorAll('.sstat')].map(b => {
-      const schiene = b.querySelector('.tr'), fuell = b.querySelector('.tr i');
-      const rs = schiene ? schiene.getBoundingClientRect() : null;
+    /* GR-3: die HAUSFORM .progress-outer, dieselbe wie beim Asteroiden-Vorrat nebenan. Gegenstand
+       ist der ANTEIL der Fuellung an der Schiene - der bleibt gleich streng, egal wie der Balken
+       heisst. */
+    const balken = [...m.querySelectorAll('.progress-outer')].map(b => {
+      const fuell = b.querySelector('.progress-inner');
+      const rs = b.getBoundingClientRect();
       const rf = fuell ? fuell.getBoundingClientRect() : null;
       return {
-        wert: (b.querySelector('.v')||{}).textContent || '',
-        hoehe: Math.round(b.getBoundingClientRect().height),
-        anteil: (rs && rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
+        hoehe: Math.round(rs.height),
+        anteil: (rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
         imGriff: !!b.closest('details') && !(b.closest('details')||{}).open
       };
     });
@@ -540,6 +542,15 @@ async function aufKarte(t){
     mess9.balken.length === 3 && mess9.balken.every((b, i) => b.anteil !== null && Math.abs(b.anteil - erwartet9[i]) < 0.05),
     { gemessen: mess9.balken.map(b => b.anteil), erwartet: erwartet9.map(x => +x.toFixed(3)),
       hinweis: 'drei gleiche Anteile heissen: die Balken messen nicht, sie stehen nur da' });
+  /* GR-3 macht die Pruefung SCHAERFER, nicht passend (Hausregel 43): Seit der Prozentwert in der
+     ZEILE steht statt im Balken, koennen Zahl und Balken auseinanderlaufen - vorher war das
+     bauartbedingt unmoeglich. Gemessen werden alle drei Paare auf einmal. */
+  const pcts9 = (mess9.zeilen || []).map(z => (z.match(/\((\d+)%\)/) || [])[1]).filter(x => x !== undefined).map(Number);
+  check('7b2: die drei Prozentzahlen der Zeilen stimmen mit den gezeichneten Balken überein',
+    pcts9.length === 3 && mess9.balken.length === 3
+      && pcts9.every((p, i) => mess9.balken[i].anteil !== null && Math.abs(p/100 - mess9.balken[i].anteil) < 0.02),
+    { zeilenProzent: pcts9, balkenAnteile: mess9.balken.map(b => b.anteil) });
+
   const hort9 = (mess9.zeilen || []).find(z => /^Hort:/.test(z)) || '';
   check('7c: die Hortzeile nennt die Kampfpunkte samt Verteilungsregel',
     /Kampfpunkte/.test(hort9) && /Schadensanteil/.test(hort9), { zeile: hort9 });

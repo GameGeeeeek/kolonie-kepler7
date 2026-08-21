@@ -108,18 +108,19 @@ async function balkenMessen(page){
   return page.evaluate(() => {
     const m = document.querySelector('.kmenu');
     if (!m) return { menue:false, balken:[], text:'' };
-    const balken = [...m.querySelectorAll('.sstat')].map(b => {
-      const schiene = b.querySelector('.tr'), fuell = b.querySelector('.tr i');
-      const rs = schiene ? schiene.getBoundingClientRect() : null;
+    /* GR-3: Gemessen wird die HAUSFORM .progress-outer - dieselbe, die der Asteroiden-Vorrat
+       nebenan seit v8.512.0 benutzt. Nicht die Klasse ist der Gegenstand, sondern der ANTEIL:
+       Wie viel von der Schiene ist gefuellt? Das bleibt gleich streng, egal wie der Balken
+       heisst. */
+    const balken = [...m.querySelectorAll('.progress-outer')].map(b => {
+      const fuell = b.querySelector('.progress-inner');
+      const rs = b.getBoundingClientRect();
       const rf = fuell ? fuell.getBoundingClientRect() : null;
-      const rb = b.getBoundingClientRect();
       return {
-        label: (b.querySelector('.k')||{}).textContent || '',
-        wert: (b.querySelector('.v')||{}).textContent || '',
-        hoehe: Math.round(rb.height),
-        schienenBreite: rs ? Math.round(rs.width) : 0,
+        hoehe: Math.round(rs.height),
+        schienenBreite: Math.round(rs.width),
         fuellBreite: rf ? Math.round(rf.width) : 0,
-        anteil: (rs && rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
+        anteil: (rs.width > 0 && rf) ? +(rf.width / rs.width).toFixed(3) : null,
         imGriff: !!b.closest('details') && !(b.closest('details')||{}).open
       };
     });
@@ -270,16 +271,26 @@ async function aufKarte(t){
   const bB = await balkenMessen(t4.page);
   await t4.ctx.close();
 
-  const restA = (bA.balken||[]).find(b => /Rest/.test(b.label));
-  const restB = (bB.balken||[]).find(b => /Rest/.test(b.label));
-  check('6-vorab: beide Laeufe haben ein offenes Kartenmenü mit einem Rest-Balken',
-    bA.menue && bB.menue && !!restA && !!restB,
-    { menueA: bA.menue, menueB: bB.menue, labelA: (bA.balken||[]).map(b=>b.label), labelB: (bB.balken||[]).map(b=>b.label) });
+  // Seit GR-3 traegt der Balken kein Label mehr - die Zuordnung macht die Zeile darueber,
+  // und im Nest-Menue gibt es genau einen (das prueft 6-vorab).
+  const restA = (bA.balken||[])[0];
+  const restB = (bB.balken||[])[0];
+  check('6-vorab: beide Laeufe haben ein offenes Kartenmenü mit genau einem Füllbalken',
+    bA.menue && bB.menue && !!restA && !!restB && (bA.balken||[]).length === 1,
+    { menueA: bA.menue, menueB: bB.menue, anzahlA: (bA.balken||[]).length, anzahlB: (bB.balken||[]).length });
   check('6a: der Balken ist SICHTBAR und nicht hinter dem Details-Griff',
     !!restA && restA.hoehe > 0 && restA.schienenBreite > 10 && !restA.imGriff, restA);
   check('6b: seine Fuellung entspricht dem Lebenspunkte-Anteil der Fixture (65 %)',
     !!restA && restA.anteil !== null && Math.abs(restA.anteil - 260000/400000) < 0.05,
-    { gemessen: restA && restA.anteil, erwartet: +(260000/400000).toFixed(3), wertText: restA && restA.wert });
+    { gemessen: restA && restA.anteil, erwartet: +(260000/400000).toFixed(3) });
+  /* GR-3 macht die Pruefung SCHAERFER, nicht passend (Hausregel 43): Seit der Prozentwert in der
+     ZEILE steht statt im Balken, koennen Zahl und Balken auseinanderlaufen - vorher war das
+     bauartbedingt unmoeglich. Genau das wird jetzt gemessen. */
+  const zeileA = (bA.zeilen || []).find(z => /Lebenspunkte/.test(z)) || '';
+  const pctA = (zeileA.match(/\((\d+)%\)/) || [])[1];
+  check('6b2: die Prozentzahl in der Zeile stimmt mit dem gezeichneten Balken überein',
+    pctA !== undefined && !!restA && restA.anteil !== null && Math.abs(+pctA/100 - restA.anteil) < 0.02,
+    { zeile: zeileA, prozentText: pctA, balkenAnteil: restA && restA.anteil });
   check('6c: ein anderer Stand ergibt einen ANDEREN Balken (10 % statt 65 %)',
     !!restA && !!restB && restB.anteil !== null && Math.abs(restB.anteil - 4000/40000) < 0.05
       && Math.abs(restA.anteil - restB.anteil) > 0.2,

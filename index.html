@@ -7190,8 +7190,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.603.0';
+  const VERSION = '8.604.0';
   const PATCHNOTES = [
+    { version:'8.604.0', date:'21.08.2026', changes:[
+      '<strong>Die Füllbalken im Kartenmenü sehen jetzt überall gleich aus.</strong> Zwei Auslieferungen zuvor hatten Alien-Nest und Asteroidenfestung schmale Balken mit Beschriftung bekommen – daneben, im selben Menü, zeichnet der Asteroiden-Vorrat seit Längerem einen breiten. Zwei Formen für dieselbe Sache. Es ist jetzt die breite, und der Prozentwert steht in der Zeile darüber, wo bei der Angriffs-Vorschau ohnehin schon einer stand.',
+      'Der Anlass war ein Blick auf den eigenen Bildschirm: Die Beschriftung lautete bei allen drei Festungsbalken „Rest" und unterschied sie damit überhaupt nicht – und genau das war der einzige Grund gewesen, die schmale Form zu wählen. Am Asteroiden ändert sich nichts Sichtbares; er zeichnet nur nicht mehr sein eigenes Markup, sondern benutzt dieselbe Stelle wie alle anderen.'
+    ] },
     { version:'8.603.0', date:'21.08.2026', changes:[
       '<strong>Die Seite ruckt nicht mehr unter dir weg, wenn oben ein Banner auftaucht oder abläuft.</strong> Bisher galt: Läuft weit über deiner Lesestelle ein Ereignis-Banner ab, verschwinden dessen 138 Pixel – und alles darunter rutscht um genau diesen Betrag nach oben. Die Seite scrollt dabei nicht, der Inhalt wandert. Wer gerade eine Zeile las, las danach eine andere; ein angesprungener Abschnitt konnte sogar halb aus dem Bild rutschen.',
       'Das Spiel gleicht solche Höhenänderungen jetzt aus – aber <strong>nur, wenn sie komplett außerhalb deines Bildschirmausschnitts liegen</strong>. Siehst du das Banner selbst, bleibt alles wie es war: Dort wäre ein Ausgleich genau der Sprung, den er verhindern soll. Betroffen waren neben dem Ereignis-Banner auch die Reiter-Hinweisleiste (bis 302 Pixel) und die Tagesaufgaben-Leiste (bis 146).',
@@ -21717,33 +21721,33 @@
       + row('Schild', sh, m.shield, '#5ce1ff', 'Schildpunkte je Stufe (40% der Verteidigung, zählt zusätzlich)')
       + '</div>';
   }
-  /* GR-2: Ein FUELLSTANDS-Balken fuer die Kartenmenues (Nest-Lebenspunkte, Festungs-Kern und
-     ihre Bauteile). Bis hierher stand dort nur eine Zahl mit Prozentwert in Klammern - lesbar,
-     aber nicht auf einen Blick erfassbar, und die Festung listete gleich vier solcher Zeilen
-     untereinander.
-     Er nutzt bewusst DIESELBE .sstat-Bildsprache wie Schiffe und Verteidigungsanlagen. Eine
-     zweite Balken-Klasse waere die typische zweite Anzeigestelle, die beim naechsten Umbau
-     auseinanderlaeuft - VT-1 hat das fuer die Verteidigungskarten ausdruecklich so entschieden.
-     DER UNTERSCHIED ZU defenseStatBarsHtml/shipStatBarsHtml STEHT IM TITEL und muss dort stehen
-     bleiben: Dort misst der Balken einen VERGLEICH (Anteil am staerksten Wert der Klasse), hier
-     einen FUELLSTAND (was von einem Ziel noch steht). Gleiche Form, andere Bezugsgroesse - wer das
-     verwechselt, liest einen kurzen Balken als "schwache Anlage" statt als "fast zerstoert".
-     Rechts steht der PROZENTWERT, nicht die absolute Zahl: .v ist 30 px breit, "1.200.000" passt
-     dort nicht. Die genauen Zahlen bleiben in der Textzeile daneben - der Balken beantwortet
-     "wie viel steht noch", die Zeile "wie viel genau".
-     Die Farbe wird geprueft statt durchgereicht. Sie kommt heute aus zwei Frontend-Tabellen
-     (ALIEN_VOELKER, FESTUNG_BAUTEILE), also aus dem Haus - aber ein Attributwert ohne Pruefung ist
-     genau die Stelle, an der ein spaeterer Serverwert das Markup aufbricht (bei GR-1 ist mir das
-     mit dem Systemnamen im data-Attribut passiert). */
-  function kartenFuellBalken(label, wert, max, farbe, tip){
+  /* GR-2/GR-3: Ein FUELLSTANDS-Balken fuer die Kartenmenues (Nest-Lebenspunkte, Festungs-Kern
+     und seine Bauteile, Asteroiden-Vorrat). Bis GR-2 stand dort nur eine Zahl mit Prozentwert in
+     Klammern - lesbar, aber nicht auf einen Blick erfassbar, und die Festung listete gleich vier
+     solcher Zeilen untereinander.
+     ER NUTZT DIE HAUSFORM .progress-outer/.progress-inner, nicht die .sstat-Kennwertform der
+     Werft. Das ist die Korrektur eines Fehlers aus GR-2, und die Begruendung gehoert hierher,
+     damit sie niemand zurueckdreht: Gemessen zeichnet das Spiel Fuellstaende an 60 Stellen mit
+     .progress-outer und nur an dreien mit .sstat - und die naechste dieser 60 steht direkt
+     nebenan im SELBEN Menue-Typ (der Asteroiden-Vorrat seit v8.512.0). Das Argument fuer die
+     schmale Form war, dass drei Leisten ohne Beschriftung nicht auseinanderzuhalten sind; im
+     gerenderten Bild hiess das Label aber dreimal "Rest" und trennte damit gar nichts (Regel 42:
+     gesehen, nicht gelesen). Die Zuordnung traegt stattdessen die Zeile UEBER dem Balken, und
+     dort steht seit GR-3 auch der Prozentwert - genau das Muster, das der Asteroid schon hatte.
+     .sstat bleibt, wo es hingehoert: bei Werft und Verteidigung misst ein Balken einen VERGLEICH
+     (Anteil am staerksten Wert der Klasse), hier einen FUELLSTAND (was von einem Ziel noch
+     steht). Wer das verwechselt, liest einen kurzen Balken als "schwache Anlage" statt als
+     "fast zerstoert" - deshalb sind es zwei Formen und nicht eine ueber alles.
+     Die Farbe wird geprueft statt durchgereicht. Sie kommt heute aus drei Frontend-Tabellen
+     (ALIEN_VOELKER, FESTUNG_STUFEN, FESTUNG_BAUTEILE) plus der Asteroidengroesse, also aus dem
+     Haus - aber ein Attributwert ohne Pruefung ist genau die Stelle, an der ein spaeterer
+     Serverwert das Markup aufbricht (bei GR-1 ist mir das mit dem Systemnamen passiert). */
+  function kartenFuellBalken(wert, max, farbe, tip){
     const m = Math.max(1, max || 0);
     const w = Math.max(0, Math.min(m, wert || 0));
-    const pct = (w / m) * 100;
     const col = /^#[0-9a-fA-F]{3,8}$/.test(String(farbe || '')) ? farbe : '#7f77dd';
-    return '<div class="sstat" style="margin-top:3px;" title="' + escapeHtml(tip || '') + '">'
-      + '<span class="k">' + escapeHtml(String(label)) + '</span>'
-      + '<span class="tr"><i style="width:' + pct.toFixed(1) + '%; background:' + col + ';"></i></span>'
-      + '<span class="v">' + Math.round(pct) + '%</span></div>';
+    return '<div class="progress-outer" title="' + escapeHtml(tip || '') + '">'
+      + '<div class="progress-inner" style="width:' + ((w / m) * 100).toFixed(1) + '%; background:' + col + ';"></div></div>';
   }
   // Vier Kennwerte als beschriftete Mikro-Balken statt einer Fliesstext-Zeile mit Mitteldots.
   //
@@ -59109,8 +59113,8 @@
       : (nest.stufe >= 5 ? '<div class="bmeta"><i class="ti ti-trophy" aria-hidden="true"></i> Fällt sie, zerfällt der ganze Schwarm dieses Volkes.</div>' : '');
     openKarteMenu(ev, v.name + ' – ' + stDef.name, 'Alien-Nest',
       eintraege,
-      `<div class="bmeta"><i class="ti ti-alien" aria-hidden="true" style="color:${v.farbe};"></i> Lebenspunkte <strong>${fmt(Math.round(nest.lp||0))}</strong> von ${fmt(nest.lpMax||0)}</div>`
-      + kartenFuellBalken('Rest', nest.lp||0, nest.lpMax||0, v.farbe,
+      `<div class="bmeta"><i class="ti ti-alien" aria-hidden="true" style="color:${v.farbe};"></i> Lebenspunkte <strong>${fmt(Math.round(nest.lp||0))}</strong> von ${fmt(nest.lpMax||0)} (${Math.round(((nest.lp||0)/Math.max(1,nest.lpMax||0))*100)}%)</div>`
+      + kartenFuellBalken(nest.lp||0, nest.lpMax||0, v.farbe,
           'Wie viel vom Nest noch steht - nicht ein Vergleich mit anderen Nestern.')
       + nestBergungZeile(stDef)
       + (v.schwaeche ? `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Wirksam dagegen: <strong>${escapeHtml(nestSchwaecheName(v.schwaeche))}</strong> im Verband</div>` : '')
@@ -59152,8 +59156,8 @@
     if ((fest.hortProto||0) > 0) hort.push(fmt(Math.floor(fest.hortProto)) + ' Protomaterie');
     openKarteMenu(ev, st.name, 'Asteroidenfestung',
       eintraege,
-      `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)}</div>`
-      + kartenFuellBalken('Rest', fest.kern||0, kernMax, st.farbe,
+      `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(fest.kern||0))}</strong> von ${fmt(kernMax)} (${Math.round(anteil*100)}%)</div>`
+      + kartenFuellBalken(fest.kern||0, kernMax, st.farbe,
           'Wie viel vom Kern noch steht - faellt er, faellt die Festung.')
       + `<div class="bmeta"><i class="ti ti-lock" aria-hidden="true"></i> Drosselt im ganzen System: Abbau &minus;${Math.round(st.blockade*100)}%, Protomaterie &minus;${Math.round(st.proto*100)}%</div>`
       + Object.keys(FESTUNG_BAUTEILE).map(k => {
@@ -59162,9 +59166,9 @@
           const spec = FESTUNG_BAUTEILE[k];
           const pct = Math.max(0, Math.min(100, Math.round(((t.lp||0) / Math.max(1, t.lpMax||1)) * 100)));
           return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true" style="color:${spec.farbe};"></i> `
-               + `${escapeHtml(spec.name)}: ${(t.lp||0) > 0 ? `<strong>${fmt(Math.round(t.lp))}</strong> von ${fmt(t.lpMax||0)}` : '<strong>zerstört</strong>'}`
+               + `${escapeHtml(spec.name)}: ${(t.lp||0) > 0 ? `<strong>${fmt(Math.round(t.lp))}</strong> von ${fmt(t.lpMax||0)} (${pct}%)` : '<strong>zerstört</strong>'}`
                + `${(t.lp||0) > 0 ? ' – ' + escapeHtml(spec.wirkung) : ''}</div>`
-               + ((t.lp||0) > 0 ? kartenFuellBalken('Rest', t.lp||0, t.lpMax||0, spec.farbe,
+               + ((t.lp||0) > 0 ? kartenFuellBalken(t.lp||0, t.lpMax||0, spec.farbe,
                    'Wie viel von diesem Bauteil noch steht.') : '');
         }).join('')
       + `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Hort: ${hort.length ? escapeHtml(hort.join(' · ')) + ' · ' : ''}${fmt(st.kampfpunkte)} Kampfpunkte – beim Fall nach Schadensanteil geteilt</div>`);
@@ -59257,7 +59261,7 @@
     const resTeile = Object.entries(so.res || {}).map(([rk, teil]) =>
       '<span style="white-space:nowrap;">' + miniResIcon(rk) + ' ' + Math.round(teil * 100) + '%</span>').join('');
     const infoHtml = '<div class="kmenu-info-res">' + resTeile + '</div>'
-      + '<div class="progress-outer"><div class="progress-inner" style="width:' + Math.round(anteil * 100) + '%; background:' + g.farbe + ';"></div></div>'
+      + kartenFuellBalken(a.vorrat || 0, g.vorrat, g.farbe, 'Wie viel vom Vorrat dieses Brockens noch da ist.')
       + '<div class="kmenu-info-zahl">Vorrat: ' + fmt(a.vorrat) + ' von ' + fmt(g.vorrat) + ' (' + Math.round(anteil * 100) + '%)</div>';
     const zeile = asteroidName(a)
       + (a.peilung ? ' · noch ' + Math.ceil(peilungRestTage(a)) + ' Tage gültig' : '')
