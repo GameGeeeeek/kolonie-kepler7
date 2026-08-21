@@ -22,7 +22,10 @@
 // Freischaltbedingung einbaut, wird hier rot - sonst baut er wieder eine stumme Sperre.
 const fs = require('fs');
 const path = require('path');
-const SPIELDATEI = path.join(__dirname, '..', 'weltraum_kolonie.html');
+// Pfad ueber die gemeinsame Quelle, nicht fest verdrahtet: Sonst wird KEPLER_SPIELDATEI
+// still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
+// bestanden (CLAUDE.md, Korrektur zu Regel 14).
+const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 

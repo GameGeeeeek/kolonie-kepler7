@@ -28,7 +28,7 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 
 // ---- Teil 1: statisch - kein nackter Statuscode mehr an den beiden Ladestellen
 {
-  const js = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
+  const js = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
   check('adminListenFehler() existiert', /function adminListenFehler\(/.test(js));
   // Die beiden Ladefunktionen dürfen den Status nicht mehr selbst in die Box schreiben.
   const roh = [...js.matchAll(/Liste konnte nicht geladen werden \(\$\{res\.status\}\)/g)];

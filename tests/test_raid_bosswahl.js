@@ -22,8 +22,11 @@ const path = require('path');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const SPIEL = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
-const SERVER_PFAD = path.join(__dirname, '..', '..', 'kolonie-kepler7-backend', 'server.js');
+// Pfad ueber die gemeinsame Quelle: sonst wird KEPLER_SPIELDATEI still ignoriert und eine
+// Gegenprobe liest die ECHTE Datei (CLAUDE.md, Korrektur zu Regel 14).
+const { SPIELDATEI, SERVER_JS } = require('./lib/spieldatei');
+const SPIEL = fs.readFileSync(SPIELDATEI, 'utf8');
+const SERVER_PFAD = SERVER_JS || path.join(__dirname, '..', '..', 'kolonie-kepler7-backend', 'server.js');
 if (!fs.existsSync(SERVER_PFAD)){ console.log('UEBERSPRUNGEN - Backend-Repo liegt nicht daneben'); process.exit(0); }
 const SERVER = fs.readFileSync(SERVER_PFAD, 'utf8');
 

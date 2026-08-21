@@ -29,7 +29,7 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 // `#1d3242` in der Eis-Zeile), und der Syntax-Check sieht es nicht - es ist eine gültige
 // Zeichenkette. Diese drei Prüfungen kosten nichts und decken alle zwölf Zeilen ab.
 {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'weltraum_kolonie.html'), 'utf8');
+  const src = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
   const a = src.indexOf('var ORT_STIL = {');
   const b = src.indexOf('\n    };', a);
   check('Stiltabelle ORT_STIL gefunden', a >= 0 && b > a);
