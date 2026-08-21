@@ -57,8 +57,8 @@ const SAVE = JSON.stringify({
   nextPlanetEventCheck: now + 3600000, nextTraderCheck: now + 3600000
 });
 
-async function messe(browser, viewport, mobil){
-  const ctx = await browser.newContext(Object.assign({ viewport }, mobil ? { hasTouch:true, isMobile:true, deviceScaleFactor:2 } : {}));
+async function messe(browser, viewport, mobil, extra){
+  const ctx = await browser.newContext(Object.assign({ viewport }, mobil ? { hasTouch:true, isMobile:true, deviceScaleFactor:2 } : {}, extra || {}));
   const page = await ctx.newPage();
   const fehler = [];
   page.on('pageerror', e => fehler.push('pageerror: ' + e));
@@ -108,6 +108,9 @@ async function messe(browser, viewport, mobil){
       // und die Pruefung darauf trivial erfuellt - eine leere Messung saehe aus wie ein bestandener
       // Test (Hausregel 37: die Bedingung selbst gehoert geprueft).
       scheibenGemessen,
+      // Fuer Abschnitt 3: wieviel BEWEGUNG traegt das Portal, und wieviel ZEICHNUNG?
+      animationen: g.querySelectorAll('animate, animateTransform, animateMotion').length,
+      formen: g.querySelectorAll('circle, ellipse, path').length,
       beschriftet: !!t
     };
   });
@@ -155,6 +158,71 @@ async function messe(browser, viewport, mobil){
     check('2b: und liegt auch dort auf keiner Planetenscheibe',
       typeof handy.abstandZurNaechstenScheibe === 'number' && handy.abstandZurNaechstenScheibe > 0, handy);
   }
+
+  /* ---- 3) Wer Bewegung abbestellt hat, bekommt das Portal STATISCH ---------------------------
+     Die Spieldatei hat 20+ CSS-Regeln fuer prefers-reduced-motion, und galaxyCamFahre respektiert
+     es ausdruecklich ("dieselbe Regel wie ueberall sonst im Spiel"). SMIL-Animationen im SVG
+     erreicht CSS aber NICHT - `animation:none` gilt fuer sie nicht. Das Portal ist mit 36
+     Animationen das einzige Kartenobjekt, bei dem das ins Gewicht faellt: Unter 4-facher
+     CPU-Drosselung gemessen (drei Durchgaenge, Ausschluss-Messung nach dem Muster von KB-9a) kostet
+     es 4.478 bis 8.600 ms Long Tasks je 10 s gegen stabile 1.083 bis 1.330 ohne Portal.
+     Geprueft wird als PAAR: keine Bewegung UND die Zeichnung trotzdem vollstaendig. Die erste
+     Haelfte allein waere auch dann erfuellt, wenn das Portal gar nicht mehr gezeichnet wuerde -
+     genau die Sorte Gruen, die nichts belegt (Hausregel 28). */
+  const ruhig = await messe(browser, { width: 1280, height: 900 }, false, { reducedMotion: 'reduce' });
+  check('3-vorab: das Portal wird auch bei abbestellter Bewegung gezeichnet', ruhig.da === true, ruhig);
+  if (ruhig.da && pc.da){
+    check('3: bei prefers-reduced-motion laeuft keine einzige Animation',
+      ruhig.animationen === 0, { animationen: ruhig.animationen });
+    check('3b: und die Zeichnung ist dabei vollstaendig (gleich viele Formen wie mit Bewegung)',
+      ruhig.formen > 20 && ruhig.formen === pc.formen,
+      { ohneBewegung: ruhig.formen, mitBewegung: pc.formen });
+    // Die Gegenrichtung: Ohne die Einstellung MUSS sich das Portal bewegen - sonst haette man die
+    // Animationen schlicht entfernt und die Pruefung darueber waere sinnlos (Hausregel 28).
+    check('3c: ohne die Einstellung bewegt sich das Portal weiterhin',
+      pc.animationen >= 20, { animationen: pc.animationen });
+  }
+
+  /* ---- 4) Die Ebenen-Leiste schaltet das Portal wirklich ab ----------------------------------
+     Zwei Anzeigestellen versprechen das seit jeher: der Tooltip des Knopfes ("Ereignis-Abzeichen
+     (Piratenbasis, Aliens, Krieg) und Wurmloch ein-/ausblenden") und der Hilfe-Abschnitt
+     ("Ereignisse (Piratenbasis, Aliens, Krieg, Wurmloch) ... lassen sich einzeln aus- und
+     einschalten"). Der Code tat es bis zum 21.08.2026 NICHT - das 🌀-Abzeichen war gegated, das
+     Portal selbst nicht. Punkt 6 der Checkliste in Reinform.
+     Gemessen als PAAR und ueber den SPIELERWEG (Klick auf den Knopf), nicht ueber einen Griff in
+     den Spielstand: "weg" allein waere auch von einem Portal erfuellt, das es gar nicht gibt. */
+  const ctxE = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const pageE = await ctxE.newPage();
+  const fehlerE = [];
+  pageE.on('pageerror', e => fehlerE.push('pageerror: ' + e));
+  await pageE.route('**/api/**', backend({ 'kepler7-save-v3': SAVE }));
+  await pageE.addInitScript(() => { localStorage.setItem('kepler7_token','tok'); });
+  await pageE.goto(SPIEL_URL);
+  await pageE.waitForTimeout(2400);
+  await pageE.evaluate(() => {
+    ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay',
+     'kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay']
+      .forEach(id => { const o = document.getElementById(id); if (o) o.style.display='none'; });
+    const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click();
+  });
+  await pageE.waitForTimeout(1400);
+  await oeffneSystemUeberSektoren(pageE, 'kepler');
+  await pageE.waitForTimeout(1400);
+  const daVorher = await pageE.evaluate(() => !!document.querySelector('#galaxyMapSvg [data-map-wurmloch]'));
+  const knopfDa = await pageE.evaluate(() => !!document.querySelector('[data-karte-ebene="ereignisse"]'));
+  await pageE.evaluate(() => { const b = document.querySelector('[data-karte-ebene="ereignisse"]'); if (b) b.click(); });
+  await pageE.waitForTimeout(1600);
+  const daAus = await pageE.evaluate(() => !!document.querySelector('#galaxyMapSvg [data-map-wurmloch]'));
+  await pageE.evaluate(() => { const b = document.querySelector('[data-karte-ebene="ereignisse"]'); if (b) b.click(); });
+  await pageE.waitForTimeout(1600);
+  const daWieder = await pageE.evaluate(() => !!document.querySelector('#galaxyMapSvg [data-map-wurmloch]'));
+  await ctxE.close();
+  check('4-vorab: Boot ohne Skriptfehler und der Ebenen-Knopf existiert',
+    fehlerE.length === 0 && knopfDa, { fehler: fehlerE.slice(0,2), knopfDa });
+  check('4-vorab: das Portal steht da, bevor die Ebene abgeschaltet wird', daVorher === true, { daVorher });
+  check('4: der Ebenen-Knopf "Ereignisse" blendet das Wurmloch-Portal aus',
+    daAus === false, { daVorher, daAus });
+  check('4b: und wieder ein - die Gegenrichtung', daWieder === true, { daAus, daWieder });
 
   await ende(async () => browser.close());
 })();

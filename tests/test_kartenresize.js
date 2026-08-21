@@ -145,16 +145,60 @@ async function lauf(browser, store, start, ziel) {
     await page.setViewportSize(ziel);
     await page.waitForTimeout(1600);          // 220 ms Entprellung plus ein Tick Luft
     nachher = await page.evaluate(ZUSTAND);
-    /* Der dritte Messpunkt ist der eigentliche Beweis: Ohne Nachzug sieht direkt nach der
-       Größenänderung noch alles unauffällig aus - erst der nächste Neuaufbau löst die drei
-       auseinandergelaufenen Entscheidungen auf einmal ein. Ein Zoom-Klick ist die billigste
-       Handlung, die einen solchen Neuaufbau auslöst. */
-    await page.evaluate(() => { const b = document.getElementById('galaxyZoomInBtn'); if (b) b.click(); });
-    await page.waitForTimeout(1400);
-    nachNeuaufbau = await page.evaluate(ZUSTAND);
   }
+  /* Der dritte Messpunkt ist der eigentliche Beweis: Ohne Nachzug sieht direkt nach der
+     Größenänderung noch alles unauffällig aus - erst der nächste Neuaufbau löst die drei
+     auseinandergelaufenen Entscheidungen auf einmal ein. Ein Zoom-Klick ist die billigste
+     Handlung, die einen solchen Neuaufbau auslöst.
+     Er läuft BEWUSST auch im Kontrolllauf: Prüfung 2 vergleicht die zwei Ergebnisse gegeneinander,
+     und ohne diesen Klick gäbe es auf der Kontrollseite gar keinen Wert - der erste Entwurf
+     verglich deshalb gegen die eingetippte Zahl 2, während der Kommentar daneben eine Kontrolle
+     behauptete (Hausregel 2/28, gefunden in der Durchsicht). */
+  await page.evaluate(() => { const b = document.getElementById('galaxyZoomInBtn'); if (b) b.click(); });
+  await page.waitForTimeout(1400);
+  nachNeuaufbau = await page.evaluate(ZUSTAND);
   await ctx.close();
   return { vorher, nachher, nachNeuaufbau, fehler: fehler.slice(0, 2) };
+}
+
+/* Der Wächter für KB-20f: Überlebt der vom Spieler eingestellte Zoom eine Größenänderung?
+   Zoom und Verschiebung leben ausschließlich in `galaxyMapViewBox`, und `galaxyCamFahre(true)`
+   ersetzt dieses Objekt durch den Vorgabe-Ausschnitt. KB-20e rief das bei JEDEM resize - am PC
+   also bei jedem Ziehen am Fensterrahmen, am Handy schon beim Auf- und Zuklappen der
+   Bildschirmtastatur. Gemessen wird die viewBox-BREITE: Sie IST die Zoomstufe. Die Höhe darf und
+   soll sich ändern, sie folgt dem Kastenverhältnis. */
+async function zoomLauf(browser, store, start, ziel) {
+  const ctx = await browser.newContext({ viewport: start });
+  const page = await ctx.newPage();
+  const fehler = [];
+  page.on('pageerror', e => fehler.push('pageerror: ' + e));
+  await page.route('**/api/**', backend(store));
+  await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  await page.goto(DATEI);
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => {
+    ['tutorialOverlay', 'welcomeNewOverlay', 'welcomeBackOverlay', 'updateNoticeOverlay',
+     'kofiEmailPromptOverlay', 'conflictOverlay', 'prestigePerkOverlay']
+      .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; });
+    const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click();
+  });
+  await page.waitForTimeout(1200);
+  await oeffneSystemUeberSektoren(page, SYSTEM);
+  await page.waitForTimeout(1400);
+  const vorZoom = await page.evaluate(ZUSTAND);
+  // Über den SPIELERWEG zoomen, nicht über einen Griff in den Modulscope (der ist von außen
+  // ohnehin nicht erreichbar - Hausregel 47).
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(() => { const b = document.getElementById('galaxyZoomInBtn'); if (b) b.click(); });
+    await page.waitForTimeout(500);
+  }
+  await page.waitForTimeout(900);
+  const gezoomt = await page.evaluate(ZUSTAND);
+  await page.setViewportSize(ziel);
+  await page.waitForTimeout(1800);            // 220 ms Entprellung plus zwei Ticks Luft
+  const danach = await page.evaluate(ZUSTAND);
+  await ctx.close();
+  return { vorZoom, gezoomt, danach, fehler: fehler.slice(0, 2) };
 }
 
 (async () => {
@@ -197,10 +241,17 @@ async function lauf(browser, store, start, ziel) {
      wurde. Verglichen wird wieder gegen die Kontrolle: Ein Zoom-Klick schiebt naturgemäß Planeten
      aus dem Bild - die Frage ist nicht OB, sondern ob mehr als bei einem Fenster, das nie
      verändert wurde (Hausregel 53: wer etwas verschiebt, misst die neue Stelle mit). */
-  const nn = um.nachNeuaufbau || {}, kn = kontrolle.nachNeuaufbau;
-  check('2: auch der nächste Neuaufbau bleibt bei der Zeichnungsform und lässt nicht mehr Planeten aus dem Kasten fallen als ohne Größenänderung',
-    nn.zeichnungVerh === k.zeichnungVerh && Array.isArray(nn.draussen) && nn.draussen.length <= 2,
-    { nachNeuaufbau: nn, kontrolleVorher: k });
+  const nn = um.nachNeuaufbau || {}, kn = kontrolle.nachNeuaufbau || {};
+  check('2-vorab: die Kontrolle hat denselben Neuaufbau gefahren',
+    !!(kn.viewBox && nn.viewBox), { um: nn.viewBox, kontrolle: kn.viewBox });
+  /* Gemessen wird gegen die KONTROLLE, nicht gegen eine eingetippte Zahl: Ein Zoom-Klick schiebt
+     naturgemäß Planeten aus dem Bild - die Frage ist nicht OB, sondern ob mehr als bei einem
+     Fenster, das nie verändert wurde (Hausregel 2/53). */
+  check('2: auch der nächste Neuaufbau steht so da wie ohne Größenänderung',
+    nn.zeichnungVerh === kn.zeichnungVerh && nn.viewBox === kn.viewBox
+      && Array.isArray(nn.draussen) && Array.isArray(kn.draussen)
+      && nn.draussen.length <= kn.draussen.length,
+    { nachAenderung: nn, kontrolle: kn });
 
   /* Gegenrichtung: Die Kamera muss dem Kasten IMMER folgen, auch wenn die Schwelle gar nicht
      berührt wird - sonst hätte man den Fehler nur an einer Stelle behoben. Gemessen wird das
@@ -209,6 +260,25 @@ async function lauf(browser, store, start, ziel) {
   const n2 = um2.nachher || {};
   check('3: auch ohne Schwellenübertritt folgt der Kamera-Ausschnitt der neuen Kastenform',
     Math.abs((n2.kameraVerh || 0) - (n2.kastenVerh || 0)) <= 0.02, n2);
+
+  /* ---- 4) Der Zoom des Spielers überlebt (KB-20f) --------------------------------------------
+     Die Größenänderung ist bewusst eine OHNE Schwellenübertritt (1920x1040 -> 1920x900, beide
+     rund): Springt die Zeichnungsform um, zeigt die alte viewBox in ein anderes Koordinatenbild -
+     dort ist das Neuzielen richtig. Falsch war, dass es bedingungslos geschah. */
+  const zoom = await zoomLauf(browser, store, { width: BREIT, height: HOCH }, { width: BREIT, height: 900 });
+  check('4-vorab: Boot ohne Skriptfehler', zoom.fehler.length === 0, zoom.fehler);
+  const zb = n => n && n.viewBox ? +n.viewBox.split(' ')[2] : null;
+  check('4-vorab: die Zoom-Knöpfe haben den Ausschnitt wirklich verkleinert',
+    zb(zoom.gezoomt) !== null && zb(zoom.vorZoom) !== null && zb(zoom.gezoomt) < zb(zoom.vorZoom) * 0.9,
+    { vorZoom: zoom.vorZoom && zoom.vorZoom.viewBox, gezoomt: zoom.gezoomt && zoom.gezoomt.viewBox });
+  check('4: eine Größenänderung ohne Schwellenübertritt lässt die Zoomstufe stehen',
+    Math.abs(zb(zoom.danach) - zb(zoom.gezoomt)) < 0.5,
+    { gezoomt: zoom.gezoomt && zoom.gezoomt.viewBox, danach: zoom.danach && zoom.danach.viewBox });
+  /* Die Gegenrichtung: Die HÖHE des Ausschnitts muss der neuen Kastenform trotzdem folgen - sonst
+     hätte man den Zoom gerettet, indem man gar nichts mehr nachzieht. */
+  check('4b: und das Seitenverhältnis folgt trotzdem dem Kasten',
+    zoom.danach && Math.abs((zoom.danach.kameraVerh || 0) - (zoom.danach.kastenVerh || 0)) <= 0.02,
+    zoom.danach);
 
   await browser.close();
   ende();

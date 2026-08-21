@@ -1365,6 +1365,112 @@ misst mit `getBBox()`, das die `scale`-Transformation des Portals **nicht** kenn
 27,9 Einheiten), und wer das Portal dort aufnehmen will, macht den Entflechter **zuerst**
 transform-fest.
 
+**KB-20f bis KB-20i (21.08.2026) sind die Befunde einer ZWEITEN adversarischen Durchsicht – und
+drei der vier waren Regressionen, die mein eigener Änderungssatz erzeugt hatte.** Der Wert dieser
+Runde liegt genau darin: Die erste Durchsicht hatte den Änderungssatz von KB-20c/d/e geprüft, die
+zweite prüfte, was er selbst kaputtgemacht hat.
+
+- **KB-20f – jede Fenstergrößenänderung warf den ZOOM weg.** Der Handler aus KB-20e rief Höhe,
+  `buildMap()` und `galaxyCamFahre(true)` **bedingungslos**. Zoom und Verschiebung leben aber
+  ausschließlich in `galaxyMapViewBox`, und `galaxyCamFahre(true)` ersetzt dieses Objekt durch den
+  Vorgabe-Ausschnitt. Am PC traf das jedes Ziehen am Fensterrahmen, am Handy schon das Auf- und
+  Zuklappen der Bildschirmtastatur (der Viewport-meta trägt `interactive-widget=resizes-content`,
+  und das Suchfeld der Karte öffnet sie). Neu gezielt wird nur noch, wenn sich wirklich etwas
+  Kamerarelevantes geändert hat – sonst zieht `galaxyVerhaeltnisAngleichen()` nur die HÖHE des
+  Ausschnitts nach und lässt die Breite, also die Zoomstufe, stehen. **Diese zoom-erhaltende
+  Antwort existierte längst; KB-20e hatte eine zerstörende danebengestellt.**
+  Der erste Entwurf ließ die zwei Zeilen weg, weil ich annahm, das erledige der nächste
+  `buildGalaxyMap()`. Gemessen läuft der gar nicht, wenn sich sonst nichts geändert hat –
+  `test_kartenresize` 3 hat es gefangen (Kastenverhältnis 0,576 gegen Kameraverhältnis 0,688).
+  **Eine Annahme ist kein Messwert** (Regel 48).
+- **KB-20g – am PC scrollte beim Öffnen nichts, und die Karte stand außerhalb des Fensters.** Der
+  Scroll aus KB-7/KB-10 galt nur am Handy (`innerWidth <= 700`). Seit KB-20 ist der Kasten am PC so
+  hoch wie in den Sektor-Ansichten: gemessen bei 1600×1040 stehen nach dem Öffnen **325 von 865 px**
+  der Karte im Bild und **alle vier** Overlay-Knöpfe (‹ › + −) außerhalb des Fensters. Die
+  Breiten-Schranke bleibt als ODER stehen (das Handy verhält sich exakt wie bisher), dazu kommt die
+  Frage nach der SACHE: Ist genug vom Kasten im Bild? Gemessen gegen das hier maximal Erreichbare –
+  ein Kasten, der höher als das Fenster ist, kann nie ganz sichtbar sein, und ein Scroll darf nicht
+  daran hängen, dass er Unmögliches verlangt. **Ein Bestandsfall kam dabei mit heraus:** Bei
+  1920×700 war die Karte schon vor KB-20 zu **0 px** sichtbar.
+- **KB-20h – der Kollisionsschieber schob die Allianzbasis aus dem Bild.** `kbMarkerFrei` wich
+  ausschließlich nach AUSSEN aus. Mit den echten Funktionen der Datei nachgemessen (ausgeführt,
+  nicht nachgebaut): Bei der runden Zeichnung landeten **14 von 138** Markern draußen – alle die
+  Allianzbasis, bis zu 18,2 Einheiten über die linke Kante, weil ihr fester Winkel 205° fast auf dem
+  Bahnwinkel −160° der Orbits 3, 9 und 15 liegt und sie deshalb um 71 bis 81 Einheiten nach außen
+  wandert. Bei der flachen Zeichnung waren es 0. Wer eine Obergrenze mitgibt, bekommt jetzt einen
+  zweiten Durchgang nach INNEN; findet sich auch dort nichts, wird gekappt – ein Marker, der eine
+  Scheibe überlappt, aber IM BILD steht, ist ehrlicher als einer, den niemand sieht (dieselbe
+  Abwägung wie beim Label-Deckel von KB-16). Ohne `maxRadius` verhält sich die Funktion byte-genau
+  wie vorher; das ist die Zusage für die fünf übrigen Markerarten.
+  **Der erste Entwurf war wirkungslos und sah richtig aus:** Er prüfte die Grenze nur am
+  SCHLEIFENENDE – im Anlassfall findet die Schleife aber nach vier bis fünf Schritten einen freien
+  Platz, nur eben einen außerhalb des Bildes. Aufgefallen ist es allein daran, dass dieselbe Messung
+  danach WIEDERHOLT wurde und unverändert 14 von 138 meldete (Regel 48).
+- **KB-20i – der KB-20e-Kommentar beschrieb einen Mechanismus, den der Code nicht hat.** Er sagte,
+  die Kastenhöhe stehe „als fester Pixelwert im style-Attribut" und der Schaden sei ein Beschnitt
+  oben und unten. Beides ist nachgemessen falsch: Am breiten runden Kasten ist die Höhe
+  `KB_SEKTOR_KASTEN_HOEHE`, also ein CSS-Ausdruck mit `100dvh`, und das SVG hat kein
+  `preserveAspectRatio` – es gilt `xMidYMid meet`, das nie beschneidet. **Direkt nach der Änderung
+  ist gemessen gar nichts draußen**; die Karte wird nur unnötig klein (1920×1040 → 1920×810: Kasten
+  folgt 865 → 635 px, die Kamera behält ihre 362×248,9 Einheiten, der Planetendurchmesser fällt von
+  87 auf 56 px). Der Schaden kommt beim nächsten Neuaufbau – ein Zoom-Klick genügt: 1920×1040 →
+  1920×780 ohne den Handler springt der Kasten von 605 auf 420 px, die Zeichnung kippt von rund
+  (358×323 Einheiten) auf flach (755×262), während die Kamera weiter den engen runden Ausschnitt von
+  258,6 Einheiten hält – danach liegen **alle sechs** gemessenen Planeten außerhalb, bis zu 1713 px
+  weit. Die Kontrolle, die von Anfang an 1920×780 groß ist, hat nach demselben Zoom-Klick zwei
+  Objekte knapp am Rand (139 bzw. 83 px) – das ist der normale Preis des Hineinzoomens und der
+  Beleg, dass die sechs nicht vom Klick kommen.
+  **Die Lehre ist nicht der Einzelfall:** Ein Kommentar, der eine Begründung nennt, die man nicht
+  gemessen hat, ist eine zweite Anzeigestelle mit Ablaufdatum – beim nächsten Lesen wird er als
+  REGEL gelesen. Dasselbe ist in dieser Sitzung schon zweimal passiert (die „23 weiteren"
+  angeschnittenen Systeme und die „47 %", beide korrigiert).
+
+**Zwei Lücken am Portal, beide aus derselben Durchsicht:**
+Der Systemname aus der Serverantwort ging **ohne `escapeHtml`** in ein Attribut (jetzt escaped, wie
+jede andere Serverzeichenkette), und das Portal ignorierte die Ebene **„Ereignisse"**, obwohl zwei
+Texte sie versprechen – das Gate umschließt jetzt auch `kbMarkerFrei` und die Anmeldung in
+`platzierteMarker`, damit ein abgeschaltetes Portal auch keinen Platz mehr belegt.
+Dazu ein **`prefers-reduced-motion`-Gate** (`kbBewegungAus()`): Wer Bewegung abbestellt hat, bekommt
+das Portal statisch statt mit 36 Dauerschleifen – die Zeichnung bleibt vollständig, nur die
+Animations-Tags fallen weg (alle 36 sind selbstschließend, nachgemessen; gemessen 0 Animationen und
+41 Formen gegen 36/41).
+**Die Kostenmessung dazu ist ehrlich unentschieden und steht so auch im Quelltext:** Unter
+4-facher CPU-Drosselung kostet das Portal nachweislich (mit 4.478–8.600 ms Long Tasks je 10 s, ohne
+1.083–1.330, also Faktor 3–6). **WELCHER Bestandteil, ließ sich NICHT auflösen** – die Variante ohne
+die `<animate>`-Tags streute 2.628–5.947 und überlappte die unveränderte vollständig; ein erster
+Lauf hatte sie als Hauptkostenträger gemeldet, die Wiederholung hat das widerlegt (Regel 20). Ohne
+Drosselung sind es in beiden Fällen 0 Long Tasks, und das Portal steht in höchstens zwei von 69
+Systemen. **Ein blinder Umbau der Zeichnung wäre damit nicht gedeckt.**
+
+**Drei Bestandstests waren auf dieselbe Weise blind und sind mitgezogen worden:**
+- `test_flugbahn_ursprung` 3b leitete die Markerposition aus dem LABEL ab (`y − 20`). `kbLabelsEntflechten`
+  darf ein Label aber um bis zu 21 Einheiten senkrecht und 12 seitlich verschieben (KB-16), während
+  3b darunter 1,0 Einheiten Toleranz verlangt – der Test war also nur so lange grün, wie dieses eine
+  Label zufällig an seiner natürlichen Stelle bleibt. Gegriffen werden jetzt die **direkten
+  `circle`-Kinder** der Heimat-Gruppe (der Maskenkreis liegt in einem `clipPath`, der Mondkreis und
+  der Orbitalring in eigenen `<g>` – Regel 51), und eine Vorab-Prüfung belegt, dass sie sich einig
+  sind. Beidseitig gegengeprüft an einer Kopie, in der jedes Label um 21 Einheiten ausweicht: der
+  alte Griff fällt mit `abweichung 21.00` auf völlig korrektem Code, der neue bleibt grün; und mit
+  der Linie zurück auf der rohen Slot-Position fällt der neue mit `abweichung 15.10`.
+- `test_kartenbeschriftung` hatte **kein `activeWormhole`** in seiner Galaxie-Antwort und sah die
+  neue Portal-Beschriftung deshalb nie – obwohl sie ein `text.planet-label` ist, das AUSSERHALB der
+  Portal-Gruppe liegt und für den Entflechter damit eine freistehende Beschriftung ohne eigenes
+  Objekt ist, die andere verdrängen kann. Gemessen mit der Fixture: kepler 12 → 13 Texte, vega
+  7 → 8. Eine Vorab-Prüfung hält fest, dass sie wirklich mitgemessen wird.
+- Und sein **„PC"-Lauf bei 1280×900 bekommt seit KB-20 die RUNDE Zeichnung** (gemessen: Kasten
+  738×725, Verhältnis 0,98; Zeichnung 0,81) – die flache, für die er ursprünglich kalibriert wurde,
+  maß danach niemand mehr. Dazu ein dritter Formfaktor **„PC flach" (1920×700)**, und weil ein
+  dritter Lauf nur dann einer ist, wenn er wirklich etwas anderes zeichnet, misst eine
+  Vorab-Prüfung das Zeichnungsverhältnis je Formfaktor gegen dieselbe 0,5-Schranke, die
+  `kbRunderKasten` benutzt (gemessen rund 0,54–0,83, flach 0,21–0,33). Am flachen PC gibt es
+  übrigens **null** bekannte Ausnahmen – kein Fehlschlag, der vom ersten Tag an rot wäre (Regel 53).
+
+**Wächter:** `test_kartenresize` (12 Prüfungen, Zoom-Erhalt als eigenes PAAR),
+`test_karte_handy_bedienung` (Overlay-Knöpfe per `elementFromPoint`, jetzt auch am PC),
+`test_kartenmarker` 1c (datengetrieben über alle sechs Markerarten),
+`test_wurmloch_portal` (21 Prüfungen: Ereignisse-Ebene als PAAR über den Spielerweg, Reduced-Motion
+als PAAR aus Animationszahl UND Formzahl) und `test_kartenbeschriftung` (24 Prüfungen).
+
 **Tests navigieren über `tests/lib/karte.js`** (`oeffneSystemUeberSektoren`/`oeffneSektorMitSystem` – Spielerweg per DOM-Klicks, Region wird nie geraten, wartet die Kamerafahrt samt Folge-Tick ab).
 - **Kennwert-Balken sind EINE Bildsprache für Schiffe UND Verteidigungsanlagen** (VT-1, 18.08.2026, Auftrag Sascha „bei verteidigung auch wie bei flotte die balken"). Die Werft zeichnet je Schiff vier beschriftete Mikro-Balken (`shipStatBarsHtml`, CSS-Klasse `.sstat`, Balken im Verhältnis zum besten Wert der Flotte); die Verteidigungskarten standen bis dahin auf dem Stand davor – eine Fließtext-Zeile mit Mitteldots. `defenseStatBarsHtml(def, lvl)` zeichnet jetzt drei Balken je Anlage: **Angriff** (`atkVal`), **Vert.** (`defVal`) und **Schild** (`def.shield`, beim Laden als `round(defVal*0,4)` abgeleitet und in `defensePower` ein eigener Summand – also eine echte Größe, keine erfundene). Bewusste Entscheidungen dabei: (a) **dieselbe CSS-Klasse und dieselben Farben** wie die Schiffe (Angriff rot, Schild cyan, Verteidigung violett) – eine zweite Balken-Klasse wäre die typische zweite Anzeigestelle, die beim nächsten Umbau ausei­nanderläuft; (b) **kein vierter Balken „Bauzeit"** – dort ist weniger besser, ein langer Balken läse sich aber wie ein guter Wert; (c) die Balken zeigen den Wert **je Stufe** (die zwischen Anlagen vergleichbare Größe, wie „je Schiff" bei der Flotte), die vorhandene Zeile „aktuell → nach Ausbau" bleibt daneben, weil sie eine andere Frage beantwortet; (d) **Abhorchposten und Mondschild bekommen keine Balken** – sie tragen ihre Wirkung in eigenen Regeln (`atkVal`/`defVal` beide 0), drei Nullbalken wären dort nichtssagend (dieselbe Ausnahme kennt `defenseLockedPreview()` schon). Die Balken hängen im Kartenkörper, **nicht** hinter dem „Details"-Griff – siehe Regel 55, das war der Fehler des ersten Anlaufs. Wächter: `tests/test_verteidigungsbalken.js` (Erwartungswerte aus `BUILDING_DEFS` gelesen, Sichtbarkeit statt Existenz geprüft).
 - **Signatur-Cache-Muster für `render*Box()`-Funktionen ohne Live-Countdown**: `let lastXSig = null;` vor der Funktion, am Anfang eine Signatur aus allen angezeigten Werten bilden, bei Gleichheit zum Vorlauf `return` statt `innerHTML` neu zu schreiben (Beispiele: `renderAllianceBaseHero`, `renderDominance`, `renderGalaxyNews`, `renderReportsBox`, `renderAllianceTitlesBox`/`renderAllianceSkinsBox`, `renderDailyLoginBox`, `renderFpAllianceDonation`, `renderFpLeaderboard`). **Nur anwenden, wenn die Box KEINEN Live-Countdown (`Date.now()`-Differenz, die sichtbar hochzählt) enthält** – sonst würde die Anzeige sichtbar einfrieren; bei Countdown-Boxen stattdessen `setBoxHtml` (Markup-Signatur, selbstkorrigierend – siehe unten). **Korrektur 16.08.2026:** Hier stand, `renderAutoExploreTourBox`/`renderAbhorchpostenBox` nutzten „stattdessen `isTypingIn()`" – das war falsch, beide schreiben nacktes `innerHTML` ohne jeden Schutz (nachgesehen, nicht erinnert; sie enthalten Live-Countdowns, weshalb die WERTLISTEN-Signatur dort zu Recht fehlt – ein Tipp-Schutz war nie da und ist mangels Eingabefeldern auch nicht nötig). `renderFactions`/`renderMarket`/`renderTradeRoutes` nutzen tatsächlich `bedienungLaeuft()`/`isTypingIn()`, Markt und Routen seit v8.538.0 zusätzlich `setBoxHtml`. Neue `render*Box()`-Funktionen ohne Countdown sollten dieses Muster von Anfang an übernehmen statt jeden Tick blind neu aufzubauen.
