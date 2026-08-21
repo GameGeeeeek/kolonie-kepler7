@@ -18,7 +18,7 @@
 //
 // Der Test prueft beide Haelften an einem echt hochgefahrenen Spiel, nicht am Quelltext: Nur so
 // faellt auf, wenn der naechste Umbau die Absicherung wieder verliert.
-const { starteBrowser, devices, SPIELDATEI, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIELDATEI, SPIEL_URL, SERVER_JS } = require('./lib/umgebung');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -302,7 +302,7 @@ const textVon = (page, id) => page.evaluate(i => {
     const src = fs.readFileSync(SPIELDATEI, 'utf8');
     const fe = (src.match(/function allianceRaidVorbei\(doc\)\{[\s\S]*?\n  \}/) || [])[0];
     check('7: die Frontend-Funktion wurde gefunden', !!fe);
-    const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+    const BE_PFAD = SERVER_JS;
     if (!fs.existsSync(BE_PFAD)){
       check('7: Backend-Repo liegt daneben (ohne es ist die Spiegelung UNGEPRUEFT)', false, BE_PFAD);
     } else {
