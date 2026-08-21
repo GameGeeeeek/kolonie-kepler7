@@ -140,4 +140,27 @@ const einspeisungen = (serverOhneKommentare.match(/\.cosmetics = kosmetikGetrage
 check('6: der Server überschreibt die Kosmetik im Bestenlisten-Eintrag (lesend UND schreibend)',
   einspeisungen === 2, { gefunden: einspeisungen });
 
+// ---- 7) Die EINLEITUNGSZEILE der Kosmetik-Box darf die Freischaltwege nicht aufzaehlen ---------
+// Gemessen am 21.08.2026: Sie nannte "Fortschritt (Prestige, Aufstieg, Kampfpunkte, Rekordtiefe,
+// Erfolge, Sektor-Bosse und abgewehrte Angriffe)" - eine von Hand gepflegte Liste der
+// Bedingungsarten. Mit den zwei PvE-Meilensteinen der Phase 6 (geschleifte Asteroidenfestungen,
+// gefallene Alien-Koenigin) war sie unvollstaendig, und beim naechsten neuen Weg waere sie es
+// wieder. Die Uebersetzung JEDER Art prueft Abschnitt 3; unter jedem gesperrten Stueck steht seine
+// eigene Bedingung. Eine zweite, kuerzere Liste daneben kann deshalb nur falsch werden.
+// Geprueft wird die REGEL: die drei stabilen Oberbegriffe ja, einzelne Bedingungsarten nein.
+{
+  const von = js.indexOf('Namensfarbe und Emblem erscheinen');
+  const bis = von < 0 ? -1 : js.indexOf('</div>', von);
+  check('7-anker: die Einleitungszeile der Kosmetik-Box laesst sich schneiden', von > 0 && bis > von, { von, bis });
+  const zeile = (von > 0 && bis > von) ? js.slice(von, bis) : '';
+  const verraeter = ['Prestige', 'Aufstieg', 'Kampfpunkte', 'Rekordtiefe', 'Sektor-Bosse',
+                     'abgewehrte Angriffe', 'Asteroidenfestungen', 'Königin'];
+  const gefunden = verraeter.filter(w => zeile.indexOf(w) >= 0);
+  check('7: die Einleitungszeile zaehlt keine einzelnen Freischaltwege auf', gefunden.length === 0,
+    { gefunden, zeile: zeile.slice(0, 240) });
+  check('7b: sie nennt aber die drei stabilen Oberbegriffe weiterhin',
+    /Fortschritt/.test(zeile) && /Unterstützer-Rang/.test(zeile) && /Sternenstaub/.test(zeile),
+    zeile.slice(0, 240));
+}
+
 ende();
