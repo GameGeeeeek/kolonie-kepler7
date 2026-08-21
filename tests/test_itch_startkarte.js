@@ -124,15 +124,39 @@ const server = http.createServer((req, res) => {
 
   // Das Sternenfeld war schon einmal unsichtbar (349 von 576.000 Bildpunkten). Gemessen
   // statt angesehen, damit es nicht still wieder verschwindet.
+  // Zwei Zahlen, nicht eine - und der Grund dafuer ist gemessen (21.08.2026).
+  //
+  // Hier stand nur "zaehle Bildpunkte mit Alpha > 20". Das war richtig, solange die Karte ein
+  // duennes Sternenfeld auf DURCHSICHTIGER Leinwand malte: Ohne Sterne war die Zahl 0.
+  // Seit die Kulisse zuerst einen DECKENDEN Grund malt, hat jeder Bildpunkt Alpha 255 - die
+  // Pruefung meldete 576.000 von 576.000 und war damit vacuous. Gemessen an einer Kulisse,
+  // die NUR die Grundfarbe malt (kein Stern, kein Planet, kein Orbit): unveraendert gruen.
+  //
+  // Gezaehlt wird deshalb, was sich vom Grund UNTERSCHEIDET. Die Grundfarbe kommt dabei aus
+  // Kulisse.GRUND, nicht aus einem eingetippten Wert - sonst stuenden hier zwei Wahrheiten,
+  // und ein Farbwechsel machte die Pruefung still wieder vacuous.
   const sterne = await page.evaluate(() => {
     const c = document.querySelector('canvas');
     if (!c) return { canvas: false };
+    const grund = (window.Kulisse && window.Kulisse.GRUND) || null;
+    if (!grund) return { canvas: true, grundBekannt: false };
+    const gr = parseInt(grund.slice(1, 3), 16), gg = parseInt(grund.slice(3, 5), 16), gb = parseInt(grund.slice(5, 7), 16);
     const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    let hell = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i] > 20) hell++;
-    return { canvas: true, gemalt: hell, gesamt: d.length / 4 };
+    let hell = 0, inhalt = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] > 20) hell++;
+      if (Math.abs(d[i] - gr) + Math.abs(d[i + 1] - gg) + Math.abs(d[i + 2] - gb) > 8) inhalt++;
+    }
+    return { canvas: true, grundBekannt: true, grund, gemalt: hell, inhalt, gesamt: d.length / 4 };
   });
-  check('2f das Sternenfeld ist wirklich gemalt', sterne.canvas && sterne.gemalt > 500, sterne);
+  check('2f-vorab die Leinwand ist ueberhaupt bemalt', sterne.canvas && sterne.grundBekannt && sterne.gemalt > 500, sterne);
+  // Die eigentliche Aussage: Auf dem Grund steht INHALT - Sterne, Nebel, Planet, Orbits.
+  // Die Schranke als REGEL statt als Literal: mindestens ein Prozent der Flaeche weicht ab.
+  // Gemessen liegt der echte Wert weit darueber (der Planet allein deckt ein Vielfaches),
+  // die Gegenprobe "nur Grundfarbe" liefert exakt 0.
+  check('2f die Kulisse malt wirklich etwas auf den Grund',
+        sterne.inhalt > sterne.gesamt * 0.01,
+        { inhalt: sterne.inhalt, gesamt: sterne.gesamt, anteil: sterne.gesamt ? (100 * sterne.inhalt / sterne.gesamt).toFixed(1) + ' %' : null });
 
   await browser.close();
   server.close();
