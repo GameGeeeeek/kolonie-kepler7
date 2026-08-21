@@ -1717,7 +1717,7 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     Sprungziel automatisch. Beide Gegenproben getrennt gefahren und jede fällt spezifisch: ohne
     `scroll-margin` genau `2b`, ohne `scrollIntoView` genau `2`.
 
-65. **Es gibt eine Ereignisquelle, die man GAR NICHT pinnen kann – und die Regel „Ereignis-Uhren
+70. **Es gibt eine Ereignisquelle, die man GAR NICHT pinnen kann – und die Regel „Ereignis-Uhren
     pinnen" verleitet dazu, das Gegenteil zu glauben.** Vorfall 19.08.2026:
     `test_klappen_kollision` fiel im vollen Lauf an seiner „ohne Ereignis"-Vorabprüfung mit einem
     **152 px hohen Fremd-Banner** bei 360×740, während 390×844 und 360×640 im selben Lauf sauber
@@ -1747,6 +1747,22 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     **Die Flanke ist nicht geschlossen, nur an dieser Stelle:** Jeder Test, der FENSTERLAGE misst,
     ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
     zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
+
+71. **Eine Gegenprobe per Env-Umleitung braucht eine Wache, die sagt, WAS fallen muss – sonst ist
+    ihr Grün nicht von einem Werkzeugfehler zu unterscheiden.** Vorfall 19.08.2026 (Phase 4,
+    Weltlage-Zeile): Drei Gegenproben liefen an sabotierten Kopien der Spieldatei, alle drei
+    blieben **grün**, und nach Regel 26 wäre das der Befund gewesen – „der Test belegt nichts".
+    Er belegte durchaus etwas; das Mess-Skript hatte nur `env = dict(os.environ, …)` gebaut und
+    beim `subprocess.call` **das `env=env` vergessen**. Gelesen wurde also dreimal die echte
+    Datei. Das ist wörtlich die Falle aus der Korrektur zu Regel 14 („eine still ignorierte
+    Env-Variable sieht aus wie eine bestandene Gegenprobe"), nur eine Ebene höher: nicht die
+    Variable wurde ignoriert, sie kam nie an.
+    **Vorgehen:** Jede Gegenprobe führt eine Liste der Prüfungen mit, die bei ihr fallen MÜSSEN,
+    und meldet ausdrücklich `WERKZEUGFEHLER`, wenn eine davon grün bleibt. Damit ist der
+    Unterschied zwischen „die Sabotage greift nicht" und „der Test taugt nichts" wieder sichtbar –
+    und man erkennt ihn im Protokoll, nicht erst beim Nachdenken. Gemessen nach der Behebung:
+    Sabotage „Zeile immer zeichnen" → genau `2a`, „Zeile nie zeichnen" → `1a/1b/1c/3a` (plus die
+    vier abhängigen Nest-Prüfungen), „alter Hilfetext" → `5a/5b`.
 
 ## Sektorkarte E1: Landmarken (19.08.2026)
 
@@ -2094,6 +2110,46 @@ gerendertes Spiel, fünf Gegenproben).
 
 **Drei Lehren aus dem Bau dieses Tests, jede über den Einzelfall hinaus** — sie stehen weiter oben
 als Arbeitsregeln 65–67.
+
+## Die Weltlage: die galaktische Gegnerstärke wird sichtbar (Phase 4, 19.08.2026)
+
+Das Backend (kolonie-kepler7-backend#145) hat `npcEmpireStrength` beweglich gemacht: kein
+Zeitzähler mehr, sondern ein **Tauziehen gegen den Nestbestand**. Der Server leitet aus den
+Alien-Nestern einen Zielwert ab und lässt die Wehrkraft mit 4 % je Tick dorthin laufen.
+
+**Ein Schwierigkeitsregler, den der Spieler bewegt, aber nicht sieht, ist kein Spielelement** –
+deshalb gehört die Anzeige zu dieser Phase und nicht in ein späteres „Feinschliff". Die Zeile steht
+oben im Galaxie-Tab (`renderGalaxyNews`, neben dem Kopfgeld-Banner) und sagt drei Dinge: wo die
+Wehrkraft steht, wohin sie läuft, und **warum** (Zahl der Nester).
+
+**Drei Zustände, und der dritte ist SCHWEIGEN.** Das Backend schreibt `npcStaerkeZiel` nur im
+Tor-Zweig – ein Server vor Phase 4 und der Solo-Betrieb führen das Feld gar nicht. Dann entfällt die
+Zeile **ersatzlos**. Ein „unbekannt" wäre hier die Falschaussage: Der Spieler könnte daraus nichts
+ableiten, und es sähe aus wie eine kaputte Anzeige. Das ist Regel 35 in ihrer Gegenrichtung – dort
+braucht eine wartende Box einen dritten Zustand, hier braucht eine Box, für die es nichts zu sagen
+gibt, gar keinen.
+
+**Die Schwelle für „steht" ist die Auflösung der Anzeige selbst** (0,01): Darunter stünden im Text
+zwei gleiche Zahlen, und eine Richtung zu behaupten wäre Rauschen statt Aussage.
+
+**Vielfache schreibt dieses Spiel als SUFFIX** (`1,77x`, wie „gedeckelt bei 2,5x" im Hilfetext) –
+der erste Entwurf hatte `x1,77` und damit eine zweite Schreibweise für dieselbe Größe. Aufgefallen
+erst am gerenderten Text, nicht am Code.
+
+**Zwei Hilfetexte sagten seit Phase 3/4 die Unwahrheit** und sind mitgezogen worden (Punkt 6 der
+Checkliste): „NPC-Reiche wachsen" behauptete, der Multiplikator „steigt langsam über die Zeit" –
+er kann jetzt auch **fallen**; und der Abschnitt daneben nannte die Alienvölker „reine
+Weltgeschichte … kein direkter Gameplay-Effekt außer der Anzeige selbst", während sie seit Phase 3
+angreifbare Nester anlegen und seit Phase 4 die Wehrkraft steuern.
+
+**Die Zahlen stehen bewusst NICHT im Frontend.** Basis, Steigung und Deckel kennt nur der Server;
+die Zeile zeigt, was er schickt. Eine Frontend-Kopie wäre eine zweite Wahrheit, die beim nächsten
+Balance-Schritt auseinanderläuft – dieselbe Entscheidung wie bei den Kosmetik-Bedingungen.
+
+Wächter: `tests/test_weltlage.js` (12 Prüfungen am gerenderten Spiel, drei Gegenproben). Er misst
+die WIRKUNG statt der Beschriftung (Regel 61): Zwei Läufe mit unterschiedlichem Ist-Wert müssen
+unterschiedliche **Zahlen** zeigen; eine Prüfung auf „das Wort Wehrkraft steht da" wäre in beiden
+Fällen grün. Und die wichtigste Prüfung ist `2a` – ohne das Feld darf **nichts** dastehen.
 
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 

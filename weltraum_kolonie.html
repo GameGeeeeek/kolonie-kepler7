@@ -16120,7 +16120,7 @@
   // ===== Lebendige Galaxie (gemeinsamer Server-Zustand) =====
   // Wird periodisch vom Backend geholt (siehe setInterval unten). Rein clientseitiger Cache, NICHT
   // Teil von state (das ist geteilter, spielerübergreifender Zustand, kein Spielstand-Feld).
-  let galaxyCache = { npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
+  let galaxyCache = { npcEmpireStrength: 1, npcStaerkeZiel: null, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
   // ===== Handelsrouten =====
   // Drei Routentypen, alle binden Frachter (die dann nicht mehr für Kämpfe/Lagerkapazität zählen):
   //   'sell'      – verkauft periodisch eine Ressource automatisch am Markt (Kredite, braucht Server)
@@ -17534,6 +17534,34 @@
     const box = document.getElementById('galaxyNewsBox');
     if (!box) return;
     const news = galaxyCache.news || [];
+    /* WELTLAGE (Phase 4). Die galaktische Gegnerstaerke ist seit dem 19.08.2026 kein reiner
+       Zeitzaehler mehr, sondern ein TAUZIEHEN gegen den Nestbestand - und ein Schwierigkeitsregler,
+       den der Spieler bewegt, aber nicht sieht, ist kein Spielelement. Deshalb steht hier, wohin
+       die Weltlage laeuft und WARUM.
+       DREI ZUSTAENDE STATT ZWEIER (Hausregel 35): Der Server schickt `npcStaerkeZiel` nur, wenn die
+       Drift wirklich laeuft (im Backend haengt das Schreiben des Feldes am selben Tor wie die
+       Rechnung). Fehlt es - Solo-Betrieb oder ein Server vor Phase 4 -, gibt es nichts zu sagen,
+       und die Zeile entfaellt ERSATZLOS. Ein "unbekannt" waere hier die Falschaussage: Der Spieler
+       koennte daraus nichts ableiten, und es sieht aus wie eine kaputte Anzeige. */
+    let weltlageHtml = '', weltlageSig = 'none';
+    if (typeof galaxyCache.npcStaerkeZiel === 'number'){
+      const ist = galaxyCache.npcEmpireStrength || 1, ziel = galaxyCache.npcStaerkeZiel;
+      const nester = (galaxyCache.alienNester || []).length;
+      const zahl = x => x.toFixed(2).replace('.', ',');
+      /* Die Schwelle ist die Aufloesung der ANZEIGE selbst: Unter 0,01 stehen im Text zwei gleiche
+         Zahlen, und eine Richtung zu behaupten waere Rauschen statt Aussage. */
+      const rauf = ziel - ist > 0.01, runter = ist - ziel > 0.01;
+      const nestText = nester ? ' Aktuell ' + (nester === 1 ? 'steht <strong>ein</strong> Alien-Nest' : 'stehen <strong>' + nester + '</strong> Alien-Nester') + ' in der Galaxie.'
+                              : ' Aktuell steht <strong>kein</strong> Alien-Nest in der Galaxie.';
+      weltlageSig = 'wl:' + zahl(ist) + ':' + zahl(ziel) + ':' + nester;
+      if (rauf){
+        weltlageHtml = '<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(226,75,74,0.12); border-color:rgba(226,75,74,0.45);"><div class="left"><i class="ti ti-alien" aria-hidden="true" style="color:#e24b4a; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong style="color:#f0997b;">Die Galaxie rüstet auf.</strong> Der Schwarm treibt die Wehrkraft der NPC-Reiche von <strong>' + zahl(ist) + 'x</strong> auf <strong>' + zahl(ziel) + 'x</strong> - solange die Nester stehen, wird jedes NPC-Ziel härter.' + nestText + '</div></div></div>';
+      } else if (runter){
+        weltlageHtml = '<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(93,202,165,0.12); border-color:rgba(93,202,165,0.45);"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong style="color:#5dcaa5;">Die Galaxie beruhigt sich.</strong> Die Wehrkraft der NPC-Reiche sinkt von <strong>' + zahl(ist) + 'x</strong> auf <strong>' + zahl(ziel) + 'x</strong>, weil der Schwarm zurückgedrängt ist.' + nestText + '</div></div></div>';
+      } else {
+        weltlageHtml = '<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ti-shield" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong>Die Weltlage steht.</strong> Die Wehrkraft der NPC-Reiche liegt bei <strong>' + zahl(ist) + 'x</strong> und bewegt sich gerade nicht.' + nestText + '</div></div></div>';
+      }
+    }
     // Kopfgeld-Banner (#2): aktuelles Kopfgeld auf den Bestenlisten-Ersten.
     const b = galaxyCache.bounty;
     let bountyHtml = '';
@@ -17550,11 +17578,11 @@
           : `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(250,199,117,0.14); border-color:rgba(250,199,117,0.5);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#fac775; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong style="color:#fac775;">Kopfgeld: ${fmt(b.reward||0)} Kredite</strong> auf <strong>${escapeHtml(b.targetName||'?')}</strong> (aktueller Bestenlisten-Erster). Schlage ihn im Kampf, um die Prämie zu kassieren – nur der Erste bekommt sie.</div></div></div>`;
       }
     }
-    if (!news.length){ const emptySig='empty|'+bountySig; if (lastGalaxyNewsSig !== emptySig){ box.innerHTML = bountyHtml + '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = emptySig; } return; }
-    const newsSig = bountySig+'||'+news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
+    if (!news.length){ const emptySig='empty|'+weltlageSig+'|'+bountySig; if (lastGalaxyNewsSig !== emptySig){ box.innerHTML = weltlageHtml + bountyHtml + '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = emptySig; } return; }
+    const newsSig = weltlageSig+'||'+bountySig+'||'+news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
     if (newsSig === lastGalaxyNewsSig) return;
     lastGalaxyNewsSig = newsSig;
-    box.innerHTML = bountyHtml + news.slice(0, 12).map(n => {
+    box.innerHTML = weltlageHtml + bountyHtml + news.slice(0, 12).map(n => {
       n = Object.assign({}, n, { text: systemNamenErsetzen(n.text) });
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       return `<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ${n.icon}" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div><div class="bmeta" style="color:#c7cbe0;">${n.text}</div><div class="bmeta" style="font-size:10px;">${when}</div></div></div></div>`;
@@ -39726,10 +39754,10 @@
       { title:'Saison-Liga', body:'Zusätzlich zur Wochenliga läuft ein <strong>monatlicher</strong> Wettbewerb mit dauerhaften Belohnungen. Jeden Kalendermonat merkt der Server deinen Score als Startwert; deine <strong>Saison-Punkte</strong> sind alles, was seitdem dazukam. Am Monatsende teilt der Server alle Teilnehmer nach Rang in <strong>fünf Ligen</strong> ein – ab 5 Teilnehmern nach Fünfteln (Top 20% <strong>Diamant</strong>, dann Platin, Gold, Silber, Bronze), bei weniger nach Plätzen. Jede Liga schaltet einen <strong>exklusiven, dauerhaften Saison-Titel</strong> frei: Diamant „Saison-Champion", Platin „Saison-Meister", Gold „Saison-Veteran", Silber „Saison-Kämpfer", Bronze „Saison-Teilnehmer" – dazu Kredite und Modulfragmente je nach Liga (Diamant 5.000 Kr + 12 Fragmente … Bronze 400 Kr + 1 Fragment). Danach beginnt automatisch eine neue Saison, in der wieder jeder eine Chance auf Platz 1 hat. Alles serverseitig bestimmt (Rang, Liga, Belohnung – nichts manipulierbar). Deine aktuelle Saison, der Countdown, deine Saison-Punkte, deine gesammelten Titel und die Liga-Belohnungen stehen im <strong>Fortschritt-Tab</strong> unter „Saison-Liga".' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Die Abrechnung läuft jetzt <strong>serverseitig</strong>: Genau am Wochenwechsel bestimmt der Server aus den (bereits serverseitig geprüften) Punktezuwächsen die Platzierung und legt deine Liga-Belohnung bereit – niemand kann sich mehr selbst eine höhere Liga oder Belohnung zuweisen. Beim nächsten Login wird sie automatisch gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
-      { title:'NPC-Reiche wachsen', body:'Ein globaler Schwierigkeitsgrad-Multiplikator steigt langsam über die Zeit (gedeckelt bei 2,5x) und macht alle NPC-Verteidigungswerte für jeden Spieler etwas härter – zusätzlich zu der bereits bestehenden persönlichen Steigerung durch eigene Kämpfe.' },
+      { title:'NPC-Reiche: die Wehrkraft der Galaxie', body:'Ein globaler Multiplikator (gedeckelt bei 2,5x) macht alle NPC-Verteidigungswerte für jeden Spieler härter – zusätzlich zur persönlichen Steigerung durch eigene Kämpfe. Er ist <strong>kein Zeitzähler mehr</strong>: Der Server leitet aus dem <strong>Bestand an Alien-Nestern</strong> einen Zielwert ab und lässt die Wehrkraft langsam dorthin laufen (spürbar innerhalb eines Tages, ein einzelner Schlag ändert die Weltlage nicht). Wer den Schwarm zurückdrängt, macht die Galaxie <strong>für alle</strong> leichter; wer die Nester wachsen lässt, bezahlt es mit härteren NPC-Gegnern. Wohin sie gerade läuft und warum, steht oben im Galaxie-Tab.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
       { title:'Supernovas', body:'Zerstört zeitweise (48 Stunden) ein zufälliges, komplett unbesiedeltes System. Ein System, in dem tatsächlich ein Spieler zuhause ist, wird garantiert nie ausgewählt. Auf der Sektorkarte als dunkel-roter, kollabierter Systemknoten mit 💥-Symbol sichtbar.' },
-      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab UND direkt sichtbar auf der Sektorkarte: ⚔️ markiert einen umkämpften Krieg-Standort, 👽 ein gesichtetes Alienvolk, 🏴‍☠️ eine aktive Piratenbasis, ein 🌀-Abzeichen an beiden Endpunkt-Systemen ein offenes Wurmloch. Aktuell ohne tiefe mechanische Kopplung ans eigentliche Spiel (reine, aber jetzt sichtbare Weltgeschichte, kein direkter Gameplay-Effekt außer der Anzeige selbst).' }
+      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab UND direkt sichtbar auf der Sektorkarte: ⚔️ markiert einen umkämpften Krieg-Standort, 👽 ein gesichtetes Alienvolk, 🏴‍☠️ eine aktive Piratenbasis, ein 🌀-Abzeichen an beiden Endpunkt-Systemen ein offenes Wurmloch. Kriege, Piratenbasen und Wurmlöcher sind dabei reine Weltgeschichte ohne tiefe mechanische Kopplung. Die <strong>Alienvölker</strong> dagegen nicht mehr: Sie legen echte, angreifbare Nester an, und ihr Bestand steuert die Wehrkraft der NPC-Reiche (siehe „NPC-Reiche").' }
     ]},
     { key:'faq', icon:'ti-list-details', title:'Häufige Fragen', entries:[
       { title:'Warum werden meine Jäger im Kampf nicht mitgezählt?', body:'Vermutlich fehlt Hangar-Kapazität. 1 Trägerschiff ermöglicht 6 Jäger. Ohne genug Träger bleiben überzählige Jäger "nicht einsatzbereit" und tragen nichts zur Angriffs- oder Verteidigungskraft bei.' },
