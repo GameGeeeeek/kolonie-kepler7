@@ -2158,6 +2158,44 @@ die WIRKUNG statt der Beschriftung (Regel 61): Zwei Läufe mit unterschiedlichem
 unterschiedliche **Zahlen** zeigen; eine Prüfung auf „das Wort Wehrkraft steht da" wäre in beiden
 Fällen grün. Und die wichtigste Prüfung ist `2a` – ohne das Feld darf **nichts** dastehen.
 
+## Der Verband kann ein Alien-Nest angreifen (Phase 5, Frontend, 21.08.2026)
+
+Das Backend (kolonie-kepler7-backend#149) hat dem Musterangriff eine `zielArt` gegeben. Diese
+Hälfte macht sie bedienbar — und zieht die Anzeigestellen nach, die sonst still falsch würden.
+
+**`musterZielText(doc)` ist die EINE Quelle für die Zielbezeichnung.** Vier Stellen lasen vorher
+`doc.targetTag` roh: Ergebniszeile, Sammelphase, „Verband unterwegs" und die Allianz-Nachricht. Bei
+einem Nest ist der Wert `null` — dort stünde also viermal **„[null]"**. Das ist Punkt 6 der
+Checkliste in Reinform: Nicht die Mechanik geht kaputt, sondern die zweite Anzeigestelle. Auch die
+Überschrift der Box heißt nicht mehr „Koordinierter Allianzbasis-Angriff", sondern „Koordinierter
+Angriff", und der Hilfe-Eintrag ebenso.
+
+**Die Zielart-Wahl erscheint NUR, wenn es Nester gibt.** Ein Server vor Phase 3/5 führt
+`alienNester` gar nicht; eine Auswahl mit leerem Zweig wäre ein Versprechen ohne Gegenstand. Ohne
+Nester sieht der Spieler exakt das Formular von vorher — derselbe dritte Zustand wie bei der
+Weltlage-Zeile.
+
+**Beide Auswahlfelder tragen `data-keep-value`.** Die Box wird im Sekundentakt per `innerHTML` neu
+geschrieben, und ein `<select>` ohne Merker springt dabei auf die erste Option zurück — beim
+Allianz-Raid hat genau das einmal still die falsche Dauer gestartet. Der aktuelle Wert wird aus
+demselben Merker GELESEN, weil davon abhängt, welches Eingabefeld überhaupt gezeigt wird.
+
+**Der claim-Zweig für ein Nest fasst die Währungsfelder nicht an.** Der Server zahlt dort bewusst
+keine Basisangriffs-Währung (die Bergung liegt anteilig im Belohnungsfach) und schickt
+`newCredits`/`newForschungspunkte` deshalb gar nicht erst mit den üblichen Werten — wer sie
+übernähme, schriebe `undefined` in den Spielstand. Der Bericht bekam denselben Zweig: „DAS NEST
+WURDE ZERSTÖRT", und bei einem verpassten Anflug den GRUND statt eines stillen „abgewehrt".
+
+Wächter: `tests/test_muster_nest_ui.js` (14 Prüfungen, zwei Gegenproben — `musterZielText` durch
+`doc.targetTag` ersetzt → `1d`/`2a` fallen; die Wahl bedingungslos gezeichnet → `3a` fällt).
+
+**Zwei Prüfungen waren dabei zunächst aus dem falschen Grund grün, und beide Male hat es die
+eigene Vorab-Prüfung gemeldet** (Regel 28/37): Erst rendert die Box gar nichts, weil
+`renderAllianceMusterBox` ohne `state.allianceBase` sofort aussteigt — `3a` („keine Zielart-Wahl")
+war damit trivial erfüllt. Und `4b` suchte „Königin" im ganzen Box-Markup, wo es auch im
+Einleitungstext steht; gescopt auf das Auswahlfeld und über den **Spielerweg** gewählt (Auswahl
+setzen, `change` auslösen) misst es die Liste wirklich.
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
