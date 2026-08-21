@@ -302,14 +302,64 @@ Spiel – und es ist die erste Seite, die ein Besucher aus einem Verzeichnis sie
 
 ## 6. E-Mail-Vorlagen
 
-### An webgamers.de — **Priorität 1**
+**Alle vier Adressen am 21.08.2026 am Original geprüft.** Die Reihenfolge hat sich dabei geändert:
+Zwei der Seiten, die in der Recherche auf Prio 9 und 8 standen, haben **gar keinen
+Einreichungsweg** — sie sind redaktionell kuratiert. Dorthin geht ein *Pitch*, keine Eintragung, und
+der Text muss anders klingen.
+
+| Empfänger | Adresse | Lädt ein? | Reihenfolge |
+|---|---|---|---|
+| browsergame-base.de (Mario Kaufmann) | `info@browsergame-base.de` | **ja, wörtlich** | **zuerst** |
+| webgamers.de (Wolfgang Scheidle) | `kontakt@webgamers.de` | **ja, wörtlich** – aber Seite wirkt seit 2023 still | zweitens |
+| bestebrowsergames.de (Tolle & Wendt GbR) | `kontakt@bestebrowsergames.de` | nein | Kaltpitch |
+| weltraumspiele.de (IDGV GmbH) | `info@idgv.info` | nein | Kaltpitch, geringste Aussicht |
+
+Die Adresse bei browsergame-base.de steht auf der Seite Cloudflare-verschleiert; jeder Browser mit
+JavaScript zeigt sie im Klartext an. Falls dort im Impressum zusätzlich eine `redaktion@`-Adresse
+steht, ist die der bessere Empfänger.
+
+---
+
+### 1. An browsergame-base.de — `info@browsergame-base.de`
+
+Die Seite lädt wörtlich ein: „Bist Du selbst Entwickler/Publisher oder vermisst hier noch einen
+bestimmten Artikel? Dann schicke Deine Vorschläge an uns." Sie führt die Kategorien **Weltraum**
+und **Strategie** — also genau die zwei, in die das Spiel gehört.
+
+> **Betreff:** Vorschlag für einen Testbericht: Kolonie Kepler-7 (Weltraum / Strategie)
+>
+> Hallo Herr Kaufmann,
+>
+> auf browsergame-base.de laden Sie Entwickler ein, fehlende Spiele vorzuschlagen — hiermit mache
+> ich das für mein eigenes.
+>
+> **Kolonie Kepler-7** (https://www.gamegeeeeek.de/) passt in Ihre Kategorien **Weltraum** und
+> **Strategie**: Kolonieaufbau mit sechs Ressourcen, Forschungsbaum, über zwanzig Schiffstypen mit
+> Konterrollen, gemeinsame Galaxie mit Allianzen, Weltbossen und PvP. Die Produktion läuft offline
+> weiter.
+>
+> Kostenlos, ohne Download, ohne Bezahlvorteile — Spenden schalten ausschließlich Kosmetik frei.
+> Kein Tracking, keine Werbung. Ich entwickle allein und liefere fast täglich aus; die öffentliche
+> Patchnote-Seite zeigt das (https://www.gamegeeeeek.de/patchnotes.html).
+>
+> Für einen Testbericht stelle ich gerne Bildmaterial bereit oder beantworte Fragen.
+>
+> Viele Grüße
+
+### 2. An webgamers.de — `kontakt@webgamers.de`
+
+Betreiber **Wolfgang Scheidle** schreibt wörtlich: „Um möglichst umfangreich berichten zu können,
+bin ich auf Euren Input angewiesen" und „Gerne stehe ich für Interviews bereit".
+
+**Erwartung dämpfen:** Der jüngste erkennbare Inhalt stammt aus 2023. Die Einladung ist echt, aber
+die Seite wirkt eingeschlafen. Kosten: eine E-Mail. Mehr sollte man nicht einplanen.
 
 > **Betreff:** Kolonie Kepler-7 – deutsches Weltraum-Browsergame, Einzelentwickler
 >
 > Hallo Herr Scheidle,
 >
-> auf webgamers.de habe ich gelesen, dass Sie für Ihre Berichterstattung auf Zusendungen aus der
-> Szene angewiesen sind – deshalb melde ich mich mit meinem eigenen Projekt.
+> auf webgamers.de schreiben Sie, dass Sie für Ihre Berichterstattung auf Input aus der Szene
+> angewiesen sind — deshalb melde ich mich mit meinem eigenen Projekt.
 >
 > **Kolonie Kepler-7** (https://www.gamegeeeeek.de/) ist ein deutsches Weltraum-Aufbauspiel im
 > Browser: Kolonie ausbauen, forschen, Flotten aufstellen, geteilte Galaxie mit Allianzen und PvP,
@@ -317,7 +367,7 @@ Spiel – und es ist die erste Seite, die ein Besucher aus einem Verzeichnis sie
 > Werbung.
 >
 > Zwei Dinge, die es vielleicht von anderen Einsendungen unterscheiden: Ich entwickle es allein und
-> liefere fast täglich aus – die öffentliche Patchnote-Seite zeigt das
+> liefere fast täglich aus — die öffentliche Patchnote-Seite zeigt das
 > (https://www.gamegeeeeek.de/patchnotes.html). Und das Spiel läuft auf einem Raspberry Pi bei mir
 > zu Hause, nicht in einer Cloud.
 >
@@ -326,27 +376,63 @@ Spiel – und es ist die erste Seite, die ein Besucher aus einem Verzeichnis sie
 >
 > Viele Grüße
 
-### An browsergame-base.de
+### 3. Kaltpitch an bestebrowsergames.de — `kontakt@bestebrowsergames.de`
 
-> **Betreff:** Vorschlag für einen Testbericht: Kolonie Kepler-7 (Weltraum)
+**Keine Einladung, kein Formular** — am Original bestätigt. Das ändert den Ton: Hier wird nicht um
+eine Eintragung gebeten, sondern ein Thema angeboten. Deshalb steht der Aufhänger vorn und die
+Spielbeschreibung dahinter; und es wird ausdrücklich nichts erwartet.
+
+> **Betreff:** Themenvorschlag: Ein Browsergame, das auf einem Raspberry Pi im Wohnzimmer läuft
 >
-> Hallo,
+> Hallo Herr Tolle, hallo Herr Wendt,
 >
-> auf browsergame-base.de laden Sie dazu ein, fehlende Spiele per E-Mail vorzuschlagen – hiermit
-> mache ich das für mein eigenes.
+> Sie führen in Ihrer Weltraum-Rubrik überwiegend die großen Titel. Vielleicht ist als Kontrast
+> etwas Kleines interessant: **Kolonie Kepler-7** (https://www.gamegeeeeek.de/) ist ein deutsches
+> Weltraum-Aufbauspiel, das ich allein entwickle und das auf einem Raspberry Pi bei mir zu Hause
+> läuft — kein Publisher, keine Cloud, kein Werbenetzwerk.
 >
-> **Kolonie Kepler-7** (https://www.gamegeeeeek.de/) passt in Ihre Kategorien **Weltraum** und
-> **Strategie**: Kolonieaufbau mit sechs Ressourcen, Forschungsbaum, über zwanzig Schiffstypen mit
-> Konterrollen, gemeinsame Galaxie mit Allianzen, Weltbossen und PvP. Die Produktion läuft offline
-> weiter.
+> Inhaltlich: Kolonieaufbau mit sechs Ressourcen, Forschungsbaum, über zwanzig Schiffstypen mit
+> Konterrollen, geteilte Galaxie mit Allianzen, Weltbossen und PvP; die Produktion läuft offline
+> weiter. Kostenlos, ohne Download, ohne Bezahlvorteile — Spenden schalten nur Kosmetik frei.
 >
-> Kostenlos, ohne Download, ohne Bezahlvorteile – Spenden bringen ausschließlich Kosmetik. Für einen
-> Testbericht stelle ich gerne Material bereit oder beantworte Fragen.
+> Ich weiß, dass Sie keine offene Einreichung anbieten, und erwarte nichts. Falls es doch passt,
+> stelle ich gerne Bildmaterial bereit.
 >
 > Viele Grüße
 
-### An weltraumspiele.de und bestebrowsergames.de
+### 4. Kaltpitch an weltraumspiele.de — `info@idgv.info`
 
-Wie oben, mit einem angepassten Einstiegssatz: Bei **weltraumspiele.de** die Passung betonen (die
-Seite führt ausschließlich Weltraumspiele), bei **bestebrowsergames.de** die Kategorie Weltraum
-nennen.
+**Geringste Aussicht der vier.** Die Seite gehört der **IDGV GmbH** (Geschäftsführer Matti Gittel,
+inhaltlich verantwortlich André Nowak) — ein Firmennetzwerk, das eher bezahlte Platzierung verkauft,
+als einen Gefallen zu tun. Dafür ist der Themenkreis der engste überhaupt: ausschließlich
+Weltraumspiele.
+
+**Deshalb die Frage offen stellen**, statt um einen Gefallen zu bitten: Wenn eine Aufnahme
+kostenpflichtig ist, will man das wissen, bevor man drei Mails schreibt.
+
+> **Betreff:** Aufnahme in die Spieleliste – Kolonie Kepler-7 (deutsches Weltraum-Browsergame)
+>
+> Hallo, Herr Nowak,
+>
+> weltraumspiele.de führt ausschließlich Weltraumspiele — genau das ist mein Projekt, deshalb frage
+> ich an.
+>
+> **Kolonie Kepler-7** (https://www.gamegeeeeek.de/) ist ein deutsches Weltraum-Aufbauspiel im
+> Browser: Kolonieaufbau mit sechs Ressourcen, Forschungsbaum, über zwanzig Schiffstypen mit
+> Konterrollen, geteilte Galaxie mit Allianzen, Weltbossen und PvP, Idle-Fortschritt läuft offline
+> weiter. Kostenlos, kein Download, keine Bezahlvorteile.
+>
+> Auf der Seite habe ich keinen Einreichungsweg gefunden. Deshalb zwei Fragen: Nehmen Sie
+> Vorschläge überhaupt entgegen — und wäre eine Aufnahme kostenpflichtig? Beides beantworten Sie mir
+> gerne kurz; ich richte mich danach.
+>
+> Bildmaterial stelle ich auf Wunsch bereit.
+>
+> Viele Grüße
+
+---
+
+**Zur Anrede:** Alle vier Namen stammen aus dem jeweiligen Impressum. Bei
+`bestebrowsergames.de` sind zwei Gesellschafter eingetragen (Manuel Tolle, Alexander Wendt) — beide
+zu nennen ist richtiger, als einen zu raten. Bei `weltraumspiele.de` ist **André Nowak** inhaltlich
+verantwortlich, der Geschäftsführer heißt anders; angeschrieben wird deshalb Nowak.

@@ -134,10 +134,10 @@ SEO-Problem aus Abschnitt 1. Aufwand je Eintrag: 10–20 Minuten, einmalig.
 
 | Portal | Zustand | Eintragsweg | Prio |
 |---|---|---|---|
-| **webgamers.de** | aktiv, redaktionell | E-Mail über Impressum. Betreiber (Wolfgang Scheidle) kommt **selbst aus der Indie-Browsergame-Szene**, bietet ausdrücklich Interviews an, schreibt: „bin ich auf Euren Input angewiesen" (**geprüft**) | 10 |
-| **browsergame-base.de** | aktiv, 2026-Inhalte | Vorschlag per E-Mail ausdrücklich eingeladen; Kategorien „Weltraum" + „Strategie" (**geprüft**) | 9 |
-| **bestebrowsergames.de** | aktiv, 1.000+ Spiele | Kontaktseite erreichbar, Einreichungsweg nicht dokumentiert (**teilweise**); `/games/weltraum.html` | 9 |
-| **weltraumspiele.de** | seit 2009, ~35 Spiele | kein Formular gefunden, Kontakt über Impressum (**teilweise**). **Ausschließlich** Weltraum – engster Themenkreis überhaupt | 8 |
+| **webgamers.de** | **jüngster Inhalt aus 2023** – Einladung echt, Seite womöglich eingeschlafen | `kontakt@webgamers.de`, Betreiber **Wolfgang Scheidle**. Wörtlich: „bin ich auf Euren Input angewiesen" und „Gerne stehe ich für Interviews bereit" (**geprüft**) | 8 |
+| **browsergame-base.de** | aktiv, 2026-Inhalte | `info@browsergame-base.de` (Cloudflare-verschleiert, zurückgerechnet), Betreiber **Mario Kaufmann**. Wörtlich: „Bist Du selbst Entwickler/Publisher … Dann schicke Deine Vorschläge an uns." Kategorien **Weltraum** + **Strategie**. **Der einzige deutsche Kanal mit ausdrücklicher Einladung UND passenden Rubriken UND frischen Inhalten** (**geprüft**) | 10 |
+| bestebrowsergames.de | aktiv, 1.000+ Spiele, `/games/weltraum.html` | **Kein Einreichungsweg** – am Original bestätigt: keine Einladung, kein Formular. `kontakt@bestebrowsergames.de`, **Tolle & Wendt GbR**. Also ein Kaltpitch an eine Redaktion, keine Eintragung (**geprüft**) | 6 |
+| weltraumspiele.de | seit 2009, ~35 Spiele, **ausschließlich** Weltraum | **Kein Einreichungsweg** – redaktionell kuratiert. Betreiber ist eine Firma: **IDGV GmbH**, `info@idgv.info` (GF Matti Gittel, Redaktion André Nowak). Engster Themenkreis überhaupt, aber ein Firmennetzwerk will eher bezahlte Platzierung als einen Gefallen (**geprüft**) | 5 |
 | browsergames.de | aktiv, 2.700+ Spiele | kein Formular sichtbar (**teilweise**) | 6 |
 | browsergames.fm | aktiv | blockt Bot-Abrufe, hat Weltraum-Rubrik (**teilweise**) | 6 |
 | browsergame-index.de | läuft, News zuletzt 2010 | „Neues Browsergame melden" unter `/browsergame-melden`, `webmaster@browsergame-index.de` (**geprüft**) | 5 |
