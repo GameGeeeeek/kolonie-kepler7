@@ -42,8 +42,30 @@ const bis = von < 0 ? -1 : JS.indexOf('\n  }', von);
 check('1a: moduleInvVergleich gefunden', von > 0 && bis > von);
 if (von < 0) return ende();
 const quelle = JS.slice(von, bis + 4);
-const nutzungen = (JS.match(/invKeys\.sort\(moduleInvVergleich\)/g) || []).length;
-check('1b: BEIDE Inventare (Standort + Klasse) nutzen denselben Vergleich', nutzungen === 2, nutzungen);
+/* Seit dem Inventar-Deckel (21.08.2026) sortiert nicht mehr jeder Aufrufer selbst, sondern
+   modulInventarZuschnitt - EINE Stelle fuer beide Inventare. Geprueft wird deshalb die REGEL
+   und nicht die alte Schreibweise `invKeys.sort(moduleInvVergleich)` (Hausregel 3): beide
+   Inventare gehen durch den Zuschnitt, UND der Zuschnitt ist die einzige Stelle, die
+   moduleInvVergleich ueberhaupt anwendet. Damit faellt auch ein kuenftiger Aufrufer auf, der
+   sich seine eigene Sortierung danebenbaut. */
+const zuschnittRufe = (JS.match(/modulInventarZuschnitt\(invKeys\)/g) || []).length;
+check('1b: BEIDE Inventare (Standort + Klasse) gehen durch denselben Zuschnitt', zuschnittRufe === 2, zuschnittRufe);
+const zVon = JS.indexOf('function modulInventarZuschnitt(keys){');
+const zBis = zVon < 0 ? -1 : JS.indexOf('\n  }', zVon);
+check('1b2: der Zuschnitt-Block ist auffindbar', zVon > 0 && zBis > zVon);
+const zBlock = zVon > 0 ? JS.slice(zVon, zBis + 4) : '';
+/* Gemessen wird in JS, nicht in JS_OHNE_HISTORIE: Der Patchnotes-Ausschnitt verschiebt alle
+   Indizes, und zVon/zBis stammen aus JS - beim ersten Anlauf lag deshalb JEDE Fundstelle
+   scheinbar ausserhalb des Zuschnitts. Ein Patchnote, der den Ausdruck zitiert, wird stattdessen
+   ueber seine eigenen Grenzen ausgeschlossen. */
+const pnVon = JS.indexOf('  const PATCHNOTES = [');
+const pnBis = pnVon < 0 ? -1 : JS.indexOf('\n  ];', pnVon);
+const sortStellen = [...JS.matchAll(/\.sort\(moduleInvVergleich\)/g)].map(m => m.index)
+  .filter(i => !(pnVon >= 0 && pnBis > pnVon && i >= pnVon && i <= pnBis));
+const ausserhalb = sortStellen.filter(i => !(i >= zVon && i <= zBis));
+check('1b3: NIEMAND sortiert am Zuschnitt vorbei', sortStellen.length >= 1 && ausserhalb.length === 0,
+  { gesamt: sortStellen.length, ausserhalb: ausserhalb.length });
+check('1b4: der Zuschnitt benutzt den gemeinsamen Vergleich', zBlock.includes('sort(moduleInvVergleich)'));
 check('1c: die alten Inline-Kopien sind weg (kein Drift-Risiko)',
   !JS_OHNE_HISTORIE.includes('rarityRankDesc') && !JS_OHNE_HISTORIE.includes('rarityRankShip'));
 
@@ -73,9 +95,23 @@ const konstanten = [
   JS.match(/const MODULE_WERT_MIN = \d+, MODULE_WERT_MAX = \d+;/)[0]
 ].join('\n');
 const RARITY_STUB = '{' + rarKeys.map(k => k + ':{}').join(',') + '}';
-const vergleich = new Function(
-  konstanten + '\nconst MODULE_RARITY = ' + RARITY_STUB + ';\n'
-  + levelZeile + '\n' + wertQuelle + '\n' + quelle + '\nreturn moduleInvVergleich;')();
+/* rarRang gehoert seit dem 21.08.2026 zu den Abhaengigkeiten von moduleInvVergleich und wird
+   deshalb ebenfalls AUS DER DATEI geschnitten - nicht nachgebaut (Hausregel 36: eine ersetzte
+   Hilfsfunktion misst nicht mehr das Spiel). Der Anker wird geprueft, bevor gesliced wird. */
+const rrVon = JS.indexOf('function rarRang(rarity){');
+const rrBis = rrVon < 0 ? -1 : JS.indexOf('\n  }', rrVon);
+check('1f2: rarRang gefunden (Abhaengigkeit von moduleInvVergleich)', rrVon > 0 && rrBis > rrVon);
+const rarRangQuelle = rrVon > 0 ? 'let _rarRangCache = null;\n' + JS.slice(rrVon, rrBis + 4) : '';
+let vergleich = null, bauFehler = null;
+try {
+  vergleich = new Function(
+    konstanten + '\nconst MODULE_RARITY = ' + RARITY_STUB + ';\n'
+    + levelZeile + '\n' + wertQuelle + '\n' + rarRangQuelle + '\n' + quelle + '\nreturn moduleInvVergleich;')();
+} catch (e) { bauFehler = String(e.message || e); }
+// Hausregel 34: der Aufbau der Messvorrichtung ist eine eigene, benannte Pruefung - sonst
+// stirbt der Test mitten drin und die uebrigen Pruefungen laufen nie.
+check('1g: der Vergleich laesst sich samt Abhaengigkeiten ausfuehren', !!vergleich, bauFehler);
+if (!vergleich) return ende();
 
 // ---- 2) Rangfolge als Ketten-Fixture (bewusst verwuerfelt uebergeben)
 {

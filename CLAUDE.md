@@ -273,6 +273,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     `naechste-version.js` liest **alle** Versionen aus `origin/main` – die Konstante UND jeden
     Patchnotes-Eintrag. Genau daran ist es aufgefallen: v8.500.0 kam zusammen mit v8.501.0 in EINEM
     Commit, und wer nur die `VERSION`-Konstante ansieht, übersieht die erste.
+
+    **Nachtrag 21.08.2026 – DREI Kollisionen an einem Tag, und die umgedrehte Reihenfolge hat
+    keine davon verhindert.** Dieselbe Lieferung musste v8.598.0 → 8.599.0 → 8.600.0 → **8.601.0**
+    durchlaufen. Der Ablauf von oben wurde jedes Mal korrekt eingehalten: Nummer erst nach dem
+    grünen Lauf, `naechste-version.js` unmittelbar davor, Kollisionsprüfung als eigener Befehl.
+    Das ist auch nicht die Lücke – **die Lücke ist arithmetisch.** Ein voller Lauf dauert gemessen
+    45 bis 52 Minuten; wer die Nummer danach vergibt, hat trotzdem noch die Zeit für
+    `build-patchnotes.js`, `--nummer`, Commit und Merge offen. Liegt der Auslieferungstakt der
+    parallelen Sitzungen darunter, konvergiert es nicht.
+    **Was wirklich hilft, ist nicht eine weitere Regel, sondern die Größe des Fensters.** Drei
+    Möglichkeiten, alle drei am 21.08. durchgerechnet: (a) Nach dem grünen Lauf nur noch
+    umnummerieren und SOFORT mergen – das Fenster schrumpft auf die zwei Minuten von `--nummer`;
+    (b) den vollen Lauf VOR der letzten fremden Lieferung starten und nach einem Rebase nur den
+    gezielten Betroffenheits-Sweep plus `--nur-pflicht` fahren (Regel 40/58) – das kostet zwei
+    Minuten statt fünfzig, deckt aber nur die betroffenen Bereiche ab; (c) auf ein ruhiges Fenster
+    warten. **Gewählt wurde (a) plus (b):** Nach dem Rebase liefen erst die vier Tests der fremden
+    Lieferung einzeln (`test_belagerungsplan` 32, `test_herkunft` 33, `test_items` 25,
+    `test_protomaterie` 43 – alle grün), dann der volle Lauf, dann in EINEM Zug Nummer, `--nummer`,
+    Commit, Merge. Der Rebase selbst ist billig, solange man den überholten Nummern-Commit
+    **überspringt** statt seinen Konflikt aufzulösen (`git rebase --skip`) – die zwei Inhalts-
+    Commits liefen beide Male sauber durch.
+    **Und der Beleg gehört zu jedem Rebase, nicht nur zum ersten:** beide Seiten NACHZÄHLEN. Nach
+    dem dritten Aufsetzen: eigene Markierungen 8 von 8 (`MODUL_INVENTAR_KAUF_DECKEL` 5×,
+    `fuseIndexBauen` 4×, `rarRang` 8×), fremde 3 von 3 (`belagerungsplan` 14×, `kbRunderKasten` 9×),
+    alle sieben Testdateien byte-identisch zum Fernstand, CLAUDE.md um die 161 Zeilen der fremden
+    Doku gewachsen. Ohne diese Zählung ist „der Rebase lief sauber" eine Behauptung.
+
 24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
     Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
     gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
@@ -1105,6 +1132,21 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Befehl mit vorangestelltem `cd /home/user/kolonie-kepler7 &&`. Und bei einem Fehlschlag, der
     ALLE Tests gleichzeitig trifft, zuerst die erste Protokollzeile ansehen: Ein echter Fehler
     trifft selten sechs unabhängige Tests auf einmal.
+
+    **Nachtrag 21.08.2026 – schlimmer als hier steht: das Arbeitsverzeichnis überlebt den
+    BEFEHL.** Die Regel oben sagt „nicht in denselben Befehl"; gemessen wirkt ein `cd` in den
+    Nachbar-Klon auch in ALLEN FOLGENDEN Bash-Aufrufen weiter, weil das Werkzeug das
+    Arbeitsverzeichnis zwischen den Aufrufen behält. Konkret passiert: Ein `cd
+    ../kolonie-kepler7-backend` für einen Pull, drei Aufrufe später ein `grep` in `CLAUDE.md` –
+    und gelesen wurde die BACKEND-CLAUDE.md. Die Suche lieferte „nichts gefunden", was wie eine
+    fehlende Zielstelle aussieht und in Wahrheit die falsche Datei war. Verraten hat es allein die
+    Zeilenzahl (1.704 statt 4.316) – dieselbe Familie wie Regel 10 („hat der Melder die veraltete
+    `index.html` gelesen?"), nur beim eigenen Werkzeug.
+    **Vorgehen:** JEDER Befehl bekommt sein Verzeichnis vorangestellt (`cd /home/user/kolonie-kepler7
+    && …`), auch wenn der vorherige schon dort stand – und wer eine Suche in einer bekannten Datei
+    ins Leere laufen sieht, prüft ZUERST `pwd` und die Dateigröße, bevor er die Zielstelle für
+    verschwunden hält.
+
 58. **Nach einem Rebase auf einen fremden Stand prüft „mein Bereich ist nicht betroffen" genau das
     Falsche – der Fehler, den man sich EINHANDELT, liegt im fremden Teil.** Vorfall 18.08.2026:
     Bei KB-13, VT-1 und KB-15 wurde je nach einem Rebase argumentiert, die fremde Lieferung berühre
@@ -1212,7 +1254,7 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - **Neue Box mit `<input>`/`<textarea>`**, die von einem wiederkehrenden Trigger (Haupt-Tick, `setInterval`) neu gerendert wird: braucht von Anfang an `isTypingIn('boxId')`-Schutz, sonst verliert das Feld beim Tippen den Fokus.
 - **Jeder Bedienzustand, der NUR im DOM steckt, überlebt das Neuzeichnen nicht.** Der Haupt-Tick schreibt Boxen jede Sekunde per `innerHTML` neu – alles, was der Browser selbst verwaltet und was nicht im erzeugten HTML wieder mitgeschrieben wird, ist danach weg. Drei Ausprägungen, alle am 25.07.2026 als echte Spielerfehler aufgetreten: (a) **`<details>`** klappte nach einer Sekunde von selbst wieder zu (gesperrte Event-Schiff-Karten, Allianzbasis-Ausbaustufen, Teilnehmerlisten) → `data-keep-open="<schlüssel>"` + `detailsOpenAttr()`; (b) **`<select>`** sprang auf die erste Option zurück – beim Allianz-Raid sogar folgenschwer, weil der Startknopf `sel.value` erst im Moment des Klicks liest und der Raid dadurch still mit der Vorgabedauer statt der gewählten startete → `data-keep-value="<schlüssel>"` + `selectedAttrFor()`; (c) **waagerechte Scrollposition** der Wischleisten → `setHtmlPreservingScroll()` statt `innerHTML =` (bereits überall angewandt, wo `data-hscroll` mit Schlüssel vorkommt). `isTypingIn()` hilft hier nur halb: Es greift ausschließlich, solange das Element den Fokus hat – sobald man wegklickt, ist der Zustand wieder verloren (genau so war der Musterangriff-Fehler verdeckt). Beim Bau einer neuen Box also von Anfang an fragen: **Kann der Spieler hier etwas einstellen, das nirgends im erzeugten HTML wieder auftaucht?**
 - **BUILDING_DEFS mit `category:'defense'`**: `defVal`/`atkVal` müssen explizit gesetzt sein (mind. `0`), sonst kippt die globale Verteidigungsberechnung auf `NaN` (kein `||0`-Fallback an der Summierstelle).
-- **Wer einem BESTANDS-Gebäude nachträglich ein `maxLevel` gibt, braucht eine NEUE Kappungs-Marke** (16.08.2026, Labor-Deckel): `deckelKappung()` läuft einmalig je Marke; Bestandskonten tragen `deckelKappung2026`/`2026b` längst, mit einer alten Marke als Wache liefe die Kappung für das neue Gebäude dort nie – der Deckel „bedeutete für Bestandskonten nichts“, exakt der Spieler-Report, der zum zweiten Durchgang führte. Ablauf: nächste Marke (`2026c` → `2026d` …) als Wache setzen, alle älteren mitsetzen, die neue Marke in BEIDEN Reset-Bewahrlisten ergänzen (Suchbegriff `deckelKappung2026`) UND in der Abstreif-Liste von `tests/test_t1_deckel.js` (der Kommentar dort verlangt es wörtlich; vergessen = Test fälschlich rot, weil die Kappung im Fixture sofort zurückkehrt). Die Schleife selbst ist generisch und idempotent – neuer Code ist nicht nötig. Das Labor bekam bewusst maxLevel 25 OHNE `flachAb`: Abflachung senkt vorhandene Raten (das war Teil des Minen-Umbaus), ein reiner Deckel nicht.
+- **Wer einem BESTANDS-Gebäude nachträglich ein `maxLevel` gibt, braucht eine NEUE Kappungs-Marke** (16.08.2026, Labor-Deckel): `deckelKappung()` läuft einmalig je Marke; Bestandskonten tragen `deckelKappung2026`/`2026b` längst, mit einer alten Marke als Wache liefe die Kappung für das neue Gebäude dort nie – der Deckel „bedeutete für Bestandskonten nichts", exakt der Spieler-Report, der zum zweiten Durchgang führte. Ablauf: nächste Marke (`2026c` → `2026d` …) als Wache setzen, alle älteren mitsetzen, die neue Marke in BEIDEN Reset-Bewahrlisten ergänzen (Suchbegriff `deckelKappung2026`) UND in der Abstreif-Liste von `tests/test_t1_deckel.js` (der Kommentar dort verlangt es wörtlich; vergessen = Test fälschlich rot, weil die Kappung im Fixture sofort zurückkehrt). Die Schleife selbst ist generisch und idempotent – neuer Code ist nicht nötig. Das Labor bekam bewusst maxLevel 25 OHNE `flachAb`: Abflachung senkt vorhandene Raten (das war Teil des Minen-Umbaus), ein reiner Deckel nicht.
 - **Ein temporärer Fehler darf NIE zur Abmeldung führen – und das serverseitige Rate-Limit gilt für ALLE `/api`-Routen** (Spieler-Report Sascha 17.08.2026: „400 Mio im Markt verkaufen, irgendwann werde ich einfach ausgeloggt"). Die Kette, komplett gemessen: Der Markt-Sammelauftrag zerlegt in Tranchen zu `MARKET_MAX_PER_TRADE` (1 Mio) und feuerte sie **ohne Pause** – bei 400 Mio also 400 Anfragen in einer knappen halben Minute. `app.use('/api', globalApiRateLimit)` im Backend deckelt aber **240 Anfragen/Minute je Verbindung**, und zwar für alles: Handel, Speichern, Marktdaten, Bestenliste. Der 429 traf danach auch den 409-Zweig von `saveGameStateVersioned`, dessen Versions-Nachladen (`storageGet`) still auf localStorage zurückfällt und einen Wert **ohne** `version` liefert – dort stand `handleSaveConflict()`, also Token löschen und Abmelde-Dialog. **Zwei Lehren:** (a) Wer eine Schleife baut, die den Server anspricht, rechnet sie gegen dieses Limit (jetzt `MARKET_BULK_PAUSE_MS`, und ein 429 lässt warten statt abbrechen); (b) `handleSaveConflict()` gehört ausschließlich an den Fall „Server hat geantwortet und nennt beharrlich eine fremde Version" (drei erfolglose Nachladeversuche) – ein *gescheitertes* Nachladen ist kein Beleg für eine zweite Sitzung, dort meldet jetzt nur `notifySaveRejected`. `tests/test_marktlimit_abmeldung.js` prüft beide Richtungen; am Stand v8.540.0 fällt es mit `{"token":"WEG"}` und gemessenen 56 ms Anfrage-Abstand.
 - **Jede Flotte, die irgendwohin fliegt und wiederkommt, ist HIN UND ZURÜCK unterwegs – die Missionsdauer deckt beide Wege** (Auftrag Sascha, 17.08.2026). Die Regel gilt ab sofort für jede neue Missionsart, ohne Ausnahme: Wer eine Flotte losschickt, bekommt sie nicht am Ziel zurück, sondern zu Hause. Sauber gebaut ist das an der **Abbaumission** – sie ist das Vorbild: `flug` ist die Rundreise, `hinBis = jetzt + flug/2` die Ankunft, `abbauBis` das Ende der Arbeit, `endTime = flug + abbau` die Heimkehr; die Vorschau zeigt „Hinflug · Abbau · Rückflug (gesamt …)". Ebenso in Ordnung sind alle Arten, bei denen die Flotte für die volle `dur` weg ist und erst am `endTime` wieder zur Verfügung steht (Erkundung, Kolonisierung, NPC-Angriff, Spielerangriff, Spionage, Weltboss, Expedition). **Bewusst einwegig und deshalb KEIN Verstoß** sind Verlegungen (`relocate`) und das Stationieren an der Allianzbasis (`defend-base`, mit eigener `defend-base-return`-Mission für den Rückweg) sowie die Eskorte am Vorkommen – dort bleiben die Schiffe wirklich am Ziel. **Am 17.08.2026 verletzten genau zwei Arten die Regel – `intercept-pirates` und `void-rift`; beide sind seit v8.563.0 (18.08.2026) umgebaut und gelten jetzt als Vorbild für zeitkritische Missionen.**
 
@@ -2911,6 +2953,96 @@ injizieren; ohne Injektion bleibt es beim lokal erzeugten Gürtel, damit die Abb
 ablesbaren Platz behalten (Regel 4). Beidseitig gegengeprüft: 19 Prüfungen in jeder Richtung, und
 am Stand davor fallen genau die sechs neuen Inhaltsprüfungen, jede mit der alten Zeile als Beleg.
 
+## GR-2: Lebenspunkte als Balken, Belohnungen als Zeile (21.08.2026)
+
+Nest- und Festungsmenü nannten ihre Lebenspunkte nur als Zahlenpaar („260.0k von 400.0k") und das
+Nest-Menü **keine einzige** mögliche Belohnung. Beides ist jetzt da: ein Füllbalken je Leiste und
+eine Zeile, die sagt, was beim Fall zu holen ist.
+
+**`kartenFuellBalken(label, wert, max, farbe, tip)` ist die EINE Quelle für alle vier Balken**
+(Nest-Kern, Festungs-Kern, Schildkuppel, Geschütztürme). Fünf Entscheidungen darin:
+
+- **Dieselbe CSS-Klasse `.sstat` wie Schiffe und Verteidigungsanlagen** – dieselbe Entscheidung
+  wie bei VT-1, und `test_verteidigungsbalken` 5 prüft sie ausdrücklich („`.sstat` statt einer
+  zweiten Bildsprache").
+  **Aber die Wahl ist NICHT so eindeutig, wie dieser Satz allein klingt, und das gehört dazu:**
+  Gemessen benutzt das Spiel für Füllstände `.progress-outer`/`.progress-inner` an **60** Stellen,
+  `.sstat` nur an **drei** (Werft, Verteidigung, jetzt hier). Und ausgerechnet im NACHBAR-Kartenmenü
+  steht seit v8.512.0 schon ein Balken dieser Hausform: der Vorrat des Asteroiden. Für den Spieler
+  stehen damit **zwei Balkenformen im selben Menü-Typ**. Ausschlaggebend war die Zahl der Leisten:
+  Der Asteroid hat EINE (die Zeile darüber sagt, was sie meint), die Festung hat DREI, und drei
+  Leisten ohne Beschriftung sind nicht auseinanderzuhalten – `.progress-outer` hat kein Label-Feld.
+  **Der saubere Abschluss wäre, den Asteroiden-Vorrat ebenfalls auf `kartenFuellBalken` zu ziehen**
+  (Label „Vorrat", Zahlenzeile bleibt) – dann gibt es im Kartenmenü EINE Form. Das ist bewusst NICHT
+  Teil dieser Etappe: `test_asteroiden_info` und `test_flottenkarten` lesen den vorhandenen Balken,
+  die Umstellung braucht also eigene Messungen statt eines Anhängsels. Wer sie angeht, prüft zuerst
+  diese zwei Tests.
+- **Der Unterschied VERGLEICH gegen FÜLLSTAND steht im Titel, nicht im Balken.** Bei Schiffen misst
+  ein Balken den Wert *im Verhältnis zur besten Klasse der Flotte*, hier den Rest eines einzelnen
+  Objekts. Gleiche Bildsprache, andere Bedeutung – der Tooltip sagt es („nicht ein Vergleich mit
+  anderen Nestern").
+- **Rechts steht der Prozentwert, nicht die absolute Zahl.** Das `.v`-Feld ist 30 px breit; „260.0k"
+  passt dort nicht, und die absolute Zahl steht ohnehin in der Zeile darüber.
+- **Die Farbe wird GEPRÜFT, nicht durchgereicht** (`/^#[0-9a-fA-F]{3,8}$/`, sonst der Violett-Ton
+  des Spiels). Sie kommt aus `ALIEN_VOELKER`/`FESTUNG_STUFEN`/`FESTUNG_BAUTEILE` und geht in ein
+  `style`-Attribut – dieselbe Lehre wie bei GR-1, wo alle 40 Farben des Portal-Entwurfs durch eine
+  Tabelle liefen, die bei einer unbekannten Farbe abbricht.
+- **Das Label heißt „Rest", nicht „Kern" oder „Nest".** Der erste Entwurf doppelte damit den
+  Zeilentext direkt darüber – aufgefallen am gerenderten Text, nicht am Code (Regel 42).
+
+**Die Belohnungszahlen sind aus `server.js` herübergekommen** – `NEST_STUFEN` trägt jetzt
+`kampfpunkte`/`xp`/`credits`, `FESTUNG_STUFEN` `kampfpunkte`. **`punkte` bewusst NICHT:** Das ist
+die Stufengewichtung fürs Tauziehen der Weltlage (Phase 4) und hat im Frontend keine
+Anzeigestelle – ein Feld, das nur mitkopiert wird, ist die Sorte Zahl, die später jemand für
+benutzt hält (Regel 59).
+
+**„Hort" bleibt „Hort", und das ist eine Entscheidung gegen die eigene Formulierung.** Der erste
+Entwurf schrieb „Beim Fall zu holen:" und riss `test_festung_ui` 2b. Gemessen steht „Hort" 25-mal
+in der Datei, mehrfach in `HELP_SECTIONS` – es ist der etablierte Begriff. Angepasst wurde der
+TEXT, nicht der Wächter (dieselbe Abwägung wie bei TX-1: Regel 3 gegen Regel 26, und hier lag der
+Fall auf der Seite des Wächters).
+
+### Die eigentliche strukturelle Änderung: beide Paritätstests sind datengetrieben
+
+`test_nest_paritaet` 3b verglich `name` und `lp` als **Namensliste**, `test_festung_paritaet` 2a
+`kern`, `blockade` und `proto`. Ein neu übernommenes Feld wäre damit stillschweigend ungeprüft
+geblieben – genau der Fall, der mit den Belohnungszahlen anstand. Beide vergleichen jetzt **jedes
+Feld, das die Frontend-Tabelle führt**; das Backend darf mehr haben (`punkte`, `hortStd`,
+`fernBis`), das Frontend aber nichts, was dort fehlt oder abweicht. `farbe` ist namentlich
+ausgenommen und reine Frontend-Kosmetik. Ein fünftes Feld ist damit automatisch mitgeprüft, ohne
+dass jemand an es gedacht haben muss (Regel 40).
+
+Gegenproben, beide beidseitig gefahren, identische Prüflisten per `diff` verglichen (Regel 60):
+Backend-Kopie mit `kampfpunkte: 16` statt 15 → genau `3b` bzw. `2a` fallen, mit dem sprechenden
+Beleg `{"stufe":1,"feld":"kampfpunkte","front":15,"back":16}`. 12 bzw. 26 Prüfungen in jeder
+Richtung.
+
+### Die Wächter messen die WIRKUNG, nicht die Anwesenheit
+
+`test_nest_ui` Abschnitt 6 und `test_festung_ui` Abschnitt 7 fahren je ZWEI Läufe, die sich nur im
+Lebenspunkte-Stand bzw. in der Stufe unterscheiden. Gemessen wird die **sichtbare Geometrie** – der
+Anteil, den die Füllung von ihrer Schiene einnimmt –, nicht das `style`-Attribut, das auch dann
+dastünde, wenn eine CSS-Regel den Balken flachlegt (Regel 55). Die Festungs-Fixture gibt den drei
+Balken absichtlich drei VERSCHIEDENE Anteile (75/50/25 %): Ein Lauf mit gleichen Werten wäre auch
+von drei identischen Balken erfüllt.
+
+Drei Gegenproben an sabotierten Kopien, jede mit der Liste der Prüfungen, die fallen MÜSSEN
+(Regel 71): fester Anteil 50 % → `6b`/`6c`/`7b`; Balken abgeschaltet → `6-vorab`/`6a`/`7-vorab`/`7a`;
+Bergungszeile abgeschaltet → `6d`/`6e`.
+
+**Ein Werkzeugfehler im eigenen neuen Test, gefangen am Beleg:** Die Bergungszeile wurde zuerst per
+`/Bergung:[^]{0,120}/` aus dem Fließtext des Menüs geschnitten – ein **geratenes Zeichenfenster**,
+das sichtbar in die Nachbarzeile lief („… geteilt Wirksam dagegen: Jäger im Verba"). Das ist
+wörtlich die Regel, die einen Abschnitt weiter oben steht („Ein GERATENES Fenster ist kein Scope"),
+im selben Atemzug verletzt. Gegriffen wird jetzt das `.bmeta`-ELEMENT. Aufgefallen ist es nur, weil
+der Fehlschlag-Beleg den Treffer mit ausgibt – ein Test, der nur „grün" meldet, hätte es verdeckt.
+
+**Und Regel 15 hat sich zum zweiten Mal bestätigt, mit demselben Exit-Code:** Ein `pkill -f 'node
+-c'` gegen einen eigenen hängengebliebenen Hilfsbefehl traf die eigene Shell (Exit 144). Die Regel
+steht seit dem 06.08.2026 wörtlich in diesem Dokument, samt Exit-Code. **Kein `pkill` mit einem
+Muster, das die eigenen Werkzeuge selbst enthalten können** – hängende Prozesse werden über `ps`
+identifiziert und einzeln über ihre PID beendet, oder man lässt sie laufen.
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
@@ -3554,7 +3686,73 @@ so gelassen.
 **Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
 Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.
 
-### Wer sein Schürfrecht verteidigt (21.08.2026, v8.597.0) – die Lücke war nicht der Text
+### Bonuscodes (21.08.2026, v8.598.0 · Backend #155)
+
+**Auftrag Sascha:** „ich will ab und zu mal bonuscodes posten wo die spieler kleine geschenke
+bekommen die codes sollen aber nur eine gewisse gültigkeit haben also max 1 mal pro account einlösbar
+und nur 1 woche etc aktiv am liebsten baust du mir das in den admin bereich ein."
+
+Fünfter Reiter im Admin-Overlay („Codes"), Eingabefeld unter **Einstellungen → Bonuscode einlösen**,
+Gutschrift über die Belohnungs-Warteschlange. Die serverseitigen Regeln und ihre Begründungen stehen
+in der **Backend-CLAUDE.md**; hier nur, was das Frontend angeht.
+
+### Der eigene `type:'bonuscode'` in `claimPendingRewards` ist PFLICHT, nicht Kosmetik
+
+`claimPendingRewards` weist einen unbekannten Belohnungstyp **nicht ab** – er fällt in den
+Rückfall-Zweig, und der meldet wörtlich **„Dankeschön vom Team: +500 Kredite für deinen
+Bug-Report!"**. Bei einem Code ohne `credits` steht dort sogar **„+NaN Kredite"**, weil die Meldung
+außerhalb des `if (r.credits)` liegt. Beides in der Gegenprobe gemessen (`3a`/`3f`), nicht vermutet.
+
+**Der Zweig darf außerdem nicht werfen.** `claimPendingRewards` läuft komplett in einem stillen
+`try/catch`, und der Server hat den Eintrag beim Abholen **bereits aus der Warteschlange entfernt** –
+eine Ausnahme bricht die Schleife ab und die Belohnung ist unwiederbringlich weg. Deshalb filtert
+der Zweig jeden Wert einzeln (`Math.floor`, `> 0`), statt dem Server zu vertrauen.
+
+Roh addiert wie der `festung`-Zweig darüber, also **ohne Lagerdeckel**: Ein Geschenk, das am vollen
+Lager verpufft, wäre die unfreundlichere Auslegung, und die Beträge sind klein.
+
+### Die Fläche folgt dem Referral-Block – bis auf einen Punkt
+
+Das Eingabefeld liegt im vorhandenen `prog-section data-sec="konto"` (kein eigener Abschnitt, sonst
+bräuchte es einen Eintrag in `PROG_SECTIONS.einstellungen`), mit derselben Sichtbarkeitsbedingung
+`useBackend() && accountUsername`. **Der Unterschied ist die Ablehnung:** Der Einladungs-Bonus
+verschweigt seine bewusst – er löst sich im Hintergrund ein, ohne dass der Spieler etwas angeklickt
+hat, und der Kommentar dort begründet es. Ein Bonuscode ist eine **bewusste Bedienhandlung**; ein
+stiller Fehlschlag wäre genau die tote Fläche, gegen die Regel 35 geschrieben ist. Der Grund steht
+deshalb in einer **bleibenden** Zeile (`#bonusCodeStatus`) – `log()` überschreibt sich mit der
+nächsten Meldung selbst.
+
+Dazu ein **Bericht** (`type:'bonuscode'`, ohne Gewonnen/Verloren-Pille, eigenes Symbol `ti-award`) –
+die dauerhafte Auskunft, was gutgeschrieben wurde.
+
+### Zwei Fallen, beide beim Bauen aufgetreten
+
+- **Die Verdrahtung MUSS `onclick =` sein, nie `addEventListener`.** Sie liegt in `render()`, und das
+  läuft jede Sekunde – ein `addEventListener` hätte nach einer Minute 60 Handler und schickte den
+  Code 60-mal ab. `test_bonuscodes` 5a misst das über den Spielerweg: ein Klick nach mehreren Ticks
+  darf genau **eine** Anfrage auslösen.
+- **`resName` gibt es nicht, die Funktion heißt `resLabel`** (Regel 4: Namen ablesen, nicht raten).
+  Der Syntax-Check hätte das nicht gefangen – `new Function` parst nur.
+
+### Die Gaben-Felder im Admin-Bereich kommen VOM SERVER
+
+`GET /admin/bonuscodes` liefert `gaben` und `laufzeiten` mit; das Frontend zeichnet die Eingabefelder
+daraus. Eine Tabelle hier wäre die zweite Kopie der Obergrenzen, die beim nächsten Umbau
+auseinanderläuft – dieselbe Entscheidung wie bei den Kosmetik-Bedingungen. `test_bonuscodes` 6b/6c
+hält das fest.
+
+Wächter: `tests/test_bonuscodes.js` (27 Prüfungen, zwei Gegenproben). **Die zweite Gegenprobe ist die
+aussagekräftige:** Nur den `bonuscode`-Zweig entfernt, alles andere gelassen – dann meldet das Spiel
+`{"zeilen":["Dankeschön vom Team: +500 Kredite für deinen Bug-Report!"]}` bzw. `+NaN Kredite`, und
+Erz wie Kampfpunkte kommen gar nicht erst an.
+
+**Und ein eigener Werkzeugfehler, der Regel 34 belegt:** Die erste Gegenprobe gegen `origin/main`
+lief mit **24 statt 27** Prüfungen – der Test starb beim Aufbau von Abschnitt 6e, weil es die
+Admin-Felder dort nicht gibt, und `6e`/`6f` liefen nie. Der rote Exit-Code sah wie eine vollständige
+Gegenprobe aus. Der Aufbau steht seitdem in `try/catch` und meldet seinen Fehlschlag als eigene
+Prüfung `6e-bau`.
+
+## Wer sein Schürfrecht verteidigt (21.08.2026, v8.597.0) – die Lücke war nicht der Text
 
 Der letzte offene Punkt der Berichts-Familie. Nachgemessen im Browser war er **zwei** Befunde, und
 der zweite ist der schwerere:
@@ -3902,6 +4100,41 @@ nginx des Pi nachweislich korrekt – also genau die Entscheidung, die der erste
 Konfiguration, die nur einen Wert annehmen KANN, ist keine). Sie ist damit nicht mehr nur
 begründet, sondern an der Produktion gemessen.
 
+## Die Flottenverteidigung sagte im Kampf etwas anderes als auf dem Bildschirm (21.08.2026)
+
+Beim Vorbereiten von Teil A des Beute-Konzepts (Set-Boni für die Schiffsklassen-Module) war die
+Frage, ob die neuen Sets auf `atk`/`hull`/`shield` wirken dürfen. Das Konzept sagt, alle drei gingen
+in die Kampfkraft. **Gemessen stimmt das nur für `atk`** — und beim Nachmessen fielen vier
+Abweichungen zwischen `shipDefenseContribution()` hier und `computeDefensePower()` im Backend auf.
+
+Die vollständige Begründung, die Zahlen und die Entscheidung stehen in der **Backend-CLAUDE.md**
+unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zählt:
+
+- **Das Frontend gilt** (Entscheidung Sascha). Seine vier Konstruktionen sind im Quelltext
+  begründet, die Server-Vereinfachungen waren erfunden. Der Server ist auf das Frontend
+  angeglichen, nicht umgekehrt — an `shipDefenseContribution` ändert sich **nichts**.
+- **`hull` und `shield` sind ab jetzt PvP-relevant.** Bis hierher waren sie faktisch
+  klientenseitig, weil der Server sie gar nicht las. Wer an ihnen etwas ändert, ändert damit einen
+  server-autoritativen Kampfwert und muss die Backend-Kopie mitpflegen — dieselbe Kopie-Familie wie
+  `SHIP_SCORE_WEIGHTS`/`computeScoreServer`.
+- **Die Synergien sind die Wache.** `SHIP_SYNERGY_DEFS` trägt gemessen ausschließlich
+  `speed`/`fuel`/`cargo`; nur deshalb darf der Server sie ignorieren. **Wer dort je eine auf
+  `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
+  3a schlägt sonst an.
+
+Wächter: `tests/test_schiffsmodul_paritaet.js` (22 Prüfungen, vier Gegenproben — jede speist eine
+der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 22 gelaufenen
+Prüfungen).
+
+**Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
+Bausteinliste war eine Liste von 21 benannten Blöcken. Die Gegenprobe zur Schild-Basis baute
+`shipShield()` wieder ein, das darin fehlte — der Test brach am Aufbau ab statt an der geprüften
+Zeile, fuhr **14 statt 22** Prüfungen, und die Sabotage sah dadurch grün aus (Regel 34). Gefangen
+hat es nur die `WERKZEUGFEHLER`-Wache des Messskripts (Regel 71). Der Sammler holt seither
+Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektliteral und IIFE)
+und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
+geschrumpft.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
@@ -4073,3 +4306,213 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
 - Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.
 
 **PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main`. Gilt für Frontend- und Backend-Repo gleichermaßen. **Seit der Webhook bekannt ist, wiegt das schwerer als gedacht**: Der Merge ist nicht bloß ein Zwischenschritt zu einem späteren manuellen Deploy, sondern die Auslieferung selbst – was gemerged wird, steht Sekunden später auf `gamegeeeeek.de`. Der Prüflauf (`node tests/run.js`, grün) ist deshalb keine Formalie, sondern das einzige, was zwischen einer Änderung und den Spielern steht.
+
+## Das Inventar hing nach einem Massenkauf (21.08.2026, Spieler-Report)
+
+**Wortlaut Sascha:** „problem entstanden ich hatte 200millioen credits und hab bei modulblaupausen
+alles auf einmal gekauft jettzt hängt das spiel sobald ich ins inventar will!"
+
+Kein Wackeln, kein Ladefehler – **das Spiel stand wirklich**. Gemessen im Browser an einem
+Fixture, das den gemeldeten Fall nachstellt, Aufbau bis zur ersten Modulkarte:
+
+| Module | vorher | nachher | Markup vorher → nachher |
+|---|---|---|---|
+| 50 | 62 ms | 60 ms | 0,25 MB → 0,25 MB |
+| 4.000 | **30.628 ms** | 158 ms | 20,1 MB → 0,60 MB |
+| 5.000 | 30.343 ms | 109 ms | 24,6 MB → 0,60 MB |
+| 20.000 | **485.186 ms** | 206 ms | 100 MB → 0,62 MB |
+
+Härter noch als der Aufbau ist der längste EINZELNE Long Task – die Zeit, in der der Browser auf
+gar nichts mehr reagiert: bei 4.000 Modulen **15.186 ms gegen 90 ms**.
+
+### Die Ursache war dreiteilig, und nur der erste Teil ist die eigentliche Überraschung
+
+**(A) Der Schlüssel enthält einen ZUFALLSWURF – gekaufte Module stapeln deshalb nie.** Seit der
+Wert-Streuung (v8.444.0) baut `grantRandomModule` den Schlüssel als
+`typ:seltenheit:1:<subs>.w<wurf>`; darin stecken die gewürfelten Zweitwerte UND der
+Hauptwert-Wurf. Zwei Blaupausen desselben Typs landen damit praktisch immer auf zwei
+verschiedenen Schlüsseln. 20.000 Käufe sind also 20.000 Inventar-Einträge, nicht ein Stapel mit
+`×20000`. Der Kommentar an `fuseGeschwister` sagt das sogar wörtlich („identische Schluessel gibt
+es bei Funden faktisch nicht mehr") – nur hatte niemand die Folge für die LISTE zu Ende gedacht.
+
+**(B) Darauf lief eine quadratische Schleife.** Jede gezeichnete Modulkarte rief `fuseAnzahl`, und
+das lief über `fuseGeschwister` durch **alle** Inventar-Schlüssel. 20.000 Karten × 20.000
+Schlüssel = 400 Mio Vergleiche – je Neuzeichnung, und die Box wird im Sekundentakt geschrieben.
+
+**(C) Der „Max"-Knopf des Kredit-Shops hatte gar keine Obergrenze** (`Math.floor(credits / cost)`).
+Bei 200 Mio Krediten waren das 20.000 Blaupausen in einem Klick.
+
+### Behoben in drei Teilen – und keiner davon allein hätte gereicht
+
+1. **`fuseIndexBauen(inv, isShip)`** baut den Zähler EINMAL je Renderdurchgang statt einmal je
+   Karte; `fuseAnzahl(inv, instKey, idx)` nimmt ihn optional entgegen. Der Einzelaufruf in
+   `fuseModules` läuft weiter ohne Index – er feuert genau einmal je Klick. Die Gruppe eines
+   Moduls (Typ, Seltenheit, Stufe) steht als `fuseGruppeVon` an EINER Stelle, damit Index und
+   `fuseGeschwister` nicht auseinanderlaufen können.
+2. **`modulInventarZuschnitt(keys)`** zeichnet höchstens `MODUL_INVENTAR_MAX_KARTEN` = 120
+   Einträge und **beziffert den Rest** statt ihn zu verschweigen. Der Hinweis nennt beide Zahlen,
+   sagt, dass nichts verloren ist, und zeigt auf die Schnell-verschrotten-Knöpfe.
+3. **`MODUL_INVENTAR_KAUF_DECKEL` = 3.000** begrenzt, wie viele Einträge ein KAUF hinterlassen
+   darf. `shopMaxMenge(item)` ist dabei die EINE Stelle, die „wie viel geht höchstens"
+   beantwortet – vorher stand die Rechnung zweimal da (Kartenbeschriftung und Max-Knopf), und
+   **beide kannten weder das Tageslimit noch den Inventar-Platz**: Der Knopf versprach eine Menge,
+   die der Kauf danach stillschweigend kürzte.
+
+**Der Zuschnitt sortiert bei großen Beständen FACHWEISE, und das ist der halbe Gewinn.** Volles
+Sortieren ruft `moduleInvVergleich` n·log(n)-mal, und der ruft je Vergleich `moduleLevelOf` und
+`moduleWertOf` – bei 20.000 Modulen rund 285.000 Vergleiche für eine Liste, von der 120 Einträge
+gezeichnet werden. **Die Reihenfolge bleibt dabei identisch, und das ist keine Hoffnung, sondern
+folgt aus der Bauart des Vergleichs:** Seine erste Stufe ist der Seltenheitsrang. Wer die Fächer
+in Rangordnung abarbeitet und jedes mit demselben Vergleich sortiert, bekommt exakt die Ordnung
+des vollen Sortierens. `test_inventar_deckel` 2c misst das als Paar gegen das volle Sortieren.
+
+Nebenbei: `moduleInvVergleich` zog bei **jedem** Vergleich zweimal ein frisches
+`Object.keys(MODULE_RARITY)`. Die Rangordnung wird jetzt einmal in `rarRang` abgeleitet – bewusst
+ABGELEITET und nicht als Namensliste hingeschrieben, `MODULE_RARITY` ist die einzige Quelle der
+Rangfolge (siehe `nextRarityOf`).
+
+### Die Zahlen sind gemessen, nicht gegriffen
+
+- **120 Karten:** Bei 5.000 gezeichneten Einträgen stand der Aufbau bei 30 s und 25 MB, bei 120 bei
+  0,06 s und 0,6 MB. Weit über jedem regulären Inventar – wer so viele hält, hat sie gekauft.
+- **3.000 Einträge:** 3.000 sind gemessen **0 Long Tasks** und 159 kB Spielstand, 5.000 schon
+  588 ms/10 s und 257 kB, 20.000 dann 1.557 ms/10 s und 980 kB (normal sind 17 kB). 3.000 ist die
+  höchste gemessene Stufe ohne messbare Belastung. **Der Spielstand wiegt dabei schwerer als die
+  Bildrate: Er reist bei JEDEM Speichern zum Server.**
+
+**Gedeckelt wird nur das HINZUFÜGEN durch Kauf.** Funde aus Expeditionen und Sonden bleiben
+unberührt, und wer heute schon darüber liegt, verliert nichts – dieselbe Regel wie bei den
+Komfort-Grenzen. Ebenfalls außen vor sind Tagesangebot und Wochen-Angebot: Die liefern ein Modul
+je Tag bzw. Woche und können den Bestand bauartbedingt nicht sprengen. Die Unterscheidung läuft
+**datengetrieben über das Feld `toModules`**, nicht über eine Namensliste.
+
+### Zwei Anzeigestellen, die still falsch geworden wären
+
+- Der Titel des Max-Knopfes sagte „Höchste mit deinen Krediten kaufbare Menge" – mit dem Deckel
+  eine Falschaussage.
+- Der Hilfe-Abschnitt „Kredit-Shop" behauptete „Alles andere ist beliebig oft kaufbar". Das war
+  seit dem Fragment-Tageslimit (17.08.2026) schon falsch und wurde es jetzt ein zweites Mal.
+
+Beide nennen jetzt ihre Grenzen, und der Hilfetext leitet die Zahl aus der Konstante ab
+(Reihenfolge vorher gemessen: beide Konstanten stehen vor `HELP_SECTIONS`, Regel 38 geprüft).
+
+### Wächter: `tests/test_inventar_deckel.js` (32 Prüfungen, fünf Gegenproben)
+
+Er misst die WIRKUNG, nicht die Beschriftung – und zwar als **Paar**: Lauf A weit über dem Deckel
+(Kauf wird abgelehnt, Grund genannt, Bestand wächst nicht), Lauf B knapp darunter (Kauf findet
+statt und füllt **genau** bis an den Deckel). **Ohne Lauf B wäre auch ein Deckel grün, der immer
+ablehnt.** Alle fünf Gegenproben beidseitig gefahren, jede mit ihrer eigenen „was muss fallen"-Liste
+und `WERKZEUGFEHLER`-Meldung (Regel 71); überall 32 Prüfungen in beide Richtungen.
+
+**Fünf Werkzeugfehler beim Bau dieses Tests – jeder eine bekannte Familie, und der vierte ist der
+lehrreichste:**
+
+1. **Geschnittene Funktionen ohne ihre Abhängigkeiten** (Regel 36), gleich viermal: `rarRang`
+   fehlte `moduleInvVergleich`, `fuseGruppeVon` fehlte `fuseAnzahl` (in **drei** Bestandstests:
+   `test_wertstreuung`, `test_seltenheiten`, und im neuen Test selbst), `MODULE_LEVEL_MAX` fehlte
+   `moduleLevelOf`. Letzteres warf erst beim AUFRUF – also außerhalb des Bau-`try/catch`; seitdem
+   ist auch das Ausführen eine eigene, benannte Prüfung (`2a-lauf`, Regel 34).
+   `test_seltenheiten` lief dadurch mit **10 statt 21** Prüfungen und meldete trotzdem nur „rot".
+2. **Indizes aus zwei verschiedenen Strings verglichen:** Die Prüfung „niemand sortiert am
+   Zuschnitt vorbei" suchte in `JS_OHNE_HISTORIE`, hielt die Treffer aber gegen Blockgrenzen aus
+   `JS` – der herausgeschnittene Patchnotes-Block verschiebt alle Indizes, also lag **jede**
+   Fundstelle scheinbar außerhalb.
+3. **Den Spielstand aus `localStorage` gelesen**, obwohl er beim Backend-Mock liegt (Regel 65):
+   gemessen wurden 0 Einträge, was wie ein Befund aussah.
+4. **Einen Kürzungspfad gemessen, den der gewählte Weg gar nicht erreichen kann.** Über „Max"
+   deckelt der Knopf ja bereits richtig – `qty > platz` ist dann nie wahr. Der Pfad ist nur über
+   einen festen Mengenknopf (×10 bei 5 freien Plätzen) oder einen veralteten Wert erreichbar.
+   Das ist Regel 67: **ein unerreichbarer Pfad ist kein Testproblem, sondern eine Aussage über das
+   Bauwerk** – hier eine gute, denn sie heißt, dass der Normalweg gar nicht erst in die Kürzung
+   läuft.
+5. **Den MutationObserver den Endstand lesen lassen statt der Records:** Ein Kauf löst eine
+   Erfolgs-Salve im selben synchronen Block aus, und der Callback läuft als Microtask danach – die
+   Kürzungs-Meldung war von „Erfolg freigeschaltet: Perfekter Wurf" überschrieben. Muster jetzt wie
+   in `test_markt_kontingent.js`, per `addInitScript` und über die Records.
+   Dazu war der BELEG einer grünen Prüfung falsch: `slice(-2)` zeigte zweimal „Erfolg
+   freigeschaltet", während die geprüfte Zeile weiter vorn stand – eine grüne Prüfung, deren
+   Beleg etwas anderes behauptet (Regel 37).
+
+75. **Ein Erwartungswert, der die geprüfte KONSTANTE aus derselben Datei liest, lässt sich durch
+    Ändern der Konstante entschärfen – das ist Regel 62 an einer Schranke statt an einer Formel.**
+    Vorfall 21.08.2026: `3b` prüfte „höchstens `MODUL_INVENTAR_MAX_KARTEN` Karten gezeichnet" und
+    las den Deckel aus der Spieldatei. Die Gegenprobe setzte ihn auf 999999 – und die Prüfung
+    blieb **grün**, völlig folgerichtig: Die sabotierte Konstante wurde ja eingehalten. Gemeldet
+    hat es nur die „was muss fallen"-Liste der Gegenprobe (Regel 71); ohne sie wäre der Test mit
+    einer Lücke ausgeliefert worden, die genau den Anlassfall durchlässt.
+    **Vorgehen:** Zu jeder Prüfung gegen eine Konstante aus der geprüften Datei gehört eine zweite
+    mit einem **absoluten, begründeten Anker** – hier `3b2` („höchstens 500 Karten, egal was die
+    Konstante sagt") und `1-vorab2`/`1-vorab3` („der Deckel liegt im gemessen vertretbaren
+    Bereich"). Die absoluten Zahlen kommen aus der Messung, nicht aus dem Gefühl. Dasselbe galt für
+    das Fixture selbst: Seine Vorab-Prüfung hing an `MAX_KARTEN * 5` und wanderte damit mit.
+
+76. **Ein Zufallswurf im SCHLÜSSEL macht aus einem Stapel eine Liste – und aus jeder Schleife
+    darüber eine quadratische.** Aus demselben Vorfall, und es ist die Ursache dahinter: Der
+    Modul-Schlüssel trägt seit v8.444.0 die gewürfelten Zweitwerte und den Hauptwert-Wurf. Damit
+    ist `state.modules` kein Stapelzähler mehr (`typ → Anzahl`), sondern eine Liste von Unikaten,
+    und jede Rechnung „je Eintrag über alle Einträge" wächst quadratisch. Der Kommentar an
+    `fuseGeschwister` benannte die Eigenschaft korrekt – gefehlt hat die Frage, was sie für die
+    ANZEIGE bedeutet.
+    **Vorgehen:** Wer einem Schlüssel ein gewürfeltes Segment hinzufügt, prüft anschließend jede
+    Stelle, die über die Schlüssel dieser Sammlung iteriert, auf ihre Ordnung – und jede Stelle,
+    die eine Obergrenze für die Sammlung annimmt (Renderlisten, Sortierungen, der Spielstand
+    selbst). Die Kosten treten erst bei einem Spieler auf, der die Sammlung wirklich füllt, also
+    Monate nach der Auslieferung und außerhalb jedes Tests mit Normal-Fixture.
+
+77. **Ein `\uXXXX`-Escape im Patchnote-Text macht die dateiweiten Zeichenprüfungen BLIND.**
+    Vorfall 21.08.2026: Der Patchnote zu v8.599.0 entstand über ein Python-Skript, das seine
+    Umlaute als `ä`/`ß` schrieb (23 Stück). Das ist zur Laufzeit korrekt – JavaScript
+    löst die Escapes in einem String-Literal auf, und die erzeugte `patchnotes.html` zeigte
+    einwandfrei „Sehr große Inventare…". Trotzdem war es ein Fehler, und zwar ein unsichtbarer:
+    Die Pflichtprüfung „Anführungszeichen im Hausstil" sucht nach dem **Literal** U+201C im
+    Quelltext. Fünf falsche Anführungszeichen standen als `“` da und wurden deshalb **nicht
+    gefunden** – der Prüflauf war grün, und v8.599.0 wäre mit demselben Hausstil-Verstoß live
+    gegangen, der schon v8.564.0 mit rotem Prüflauf ausgeliefert hat (Regel 58).
+    Aufgefallen ist es nur, weil die Escapes als STIL-Abweichung auffielen (1.473 echte Umlaute in
+    der Datei gegen 23 Escapes) und ich sie vor dem Merge ersetzt habe – erst danach schlug die
+    Prüfung an.
+    **Vorgehen:** Wer Spielertext über ein Skript einfügt, schreibt die Sonderzeichen **direkt**
+    hinein (Python-Quelldateien sind UTF-8, `io.open(..., encoding='utf-8')` genügt) – nie als
+    Escape. Ein Escape ist kein Schreibfehler, sondern eine TARNUNG: Er versteckt das Zeichen vor
+    jeder Prüfung, die den Quelltext liest, und genau solche Prüfungen sind hier die
+    Pflichtprüfungen. Und wer einen Patchnote noch vor dem Merge umschreibt, fährt danach
+    `--nummer` erneut – die Änderung sieht harmlos aus und kann eine dateiweite Prüfung kippen.
+    **Die zweite Hälfte ist die eigentliche Lehre:** Ein Prüflauf, der grün ist, weil das Gesuchte
+    in einer anderen Kodierung dasteht, ist die Familie aus Regel 32 (Literal gesucht, Rechenform
+    übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
+    das Werkzeug Sauberkeit, wo keine ist.
+
+## Vorarbeit: die Belohnungsvorschau des Allianz-Raids IST rechenbar (gemessen 21.08.2026)
+
+Auftrag Sascha: „allianz raid deutlich optisch aktraktiver gestalkten weniger text und vsl.
+belohnungen einblenden." Die Etappe ist noch nicht gebaut; hier steht nur, was die Vorabmessung
+ergeben hat – **und sie widerlegt meine eigene erste Einschätzung.**
+
+Notiert hatte ich, eine exakte Vorschau sei unmöglich, weil die Belohnung am Platz ALLER
+Teilnehmer hängt. Gemessen stimmt das nicht: `ranking` wird **beim Abflug** gebildet und nach
+Angriffskraft sortiert (`server.js`, `onTime.slice().sort((a,b) => (b.power||0) - (a.power||0))`),
+und dieselbe Liste wandert unverändert ins Wellen-Ergebnis, aus dem `/claim` den Platz liest. Damit
+stehen nach dem Versand **alle** Eingaben von `allianceRaidRewardFor` fest:
+
+| Eingabe | Woher im Frontend |
+|---|---|
+| `share` | eigene `power` / `doc.dispatch.totalPower` |
+| `platz` | Index in `doc.dispatch.ranking` |
+| `anzahl` | Länge derselben Liste |
+| `boss` | `ALLIANCE_RAID_BOSSE` liegt im Frontend (`beuteMult`, `schwerpunkt`) |
+| `level` | `doc.level` |
+| `destroyed` | **das Einzige, was offen ist** |
+
+Eine Vorschau ist deshalb kein Schätzwert mit Spanne, sondern ein **PAAR aus zwei exakten Werten**:
+„Boss überlebt" (Faktor 0,6, keine Antimaterie, keine Fragmente) und „Boss fällt" (Faktor 1,0).
+
+**Der Preis ist eine Kopie-Familie.** `allianceRaidRewardFor` müsste im Frontend nachgebaut werden –
+mit Paritätsprüfung als Pflicht, wie bei `FESTUNG_STUFEN` und `SHIP_SCORE_WEIGHTS`. Die Alternative
+ist ein Feld vom Server (ein Backend-PR, keine zweite Formel). Diese Wahl gehört Sascha vorgelegt,
+nicht still entschieden.
+
+**Zum Textumfang, gemessen statt geschätzt:** `renderAllianceRaidBox` ist 15.462 Zeichen über 166
+Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die zwei längsten sind
+der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
+die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
+TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.

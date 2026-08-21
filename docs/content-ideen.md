@@ -348,7 +348,7 @@ flache Vollfarbe mit einer helleren Facette, Striche 1,4–2,5 — der Stil steh
 zu behaupten (Hausregel 42: der erste Protomaterie-Entwurf wirkte wie eine Münze, der zweite war
 bei 20 px nicht von Erz zu unterscheiden — beides fiel nur am Bild auf).
 
-### 4.9 Bonuscodes im Admin-Bereich (Auftrag Sascha 21.08.2026)
+### 4.9 Bonuscodes im Admin-Bereich (Auftrag Sascha 21.08.2026) — **UMGESETZT 21.08.2026 (v8.598.0, Backend #155)**
 
 **Wortlaut:** „bonuscodes einführen ich will ab und zu mal bonuscodes posten wo die spieler kleine
 geschenke bekommen die codes sollen aber nur eine gewisse gültigkeit haben also max 1 mal pro
@@ -411,6 +411,23 @@ landet, ist sonst nicht zu bremsen – eine Woche Laufzeit hilft dagegen nicht.
 deaktivieren), Frontend ein Eingabefeld und ein Abschnitt im Admin-Overlay. Beide Hälften sind
 einzeln auslieferbar, wenn das Frontend einen fehlenden Endpunkt sauber benennt (CLAUDE.md Regel 35)
 – **Backend zuerst**, sonst bietet das Spiel eine Eingabe an, die niemand einlösen kann.
+
+**So gebaut (21.08.2026).** Die Schätzung hat gehalten; drei Dinge kamen beim Bauen dazu, jedes aus
+einer Messung:
+
+1. **`authRateLimit` gehört NICHT an die Einlöse-Route** – der naheliegende Griff, und im Test
+   gemessen falsch. Es zählt jeden Aufruf, auch die erfolgreichen; ein Konto hatte nach vier
+   eingelösten Codes und elf Rateversuchen die IP-Grenze erreicht und bekam eine Meldung, die mit
+   Bonuscodes nichts zu tun hat. Beim Login ist jeder Aufruf ein Versuch, hier ist ein Erfolg keiner.
+2. **Der eigene `type:'bonuscode'` im Client ist Pflicht, nicht Kosmetik.** `claimPendingRewards`
+   weist einen unbekannten Typ nicht ab, sondern lässt ihn in den Rückfall-Zweig fallen – der meldet
+   wörtlich „Dankeschön vom Team: +500 Kredite für deinen Bug-Report!" und bei fehlendem
+   `credits`-Feld sogar „+NaN Kredite". Beides in der Gegenprobe gemessen.
+3. **Die Gaben-Felder im Admin-Bereich entstehen aus der Server-Antwort**, nicht aus einer Tabelle im
+   Frontend – sonst gäbe es zwei Sätze Obergrenzen, die auseinanderlaufen.
+
+Wächter: `tests/test_bonuscodes_http.js` (Backend, 32 Prüfungen, vier Gegenproben) und
+`tests/test_bonuscodes.js` (Frontend, 27 Prüfungen, zwei Gegenproben).
 
 ## 5. Töpfe ohne Senke (alle vier nachgemessen, alle vier offen)
 
