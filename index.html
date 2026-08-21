@@ -32282,10 +32282,27 @@
         if (res.status === 403 && data && data.shieldMs > 0){
           const mins = Math.max(1, Math.ceil(data.shieldMs/60000));
           if (showLog !== false) log((m.fleetName||'Flotte')+': '+name+' steht unter Angriffs-Schutzschild (noch ~'+mins+' Min) – der Angriff prallt ab, die Flotte kehrt unversehrt zurück.', 'ti-shield');
+          /* Der Bericht ist hier WICHTIGER als das log: `showLog` steht beim Offline-Nachholen auf
+             false - genau dann erfuhr der Spieler bis v8.591.0 ueberhaupt nichts. */
+          angriffOhneKampf('player-attack', name,
+            name+' stand unter Angriffs-Schutzschild (noch ~'+mins+' Min) – der Angriff prallte ab.',
+            { fleetName:m.fleetName, targetName:name, targetId:m.targetId });
           return;
         }
-        if (!res.ok){ if (showLog !== false) log('Angriff auf '+name+' konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
-      } catch(e){ if (showLog !== false) log('Server für Angriffsauswertung nicht erreichbar - Flotte kehrt ohne Ergebnis zurück.', 'ti-alert-triangle'); return; }
+        if (!res.ok){
+          if (showLog !== false) log('Angriff auf '+name+' konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle');
+          angriffOhneKampf('player-attack', name,
+            'Der Server konnte den Angriff nicht auswerten: '+((data && data.error)||'unbekannter Grund')+'.',
+            { fleetName:m.fleetName, targetName:name, targetId:m.targetId });
+          return;
+        }
+      } catch(e){
+        if (showLog !== false) log('Server für Angriffsauswertung nicht erreichbar - Flotte kehrt ohne Ergebnis zurück.', 'ti-alert-triangle');
+        angriffOhneKampf('player-attack', name,
+          'Die Verbindung brach ab, bevor der Angriff ausgewertet werden konnte – deine Flotte ist unversehrt.',
+          { fleetName:m.fleetName, targetName:name, targetId:m.targetId });
+        return;
+      }
       // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
       if (data.success){
@@ -33984,6 +34001,13 @@
     return teile.length;
   }
   function battleOutcomeOf(r){
+    /* Ein Angriff, der gar nicht erst zum Kampf kam, ist KEIN Kampf - er zaehlt weder als Sieg noch
+       als Niederlage. Diese Zeile muss ganz vorn stehen: Die Zeilen darunter urteilen nach `result`,
+       und ein `keinKampf`-Bericht traegt das Feld nicht. Ein abgeprallter Angriff (Ziel unter
+       Schutzschild) landete sonst als VERLORENER Kampf in der Bilanz und loeste ueber pushReport
+       ausserdem die Kampf-Nachwirkung nicht aus, wohl aber die Verlust-Zaehlung.
+       Dieselbe Ueberlegung wie beim 'escaped' der Piraten sechs Zeilen weiter unten. */
+    if (r.keinKampf) return null;
     if (r.type === 'raid') return r.result === 'win' ? 'win' : 'loss';
     if (r.type === 'npc-attack' || r.type === 'player-attack') return r.result === 'win' ? 'win' : 'loss';
     if (r.type === 'expedition' && r.encountered) return r.result === 'defended' ? 'win' : 'loss';
@@ -43360,8 +43384,18 @@
     try {
       res = await backendFetch('/basedamage/solo', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, targetTag, composition: m.composition, originPlanet: planetKey }) });
       data = await res.json();
-    } catch(e){ log('Verbindungsfehler bei der Auflösung des Basis-Angriffs.', 'ti-alert-triangle'); return; }
-    if (!res.ok || !data.ok){ log('Angriff auf die Allianzbasis von ['+targetTag+'] fehlgeschlagen: '+(data && data.error || 'unbekannter Fehler')+'.', 'ti-alert-triangle'); return; }
+    } catch(e){
+      log('Verbindungsfehler bei der Auflösung des Basis-Angriffs.', 'ti-alert-triangle');
+      angriffOhneKampf('alliance-base-attack', 'Allianzbasis von ['+targetTag+']',
+        'Die Verbindung brach ab, bevor der Angriff ausgewertet werden konnte.', { targetTag });
+      return;
+    }
+    if (!res.ok || !data.ok){
+      log('Angriff auf die Allianzbasis von ['+targetTag+'] fehlgeschlagen: '+(data && data.error || 'unbekannter Fehler')+'.', 'ti-alert-triangle');
+      angriffOhneKampf('alliance-base-attack', 'Allianzbasis von ['+targetTag+']',
+        'Der Server hat den Angriff abgelehnt: '+((data && data.error) || 'unbekannter Grund')+'.', { targetTag });
+      return;
+    }
     if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
     state.battlePoints = data.newBattlePoints;
     if (data.destroyed) state.allianceBaseAttacksWon = (state.allianceBaseAttacksWon||0)+1;
