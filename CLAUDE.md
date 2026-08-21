@@ -4291,3 +4291,26 @@ lehrreichste:**
     die eine Obergrenze für die Sammlung annimmt (Renderlisten, Sortierungen, der Spielstand
     selbst). Die Kosten treten erst bei einem Spieler auf, der die Sammlung wirklich füllt, also
     Monate nach der Auslieferung und außerhalb jedes Tests mit Normal-Fixture.
+
+77. **Ein `\uXXXX`-Escape im Patchnote-Text macht die dateiweiten Zeichenprüfungen BLIND.**
+    Vorfall 21.08.2026: Der Patchnote zu v8.599.0 entstand über ein Python-Skript, das seine
+    Umlaute als `ä`/`ß` schrieb (23 Stück). Das ist zur Laufzeit korrekt – JavaScript
+    löst die Escapes in einem String-Literal auf, und die erzeugte `patchnotes.html` zeigte
+    einwandfrei „Sehr große Inventare…". Trotzdem war es ein Fehler, und zwar ein unsichtbarer:
+    Die Pflichtprüfung „Anführungszeichen im Hausstil" sucht nach dem **Literal** U+201C im
+    Quelltext. Fünf falsche Anführungszeichen standen als `“` da und wurden deshalb **nicht
+    gefunden** – der Prüflauf war grün, und v8.599.0 wäre mit demselben Hausstil-Verstoß live
+    gegangen, der schon v8.564.0 mit rotem Prüflauf ausgeliefert hat (Regel 58).
+    Aufgefallen ist es nur, weil die Escapes als STIL-Abweichung auffielen (1.473 echte Umlaute in
+    der Datei gegen 23 Escapes) und ich sie vor dem Merge ersetzt habe – erst danach schlug die
+    Prüfung an.
+    **Vorgehen:** Wer Spielertext über ein Skript einfügt, schreibt die Sonderzeichen **direkt**
+    hinein (Python-Quelldateien sind UTF-8, `io.open(..., encoding='utf-8')` genügt) – nie als
+    Escape. Ein Escape ist kein Schreibfehler, sondern eine TARNUNG: Er versteckt das Zeichen vor
+    jeder Prüfung, die den Quelltext liest, und genau solche Prüfungen sind hier die
+    Pflichtprüfungen. Und wer einen Patchnote noch vor dem Merge umschreibt, fährt danach
+    `--nummer` erneut – die Änderung sieht harmlos aus und kann eine dateiweite Prüfung kippen.
+    **Die zweite Hälfte ist die eigentliche Lehre:** Ein Prüflauf, der grün ist, weil das Gesuchte
+    in einer anderen Kodierung dasteht, ist die Familie aus Regel 32 (Literal gesucht, Rechenform
+    übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
+    das Werkzeug Sauberkeit, wo keine ist.
