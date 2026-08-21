@@ -287,13 +287,13 @@ Ressourcen nur über HTTPS (wir haben genau eine, den Link aufs Spiel) und keine
 | Kind of project | **HTML** („play in browser") |
 | Release status | **Released** |
 | Pricing | **No payments** |
-| Uploads | `kolonie-kepler-7-itch.zip`, Haken bei **„This file will be played in the browser"** |
+| Uploads | `kolonie-kepler-7-itch.zip` (2 Dateien: `index.html` + `kulisse.js`, 23 kB), Haken bei **„This file will be played in the browser"** |
 | Embed | **Embed in page**, Breite `960`, Höhe `600` |
 | Mobile friendly | **an** (die Karte ist am Hochformat gemessen) |
 | Fullscreen button | **aus** – eine Startkarte braucht keinen |
 | Genre | **Strategy** |
 | Tags | `browser`, `space`, `idle`, `incremental`, `multiplayer`, `strategy`, `management`, `german`, `no-pay-to-win`, `4x` (itch.io erlaubt **bis zu 10**) |
-| Cover image | `presse-bilder/itch-cover.png` (630×500 – erzeugt mit `node itch-wrapper/theme-bauen.js`) |
+| Cover image | `presse-bilder/itch-cover.jpg` (630×500 – erzeugt mit `node itch-wrapper/theme-bauen.js`) |
 | Screenshots | 3–5 aus `presse-bilder/` (`node marketing-screenshots.js`) |
 | Visibility | erst **Draft**, dann **Public** |
 
@@ -301,11 +301,29 @@ Ressourcen nur über HTTPS (wir haben genau eine, den Link aufs Spiel) und keine
 
 Alle Bilder liegen nach `node itch-wrapper/theme-bauen.js` in `presse-bilder/`.
 
-| Feld auf der Theme-Seite | Datei | Größe |
+| Feld auf der Theme-Seite | Datei | Größe | Gewicht |
+|---|---|---|---|
+| **Banner** | `itch-banner.jpg` | 960×300 (Datei 1920×600) | 90 kB |
+| **Background** | `itch-hintergrund.png` | 1600×1000 (1:1), kachelbar | 14 kB |
+| **Embed BG** | `itch-embed-bg.jpg` | 960×600 (Datei 1920×1200) | 129 kB |
+
+**Warum drei JPEG und ein PNG, und warum die Textur bei einfacher Auflösung bleibt** – beides
+gemessen, nicht nach Geschmack entschieden. Der Inhalt der drei Bildflächen ist fast
+ausschließlich weicher Verlauf (Planetenkörper, Terminator, Nebel), und daran scheitert PNG:
+Es speichert jeden Farbwert verlustfrei und kann aus einem Verlauf nichts wegnehmen. Der
+Seitenhintergrund umgekehrt ist nach dem Wegfall des Nebels fast leer – dort wäre JPEG falsch,
+weil es um jeden Stern Ringe malte und die harte Kante dort der ganze Inhalt ist.
+
+| | vorher (alles PNG, alles 2×) | jetzt |
 |---|---|---|
-| **Banner** | `itch-banner.png` | 960×300 (Datei 1920×600) |
-| **Background** | `itch-hintergrund.png` | 1600×1000 (Datei 3200×2000), kachelbar |
-| **Embed BG** | `itch-embed-bg.png` | 960×600 – **zeigt derzeit nichts**, siehe unten |
+| Cover | 877 kB | **95 kB** |
+| Banner | 787 kB | **90 kB** |
+| Hintergrund | 2.026 kB | **14 kB** |
+| Embed BG | 1.508 kB | **129 kB** |
+| **Summe** | **5,2 MB** | **328 kB** |
+
+Banner und Hintergrund laden bei **jedem** Aufruf der Spielseite mit – das waren zusammen
+1,4 MB, bevor ein Besucher ein Wort gelesen hatte.
 
 **Die Größen sind abgeleitet, nicht abgeschrieben.** itch.io nennt für diese drei in seiner
 Doku (`itch.io/docs/creators/design`, geprüft 21.08.2026) **keine** Pixelmaße – nur, dass der
@@ -343,6 +361,45 @@ und der Rand bleibt hell, wo das Bild nicht reicht:
 | BG 2 | `#ffffff` | **unverändert** | der Inhaltskasten bleibt weiß, die Beschreibung damit gut lesbar |
 | Text | `#222222` | **unverändert** | steht auf BG 2, nicht auf dem Bild |
 | Link | `#fa5c5c` | `#F09849` | die Akzentfarbe des Spiels statt itch.ios Vorgaberot |
+
+### Was die LIVE-Seite am 21.08.2026 wirklich zeigte – gemessen, nicht angenommen
+
+Die Seite steht: **https://gamegeeeeek.itch.io/kolonie-kepler-7** (Cover, Banner, Hintergrund,
+fünf Screenshots, neun Tags, Genre Strategy, HTML5). Gemessen wurde am **rohen HTML** der Seite,
+nicht am Eindruck – und drei Dinge weichen von der Tabelle oben ab:
+
+| Befund | Messung | Folge |
+|---|---|---|
+| **Die Beschreibung ist LEER** | kein `formatted_description`-Block im HTML | Die Seite hat **gar keinen Text**. Der fertige liegt unten in diesem Abschnitt. |
+| **Modus ist „Click to play"** | `iframe_placeholder` + `load_iframe_btn` + „Run game" | Ein Klick mehr bis ins Spiel (siehe unten) |
+| **Farben unverändert** | `--itchio_bg_color: #eeeeee`, `--itchio_link_color: #fa5c5c` | Die zwei empfohlenen Änderungen sind noch nicht gesetzt |
+
+**Die leere Beschreibung ist der mit Abstand teuerste Punkt.** Sie ist das einzige Feld, das
+erklärt, was das Spiel ist; sie trägt jedes Suchwort, über das jemand die Seite findet; und sie
+steht direkt unter der Einbettung, also genau dort, wohin ein Besucher nach dem ersten Blick
+schaut. Ein Eintrag ohne sie ist ein Bild mit einem Knopf.
+
+**Zum Modus, und es ist eine echte Abwägung statt eines Fehlers:** „Click to play" ist der
+einzige Modus, in dem die **Embed BG** überhaupt erscheint – dafür kostet er einen Klick mehr.
+Gezählt:
+
+| Modus | Weg bis ins Spiel |
+|---|---|
+| **Embed in page** *(empfohlen)* | Startkarte steht sofort → **1 Klick** → Spiel im eigenen Tab |
+| Click to play | „Run game" → Startkarte lädt → **2 Klicks** → Spiel im eigenen Tab |
+
+Die Empfehlung bleibt **Embed in page**, und seit dem 21.08.2026 hat sie einen zweiten Grund:
+Die Startkarte zeichnet jetzt selbst einen animierten Planeten mit kreisenden Verbänden. Sie ist
+damit das bessere Standbild als die Embed BG – und sie steht sofort da, statt hinter einem Knopf.
+
+**Was die AI-Kennzeichnung angeht** (die Seite trägt „AI Assisted" für Code, Graphics, Sounds,
+Text): itch.io wendet darauf **keine automatische Filterung an** – die Angabe erzeugt virtuelle
+Tags, nach denen Besucher *positiv* filtern können, und pflichtig ist sie nur für Asset-Ersteller.
+Eine Sache ist dabei gemessen und gehört genannt: Das Spiel enthält **keine einzige Tondatei**
+(`find` über das Repo: null Treffer für mp3/ogg/wav/m4a, kein `new Audio`). Seine Klänge entstehen
+zur Laufzeit aus `webkitAudioContext` + `createOscillator` – also aus **Code**, nicht aus
+generierten Audio-Assets. Ob „Sounds" damit zutrifft, ist Saschas Entscheidung; die Messung sagt
+nur, worüber entschieden wird.
 
 **Drei Feldwerte mit Begründung, weil der naheliegende falsch wäre:**
 

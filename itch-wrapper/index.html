@@ -93,6 +93,15 @@ h1{
   word-break:normal; overflow-wrap:break-word;
 }
 @media (max-width:520px){ .karte{padding:26px 22px 22px;} }
+/* Ab 820 px steht die Karte LINKS statt mittig - sonst laege sie auf dem Planeten, und der
+   waere ein Hintergrund, den man nicht sieht. Darunter (Handy, schmale Einbettung) bleibt
+   sie mittig: Dort ist fuer ein Nebeneinander kein Platz, und der Planet rutscht ueber
+   seine Anteile ohnehin fast vollstaendig aus dem Bild. */
+@media (min-width:820px){
+  body{ justify-content:flex-start; padding-left:5%; }
+  .karte{ max-width:560px; }
+}
+
 </style>
 </head>
 <body>
@@ -132,50 +141,40 @@ h1{
   </p>
 </main>
 
+<script src="kulisse.js"></script>
 <script>
-// Sternenfeld - dieselbe Bildsprache wie im Spiel, ohne eine einzige externe Datei
-// (die CSP eines eingebetteten Rahmens lässt fremde Hosts ohnehin nicht durch).
+// Kulisse: Sternenfeld, Nebel, Planet und laufende Verbaende - dieselbe EINE Quelle wie
+// Cover, Banner, Hintergrund und Embed-BG (kulisse.js). Vorher trug diese Datei ihr eigenes
+// Sternenfeld, also die fuenfte fast gleiche Kopie derselben zwanzig Zeilen.
+//
+// bewegt:true gibt es NUR hier: Die vier Standbilder werden einmal gerendert und
+// abgespeichert - eine Animationsschleife waere dort Rechenzeit fuer nichts. Diese Seite
+// dagegen laeuft im Browser des Spielers, und der Planet mit den kreisenden Verbaenden ist
+// das, was aus einer Textkarte eine Startkarte macht.
+// prefers-reduced-motion schaltet die Bewegung ab, ohne dass das Bild verschwindet.
 (function () {
-  var c = document.getElementById('sterne'), x = c.getContext('2d'), sterne = [];
+  var c = document.getElementById('sterne');
   function neu() {
-    c.width = innerWidth; c.height = innerHeight;
-    sterne = [];
-    // Dichte und Helligkeit sind GEMESSEN, nicht geschätzt: Der erste Entwurf (1 Stern je
-    // 9000 px², r bis 1,6, Alpha ab 0,2) malte auf 960x600 nur 349 von 576.000 Bildpunkten an -
-    // also 0,06 %, im Screenshot schlicht nicht zu sehen. Ein Effekt, den niemand sieht, ist
-    // toter Code.
-    var n = Math.min(420, Math.round(innerWidth * innerHeight / 2600));
-    for (var i = 0; i < n; i++) sterne.push({
-      x: Math.random() * c.width, y: Math.random() * c.height,
-      r: Math.random() * 1.6 + .55, a: Math.random() * .45 + .35,
-      s: Math.random() * .02 + .005
+    Kulisse.zeichne(c, {
+      breite: innerWidth, hoehe: innerHeight,
+      bewegt: true,
+      sternFlaeche: 2600, sternMax: 460,
+      // Der Planet steht rechts unten und ragt aus dem Bild. Auf einem schmalen Hochformat
+      // rutscht er dabei weit genug hinaus, dass die Karte nicht auf ihm liegt - deshalb
+      // Anteile statt fester Punkte.
+      planet: { fx: .93, fy: 1.04, fr: .60 },
+      orbits: [
+        { rx: 1.22, ry: 1.18, dreh: -16, punkte: 3, start: 1.1, tempo: .11, a: .26 },
+        { rx: 1.55, ry: 1.49, dreh: -16, punkte: 2, start: 3.7, tempo: -.08, a: .17, punktR: 2.1 },
+        { rx: 1.92, ry: 1.84, dreh: -16, punkte: 1, start: 5.5, tempo: .06, a: .11, punktR: 1.9 }
+      ]
     });
   }
-  var phase = 0;
-  function mal() {
-    x.clearRect(0, 0, c.width, c.height);
-    phase += .01;
-    for (var i = 0; i < sterne.length; i++) {
-      var st = sterne[i];
-      x.globalAlpha = st.a + Math.sin(phase + i) * .12;
-      x.fillStyle = '#CBD6F0';
-      x.beginPath(); x.arc(st.x, st.y, st.r, 0, 6.284); x.fill();
-    }
-    x.globalAlpha = 1;
-    requestAnimationFrame(mal);
-  }
-  addEventListener('resize', neu);
-  // prefers-reduced-motion respektieren: dann einmal zeichnen statt zu animieren.
   neu();
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    x.clearRect(0, 0, c.width, c.height);
-    for (var i = 0; i < sterne.length; i++) {
-      var st = sterne[i];
-      x.globalAlpha = st.a; x.fillStyle = '#CBD6F0';
-      x.beginPath(); x.arc(st.x, st.y, st.r, 0, 6.284); x.fill();
-    }
-    x.globalAlpha = 1;
-  } else mal();
+  // Ein Grossenwechsel wird ENTPRELLT: itch.io stellt die Einbettung beim Wechsel in den
+  // Vollbildmodus in mehreren Schritten um, und jeder Neuaufbau wuerfelt das Sternenfeld neu.
+  var t = null;
+  addEventListener('resize', function () { clearTimeout(t); t = setTimeout(neu, 160); });
 })();
 
 // Ein sandboxed iframe OHNE allow-popups blockiert target="_blank" stillschweigend - der Spieler

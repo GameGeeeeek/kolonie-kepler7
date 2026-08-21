@@ -57,15 +57,20 @@ Messwerkzeug messen statt die Seite.
 
 ## Hochladen
 
-1. **NUR `index.html`** als ZIP packen — nicht den Ordner, und nicht die übrigen Dateien darin.
-   Der Ordner enthält inzwischen vier Dateien, von denen drei **nicht** hochgeladen werden dürfen:
-   `README.md` (diese Datei), die vier Bild-Vorlagen (`cover.html`, `theme-banner.html`,
-   `theme-hintergrund.html`, `theme-embed.html`) und `theme-bauen.js`. Ein
-   `zip -r` über den Ordner lädt sie mit hoch, und `cover.html` wäre auf itch.io dann als
-   `/cover.html` öffentlich abrufbar — eine zweite Seite, die niemand erwartet.
+1. **Genau `index.html` UND `kulisse.js`** als ZIP packen — nicht den Ordner, und nichts
+   sonst darin. `kulisse.js` ist seit dem 21.08.2026 Pflicht: Die Startkarte zeichnet ihren
+   Hintergrund (Sternenfeld, Nebel, Planet, kreisende Verbände) nicht mehr selbst, sondern
+   aus dieser einen gemeinsamen Quelle, die auch Cover, Banner, Seitenhintergrund und
+   Embed-BG benutzen. Fehlt sie im ZIP, lädt die Seite — und der Hintergrund bleibt **leer**,
+   ohne Fehlermeldung.
+   **Nicht** hochgeladen werden dürfen: `README.md` (diese Datei), die vier Bild-Vorlagen
+   (`cover.html`, `theme-banner.html`, `theme-hintergrund.html`, `theme-embed.html`) und
+   `theme-bauen.js`. Ein `zip -r` über den Ordner lädt sie mit hoch, und `cover.html` wäre
+   auf itch.io dann als `/cover.html` öffentlich abrufbar — eine zweite Seite, die niemand
+   erwartet.
 
    ```
-   cd itch-wrapper && zip -X ../kolonie-kepler-7-itch.zip index.html
+   cd itch-wrapper && zip -X ../kolonie-kepler-7-itch.zip index.html kulisse.js
    ```
 
    Prüfen, dass wirklich nur eine Datei drin ist: `unzip -l kolonie-kepler-7-itch.zip`
@@ -79,6 +84,10 @@ Messwerkzeug messen statt die Seite.
    für die drei Felder, bei denen der naheliegende Wert der falsche wäre.
 6. **Coverbild** (itch.io verlangt das Seitenverhältnis 315:250, empfohlen 630×500):
    `node itch-wrapper/theme-bauen.js` erzeugt ALLE vier itch.io-Bilder nach `presse-bilder/`
+   — die drei Bildflächen als **JPEG** (`itch-cover.jpg`, `itch-banner.jpg`,
+   `itch-embed-bg.jpg`), die kachelnde Textur als PNG (`itch-hintergrund.png`). Das
+   Format ist gemessen, nicht Geschmack: Als PNG wogen die vier zusammen 3,8 MB, jetzt
+   328 kB — Begründung im Kopf der Tabelle in `theme-bauen.js`.
    (Cover, Banner, Seitenhintergrund, Embed-BG); `node itch-wrapper/theme-bauen.js banner`
    baut nur eines. Die Vorlage ist
    `cover.html` — wer sie ändert, sieht sich das Ergebnis in **Thumbnail-Größe** an, nicht nur

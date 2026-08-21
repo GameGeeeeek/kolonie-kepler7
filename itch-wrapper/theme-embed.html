@@ -4,79 +4,60 @@
 <meta charset="utf-8">
 <title>Kolonie Kepler-7 – Embed-Hintergrund</title>
 <!--
-  EMBED-HINTERGRUND ("Embed BG") fuer itch.io. Gerendert auf 960x600.
+  EMBED-BG fuer itch.io. Gerendert auf 960x600 - exakt die eingestellte Einbettungsgroesse.
 
-  ==> WICHTIG, UND ES IST GEMESSEN, NICHT VERMUTET: Bei der AKTUELLEN Einstellung zeigt itch.io
-  dieses Bild GAR NICHT. Die Doku (itch.io/docs/creators/html5, geprueft 21.08.2026) beschreibt
-  es woertlich als "A image that takes up the size of the viewport that sits behind the Play
-  button" - und den Play-Knopf gibt es nur im Modus "Click to play". Die Spielseite steht auf
-  "Embed in page" (dokumentiert in docs/marketing-einreichungen.md), die Einbettung laedt also
-  sofort und fuellt ihre 960x600 vollstaendig mit der Startkarte. Dahinter ist nichts zu sehen.
+  WANN DAS BILD UEBERHAUPT ERSCHEINT: Die Doku (itch.io/docs/creators/html5) beschreibt es
+  als "A image that takes up the size of the viewport that sits behind the Play button" -
+  den Play-Knopf gibt es NUR im Modus "Click to play". Bei "Embed in page" laedt die
+  Startkarte sofort und fuellt ihre 960x600 vollstaendig; das Bild ist dann unsichtbar.
+  Es liegt trotzdem bei, damit es da ist, falls der Modus wechselt.
 
-  Warum es trotzdem existiert: Der Umschalter kostet zwei Klicks, und wer ihn je umlegt, hat
-  das passende Bild dann schon. Ein hochgeladenes Bild ohne Wirkung schadet nicht - eine
-  Startkarte, die ploetzlich auf weissem Grund steht, schon.
-
-  Von "Click to play" wird ABGERATEN, und auch das ist eine Rechnung, keine Meinung: Die
-  Einbettung IST bereits eine Startkarte mit einem Knopf. Mit "Click to play" braeuchte der
-  Spieler DREI Klicks bis ins Spiel (Play -> Startkarte -> eigener Tab) statt zwei.
-
-  Die Masse 960x600 sind exakt die eingestellte Einbettungsgroesse - der "viewport" aus der
-  Doku ist genau diese Flaeche.
-
-  Rendern:  node itch-wrapper/theme-bauen.js
+  Rendern:  node itch-wrapper/theme-bauen.js embed
 -->
 <style>
-  html,body{margin:0;padding:0;width:960px;height:600px;overflow:hidden;}
-  body{
-    background:#0B1020; color:#E6EAF2; position:relative;
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-  }
-  canvas#sterne{position:absolute;inset:0;}
-  .planet{
-    position:absolute; right:-140px; bottom:-210px; width:470px; height:470px; border-radius:50%;
-    background:radial-gradient(circle at 32% 28%, #F0A85E 0%, #C2410C 42%, #7C2D12 68%, #3B1608 100%);
-    box-shadow:0 0 100px rgba(240,152,73,.30), inset -34px -26px 74px rgba(0,0,0,.55);
-  }
-  .ring{
-    position:absolute; right:-230px; bottom:-300px; width:650px; height:650px;
-    border-radius:50%; border:2px solid rgba(240,152,73,.24);
-    transform:rotate(-16deg) scaleY(.42); transform-origin:center;
-  }
-  /* Der Titel steht OBEN und nicht mittig: Im "Click to play"-Modus legt itch.io den
-     Play-Knopf in die Mitte der Flaeche - ein Titel dort waere halb verdeckt. */
-  .inhalt{position:absolute; left:56px; top:60px; right:380px;}
-  .marke{
-    font-size:12px; letter-spacing:.19em; text-transform:uppercase;
-    color:#F09849; font-weight:600; margin:0 0 12px;
-  }
-  h1{
-    margin:0; font-size:46px; line-height:1.02; font-weight:800;
-    letter-spacing:-.025em; text-shadow:0 3px 22px rgba(0,0,0,.75);
-  }
+  html,body{margin:0;padding:0;width:960px;height:600px;overflow:hidden;background:#0B1020;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;}
+  canvas{position:absolute;inset:0;}
+  .inhalt{position:absolute;left:64px;top:0;height:600px;width:470px;
+    display:flex;flex-direction:column;justify-content:center;z-index:2;}
+  .marke{font-size:12.5px;letter-spacing:.19em;text-transform:uppercase;color:#F09849;
+    margin:0 0 16px;font-weight:600;}
+  h1{font-size:66px;line-height:1.02;margin:0 0 18px;letter-spacing:-.025em;font-weight:600;
+    color:#E9ECF5;text-shadow:0 4px 26px rgba(0,0,0,.8);}
+  .zeile{font-size:17px;line-height:1.55;color:#9AA6BE;margin:0 0 26px;max-width:400px;}
+  .merkmale{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none;}
+  .merkmale li{font-size:13px;color:#9AA6BE;border:1px solid #28324A;border-radius:99px;
+    padding:5px 13px;background:rgba(255,255,255,.03);}
+  .merkmale li.frei{color:#5DD48D;border-color:rgba(93,212,141,.4);}
+  .schleier{position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:linear-gradient(100deg,rgba(11,16,32,.93) 0%,rgba(11,16,32,.82) 44%,rgba(11,16,32,0) 76%);}
 </style>
 </head>
 <body>
-<canvas id="sterne" width="960" height="600"></canvas>
-<div class="ring"></div>
-<div class="planet"></div>
+<canvas id="sterne"></canvas>
+<div class="schleier"></div>
 <div class="inhalt">
   <p class="marke">Weltraum-Aufbauspiel · Browser</p>
   <h1>Kolonie<br>Kepler-7</h1>
+  <p class="zeile">Kolonie ausbauen, Flotte aufstellen, geteilte Galaxie.</p>
+  <ul class="merkmale">
+    <li class="frei">Kostenlos</li>
+    <li class="frei">Kein Pay-to-Win</li>
+    <li>Kein Download</li>
+  </ul>
 </div>
+<script src="kulisse.js"></script>
 <script>
-(function () {
-  var c = document.getElementById('sterne'), x = c.getContext('2d');
-  var n = Math.round(960 * 600 / 2600);
-  for (var i = 0; i < n; i++) {
-    x.globalAlpha = Math.random() * .5 + .3;
-    x.fillStyle = '#CBD6F0';
-    x.beginPath();
-    x.arc(Math.random() * 960, Math.random() * 600, Math.random() * 1.5 + .5, 0, 6.284);
-    x.fill();
-  }
-  x.globalAlpha = 1;
-})();
+Kulisse.zeichne(document.getElementById('sterne'), {
+  breite: 960, hoehe: 600,
+  sternFlaeche: 2400,
+  planet: { fx: .83, fy: .50, fr: .40 },
+  orbits: [
+    { rx: 1.34, ry: 1.28, dreh: -18, punkte: 3, start: 1.2, tempo: .10, a: .26 },
+    { rx: 1.72, ry: 1.64, dreh: -18, punkte: 2, start: 3.9, tempo: -.07, a: .17, punktR: 2 },
+    { rx: 2.14, ry: 2.04, dreh: -18, punkte: 1, start: 5.6, tempo: .05, a: .11, punktR: 1.8 }
+  ]
+});
 </script>
 </body>
 </html>
