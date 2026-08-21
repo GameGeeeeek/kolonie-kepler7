@@ -143,7 +143,18 @@ async function messeSystem(browser, store, viewport, mobil) {
       oben = Math.min(oben, b.top); unten = Math.max(unten, b.bottom);
     });
     const fuellung = (unten > oben && wrap.height > 0) ? +((unten - oben) / wrap.height).toFixed(3) : 0;
+    /* Form der ZEICHNUNG in SVG-Nutzerkoordinaten (also zoom- und kastenunabhaengig): Die flache
+       Streifen-Geometrie liegt bei ~0,35, die runde bei ~0,9. Gebraucht wird sie fuer Abschnitt 5 -
+       dort ist die Frage nicht, wie gross etwas ist, sondern WELCHE der beiden Zeichnungen gilt. */
+    let zx0 = Infinity, zx1 = -Infinity, zy0 = Infinity, zy1 = -Infinity, zn = 0;
+    document.querySelectorAll('#galaxyMapSvg .planet-node[data-planet]').forEach(g => {
+      const bb = g.getBBox(); zn++;
+      zx0 = Math.min(zx0, bb.x); zx1 = Math.max(zx1, bb.x + bb.width);
+      zy0 = Math.min(zy0, bb.y); zy1 = Math.max(zy1, bb.y + bb.height);
+    });
+    const zeichnungVerh = zn ? +((zy1 - zy0) / (zx1 - zx0)).toFixed(2) : null;
     return {
+      zeichnungVerh,
       durchmesserPx: Math.round(groesste), planeten: anzahl, draussen,
       kasten: { w: Math.round(wrap.width), h: Math.round(wrap.height) },
       verhaeltnis: +(wrap.height / wrap.width).toFixed(3),
@@ -183,7 +194,13 @@ async function messeSystem(browser, store, viewport, mobil) {
   check('2: der Kartenkasten ist am Handy hoch genug für die runden Bahnen (h/b >= 0,6)',
     handy.verhaeltnis >= 0.6, handy);
 
-  // ---- PC (breiter Kasten: dort gilt weiter die flache Zeichnung) ------------------------------
+  /* ---- PC, hoher Kasten -----------------------------------------------------------------------
+     KORREKTUR 21.08.2026: Hier stand "breiter Kasten: dort gilt weiter die flache Zeichnung". Das
+     stimmte bis KB-12/KB-11 und ist seit KB-20 falsch - welche Zeichnung gilt, haengt nicht mehr an
+     der FENSTERBREITE, sondern an der FORM des Kastens (kbRunderKasten: Zielhoehe/Breite > 0,5).
+     Bei 900x1000 ist der Kasten hoch, also liegen die Bahnen hier RUND. Das flache Band bekommt
+     deshalb einen eigenen Abschnitt 5 - eine Ueberschrift, die eine alte Annahme festhaelt, ist
+     eine zweite Anzeigestelle (Punkt 6 der Checkliste). */
   const pc = await messeSystem(browser, store, { width: 900, height: 1000 }, false);
   check('0-vorab: PC - Boot ohne Skriptfehler', pc.fehler.length === 0, pc.fehler);
   /* KORREKTUR 21.08.2026 (KB-20, Spieler-Report "karten sind unterschiedlich gross bitte selbe
@@ -231,6 +248,24 @@ async function messeSystem(browser, store, viewport, mobil) {
   check('4b: am Handy bleibt die Systemebene bewusst flacher als die Sektoransicht',
     handy.sektorHoehe > handy.kasten.h + 20,
     { sektoransicht: handy.sektorHoehe, systemebene: handy.kasten.h });
+
+  /* ---- 5) Das FLACHE Band: breites, niedriges Fenster (KB-20d) -------------------------------
+     Zwischen Handy und hohem PC-Kasten liegt ein dritter Fall, den KB-20 zunaechst uebersehen
+     hatte: ein breites, aber niedriges Fenster. Dort ist der Kasten flach genug, dass die alte
+     Streifen-Zeichnung ihn ausfuellt - die volle Sektor-Hoehe waere hier genau der tote Raum, den
+     der Kommentar ueber kbSchmalerKasten seit KB-12 verbietet. Gemessen bei 1920x700: Zielhoehe
+     max(480, 700-175) = 525 gegen 1258 px Kastenbreite, Verhaeltnis 0,417 - also unter der
+     0,5-Schranke von kbRunderKasten.
+     Geprueft wird das PAAR: flache Zeichnung UND flache Kastenhoehe. Jede Haelfte allein waere
+     auch dann erfuellt, wenn die andere danebenliegt - und genau dieses Auseinanderlaufen ist der
+     Fehler, gegen den der Abschnitt geschrieben ist. */
+  const flach = await messeSystem(browser, store, { width: 1920, height: 700 }, false);
+  check('5-vorab: flaches Band - Boot ohne Skriptfehler', flach.fehler.length === 0, flach.fehler);
+  check('5: im flachen Band gilt die flache Zeichnung UND die flache Kastenhoehe',
+    flach.zeichnungVerh !== null && flach.zeichnungVerh < 0.5 && flach.kasten.h <= 420,
+    { zeichnungVerh: flach.zeichnungVerh, kasten: flach.kasten, sektorHoehe: flach.sektorHoehe });
+  check('5b: und die Zeichnung fuellt den Kasten auch dort (kein toter Raum)',
+    flach.fuellung >= 0.40, flach);
 
   await ende(async () => browser.close());
 })();

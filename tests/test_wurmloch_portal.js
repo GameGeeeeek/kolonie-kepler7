@@ -84,12 +84,13 @@ async function messe(browser, viewport, mobil){
     const vb = (svg.getAttribute('viewBox')||'').split(/\s+/).map(Number);
     const proGalaxie = vb.length === 4 ? svg.getBoundingClientRect().width / vb[2] : 0;
     // Naechste Planetenscheibe: Das Portal laeuft durch kbMarkerFrei, es darf auf keiner liegen.
-    let naechste = Infinity;
+    let naechste = Infinity, scheibenGemessen = 0;
     document.querySelectorAll('#galaxyMapSvg .planet-node[data-planet]').forEach(pn => {
       const el = pn.querySelector('image') || pn.querySelector('circle.body');
       if (!el) return;
       const pb = el.getBoundingClientRect();
       if (!pb.width) return;
+      scheibenGemessen++;
       const d = Math.hypot((pb.left+pb.right)/2 - (b.left+b.right)/2, (pb.top+pb.bottom)/2 - (b.top+b.bottom)/2);
       naechste = Math.min(naechste, d - pb.width/2 - b.width/2);
     });
@@ -103,6 +104,10 @@ async function messe(browser, viewport, mobil){
       // vergleichbar ist (px haengen an Kastenbreite und Zoom).
       breiteSektor: proGalaxie ? +(b.width / proGalaxie / (410/700)).toFixed(1) : 0,
       abstandZurNaechstenScheibe: naechste === Infinity ? null : Math.round(naechste),
+      // Wieviele Scheiben ueberhaupt gemessen wurden. Ohne diese Zahl waere der Abstand oben `null`
+      // und die Pruefung darauf trivial erfuellt - eine leere Messung saehe aus wie ein bestandener
+      // Test (Hausregel 37: die Bedingung selbst gehoert geprueft).
+      scheibenGemessen,
       beschriftet: !!t
     };
   });
@@ -131,7 +136,11 @@ async function messe(browser, viewport, mobil){
       pc.breiteSektor >= 20 && pc.breiteSektor <= 40, pc);
     /* Es laeuft durch kbMarkerFrei() und meldet sich in platzierteMarker an - es darf also auf
        keiner Planetenscheibe liegen (KB-13/KB-17). */
-    check('1e: es liegt auf keiner Planetenscheibe', (pc.abstandZurNaechstenScheibe ?? 1) > 0, pc);
+    /* Die Vorab-Zeile ist hier keine Formsache: Ohne sie waere 1e auch dann gruen, wenn GAR KEINE
+       Planetenscheibe gemessen wurde (der Abstand ist dann `null`, und ein `?? 1` haette ihn als
+       "weit genug" gelesen). Genau diese Sorte Gruen ist so schlecht wie ein Fehlschlag. */
+    check('1e-vorab: es wurden ueberhaupt Planetenscheiben gemessen', pc.scheibenGemessen >= 4, pc);
+    check('1e: es liegt auf keiner Planetenscheibe', typeof pc.abstandZurNaechstenScheibe === 'number' && pc.abstandZurNaechstenScheibe > 0, pc);
   }
 
   // Die Gegenrichtung: Am Handy gilt eine andere Zeichnung UND ein anderer Ausschnitt (KB-12/KB-20).
@@ -142,8 +151,9 @@ async function messe(browser, viewport, mobil){
   if (handy.da){
     check('2: das Wurmloch-Portal liegt auch am Handy vollstaendig im Kartenkasten',
       handy.ganzImKasten === true, handy);
+    check('2b-vorab: es wurden auch am Handy Planetenscheiben gemessen', handy.scheibenGemessen >= 4, handy);
     check('2b: und liegt auch dort auf keiner Planetenscheibe',
-      (handy.abstandZurNaechstenScheibe ?? 1) > 0, handy);
+      typeof handy.abstandZurNaechstenScheibe === 'number' && handy.abstandZurNaechstenScheibe > 0, handy);
   }
 
   await ende(async () => browser.close());

@@ -1282,6 +1282,83 @@ Behoben wie bei allen anderen Markern: Die Bahn kommt aus `kbOrbitRx(maxOrbit) *
 
 Wächter: `tests/test_wurmloch_portal.js` (11 Prüfungen, PC und Handy). Gegenprobe an einer Kopie mit der festen Position: 11 Prüfungen in beiden Richtungen bei identischen Prüfnamen, rot sind genau 1 und 2 mit `ueberRechts` 225 bzw. 127. `test_kartenmarker` 3b/3b2 führt das Portal seither in seiner **namentlichen** Erlaubnisliste – genau dieser Wächter hat die neue Aufrufstelle beim ersten Lauf als „überzählig" gemeldet, also gearbeitet wie gebaut.
 
+
+**KB-20c bis KB-20e (21.08.2026) sind die drei Befunde einer adversarischen Durchsicht VOR dem
+Merge – und der schwerste war einer, den mein eigener „was fällt aus dem Kasten"-Durchgang übersehen
+hatte.** Er fand vier Dinge (drei Sternenfeld-Punkte und das Portal) und meldete alles andere als
+sauber. Die **Allianzbasis** stand aber genauso auf einem festen Punkt (`translate(165,52)`) – sie
+fehlte in der Messung schlicht, weil die Fixture gar keine Allianz hatte. **Ein Durchgang über „alle
+Objekte" misst nur die Objekte, die die Fixture erzeugt** – wer so einen Sweep fährt, prüft zuerst,
+welche Objektarten unter seinen Bedingungen überhaupt entstehen können.
+
+- **KB-20c – die Allianzbasis kommt auf eine abgeleitete Bahn.** Nachgerechnet lag Sektor-x 165 bei
+  **18 von 69** Systemen ganz außerhalb des Ausschnitts und bei 23 weiteren angeschnitten (für
+  1280×800: sichtbar sind links der Sonne nur 160,6 Einheiten bei maxOrbit 5, nötig wären 208). Die
+  Basis hat auf der Karte **keine zweite Darstellung** – fällt sie aus dem Ausschnitt, ist sie für
+  den Spieler weg. Behoben wie beim Portal: `kbOrbitRx(kbMaxOrbit) * 0,80` bei 205°, durch
+  `kbMarkerFrei` geschoben, in `platzierteMarker` angemeldet. 0,80 statt 0,92 hält sie **innerhalb**
+  der Portalbahn, damit sich die zwei großen Strukturen nicht am selben Rand drängen; der Radius 30
+  ist der **sichtbare** Rand des größten Modells, nicht sein Zeichenradius (dieselbe Lehre wie beim
+  Boss-Puls und beim Nest). `kbMaxOrbit` steht seither als EINE Quelle direkt hinter `sysPlanets` –
+  Portal und Basis lasen ihn vorher jeweils selbst.
+- **KB-20d – die Schranke misst die ZIELhöhe, nicht die aktuelle.** Ohne das entschieden Kastenhöhe
+  und Zeichnung getrennt: Bei einem breiten, flachen Fenster (ab 1472 px Breite) bekam der Kasten
+  die volle Sektor-Höhe, während die Zeichnung flach blieb. Gemessen bei 1920×804: Kasten 1258×629,
+  Verhältnis exakt 0,500, Füllung 0,351 – **zwei Pixel Fensterhöhe mehr kippten die Darstellung um
+  47 %**. `kbRunderKasten()` misst deshalb `max(480, innerHeight − 175)` gegen die gemessene
+  Kastenbreite (kein Zirkelschluss: die Breite hängt nicht an der Höhe), hat einen 200-ms-Zwischen-
+  speicher (es läuft ~677-mal je Kartenaufbau) und behält bei einem VERSTECKTEN Reiter den zuletzt
+  gültigen Stand, statt eine Antwort zu erfinden. `kbSystemKastenHoehe()` gibt die volle
+  Sektor-Höhe nur noch zurück, wo auch die runde Zeichnung gilt.
+- **KB-20e – eine Fenstergrößenänderung bei OFFENEM System zog nichts nach.** Bis KB-20 war das
+  folgenlos (Ausschnitt und Kastenhöhe hingen beide an der Breite); seither können Kastenhöhe,
+  Zeichnung und Kamera aus **drei verschiedenen Momenten** stammen. Gemessen 1920×1040 → 1920×780
+  an einem System mit Orbit 10: Direkt nach der Änderung sieht alles unauffällig aus. Erst der
+  nächste Neuaufbau – **ein Zoom-Klick genügt** – löst alles auf einmal ein, und dann liegen
+  **sechs von zehn Planeten außerhalb des Kastens** (`["gx031"…"gx036"]`). `kbFensterNachziehen()`
+  setzt deshalb entprellt (220 ms) Höhe, Zeichnung und Kamera in genau dieser Reihenfolge neu; der
+  Zwischenspeicher aus KB-20d wird dabei ausdrücklich verworfen, damit die Zusage nicht an der
+  Reihenfolge zweier Zahlen hängt. Die zwei Sektor-Ansichten brauchen nichts davon – ihre Höhe ist
+  ein CSS-Ausdruck mit `100dvh` und folgt dem Fenster von selbst.
+
+**Wächter:** `tests/test_kartenresize.js` (7 Prüfungen). Er prüft **nicht** einzelne Zahlen, sondern
+die Eigenschaft: *Nach einer Größenänderung steht die Karte so da, wie sie stünde, wenn das Fenster
+von Anfang an diese Größe gehabt hätte.* Jede Messung läuft deshalb als PAAR gegen eine Kontrolle,
+die direkt in der Zielgröße startet – gemessen ist die viewBox danach zeichengleich
+(`199.8 92.8 571.8 190.9`). Dazu `test_kartengroesse` Abschnitt 5 für das **flache Band** (1920×700:
+flache Zeichnung UND flache Kastenhöhe als PAAR – die Gegenprobe mit zurückgenommenem KB-20d meldet
+`{"zeichnungVerh":0.32,"kasten":{"h":525}}`) und `test_kartenmarker` **1c**.
+
+**`test_kartenmarker` 1c ist die eigentliche Lehre dieser Runde.** Der Test maß bis dahin
+ausschließlich Abstände ZWISCHEN Objekten und stellte die Frage „liegt das überhaupt im Kasten?" nie
+– genau deshalb hat er weder gesehen, dass das Portal am Handy seit KB-12 **vier Tage** unsichtbar
+war, noch die Allianzbasis. 1c misst das jetzt **datengetrieben über alle sechs Markerarten**, eine
+neue erbt den Schutz automatisch (Regel 40). Beide Gegenproben fallen spezifisch und mit sprechendem
+Beleg: Basis zurück auf den festen Punkt → 29 px (Handy) bzw. 61 px (PC) über die linke Kante;
+Portal zurück → 127 bzw. 270 px über die rechte.
+
+**Zwei Werkzeugfehler aus dieser Runde, beide über den Einzelfall hinaus:**
+1. **Zwei Messläufe teilten sich EIN Speicher-Objekt.** `test_kartenmarker` fährt Handy und PC
+   nacheinander gegen dasselbe `store`, und das Spiel schreibt darin während des Laufs herum. Im
+   Handy-Lauf stand die Allianzbasis auf der Karte, im PC-Lauf danach nicht mehr – bei identischem
+   Code und identischer Fixture. **Ein Messwerkzeug, dessen erster Lauf den zweiten verändert, misst
+   nicht zweimal dasselbe** (dieselbe Familie wie Regel 15/17/19). Jeder Lauf bekommt seither eine
+   eigene Kopie.
+2. **Eine Fixture-Ergänzung im Spielstand allein genügt nicht, wenn ein Lade-Pfad sie überschreibt.**
+   `loadAllianceBase` setzt `state.allianceBase` beim Boot **bedingungslos** auf das, was der Server
+   liefert – bei fehlendem Schlüssel also auf `null`. Die Basis muss deshalb im *geteilten Speicher*
+   der Fixture liegen, nicht nur im Spielstand. Gefunden hat es die eigene Vorab-Prüfung
+   (`gemesseneArten` ohne `allianzbasis`), nicht das Nachdenken – Regel 37 in der Anwendung.
+
+**Und ein Beinahe-Fehler in eigener Sache, gemessen statt geglaubt:** In den Kommentar am
+Entflechter war zunächst „in 2,3 % der Fälle überlappt eine Beschriftung das Portal" geschrieben –
+eine Zahl aus einer Zusammenfassung, die eine ganz andere Größe gemessen hatte. Sie ist wieder raus,
+bevor sie ausgeliefert wurde: **eine Zahl, die man nicht selbst gemessen hat, gehört nicht in den
+Quelltext** (Regel 41). Der offene Befund selbst steht jetzt dort ausformuliert – `kbLabelsEntflechten`
+misst mit `getBBox()`, das die `scale`-Transformation des Portals **nicht** kennt (gemessen 82 gegen
+27,9 Einheiten), und wer das Portal dort aufnehmen will, macht den Entflechter **zuerst**
+transform-fest.
+
 **Tests navigieren über `tests/lib/karte.js`** (`oeffneSystemUeberSektoren`/`oeffneSektorMitSystem` – Spielerweg per DOM-Klicks, Region wird nie geraten, wartet die Kamerafahrt samt Folge-Tick ab).
 - **Kennwert-Balken sind EINE Bildsprache für Schiffe UND Verteidigungsanlagen** (VT-1, 18.08.2026, Auftrag Sascha „bei verteidigung auch wie bei flotte die balken"). Die Werft zeichnet je Schiff vier beschriftete Mikro-Balken (`shipStatBarsHtml`, CSS-Klasse `.sstat`, Balken im Verhältnis zum besten Wert der Flotte); die Verteidigungskarten standen bis dahin auf dem Stand davor – eine Fließtext-Zeile mit Mitteldots. `defenseStatBarsHtml(def, lvl)` zeichnet jetzt drei Balken je Anlage: **Angriff** (`atkVal`), **Vert.** (`defVal`) und **Schild** (`def.shield`, beim Laden als `round(defVal*0,4)` abgeleitet und in `defensePower` ein eigener Summand – also eine echte Größe, keine erfundene). Bewusste Entscheidungen dabei: (a) **dieselbe CSS-Klasse und dieselben Farben** wie die Schiffe (Angriff rot, Schild cyan, Verteidigung violett) – eine zweite Balken-Klasse wäre die typische zweite Anzeigestelle, die beim nächsten Umbau ausei­nanderläuft; (b) **kein vierter Balken „Bauzeit"** – dort ist weniger besser, ein langer Balken läse sich aber wie ein guter Wert; (c) die Balken zeigen den Wert **je Stufe** (die zwischen Anlagen vergleichbare Größe, wie „je Schiff" bei der Flotte), die vorhandene Zeile „aktuell → nach Ausbau" bleibt daneben, weil sie eine andere Frage beantwortet; (d) **Abhorchposten und Mondschild bekommen keine Balken** – sie tragen ihre Wirkung in eigenen Regeln (`atkVal`/`defVal` beide 0), drei Nullbalken wären dort nichtssagend (dieselbe Ausnahme kennt `defenseLockedPreview()` schon). Die Balken hängen im Kartenkörper, **nicht** hinter dem „Details"-Griff – siehe Regel 55, das war der Fehler des ersten Anlaufs. Wächter: `tests/test_verteidigungsbalken.js` (Erwartungswerte aus `BUILDING_DEFS` gelesen, Sichtbarkeit statt Existenz geprüft).
 - **Signatur-Cache-Muster für `render*Box()`-Funktionen ohne Live-Countdown**: `let lastXSig = null;` vor der Funktion, am Anfang eine Signatur aus allen angezeigten Werten bilden, bei Gleichheit zum Vorlauf `return` statt `innerHTML` neu zu schreiben (Beispiele: `renderAllianceBaseHero`, `renderDominance`, `renderGalaxyNews`, `renderReportsBox`, `renderAllianceTitlesBox`/`renderAllianceSkinsBox`, `renderDailyLoginBox`, `renderFpAllianceDonation`, `renderFpLeaderboard`). **Nur anwenden, wenn die Box KEINEN Live-Countdown (`Date.now()`-Differenz, die sichtbar hochzählt) enthält** – sonst würde die Anzeige sichtbar einfrieren; bei Countdown-Boxen stattdessen `setBoxHtml` (Markup-Signatur, selbstkorrigierend – siehe unten). **Korrektur 16.08.2026:** Hier stand, `renderAutoExploreTourBox`/`renderAbhorchpostenBox` nutzten „stattdessen `isTypingIn()`" – das war falsch, beide schreiben nacktes `innerHTML` ohne jeden Schutz (nachgesehen, nicht erinnert; sie enthalten Live-Countdowns, weshalb die WERTLISTEN-Signatur dort zu Recht fehlt – ein Tipp-Schutz war nie da und ist mangels Eingabefeldern auch nicht nötig). `renderFactions`/`renderMarket`/`renderTradeRoutes` nutzen tatsächlich `bedienungLaeuft()`/`isTypingIn()`, Markt und Routen seit v8.538.0 zusätzlich `setBoxHtml`. Neue `render*Box()`-Funktionen ohne Countdown sollten dieses Muster von Anfang an übernehmen statt jeden Tick blind neu aufzubauen.

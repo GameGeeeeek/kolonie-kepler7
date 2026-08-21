@@ -32,10 +32,23 @@
 // als INFO-Zeile mitgeschrieben, damit ein Zuwachs auffällt; die Lösung (Beschriftungen weichen
 // belegten Flächen aus) ist eine eigene Etappe.
 //
+// ERGAENZUNG 21.08.2026 (KB-20b/KB-20c): Pruefung 1c misst, ob ein Marker aus dem KARTENKASTEN
+// ragt - und zwar datengetrieben ueber alle Markerarten. Diese Frage stellte der Test bis dahin
+// gar nicht: Er mass ausschliesslich Abstaende ZWISCHEN Objekten. Genau deshalb hat er weder
+// gesehen, dass das Wurmloch-Portal am Handy seit KB-12 vier Tage lang unsichtbar war, noch dass
+// die Allianzbasis auf einem festen Punkt sass, den der engere Ausschnitt von KB-20 verlassen
+// haette. Gefunden hat beides ein Durchgang ueber ALLE Kinder der Systemebene - der ist jetzt hier
+// als Regel abgebildet, damit die naechste Markerart den Schutz automatisch erbt (Hausregel 40).
+//
 // GEGENPROBE (beide Richtungen gefahren, Hausregel 1):
 //   grün:  node tests/test_kartenmarker.js
 //   rot:   am Stand v8.553.0 - Prüfung 1 meldet je System einen Treffer mit Abstand 17,1 bei
 //          nötigen 22,0: KEPLER_SPIELDATEI=/tmp/vor_kb13.html node tests/test_kartenmarker.js
+//   rot:   Allianzbasis zurueck auf translate(165,52) - fallen MUESSEN 1c (beide Formfaktoren),
+//          3b und 3b2, bei identischen Pruefnamen. Gemessen ragt sie 29 px (Handy) bzw. 61 px (PC)
+//          ueber die linke Kastenkante: {"was":"marker:allianzbasis","ueber":{"l":61,…}}.
+//   rot:   Wurmloch zurueck auf (665, 28) - dieselben drei, gemessen 127 px (Handy) bzw. 270 px
+//          (PC) ueber die RECHTE Kante.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -84,6 +97,10 @@ const NEST_FIXTURE_ROH = [
   { id: 'kb17-c', volk: 'verglueht', stufe: 5, lp: 3100000, lpMax: 4400000 }
 ];
 let NEST_FIXTURE = [];
+/* Wurmloch und Allianzbasis brauchen ebenfalls eine Fixture, sonst ist die Erweiterung oben
+   VACUOUS: Ohne beide im Bild ist "kein Marker liegt auf einer Scheibe" fuer sie trivial erfuellt,
+   und die Gegenprobe bliebe gruen (genau so bei KB-19 gemessen - und das war dort der Befund). */
+let WURMLOCH_FIXTURE = null, BASIS_SYS = null;
 function nestFixtureSetzen(sys){
   NEST_SYS = sys;
   const t = Date.now();
@@ -105,8 +122,8 @@ function backend(store) {
        erfüllt, und die Prüfung wäre aus dem falschen Grund grün (Regel 28/37). Genau diese Lage
        hat den Fehler von KB-17 erzeugt. */
     if (p === 'galaxy') return j({ npcEmpireStrength: 1, marketTrend: 1, activePirateFaction: null,
-      unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [],
-      alienNester: NEST_FIXTURE });
+      unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: WURMLOCH_FIXTURE,
+      news: [], alienNester: NEST_FIXTURE });
     if (p.startsWith('storage/')) {
       const k = decodeURIComponent(p.slice(8));
       if (req.method() === 'PUT') { try { store[k] = JSON.parse(req.postData() || '{}').value; } catch (e) {} return j({ ok: true }); }
@@ -122,6 +139,7 @@ async function messe(page) {
   return page.evaluate(() => {
     const svg = document.getElementById('galaxyMapSvg');
     const rect = svg.getBoundingClientRect();
+    const kastenR = (document.querySelector('#tab-karte .map-wrap') || svg).getBoundingClientRect();
     const vbW = +svg.getAttribute('viewBox').split(/\s+/)[2];
     const proSektor = (rect.width / vbW) * (410 / 700);   // px je Sektor-Einheit
     const mitte = el => { const b = el.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: b.width / 2 }; };
@@ -135,15 +153,38 @@ async function messe(page) {
        zwei gleichartige Marker in einem System, deshalb kannte dieser Test die Paarung
        Marker x Marker gar nicht - und genau darin steckte der Fehler, den erst der Screenshot
        gezeigt hat: drei Nester uebereinander, ihre Beschriftungen ineinander. */
+    /* KORREKTUR 21.08.2026 (KB-20b/KB-20c): Hier fehlten ZWEI weitere Markerarten - das
+       Wurmloch-Portal und die Allianzbasis. Beide sassen bis dahin auf FESTEN Punkten des alten
+       700x230-Systemfelds und liefen gar nicht durch kbMarkerFrei; genau deshalb hat dieser Test
+       sie nie vermisst. Seit sie beide durch den Schieber gehen, gehoeren sie auch in die Messung -
+       sonst haette der Test wieder denselben blinden Fleck wie die Implementierung (das ist die
+       Lehre von KB-19, nur eine Ebene hoeher: eine Pruefung, die die Liste des Codes spiegelt,
+       erbt dessen Luecke). */
     const marker = [];
-    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player], #galaxyMapSvg [data-map-nest], #galaxyMapSvg [data-map-festung]').forEach(g => {
+    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player], #galaxyMapSvg [data-map-nest], #galaxyMapSvg [data-map-festung], #galaxyMapSvg [data-map-wurmloch], #galaxyMapSvg [data-alliance-base]').forEach(g => {
       const kreise = [...g.querySelectorAll('circle')];
       const poly = g.querySelector('polygon');
       const bezug = kreise.length ? kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a)) : poly;
       if (!bezug) return;
       const name = g.getAttribute('data-map-npc') || g.getAttribute('data-map-player')
-        || (g.hasAttribute('data-map-nest') ? 'nest:' + g.getAttribute('data-map-nest') : 'festung');
-      marker.push(Object.assign({ was: 'marker:' + name }, mitte(bezug)));
+        || (g.hasAttribute('data-map-nest') ? 'nest:' + g.getAttribute('data-map-nest') : null)
+        || (g.hasAttribute('data-map-wurmloch') ? 'wurmloch:' + g.getAttribute('data-map-wurmloch') : null)
+        || (g.hasAttribute('data-alliance-base') ? 'allianzbasis' : null)
+        || 'festung';
+      /* Das Portal traegt eine scale-Transformation (die Zeichnung ist fuer viewBox 0 0 100 100
+         gebaut). getBoundingClientRect liefert deshalb den ECHTEN Bildschirmplatz, das <circle>
+         darin aber seine eigenen, viel groesseren Nutzerkoordinaten - gemessen 82 gegen die 27,9
+         Sektor-Einheiten, die es auf der Karte einnimmt. Fuer die Kollisionsrechnung zaehlt der
+         sichtbare Platz, also die GRUPPE (dieselbe Messung, die begruendet, warum die Gruppe
+         bewusst kein planet-node traegt). */
+      const bezugsEl = g.hasAttribute('data-map-wurmloch') ? g : bezug;
+      const gb = g.getBoundingClientRect();
+      marker.push(Object.assign({ was: 'marker:' + name,
+        // Ragt der Marker aus dem Kartenkasten? Gemessen an der GRUPPE, also an dem, was der
+        // Spieler sieht - inklusive Puls-Hof und Modell, nicht nur am Bezugskreis.
+        ueber: { l: Math.round(kastenR.left - gb.left), r: Math.round(gb.right - kastenR.right),
+                 o: Math.round(kastenR.top - gb.top), u: Math.round(gb.bottom - kastenR.bottom) }
+      }, mitte(bezugsEl)));
     });
     /* DIE PAARUNG, DIE GEFEHLT HAT. Gemessen werden die SICHTBAREN Radien gegeneinander - zwei
        Marker duerfen sich nicht beruehren. Der pulsierende Hof zaehlt bewusst mit: Er ist Teil
@@ -184,7 +225,10 @@ async function messe(page) {
         textAufScheibe.push({ text: t.text, auf: sc.was });
     }
     return { scheiben: scheiben.length, marker: marker.length, treffer, textPaare,
-             textAufScheibe, markerPaare, beschriftungen: boxen.length };
+             textAufScheibe, markerPaare, beschriftungen: boxen.length,
+             markerArten: marker.map(m => m.was.replace(/^marker:/, '').split(':')[0]),
+             ausserhalb: marker.filter(m => m.ueber.l > 1 || m.ueber.r > 1 || m.ueber.o > 1 || m.ueber.u > 1)
+                               .map(m => ({ was: m.was, ueber: m.ueber })) };
   });
 }
 
@@ -234,12 +278,36 @@ async function laufe(browser, store, viewport, mobil, systeme) {
   const ziele = [...new Set([...NPC_SYSTEME.normal.slice(0, 2), ...NPC_SYSTEME.boss])];
   // Die Nester in das erste Zielsystem legen - dort misst 1b dann wirklich etwas.
   nestFixtureSetzen(ziele[0]);
+  /* Wurmloch und Allianzbasis bewusst in ein ANDERES Zielsystem als die drei Nester: Zusammen
+     waeren es sechs grosse Marker in einem System, und dann misst der Test die Grenzen des
+     Schiebers statt der Positionen. Verteilt auf zwei Systeme ist jede Lage die, die im Spiel
+     wirklich vorkommt. */
+  BASIS_SYS = ziele[1] || ziele[0];
+  WURMLOCH_FIXTURE = { from: BASIS_SYS, to: ziele[0], until: now + 6 * 3600000 };
+  store['kepler7-save-v3'] = JSON.stringify(Object.assign(JSON.parse(store['kepler7-save-v3']), {
+    player: { id: 'u', name: 'A', allianceTag: 'KB' },
+    allianceBase: { tag: 'KB', sector: BASIS_SYS, foundedAt: now - 86400000, readyAtByLevel: {} }
+  }));
+  /* Die Basis MUSS zusaetzlich im geteilten Speicher liegen, nicht nur im Spielstand: `loadAllianceBase`
+     laeuft beim Boot und setzt `state.allianceBase` bedingungslos auf das, was der Server liefert -
+     bei fehlendem Schluessel also auf null. Der erste Anlauf hatte sie nur im Spielstand, und die
+     Vorab-Pruefung meldete korrekt `["nest","wurmloch","raider1",...]` ohne Allianzbasis. Genau
+     dafuer ist die Vorab-Zeile da (Hausregel 37). */
+  store['alliance:KB:base'] = JSON.stringify({ tag: 'KB', sector: BASIS_SYS, foundedAt: now - 86400000, readyAtByLevel: {} });
+  store['alliance:KB:info'] = JSON.stringify({ tag: 'KB', creatorId: 'u', creatorName: 'A', createdAt: now - 86400000, joinMode: 'open' });
+  store['alliance:KB:member:u'] = JSON.stringify({ id: 'u', name: 'A', role: 'admin', joinedAt: now - 86400000 });
   check('0-vorab: die NPC-Systemliste ließ sich aus NPCS lesen', ziele.length >= 3,
     { normal: NPC_SYSTEME.normal.length, boss: NPC_SYSTEME.boss.length, ziele });
 
   for (const [name, viewport, mobil] of [['Handy', { width: 390, height: 844 }, true],
                                          ['PC', { width: 900, height: 1000 }, false]]) {
-    const { ergebnisse, fehler } = await laufe(browser, store, viewport, mobil, ziele);
+    /* JEDER Lauf bekommt eine EIGENE Kopie des Speichers. Vorher teilten sich beide Laeufe ein
+       Objekt, und das Spiel schreibt darin waehrend des Laufs herum (Spielstand, Allianz-Dokumente).
+       Gemessen: Im Handy-Lauf stand die Allianzbasis auf der Karte, im PC-Lauf danach nicht mehr -
+       bei identischem Code und identischer Fixture. Ein Messwerkzeug, dessen erster Lauf den
+       zweiten veraendert, misst nicht zweimal dasselbe (dieselbe Familie wie Hausregel 15/17/19). */
+    const speicher = JSON.parse(JSON.stringify(store));
+    const { ergebnisse, fehler } = await laufe(browser, speicher, viewport, mobil, ziele);
     check(`0-vorab: ${name} - Boot ohne Skriptfehler`, fehler.length === 0, fehler.slice(0, 2));
 
     // Ohne diese Vorab-Prüfung wären die beiden Regeln darunter trivial grün, sobald die
@@ -250,11 +318,30 @@ async function laufe(browser, store, viewport, mobil, systeme) {
       offen.length === ziele.length && mitMarker.length === ziele.length,
       ergebnisse.map(e => ({ s: e.system, offen: !e.nichtGeoeffnet, marker: e.marker, scheiben: e.scheiben })));
 
+    /* Ohne diese Zeile waere die Erweiterung um Wurmloch und Allianzbasis vacuous - beide muessen
+       in mindestens einem gemessenen System WIRKLICH auf der Karte stehen, sonst pruefen die
+       Zeilen darunter fuer sie gar nichts (Hausregel 37, und die Lehre aus KB-19). */
+    const arten = new Set(offen.flatMap(e => (e.markerArten || [])));
+    check(`0-vorab: ${name} - Wurmloch-Portal und Allianzbasis sind wirklich im Bild`,
+      arten.has('wurmloch') && arten.has('allianzbasis'),
+      { gemesseneArten: [...arten], basisSystem: BASIS_SYS,
+        jeSystem: offen.map(e => ({ s: e.system, arten: e.markerArten })) });
+
     const treffer = offen.flatMap(e => e.treffer.map(t => Object.assign({ system: e.system }, t)));
     check(`1 (${name}): kein Marker liegt auf einer Planetenscheibe`, treffer.length === 0, treffer.slice(0, 5));
 
     const texte = offen.flatMap(e => e.textPaare.map(t => Object.assign({ system: e.system }, t)));
     check(`2 (${name}): keine zwei Beschriftungen überlappen sich`, texte.length === 0, texte.slice(0, 5));
+
+    /* 1c (KB-20b/KB-20c): Faellt ein Marker aus dem KARTENKASTEN? Genau das war der Fehler des
+       Wurmloch-Portals (gemessen 241 px hinter der rechten Kante am PC, 133 px am Handy seit
+       KB-12) und der Allianzbasis (bei 18 von 69 Systemen ganz ausserhalb). Beide hat KEIN Test
+       gefunden, sondern ein Durchgang ueber alle Kinder der Systemebene - dieser Test mass
+       ausschliesslich Abstaende ZWISCHEN Objekten und nie ihre Lage im Kasten.
+       Bewusst datengetrieben ueber ALLE Markerarten: Eine neue Art erbt die Pruefung automatisch,
+       statt dass jemand an sie denken muss (Hausregel 40). */
+    const raus = offen.flatMap(e => (e.ausserhalb || []).map(t => Object.assign({ system: e.system }, t)));
+    check(`1c (${name}): kein Marker ragt aus dem Kartenkasten`, raus.length === 0, raus.slice(0, 6));
 
     /* 1b (KB-17): DIE PAARUNG, DIE GEFEHLT HAT. Bis Phase 3 gab es nie zwei gleichartige Marker in
        einem System, also prüfte niemand Marker gegen Marker - der Schieber kannte nur Planeten und
@@ -307,7 +394,15 @@ async function laufe(browser, store, viewport, mobil, systeme) {
        und laeuft durch den Schieber wie jeder andere Marker. Es hat keine eigene *MarkerXY-Funktion,
        weil seine Bahn von der aeussersten PLANETENBAHN abhaengt (0,92 davon) und nicht von einer
        festen Marker-Bahn - gegriffen wird deshalb ueber die Variable. */
-    { was: 'Wurmloch-Portal',    muster: /kbMarkerFrei\(\{ x: SUN_X \+ whRx/ }
+    { was: 'Wurmloch-Portal',    muster: /kbMarkerFrei\(\{ x: SUN_X \+ whRx/ },
+    /* KB-20c (21.08.2026): Dieselbe Fehlerklasse an der Allianzbasis. Sie stand fest bei
+       translate(165,52) - mit dem engeren Ausschnitt von KB-20 lag Sektor-x 165 bei 18 von 69
+       Systemen ganz ausserhalb des Bildes und bei 23 weiteren angeschnitten. Sie hat auf der Karte
+       KEINE zweite Darstellung; faellt sie aus dem Ausschnitt, ist sie fuer den Spieler schlicht
+       weg. Gefunden hat sie kein Test, sondern die Durchsicht vor dem Merge - der eigene
+       "was faellt aus dem Kasten"-Durchgang hatte sie uebersehen, weil die Fixture gar keine
+       Allianz hatte (seit dem hat sie eine, siehe oben). */
+    { was: 'Allianzbasis',       muster: /kbMarkerFrei\(\{ x: SUN_X \+ abRx/ }
   ];
   const fehlende = ERLAUBTE_MARKER.filter(m => !m.muster.test(OHNE_KOMMENTARE)).map(m => m.was);
   const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;

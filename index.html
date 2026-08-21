@@ -55556,9 +55556,13 @@
        EINE Quelle fuer beide Ansichten, damit sie nicht wieder auseinanderlaufen. Am Handy bleibt
        die Rechnung aus KB-10/11/12 stehen: dort ist die Breite die bindende Richtung, ein gleich
        hoher Kasten waere gemessen zu 63% leer und die Planeten blieben bei 20 px. */
-    return kbSchmalerKasten()
-      ? Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px'
-      : KB_SEKTOR_KASTEN_HOEHE;
+    if (kbSchmalerKasten()) return Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px';
+    /* KB-20d: Die volle Sektor-Hoehe gilt nur, wo auch die RUNDE Zeichnung gilt. Faellt der Kasten
+       in das flache Band (breites, niedriges Fenster), bleibt es bei der Rechnung von vor KB-20 -
+       ein hoher Kasten mit flacher Zeichnung waere genau der tote Raum, den der Kommentar ueber
+       kbSchmalerKasten seit KB-12 verbietet. */
+    return kbRunderKasten() ? KB_SEKTOR_KASTEN_HOEHE
+                            : Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
   }
   function galaxyOeffne(systemId){
     // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
@@ -56428,6 +56432,38 @@
   window.addEventListener('scroll', closeKarteMenu, true);
   window.addEventListener('resize', closeKarteMenu);
 
+  /* KB-20e: Ein Fenster kann seine Groesse aendern, WAEHREND ein System offen steht - Handy
+     drehen, Fenster andocken, Entwicklerwerkzeuge aufziehen. Bis KB-20 war das folgenlos: Der
+     Ausschnitt kam aus der BREITE, und die Kastenhoehe der Systemebene folgte ihr (0,44 bzw. 0,78
+     der Breite), also stimmten beide danach von selbst wieder. Seit KB-20 ist am breiten Kasten
+     die HOEHE die bindende Richtung, und sie steht als fester Pixelwert im style-Attribut - wird
+     das Fenster niedriger, bleibt der alte, zu hohe Ausschnitt stehen und schneidet den Inhalt
+     oben UND unten ab (gemessen 1920x1040 -> 1920x810 an einem System mit Orbit 10: Kamera bleibt
+     bei h=248,9 Einheiten, die aeussere Scheibe liegt bei +-178,7 - beide Enden weg).
+     Die zwei Sektor-Ansichten brauchen nichts davon: Ihre Hoehe ist ein CSS-Ausdruck
+     (KB_SEKTOR_KASTEN_HOEHE mit 100dvh) und folgt dem Fenster ohne Zutun. Deshalb haengt der
+     ganze Block an galaxyOpenSystem.
+     Entprellt, weil ein gezogener Fensterrahmen hunderte Ereignisse feuert - und mit 220 ms
+     bewusst laenger als der 200-ms-Zwischenspeicher in kbRunderKasten. Der wird trotzdem
+     ausdruecklich verworfen, damit die Zusage nicht an der Reihenfolge zweier Zahlen haengt. */
+  let kbFensterTimer = null;
+  function kbFensterNachziehen(){
+    kbFensterTimer = null;
+    if (!galaxyOpenSystem) return;
+    kbRundBis = 0;                                     // gemessen wird jetzt, nicht aus dem Speicher
+    const kbWrapF = document.querySelector('#tab-karte .map-wrap');
+    if (kbWrapF) kbWrapF.style.height = kbSystemKastenHoehe();
+    // Reihenfolge: erst die Hoehe (kbRunderKasten misst den Kasten), dann die Zeichnung, dann die
+    // Kamera. Andersherum entschiede die Kamera gegen eine Geometrie, die es gleich nicht mehr
+    // gibt - genau der getrennte Entscheidungsweg, der als schwerster Befund von KB-20d galt.
+    buildMap();
+    galaxyCamFahre(true);   // Sprung, keine Fahrt: eine Groessenaenderung ist keine Navigation
+  }
+  window.addEventListener('resize', () => {
+    if (kbFensterTimer) clearTimeout(kbFensterTimer);
+    kbFensterTimer = setTimeout(kbFensterNachziehen, 220);
+  });
+
   // --- Menü eines Planetenmarkers
   function planetMapMenu(ev, planetId){
     const p = PLANETS.find(x => x.id === planetId);
@@ -56564,6 +56600,10 @@
   // Funktion - zwei Kopien liefen sonst beim nächsten Umbau auseinander (Regel 43).
   // Bewusst window.innerWidth statt getBoundingClientRect des Kastens: planetOrbitXY läuft je
   // Planet und Zeichenvorgang, und ein getBoundingClientRect erzwingt dabei jedes Mal ein Layout.
+  // KORREKTUR KB-20d: Seit KB-20 hängt die Bahnform nicht mehr an dieser Funktion allein, sondern
+  // an kbRunderKasten() darunter - und das MISST den Kasten. Die Regel oben gilt trotzdem weiter,
+  // deshalb hat kbRunderKasten einen 200-ms-Zwischenspeicher: gemessen wird einmal je Aufbau statt
+  // 677-mal. Wer dort etwas ändert, prüft zuerst, ob diese Zusage noch stimmt.
   // Dieselbe Schranke wie die .map-zoom-Media-Query und das Scroll-Gate - EINE Zahl, vier Stellen
   // (Geometrie, Kamera-Ausschnitt, Kastenhöhe, CSS). Sie müssen zusammen umschalten: Die rundere
   // Bahnform braucht einen höheren Kasten, ein höherer Kasten ohne rundere Bahnen ist nur toter
@@ -56579,12 +56619,36 @@
      ein hoher PC-Kasten haben dasselbe geometrische Problem, und ein flacher Streifen kann beide
      nicht fuellen, egal wie breit das Fenster ist. Sehr breite Bildschirme bleiben dadurch von
      selbst bei der flachen Zeichnung - dort ist der Kasten wieder flach genug. */
+  let kbRundZuletzt = false, kbRundBis = 0;
   function kbRunderKasten(){
     if (kbSchmalerKasten()) return true;
+    /* Kurzer Zwischenspeicher nach dem Muster von storageCapCached: kbOrbitMass haengt hier dran
+       und laeuft je Planet und Zeichenvorgang - gemessen rund 677 Aufrufe je Kartenaufbau. Ohne
+       ihn stuende in jedem davon ein getBoundingClientRect, und der Kommentar ueber
+       kbSchmalerKasten verbietet genau das (er ist deshalb unten mitgezogen). 200 ms sind kurz
+       genug, dass eine Fenstergroessenaenderung im naechsten Aufbau ankommt. */
+    const kbJetzt = Date.now();
+    if (kbJetzt < kbRundBis) return kbRundZuletzt;
     const kbEl = document.querySelector('#tab-karte .map-wrap');
-    if (!kbEl) return false;
-    const kbR = kbEl.getBoundingClientRect();
-    return kbR.width > 0 && (kbR.height / kbR.width) > 0.5;
+    const kbBreite = kbEl ? kbEl.getBoundingClientRect().width : 0;
+    /* Ein VERSTECKTER Reiter liefert Breite 0 (.tab-panel display:none). Dann wird der zuletzt
+       gueltig gemessene Stand behalten statt eine Antwort zu erfinden: loadPlayersInSystem ruft
+       buildMap() nach seinem await ohne Ruecksicht auf den offenen Reiter, und eine erfundene
+       "flache" Antwort schriebe flache Bahnen in ein SVG, dessen Ausschnitt rund ist - der Spieler
+       saehe beim Zurueckwechseln kurz ein beschnittenes System. */
+    if (!(kbBreite > 0)) return kbRundZuletzt;
+    /* Gemessen wird die ZIELhoehe des Kastens, nicht seine aktuelle: Sonst entscheiden Hoehe und
+       Zeichnung getrennt, und genau das war der schwerste Befund der Durchsicht - bei einem
+       breiten, flachen Fenster (ab 1472 px Breite, Hoehe im Band darunter) bekam der Kasten die
+       volle Sektor-Hoehe, die Zeichnung blieb aber flach. Gemessen bei 1920x804: Kasten 1258x629,
+       Verhaeltnis exakt 0,500, Fuellung 0,351 - zwei Pixel Fensterhoehe mehr kippten die
+       Darstellung um 47%. Die Zielhoehe haengt an window.innerHeight, die Breite nicht an der
+       Hoehe: es gibt also keinen Zirkelschluss. Die Formel ist dieselbe wie
+       KB_SEKTOR_KASTEN_HOEHE, nur in JS statt in CSS. */
+    const kbZielH = Math.max(480, window.innerHeight - 175);
+    kbRundZuletzt = (kbZielH / kbBreite) > 0.5;
+    kbRundBis = kbJetzt + 200;
+    return kbRundZuletzt;
   }
   function kbOrbitMass(){
     return kbRunderKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
@@ -56796,6 +56860,20 @@
     // und keine solche Gruppe existiert ohne data-Attribut. Eine neue Markerart erbt den Schutz
     // damit automatisch - genau wie beim Kollisionsschieber kbMarkerFrei (Regel 52).
     const OBJEKTE = '.planet-node';
+    /* OFFEN und bewusst nicht in dieser Etappe behoben (KB-20b, 21.08.2026): Dieser Durchgang misst
+       mit getBBox(), und das liefert die EIGENEN Nutzerkoordinaten einer Gruppe - OHNE ihre
+       transform. Fuer die sechs `planet-node`-Arten stimmt das, weil keine davon skaliert. Das
+       Wurmloch-Portal dagegen ist fuer viewBox "0 0 100 100" gezeichnet und sitzt hinter einem
+       scale(0.34); sein groesster Kreis meldet gemessen 82 Einheiten, waehrend das Portal auf der
+       Karte 27,9 Einheiten breit ist. Es traegt deshalb bewusst KEIN planet-node - mit der Klasse
+       naehme der Entflechter eine fast dreimal zu grosse Flaeche an und schoebe Beschriftungen
+       grundlos beiseite.
+       Der Preis dafuer ist, dass eine Beschriftung das Portal ueberlappen kann. Das ist die
+       kleinere Unwahrheit als eine dreifach zu grosse Sperrflaeche, die Namen grundlos von ihren
+       Planeten wegschoebe - und das Portal steht ohnehin nur an zwei Systemen gleichzeitig.
+       WER DAS AENDERN WILL, macht zuerst den Entflechter transform-fest (getBBox mal
+       getCTM/getScreenCTM statt roh) und nimmt DANACH das Portal in OBJEKTE auf. Die Klasse hier
+       zu setzen, ohne das zu tun, macht es schlimmer statt besser. */
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
       let el = g.querySelector('image') || g.querySelector('circle.body');
@@ -57072,6 +57150,10 @@
     if (!svg) return;
 
     const sysPlanets = PLANETS.filter(p=>p.system===activeSystem);
+    /* Der aeusserste Orbit dieses Systems - EINE Quelle fuer alles, was seine Bahn braucht
+       (Wurmloch-Portal, Allianzbasis). Vorher rechnete das Portal ihn selbst aus, und die
+       Allianzbasis hatte gar keine Bahn, sondern einen festen Punkt (KB-20c). */
+    const kbMaxOrbit = sysPlanets.length ? Math.max.apply(null, sysPlanets.map(p => p.orbit || 3)) : 6;
     /* Alle in dieser Systemebene bereits gesetzten Marker - der Kollisionsschieber bekommt sie
        mit, damit zwei Marker nicht aufeinander landen (KB-17). Jede Markerart traegt sich hier
        ein; wer eine neue hinzufuegt, tut dasselbe. */
@@ -57273,8 +57355,7 @@
          BEIDEN Zeichnungen im Bild: rund bei 144 von 242 sichtbaren Einheiten, flach bei 316 von
          350. Die Bahn ist runder als die Planetenbahn (mindestens 0,55), damit das Portal nicht
          auf der Ekliptik zwischen den Planeten klebt. */
-      const whMaxOrbit = sysPlanets.length ? Math.max.apply(null, sysPlanets.map(p => p.orbit || 3)) : 6;
-      const whRx = kbOrbitRx(whMaxOrbit) * 0.92, whRy = whRx * Math.max(0.55, kbOrbitMass().ry);
+      const whRx = kbOrbitRx(kbMaxOrbit) * 0.92, whRy = whRx * Math.max(0.55, kbOrbitMass().ry);
       const whRad = 325 * Math.PI / 180;
       const whR = 14;
       const whPos = kbMarkerFrei({ x: SUN_X + whRx*Math.cos(whRad), y: SUN_Y + whRy*Math.sin(whRad) },
@@ -57538,9 +57619,29 @@
     if (myAllianceTag() && state.allianceBase && state.allianceBase.foundedAt && state.allianceBase.sector === activeSystem){
       const abLvl = allianceBaseLevel();
       const abDestroyed = allianceBaseDestroyed();
-      // Position bewusst im oberen linken Kartenviertel zwischen den Orbits statt ganz am Rand.
+      /* KB-20c - der schwerste Befund der Durchsicht vor dem Merge, und er ist dieselbe
+         Fehlerklasse wie das Wurmloch-Portal einen Absatz weiter oben: Hier stand
+         transform="translate(165,52)", ein fester Punkt aus dem alten 700x230-Systemfeld, mit dem
+         Kommentar "Position bewusst im oberen linken Kartenviertel". Mit dem engeren Ausschnitt
+         von KB-20 liegt Sektor-x 165 bei 18 der 69 Systeme GANZ ausserhalb des Bildes und bei 23
+         weiteren angeschnitten (unabhaengig nachgerechnet fuer 1280x800: sichtbar sind nur
+         160,6 Einheiten links der Sonne bei maxOrbit 5, noetig waeren 208 fuer den Modellrand).
+         Die Basis hat auf der Karte KEINE zweite Darstellung - faellt sie aus dem Ausschnitt, ist
+         sie fuer den Spieler schlicht verschwunden. Am Handy war das seit KB-12 so, am PC waere es
+         durch KB-20 dazugekommen.
+         Behoben wie beim Portal: Bahn aus kbOrbitRx, durch kbMarkerFrei geschoben, in
+         platzierteMarker angemeldet. 0,80 statt 0,92 haelt sie INNERHALB der Portalbahn, damit
+         sich die zwei grossen Strukturen nicht am selben Rand draengen; 205 Grad haelt die alte
+         Bildidee (links oben) bei. Der Radius 30 ist der sichtbare Rand des groessten Modells
+         (Stufe 10 mit Gluehkreis), nicht sein Zeichenradius - dieselbe Lehre wie beim Boss-Puls
+         und beim Nest (KB-17). */
+      const abRx = kbOrbitRx(kbMaxOrbit) * 0.80, abRy = abRx * Math.max(0.55, kbOrbitMass().ry);
+      const abRad = 205 * Math.PI / 180;
+      const abPos = kbMarkerFrei({ x: SUN_X + abRx*Math.cos(abRad), y: SUN_Y + abRy*Math.sin(abRad) },
+                                 sysPlanets, activeSunType.r, 30, platzierteMarker);
+      platzierteMarker.push({ x: abPos.x, y: abPos.y, r: 30 });
       inner += `
-        <g transform="translate(165,52)" data-alliance-base="1" style="cursor:pointer;">
+        <g transform="translate(${abPos.x.toFixed(1)},${abPos.y.toFixed(1)})" data-alliance-base="1" style="cursor:pointer;">
           <title>Allianzbasis [${myAllianceTag()}] · Stufe ${abLvl}${abDestroyed?' (ZERSTÖRT)':(abLvl>=10?' (Monument)':'')}</title>
           <g ${abDestroyed?'opacity="0.4"':''}>${allianceBaseModelSvg(Math.max(1,abLvl), 'Map')}</g>
           ${abDestroyed?`
@@ -57549,7 +57650,7 @@
             <circle r="3" cx="7" cy="-4" fill="#f0997b" opacity="0.35"><animate attributeName="opacity" values="0.35;0.1;0.35" dur="1.7s" repeatCount="indefinite"/></circle>
           `:''}
         </g>
-        <text class="planet-label" x="165" y="86" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
+        <text class="planet-label" x="${abPos.x.toFixed(1)}" y="${(abPos.y+34).toFixed(1)}" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
       `;
     }
     // Kein eigener viewBox mehr: Der Ausschnitt gehört jetzt der Galaxiekarte, und die Gruppe sitzt
