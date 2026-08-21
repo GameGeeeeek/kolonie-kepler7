@@ -178,6 +178,18 @@ async function imBrowser(){
              texturen: g ? g.querySelectorAll('image').length : 0,
              sonne: g ? g.querySelectorAll('circle').length : 0,
              breite: vb[2],
+             // KB-20: Statt einer festen Spanne die EIGENSCHAFT messen, die die Spanne meinte -
+             // "die Kamera zeigt EIN System, und zwar vollstaendig". Die untere Schranke 300 war
+             // auf die flache Zeichnung kalibriert; seit die Bahnen am hohen Kasten rund liegen,
+             // ist der korrekte Ausschnitt 284 Einheiten breit, und der Test fiel auf richtigem
+             // Code durch (Hausregel 3: die Regel pruefen, nicht die Momentaufnahme).
+             ausserhalb: (()=>{
+               const kasten = svg.getBoundingClientRect();
+               return [...(g ? g.querySelectorAll('[data-planet] image, [data-planet] circle') : [])]
+                 .map(e => e.getBoundingClientRect()).filter(b => b.width > 0)
+                 .filter(b => b.left < kasten.left - 1 || b.right > kasten.right + 1
+                           || b.top < kasten.top - 1 || b.bottom > kasten.bottom + 1).length;
+             })(),
              zurueck: document.getElementById('galaxyBackBtn').style.display,
              // Die Nachbarn dürfen im offenen Zustand keinen Leuchthof mehr tragen.
              hoefe: [...svg.querySelectorAll('[data-system-node] circle')].filter(c => /miniSunGlow/.test(c.getAttribute('fill')||'')).length,
@@ -186,7 +198,10 @@ async function imBrowser(){
   check('2: das System ist aufgeklappt', auf.ebene);
   check('2: seine Planeten sind gezeichnet', auf.planeten >= 5, auf.planeten);
   check('2: und tragen die echten Planetentexturen', auf.texturen >= 5, auf.texturen);
-  check('2: die Kamera ist hineingefahren', auf.breite > 300 && auf.breite < 500, auf.breite);
+  // Das Galaxie-Gesamtfeld ist 950 Einheiten breit - alles deutlich darunter heisst "ein System".
+  check('2: die Kamera ist hineingefahren', auf.breite < 500, auf.breite);
+  check('2b: und zeigt das System vollstaendig, nichts ist abgeschnitten', auf.ausserhalb === 0,
+    { ausserhalb: auf.ausserhalb, ausschnittBreite: auf.breite });
   check('2: der Zurück-Knopf ist sichtbar', auf.zurueck !== 'none', auf.zurueck);
   check('3: die Nachbarsysteme sind noch da', auf.knoten > 30, auf.knoten);
   check('3: aber keiner von ihnen trägt einen Leuchthof', auf.hoefe === 0, auf.hoefe);

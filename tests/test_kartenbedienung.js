@@ -61,7 +61,8 @@ function backend(store) {
     nextPlanetEventCheck: now + 3600000
   });
 
-  const ctx = await browser.newContext({ viewport: { width: 900, height: 1000 } });
+  const FENSTER_H = 1000;
+  const ctx = await browser.newContext({ viewport: { width: 900, height: FENSTER_H } });
   const page = await ctx.newPage();
   const fehler = [];
   page.on('pageerror', e => fehler.push('pageerror: ' + e));
@@ -137,7 +138,23 @@ function backend(store) {
      der Fensterkante. Waechst irgendetwas OBERHALB der Karte - eine zweite Zeile in der
      Ressourcenleiste, ein Banner, eine breitere Ebenen-Leiste -, rutscht der Zielpunkt heraus.
      Deshalb ist der Treffpunkt jetzt eine eigene, benannte Pruefung und keine Fussnote. */
-  const zielpunkt = kasten ? { x: kasten.x + kasten.width / 2, y: kasten.y + kasten.height / 2 } : null;
+  /* KB-20 (21.08.2026): Der Kartenkasten ist am PC jetzt so hoch wie die Sektoransicht - und damit
+     hoeher als der sichtbare Fensterausschnitt, genau wie die Sektoransicht das seit jeher ist. Die
+     GEOMETRISCHE Mitte liegt dann unter der Fensterkante (gemessen: y=1016 bei 1000 px Fensterhoehe,
+     also 16 px darunter), obwohl die Karte tadellos zu ziehen ist: Ein Spieler greift dorthin, wo er
+     hinsieht, nicht auf einen Punkt ausserhalb seines Bildschirms.
+     Gegriffen wird deshalb die SICHTBARE Mitte des Kastens. Das ist keine Aufweichung, sondern die
+     genauere Messung derselben Regel ("das Ziehen klebt am Zeiger"): Bei einem Kasten, der ganz ins
+     Fenster passt, ist es derselbe Punkt wie vorher, und die Vorab-Pruefung darunter faellt
+     weiterhin, sobald der Zeiger die Karte gar nicht mehr trifft - das war ihr Zweck. Gegengeprueft
+     an einer Kopie mit abgeschaltetem Ziehen: 2a/2b fallen dort weiterhin mit Treue 0. */
+  const sichtbar = kasten ? (() => {
+    const y0 = Math.max(0, kasten.y), y1 = Math.min(FENSTER_H, kasten.y + kasten.height);
+    return { y0, y1, h: Math.max(0, y1 - y0) };
+  })() : null;
+  const zielpunkt = (kasten && sichtbar && sichtbar.h > 20)
+    ? { x: kasten.x + kasten.width / 2, y: sichtbar.y0 + sichtbar.h / 2 }
+    : null;
   const umfeld = zielpunkt ? await page.evaluate(p => {
     const el = document.elementFromPoint(p.x, p.y);
     const svg = document.getElementById('galaxyMapSvg');
@@ -157,19 +174,24 @@ function backend(store) {
     { zielpunkt: zielpunkt && { x: Math.round(zielpunkt.x), y: Math.round(zielpunkt.y) },
       kasten: kasten && { y: Math.round(kasten.y), h: Math.round(kasten.height) },
       luftBisFensterkante: (umfeld && zielpunkt) ? Math.round(umfeld.fensterhoehe - zielpunkt.y) : null,
+      sichtbarerTeil: sichtbar && { von: Math.round(sichtbar.y0), bis: Math.round(sichtbar.y1), hoehe: Math.round(sichtbar.h) },
       umfeld });
   if (vor) {
     const ZIEH_X = 120, ZIEH_Y = 70;
-    await page.mouse.move(kasten.x + kasten.width / 2, kasten.y + kasten.height / 2);
+    await page.mouse.move(zielpunkt.x, zielpunkt.y);
     await page.mouse.down();
     for (let i = 1; i <= 6; i++) {
-      await page.mouse.move(kasten.x + kasten.width / 2 + ZIEH_X * i / 6,
-                            kasten.y + kasten.height / 2 + ZIEH_Y * i / 6);
+      await page.mouse.move(zielpunkt.x + ZIEH_X * i / 6, zielpunkt.y + ZIEH_Y * i / 6);
     }
     await page.mouse.up();
     await page.waitForTimeout(250);
     const nach = await knotenPunkt();
-    const gx = nach.x - vor.x, gy = nach.y - vor.y;
+    /* Hausregel 34: Ohne diese Wache stirbt der Test hier mit einem TypeError, statt einen
+       benannten Fehlschlag zu melden - die uebrigen Pruefungen laufen dann gar nicht mehr, und der
+       rote Exit-Code sieht aus wie eine gelungene Gegenprobe. Genau so passiert bei der Gegenprobe
+       zu KB-20 (Kopie mit abgeschaltetem Ziehen): 6 statt 14 Pruefungen, keine einzige FAIL-Zeile. */
+    check('2-vorab: der Systemknoten ist nach dem Ziehen noch messbar', !!nach, { vor, nach });
+    const gx = nach ? nach.x - vor.x : NaN, gy = nach ? nach.y - vor.y : NaN;
     // Anteil der tatsächlich zurückgelegten Strecke. 1,00 heißt: klebt exakt am Zeiger.
     const treueX = gx / ZIEH_X, treueY = gy / ZIEH_Y;
     check('2a: waagerechtes Ziehen klebt am Zeiger', Math.abs(treueX - 1) < 0.08,

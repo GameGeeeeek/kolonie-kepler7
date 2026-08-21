@@ -7157,8 +7157,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.598.0';
+  const VERSION = '8.599.0';
   const PATCHNOTES = [
+    { version:'8.599.0', date:'21.08.2026', changes:[
+      '<strong>Der Zoom der Karte bleibt jetzt erhalten, wenn sich das Fenster ändert.</strong> Bisher warf <em>jede</em> Größenänderung bei offenem System den eingestellten Ausschnitt weg und sprang auf die Vorgabe zurück – am PC schon beim Ziehen am Fensterrahmen, am Handy beim Auf- und Zuklappen der Bildschirmtastatur, die sich öffnet, sobald man das Suchfeld antippt. Wer hineingezoomt hatte, um etwas anzusehen, fing danach von vorn an.',
+      '<strong>Beim Öffnen eines Systems scrollt die Seite jetzt auch am PC zur Karte.</strong> Seit die Karte dort so hoch ist wie die Sektoransicht, stand sie nach dem Öffnen zum großen Teil unterhalb des Fensterrands: gemessen auf einem 1600×1040-Fenster nur 325 von 865 Pixeln im Bild – und <em>alle vier</em> Knöpfe am Kartenrand (Blättern und Zoom) außerhalb. Am Handy bleibt alles wie bisher.',
+      '<strong>Die Allianzbasis wird nicht mehr aus dem Bild geschoben.</strong> Damit Marker nicht auf Planetenscheiben liegen, rückt das Spiel sie beiseite – bisher ausschließlich nach außen. Über alle Systeme gemessen landeten dadurch 14 von 138 Markern außerhalb des sichtbaren Ausschnitts, jedes Mal die Allianzbasis. Findet sich außen kein Platz, weicht sie jetzt nach innen aus; im Zweifel überlappt sie lieber ein wenig, als unsichtbar zu sein.',
+      'Das Wurmloch-Portal folgt jetzt der Karten-Ebene „Ereignisse" wie die übrigen Ereignis-Marker – vorher blieb es sichtbar, obwohl gleich zwei Texte das Gegenteil versprachen. Und wer im Betriebssystem „Bewegung reduzieren" eingestellt hat, bekommt es ohne seine Animationen; die Zeichnung selbst bleibt vollständig.'
+    ]},
     { version:'8.598.0', date:'21.08.2026', changes:[
       '<strong>Behoben: Dreizehn Gegenstände verschwanden aus deinem Inventar, ohne irgendetwas zu bewirken.</strong> Wer einen Gegenstand aktivierte, der gerade nichts ausrichten konnte – weil seine Vormerkung schon stand, kein Tauchgang lief oder keine Forschung offen war –, verlor sein Exemplar trotzdem. Betroffen waren Stücke jeder Seltenheit, darunter <strong>vier mythische</strong>: Forschungsdurchbruch, Urwerkzeug, Werftkommando und Grundberührung. Ab jetzt wird ein Gegenstand nur noch verbraucht, wenn er auch <em>wirkt</em>.',
       '<strong>Bei vier davon war die Meldung sogar leer.</strong> Bannspule, Rückholanker, Wächterruf und Grundberührung schrieben eine Protokollzeile ohne einen einzigen Buchstaben – man sah also nicht einmal, <em>dass</em> etwas schiefgegangen war, geschweige denn was. Jetzt nennt jede Ablehnung ihren Grund in einem ganzen Satz und sagt ausdrücklich dazu, dass dein Exemplar dir erhalten bleibt.',
@@ -55464,17 +55470,32 @@
     // dieses Systems statt nach dem Maximum (KB-12): Ein System mit drei Planeten braucht keinen
     // Ausschnitt für sechs Orbits - es wird entsprechend stärker vergrößert. Gerechnet wird über
     // dieselbe Geometrie-Quelle wie die Zeichnung (kbOrbitRx), plus Rand für Beschriftungen.
-    const kbEng = kbSchmalerKasten();
+    const kbEng = kbRunderKasten();
+    const kbOrbits = PLANETS.filter(pl => pl.system === galaxyOpenSystem).map(pl => pl.orbit || 3);
+    const kbMaxOrbit = kbOrbits.length ? Math.max.apply(null, kbOrbits) : 6;
     let w = GALAXY_SYSTEM_VIEW_W;
     if (kbEng){
-      const kbOrbits = PLANETS.filter(pl => pl.system === galaxyOpenSystem).map(pl => pl.orbit || 3);
-      const kbMaxOrbit = kbOrbits.length ? Math.max.apply(null, kbOrbits) : 6;
       // +34 Sektor-Einheiten Rand: Planetenscheibe (r=11..14) plus die zwei Beschriftungszeilen.
       w = Math.max(150, (kbOrbitRx(kbMaxOrbit) + 34) * 2 * GALAXY_SYSTEM_SCALE);
     }
     let h = w*kbVerh;
+    /* KB-20: Bei RUNDER Bahn ist oft die HOEHE die bindende Richtung, nicht die Breite - wer nur
+       aus der Breite rechnet, schneidet oben und unten ab (gemessen an einer Probe-Fassung:
+       Ausschnitt 153 Einheiten hoch bei 174 Einheiten Inhalt). Die Korrektur gilt bewusst NUR am
+       breiten Kasten: Am Handy wuerde sie die Skala von 1,56 auf 1,39 druecken, die Karte also
+       verkleinern. Dort ist die Fit-nach-Breite die bewusste Wahl aus KB-12, samt angeschnittenem
+       Aussenring - eine Verkleinerung waere das Gegenteil dessen, wofuer KB-12 gebaut wurde. */
+    if (kbEng && !kbSchmalerKasten()){
+      const kbInhaltH = (kbOrbitRx(kbMaxOrbit) * kbOrbitMass().ry + 34) * 2 * GALAXY_SYSTEM_SCALE;
+      if (h < kbInhaltH){ h = kbInhaltH; w = h / kbVerh; }
+    }
     const kbBreitePx = kbRectCam ? kbRectCam.width : 0;
-    if (kbBreitePx && kbBreitePx / w > GALAXY_SYSTEM_MAX_SCALE){
+    /* Der Deckel aus KB-11 schuetzt die FLACHE Zeichnung vor Ueberzoom ("riesige Sonne, teils
+       beschnitten"). Bei runder Bahn ist der Inhalt schmaler (380 statt 600 Einheiten) und der
+       Ausschnitt kommt ohnehin aus dem echten Inhalt - dort bindet der Deckel nur noch zu frueh
+       und haelt die Karte klein. Am Handy hat er nie gebunden (gemessen 1,56 gegen Deckel 2,2),
+       die Zeile aendert dort also nichts. */
+    if (!kbEng && kbBreitePx && kbBreitePx / w > GALAXY_SYSTEM_MAX_SCALE){
       w = kbBreitePx / GALAXY_SYSTEM_MAX_SCALE;
       h = w*kbVerh;
     }
@@ -55521,6 +55542,26 @@
   // Planeten-Chips lag erst eine halbe Bildschirmhöhe tiefer. Die Höhe folgt jetzt der Breite
   // (0.6 ≈ Inhalt + Luft für Blätterknöpfe und Zoomstapel), gedeckelt auf die alten 420 px -
   // am PC (breiter Kasten) ändert sich dadurch nichts.
+  /* Die Kastenhoehe der beiden Sektor-Ansichten - und seit KB-20 am PC auch die der offenen
+     Systemebene. Als benannte Konstante, damit die zwei Anzeigestellen nicht wieder mit
+     verschiedenen Zahlen dastehen (genau das war der Report vom 21.08.2026). */
+  const KB_SEKTOR_KASTEN_HOEHE = 'max(480px, calc(100dvh - 175px))';
+  /* Die Kastenhoehe anwenden und sich merken, WAS dabei galt (KB-20f). Beides gehoert zusammen:
+     Ob die Kamera neu gezielt werden muss, entscheidet sich genau daran, ob sich Hoehe ODER
+     Zeichnungsform geaendert haben - wer das an mehreren Stellen getrennt festhaelt, laesst es
+     auseinanderlaufen (Regel 43). Rueckgabe: hat sich etwas geaendert?
+     Bei einem VERSTECKTEN Reiter (Breite 0) wird gar nichts angewandt: kbSystemKastenHoehe faellt
+     dort auf '420px' zurueck, und dieser Rueckfall duerfte sonst als "Aenderung" durchgehen und
+     einen Kameraschwenk gegen ein Kastenverhaeltnis ausloesen, das niemand gemessen hat. */
+  let kbAngewandtHoehe = null, kbAngewandtRund = null;
+  function kbKastenhoeheAnwenden(el){
+    if (!el || !(el.getBoundingClientRect().width > 0)) return false;
+    const h = kbSystemKastenHoehe(), rund = kbRunderKasten();
+    const geaendert = (h !== kbAngewandtHoehe) || (rund !== kbAngewandtRund);
+    el.style.height = h;
+    kbAngewandtHoehe = h; kbAngewandtRund = rund;
+    return geaendert;
+  }
   function kbSystemKastenHoehe(){
     const kbWrapEl = document.querySelector('#tab-karte .map-wrap');
     const breite = kbWrapEl ? kbWrapEl.getBoundingClientRect().width : 0;
@@ -55532,9 +55573,18 @@
     // 0,78 machte dort aus 325 px Kasten 480 px, also wieder toten Raum - und schob die Kastenmitte
     // unter den Fensterrand, wodurch das Ziehen der Karte gar nicht mehr ankam (gemessen,
     // test_kartenbedienung 2a/2b). Der Deckel 480 px hält auf großen Handys die Detailtafel im Bild.
-    return kbSchmalerKasten()
-      ? Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px'
-      : Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
+    /* KB-20: Am PC ist die Hoehe seit dem 21.08.2026 dieselbe wie in den Sektor-Ansichten - der
+       Kasten springt beim Oeffnen eines Systems nicht mehr (Spieler-Report mit zwei Screenshots).
+       EINE Quelle fuer beide Ansichten, damit sie nicht wieder auseinanderlaufen. Am Handy bleibt
+       die Rechnung aus KB-10/11/12 stehen: dort ist die Breite die bindende Richtung, ein gleich
+       hoher Kasten waere gemessen zu 63% leer und die Planeten blieben bei 20 px. */
+    if (kbSchmalerKasten()) return Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px';
+    /* KB-20d: Die volle Sektor-Hoehe gilt nur, wo auch die RUNDE Zeichnung gilt. Faellt der Kasten
+       in das flache Band (breites, niedriges Fenster), bleibt es bei der Rechnung von vor KB-20 -
+       ein hoher Kasten mit flacher Zeichnung waere genau der tote Raum, den der Kommentar ueber
+       kbSchmalerKasten seit KB-12 verbietet. */
+    return kbRunderKasten() ? KB_SEKTOR_KASTEN_HOEHE
+                            : Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
   }
   function galaxyOeffne(systemId){
     // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
@@ -55549,7 +55599,7 @@
     // nach dem Öffnen).
     const kbSvgOeffne = document.getElementById('galaxyMapSvg');
     const kbWrapOeffne = kbSvgOeffne ? kbSvgOeffne.closest('.map-wrap') : null;
-    if (kbWrapOeffne) kbWrapOeffne.style.height = kbSystemKastenHoehe();
+    kbKastenhoeheAnwenden(kbWrapOeffne);
     // Nur-Sektoren-Karte (KB-4): Der Rückweg aus dem System führt immer in die Sektoransicht
     // SEINER Region - auch wenn das System nicht über die Karte geöffnet wurde (Suchfeld,
     // „Zeigen, wo das war", Allianz-Sprungknopf). Ohne diese Zeilen landete man beim Schließen
@@ -55571,14 +55621,33 @@
     // Karte längst im Bild - der Scroll warf den Spieler dann jedes Mal wieder nach unten
     // (gemessen: hochgescrollt auf 300, ein ›-Klick sprang zurück auf 843). kbWarOffen weiß, ob
     // gerade nur weitergeblättert wird.
-    if (window.innerWidth <= 700 && kbWrapOeffne && !kbWarOffen){
+    /* KB-20g: Bis hierher galt der Scroll NUR am Handy (innerWidth <= 700). Seit KB-20 ist der
+       Kasten am PC so hoch wie in den Sektor-Ansichten, und die Seite scrollt beim Oeffnen nicht
+       mit - gemessen bei 1600x1040 stehen danach 325 von 865 px der Karte im Bild und ALLE VIER
+       Overlay-Knoepfe (‹ › + −) ausserhalb des Fensters. Am Stand davor war dort nur der unterste
+       betroffen; bei 1920x700 war die Karte sogar schon vorher zu 0 px sichtbar.
+       Die Breiten-Schranke bleibt als ODER stehen, damit das Handy sich exakt wie bisher verhaelt
+       (KB-7/KB-10/KB-11 haben dort drei Anlaeufe gebraucht) - dazu kommt die Frage nach der SACHE
+       selbst: Ist ueberhaupt genug vom Kasten im Bild? Gemessen wird gegen das, was hier maximal
+       erreichbar ist (Kastenhoehe oder Fensterrest, je nachdem was kleiner ist) - ein Kasten, der
+       hoeher als das Fenster ist, kann nie ganz sichtbar sein, und ein Scroll darf nicht daran
+       haengen, dass er etwas Unmoegliches verlangt.
+       Das !kbWarOffen bleibt unangetastet: Beim BLAETTERN steht die Karte laengst im Bild, und der
+       Scroll warf den Spieler dort jedes Mal nach unten (KB-11c, gemessen 300 -> 843). */
+    const kbTabsOeffne = document.querySelector('.tabs');
+    const kbVersatz = (kbTabsOeffne && getComputedStyle(kbTabsOeffne).position === 'sticky')
+      ? kbTabsOeffne.getBoundingClientRect().height : 0;
+    const kbROeffne = kbWrapOeffne ? kbWrapOeffne.getBoundingClientRect() : null;
+    const kbSichtbar = kbROeffne
+      ? Math.max(0, Math.min(window.innerHeight, kbROeffne.bottom) - Math.max(kbVersatz, kbROeffne.top)) : 0;
+    const kbErreichbar = kbROeffne
+      ? Math.max(1, Math.min(kbROeffne.height, window.innerHeight - kbVersatz)) : 1;
+    const kbZuWenigImBild = kbSichtbar < kbErreichbar * 0.9;
+    if (kbWrapOeffne && !kbWarOffen && (window.innerWidth <= 700 || kbZuWenigImBild)){
       // Ziel ist die Kastenoberkante DIREKT UNTER der Reiter-Leiste (KB-10): Im kompakten Kopf
       // ist .tabs position:sticky, und scrollIntoView(block:'start') legte die Leiste ÜBER die
       // Karte - gemessen am 390er-Viewport: 118 px verdeckt, beim 230er-Kasten wäre das die
       // halbe Karte samt Sonne. Ohne Sticky-Leiste ist der Versatz 0 und alles bleibt wie vorher.
-      const kbTabs = document.querySelector('.tabs');
-      const kbVersatz = (kbTabs && getComputedStyle(kbTabs).position === 'sticky')
-        ? kbTabs.getBoundingClientRect().height : 0;
       window.scrollTo({ top: window.scrollY + kbWrapOeffne.getBoundingClientRect().top - kbVersatz, behavior: 'smooth' });
     }
   }
@@ -56024,7 +56093,8 @@
     // Die Zoom-Knöpfe sind in den Sektor-Ansichten wirkungslos und deshalb ausgeblendet.
     const kbWrap = svg.closest('.map-wrap');
     const kbSektorModus = !galaxyOpenSystem;
-    if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : kbSystemKastenHoehe();
+    if (kbWrap && kbSektorModus) kbWrap.style.height = KB_SEKTOR_KASTEN_HOEHE;
+    else if (kbWrap) kbKastenhoeheAnwenden(kbWrap);
     ['galaxyZoomInBtn','galaxyZoomOutBtn'].forEach(function(id){
       const b = document.getElementById(id);
       if (b) b.style.display = kbSektorModus ? 'none' : '';
@@ -56404,6 +56474,75 @@
   window.addEventListener('scroll', closeKarteMenu, true);
   window.addEventListener('resize', closeKarteMenu);
 
+  /* KB-20e: Ein Fenster kann seine Groesse aendern, WAEHREND ein System offen steht - Handy
+     drehen, Fenster andocken, Entwicklerwerkzeuge aufziehen. Bis KB-20 war das folgenlos: Der
+     Ausschnitt kam aus der BREITE, und die Kastenhoehe der Systemebene folgte ihr (0,44 bzw. 0,78
+     der Breite), also stimmten beide danach von selbst wieder. Seit KB-20 koennen Kastenhoehe,
+     Zeichnungsform und Kamera aus DREI VERSCHIEDENEN Momenten stammen.
+     KORREKTUR 21.08.2026 - hier stand zuerst, die Kastenhoehe sei ein fester Pixelwert und der
+     Schaden ein Beschnitt oben und unten. Beides ist nachgemessen falsch: Am breiten runden Kasten
+     ist die Hoehe KB_SEKTOR_KASTEN_HOEHE, also ein CSS-Ausdruck mit 100dvh, und das SVG hat kein
+     preserveAspectRatio - es gilt 'xMidYMid meet', das nie beschneidet, sondern einpasst. Direkt
+     nach der Aenderung ist deshalb gar nichts draussen; die Karte wird nur unnoetig klein
+     (1920x1040 -> 1920x810 an einem System mit Orbit 10: Kasten folgt 865 -> 635 px, die Kamera
+     behaelt ihre 362x248,9 Einheiten, der Planetendurchmesser faellt von 87 auf 56 px).
+     DER Schaden kommt beim naechsten Neuaufbau - ein Zoom-Klick genuegt -, weil dann alle drei
+     Groessen auf einmal einloesen. Gemessen 1920x1040 -> 1920x780, ohne diesen Handler: Der Kasten
+     springt von 605 auf 420 px, die Zeichnung kippt von rund (358x323 Einheiten) auf flach
+     (755x262), waehrend die Kamera weiter den engen runden Ausschnitt von 258,6 Einheiten haelt -
+     danach liegen ALLE SECHS gemessenen Planeten ausserhalb des Kastens, bis zu 1713 px weit. Die
+     Kontrolle, die von Anfang an 1920x780 gross ist, hat nach demselben Zoom-Klick zwei Objekte
+     knapp am Rand (139 bzw. 83 px) - das ist der normale Preis des Hineinzoomens und der Beleg,
+     dass die sechs nicht vom Klick kommen.
+     Die zwei Sektor-Ansichten brauchen nichts davon: Ihre Hoehe ist derselbe CSS-Ausdruck und ihre
+     Zeichnung haengt an keiner Schwelle. Deshalb haengt der ganze Block an galaxyOpenSystem.
+     Entprellt, weil ein gezogener Fensterrahmen hunderte Ereignisse feuert - und mit 220 ms
+     bewusst laenger als der 200-ms-Zwischenspeicher in kbRunderKasten. Der wird trotzdem
+     ausdruecklich verworfen, damit die Zusage nicht an der Reihenfolge zweier Zahlen haengt. */
+  let kbFensterTimer = null;
+  function kbFensterNachziehen(){
+    kbFensterTimer = null;
+    if (!galaxyOpenSystem) return;
+    kbRundBis = 0;                                     // gemessen wird jetzt, nicht aus dem Speicher
+    const kbWrapF = document.querySelector('#tab-karte .map-wrap');
+    /* KB-20f - der schwerste Befund der Durchsicht zu KB-20e, und er war ein Rueckschritt:
+       Hier stand die Kastenhoehe, buildMap() und galaxyCamFahre(true) BEDINGUNGSLOS. Zoom und
+       Verschiebung der Systemebene leben aber ausschliesslich in galaxyMapViewBox, und
+       galaxyCamFahre(true) ersetzt dieses Objekt durch den Vorgabe-Ausschnitt. Damit warf JEDES
+       resize den vom Spieler eingestellten Zoom weg - am PC jedes Ziehen am Fensterrahmen, am
+       Handy schon das Auf- und Zuklappen der Bildschirmtastatur (der viewport-meta traegt
+       interactive-widget=resizes-content, und das Suchfeld der Karte oeffnet sie).
+       Neu gezielt wird nur noch, wenn sich WIRKLICH etwas geaendert hat, das die Kamera betrifft:
+       die Kastenhoehe oder die Zeichnungsform. Sonst passiert hier gar nichts - das Seitenverhaeltnis
+       zieht galaxyVerhaeltnisAngleichen() am Kopf des naechsten buildGalaxyMap() nach, und das
+       laesst die Zoomstufe (viewBox-Breite) ausdruecklich stehen. Diese zoom-erhaltende Antwort gab
+       es also laengst; KB-20e hatte eine zerstoerende danebengestellt. */
+    if (!kbKastenhoeheAnwenden(kbWrapF)){
+      /* Nichts, was ein Neuzielen rechtfertigt - aber das SEITENVERHAELTNIS des Kastens kann sich
+         trotzdem geaendert haben: Am breiten Kasten ist die Hoehe ein CSS-Ausdruck mit 100dvh und
+         folgt dem Fenster ohne Zutun, die Hoehen-Zeichenkette bleibt dabei dieselbe.
+         galaxyVerhaeltnisAngleichen() zieht genau das nach - nur die HOEHE des Ausschnitts, die
+         Breite (also die Zoomstufe) bleibt stehen. Dieser Weg existierte laengst; KB-20e hatte
+         stattdessen den zerstoerenden genommen.
+         Der erste Entwurf von KB-20f liess diese zwei Zeilen weg, weil ich annahm, das erledige der
+         naechste buildGalaxyMap() an seinem Kopf. Gemessen laeuft der aber gar nicht, wenn sich
+         sonst nichts geaendert hat - test_kartenresize 3 hat genau das gefangen (Kastenverhaeltnis
+         0,576 gegen Kameraverhaeltnis 0,688). Eine Annahme ist kein Messwert. */
+      galaxyVerhaeltnisAngleichen();
+      galaxyNurAusschnitt();
+      return;
+    }
+    // Reihenfolge: erst die Hoehe (kbRunderKasten misst den Kasten), dann die Zeichnung, dann die
+    // Kamera. Andersherum entschiede die Kamera gegen eine Geometrie, die es gleich nicht mehr
+    // gibt - genau der getrennte Entscheidungsweg, der als schwerster Befund von KB-20d galt.
+    buildMap();
+    galaxyCamFahre(true);   // Sprung, keine Fahrt: eine Groessenaenderung ist keine Navigation
+  }
+  window.addEventListener('resize', () => {
+    if (kbFensterTimer) clearTimeout(kbFensterTimer);
+    kbFensterTimer = setTimeout(kbFensterNachziehen, 220);
+  });
+
   // --- Menü eines Planetenmarkers
   function planetMapMenu(ev, planetId){
     const p = PLANETS.find(x => x.id === planetId);
@@ -56540,15 +56679,69 @@
   // Funktion - zwei Kopien liefen sonst beim nächsten Umbau auseinander (Regel 43).
   // Bewusst window.innerWidth statt getBoundingClientRect des Kastens: planetOrbitXY läuft je
   // Planet und Zeichenvorgang, und ein getBoundingClientRect erzwingt dabei jedes Mal ein Layout.
+  // KORREKTUR KB-20d: Seit KB-20 hängt die Bahnform nicht mehr an dieser Funktion allein, sondern
+  // an kbRunderKasten() darunter - und das MISST den Kasten. Die Regel oben gilt trotzdem weiter,
+  // deshalb hat kbRunderKasten einen 200-ms-Zwischenspeicher: gemessen wird einmal je Aufbau statt
+  // 677-mal. Wer dort etwas ändert, prüft zuerst, ob diese Zusage noch stimmt.
   // Dieselbe Schranke wie die .map-zoom-Media-Query und das Scroll-Gate - EINE Zahl, vier Stellen
   // (Geometrie, Kamera-Ausschnitt, Kastenhöhe, CSS). Sie müssen zusammen umschalten: Die rundere
   // Bahnform braucht einen höheren Kasten, ein höherer Kasten ohne rundere Bahnen ist nur toter
   // Raum (gemessen am PC-Viewport: Kasten 325 -> 480 px, die Kastenmitte lag dadurch unterhalb des
   // Fensters, elementFromPoint lieferte null und das Ziehen der Karte kam gar nicht mehr an -
   // test_kartenbedienung 2a/2b, Treue 1 -> 0).
+  /* Hat der Spieler Bewegung abbestellt? Die Datei hat 20+ CSS-Regeln fuer prefers-reduced-motion
+     und galaxyCamFahre respektiert es ausdruecklich ("dieselbe Regel wie ueberall sonst im Spiel").
+     SMIL-Animationen im SVG erreicht CSS aber NICHT - `animation:none` gilt fuer sie nicht, und
+     pauseAnimations() waere zu grob (es hielte auch Sonne, Nester und Festung an). Gebraucht wird
+     das bisher nur vom Wurmloch-Portal, dem einzigen Kartenobjekt mit einer nennenswerten Zahl
+     eigener Animationen (36). */
+  function kbBewegungAus(){
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
   function kbSchmalerKasten(){ return window.innerWidth <= 700; }
+  /* Ab wann ist der Kasten zu HOCH fuer die flache Streifen-Zeichnung? (KB-20)
+     Die flache Systemzeichnung ist 600x180 Sektor-Einheiten, also im Verhaeltnis 0,30. Sie fuellt
+     einen Kasten mit Verhaeltnis r immer nur zu 0,30/r seiner Hoehe - bei r = 0,5 bleiben also
+     40% leer. Genau dort liegt die Schranke. Das ist dieselbe Einsicht wie bei KB-12, nur nicht
+     mehr an die FENSTERBREITE gehaengt, sondern an die Form des Kastens: Ein Hochformat-Handy und
+     ein hoher PC-Kasten haben dasselbe geometrische Problem, und ein flacher Streifen kann beide
+     nicht fuellen, egal wie breit das Fenster ist. Sehr breite Bildschirme bleiben dadurch von
+     selbst bei der flachen Zeichnung - dort ist der Kasten wieder flach genug. */
+  let kbRundZuletzt = false, kbRundBis = 0;
+  function kbRunderKasten(){
+    if (kbSchmalerKasten()) return true;
+    /* Kurzer Zwischenspeicher nach dem Muster von storageCapCached: kbOrbitMass haengt hier dran
+       und laeuft je Planet und Zeichenvorgang - gemessen rund 677 Aufrufe je Kartenaufbau. Ohne
+       ihn stuende in jedem davon ein getBoundingClientRect, und der Kommentar ueber
+       kbSchmalerKasten verbietet genau das (er ist deshalb unten mitgezogen). 200 ms sind kurz
+       genug, dass eine Fenstergroessenaenderung im naechsten Aufbau ankommt. */
+    const kbJetzt = Date.now();
+    if (kbJetzt < kbRundBis) return kbRundZuletzt;
+    const kbEl = document.querySelector('#tab-karte .map-wrap');
+    const kbBreite = kbEl ? kbEl.getBoundingClientRect().width : 0;
+    /* Ein VERSTECKTER Reiter liefert Breite 0 (.tab-panel display:none). Dann wird der zuletzt
+       gueltig gemessene Stand behalten statt eine Antwort zu erfinden: loadPlayersInSystem ruft
+       buildMap() nach seinem await ohne Ruecksicht auf den offenen Reiter, und eine erfundene
+       "flache" Antwort schriebe flache Bahnen in ein SVG, dessen Ausschnitt rund ist - der Spieler
+       saehe beim Zurueckwechseln kurz ein beschnittenes System. */
+    if (!(kbBreite > 0)) return kbRundZuletzt;
+    /* Gemessen wird die ZIELhoehe des Kastens, nicht seine aktuelle: Sonst entscheiden Hoehe und
+       Zeichnung getrennt, und genau das war der schwerste Befund der Durchsicht - bei einem
+       breiten, flachen Fenster (ab 1472 px Breite, Hoehe im Band darunter) bekam der Kasten die
+       volle Sektor-Hoehe, die Zeichnung blieb aber flach. Gemessen bei 1920x804: Kasten 1258x629,
+       Verhaeltnis exakt 0,500, Fuellung 0,351 - zwei Pixel Fensterhoehe mehr kippen die Zeichnung
+       von flach auf rund. (Hier stand zuerst "um 47%": Diese Zahl haette 0,351 gegen eine Fuellung
+       aus einem ANDEREN Viewport gehalten und war damit keine Messung, sondern eine Mischung
+       zweier - Regel 41 gilt auch fuer die eigenen Zahlen von gestern.) Die Zielhoehe haengt an window.innerHeight, die Breite nicht an der
+       Hoehe: es gibt also keinen Zirkelschluss. Die Formel ist dieselbe wie
+       KB_SEKTOR_KASTEN_HOEHE, nur in JS statt in CSS. */
+    const kbZielH = Math.max(480, window.innerHeight - 175);
+    kbRundZuletzt = (kbZielH / kbBreite) > 0.5;
+    kbRundBis = kbJetzt + 200;
+    return kbRundZuletzt;
+  }
   function kbOrbitMass(){
-    return kbSchmalerKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
+    return kbRunderKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
   }
   function kbOrbitRx(orbit){ const m = kbOrbitMass(); return m.basis + orbit*m.schritt; }
   function planetOrbitXY(p){
@@ -56600,31 +56793,59 @@
      Phase 3 nie zwei gleichartige Marker in einem System gab (Regel 53: wer eine Paarung nicht
      misst, haelt eine Verschiebung fuer eine Loesung).
      Der Parameter ist optional - ein Aufrufer, der ihn weglaesst, verhaelt sich exakt wie vorher. */
-  function kbMarkerFrei(pos, planeten, sonnenR, markerR, belegt){
+  function kbMarkerFrei(pos, planeten, sonnenR, markerR, belegt, maxRadius){
     const minSonne = 34*(sonnenR||1) + 20, schritt = kbMarkerSchritt();
     const minPlanet = Math.max(kbMarkerAbstand(), (markerR||11) + 14);
     const winkel = Math.atan2(pos.y-SUN_Y, pos.x-SUN_X);
-    let radius = Math.hypot(pos.x-SUN_X, pos.y-SUN_Y);
-    let p = pos;
+    const startRadius = Math.hypot(pos.x-SUN_X, pos.y-SUN_Y);
+    const aufBahn = (r) => ({ x: SUN_X + r*Math.cos(winkel), y: SUN_Y + r*Math.sin(winkel) });
+    const frei = (q, r) => {
+      if (r < minSonne) return false;
+      if ((planeten||[]).some(pl => { const pp = planetOrbitXY(pl);
+            return Math.hypot(q.x-pp.x, q.y-pp.y) < minPlanet; })) return false;
+      // Abstand zweier Marker: die SICHTBAREN Radien plus Luft fuer die Beschriftung darueber.
+      return !(belegt||[]).some(b =>
+        Math.hypot(q.x-b.x, q.y-b.y) < ((markerR||11) + (b.r||11) + 8));
+    };
     /* 24 statt 14 Versuche (KB-17). Am schmalen Kasten ist die Schrittweite nur 5 Einheiten
        (kbOrbitMass().schritt 18 x 0,28), 14 Versuche reichten also fuer hoechstens 70 Einheiten -
        zu wenig fuer einen grossen Marker wie die Alien-Koenigin, deren sichtbarer Hof allein 30
        Einheiten misst. Gemessen: Sie blieb bei 32,1 statt der noetigen 41 stehen, weil die
        Schleife auslief, nicht weil kein Platz da war. */
+    let radius = startRadius, p = pos, aussen = null;
     for (let versuch=0; versuch<24; versuch++){
-      const zuNahSonne = radius < minSonne;
-      const zuNahPlanet = (planeten||[]).some(pl => {
-        const pp = planetOrbitXY(pl);
-        return Math.hypot(p.x-pp.x, p.y-pp.y) < minPlanet;
-      });
-      // Abstand zweier Marker: die SICHTBAREN Radien plus Luft fuer die Beschriftung darueber.
-      const zuNahMarker = (belegt||[]).some(b =>
-        Math.hypot(p.x-b.x, p.y-b.y) < ((markerR||11) + (b.r||11) + 8));
-      if (!zuNahSonne && !zuNahPlanet && !zuNahMarker) break;
+      if (frei(p, radius)){ aussen = { p, radius }; break; }
       radius += schritt;
-      p = { x: SUN_X + radius*Math.cos(winkel), y: SUN_Y + radius*Math.sin(winkel) };
+      p = aufBahn(radius);
     }
-    return p;
+    /* KB-20h - der Schieber schob bis hierher AUSSCHLIESSLICH nach aussen, und damit konnte er
+       einen Marker aus dem Kartenausschnitt hinausschieben. Mit den echten Funktionen der Datei
+       nachgemessen (ausgefuehrt, nicht nachgebaut): Bei der RUNDEN Zeichnung landeten so 14 von
+       138 Markern draussen - alle die Allianzbasis, bis zu 18,2 Einheiten ueber die linke Kante,
+       weil ihr fester Winkel 205 Grad fast auf dem Bahnwinkel -160 Grad der Orbits 3, 9 und 15
+       liegt und sie deshalb um 71 bis 81 Einheiten nach aussen wandert. Bei der flachen Zeichnung
+       waren es 0 - dort ist der Ausschnitt breit genug.
+       Wer eine Obergrenze mitgibt, bekommt deshalb einen zweiten Durchgang nach INNEN. Und findet
+       sich auch dort nichts, wird auf die Obergrenze gekappt: Ein Marker, der eine Scheibe
+       ueberlappt, aber IM BILD steht, ist ehrlicher als einer, den niemand sieht - dieselbe
+       Abwaegung wie beim Label-Deckel von KB-16.
+       Ohne maxRadius verhaelt sich die Funktion byte-genau wie vorher; das ist die Zusage fuer die
+       fuenf uebrigen Markerarten. */
+    /* Die Obergrenze muss auch dann greifen, wenn die Schleife ERFOLGREICH war: Im gemessenen
+       Anlassfall findet sie nach vier bis fuenf Schritten einen freien Platz - nur eben einen
+       ausserhalb des Bildes. Der erste Entwurf dieser Behebung pruefte die Grenze bloss am
+       Schleifenende und war damit wirkungslos; aufgefallen ist das nur, weil dieselbe Messung
+       danach WIEDERHOLT wurde und unveraendert 14 von 138 meldete (Regel 48). */
+    if (aussen && (!(maxRadius > 0) || aussen.radius <= maxRadius)) return aussen.p;
+    if (!(maxRadius > 0)) return p;
+    let innen = startRadius;
+    for (let versuch=0; versuch<24; versuch++){
+      innen -= schritt;
+      if (innen < minSonne) break;
+      const q = aufBahn(innen);
+      if (frei(q, innen)) return q;
+    }
+    return aufBahn(Math.min(startRadius, maxRadius));
   }
   function homeSlotXY(slot){
     // Bugfix (danke an den Bug-Report mit Screenshot): war vorher eine sehr flache Ellipse
@@ -56757,6 +56978,20 @@
     // und keine solche Gruppe existiert ohne data-Attribut. Eine neue Markerart erbt den Schutz
     // damit automatisch - genau wie beim Kollisionsschieber kbMarkerFrei (Regel 52).
     const OBJEKTE = '.planet-node';
+    /* OFFEN und bewusst nicht in dieser Etappe behoben (KB-20b, 21.08.2026): Dieser Durchgang misst
+       mit getBBox(), und das liefert die EIGENEN Nutzerkoordinaten einer Gruppe - OHNE ihre
+       transform. Fuer die sechs `planet-node`-Arten stimmt das, weil keine davon skaliert. Das
+       Wurmloch-Portal dagegen ist fuer viewBox "0 0 100 100" gezeichnet und sitzt hinter einem
+       scale(0.34); sein groesster Kreis meldet gemessen 82 Einheiten, waehrend das Portal auf der
+       Karte 27,9 Einheiten breit ist. Es traegt deshalb bewusst KEIN planet-node - mit der Klasse
+       naehme der Entflechter eine fast dreimal zu grosse Flaeche an und schoebe Beschriftungen
+       grundlos beiseite.
+       Der Preis dafuer ist, dass eine Beschriftung das Portal ueberlappen kann. Das ist die
+       kleinere Unwahrheit als eine dreifach zu grosse Sperrflaeche, die Namen grundlos von ihren
+       Planeten wegschoebe - und das Portal steht ohnehin nur an zwei Systemen gleichzeitig.
+       WER DAS AENDERN WILL, macht zuerst den Entflechter transform-fest (getBBox mal
+       getCTM/getScreenCTM statt roh) und nimmt DANACH das Portal in OBJEKTE auf. Die Klasse hier
+       zu setzen, ohne das zu tun, macht es schlimmer statt besser. */
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
       let el = g.querySelector('image') || g.querySelector('circle.body');
@@ -57033,6 +57268,10 @@
     if (!svg) return;
 
     const sysPlanets = PLANETS.filter(p=>p.system===activeSystem);
+    /* Der aeusserste Orbit dieses Systems - EINE Quelle fuer alles, was seine Bahn braucht
+       (Wurmloch-Portal, Allianzbasis). Vorher rechnete das Portal ihn selbst aus, und die
+       Allianzbasis hatte gar keine Bahn, sondern einen festen Punkt (KB-20c). */
+    const kbMaxOrbit = sysPlanets.length ? Math.max.apply(null, sysPlanets.map(p => p.orbit || 3)) : 6;
     /* Alle in dieser Systemebene bereits gesetzten Marker - der Kollisionsschieber bekommt sie
        mit, damit zwei Marker nicht aufeinander landen (KB-17). Jede Markerart traegt sich hier
        ein; wer eine neue hinzufuegt, tut dasselbe. */
@@ -57224,15 +57463,73 @@
     // Wurmloch-Portal: sichtbar, wenn das aktuell gezoomte System einer der beiden Endpunkte ist -
     // die verbindende Linie selbst ergibt hier keinen Sinn (das andere System ist nicht im Bild),
     // daher ein eigenes kleines Portal-Symbol mit Tooltip zum Ziel.
-    if (galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === activeSystem || galaxyCache.activeWormhole.to === activeSystem)){
+    /* Das Ereignisse-Gate hat hier bis zum 21.08.2026 GEFEHLT - und zwei Anzeigestellen haben es
+       trotzdem versprochen: der Tooltip der Ebenen-Leiste ("Ereignis-Abzeichen (Piratenbasis,
+       Aliens, Krieg) und Wurmloch ein-/ausblenden") und der Hilfe-Abschnitt ("Ereignisse
+       (Piratenbasis, Aliens, Krieg, Wurmloch) ... lassen sich einzeln aus- und einschalten").
+       Das 🌀-Abzeichen in karteSystemBadges war sehr wohl gegated, nur das Portal selbst nicht -
+       Punkt 6 der Checkliste in Reinform. Mit GR-1 waere es das lauteste Objekt der Systemebene
+       geworden, also genau das, was ein Spieler wegschalten WILL.
+       Das Gate umschliesst bewusst auch kbMarkerFrei und platzierteMarker: Was nicht gezeichnet
+       wird, darf auch keinen Platz fuer andere Marker blockieren. */
+    if (karteEbeneAn('ereignisse') && galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === activeSystem || galaxyCache.activeWormhole.to === activeSystem)){
       const otherSysId = galaxyCache.activeWormhole.from === activeSystem ? galaxyCache.activeWormhole.to : galaxyCache.activeWormhole.from;
       const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
-      const whX = 665, whY = 28;
-      inner += `<g><title>Wurmloch nach ${otherSys?otherSys.name:'unbekanntem System'}</title>
-        <circle cx="${whX}" cy="${whY}" r="14" fill="none" stroke="#af9ce6" stroke-width="2" stroke-dasharray="3 3" opacity="0.85"><animateTransform attributeName="transform" type="rotate" from="0 ${whX} ${whY}" to="360 ${whX} ${whY}" dur="4s" repeatCount="indefinite"/></circle>
-        <circle cx="${whX}" cy="${whY}" r="7" fill="#af9ce6" opacity="0.5"><animate attributeName="r" values="6;9;6" dur="1.8s" repeatCount="indefinite"/></circle>
-        <text x="${whX}" y="${whY+24}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>
+      /* Die Bahn kommt aus derselben Quelle wie alles andere auf dieser Karte (KB-20b): knapp
+         INNERHALB der aeussersten Planetenbahn, oben rechts. Vorher stand hier ein fester Punkt
+         (665, 28) aus dem alten, breiten Systemfeld - mit dem engeren Ausschnitt lag er gemessen
+         241 px hinter der Kastenkante, das Portal war also unsichtbar. Der Faktor 0,92 haelt es in
+         BEIDEN Zeichnungen im Bild: rund bei 144 von 242 sichtbaren Einheiten, flach bei 316 von
+         350. Die Bahn ist runder als die Planetenbahn (mindestens 0,55), damit das Portal nicht
+         auf der Ekliptik zwischen den Planeten klebt. */
+      const whRx = kbOrbitRx(kbMaxOrbit) * 0.92, whRy = whRx * Math.max(0.55, kbOrbitMass().ry);
+      const whRad = 325 * Math.PI / 180;
+      const whR = 14;
+      /* Obergrenze (KB-20h): So weit reicht der sichtbare Ausschnitt seitlich - dieselbe Zahl,
+         aus der galaxyCamTarget seine Breite bildet, minus dem eigenen sichtbaren Radius. */
+      const whMax = kbOrbitRx(kbMaxOrbit) + 34 - whR;
+      const whPos = kbMarkerFrei({ x: SUN_X + whRx*Math.cos(whRad), y: SUN_Y + whRy*Math.sin(whRad) },
+                                 sysPlanets, activeSunType.r, whR, platzierteMarker, whMax);
+      platzierteMarker.push({ x: whPos.x, y: whPos.y, r: whR });
+      const whX = whPos.x, whY = whPos.y;
+      /* Die Akkretionsscheibe ist fuer viewBox 0 0 100 100 gezeichnet (sichtbarer Radius ~41).
+         0,34 bringt sie auf denselben Durchmesser, den der alte gepunktete Ring hatte: 41 x 0,34
+         = 13,9 Sektor-Einheiten gegen vorher r = 14. */
+      /* BEWUSST OHNE `planet-node` - und das ist gemessen, nicht vorsichtshalber: Diese Gruppe
+         traegt als einzige Kartenobjekt-Gruppe eine `scale`-Transformation (die Zeichnung ist fuer
+         viewBox 0 0 100 100 gebaut). `kbLabelsEntflechten` misst belegte Flaechen mit getBBox(),
+         und das liefert die EIGENEN Nutzerkoordinaten OHNE die transform - im Browser nachgemessen
+         meldet der groesste Kreis 82 Einheiten, waehrend das Portal auf der Karte 27,9 Einheiten
+         breit ist. Mit der Klasse haette der Entflechter eine fast dreimal zu grosse Flaeche
+         angenommen und Beschriftungen unnoetig weit weggeschoben. Wer das Portal spaeter doch
+         aufnehmen will, muss den Entflechter zuerst transform-fest machen (Matrix der Gruppe
+         mitrechnen), nicht die Klasse hier setzen.
+         Gegen KOLLISIONEN ist es trotzdem geschuetzt: Es laeuft durch kbMarkerFrei() und meldet
+         sich in platzierteMarker an, wie jeder andere Marker auch. */
+      // Serverwert escapen wie bei den Nachbarn (data-map-nest schreibt escapeHtml(String(...))):
+      // otherSysId kommt aus galaxyCache.activeWormhole, also vom Server - und ein Attributwert
+      // ohne escapeHtml ist genau die Stelle, an der eine Anfuehrungszeichen-Ueberraschung das
+      // Markup aufbricht. Der Systemname stammt aus STAR_SYSTEMS, wird aber der Einheitlichkeit
+      // halber mitgenommen: Zwei Schreibweisen nebeneinander sind die zweite Anzeigestelle.
+      /* Gemessen unter 4-facher CPU-Drosselung (Ausschluss-Messung nach dem Muster von KB-9a,
+         drei Durchgaenge): Mit Portal 4.478 bis 8.600 ms Long Tasks je 10 s, ohne Portal stabil
+         1.083 bis 1.330 - das Portal kostet also nachweislich, Faktor 3 bis 6. WELCHER Bestandteil,
+         liess sich NICHT aufloesen: Die Variante ohne die 23 <animate> streute 2.628 bis 5.947 und
+         ueberlappte damit die unveraenderte vollstaendig (Regel 20 - ein erster Lauf hatte sie als
+         Hauptkostentraeger gemeldet, die Wiederholung hat das widerlegt). Ohne Drosselung sind es
+         in beiden Faellen 0 Long Tasks, und das Portal steht in hoechstens zwei von 69 Systemen.
+         Ein blinder Umbau der Zeichnung waere damit nicht gedeckt; wer sie anfasst, misst zuerst
+         nach - und zwar mehrfach. */
+      const whRoh = `<g data-map-wurmloch="${escapeHtml(String(otherSysId))}" transform="translate(${whX.toFixed(1)} ${whY.toFixed(1)}) scale(0.34) translate(-50 -50)"><title>Wurmloch nach ${escapeHtml(otherSys?otherSys.name:'unbekanntem System')}</title>
+        <defs> <radialGradient id="wh_${activeSystem}_glut" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="36"> <stop offset="0.355" stop-color="#ffffff"/> <stop offset="0.385" stop-color="#e8eaf6"/> <stop offset="0.42" stop-color="#5ce1ff"/> <stop offset="0.48" stop-color="#6f8fe0"/> <stop offset="0.55" stop-color="#7f77dd"/> <stop offset="0.63" stop-color="#af9ce6"/> <stop offset="0.715" stop-color="#8b7fd6"/> <stop offset="0.8" stop-color="#d8a75e"/> <stop offset="0.885" stop-color="#fac775"/> <stop offset="0.95" stop-color="#8a6a4a" stop-opacity="0.75"/> <stop offset="1" stop-color="#2a2350" stop-opacity="0"/> </radialGradient> <linearGradient id="wh_${activeSystem}_doppler" gradientUnits="userSpaceOnUse" x1="-36" y1="0" x2="36" y2="0"> <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/> <stop offset="0.26" stop-color="#f5e2b8" stop-opacity="0.2"/> <stop offset="0.52" stop-color="#ffffff" stop-opacity="0"/> <stop offset="0.8" stop-color="#1a1730" stop-opacity="0.34"/> <stop offset="1" stop-color="#0f0d22" stop-opacity="0.62"/> </linearGradient> <radialGradient id="wh_${activeSystem}_halo" cx="0.5" cy="0.5" r="0.5"> <stop offset="0.4" stop-color="#9b8ad8" stop-opacity="0"/> <stop offset="0.6" stop-color="#9b8ad8" stop-opacity="0.26"/> <stop offset="0.78" stop-color="#6a5fc0" stop-opacity="0.18"/> <stop offset="0.93" stop-color="#20204a" stop-opacity="0.1"/> <stop offset="1" stop-color="#20204a" stop-opacity="0"/> </radialGradient> <radialGradient id="wh_${activeSystem}_nebel" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#e8b463" stop-opacity="0.6"/> <stop offset="0.45" stop-color="#9b8ad8" stop-opacity="0.42"/> <stop offset="0.8" stop-color="#4e4290" stop-opacity="0.22"/> <stop offset="1" stop-color="#4e4290" stop-opacity="0"/> </radialGradient> <radialGradient id="wh_${activeSystem}_loch" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#0d1a2a"/> <stop offset="0.4" stop-color="#05070f"/> <stop offset="0.82" stop-color="#000000"/> <stop offset="1" stop-color="#000000"/> </radialGradient> <radialGradient id="wh_${activeSystem}_schlund" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#bfeeff" stop-opacity="0.62"/> <stop offset="0.4" stop-color="#5dcaa5" stop-opacity="0.26"/> <stop offset="1" stop-color="#101f30" stop-opacity="0"/> </radialGradient> <linearGradient id="wh_${activeSystem}_bogen" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#d8a75e" stop-opacity="0"/> <stop offset="0.16" stop-color="#af9ce6"/> <stop offset="0.5" stop-color="#ffffff"/> <stop offset="0.84" stop-color="#4fd4f5"/> <stop offset="1" stop-color="#6f8fe0" stop-opacity="0"/> </linearGradient> <linearGradient id="wh_${activeSystem}_photon" x1="0" y1="1" x2="1" y2="0"> <stop offset="0" stop-color="#e8b463"/> <stop offset="0.35" stop-color="#ffffff"/> <stop offset="0.7" stop-color="#7ed6ff"/> <stop offset="1" stop-color="#af9ce6"/> </linearGradient> <linearGradient id="wh_${activeSystem}_strom" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#f0d29b"/> <stop offset="0.5" stop-color="#ffffff"/> <stop offset="1" stop-color="#8ddcff"/> </linearGradient> <filter id="wh_${activeSystem}_fein" x="-60%" y="-60%" width="220%" height="220%"> <feGaussianBlur stdDeviation="0.5"/> </filter> <filter id="wh_${activeSystem}_weich" x="-60%" y="-60%" width="220%" height="220%"> <feGaussianBlur stdDeviation="1.5"/> </filter> <filter id="wh_${activeSystem}_stark" x="-70%" y="-70%" width="240%" height="240%"> <feGaussianBlur stdDeviation="3.4"/> </filter> <filter id="wh_${activeSystem}_wolke" x="-40%" y="-40%" width="180%" height="180%"> <feTurbulence type="fractalNoise" baseFrequency="0.04 0.11" numOctaves="2" seed="7" result="wh_${activeSystem}_rauschen"/> <feDisplacementMap in="SourceGraphic" in2="wh_${activeSystem}_rauschen" scale="4" xChannelSelector="R" yChannelSelector="G"/> <feGaussianBlur stdDeviation="0.4"/> </filter> <clipPath id="wh_${activeSystem}_scheibevorn" clipPathUnits="userSpaceOnUse"><rect x="-60" y="0" width="120" height="60"/></clipPath> <clipPath id="wh_${activeSystem}_hinten" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="100" height="50"/></clipPath> <clipPath id="wh_${activeSystem}_vorn" clipPathUnits="userSpaceOnUse"><rect x="0" y="50" width="100" height="50"/></clipPath> </defs> <circle cx="50" cy="50" r="41" fill="url(#wh_${activeSystem}_halo)"> <animate attributeName="opacity" values="0.6;1;0.6" dur="5s" repeatCount="indefinite"/> </circle> <ellipse cx="50" cy="50" rx="31" ry="13" transform="rotate(-16 50 50)" fill="url(#wh_${activeSystem}_nebel)" filter="url(#wh_${activeSystem}_stark)" opacity="0.75"> <animate attributeName="opacity" values="0.5;0.9;0.5" dur="6.5s" repeatCount="indefinite"/> </ellipse> <g transform="rotate(-16 50 50)"> <g transform="translate(50 50) scale(1 0.44)"> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23" opacity="0.5" filter="url(#wh_${activeSystem}_weich)"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_doppler)" stroke-width="23"/> <circle r="15.5" fill="none" stroke="#9fe3ff" stroke-width="3.2" opacity="0.5" stroke-dasharray="10 8" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/> </circle> <circle r="20.5" fill="none" stroke="#f0d29b" stroke-width="4.6" opacity="0.32" stroke-dasharray="20 15" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="7s" repeatCount="indefinite"/> </circle> <circle r="27" fill="none" stroke="#c3bef5" stroke-width="6" opacity="0.28" stroke-dasharray="28 21" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="11s" repeatCount="indefinite"/> </circle> <circle r="13.4" fill="none" stroke="#eef0ff" stroke-width="2.6" opacity="0.85" filter="url(#wh_${activeSystem}_fein)"/> </g> </g> <g transform="rotate(-16 50 50)"> <g clip-path="url(#wh_${activeSystem}_hinten)"> <path d="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50" fill="none" stroke="url(#wh_${activeSystem}_strom)" stroke-width="2.4" stroke-linecap="round" opacity="0.9" stroke-dasharray="5 14"> <animate attributeName="stroke-dashoffset" values="19;0" dur="1.5s" repeatCount="indefinite"/> </path> <path d="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50" fill="none" stroke="#a9e6ff" stroke-width="2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 16"> <animate attributeName="stroke-dashoffset" values="20;0" dur="2.1s" repeatCount="indefinite"/> </path> <circle r="1.8" fill="#f3e6c8" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="3.2s" repeatCount="indefinite" path="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="3.2s" repeatCount="indefinite"/> </circle> <circle r="1.6" fill="#9fe3ff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="4.1s" begin="-1.5s" repeatCount="indefinite" path="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="4.1s" begin="-1.5s" repeatCount="indefinite"/> </circle> </g> </g> <circle cx="50" cy="50" r="9.7" fill="url(#wh_${activeSystem}_loch)"/> <circle cx="50" cy="50" r="7.2" fill="none" stroke="#5dcaa5" stroke-width="1.6" opacity="0.3" stroke-dasharray="6 7" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="360 50 50" to="0 50 50" dur="9s" repeatCount="indefinite"/> </circle> <circle cx="50" cy="50" r="4.6" fill="url(#wh_${activeSystem}_schlund)"> <animate attributeName="r" values="3.4;5.8;3.4" dur="6.5s" repeatCount="indefinite"/> <animate attributeName="opacity" values="0.45;1;0.45" dur="6.5s" repeatCount="indefinite"/> </circle> <circle cx="47.4" cy="52.1" r="0.9" fill="#e8eaf6" opacity="0.8"> <animate attributeName="opacity" values="0.15;0.9;0.15" dur="3.1s" repeatCount="indefinite"/> </circle> <circle cx="52.6" cy="47.6" r="0.75" fill="#9fe3ff" opacity="0.7"> <animate attributeName="opacity" values="0.8;0.15;0.8" dur="4.3s" repeatCount="indefinite"/> </circle> <circle cx="50" cy="50" r="10.9" fill="none" stroke="#7ed6ff" stroke-width="4" opacity="0.4" filter="url(#wh_${activeSystem}_weich)"/> <circle cx="50" cy="50" r="10.9" fill="none" stroke="url(#wh_${activeSystem}_photon)" stroke-width="2.2"> <animate attributeName="stroke-width" values="1.9;2.8;1.9" dur="2.2s" repeatCount="indefinite"/> <animate attributeName="opacity" values="0.8;1;0.8" dur="2.2s" repeatCount="indefinite"/> </circle> <g transform="rotate(-16 50 50)"> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="7.5" opacity="0.4" filter="url(#wh_${activeSystem}_weich)"/> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="4" stroke-linecap="round"/> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.85" stroke-linecap="round"> <animate attributeName="opacity" values="0.3;0.95;0.3" dur="3.7s" repeatCount="indefinite"/> </path> <path d="M 24,50 C 24,75.3 76,75.3 76,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="3" opacity="0.55" stroke-linecap="round"/> </g> <g transform="rotate(-16 50 50)"> <g transform="translate(50 50) scale(1 0.44)"> <g clip-path="url(#wh_${activeSystem}_scheibevorn)"> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23" opacity="0.45" filter="url(#wh_${activeSystem}_wolke)"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_doppler)" stroke-width="23"/> <circle r="15.5" fill="none" stroke="#9fe3ff" stroke-width="3.2" opacity="0.55" stroke-dasharray="10 8" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/> </circle> <circle r="20.5" fill="none" stroke="#f0d29b" stroke-width="4.6" opacity="0.36" stroke-dasharray="20 15" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="7s" repeatCount="indefinite"/> </circle> <circle r="27" fill="none" stroke="#c3bef5" stroke-width="6" opacity="0.3" stroke-dasharray="28 21" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="11s" repeatCount="indefinite"/> </circle> <circle r="13.4" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.95" filter="url(#wh_${activeSystem}_fein)"/> </g> </g> </g> <g transform="rotate(-16 50 50)"> <ellipse cx="26" cy="50" rx="7" ry="3" fill="#f3e6c8" opacity="0.5" filter="url(#wh_${activeSystem}_weich)"> <animate attributeName="opacity" values="0.22;0.7;0.22" dur="3.4s" repeatCount="indefinite"/> </ellipse> </g> <g transform="rotate(-16 50 50)"> <g clip-path="url(#wh_${activeSystem}_vorn)"> <path d="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50" fill="none" stroke="url(#wh_${activeSystem}_strom)" stroke-width="2.4" stroke-linecap="round" opacity="0.9" stroke-dasharray="5 14"> <animate attributeName="stroke-dashoffset" values="19;0" dur="1.5s" repeatCount="indefinite"/> </path> <path d="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50" fill="none" stroke="#a9e6ff" stroke-width="2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 16"> <animate attributeName="stroke-dashoffset" values="20;0" dur="2.1s" repeatCount="indefinite"/> </path> <circle r="1.8" fill="#f3e6c8" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="3.2s" repeatCount="indefinite" path="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="3.2s" repeatCount="indefinite"/> </circle> <circle r="1.6" fill="#9fe3ff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="4.1s" begin="-1.5s" repeatCount="indefinite" path="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="4.1s" begin="-1.5s" repeatCount="indefinite"/> </circle> </g> </g> <g transform="rotate(-16 50 50)"> <circle r="1.7" fill="#ffffff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="5s" repeatCount="indefinite" path="M 78,50 A 28,12.3 0 1 1 22,50 A 28,12.3 0 1 1 78,50"/> <animate attributeName="opacity" values="0.2;1;0.45;1;0.2" dur="5s" repeatCount="indefinite"/> </circle> <circle r="1.5" fill="#fac775" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="8s" begin="-2.6s" repeatCount="indefinite" path="M 84,50 A 34,15 0 1 1 16,50 A 34,15 0 1 1 84,50"/> <animate attributeName="opacity" values="0.25;1;0.35;1;0.25" dur="8s" begin="-2.6s" repeatCount="indefinite"/> </circle> </g> <circle cx="24" cy="31" r="1.2" fill="#efd6ae" opacity="0.6"> <animate attributeName="opacity" values="0.15;0.75;0.15" dur="2.6s" repeatCount="indefinite"/> </circle> <circle cx="77" cy="69" r="1.3" fill="#9fe3ff" opacity="0.55"> <animate attributeName="opacity" values="0.7;0.1;0.7" dur="3.9s" repeatCount="indefinite"/> </circle> <circle cx="71" cy="26" r="1.1" fill="#cfc7f7" opacity="0.5"> <animate attributeName="opacity" values="0.1;0.65;0.1" dur="4.8s" repeatCount="indefinite"/> </circle>
       </g>`;
+      /* Wer Bewegung abbestellt hat, bekommt das Portal STATISCH statt 36 Dauerschleifen. Die
+         Zeichnung bleibt vollstaendig - nur die Animations-Tags fallen weg; alle 36 sind
+         selbstschliessend (nachgemessen), ein einfaches Entfernen ist also sicher. */
+      inner += kbBewegungAus()
+        ? whRoh.replace(/<(?:animate|animateTransform|animateMotion)\b[^>]*\/>/g, '')
+        : whRoh;
+      inner += `<text class="planet-label" x="${whX.toFixed(1)}" y="${(whY+22).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>`;
     }
     // Sonne (Größe/Farbe/Sonderform folgen dem Sonnentyp dieses Systems, siehe activeSunType oben)
     inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(34*activeSunType.r).toFixed(1)}" fill="url(#sunGlow)"/>`;
@@ -57472,9 +57769,33 @@
     if (myAllianceTag() && state.allianceBase && state.allianceBase.foundedAt && state.allianceBase.sector === activeSystem){
       const abLvl = allianceBaseLevel();
       const abDestroyed = allianceBaseDestroyed();
-      // Position bewusst im oberen linken Kartenviertel zwischen den Orbits statt ganz am Rand.
+      /* KB-20c - der schwerste Befund der Durchsicht vor dem Merge, und er ist dieselbe
+         Fehlerklasse wie das Wurmloch-Portal einen Absatz weiter oben: Hier stand
+         transform="translate(165,52)", ein fester Punkt aus dem alten 700x230-Systemfeld, mit dem
+         Kommentar "Position bewusst im oberen linken Kartenviertel". Mit dem engeren Ausschnitt
+         von KB-20 liegt Sektor-x 165 bei 18 der 69 Systeme GANZ ausserhalb des Bildes, bei 37
+         weiteren angeschnitten - nur 14 waeren vollstaendig im Bild. Nachgerechnet: Links der Sonne
+         sind kbOrbitRx(maxOrbit) + 34 Sektor-Einheiten sichtbar, bei maxOrbit 5 also 154; die Basis
+         braucht 185 fuer ihre Mitte und 215 fuer ihren sichtbaren Modellrand von 30. Die Zahl haengt
+         nicht am Formfaktor, weil der Ausschnitt in Sektor-Einheiten gerechnet wird.
+         Die Basis hat auf der Karte KEINE zweite Darstellung - faellt sie aus dem Ausschnitt, ist
+         sie fuer den Spieler schlicht verschwunden. Am Handy war das seit KB-12 so, am PC waere es
+         durch KB-20 dazugekommen.
+         Behoben wie beim Portal: Bahn aus kbOrbitRx, durch kbMarkerFrei geschoben, in
+         platzierteMarker angemeldet. 0,80 statt 0,92 haelt sie INNERHALB der Portalbahn, damit
+         sich die zwei grossen Strukturen nicht am selben Rand draengen; 205 Grad haelt die alte
+         Bildidee (links oben) bei. Der Radius 30 ist der sichtbare Rand des groessten Modells
+         (Stufe 10 mit Gluehkreis), nicht sein Zeichenradius - dieselbe Lehre wie beim Boss-Puls
+         und beim Nest (KB-17). */
+      const abRx = kbOrbitRx(kbMaxOrbit) * 0.80, abRy = abRx * Math.max(0.55, kbOrbitMass().ry);
+      const abRad = 205 * Math.PI / 180;
+      // Obergrenze wie beim Portal (KB-20h): Die Basis war der gemessene Anlassfall.
+      const abMax = kbOrbitRx(kbMaxOrbit) + 34 - 30;
+      const abPos = kbMarkerFrei({ x: SUN_X + abRx*Math.cos(abRad), y: SUN_Y + abRy*Math.sin(abRad) },
+                                 sysPlanets, activeSunType.r, 30, platzierteMarker, abMax);
+      platzierteMarker.push({ x: abPos.x, y: abPos.y, r: 30 });
       inner += `
-        <g transform="translate(165,52)" data-alliance-base="1" style="cursor:pointer;">
+        <g transform="translate(${abPos.x.toFixed(1)},${abPos.y.toFixed(1)})" data-alliance-base="1" style="cursor:pointer;">
           <title>Allianzbasis [${myAllianceTag()}] · Stufe ${abLvl}${abDestroyed?' (ZERSTÖRT)':(abLvl>=10?' (Monument)':'')}</title>
           <g ${abDestroyed?'opacity="0.4"':''}>${allianceBaseModelSvg(Math.max(1,abLvl), 'Map')}</g>
           ${abDestroyed?`
@@ -57483,7 +57804,7 @@
             <circle r="3" cx="7" cy="-4" fill="#f0997b" opacity="0.35"><animate attributeName="opacity" values="0.35;0.1;0.35" dur="1.7s" repeatCount="indefinite"/></circle>
           `:''}
         </g>
-        <text class="planet-label" x="165" y="86" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
+        <text class="planet-label" x="${abPos.x.toFixed(1)}" y="${(abPos.y+34).toFixed(1)}" text-anchor="middle" style="fill:${abDestroyed?'#e24b4a':(abLvl>=10?'#fac775':'#c3bef5')};">Allianzbasis [${myAllianceTag()}] · ${abDestroyed?'ZERSTÖRT':'St. '+abLvl}</text>
       `;
     }
     // Kein eigener viewBox mehr: Der Ausschnitt gehört jetzt der Galaxiekarte, und die Gruppe sitzt
