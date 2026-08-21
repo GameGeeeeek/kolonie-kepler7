@@ -1702,7 +1702,7 @@ wurde als dort.
 | **3** | Nester Stufe 1–5: Reifen, Ausbreiten, Königin, Angriff | **fertig** – Backend #137, Frontend siehe unten |
 | **4** | `npcEmpireStrength` wird beweglich (Tauziehen gegen den Nestbestand) | **fertig** – Backend #145, Frontend v8.585.0 |
 | **5** | Musterangriff-Zielart `alien-nest` | **fertig** – Backend #149, Frontend v8.590.0 |
-| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.597.0. Der `belagerungsplan` ist bewusst NICHT gebaut – Begründung unter „Offen aus Phase 6“ |
+| **6** | Feinschliff: Embleme, Kompendium, Vorbote | **fertig** – Backend #150, Frontend v8.597.0. Der `belagerungsplan` ist bewusst NICHT in seiner Konzept-Fassung gebaut – Begründung und die gewählte Wirkung unter „Der `belagerungsplan` – entschieden am 21.08.2026“ |
 
 ### Was beim Umsetzen ANDERS entschieden wurde als im Konzept
 
