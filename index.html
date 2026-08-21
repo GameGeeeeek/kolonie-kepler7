@@ -7157,8 +7157,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.594.0';
+  const VERSION = '8.595.0';
   const PATCHNOTES = [
+    { version:'8.595.0', date:'21.08.2026', changes:[
+      '<strong>Behoben: Der Knopf „Zeigen, wo das war" sagte bei Festungs- und Nest-Berichten die Unwahrheit.</strong> Er steht seit jeher an Abbau- und Anfechtungsberichten und springt dort auf den Gürtelplatz, an dem der Brocken lag. Mit den Asteroidenfestungen und den Alien-Nestern kam er an zwei Berichtsarten dazu, die gar keinen Gürtelplatz meinen – sie zielen auf etwas im System. Der Knopf sprang deshalb zwar richtig, meldete dazu aber: <em>„Der Bericht stammt aus der Zeit vor dieser Anzeige und kennt nur das System."</em> – über einen Bericht, der wenige Minuten alt war.',
+      '<strong>Jetzt sagt er, was dich dort JETZT erwartet</strong>, genau wie beim Vorkommen: ob das Nest noch steht (mit seinen Lebenspunkten) oder gefallen bzw. weitergezogen ist, und ob die Festung noch steht (mit dem Anteil ihres Kerns) oder der Gürtel wieder frei ist. Stehen mehrere Nester im selben System, wird das aus deinem Bericht gesucht und kein beliebiges anderes.',
+      'Die Festungs-Hälfte davon war seit v8.569.0 unterwegs. Aufgefallen ist sie erst, als die Nest-Berichte denselben Knopf bekamen und dieselbe Zeile erzeugten – ein zweiter Betroffener macht einen Einzelfall sichtbar, den man allein übersieht.'
+    ]},
     { version:'8.594.0', date:'21.08.2026', changes:[
       '<strong>Behoben: Die Bergung einer Asteroidenfestung oder eines Alien-Nestes konnte spurlos verlorengehen.</strong> Beim Abholen entfernt der Server die Belohnung sofort aus deinem Fach – es gibt keinen zweiten Versuch. Ausgerechnet diese beiden Belohnungsarten haben das Ergebnis danach als einzige nicht gespeichert. Wer das Spiel öffnete, seinen Anteil einstrich und den Reiter gleich wieder schloss, verlor Rohstoffe, Protomaterie, Kampfpunkte, Erfahrung und Kredite endgültig. Betroffen seit v8.569.0 (Festungen) und v8.582.0 (Nester); beide speichern jetzt sofort.',
       '<strong>Zwei neue Embleme für die Aliens und die Asteroidenfestungen.</strong> Der <strong>Festungsbrecher</strong> steht für 25 geschleifte Asteroidenfestungen, der <strong>Schwarmbrecher</strong> für eine gefallene Alien-Königin. Bisher führte im Abschnitt „Aussehen" kein einziger Weg über die neuen PvE-Ziele.',
@@ -41055,6 +41060,35 @@
   function zeigeAsteroidFundort(reportId){
     const r = (reportsCache || []).find(x => x && x.id === reportId);
     if (!r || !r.system) return;
+    /* Nest- und Festungsberichte haben KEINEN Guertelplatz - sie meinen ein Ziel im System, nicht
+       einen Platz auf der Guertelbahn. Ohne eigenen Zweig fielen sie unten in die
+       Altbestands-Meldung ("stammt aus der Zeit vor dieser Anzeige") und behaupteten damit etwas
+       Falsches ueber einen Bericht, der Minuten alt ist. Die Festungs-Haelfte war seit v8.569.0
+       live; aufgefallen ist sie erst, als der Nest-Bericht denselben Knopf bekam.
+       Gesagt wird stattdessen, was den Spieler dort JETZT erwartet - dieselbe Ehrlichkeit, die der
+       Vorkommen-Zweig weiter unten schon leistet. */
+    if (r.type === 'nest-angriff' || r.type === 'festung-angriff'){
+      springeZuAsteroid(r.system, null);
+      const sysN = (STAR_SYSTEMS.find(x => x.id === r.system) || { name: r.system }).name;
+      if (r.type === 'nest-angriff'){
+        // Nach Volk suchen: In einem System koennen mehrere Nester stehen, und der Bericht meint
+        // genau eines davon.
+        const nb = nesterImSystem(r.system).find(n => n && n.volk === r.volk);
+        log(nb
+          ? (nestStufeDef(nb.stufe) || {}).name + ' der ' + nestVolk(nb.volk).name + ' steht noch in '
+            + sysN + ' – ' + Math.round(100 * Math.max(0, Math.min(1, (nb.lp||0) / Math.max(1, nb.lpMax||1)))) + '% Lebenspunkte.'
+          : 'Bei ' + sysN + ' steht kein Nest dieses Volkes mehr – es ist gefallen oder weitergezogen.',
+          'ti-map-2');
+      } else {
+        const ff = festungFaktoren(r.system);
+        log(ff.festung
+          ? (ff.stufe ? ff.stufe.name : 'Die Festung') + ' steht noch in ' + sysN + ' – '
+            + Math.round(100 * Math.max(0, Math.min(1, (ff.festung.kern||0) / Math.max(1, ff.festung.kernMax || (ff.stufe && ff.stufe.kern) || 1)))) + '% Kern.'
+          : 'Die Festung bei ' + sysN + ' steht nicht mehr – der Gürtel ist wieder frei.',
+          'ti-map-2');
+      }
+      return;
+    }
     springeZuAsteroid(r.system, r.platz);
     const sysName = (STAR_SYSTEMS.find(x => x.id === r.system) || { name: r.system }).name;
     // Ältere Berichte kennen den Platz nicht - sie sind vor diesem Knopf entstanden. Dann bleibt es
