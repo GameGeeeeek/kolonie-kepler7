@@ -4177,7 +4177,39 @@
   const LOCAL_PREFIX = 'kepler7_';
   const TOKEN_KEY = 'kepler7_token';
   let backendAvailable = null; // null=noch nicht geprüft, true/false danach
+  // Der Token lag bis zum 19.08.2026 in localStorage - die erste XSS-Lücke, die je entsteht, wäre
+  // damit sofort eine vollständige Kontoübernahme gewesen (Sicherheits-Audit P3). Seither trägt
+  // die Sitzung ein HttpOnly-Cookie, das JavaScript gar nicht erst lesen kann.
+  // authToken ist deshalb NUR NOCH der Altbestand: ein Token aus der Zeit davor, den wir weiter
+  // als Bearer mitschicken, damit niemand ausgesperrt wird. Bei jeder frischen Anmeldung bleibt
+  // er null. Er taugt damit NICHT mehr als "bin ich angemeldet?" - dafür ist sitzungAktiv da.
   let authToken = null;
+  let sitzungAktiv = false;
+  // Räumt den eigenen Sitzungszustand ab. Das Cookie bleibt davon unberührt - es ist HttpOnly.
+  function sitzungLokalAbraeumen(){
+    sitzungAktiv = false;
+    authToken = null;
+    try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+  }
+  // Beendet die Sitzung auf DIESEM Gerät. Das Cookie kann nur der Server abräumen; ohne den Aufruf
+  // hätte ein "Abmelden" den localStorage-Rest weggeräumt, neu geladen, und das Cookie hätte den
+  // Spieler stillschweigend WIEDER angemeldet.
+  // Bewusst nacktes fetch() statt backendFetch: Hier soll kein Bearer mitreisen und keine
+  // 401-Sonderbehandlung greifen - die Route verlangt ohnehin keine gültige Anmeldung.
+  // DER RÜCKGABEWERT IST DER PUNKT: Ein 404 wirft NICHT. Kennt der Server die Route nicht - weil
+  // sein Deploy hängt, und das ist diesem Projekt sechsmal passiert -, käme sonst ein stilles
+  // "abgemeldet" heraus, während die Sitzung weiterlebt. false heißt: Der Spieler ist NICHT
+  // abgemeldet, und Neuladen wäre das Falsche.
+  // Abgeräumt wird NUR im Erfolgsfall. Sonst stünde das Spiel in einem Halbzustand: nach außen
+  // angemeldet (das Cookie lebt), nach innen abgemeldet - und die Server-Funktionen wären bis zum
+  // nächsten Neuladen still tot. Bleibt der Zustand stehen, kann der Spieler es einfach erneut
+  // versuchen.
+  async function sitzungBeenden(){
+    let ok = false;
+    try { const res = await fetch('/api/logout', { method:'POST' }); ok = res.ok; } catch(e){}
+    if (ok) sitzungLokalAbraeumen();
+    return ok;
+  }
   // Lädt Konto-Infos (E-Mail-Status, ausstehende Änderung, Mail-Präferenz) neu vom Server, z.B. nach
   // einer E-Mail-Änderung, ohne den kompletten /me-Init-Pfad erneut zu durchlaufen.
   async function refreshAccountInfo(){
@@ -4347,7 +4379,9 @@
     return backendAvailable;
   }
   function hasCloudStorage(){ return typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function'; }
-  function useBackend(){ return backendAvailable === true && !!authToken; }
+  // Haengt an der SITZUNG, nicht mehr am Token: Bei einer Cookie-Sitzung ist authToken null,
+  // und ein !!authToken haette hier das ganze Mehrspieler-Spiel abgeschaltet.
+  function useBackend(){ return backendAvailable === true && sitzungAktiv; }
 
   // Ko-fi-Top-Unterstützer (13.07.2026): rein informativ, kein Login nötig - fragt höchstens alle
   // 10 Minuten neu ab, dazwischen wird die zwischengespeicherte Antwort einfach erneut gerendert.
@@ -4908,7 +4942,15 @@
   let bootAuthPhase = true;
   async function backendFetch(path, options){
     const opts = options || {};
-    opts.headers = Object.assign({ 'Authorization': 'Bearer '+authToken }, opts.headers||{});
+    // NUR setzen, wenn wirklich ein Token dasteht. Im Browser gemessen (19.08.2026): Ein
+    // 'Bearer '+null ergibt wörtlich den Header "Bearer null" - und die Wache des Servers sieht
+    // dann einen Bearer-Header und schaut das Cookie GAR NICHT MEHR an. Jede frische Anmeldung
+    // wäre in einen 401 gelaufen, und zwar für jeden Spieler gleichzeitig.
+    // credentials wird bewusst NICHT gesetzt: Dieselbe Messung zeigt, dass ein nacktes fetch()
+    // das Cookie bei gleicher Herkunft von selbst mitschickt (Gegenprobe mit 'omit': dann nicht).
+    const grundkopf = {};
+    if (authToken) grundkopf['Authorization'] = 'Bearer '+authToken;
+    opts.headers = Object.assign(grundkopf, opts.headers||{});
     const res = await fetch('/api'+path, opts);
     // Sitzungsführung (25.07.2026): Der Server lässt pro Konto nur EINE Sitzung zu. Meldet man sich
     // auf einem zweiten Gerät an, beantwortet er jede weitere Anfrage des alten Geräts mit
@@ -7104,8 +7146,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.585.0';
+  const VERSION = '8.586.0';
   const PATCHNOTES = [
+    { version:'8.586.0', date:'21.08.2026', changes:[
+      '<strong>Deine Anmeldung liegt jetzt an einem Ort, den das Spiel selbst nicht lesen kann.</strong> Bisher lag der Ausweis deiner Sitzung im Speicher des Browsers – dort, wo jedes Skript der Seite ihn hätte abholen können. Er wandert damit in ein Cookie, das dem Browser gehört und für JavaScript unsichtbar ist. Für dich ändert sich am Spielen nichts; was sich ändert, ist der Schaden, den ein künftiger Fehler auf der Seite anrichten könnte.',
+      '<strong>Du musst dich deswegen nicht neu anmelden.</strong> Wer angemeldet ist, bleibt es – die bestehende Anmeldung zieht beim nächsten Laden von selbst um, ohne dass du etwas tust.',
+      '<strong>„Abmelden" beendet die Sitzung jetzt wirklich auf dem Server</strong>, statt nur den Ausweis auf deinem Gerät wegzuräumen. Und wenn das einmal nicht klappt – etwa weil der Server gerade nicht erreichbar ist –, sagt das Spiel es dir und lässt dich angemeldet, statt so zu tun, als wärst du abgemeldet.'
+    ]},
     { version:'8.585.0', date:'19.08.2026', changes:[
       '<strong>Neu: Die Karte zeigt Landmarken.</strong> Bisher stand an einem System, ob dort eine Allianzbasis, eine Piratenbasis, ein Krieg oder ein Wurmloch ist – aber nichts über die beiden Dinge, die man tatsächlich angreifen kann. Eine <strong>Asteroidenfestung</strong> (🛡) und ein <strong>Alien-Nest</strong> (👾) lebten ausschließlich im aufgeklappten System: Wer eine Festung finden wollte, musste alle <strong>67 Systeme</strong> einzeln durchklicken. Beide stehen jetzt als Abzeichen an ihrem System – dazu ein <strong>🎯</strong> für <strong>Gegner</strong> mit Name und Stufe.',
       '<strong>Und zwar auf allen drei Kartenebenen.</strong> Auf der Regionsübersicht werden die Abzeichen zusammengefasst (ein 🛡 an einer Region heißt „hier drin steht eine Festung", der Tooltip nennt das System), in der Sektoransicht stehen sie am Systemplatz, und im aufgeklappten System tragen sie die Nachbarpunkte. Du siehst also schon von ganz oben, wo etwas los ist, statt es zu suchen.',
@@ -13934,8 +13981,10 @@
   const AST_FELD_TAKT_MS = 45000;  // Anzeige-Polling; der Vorrat aendert sich nicht im Sekundentakt
   /* Geteilt ist das Feld nur, solange der Server geliefert hat UND eine Sitzung besteht.
      WARUM die zweite Bedingung (Spieler-Report 14.08.2026, v8.490.0): _astFeldVomServer wird
-     einmal true und nie wieder false - authToken dagegen faellt an vier Stellen auf null zurueck
-     (Abmelden, Speicherkonflikt, vom Server verdraengte Sitzung). Ohne useBackend() blieben die
+     einmal true und nie wieder false - sitzungAktiv dagegen faellt an vier Stellen zurueck
+     (Abmelden, Speicherkonflikt, vom Server verdraengte Sitzung). Bis zum 19.08.2026 stand hier
+     authToken; der taugt seit dem Cookie-Umbau nicht mehr als Anmelde-Flagge, weil er bei einer
+     frischen Sitzung bewusst null bleibt. Ohne useBackend() blieben die
      Schuerfrecht-Knoepfe danach sichtbar, der claim-Aufruf ging mit ungueltigem Token raus, und
      der Spieler bekam den ROHEN Servertext "Nicht angemeldet." zu sehen. Mit dieser Bedingung
      faellt das Spiel bei Sitzungsverlust sauber auf den Solo-Betrieb zurueck: Abbau laeuft lokal
@@ -14130,7 +14179,7 @@
   // ein veralteter Save würde sonst die falsche Eskorte ins Felddokument schreiben.
   async function asteroidClaim(sysId, platz, still){
     if (!asteroidFeldGeteilt()) {
-      if (!still) log(authToken ? 'Schürfrechte gibt es nur im Mehrspieler-Betrieb mit Server.'
+      if (!still) log(sitzungAktiv ? 'Schürfrechte gibt es nur im Mehrspieler-Betrieb mit Server.'
                                 : 'Dafür musst du angemeldet sein – im abgemeldeten Spiel gehört jedes Vorkommen allen.', 'ti-alert-triangle');
       return false;
     }
@@ -45292,8 +45341,13 @@
   function handleSaveConflict(){
     if (saveConflictDetected) return;
     saveConflictDetected = true;
-    try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
-    authToken = null;
+    // sitzungBeenden() statt nur localStorage zu leeren: Sonst bliebe das Cookie liegen und das
+    // Neuladen meldete den Spieler wieder an - vorher landete er hier beim Anmeldebildschirm.
+    // Bewusst ohne await und ohne den Rückgabewert zu prüfen: Der Überlagerungs-Dialog soll sofort
+    // stehen, und die Sitzung ist hier ohnehin verloren - anders als beim Abmeldeknopf gibt es
+    // nichts, was der Spieler stattdessen tun könnte.
+    sitzungLokalAbraeumen();
+    sitzungBeenden();
     showConflictOverlay('conflict');
   }
   // Gegenstück zu handleSaveConflict() für die serverseitige Sitzungsführung: der Server hat diese
@@ -45303,8 +45357,8 @@
   function handleSessionSuperseded(){
     if (saveConflictDetected) return;
     saveConflictDetected = true;
-    try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
-    authToken = null;
+    sitzungLokalAbraeumen();
+    sitzungBeenden();
     showConflictOverlay('superseded');
   }
   // Bug-Fix: Server-seitige Aktionen wie ein Spielerangriff (/attack) verändern u.U. den
@@ -65107,8 +65161,11 @@
         // dieselbe saubere Abmeldung wie bei einer verdrängten Sitzung - inklusive gestopptem
         // Speichern (saveConflictDetected), damit nichts mehr gegen einen 401 läuft.
         saveConflictDetected = true;
-        try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+        // Hier KEIN sitzungBeenden(): Die Antwort von /logout-all räumt das Cookie schon ab, und
+        // ein zweiter Aufruf danach wäre nur Lärm. Was hier zählt, ist der eigene Zustand.
+        sitzungAktiv = false;
         authToken = null;
+        try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
         showConflictOverlay('logoutall');
       } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle', 'error'); }
     };
@@ -66342,9 +66399,26 @@
     });
   }
   function showLogoutBtn(){
-    const doLogout = () => {
+    const doLogout = async () => {
       if (!confirm('Abmelden? Dein Fortschritt ist auf dem Server gespeichert und bleibt beim nächsten Anmelden erhalten.')) return;
-      try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+      // Das await ist hier keine Höflichkeit, sondern die Sache selbst: Lädt die Seite neu, bevor
+      // die Antwort da ist, kommt die Lösch-Kopfzeile nie an - und der Spieler ist nach dem
+      // "Abmelden" wieder angemeldet.
+      const abgemeldet = await sitzungBeenden();
+      if (!abgemeldet){
+        // Der Server hat das Sitzungs-Cookie nicht abgeräumt. Hier NICHT neu laden: Das Cookie
+        // lebt weiter, das Neuladen würde den Spieler wieder anmelden, und er hätte "Abmelden"
+        // gedrückt und wäre drin - auf einem geteilten Gerät genau der Fall, den ein Abmeldeknopf
+        // verhindern soll. Dasselbe Muster wie bei "Alle Sitzungen beenden", das den 404 eines
+        // veralteten Servers schon immer benennt statt ihn zu verschlucken.
+        // 'wichtig' statt 'error': Der Toast-Stapel hält nur drei, und die älteste fliegt raus -
+        // ausser sie trägt diese Marke (siehe pushToast). Genau diese eine Zeile erklärt dem
+        // Spieler den ganzen Vorgang, sie darf einer Ereignis-Salve nicht zum Opfer fallen.
+        // Und KEIN zweiter pushToast daneben: log() ruft ihn bereits selbst auf - der Spieler
+        // bekäme die Meldung sonst doppelt.
+        log('Abmelden hat nicht geklappt - der Server hat die Sitzung nicht beendet. Du bist weiterhin angemeldet; bitte in einem Moment erneut versuchen.', 'ti-alert-triangle', 'wichtig');
+        return;
+      }
       location.reload();
     };
     const btn = document.getElementById('logoutBtn');
@@ -66496,8 +66570,14 @@
         if (tosRowAfter) tosRowAfter.style.display = 'none';
         btn.disabled = false; return;
       }
-      authToken = data.token;
-      try { localStorage.setItem(TOKEN_KEY, authToken); } catch(e){}
+      // Der Token wird NICHT mehr abgelegt - genau das war die Angriffsfläche (Audit P3). Die
+      // Sitzung trägt ab hier das HttpOnly-Cookie, das der Server bei der Anmeldung mitschickt.
+      // data.token gibt es weiterhin, es wird nur bewusst nirgends hingeschrieben.
+      // Das removeItem räumt einen Rest aus der Zeit davor weg: Wer sich neu anmeldet, soll den
+      // alten Token nicht behalten, nur weil er zufällig noch gültig wäre.
+      sitzungAktiv = true;
+      authToken = null;
+      try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
       state.player.id = data.userId;
       if (!state.player.name) state.player.name = data.username;
       hideLoginOverlay();
@@ -66638,36 +66718,56 @@
     }
     let stored = null;
     try { stored = localStorage.getItem(TOKEN_KEY); } catch(e){}
-    if (stored){
-      authToken = stored;
-      try {
-        const res = await backendFetch('/me');
-        if (res.ok){
-          const me = await res.json();
-          state.player.id = me.userId;
-          accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; }
-          accountMaskedEmail = me.maskedEmail||'';
-          accountPendingEmail = me.pendingEmail||null;
-          accountWantsPatchnotes = me.wantsPatchnotes !== false;
-          accountUsername = me.username||'';
-          accountLastLoginAt = me.lastLoginAt || null;
-          supporterStatusUebernehmen(me);
-          if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; }
-          if (!state.player.name) state.player.name = me.username;
-          showLogoutBtn();
-          return true;
-        }
-        // Sitzungsführung: Das gespeicherte Token gehört zu einer Sitzung, die inzwischen von einem
-        // anderen Gerät abgelöst wurde. Beim Spielstart ist der Abmelde-Dialog der falsche Ort dafür
-        // (man ist ja noch gar nicht drin) - stattdessen ganz normal den Anmeldebildschirm zeigen und
-        // dort erklären, warum die gespeicherte Anmeldung nicht mehr gilt.
-        if (res.status === 401){
-          try { const info = await res.json(); if (info && info.sessionSuperseded) supersededAtBoot = true; } catch(e){}
-        }
-      } catch(e){}
-      authToken = null;
-      try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
+    // ERST ohne Bearer versuchen - dann entscheidet das HttpOnly-Cookie, das der Server bei der
+    // Anmeldung gesetzt hat. Erst wenn das nichts wird, kommt ein noch gespeicherter Token aus der
+    // Zeit vor dem 19.08.2026 zum Zug.
+    // DIE REIHENFOLGE IST DER GANZE MIGRATIONSWEG, und sie ist bewusst so herum: Wer ein Cookie
+    // hat, wird seinen localStorage-Token unten los, ohne sich neu anmelden zu müssen. Wer keines
+    // hat, spielt exakt wie vorher weiter - niemand wird durch diese Auslieferung ausgesperrt.
+    // Der Server reicht Bestandssitzungen beim ersten Bearer-Aufruf ein Cookie nach; beim nächsten
+    // Laden greift dann der erste Zweig. Zwei Seitenaufrufe, keine Nutzeraktion.
+    authToken = null;
+    let res = null, angemeldet = false;
+    try {
+      res = await backendFetch('/me');
+      angemeldet = res.ok;
+      if (!angemeldet && stored){
+        authToken = stored;
+        res = await backendFetch('/me');
+        angemeldet = res.ok;
+      }
+    } catch(e){ res = null; }
+    if (angemeldet){
+      // Trägt das Cookie die Sitzung (authToken ist dann null), wird der gespeicherte Token nicht
+      // mehr gebraucht und verschwindet aus der JS-Reichweite - das ist die eigentliche Behebung.
+      // Trägt ihn dagegen der Bearer-Weg, bleibt er liegen: Ihn dort wegzuwerfen hieße, den
+      // Spieler beim nächsten Laden abzumelden.
+      if (!authToken){ try { localStorage.removeItem(TOKEN_KEY); } catch(e){} }
+      sitzungAktiv = true;
+      const me = await res.json();
+      state.player.id = me.userId;
+      accountHasEmail = !!me.hasEmail; if (typeof me.attackShieldMs === 'number') myAttackShieldUntil = me.attackShieldMs > 0 ? Date.now() + me.attackShieldMs : 0; if (me.season){ mySeasonKey = me.season.key||null; mySeasonStartScore = (me.season.startScore!=null ? me.season.startScore : null); mySeasonEndsAt = me.season.endsAt||0; }
+      accountMaskedEmail = me.maskedEmail||'';
+      accountPendingEmail = me.pendingEmail||null;
+      accountWantsPatchnotes = me.wantsPatchnotes !== false;
+      accountUsername = me.username||'';
+      accountLastLoginAt = me.lastLoginAt || null;
+      supporterStatusUebernehmen(me);
+      if (me.homeSystem && STAR_SYSTEMS.some(s=>s.id===me.homeSystem)){ activeSystem = me.homeSystem; myHomeSystem = me.homeSystem; myHomeSlot = me.homeSlot||0; }
+      if (!state.player.name) state.player.name = me.username;
+      showLogoutBtn();
+      return true;
     }
+    // Sitzungsführung: Die gespeicherte Anmeldung gehört zu einer Sitzung, die inzwischen von einem
+    // anderen Gerät abgelöst wurde. Beim Spielstart ist der Abmelde-Dialog der falsche Ort dafür
+    // (man ist ja noch gar nicht drin) - stattdessen ganz normal den Anmeldebildschirm zeigen und
+    // dort erklären, warum die gespeicherte Anmeldung nicht mehr gilt.
+    if (res && res.status === 401){
+      try { const info = await res.json(); if (info && info.sessionSuperseded) supersededAtBoot = true; } catch(e){}
+    }
+    authToken = null;
+    sitzungAktiv = false;
+    try { localStorage.removeItem(TOKEN_KEY); } catch(e){}
     wireLoginUI();
     showLoginOverlay();
     if (supersededAtBoot){

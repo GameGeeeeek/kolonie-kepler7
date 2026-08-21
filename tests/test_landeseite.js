@@ -40,13 +40,26 @@ const LL_RAF_ZAEHLER = () => {
 
 function backend(store, opt){
   opt = opt || {};
+  /* Der Mock kennt seit dem 19.08.2026 einen ANMELDEZUSTAND, und das ist kein Beiwerk: Er
+     beantwortete /api/me vorher BEDINGUNGSLOS mit 200 - also auch fuer einen Besucher, der sich
+     nie angemeldet hat. Das fiel nie auf, weil das Spiel /me damals nur bei gespeichertem Token
+     aufrief. Seit dem Sitzungs-Cookie (Audit P3, Etappe b) fragt der Start IMMER zuerst ohne
+     Zugangsdaten nach - dann entscheidet das Cookie -, und der bedingungslose 200 machte aus jedem
+     Besucher einen angemeldeten Spieler: Die Landeseite erschien gar nicht mehr, und alle
+     Pruefungen dieses Tests fielen.
+     Ein echter Server antwortet dort 401. Der Mock tut das jetzt auch - er ist damit
+     FAITHFULER als vorher, nicht nachsichtiger. */
+  let angemeldet = false;
   return async r => {
     const req = r.request();
     const p = req.url().split('/api/')[1].split('?')[0];
     const j = (o, s=200) => r.fulfill({ status:s, contentType:'application/json', body:JSON.stringify(o) });
     if (p === 'health') return opt.tot ? r.abort() : j({ ok:true });
-    if (p === 'login') return j({ token:'tok', userId:'u1', username:'AdmiralX' });
-    if (p === 'me') return j({ userId:'u1', username:'AdmiralX', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
+    if (p === 'login') { angemeldet = true; return j({ token:'tok', userId:'u1', username:'AdmiralX' }); }
+    if (p === 'me') {
+      if (!angemeldet) return j({ error:'Nicht angemeldet.' }, 401);
+      return j({ userId:'u1', username:'AdmiralX', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
+    }
     if (p === 'galaxy') return j({});
     if (p.startsWith('storage/')){
       const k = decodeURIComponent(p.slice(8));
