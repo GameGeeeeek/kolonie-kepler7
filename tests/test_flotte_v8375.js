@@ -12,7 +12,7 @@
 //      also auch die Markenzuwaechse - und muss auf BEIDEN Seiten passieren.
 //   3. Die mitwandernde Kampferfahrung rechnet nur mit KAMPFSCHIFFEN. Ohne diese Einschraenkung
 //      liesse sich der Rang einer Welt mit reinen Frachterfluegen leerraeumen.
-const { starteBrowser, SPIELDATEI, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIELDATEI, SPIEL_URL, SERVER_JS } = require('./lib/umgebung');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,7 +20,7 @@ let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
-const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+const BE_PFAD = SERVER_JS;
 const be = fs.existsSync(BE_PFAD) ? fs.readFileSync(BE_PFAD, 'utf8') : '';
 check('Backend-Repo liegt daneben (ohne es ist die Konterrollen-Spiegelung UNGEPRUEFT)', !!be, BE_PFAD);
 

@@ -15,12 +15,12 @@
 // veraendert - beides ausgefuehrt.
 const fs = require('fs');
 const path = require('path');
-const { SPIELDATEI, pruefer } = require('./lib/umgebung');
+const { SPIELDATEI, pruefer, SERVER_JS } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
-const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+const BE_PFAD = SERVER_JS;
 const hatBackend = fs.existsSync(BE_PFAD);
 check('Backend-Repo liegt daneben (ohne es ist die Paritaet UNGEPRUEFT)', hatBackend, BE_PFAD);
 const BE = hatBackend ? fs.readFileSync(BE_PFAD, 'utf8') : '';

@@ -17,14 +17,14 @@
 //      liefe sonst womoeglich wochenlang mit einer veralteten Zuordnung weiter.
 const fs = require('fs');
 const path = require('path');
-const { SPIELDATEI } = require('./lib/umgebung');
+const { SPIELDATEI, SERVER_JS } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const WURZEL = path.dirname(SPIELDATEI);
-const BE_PFAD = path.join(WURZEL, '..', 'kolonie-kepler7-backend', 'server.js');
+const BE_PFAD = SERVER_JS;
 const SW_PFAD = path.join(WURZEL, 'service-worker.js');
 const hatBackend = fs.existsSync(BE_PFAD);
 check('Backend-Repo liegt daneben (ohne es ist fast alles UNGEPRUEFT)', hatBackend, BE_PFAD);

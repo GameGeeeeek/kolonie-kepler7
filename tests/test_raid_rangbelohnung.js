@@ -28,7 +28,7 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 
 // Die echten Funktionen aus server.js schneiden und ausfuehren - kein Nachbau. Ein Nachbau wuerde
 // genau dann gruen bleiben, wenn der Server sich aendert, und waere damit wertlos.
-const SERVER = path.join(__dirname, '..', '..', 'kolonie-kepler7-backend', 'server.js');
+const SERVER = require('./lib/spieldatei').SERVER_JS || '';
 if (!fs.existsSync(SERVER)){
   console.log('UEBERSPRUNGEN - Backend-Repo liegt nicht daneben (' + SERVER + ')');
   process.exit(0);

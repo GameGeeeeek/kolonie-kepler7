@@ -29,7 +29,7 @@
 //
 // GEGENPROBE steht am Dateiende.
 const fs = require('fs');
-const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer, SERVER_JS } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -81,7 +81,7 @@ const JS = S.match(/<script>([\s\S]*)<\/script>/)[1];
   const front = Number((JS.match(/const ROUTEN_KONTINGENT_LOKAL = (\d+);/) || [])[1]);
   let back = null;
   try {
-    const sjs = fs.readFileSync(require('path').join(__dirname, '..', '..', 'kolonie-kepler7-backend', 'server.js'), 'utf8');
+    const sjs = fs.readFileSync(SERVER_JS, 'utf8');
     back = Number((sjs.match(/const MARKT_TAGES_ERLOES_MAX = (\d+);/) || [])[1]);
   } catch (e) {}
   check('1h: die lokale Solo-Grenze entspricht der Server-Grenze (zwei Zahlen, eine Regel)',

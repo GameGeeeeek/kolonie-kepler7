@@ -14,13 +14,13 @@
 // der Raid-Kategorie ist mir genau das passiert, deshalb steht die Pruefung hier.
 const fs = require('fs');
 const path = require('path');
-const { SPIELDATEI } = require('./lib/umgebung');
+const { SPIELDATEI, SERVER_JS } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
-const BE_PFAD = path.join(path.dirname(SPIELDATEI), '..', 'kolonie-kepler7-backend', 'server.js');
+const BE_PFAD = SERVER_JS;
 const hatBackend = fs.existsSync(BE_PFAD);
 check('Backend-Repo liegt daneben (ohne es ist der groesste Teil UNGEPRUEFT)', hatBackend, BE_PFAD);
 const be = hatBackend ? fs.readFileSync(BE_PFAD, 'utf8') : '';
