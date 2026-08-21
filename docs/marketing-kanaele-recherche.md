@@ -153,9 +153,9 @@ sind Affiliate-Strecken in Zeitungsportalen (`blick.de/vergleich/…`, `freiepre
 |---|---|---|
 | **browsermmorpg.com/register_game** | **Kostenlos.** Kategorie Sci-Fi. Verlangt sauberen Link ohne Referrer-Codes und eine **E-Mail auf der Spiel-Domain** – Eigentum wird geprüft. Menschliche Freigabe. (**geprüft**) | 10 |
 | **thebigmmorpglist.com/submit-game/** | Formular, Typ „MMO Strategy", Client „Browser Based"; führt 83 Browserspiele. Kosten nicht ausgewiesen. (**geprüft**) | 8 |
-| bbogd.com | Browserspiel-Verzeichnis mit Einreichung (**teilweise**) | 7 |
-| mmorpg.com/games-list | eigene Browser-MMORPG-Liste mit Einreichung (**teilweise**) | 7 |
-| mmohub.com | Toplist nach Stimmen (**teilweise**) | 6 |
+| **bbogd.com/addgame** | **Kostenlos.** Formular am Original geprüft: Konto nötig, kein Captcha, keine Zeichengrenze, Bild-Upload optional. Nennt sich selbst „Browser Based Online Game Directory“. Achtung: `/submit-game/` antwortet mit 404. (**geprüft**) | 8 |
+| mmorpg.com/games-list | **Kein Selbsteintrag, sondern eine Bewerbung** über ein Google-Formular: „considered for inclusion“. Browser-Kategorie vorhanden, Ergebnis ungewiss. (**geprüft**) | 5 |
+| ~~mmohub.com~~ | **Passt nicht – gestrichen.** Listet ausschließlich PRIVATE SERVER (Aion, Lineage, MU Online, WoW). Ein eigenes Spiel ist dort off-topic. (**geprüft**) | – |
 | mmohuts.com / mmobomb.com / mmogames.com | redaktionelle Browser-Listen (**ungeprüft**) | 5 |
 
 ### itch.io – der Befund, der die Vorgehensweise bestimmt
@@ -294,8 +294,12 @@ Download. Das ist der größte Vorteil gegenüber jedem Steam-Indie. Drei Sätze
 
 **Vier Maßnahmen nach Wirkung:**
 
-1. **Verzeichniseinträge** (Abschnitt 4) – 17 Einträge à 10 Minuten = 17 thematisch passende
-   Backlinks. Bestes Verhältnis von Aufwand zu Wirkung in dieser ganzen Recherche.
+1. **Verzeichniseinträge** (Abschnitt 4) – je rund 10 Minuten, je ein thematisch passender
+   Backlink. Bestes Verhältnis von Aufwand zu Wirkung in dieser ganzen Recherche.
+   *Bewusst ohne Stückzahl:* Hier stand „17 Einträge“, und die Zahl war schon beim Schreiben
+   nicht nachrechenbar (eine Tabellenzeile führt drei Seiten zusammen, eine ist inzwischen
+   gestrichen). Eine handgepflegte Zahl neben einer Liste wird immer wieder falsch – die Liste
+   selbst ist die Auskunft.
 2. **Landingpage „Browsergame ohne Pay-to-Win"** – vier solche Seiten existieren bereits, eine
    fünfte auf den Begriff, der die Positionierung trägt, ist konsequent.
 3. **Die Patchnotes sind ein ungenutztes SEO-Vermögen.** `patchnotes.html` steht in der Sitemap mit
@@ -362,7 +366,7 @@ Diese Liste gehört zum Ergebnis.
 
 ## 12. Wenn nur drei Dinge passieren
 
-1. **Die siebzehn Verzeichniseinträge.** Ein Nachmittag, und das Sichtbarkeitsproblem aus
+1. **Die Verzeichniseinträge aus Abschnitt 4.** Ein Nachmittag, und das Sichtbarkeitsproblem aus
    Abschnitt 1 ist strukturell angegangen statt beklagt.
 2. **Den falschen Satz auf `weltraum-browsergame.html` korrigieren.** Er verspricht einen
    Einstieg, den es nicht gibt – auf genau der Seite, auf der ein Besucher aus einem

@@ -206,9 +206,68 @@ Kategorien dort: **Weltraum** („Science-Fiction und Weltraumspiele") und **Str
 Formularweg; Kontakt `webmaster@browsergame-index.de`. Kategorie Weltraum vorhanden.
 *Die Seite wirkt eingeschlafen (News zuletzt 2010) – der Eintrag zählt vor allem als Backlink.*
 
-### bbogd.com · mmorpg.com/games-list · mmohub.com
+### bbogd.com/addgame — **kostenlos**
 
-Direkte Einreichung auf der jeweiligen Seite, mittlere englische Fassung, Kategorie Sci-Fi/Strategy.
+Am Original geprüft (21.08.2026). **Zwei Abweichungen von der Recherche-Notiz:** Das Formular liegt
+unter `/addgame`, nicht unter `/submit-game/` (diese Adresse antwortet mit 404), und es verlangt
+**vorher ein Konto**. Kein Captcha, keine Zeichengrenze, Bild-Uploads (Banner, Avatar) sind optional.
+Die Seite bezeichnet sich selbst als „Browser Based Online Game Directory where players can submit,
+vote, rate and discuss their favorite games" — passt also genau.
+
+| Feld | Wert |
+|---|---|
+| Name | `Kolonie Kepler-7` |
+| URL | `https://www.gamegeeeeek.de/` |
+| FB | *leer lassen* |
+| Can connect with Facebook? | **nicht** ankreuzen |
+| Released (Month) | `7` |
+| Released (Year) | `2026` |
+| Categories | **Space**, **Strategy**, **Simulation** |
+| Interface | **Web Browser** |
+| Graphics | **2D Dimension** |
+| Plugins | **None** |
+| In Beta | **No** |
+| Description | mittlere englische Fassung aus Abschnitt 3 |
+| Vote Link | *steht auf „Unavailable" — nichts eintragen* |
+| Callback | *leer lassen* |
+
+**Vier Felder, bei denen der naheliegende Wert der falsche wäre:**
+
+- **Released 7/2026 ist gemessen, nicht geschätzt.** Der älteste Patchnote-Eintrag ist `1.0.0` vom
+  **10.07.2026**; die Versionen bis `4.1.1` liegen alle auf demselben Tag. Das ist der Start der
+  Historie und damit die beste verfügbare Auskunft.
+- **FB bleibt leer, weil es keine Facebook-Seite gibt.** Gemessen an allen ausgelieferten
+  HTML-Dateien: Discord, Instagram (`@GameGeeeeek`), TikTok und YouTube (beide `@GameGeeeeek`) sind
+  verlinkt — Facebook nicht. Ein erfundener Eintrag wäre ein toter Link im Verzeichnis.
+- **Graphics „2D Dimension", nicht „Illustrated".** Die Karte ist gezeichnetes SVG mit beweglichen
+  Knoten, keine Sammlung fester Illustrationen. „Text Based" wäre schlicht falsch.
+- **In Beta „No".** Das Spiel läuft seit Juli 2026 mit Spielern und trägt heute v8.594.0. „Yes"
+  wäre eine Ausrede, die die Bewertung drückt, ohne etwas zu gewinnen.
+
+### mmorpg.com/games-list — **redaktionell, kein Selbsteintrag**
+
+Am Original geprüft (21.08.2026). Die Seite hat eine Browser-Games-Kategorie, aber der Weg dorthin
+ist ein **Google-Formular** und ausdrücklich eine Bewerbung, keine Eintragung: „to submit a game
+you'd like to have **considered** for inclusion on this list".
+
+Formular: `https://docs.google.com/forms/d/1jMevWFLPUNOjz5oAFOMF2S-IJcu4Ku3u3qndoD5TVvY/viewform`
+
+Die Felder ließen sich von hier aus nicht auslesen (Google-Formulare bauen sich per Skript auf).
+Erwartungshaltung: Aufwand fünf Minuten, Ergebnis ungewiss — anders als bei den Verzeichnissen oben
+entscheidet dort eine Redaktion. Deshalb **nach** den sicheren Einträgen, nicht davor.
+
+### ~~mmohub.com~~ — **passt nicht, gestrichen**
+
+Am Original geprüft (21.08.2026): Die Seite listet **ausschließlich Private Server** („Top MMORPG
+private servers", Kategorien Aion, Lineage, MU Online, WoW). Kolonie Kepler-7 ist kein Private
+Server, sondern ein eigenes Spiel — ein Eintrag dort wäre off-topic und nichts weiter als ein
+Spam-Risiko ohne Gegenwert.
+
+Die Recherche hatte den Eintrag als **teilweise belegt** geführt („Toplist nach Stimmen"). Das war
+richtig beschrieben und trotzdem der falsche Schluss: *wonach* die Toplist sortiert, sagt nichts
+darüber, *was* dort überhaupt gelistet werden darf. **Übertragbar für die restlichen Verzeichnisse:
+Vor dem Ausfüllen erst prüfen, welche ART von Eintrag die Seite sammelt — nicht nur, ob sie ein
+Formular hat.**
 
 ---
 
