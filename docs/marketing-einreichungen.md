@@ -171,17 +171,31 @@ Menschliche Freigabe – der Eintrag erscheint nicht sofort.
 
 ### thebigmmorpglist.com/submit-game/
 
-| Feld | Eintrag |
-|---|---|
-| Game Name | `Kolonie Kepler-7` |
-| Game Website | `https://www.gamegeeeeek.de/` |
-| Game Type | `MMO Strategy` |
-| Graphics | `2D` |
-| Client Type | `Browser Based` |
-| Point of View | `Multi` |
-| Subscription | `Free` |
-| Retail Price | `Free` |
-| Description | mittlere englische Fassung |
+Elf Felder, **kein Captcha, kein Bildupload, keine Zeichenlimits** (am Formular geprüft, 21.08.2026).
+Reihenfolge wie dort:
+
+| # | Feld | Eintrag |
+|---|---|---|
+| 1 | Game Name | `Kolonie Kepler-7` |
+| 2 | Game Website | `https://www.gamegeeeeek.de/` |
+| 3 | Your Name | Saschas Name |
+| 4 | Your Email | dieselbe wie bei browsermmorpg.com |
+| 5 | Game Description | mittlere englische Fassung (Abschnitt 3) |
+| 6 | Game Type | `MMO Strategy` |
+| 7 | Graphics | `2D` |
+| 8 | Client Type | `Browser Based` |
+| 9 | Point of View | `Multi` |
+| 10 | Subscription | `Free` |
+| 11 | Retail Price | `Free` |
+
+**Zwei Auswahlfelder brauchen eine Begründung, weil die naheliegende Antwort falsch wäre:**
+
+- **Client Type → `Browser Based`, nicht `Multiple`.** Die Liste bietet `Multiple` an, und das Spiel
+  läuft auf Desktop *und* Handy – aber beides im Browser. `Multiple` bedeutet verschiedene Client-
+  ARTEN (Download-Client **und** Browser), weckt also eine Erwartung, die der Eintrag nicht hält.
+- **Point of View → `Multi`.** Ehrlicherweise passt keine der vier Optionen: Kolonie Kepler hat
+  keine Perspektive im klassischen Sinn, es ist eine Kommandozentrale mit Karte. `Multi` ist die
+  harmloseste; `Third Person` oder `Side-scrolling` wären schlicht falsch.
 
 ### browsergame-base.de — **per E-Mail, Vorlage in Abschnitt 6**
 
