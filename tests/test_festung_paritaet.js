@@ -207,4 +207,60 @@ if (!F || !B) return ende();
     fBei !== null && bBei !== null && fBei === bBei, { front: fBei, back: bBei });
 }
 
+/* ------------------------------------------------------------------ 6) die Abklingzeit
+   Sie stand im Frontend bis zum 21.08.2026 als eingetippte 6 an FÜNF Stellen – vier Anzeigen
+   und, schwerer wiegend, an der SPERRE selbst (`meinLetzter + 6*3600*1000` im Kartenmenü, also
+   die Entscheidung, ob der Angriffs-Eintrag überhaupt anklickbar ist). Der Server ist die
+   Autorität (`FESTUNG_ABKLING_MS`); liefen die zwei auseinander, zeigte die Karte den Schlag
+   als frei an und `/api/festung/angriff` antwortete mit 403 – oder umgekehrt sperrte das
+   Frontend etwas, das der Server längst erlaubt.
+   VERGLICHEN WIRD DER WERT, nicht der Text: Das Frontend führt Stunden, das Backend
+   Millisekunden. Ein Textvergleich fiele hier zwangsläufig durch und wäre kein Befund –
+   dasselbe Muster wie 4a in test_nest_paritaet.js. */
+{
+  const fStd = (FRONT.match(/const FESTUNG_ABKLING_STD = ([\d.]+);/) || [])[1];
+  const bMs  = (BACK.match(/const FESTUNG_ABKLING_MS = ([^;]+);/) || [])[1];
+  let bStd = null;
+  try { bStd = bMs ? (new Function('return (' + bMs + ');')()) / 3600000 : null; } catch (e) {}
+  check('6-anker: beide Konstanten sind auffindbar', !!fStd && bStd !== null, { front: fStd, backMs: bMs });
+  check('6a: die Abklingzeit der Festung ist auf beiden Seiten dieselbe',
+    fStd !== undefined && bStd !== null && Math.abs(parseFloat(fStd) - bStd) < 0.001,
+    { frontStunden: fStd, backStunden: bStd });
+  /* Und die Gegenrichtung, sonst wäre die Konstante ein Denkmal: Sie muss auch BENUTZT werden.
+     Eine eingeführte Konstante, die niemand liest, während die alte Ziffer weiterlebt, ist genau
+     die zweite Anzeigestelle, gegen die dieser Umbau gebaut ist (Arbeitsregel 59).
+
+     HIER STAND `leser >= 5` ÜBER ALLE Fundstellen – also inklusive der DEFINITION. Bei sechs
+     Vorkommen (1 Definition + 5 Leser) durfte damit genau einer still auf die alte Ziffer
+     zurückfallen, ohne dass etwas anschlug. Gezählt wird deshalb ohne die Definition. */
+  const alleFund = (FRONT.match(/FESTUNG_ABKLING_STD/g) || []).length;
+  const definition = (FRONT.match(/const FESTUNG_ABKLING_STD = /g) || []).length;
+  const leser = alleFund - definition;
+  check('6b: die Konstante hat mindestens fünf LESER (die Definition zählt nicht mit)',
+    definition === 1 && leser >= 5, { alleFund, definition, leser });
+  /* Und die eine Fundstelle, die nicht nur anzeigt, sondern ENTSCHEIDET, wird namentlich
+     verlangt: Fällt ausgerechnet die Sperre auf eine eingetippte Ziffer zurück, zeigt die Karte
+     den Schlag als frei an, während der Server mit 403 antwortet – der Spieler schickt dann eine
+     Flotte los, die zurückprallt. Ein reiner Zähler kann das nicht von einem Anzeigetext
+     unterscheiden. */
+  /* KOMMENTARE MÜSSEN VORHER WEG (Arbeitsregel 33). Der Erklärkommentar an der Konstante ZITIERT
+     die alte Zeile `meinLetzter + 6*3600*1000`, um zu sagen, was behoben wurde – die rohe
+     Textsuche sah sie dadurch als noch vorhanden an, und 6c fiel auf korrektem Code durch.
+     Genau dieselbe Falle hat in derselben Lieferung schon test_belohnungen_speichern erwischt. */
+  const ohneKommentare = FRONT
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/^([^'"\n]*?)\/\/[^\n]*$/gm, (m, vor) => vor + ' '.repeat(m.length - vor.length));
+  // Und die Leerung belegt sich selbst - sonst prüfte 6c am Ende nur, dass nichts gegriffen hat.
+  check('6c-vorab: das Leeren der Kommentare hat gegriffen',
+    ohneKommentare.length === FRONT.length && ohneKommentare !== FRONT
+      && /meinLetzter \+ 6\*3600\*1000/.test(FRONT)
+      && !/meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare),
+    { zitatImKommentar: /meinLetzter \+ 6\*3600\*1000/.test(FRONT) });
+  check('6c: auch die SPERRE im Kartenmenü rechnet mit der Konstante, nicht mit einer Ziffer',
+    /meinLetzter \+ FESTUNG_ABKLING_STD\*3600\*1000/.test(ohneKommentare)
+      && !/meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare),
+    { mitKonstante: /meinLetzter \+ FESTUNG_ABKLING_STD\*3600\*1000/.test(ohneKommentare),
+      mitZiffer: /meinLetzter \+ 6\*3600\*1000/.test(ohneKommentare) });
+}
+
 ende();

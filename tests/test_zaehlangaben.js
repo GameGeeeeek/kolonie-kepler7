@@ -65,9 +65,26 @@ const gerechnet = [
      Richtigstellung blockiert (Arbeitsregel 68). Beides ist behoben; hier steht der Ausdruck,
      damit die Ziffer nicht zurueckkehrt. */
   ["Kompendium-Kategorien", "'+COMPENDIUM_CATS.length+' Kategorien"],
+  /* Ebenfalls am 21.08.2026 dazu: Die Abklingzeit der Asteroidenfestung stand als eingetippte 6
+     an fuenf Stellen - vier Anzeigen UND der Sperre selbst. Sie ist eine Kopie von
+     FESTUNG_ABKLING_MS aus server.js (test_festung_paritaet 6a haelt beide zusammen); hier steht
+     der Ausdruck, damit die Ziffer im Hilfetext nicht zurueckkehrt. */
+  ["Festungs-Abklingzeit", "Abklingzeit von ' + FESTUNG_ABKLING_STD + ' Stunden"],
 ];
+/* GESUCHT WIRD OHNE KOMMENTARE (Arbeitsregel 33). Das ist eine PRAESENZ-Suche ueber die ganze
+   Datei: Wer den Ausdruck aus dem Code entfernt und die feste Ziffer zurueckschreibt, ihn aber
+   in einem Erklaerkommentar ZITIERT ("hier stand frueher '+X.length+'"), haelt diese Pruefung
+   weiterhin gruen - und genau solche Kommentare schreibt dieses Projekt staendig. In derselben
+   Lieferung hat dieselbe Falle schon test_belohnungen_speichern und test_festung_paritaet 6c
+   erwischt; beim dritten Mal gehoert sie behoben statt notiert. */
+const srcOhneKommentare = src
+  .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+  .replace(/^([^'"\n]*?)\/\/[^\n]*$/gm, (m, vor) => vor + ' '.repeat(m.length - vor.length));
+check('gerechnet-vorab: das Leeren der Kommentare hat gegriffen',
+  srcOhneKommentare.length === src.length && srcOhneKommentare !== src,
+  { gleicheLaenge: srcOhneKommentare.length === src.length, veraendert: srcOhneKommentare !== src });
 for (const [was, ausdruck] of gerechnet){
-  const da = ausdruck instanceof RegExp ? ausdruck.test(src) : src.includes(ausdruck);
+  const da = ausdruck instanceof RegExp ? ausdruck.test(srcOhneKommentare) : srcOhneKommentare.includes(ausdruck);
   check(`${was}: die Hilfe rechnet, statt eine Ziffer zu nennen`, da, String(ausdruck).slice(0, 56));
 }
 
