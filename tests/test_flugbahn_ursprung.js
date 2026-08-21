@@ -133,14 +133,37 @@ function backend(store) {
   // VERSCHOBENE Marker ist (kbMarkerFrei, KB-13) und nicht die rohe Slot-Position: Der Schieber
   // rueckt ihn ueber die 50 Einheiten der Rohbahn hinaus.
   const heim = await lies('kepler');
+  // Wo steht der GEZEICHNETE Heimatmarker? Aus dem DOM abgelesen statt aus einer Zahl: Sein Label
+  // sitzt 20 Einheiten unter seiner Mitte (planet-label bei hc.y+20), beide in SVG-Nutzerkoordinaten
+  // - denselben, in denen die Linie ihr x1/y1 fuehrt.
+  const marker = await page.evaluate(() => {
+    const t = [...document.querySelectorAll('#galaxyMapSvg text.planet-label')]
+      .find(e => (e.textContent||'').trim() === 'Deine Basis');
+    return t ? { x: +t.getAttribute('x'), y: +t.getAttribute('y') - 20 } : null;
+  });
   check('3-vorab: im Heimatsystem liegt genau EINE Missionslinie der Systemebene vor',
     heim.systemLinien === 1 && !!heim.start, heim);
   if (heim.systemLinien === 1) {
     const d = abstand(heim.start);
     check('3: im Heimatsystem startet die Flugbahn weiterhin am Heimatmarker, nicht auf der Sonne',
       d > 20, { start: heim.start, abstandZurSonne: d.toFixed(1) });
-    check('3b: und zwar am kollisionsverschobenen Marker, nicht an der rohen Slot-Position',
-      d > 50.5, { abstandZurSonne: d.toFixed(1), roheSlotBahn: 50 });
+    /* 3b prueft, dass die Linie am GEZEICHNETEN Marker haengt - also an dem, den kbMarkerFrei
+       verschoben hat (KB-13), und nicht an einer daneben gerechneten Position.
+       KORREKTUR 21.08.2026 (KB-20): Hier stand "d > 50.5" mit dem Kommentar "die rohe Slot-Bahn
+       ist 50 Einheiten". Das war eine Momentaufnahme (Hausregel 2/3): Die Heimatbahn wird seit
+       KB-13 aus kbOrbitRx(1) abgeleitet, und seit KB-20 liegen die Bahnen auch am hohen
+       PC-Kasten rund - kbOrbitRx(1) faellt damit von 85 auf 48, die rohe Slot-Bahn von 50 auf
+       28,2. Der Test fiel auf voellig richtigem Code durch (gemessen 43,3).
+       Gemessen wird jetzt die REGEL: Der Linienstart liegt AUF dem gezeichneten Marker. Das ist
+       zugleich schaerfer - es faellt auch dann, wenn die Linie an einer beliebigen anderen Stelle
+       ansetzt, waehrend die alte Schranke jede Position jenseits von 50 durchgelassen haette. */
+    check('3b-vorab: der gezeichnete Heimatmarker ist auffindbar', !!marker, marker);
+    if (marker){
+      const dm = Math.hypot(heim.start.x - marker.x, heim.start.y - marker.y);
+      check('3b: und zwar exakt am gezeichneten (kollisionsverschobenen) Heimatmarker',
+        dm <= 1.0, { linienStart: heim.start, marker, abweichung: dm.toFixed(2),
+                     abstandMarkerZurSonne: Math.hypot(marker.x - SONNE.x, marker.y - SONNE.y).toFixed(1) });
+    }
   }
 
   check('4: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));

@@ -55464,17 +55464,32 @@
     // dieses Systems statt nach dem Maximum (KB-12): Ein System mit drei Planeten braucht keinen
     // Ausschnitt für sechs Orbits - es wird entsprechend stärker vergrößert. Gerechnet wird über
     // dieselbe Geometrie-Quelle wie die Zeichnung (kbOrbitRx), plus Rand für Beschriftungen.
-    const kbEng = kbSchmalerKasten();
+    const kbEng = kbRunderKasten();
+    const kbOrbits = PLANETS.filter(pl => pl.system === galaxyOpenSystem).map(pl => pl.orbit || 3);
+    const kbMaxOrbit = kbOrbits.length ? Math.max.apply(null, kbOrbits) : 6;
     let w = GALAXY_SYSTEM_VIEW_W;
     if (kbEng){
-      const kbOrbits = PLANETS.filter(pl => pl.system === galaxyOpenSystem).map(pl => pl.orbit || 3);
-      const kbMaxOrbit = kbOrbits.length ? Math.max.apply(null, kbOrbits) : 6;
       // +34 Sektor-Einheiten Rand: Planetenscheibe (r=11..14) plus die zwei Beschriftungszeilen.
       w = Math.max(150, (kbOrbitRx(kbMaxOrbit) + 34) * 2 * GALAXY_SYSTEM_SCALE);
     }
     let h = w*kbVerh;
+    /* KB-20: Bei RUNDER Bahn ist oft die HOEHE die bindende Richtung, nicht die Breite - wer nur
+       aus der Breite rechnet, schneidet oben und unten ab (gemessen an einer Probe-Fassung:
+       Ausschnitt 153 Einheiten hoch bei 174 Einheiten Inhalt). Die Korrektur gilt bewusst NUR am
+       breiten Kasten: Am Handy wuerde sie die Skala von 1,56 auf 1,39 druecken, die Karte also
+       verkleinern. Dort ist die Fit-nach-Breite die bewusste Wahl aus KB-12, samt angeschnittenem
+       Aussenring - eine Verkleinerung waere das Gegenteil dessen, wofuer KB-12 gebaut wurde. */
+    if (kbEng && !kbSchmalerKasten()){
+      const kbInhaltH = (kbOrbitRx(kbMaxOrbit) * kbOrbitMass().ry + 34) * 2 * GALAXY_SYSTEM_SCALE;
+      if (h < kbInhaltH){ h = kbInhaltH; w = h / kbVerh; }
+    }
     const kbBreitePx = kbRectCam ? kbRectCam.width : 0;
-    if (kbBreitePx && kbBreitePx / w > GALAXY_SYSTEM_MAX_SCALE){
+    /* Der Deckel aus KB-11 schuetzt die FLACHE Zeichnung vor Ueberzoom ("riesige Sonne, teils
+       beschnitten"). Bei runder Bahn ist der Inhalt schmaler (380 statt 600 Einheiten) und der
+       Ausschnitt kommt ohnehin aus dem echten Inhalt - dort bindet der Deckel nur noch zu frueh
+       und haelt die Karte klein. Am Handy hat er nie gebunden (gemessen 1,56 gegen Deckel 2,2),
+       die Zeile aendert dort also nichts. */
+    if (!kbEng && kbBreitePx && kbBreitePx / w > GALAXY_SYSTEM_MAX_SCALE){
       w = kbBreitePx / GALAXY_SYSTEM_MAX_SCALE;
       h = w*kbVerh;
     }
@@ -55521,6 +55536,10 @@
   // Planeten-Chips lag erst eine halbe Bildschirmhöhe tiefer. Die Höhe folgt jetzt der Breite
   // (0.6 ≈ Inhalt + Luft für Blätterknöpfe und Zoomstapel), gedeckelt auf die alten 420 px -
   // am PC (breiter Kasten) ändert sich dadurch nichts.
+  /* Die Kastenhoehe der beiden Sektor-Ansichten - und seit KB-20 am PC auch die der offenen
+     Systemebene. Als benannte Konstante, damit die zwei Anzeigestellen nicht wieder mit
+     verschiedenen Zahlen dastehen (genau das war der Report vom 21.08.2026). */
+  const KB_SEKTOR_KASTEN_HOEHE = 'max(480px, calc(100dvh - 175px))';
   function kbSystemKastenHoehe(){
     const kbWrapEl = document.querySelector('#tab-karte .map-wrap');
     const breite = kbWrapEl ? kbWrapEl.getBoundingClientRect().width : 0;
@@ -55532,9 +55551,14 @@
     // 0,78 machte dort aus 325 px Kasten 480 px, also wieder toten Raum - und schob die Kastenmitte
     // unter den Fensterrand, wodurch das Ziehen der Karte gar nicht mehr ankam (gemessen,
     // test_kartenbedienung 2a/2b). Der Deckel 480 px hält auf großen Handys die Detailtafel im Bild.
+    /* KB-20: Am PC ist die Hoehe seit dem 21.08.2026 dieselbe wie in den Sektor-Ansichten - der
+       Kasten springt beim Oeffnen eines Systems nicht mehr (Spieler-Report mit zwei Screenshots).
+       EINE Quelle fuer beide Ansichten, damit sie nicht wieder auseinanderlaufen. Am Handy bleibt
+       die Rechnung aus KB-10/11/12 stehen: dort ist die Breite die bindende Richtung, ein gleich
+       hoher Kasten waere gemessen zu 63% leer und die Planeten blieben bei 20 px. */
     return kbSchmalerKasten()
       ? Math.round(Math.max(240, Math.min(480, breite * 0.78))) + 'px'
-      : Math.round(Math.max(190, Math.min(420, breite * 0.44))) + 'px';
+      : KB_SEKTOR_KASTEN_HOEHE;
   }
   function galaxyOeffne(systemId){
     // Vor dem Umschalten festhalten, ob schon ein System offen war: Nur dann liegt die aktuelle
@@ -56024,7 +56048,7 @@
     // Die Zoom-Knöpfe sind in den Sektor-Ansichten wirkungslos und deshalb ausgeblendet.
     const kbWrap = svg.closest('.map-wrap');
     const kbSektorModus = !galaxyOpenSystem;
-    if (kbWrap) kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : kbSystemKastenHoehe();
+    if (kbWrap) kbWrap.style.height = kbSektorModus ? KB_SEKTOR_KASTEN_HOEHE : kbSystemKastenHoehe();
     ['galaxyZoomInBtn','galaxyZoomOutBtn'].forEach(function(id){
       const b = document.getElementById(id);
       if (b) b.style.display = kbSektorModus ? 'none' : '';
@@ -56547,8 +56571,23 @@
   // Fensters, elementFromPoint lieferte null und das Ziehen der Karte kam gar nicht mehr an -
   // test_kartenbedienung 2a/2b, Treue 1 -> 0).
   function kbSchmalerKasten(){ return window.innerWidth <= 700; }
+  /* Ab wann ist der Kasten zu HOCH fuer die flache Streifen-Zeichnung? (KB-20)
+     Die flache Systemzeichnung ist 600x180 Sektor-Einheiten, also im Verhaeltnis 0,30. Sie fuellt
+     einen Kasten mit Verhaeltnis r immer nur zu 0,30/r seiner Hoehe - bei r = 0,5 bleiben also
+     40% leer. Genau dort liegt die Schranke. Das ist dieselbe Einsicht wie bei KB-12, nur nicht
+     mehr an die FENSTERBREITE gehaengt, sondern an die Form des Kastens: Ein Hochformat-Handy und
+     ein hoher PC-Kasten haben dasselbe geometrische Problem, und ein flacher Streifen kann beide
+     nicht fuellen, egal wie breit das Fenster ist. Sehr breite Bildschirme bleiben dadurch von
+     selbst bei der flachen Zeichnung - dort ist der Kasten wieder flach genug. */
+  function kbRunderKasten(){
+    if (kbSchmalerKasten()) return true;
+    const kbEl = document.querySelector('#tab-karte .map-wrap');
+    if (!kbEl) return false;
+    const kbR = kbEl.getBoundingClientRect();
+    return kbR.width > 0 && (kbR.height / kbR.width) > 0.5;
+  }
   function kbOrbitMass(){
-    return kbSchmalerKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
+    return kbRunderKasten() ? { basis: 30, schritt: 18, ry: 0.85 } : { basis: 42, schritt: 43, ry: 0.3 };
   }
   function kbOrbitRx(orbit){ const m = kbOrbitMass(); return m.basis + orbit*m.schritt; }
   function planetOrbitXY(p){
@@ -57227,12 +57266,39 @@
     if (galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === activeSystem || galaxyCache.activeWormhole.to === activeSystem)){
       const otherSysId = galaxyCache.activeWormhole.from === activeSystem ? galaxyCache.activeWormhole.to : galaxyCache.activeWormhole.from;
       const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
-      const whX = 665, whY = 28;
-      inner += `<g><title>Wurmloch nach ${otherSys?otherSys.name:'unbekanntem System'}</title>
-        <circle cx="${whX}" cy="${whY}" r="14" fill="none" stroke="#af9ce6" stroke-width="2" stroke-dasharray="3 3" opacity="0.85"><animateTransform attributeName="transform" type="rotate" from="0 ${whX} ${whY}" to="360 ${whX} ${whY}" dur="4s" repeatCount="indefinite"/></circle>
-        <circle cx="${whX}" cy="${whY}" r="7" fill="#af9ce6" opacity="0.5"><animate attributeName="r" values="6;9;6" dur="1.8s" repeatCount="indefinite"/></circle>
-        <text x="${whX}" y="${whY+24}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>
+      /* Die Bahn kommt aus derselben Quelle wie alles andere auf dieser Karte (KB-20b): knapp
+         INNERHALB der aeussersten Planetenbahn, oben rechts. Vorher stand hier ein fester Punkt
+         (665, 28) aus dem alten, breiten Systemfeld - mit dem engeren Ausschnitt lag er gemessen
+         241 px hinter der Kastenkante, das Portal war also unsichtbar. Der Faktor 0,92 haelt es in
+         BEIDEN Zeichnungen im Bild: rund bei 144 von 242 sichtbaren Einheiten, flach bei 316 von
+         350. Die Bahn ist runder als die Planetenbahn (mindestens 0,55), damit das Portal nicht
+         auf der Ekliptik zwischen den Planeten klebt. */
+      const whMaxOrbit = sysPlanets.length ? Math.max.apply(null, sysPlanets.map(p => p.orbit || 3)) : 6;
+      const whRx = kbOrbitRx(whMaxOrbit) * 0.92, whRy = whRx * Math.max(0.55, kbOrbitMass().ry);
+      const whRad = 325 * Math.PI / 180;
+      const whR = 14;
+      const whPos = kbMarkerFrei({ x: SUN_X + whRx*Math.cos(whRad), y: SUN_Y + whRy*Math.sin(whRad) },
+                                 sysPlanets, activeSunType.r, whR, platzierteMarker);
+      platzierteMarker.push({ x: whPos.x, y: whPos.y, r: whR });
+      const whX = whPos.x, whY = whPos.y;
+      /* Die Akkretionsscheibe ist fuer viewBox 0 0 100 100 gezeichnet (sichtbarer Radius ~41).
+         0,34 bringt sie auf denselben Durchmesser, den der alte gepunktete Ring hatte: 41 x 0,34
+         = 13,9 Sektor-Einheiten gegen vorher r = 14. */
+      /* BEWUSST OHNE `planet-node` - und das ist gemessen, nicht vorsichtshalber: Diese Gruppe
+         traegt als einzige Kartenobjekt-Gruppe eine `scale`-Transformation (die Zeichnung ist fuer
+         viewBox 0 0 100 100 gebaut). `kbLabelsEntflechten` misst belegte Flaechen mit getBBox(),
+         und das liefert die EIGENEN Nutzerkoordinaten OHNE die transform - im Browser nachgemessen
+         meldet der groesste Kreis 82 Einheiten, waehrend das Portal auf der Karte 27,9 Einheiten
+         breit ist. Mit der Klasse haette der Entflechter eine fast dreimal zu grosse Flaeche
+         angenommen und Beschriftungen unnoetig weit weggeschoben. Wer das Portal spaeter doch
+         aufnehmen will, muss den Entflechter zuerst transform-fest machen (Matrix der Gruppe
+         mitrechnen), nicht die Klasse hier setzen.
+         Gegen KOLLISIONEN ist es trotzdem geschuetzt: Es laeuft durch kbMarkerFrei() und meldet
+         sich in platzierteMarker an, wie jeder andere Marker auch. */
+      inner += `<g data-map-wurmloch="${otherSysId}" transform="translate(${whX.toFixed(1)} ${whY.toFixed(1)}) scale(0.34) translate(-50 -50)"><title>Wurmloch nach ${otherSys?otherSys.name:'unbekanntem System'}</title>
+        <defs> <radialGradient id="wh_${activeSystem}_glut" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="36"> <stop offset="0.355" stop-color="#ffffff"/> <stop offset="0.385" stop-color="#e8eaf6"/> <stop offset="0.42" stop-color="#5ce1ff"/> <stop offset="0.48" stop-color="#6f8fe0"/> <stop offset="0.55" stop-color="#7f77dd"/> <stop offset="0.63" stop-color="#af9ce6"/> <stop offset="0.715" stop-color="#8b7fd6"/> <stop offset="0.8" stop-color="#d8a75e"/> <stop offset="0.885" stop-color="#fac775"/> <stop offset="0.95" stop-color="#8a6a4a" stop-opacity="0.75"/> <stop offset="1" stop-color="#2a2350" stop-opacity="0"/> </radialGradient> <linearGradient id="wh_${activeSystem}_doppler" gradientUnits="userSpaceOnUse" x1="-36" y1="0" x2="36" y2="0"> <stop offset="0" stop-color="#ffffff" stop-opacity="0.6"/> <stop offset="0.26" stop-color="#f5e2b8" stop-opacity="0.2"/> <stop offset="0.52" stop-color="#ffffff" stop-opacity="0"/> <stop offset="0.8" stop-color="#1a1730" stop-opacity="0.34"/> <stop offset="1" stop-color="#0f0d22" stop-opacity="0.62"/> </linearGradient> <radialGradient id="wh_${activeSystem}_halo" cx="0.5" cy="0.5" r="0.5"> <stop offset="0.4" stop-color="#9b8ad8" stop-opacity="0"/> <stop offset="0.6" stop-color="#9b8ad8" stop-opacity="0.26"/> <stop offset="0.78" stop-color="#6a5fc0" stop-opacity="0.18"/> <stop offset="0.93" stop-color="#20204a" stop-opacity="0.1"/> <stop offset="1" stop-color="#20204a" stop-opacity="0"/> </radialGradient> <radialGradient id="wh_${activeSystem}_nebel" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#e8b463" stop-opacity="0.6"/> <stop offset="0.45" stop-color="#9b8ad8" stop-opacity="0.42"/> <stop offset="0.8" stop-color="#4e4290" stop-opacity="0.22"/> <stop offset="1" stop-color="#4e4290" stop-opacity="0"/> </radialGradient> <radialGradient id="wh_${activeSystem}_loch" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#0d1a2a"/> <stop offset="0.4" stop-color="#05070f"/> <stop offset="0.82" stop-color="#000000"/> <stop offset="1" stop-color="#000000"/> </radialGradient> <radialGradient id="wh_${activeSystem}_schlund" cx="0.5" cy="0.5" r="0.5"> <stop offset="0" stop-color="#bfeeff" stop-opacity="0.62"/> <stop offset="0.4" stop-color="#5dcaa5" stop-opacity="0.26"/> <stop offset="1" stop-color="#101f30" stop-opacity="0"/> </radialGradient> <linearGradient id="wh_${activeSystem}_bogen" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#d8a75e" stop-opacity="0"/> <stop offset="0.16" stop-color="#af9ce6"/> <stop offset="0.5" stop-color="#ffffff"/> <stop offset="0.84" stop-color="#4fd4f5"/> <stop offset="1" stop-color="#6f8fe0" stop-opacity="0"/> </linearGradient> <linearGradient id="wh_${activeSystem}_photon" x1="0" y1="1" x2="1" y2="0"> <stop offset="0" stop-color="#e8b463"/> <stop offset="0.35" stop-color="#ffffff"/> <stop offset="0.7" stop-color="#7ed6ff"/> <stop offset="1" stop-color="#af9ce6"/> </linearGradient> <linearGradient id="wh_${activeSystem}_strom" x1="0" y1="0" x2="1" y2="0"> <stop offset="0" stop-color="#f0d29b"/> <stop offset="0.5" stop-color="#ffffff"/> <stop offset="1" stop-color="#8ddcff"/> </linearGradient> <filter id="wh_${activeSystem}_fein" x="-60%" y="-60%" width="220%" height="220%"> <feGaussianBlur stdDeviation="0.5"/> </filter> <filter id="wh_${activeSystem}_weich" x="-60%" y="-60%" width="220%" height="220%"> <feGaussianBlur stdDeviation="1.5"/> </filter> <filter id="wh_${activeSystem}_stark" x="-70%" y="-70%" width="240%" height="240%"> <feGaussianBlur stdDeviation="3.4"/> </filter> <filter id="wh_${activeSystem}_wolke" x="-40%" y="-40%" width="180%" height="180%"> <feTurbulence type="fractalNoise" baseFrequency="0.04 0.11" numOctaves="2" seed="7" result="wh_${activeSystem}_rauschen"/> <feDisplacementMap in="SourceGraphic" in2="wh_${activeSystem}_rauschen" scale="4" xChannelSelector="R" yChannelSelector="G"/> <feGaussianBlur stdDeviation="0.4"/> </filter> <clipPath id="wh_${activeSystem}_scheibevorn" clipPathUnits="userSpaceOnUse"><rect x="-60" y="0" width="120" height="60"/></clipPath> <clipPath id="wh_${activeSystem}_hinten" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="100" height="50"/></clipPath> <clipPath id="wh_${activeSystem}_vorn" clipPathUnits="userSpaceOnUse"><rect x="0" y="50" width="100" height="50"/></clipPath> </defs> <circle cx="50" cy="50" r="41" fill="url(#wh_${activeSystem}_halo)"> <animate attributeName="opacity" values="0.6;1;0.6" dur="5s" repeatCount="indefinite"/> </circle> <ellipse cx="50" cy="50" rx="31" ry="13" transform="rotate(-16 50 50)" fill="url(#wh_${activeSystem}_nebel)" filter="url(#wh_${activeSystem}_stark)" opacity="0.75"> <animate attributeName="opacity" values="0.5;0.9;0.5" dur="6.5s" repeatCount="indefinite"/> </ellipse> <g transform="rotate(-16 50 50)"> <g transform="translate(50 50) scale(1 0.44)"> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23" opacity="0.5" filter="url(#wh_${activeSystem}_weich)"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_doppler)" stroke-width="23"/> <circle r="15.5" fill="none" stroke="#9fe3ff" stroke-width="3.2" opacity="0.5" stroke-dasharray="10 8" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/> </circle> <circle r="20.5" fill="none" stroke="#f0d29b" stroke-width="4.6" opacity="0.32" stroke-dasharray="20 15" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="7s" repeatCount="indefinite"/> </circle> <circle r="27" fill="none" stroke="#c3bef5" stroke-width="6" opacity="0.28" stroke-dasharray="28 21" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="11s" repeatCount="indefinite"/> </circle> <circle r="13.4" fill="none" stroke="#eef0ff" stroke-width="2.6" opacity="0.85" filter="url(#wh_${activeSystem}_fein)"/> </g> </g> <g transform="rotate(-16 50 50)"> <g clip-path="url(#wh_${activeSystem}_hinten)"> <path d="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50" fill="none" stroke="url(#wh_${activeSystem}_strom)" stroke-width="2.4" stroke-linecap="round" opacity="0.9" stroke-dasharray="5 14"> <animate attributeName="stroke-dashoffset" values="19;0" dur="1.5s" repeatCount="indefinite"/> </path> <path d="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50" fill="none" stroke="#a9e6ff" stroke-width="2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 16"> <animate attributeName="stroke-dashoffset" values="20;0" dur="2.1s" repeatCount="indefinite"/> </path> <circle r="1.8" fill="#f3e6c8" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="3.2s" repeatCount="indefinite" path="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="3.2s" repeatCount="indefinite"/> </circle> <circle r="1.6" fill="#9fe3ff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="4.1s" begin="-1.5s" repeatCount="indefinite" path="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="4.1s" begin="-1.5s" repeatCount="indefinite"/> </circle> </g> </g> <circle cx="50" cy="50" r="9.7" fill="url(#wh_${activeSystem}_loch)"/> <circle cx="50" cy="50" r="7.2" fill="none" stroke="#5dcaa5" stroke-width="1.6" opacity="0.3" stroke-dasharray="6 7" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="360 50 50" to="0 50 50" dur="9s" repeatCount="indefinite"/> </circle> <circle cx="50" cy="50" r="4.6" fill="url(#wh_${activeSystem}_schlund)"> <animate attributeName="r" values="3.4;5.8;3.4" dur="6.5s" repeatCount="indefinite"/> <animate attributeName="opacity" values="0.45;1;0.45" dur="6.5s" repeatCount="indefinite"/> </circle> <circle cx="47.4" cy="52.1" r="0.9" fill="#e8eaf6" opacity="0.8"> <animate attributeName="opacity" values="0.15;0.9;0.15" dur="3.1s" repeatCount="indefinite"/> </circle> <circle cx="52.6" cy="47.6" r="0.75" fill="#9fe3ff" opacity="0.7"> <animate attributeName="opacity" values="0.8;0.15;0.8" dur="4.3s" repeatCount="indefinite"/> </circle> <circle cx="50" cy="50" r="10.9" fill="none" stroke="#7ed6ff" stroke-width="4" opacity="0.4" filter="url(#wh_${activeSystem}_weich)"/> <circle cx="50" cy="50" r="10.9" fill="none" stroke="url(#wh_${activeSystem}_photon)" stroke-width="2.2"> <animate attributeName="stroke-width" values="1.9;2.8;1.9" dur="2.2s" repeatCount="indefinite"/> <animate attributeName="opacity" values="0.8;1;0.8" dur="2.2s" repeatCount="indefinite"/> </circle> <g transform="rotate(-16 50 50)"> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="7.5" opacity="0.4" filter="url(#wh_${activeSystem}_weich)"/> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="4" stroke-linecap="round"/> <path d="M 20,50 C 20,24 80,24 80,50" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.85" stroke-linecap="round"> <animate attributeName="opacity" values="0.3;0.95;0.3" dur="3.7s" repeatCount="indefinite"/> </path> <path d="M 24,50 C 24,75.3 76,75.3 76,50" fill="none" stroke="url(#wh_${activeSystem}_bogen)" stroke-width="3" opacity="0.55" stroke-linecap="round"/> </g> <g transform="rotate(-16 50 50)"> <g transform="translate(50 50) scale(1 0.44)"> <g clip-path="url(#wh_${activeSystem}_scheibevorn)"> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_glut)" stroke-width="23" opacity="0.45" filter="url(#wh_${activeSystem}_wolke)"/> <circle r="24.5" fill="none" stroke="url(#wh_${activeSystem}_doppler)" stroke-width="23"/> <circle r="15.5" fill="none" stroke="#9fe3ff" stroke-width="3.2" opacity="0.55" stroke-dasharray="10 8" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/> </circle> <circle r="20.5" fill="none" stroke="#f0d29b" stroke-width="4.6" opacity="0.36" stroke-dasharray="20 15" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="7s" repeatCount="indefinite"/> </circle> <circle r="27" fill="none" stroke="#c3bef5" stroke-width="6" opacity="0.3" stroke-dasharray="28 21" stroke-linecap="round"> <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="11s" repeatCount="indefinite"/> </circle> <circle r="13.4" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.95" filter="url(#wh_${activeSystem}_fein)"/> </g> </g> </g> <g transform="rotate(-16 50 50)"> <ellipse cx="26" cy="50" rx="7" ry="3" fill="#f3e6c8" opacity="0.5" filter="url(#wh_${activeSystem}_weich)"> <animate attributeName="opacity" values="0.22;0.7;0.22" dur="3.4s" repeatCount="indefinite"/> </ellipse> </g> <g transform="rotate(-16 50 50)"> <g clip-path="url(#wh_${activeSystem}_vorn)"> <path d="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50" fill="none" stroke="url(#wh_${activeSystem}_strom)" stroke-width="2.4" stroke-linecap="round" opacity="0.9" stroke-dasharray="5 14"> <animate attributeName="stroke-dashoffset" values="19;0" dur="1.5s" repeatCount="indefinite"/> </path> <path d="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50" fill="none" stroke="#a9e6ff" stroke-width="2" stroke-linecap="round" opacity="0.7" stroke-dasharray="4 16"> <animate attributeName="stroke-dashoffset" values="20;0" dur="2.1s" repeatCount="indefinite"/> </path> <circle r="1.8" fill="#f3e6c8" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="3.2s" repeatCount="indefinite" path="M 88,50 A 34.5,15.2 0 0 1 20,50 A 28.5,12.5 0 0 1 76,50 A 23.5,10.3 0 0 1 30,50 A 16.5,7.3 0 0 1 62,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="3.2s" repeatCount="indefinite"/> </circle> <circle r="1.6" fill="#9fe3ff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="4.1s" begin="-1.5s" repeatCount="indefinite" path="M 12,50 A 34.5,15.2 0 0 1 80,50 A 28.5,12.5 0 0 1 24,50 A 23.5,10.3 0 0 1 70,50 A 16.5,7.3 0 0 1 38,50"/> <animate attributeName="opacity" values="0;1;1;0.25;0" dur="4.1s" begin="-1.5s" repeatCount="indefinite"/> </circle> </g> </g> <g transform="rotate(-16 50 50)"> <circle r="1.7" fill="#ffffff" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="5s" repeatCount="indefinite" path="M 78,50 A 28,12.3 0 1 1 22,50 A 28,12.3 0 1 1 78,50"/> <animate attributeName="opacity" values="0.2;1;0.45;1;0.2" dur="5s" repeatCount="indefinite"/> </circle> <circle r="1.5" fill="#fac775" filter="url(#wh_${activeSystem}_fein)"> <animateMotion dur="8s" begin="-2.6s" repeatCount="indefinite" path="M 84,50 A 34,15 0 1 1 16,50 A 34,15 0 1 1 84,50"/> <animate attributeName="opacity" values="0.25;1;0.35;1;0.25" dur="8s" begin="-2.6s" repeatCount="indefinite"/> </circle> </g> <circle cx="24" cy="31" r="1.2" fill="#efd6ae" opacity="0.6"> <animate attributeName="opacity" values="0.15;0.75;0.15" dur="2.6s" repeatCount="indefinite"/> </circle> <circle cx="77" cy="69" r="1.3" fill="#9fe3ff" opacity="0.55"> <animate attributeName="opacity" values="0.7;0.1;0.7" dur="3.9s" repeatCount="indefinite"/> </circle> <circle cx="71" cy="26" r="1.1" fill="#cfc7f7" opacity="0.5"> <animate attributeName="opacity" values="0.1;0.65;0.1" dur="4.8s" repeatCount="indefinite"/> </circle>
       </g>`;
+      inner += `<text class="planet-label" x="${whX.toFixed(1)}" y="${(whY+22).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>`;
     }
     // Sonne (Größe/Farbe/Sonderform folgen dem Sonnentyp dieses Systems, siehe activeSunType oben)
     inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(34*activeSunType.r).toFixed(1)}" fill="url(#sunGlow)"/>`;

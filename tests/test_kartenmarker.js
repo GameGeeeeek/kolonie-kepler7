@@ -300,7 +300,14 @@ async function laufe(browser, store, viewport, mobil, systeme) {
     { was: 'eigene Heimatbasis', muster: /kbMarkerFrei\(homeSlotXY\(myHomeSlot\)/ },
     { was: 'fremde Spieler',     muster: /kbMarkerFrei\(homeSlotXY\(pl\.slot\)/ },
     { was: 'NPCs',               muster: /kbMarkerFrei\(npcMarkerXY\(\)/ },
-    { was: 'Alien-Nester',       muster: /kbMarkerFrei\(nestMarkerXY\(/ }
+    { was: 'Alien-Nester',       muster: /kbMarkerFrei\(nestMarkerXY\(/ },
+    /* KB-20b (21.08.2026): Das Wurmloch-Portal sass bis dahin fest bei (665, 28) - einem Punkt aus
+       dem alten, breiten Systemfeld. Mit dem engeren Ausschnitt lag es am PC gemessen 241 px hinter
+       der Kastenkante, am Handy schon seit KB-12 133 px. Seitdem kommt seine Bahn aus kbOrbitRx()
+       und laeuft durch den Schieber wie jeder andere Marker. Es hat keine eigene *MarkerXY-Funktion,
+       weil seine Bahn von der aeussersten PLANETENBAHN abhaengt (0,92 davon) und nicht von einer
+       festen Marker-Bahn - gegriffen wird deshalb ueber die Variable. */
+    { was: 'Wurmloch-Portal',    muster: /kbMarkerFrei\(\{ x: SUN_X \+ whRx/ }
   ];
   const fehlende = ERLAUBTE_MARKER.filter(m => !m.muster.test(OHNE_KOMMENTARE)).map(m => m.was);
   const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
