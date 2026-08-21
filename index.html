@@ -47404,7 +47404,7 @@
     // Forschungs-Booster: wirkt bewusst NUR auf die laufende Forschung (nicht auf Missionen wie
     // Zeitkompressor), dafür mit stärkerem Einzeleffekt - eigenständige Nische statt Dopplung.
     { key:'forschungsboost', name:'Forschungsbeschleuniger', icon:'ti-flask', desc:'Schaltet zusätzliche Rechenkapazität auf das aktuelle Projekt: verkürzt die verbleibende Zeit der laufenden Forschung sofort um 40%. Ohne laufende Forschung verpufft er wirkungslos.', chance:0.03, rarity:'selten', activate: () => {
-        if (!state.activeResearch) return 'Keine laufende Forschung – der Forschungsbeschleuniger verpufft wirkungslos.';
+        if (!state.activeResearch) return { fehler: 'Keine laufende Forschung – der Forschungsbeschleuniger hätte nichts zu beschleunigen. Dein Exemplar bleibt dir erhalten.' };
         const saved = Math.round((state.activeResearch.endTime-Date.now())*0.4);
         state.activeResearch.endTime -= saved;
         return 'Forschungsbeschleuniger aktiviert: laufende Forschung um '+Math.round(saved/1000)+'s beschleunigt!';
@@ -47415,7 +47415,7 @@
     { key:'baubeschleuniger', name:'Bautrupp-Express', icon:'ti-building-factory-2', desc:'Beschleunigt den aktuell nächstfertigen Bauauftrag sofort um 25%.', chance:0.045, rarity:'ungewoehnlich', activate: () => {
         const now = Date.now();
         const jobs = (state.constructionQueue||[]).filter(j=>j.paid && j.endTime>now).sort((a,b)=>a.endTime-b.endTime);
-        if (!jobs.length) return 'Kein aktiver Bauauftrag vorhanden – der Bautrupp-Express verpufft wirkungslos.';
+        if (!jobs.length) return { fehler: 'Kein aktiver Bauauftrag vorhanden – der Bautrupp-Express hätte nichts zu beschleunigen. Dein Exemplar bleibt dir erhalten.' };
         const job = jobs[0];
         const saved = Math.round((job.endTime-now)*0.25);
         job.endTime -= saved;
@@ -47449,7 +47449,7 @@
         const felder = Object.entries(state.debrisFields||{})
           .map(([pk, f]) => [pk, f, Object.values(f||{}).reduce((a,b)=>a+(b||0),0)])
           .filter(x => x[2] > 0).sort((a,b) => b[2]-a[2]);
-        if (!felder.length) return 'Kein Trümmerfeld in Reichweite – die Bergungsdrohnen kehren unverrichteter Dinge zurück.';
+        if (!felder.length) return { fehler: 'Kein Trümmerfeld in Reichweite – die Bergungsdrohnen finden nichts zu bergen. Dein Exemplar bleibt dir erhalten.' };
         const [pk, feld] = felder[0];
         const geborgen = {};
         for (const [r, menge] of Object.entries(feld)) if (menge > 0) geborgen[r] = Math.floor(menge);
@@ -47459,7 +47459,7 @@
     }},
     { key:'sternenkartenkopie', name:'Sternenkarten-Kopie', icon:'ti-map-2', desc:'Eine geborgene Kopie eines Sternenkarten-Fragments – zählt genauso wie ein selbst gefundenes auf die Schatzdepot-Kette ein und bringt dich dem garantierten Jackpot einen Schritt näher.', chance:0.025, rarity:'selten', activate: () => {
         if (!state.expeditionChain) state.expeditionChain = { fragments:0, readyFinale:false };
-        if (state.expeditionChain.readyFinale) return 'Die Koordinaten sind bereits vollständig – die Kopie wird archiviert, ohne etwas hinzuzufügen.';
+        if (state.expeditionChain.readyFinale) return { fehler: 'Die Koordinaten sind bereits vollständig – eine weitere Kopie fügt ihnen nichts hinzu. Dein Exemplar bleibt dir erhalten.' };
         state.expeditionChain.fragments = Math.min(EXPEDITION_CHAIN_NEEDED, (state.expeditionChain.fragments||0)+1);
         if (state.expeditionChain.fragments >= EXPEDITION_CHAIN_NEEDED){
           state.expeditionChain.readyFinale = true;
@@ -47488,7 +47488,7 @@
         return 'Empfehlungsschreiben überbracht: +12 Ruf bei '+fName+' (jetzt '+((state.factionRep||{})[fid]||0)+').';
     }},
     { key:'umschulungsbefehl', name:'Umschulungsbefehl', icon:'ti-target', desc:'Macht deinen nächsten Doktrin-Wechsel kostenlos – die sonst fällige Umschulungsgebühr entfällt einmalig. Bleibt liegen, bis du sie einlöst.', chance:0.025, rarity:'selten', activate: () => {
-        if (state.freeDoctrineSwitch) return 'Es liegt bereits ein Umschulungsbefehl vor – ein zweiter bringt nichts, löse zuerst den vorhandenen ein.';
+        if (state.freeDoctrineSwitch) return { fehler: 'Es liegt bereits ein Umschulungsbefehl vor – löse zuerst den vorhandenen ein. Dein Exemplar bleibt dir erhalten.' };
         state.freeDoctrineSwitch = true;
         return 'Umschulungsbefehl hinterlegt: Der nächste Doktrin-Wechsel kostet dich nichts.';
     }},
@@ -47527,14 +47527,14 @@
         return 'Bergungs-Modulkiste geöffnet: '+modName+' erhalten.';
     }},
     { key:'forschungsdurchbruch', name:'Forschungsdurchbruch', icon:'ti-microscope', desc:'Ein vollständiger Datensatz einer fremden Zivilisation zu genau der Frage, an der deine Labore gerade arbeiten: Die LAUFENDE Forschung ist sofort abgeschlossen, egal wie viel Zeit noch offen war. Das Gegenstück zum Werftkommando – und genauso selten.', chance:0.004, rarity:'mythisch', activate: () => {
-        if (!state.activeResearch) return 'Kein laufendes Forschungsprojekt – der Datensatz wandert ins Archiv und wartet auf seinen Moment.';
+        if (!state.activeResearch) return { fehler: 'Kein laufendes Forschungsprojekt – der Datensatz braucht eine Frage, an der deine Labore gerade arbeiten. Dein Exemplar bleibt dir erhalten.' };
         const r = findeForschung(state.activeResearch.key);
         state.activeResearch.endTime = Date.now();
         return 'Forschungsdurchbruch: '+((r&&r.name)||'Das laufende Projekt')+' ist sofort abgeschlossen.';
     }},
     { key:'urwerkzeug', name:'Urwerkzeug', icon:'ti-sparkles', desc:'Ein Werkzeug aus einer Legierung, die es nicht geben sollte – älter als jede bekannte Werft und immer noch funktionsfähig. Es fertigt ein Modul höchster, MYTHISCHER Güte, wie es sonst nur die Mythische Modulschmiede herstellt.', chance:0.004, rarity:'mythisch', activate: () => {
         const gezogen = zieheAusPool(MODULE_DEFS);
-        if (!gezogen) return 'Das Urwerkzeug findet nichts, woran es arbeiten könnte.';
+        if (!gezogen) return { fehler: 'Das Urwerkzeug findet nichts, woran es arbeiten könnte. Dein Exemplar bleibt dir erhalten.' };
         const name = gibModul(gezogen.key, 'mythisch');
         return 'Urwerkzeug eingesetzt: '+name+' gefertigt.';
     }},
@@ -47545,7 +47545,7 @@
     { key:'werftkommando', name:'Werftkommando', icon:'ti-anchor', desc:'Ein Sonderkommando übernimmt sämtliche Werften gleichzeitig: ALLE bereits bezahlten Bauaufträge – Gebäude, Schiffe und Verteidigung – werden sofort fertiggestellt.', chance:0.010, rarity:'mythisch', activate: () => {
         const jetzt = Date.now();
         const jobs = (state.constructionQueue||[]).filter(j => j.paid && j.endTime > jetzt);
-        if (!jobs.length) return 'Keine bezahlten Bauaufträge in der Warteschlange – das Werftkommando rückt unverrichteter Dinge ab.';
+        if (!jobs.length) return { fehler: 'Keine bezahlten Bauaufträge in der Warteschlange – das Werftkommando hätte nichts fertigzustellen. Dein Exemplar bleibt dir erhalten.' };
         for (const j of jobs) j.endTime = jetzt;
         return 'Werftkommando eingesetzt: '+jobs.length+' Bauauftrag'+(jobs.length===1?'':'e')+' sofort fertiggestellt.';
     }},
@@ -47571,14 +47571,14 @@
       } },
     { key:'ab_bannspule', name:'Bannspule', icon:'ti-arrows-shuffle', desc:'Verstärkt deine nächste Gegenmaßnahme: Statt eines Mutators fallen <strong>zwei</strong> aus dem Sektor. Du musst dafür wie gewohnt einen Mutator auswählen – die Spule streicht den zweiten dazu. Ohne gewählte Gegenmaßnahme bleibt sie unverbraucht liegen.', chance:0.05, rarity:'selten', quelle:HERKUNFT_ABGRUND, activate: () => {
         const a = ensureAbgrund();
-        if (a.spule) return { fehler: 'Eine Bannspule ist bereits vorgemerkt – der nächste Tauchgang nutzt sie. Dein zweites Exemplar bleibt dir erhalten.' };
+        if (a.spule) return { fehler: 'Eine Bannspule ist bereits vorgemerkt – sie wird eingesetzt, sobald du beim nächsten Tauchgang eine Gegenmaßnahme wählst. Dein Exemplar bleibt dir erhalten.' };
         a.spule = true;
         return 'Bannspule geladen: Beim nächsten Tauchgang fällt ein zweiter Mutator mit – wähle wie gewohnt eine Gegenmaßnahme.';
       } },
     { key:'ab_rueckholanker', name:'Rückholanker', icon:'ti-logout', desc:'Bricht einen <strong>laufenden</strong> Tauchgang sofort ab und holt die komplette Flotte unversehrt zurück – ohne Verluste, aber auch ohne Beute. Für den Moment, in dem du merkst, dass die Flotte für die gewählte Tiefe doch nicht reicht.', chance:0.03, rarity:'episch', quelle:HERKUNFT_ABGRUND, activate: () => {
         const cf = currentFleet();
         const m = (cf.missions||[]).find(x => x.type === 'abgrund');
-        if (!m) return { fehler: 'Der Rückholanker greift nur, während ein Tauchgang läuft – gerade ist keiner unterwegs. Dein Exemplar bleibt dir erhalten.' };
+        if (!m) return { fehler: 'Der Rückholanker greift nur, während von DIESEM Standort ein Tauchgang läuft – hier ist gerade keiner unterwegs. Dein Exemplar bleibt dir erhalten.' };
         // Die Schiffe stehen waehrend der Mission in m.composition und sind aus der Flotte
         // herausgerechnet - zurueckgeben heisst: wieder addieren, ohne Verlustwurf.
         for (const [k,n] of Object.entries(m.composition||{})) cf[k] = (cf[k]||0) + n;
@@ -47588,18 +47588,18 @@
     { key:'ab_sternenkarte', name:'Sternenkarte der Tiefe', icon:'ti-map-pin', desc:'Verrät, in welcher Tiefe die nächste <strong>Konstellation</strong> wartet – jenes seltene Zusammentreffen mehrerer Mutatoren, das einen Sektor auf einen Schlag zuspitzt. Gesucht wird ab deiner aktuellen Tauchtiefe abwärts.', chance:0.03, rarity:'episch', quelle:HERKUNFT_ABGRUND, activate: () => {
         const a = ensureAbgrund();
         const treffer = abgrundKonstellationsSuche(a.tiefe||1);
-        if (!treffer) return 'Die Karte bleibt leer – so weit die Sonde reicht, wartet keine Konstellation.';
+        if (!treffer) return { fehler: 'Die Karte bleibt leer – so weit die Sonde reicht, wartet keine Konstellation. Dein Exemplar bleibt dir erhalten.' };
         return 'Sternenkarte gelesen: „'+treffer.def.name+'" liegt in Tiefe '+treffer.tiefe+'.';
       } },
     { key:'ab_waechterruf', name:'Wächterruf', icon:'ti-bell', desc:'Ruft einen <strong>Wächter</strong> in die Tiefe, die du gerade angesteuert hast – auch wenn dort sonst keiner läge. Wächter sind stärker, lassen aber das Vierfache an Bergungsgut fallen und beim ersten Sieg ihre Reliquie. Aus der festen Zehner-Regel wird damit etwas, das du selbst in der Hand hast.', chance:0.012, rarity:'legendaer', quelle:HERKUNFT_ABGRUND, activate: () => {
         const a = ensureAbgrund();
-        if (a.ruf) return { fehler: 'Ein Wächterruf ist bereits abgesetzt – der nächste Tauchgang trifft auf den Wächter. Dein zweites Exemplar bleibt dir erhalten.' };
+        if (a.ruf) return { fehler: 'Ein Wächterruf ist bereits abgesetzt – der nächste Tauchgang trifft auf den Wächter. Dein Exemplar bleibt dir erhalten.' };
         a.ruf = true;
         return 'Wächterruf abgesetzt: In Tiefe '+(a.tiefe||1)+' wartet jetzt ein Wächter.';
       } },
     { key:'ab_grundberuehrung', name:'Grundberührung', icon:'ti-mountain', desc:'Lässt deinen nächsten Tauchgang als <strong>Erstabstieg</strong> zählen: volle Ausbeute an Splittern, Bergungsgut und Rohstoffen, auch in einer Tiefe, die du längst bezwungen hast. Die Antwort auf den Wiederholungsabschlag – selten genug, dass sie ihn nicht entwertet.', chance:0.004, rarity:'mythisch', quelle:HERKUNFT_ABGRUND, activate: () => {
         const a = ensureAbgrund();
-        if (a.grund) return { fehler: 'Eine Grundberührung ist bereits vorgemerkt – der nächste Tauchgang zählt als Erstabstieg. Dein zweites Exemplar bleibt dir erhalten.' };
+        if (a.grund) return { fehler: 'Eine Grundberührung ist bereits vorgemerkt – der nächste Tauchgang zählt als Erstabstieg. Dein Exemplar bleibt dir erhalten.' };
         a.grund = true;
         return 'Grundberührung vorgemerkt: Der nächste Tauchgang zählt als Erstabstieg – volle Ausbeute, auch in bekannter Tiefe.';
       } }
@@ -47611,10 +47611,13 @@
     /* ERST wirken lassen, DANN abbuchen - und das ist kein Schoenheitsfehler, den wir aufraeumen.
        Bis zum 21.08.2026 stand die Abbuchung davor. Vier Gegenstaende melden aber, dass sie gerade
        NICHTS bewirken koennen (die Vormerkung steht schon, oder es ist gar kein Tauchgang
-       unterwegs): ab_bannspule, ab_rueckholanker, ab_waechterruf und ab_grundberuehrung - der
-       letzte ist MYTHISCH, die seltenste Stufe des Spiels. Sie gaben `null` zurueck, escapeHtml
-       liefert dafuer '' (ausgefuehrt gemessen, nicht vermutet), und der Spieler sah eine LEERE
-       Protokollzeile, waehrend sein Exemplar weg war.
+       unterwegs). Sie gaben `null` zurueck, escapeHtml liefert dafuer '' (ausgefuehrt gemessen,
+       nicht vermutet), und der Spieler sah eine LEERE Protokollzeile, waehrend sein Exemplar weg
+       war. Dazu NEUN weitere, die ihre Nicht-Wirkung als ganz normalen Text meldeten und deshalb
+       genauso verbraucht wurden - darunter drei MYTHISCHE (forschungsdurchbruch, urwerkzeug,
+       werftkommando). Mythisch ist die hoechste Stufe, die ein GEGENSTAND fuehrt (gemessen: vier
+       Stueck); die Leiter des Spiels geht darueber hinaus noch bis exotisch und primordial, das
+       betrifft aber nur Module.
        Sie geben jetzt `{ fehler: '<Grund>' }` zurueck - eine Form, die die 33 uebrigen nicht
        kennen und die deshalb niemanden sonst beruehrt. Der zweite Zweig faengt ein blankes
        falsy ab: Wer kuenftig eine activate() ohne Rueckgabe baut, verliert dadurch kein

@@ -79,6 +79,7 @@ check('2-anker2: kein Block enthaelt eine fremde Deklaration der Modulebene',
   bloecke.every(b => b.txt && !/\n  const [A-Z_]/.test(b.txt.slice(20))));
 
 const stumm = [];
+const ohneRueckgabe = [];
 const mitFehlerform = new Set();
 let mitAktivierung = 0;
 for (const b of bloecke){
@@ -98,6 +99,13 @@ for (const b of bloecke){
        waere unbegrenzt oft nutzbar, obwohl er jedes Mal wirkt. Ebenso `return 0`. */
     if (/return\s+(null|undefined|false|0|''|""|``)\s*[;}]|return\s*[;}]/.test(akt))
       stumm.push(b.name + ':' + eintraege[i][1]);
+    /* Und der Fall OHNE jedes return: Eine activate(), die einfach durchfaellt, liefert
+       implizit undefined - also wieder falsy, also wieder der "hat nichts bewirkt"-Zweig, und
+       das Stueck wird nie verbraucht, obwohl es gewirkt hat. Das ist die GEGENRICHTUNG des
+       behobenen Fehlers. Erkennbar ist nur der blanke Fall (gar kein return im Rumpf); ein
+       BEDINGTER Durchfall braeuchte einen Parser und ist hier nicht abgedeckt - das steht
+       ausdruecklich hier, damit niemand den Anspruch fuer breiter haelt. */
+    if (!/return/.test(akt)) ohneRueckgabe.push(b.name + ':' + eintraege[i][1]);
     if (/return \{ fehler:/.test(akt)) mitFehlerform.add(eintraege[i][1]);
   }
 }
@@ -118,6 +126,8 @@ check('2-vorab: es wurden ueberhaupt activate()-Funktionen gefunden (Anker nicht
 // Erfolgs- und Auskunftsmeldungen waren. Beide Wege sind damit als Wachter untauglich.
 check('2: kein Gegenstand endet STUMM - keine falsy Rueckgabe in einer activate()',
   stumm.length === 0, { stumm });
+check('2a: jede activate() gibt ueberhaupt etwas zurueck (kein impliziter undefined-Durchfall)',
+  ohneRueckgabe.length === 0, { ohneRueckgabe });
 
 // Deshalb daneben eine benannte REGRESSIONSLISTE - dasselbe Mittel wie die acht Schiffsklassen in
 // test_werft_massenflotten, und aus demselben Grund: Die Liste ist ein historischer Befund, keine
