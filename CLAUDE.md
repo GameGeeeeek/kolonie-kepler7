@@ -4191,6 +4191,95 @@ Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektl
 und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
 geschrumpft.
 
+## Klassen-Sets für die Schiffsmodule (Teil A, 21.08.2026, v8.603.0)
+
+Auftrag Sascha: „Findbare Module die zusammen set Bonus geben." Set-Boni gab es im Spiel schon –
+aber ausschließlich bei den STANDORT-Modulen (`MODULE_SET_DEFS`) und den Boss-Sets. Die 44
+Schiffsklassen-Module hatten **keinen einzigen** (gemessen: 0 Treffer). Jede der acht Klassen hat
+jetzt ein Set aus drei namentlich festgelegten Modulen, gestaffelt bei zwei und drei Teilen.
+
+### Drei Entscheidungen, alle vorher gemessen
+
+- **Bestimmte Schlüssel statt „N beliebige".** Der erste Entwurf wollte nach ANZAHL staffeln wie
+  die Boss-Sets. Gemessen ist das hier **keine Entscheidung**: `equipShipModule` verbietet zwei
+  Module desselben TYPS an einer Klasse („je Typ ist nur EIN Modul erlaubt"), es gibt also gar
+  keine Stapel-Alternative – „zwei beliebige" wäre schlicht eine Belohnung dafür, einen zweiten
+  Slot gekauft zu haben. Mit benannten Schlüsseln entsteht die Wahl: Bei drei Slots kostet das
+  volle Set ALLE drei, die Zwischenstufe lässt einen Platz frei.
+- **Kein Set trägt einen Kanal, den seine Klasse nicht verbraucht.** Gemessen:
+  `hull`/`shield`/`speed`/`fuel` wirken in **allen** Klassen (generisch über `cls`), `atk` nur in
+  `schlachtschiff` und `raffiniert`, `cargo` nur in `frachter`, `siegechance` im Frontend
+  **gar nicht**. Ein Set-Bonus auf `atk` für die Schwere Linie wäre ein Tabellenfeld, das nur der
+  Anzeigetext liest (Regel 59). `test_schiffsmodul_paritaet.js` 5d **leitet diese Zuordnung aus
+  der Spieldatei ab** statt sie einzutippen – führt jemand einen Kanal neu generisch ein, wird die
+  Wache automatisch lockerer; schafft jemand eine Verbrauchsstelle ab, schlägt sie an.
+- **Der Mondzerstörer bekommt bewusst kein `atk`.** Der Server verbraucht es (Mondangriff), das
+  Frontend nicht – die Vorschau verschwiege sonst eine Wirkung, die im Kampf eintritt.
+
+### Zwei Stellen, die man kennen muss
+
+**Der Bonus fließt an EINER Stelle ein:** `shipModuleBonusFor`. Damit erreicht er jede
+Verbrauchsstelle automatisch – Tempo, Treibstoff, Laderaum, Hülle, Schild, Angriff. Eine eigene
+Addition je Rechenstelle wäre die übliche zweite Wahrheit.
+
+**Die Anzeige liegt in einer eigenen Funktion** (`shipModuleSetZeilenHtml`), damit sie ohne den
+ganzen Renderer messbar ist – und weil ein Set ohne Anzeige eine versteckte Mechanik wäre: Der
+Spieler könnte nicht erkennen, warum sich sein Angriffswert beim Modultausch ändert.
+
+**PvP-Parität ist Pflicht.** Der Set-Bonus trägt `atk`/`hull`/`shield`; die Tabelle liegt als Kopie
+in `server.js`, eingespeist in BEIDE Verbrauchspfade (`shipModuleBonus` für `atk`,
+`shipModulKlassenBoni` für `hull`/`shield`), jeweils **vor** dem Deckel wie vorne.
+
+### Drei Bestandstests hielten das ALTE Verhalten fest
+
+Alle drei sind mitgezogen worden, und zwar **schärfer** statt passend (Regel 43/68):
+
+- **`test_pvp_deckel`** verlangte, dass `'hull'` im Backend **gar nicht vorkommt** („solange der
+  Server ihn nicht kennt"). Das war richtig und ist überholt. Geprüft wird jetzt die Parität:
+  **beide Seiten deckeln hart** – aus „eine Seite kennt ihn nicht" wird „beide deckeln gleich".
+- **`test_wertstreuung` 6e** zählte Aufrufstellen und verlangte genau **2**. Meine dritte war
+  korrekt (ohne sie zählte der gewürfelte Hauptwert in der Verteidigung nicht). Ein Zähler kann
+  nicht zwischen „eine Stelle vergisst den Wurf" und „es gibt eine mehr" unterscheiden (Regel 33);
+  geprüft wird jetzt die REGEL, und der Fehlschlag **nennt die Zeile**.
+- **`test_schiffssynergien`** schnitt `shipModuleBonusFor` aus und starb an
+  `shipModuleSetBonus is not defined` – dieselbe Bausteinlisten-Falle wie `test_protomaterie` am
+  selben Tag. Die zwei Funktionen und die Tabelle werden jetzt mitgeschnitten.
+
+### Der Befund, der die Gegenprobe fast unmöglich gemacht hätte
+
+Die Gegenprobe zum Hüllen-Deckel blieb grün, obwohl das Backend sabotiert war: **`test_pvp_deckel`
+verdrahtete den BACKEND-Pfad fest** und ignorierte `KEPLER_BACKEND_SERVER` still. Der Durchgang vom
+21.08.2026 hatte 25 Tests von genau diesem Defekt befreit – aber er suchte die Leser der
+**Spieldatei**; die Leser von `server.js` blieben unberührt.
+
+**Gemessen sind zwölf Tests betroffen** – zehn ganz, und zwei (`test_raid_bosswahl`,
+`test_verstrickungen`) **trotz** vorhandenem `SERVER_JS`-Import, also halb umgeleitet: Bei ihnen
+liefe der Browser auf der Kopie und die Backend-Prüfung auf dem Original. Behoben ist bisher nur
+`test_pvp_deckel`; die übrigen elf sind ein eigener Durchgang. **Wer nach dieser Fehlerklasse
+sucht, sucht nach der LESESTELLE (`kolonie-kepler7-backend'` im `path.join`), nicht nach dem
+fehlenden `require`** – sonst findet er wieder nur die Hälfte.
+
+### Ein Nebenbefund, der NICHT behoben ist
+
+Das Event-Modul **`ev_erzgreifer`** („Erzgreifer-Ausleger", `cargo`, `base:0.25` – der höchste
+Frachtwert der Tabelle) bewirkt **nichts**. `cargo` wird ausschließlich für die Frachter-Klasse
+gelesen, und alle drei Frachtschiffe (`frachter`, `frachtergross`, `bergungsfrachter`) gehören
+dorthin – **Event-Schiffe haben überhaupt keine Frachtkapazität** (`CARGO_PER_SHIP` führt genau
+diese drei). Seine Beschreibung verspricht ausdrücklich „erhöht die Frachtkapazität aller
+Event-Schiffe deutlich … Exklusiv". Eine per-Klasse-Umstellung von `fleetCargoCapacity` änderte
+daran nichts; es bräuchte Frachtraum für Event-Schiffe oder eine Umwidmung des Moduls. **Das ist
+eine Entscheidung über die Identität eines Event-Gegenstands und liegt bei Sascha.**
+
+Wächter: `tests/test_schiffsmodul_sets.js` (17 Prüfungen, drei Gegenproben) und
+`tests/test_schiffsmodul_paritaet.js` (31 Prüfungen).
+
+**Eine Lücke im eigenen Wächter, die nur die Gegenprobe gezeigt hat:** Abschnitt 1 rief
+`shipModuleSetBonus` **direkt** auf und blieb deshalb grün, als die Einspeisung in
+`shipModuleBonusFor` entfernt wurde – er maß die Mechanik, aber nicht, dass sie ANGESCHLOSSEN ist.
+Das ist Regel 61 am eigenen Test; gefangen hat es die `WERKZEUGFEHLER`-Wache des Messskripts
+(Regel 71). Prüfung `1e` schließt es, **gescopt auf den Rumpf** von `shipModuleBonusFor` – ein
+Aufruf irgendwo sonst in der Datei zählt nicht (Regel 39).
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).

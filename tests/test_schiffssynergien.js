@@ -65,8 +65,18 @@ check('2b: jeder Einzelwert bleibt klein (<= 0.10 - Synergien sind Zulage, kein 
 
 // ---- 3) Verrechnung ausgefuehrt
 {
-  const quelle = fnAus('shipSynergyAktiv') + '\n' + fnAus('shipSynergyBonusFor') + '\n' + fnAus('shipModuleBonusFor');
-  check('3a: alle drei Funktionen gefunden', quelle.length > 600, quelle.length);
+  /* shipModuleBonusFor addiert seit dem 21.08.2026 auch den KLASSEN-SET-Bonus. Die zwei dafuer
+     noetigen Funktionen und ihre Tabelle werden AUS DER DATEI geschnitten, nicht durch einen
+     Platzhalter ersetzt (Arbeitsregel 36) - sonst maesse dieser Test einen Nachbau. Ohne sie
+     starb er mit "shipModuleSetBonus is not defined"; das ist dieselbe Bausteinlisten-Falle wie
+     in test_protomaterie am selben Tag. */
+  const setTab = (() => { const v = JS.indexOf('  const SHIP_MODULE_SET_DEFS = [');
+                          const b = v < 0 ? -1 : JS.indexOf('\n  ];', v);
+                          return (v >= 0 && b > v) ? JS.slice(v, b + 5) : ''; })();
+  const quelle = setTab + '\n' + fnAus('shipModuleSetTeile') + '\n' + fnAus('shipModuleSetBonus') + '\n'
+    + fnAus('shipSynergyAktiv') + '\n' + fnAus('shipSynergyBonusFor') + '\n' + fnAus('shipModuleBonusFor');
+  check('3a: alle Funktionen gefunden - inklusive der Set-Bausteine', quelle.length > 600
+    && /SHIP_MODULE_SET_DEFS/.test(quelle) && /function shipModuleSetBonus/.test(quelle), quelle.length);
   const mach = (ausruestung) => new Function('SHIP_SYNERGY_DEFS', 'equippedShipModulesAt', 'shipModuleInstanceInfo',
     quelle + '\nreturn shipModuleBonusFor;')(SYN, (kl) => ausruestung[kl] || [], () => null);
   const sy = SYN.find(x => x.key === 'konvoi');

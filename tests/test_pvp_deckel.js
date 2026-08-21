@@ -52,11 +52,19 @@ for (const [name, muster] of [
   ['Ueberfall-Schutz',   "Math.max(0.4, 1 - moduleBonusAt(targetPlanet, 'raidloss')"]
 ]) check('1: der harte Deckel bei ' + name.padEnd(24) + ' ist entfernt', !JS.includes(muster));
 
-// Und die Gegenrichtung: Der Huellen-Bonus MUSS hart bleiben, solange der Server ihn nicht kennt.
-// Faellt diese Pruefung, hat jemand ihn einseitig umgestellt.
-check('1: der Huellen-Bonus bleibt hart (der Server kennt ihn nicht)',
-  JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))") &&
-  !/'hull'/.test(BE), { imBackend: /'hull'/.test(BE) });
+/* Und die Gegenrichtung: Der Huellen-Bonus MUSS hart gedeckelt bleiben - jetzt auf BEIDEN Seiten.
+   Hier stand bis zum 21.08.2026 "solange der Server ihn nicht kennt" mit der Pruefung, dass 'hull'
+   im Backend GAR NICHT vorkommt. Das war richtig und ist ueberholt: Seit der Angleichung der
+   Flottenverteidigung rechnet der Server den Huellen-Bonus mit (er hatte dem Verteidiger vorher
+   bis zu 100 % unterschlagen). Die Pruefung ist damit nicht schwaecher geworden, sondern
+   STAERKER - aus "eine Seite kennt ihn nicht" wird "beide deckeln ihn gleich hart".
+   Faellt sie, hat jemand eine der zwei Seiten einseitig auf den weichen Deckel umgestellt, und
+   Anzeige und Kampf laufen wieder auseinander. */
+check('1: der Huellen-Bonus ist auf BEIDEN Seiten hart gedeckelt',
+  JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))")
+  && /Math\.min\(1\.0, huelle\[klasse\] \|\| 0\)/.test(BE),
+  { frontend: JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))"),
+    backend: /Math\.min\(1\.0, huelle\[klasse\] \|\| 0\)/.test(BE) });
 
 // ---- 2) PARITAET: beide Fassungen ausgefuehrt und verglichen
 if (hatBackend){

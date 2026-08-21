@@ -133,8 +133,21 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
   check('6d: der Server liest den Wurf identisch (104 -> 1.04, ohne Token -> 1, geklammert)',
     Math.abs(srvWert('waffen:selten:1:prod15.w104') - 1.04) < 1e-9 &&
     srvWert('waffen:selten') === 1 && Math.abs(srvWert('x:y:1:w999') - 1.1) < 1e-9);
-  check('6e: BEIDE Nachrechnungsstellen multiplizieren den Wurf (PvP-Kampfmodule + Ueberfall-Schutz)',
-    (srv.match(/\* moduleWertMultServer\(instKey\);/g) || []).length === 2);
+  /* Hier stand eine ZAHL ("=== 2"), und sie ist am 21.08.2026 gefallen, als mit der Angleichung
+     der Flottenverteidigung eine DRITTE, voellig richtige Nachrechnungsstelle dazukam. Ein Zaehler
+     ist eine Momentaufnahme (Arbeitsregel 33): Er kann nicht zwischen "eine Stelle vergisst den
+     Wurf" und "es gibt eine Stelle mehr" unterscheiden.
+     Geprueft wird deshalb die REGEL: JEDE Stelle, die den Modulwert aus Basis und Seltenheit
+     zusammensetzt, muss auch den Wurf mitnehmen - sonst zaehlte der gewuerfelte Hauptwert dort
+     nicht, und der Server rechnete anders als die Anzeige. Der Fehlschlag nennt die Zeile. */
+  const rarityStellen = srv.split('\n')
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(x => /MODULE_RARITY_MULT\[rarity\]/.test(x.z));
+  check('6e-vorab: es gibt ueberhaupt Stellen, die den Modulwert zusammensetzen',
+    rarityStellen.length >= 2, { anzahl: rarityStellen.length });
+  const ohneWurf = rarityStellen.filter(x => !/moduleWertMultServer/.test(x.z))
+    .map(x => 'Zeile ' + x.nr + ': ' + x.z.trim().slice(0, 90));
+  check('6e: JEDE Nachrechnungsstelle multipliziert den Wurf mit', ohneWurf.length === 0, ohneWurf);
 }
 
 // ---- 7) Hilfe (zweite Anzeigestelle)

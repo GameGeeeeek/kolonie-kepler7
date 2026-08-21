@@ -7190,8 +7190,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.604.0';
+  const VERSION = '8.605.0';
   const PATCHNOTES = [
+    { version:'8.605.0', date:'21.08.2026', changes:[
+      '<strong>Neu: Klassen-Sets für die Schiffsmodule.</strong> Jede der acht Schiffsklassen hat jetzt ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – additiv zu den Modulen selbst. Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.',
+      '<strong>Das volle Set kostet alle drei Slots – und das ist die Entscheidung.</strong> Eine Klasse hat höchstens drei Plätze. Wer das Set komplettiert, verzichtet auf den freien Platz für ein Abgrund-Modul oder einen anderen Kanal; wer bei zwei Teilen bleibt, behält ihn. Ein Set ist deshalb keine reine Zugabe.',
+      '<strong>Behoben: Der Server rechnete deine Flottenverteidigung anders aus, als dein Spiel sie anzeigt.</strong> Gemessen an einer Flotte aus 200 Schlachtschiffen, 300 Kreuzern, 200 Zerstörern und 100 Metamaterial-Titanen schrieb er dir ohne Module <strong>47% zu viel</strong> gut und mit Modulen <strong>25% zu wenig</strong> – die beiden Fehler haben einander verdeckt. Vier Ursachen: eine erfundene Schild-Basis für die 34 Schiffstypen ohne eigenen Schildwert, fehlende Hüllen- und Schildmodule, fehlende Kampfforschung am Flottenanteil und Jäger, die ohne Trägerhangar mitzählten.',
+      '<strong>Was das für dich heißt:</strong> Verteidigung ist ab jetzt <em>modulabhängig</em>. Wer seine Klassen ausgerüstet hat, steht im Kampf spürbar besser da als bisher – wer keine Module eingebaut hat, schlechter. Anzeige und Kampf sagen dafür zum ersten Mal dasselbe.'
+    ] },
     { version:'8.604.0', date:'21.08.2026', changes:[
       '<strong>Die Füllbalken im Kartenmenü sehen jetzt überall gleich aus.</strong> Zwei Auslieferungen zuvor hatten Alien-Nest und Asteroidenfestung schmale Balken mit Beschriftung bekommen – daneben, im selben Menü, zeichnet der Asteroiden-Vorrat seit Längerem einen breiten. Zwei Formen für dieselbe Sache. Es ist jetzt die breite, und der Prozentwert steht in der Zeile darüber, wo bei der Angriffs-Vorschau ohnehin schon einer stand.',
       'Der Anlass war ein Blick auf den eigenen Bildschirm: Die Beschriftung lautete bei allen drei Festungsbalken „Rest" und unterschied sie damit überhaupt nicht – und genau das war der einzige Grund gewesen, die schmale Form zu wählen. Am Asteroiden ändert sich nichts Sichtbares; er zeichnet nur nicht mehr sein eigenes Markup, sondern benutzt dieselbe Stelle wie alle anderen.'
@@ -26199,6 +26205,122 @@
     // doppelt falsch: Es hat gar keinen Prozentwert (base:1 = ein Bann je Tauchgang), die
     // Slot-Karte zeigte aber "+100% drucklot".
     drucklot:'Mutator-Bann je Tauchgang', ballast:'gerettete Beute bei verlorenem Tauchgang' };
+  /* ===== Klassen-Sets fuer die Schiffsmodule (21.08.2026, Auftrag Sascha) ====================
+     Der Auftrag lautete "findbare Module die zusammen set Bonus geben". Set-Boni gab es im Spiel
+     schon - aber ausschliesslich bei den STANDORT-Modulen (MODULE_SET_DEFS) und den Boss-Sets.
+     Die 44 Schiffsklassen-Module hatten keinen einzigen (gemessen: 0 Treffer).
+
+     WARUM BESTIMMTE SCHLUESSEL UND NICHT "N BELIEBIGE". Der erste Entwurf wollte nach ANZAHL
+     staffeln, wie die Boss-Sets. Gemessen ist das hier keine Entscheidung: `equipShipModule`
+     verbietet zwei Module desselben TYPS an einer Klasse ("je Typ ist nur EIN Modul erlaubt"), es
+     gibt also gar keine Stapel-Alternative - "zwei beliebige" waere schlicht eine Belohnung dafuer,
+     einen zweiten Slot gekauft zu haben. Mit benannten Schluesseln entsteht die Wahl: Bei drei
+     Slots (SHIP_MODULE_MAX_SLOT_LEVEL) kostet das volle Set ALLE drei, die Zwischenstufe laesst
+     einen Platz frei - fuer ein Abgrund-Modul, ein Event-Stueck oder einen anderen Kanal.
+
+     WELCHE KANAELE UEBERHAUPT WIRKEN, vorher gemessen statt angenommen (Arbeitsregel 59 - ein
+     Tabellenfeld, das nur der Anzeigetext liest, ist keine Mechanik):
+       hull/shield/speed/fuel  -> ALLE Klassen (generisch ueber `cls`)
+       atk                     -> NUR schlachtschiff und raffiniert
+       cargo                   -> NUR frachter
+       siegechance             -> im Frontend gar nicht (nur serverseitig beim Mondangriff)
+     Deshalb traegt kein Set einen Kanal, den seine Klasse nicht verbraucht. Der Mondzerstoerer
+     bekommt bewusst KEIN atk: Der Server verbraucht es, das Frontend nicht - die Vorschau wuerde
+     eine Wirkung verschweigen, die im Kampf eintritt.
+
+     ABGRUND-MODULE (ab_*) STEHEN IN KEINEM SET. Sie haben eine eigene Herkunft und eigene
+     Sonderkanaele; ein Set, das eines verlangt, waere fuer jeden unerreichbar, der nicht taucht.
+     Die Event-Flotte ist die eine Ausnahme, bei der ALLE Module Event-Stuecke sind - dort ist das
+     Set zwangslaeufig eine Event-Sammlung, und der Text sagt das.
+
+     PvP: `atk`, `hull` und `shield` entscheiden Kaempfe. Die Tabelle liegt deshalb als Kopie in
+     server.js; tests/test_schiffsmodul_paritaet.js haelt beide Seiten zusammen. */
+  const SHIP_MODULE_SET_DEFS = [
+    { key:'linienschiff', klasse:'schlachtschiff', name:'Linienschiff-Doktrin', icon:'ti-shield',
+      req:['ss_panzerung','ss_zielcomputer','ss_schildverstaerker'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ atk:0.06 } }],
+      desc:'Panzerung, Zielcomputer und Schildverstärker zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +6% Angriff. Additiv zu den Modulen selbst.' },
+    { key:'handelskonvoi', klasse:'frachter', name:'Handelskonvoi', icon:'ti-truck',
+      req:['fr_frachtraum','fr_treibstoff','fr_triebwerke'],
+      stufen:[{ teile:2, bonuses:{ cargo:0.10 } }, { teile:3, bonuses:{ fuel:0.08 } }],
+      desc:'Frachtraum, Treibstoffoptimierung und Triebwerke zusammen: ab zwei Teilen +10% Laderaum, mit allen dreien zusätzlich +8% Treibstoffersparnis.' },
+    { key:'spaehverband', klasse:'aufklaerer', name:'Spähverband', icon:'ti-antenna-bars-5',
+      req:['au_sensoren','au_tarnmodul','au_scanner'],
+      stufen:[{ teile:2, bonuses:{ speed:0.10 } }, { teile:3, bonuses:{ fuel:0.08 } }],
+      desc:'Langstreckensensoren, Tarnmodul und Scanner zusammen: ab zwei Teilen +10% Tempo, mit allen dreien zusätzlich +8% Treibstoffersparnis.' },
+    { key:'belagerungsflotte', klasse:'mondzerstoerer', name:'Belagerungsflotte', icon:'ti-planet',
+      req:['mz_huelle','mz_schildmatrix','mz_antrieb'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Verstärkte Hülle, Schildmatrix und Antriebsoptimierung zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'singularitaet', klasse:'raffiniert', name:'Singularitäts-Synthese', icon:'ti-atom',
+      req:['t2_kristallhuelle','t2_singularitaetsfokus','t2_quantenkondensator'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ atk:0.06 } }],
+      desc:'Kristallmatrix-Hülle, Fokusarray und Quantenfeld-Kondensator zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +6% Angriff. Alle drei werden in der Tier-2-Fertigung hergestellt.' },
+    { key:'schwarmtaktik', klasse:'jagdgeschwader', name:'Schwarmtaktik', icon:'ti-rocket',
+      req:['jg_leichtbau','jg_staffelpanzer','jg_deflektor'],
+      stufen:[{ teile:2, bonuses:{ speed:0.10 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Leichtbau-Zelle, Staffel-Panzerung und Geschwader-Deflektor zusammen: ab zwei Teilen +10% Tempo, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'sturmlinie', klasse:'schwerelinie', name:'Sturmlinie', icon:'ti-sword',
+      req:['sl_kompositpanzer','sl_schildgitter','sl_marschtriebwerk'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Komposit-Panzerung, Schildgitter und Marschtriebwerke zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'beutezug', klasse:'eventflotte', name:'Beutezug-Ausrüstung', icon:'ti-box',
+      req:['ev_enterhaken','ev_risskern','ev_phasenfeld'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ speed:0.10 } }],
+      desc:'Enterhaken, Riss-Kern und Phasenfeld-Stabilisator zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +10% Tempo. Alle drei sind Event-Stücke – dieses Set sammelt sich über mehrere Events.' }
+  ];
+  // Wie viele Teile des Sets einer Klasse sind gerade ausgerüstet? (Der Typ, nicht die Instanz -
+  // equipShipModule verbietet zwei Module desselben Typs ohnehin.)
+  function shipModuleSetTeile(klasse){
+    const def = SHIP_MODULE_SET_DEFS.find(s => s.klasse === klasse);
+    if (!def) return { def:null, teile:0 };
+    const typen = equippedShipModulesAt(klasse).map(k => String(k).split(':')[0]);
+    return { def, teile: def.req.filter(r => typen.indexOf(r) >= 0).length };
+  }
+  /* Der Set-Bonus fliesst in shipModuleBonusFor() ein und damit AUTOMATISCH in jede Verbrauchs-
+     stelle - Tempo, Treibstoff, Laderaum, Huelle, Schild, Angriff. Eine eigene Addition an jeder
+     Rechenstelle waere die uebliche zweite Wahrheit, die beim naechsten Umbau auseinanderlaeuft. */
+  function shipModuleSetBonus(klasse, effect){
+    const { def, teile } = shipModuleSetTeile(klasse);
+    if (!def) return 0;
+    let sum = 0;
+    for (const st of def.stufen) if (teile >= st.teile) sum += (st.bonuses[effect] || 0);
+    return sum;
+  }
+
+  /* Die Anzeige des Klassen-Sets - eine eigene Funktion, damit sie ohne den ganzen Renderer
+     messbar ist (tests/test_schiffsmodul_sets.js fuehrt sie mit echten Tabellen aus).
+     Sprache und Aufbau sind bewusst dieselben wie bei den Synergien im selben Panel: aktive
+     Stufen gruen mit ihrer Wirkung, die naechste gedimmt mit dem konkret fehlenden Teil - und
+     ohne ein einziges eingebautes Teil GAR NICHTS, sonst stuende dort eine Dauerzeile fuer jeden,
+     der die Klasse noch nicht ausbaut.
+     Ein Set ohne Anzeige waere eine versteckte Mechanik: Der Spieler koennte nicht erkennen,
+     warum sich sein Angriffswert aendert, wenn er ein Modul tauscht. */
+  function shipModuleSetZeilenHtml(klasse, equipped){
+    const sDef = SHIP_MODULE_SET_DEFS.find(x => x.klasse === klasse);
+    if (!sDef) return '';
+    const typen = (equipped || []).map(k => String(k).split(':')[0]);
+    const drin = sDef.req.filter(r => typen.indexOf(r) >= 0);
+    if (!drin.length) return '';
+    const wirkung = (b) => Object.keys(b).map(e =>
+      (e === 'fuel' ? '−' : '+') + Math.round(b[e]*100) + '% ' + (SHIP_MODULE_EFFECT_LABEL[e] || e)).join(' · ');
+    const modName = (k) => (SHIP_MODULE_DEFS.find(x => x.key === k) || {}).name || k;
+    const aktiv = sDef.stufen.filter(st => drin.length >= st.teile);
+    const offen = sDef.stufen.find(st => drin.length < st.teile);
+    let out = '';
+    if (aktiv.length){
+      out += `<div class="bmeta" style="color:#5dcaa5; margin-bottom:4px;"><i class="ti ${sDef.icon}" aria-hidden="true"></i> `
+           + `Set „${escapeHtml(sDef.name)}" · ${drin.length}/${sDef.req.length} Teile · `
+           + escapeHtml(aktiv.map(st => wirkung(st.bonuses)).join(' · ')) + `</div>`;
+    }
+    if (offen){
+      const fehlt = sDef.req.filter(r => typen.indexOf(r) < 0).map(modName).join(', ');
+      out += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ${sDef.icon}" aria-hidden="true"></i> `
+           + `Set „${escapeHtml(sDef.name)}": mit ${escapeHtml(fehlt)} dazu ${escapeHtml(wirkung(offen.bonuses))}</div>`;
+    }
+    return out;
+  }
+
   function shipModuleEffectLabel(effect){ return SHIP_MODULE_EFFECT_LABEL[effect] || effect; }
   // Nicht jeder Moduleffekt ist ein Prozentwert. Das Drucklot wird als Ja/Nein gelesen
   // (drucklotAktiv: abgrundSchiffsmodul(...) > 0) und hat base:1 - die Anzeige rechnete daraus
@@ -27538,6 +27660,11 @@
     // Synergien (v8.437.0): ebenfalls atk-frei (nur speed/fuel/cargo, siehe SHIP_SYNERGY_DEFS) -
     // die PvP-Paritaets-Aussage der Zeile darueber bleibt damit unveraendert wahr.
     sum += shipSynergyBonusFor(klasse, effect);
+    /* Klassen-Set (21.08.2026): Hier und NUR hier, damit jede Verbrauchsstelle ihn automatisch
+       bekommt. Anders als Substats und Synergien traegt er auch `atk` - die Aussage der zwei
+       Kommentare darueber ("atk-frei, PvP-Paritaet bleibt") gilt fuer SIE weiterhin, aber nicht
+       mehr fuer diese Funktion als Ganzes: server.js fuehrt die Set-Tabelle deshalb als Kopie. */
+    sum += shipModuleSetBonus(klasse, effect);
     return sum;
   }
   /* Klassen-Vorlagen (v8.447.0, Task #38): das Standort-Vorlagen-System (drei Profile A/B/C,
@@ -40540,6 +40667,7 @@
       { title:'Reliquien – was ein Wächter zurücklässt', body:'Jeder der zwölf Wächter lässt beim <strong>ersten</strong> Sieg seine eigene <strong>Reliquie</strong> zurück: ein benanntes, gezeichnetes Stück mit einem Satz darüber, was es war. Der <em>Kalte Anker</em> hinterlässt einen Ankerstein, der <em>Zählende</em> ein Zählwerk, das ihn nicht mehr anhalten lässt, die <em>Schwelle</em> eine Navigationstafel, auf der die Rückflugbahn fehlt – nicht gelöscht, nie eingetragen. Ab dem zweiten Sieg über denselben Wächter fällt wieder ein Modul wie bisher; du verlierst also nichts. Die zwölf Reliquien stehen im <strong>Reliquienkabinett</strong> unter der Sektorkarte, und die leeren Plätze sind dort genauso sichtbar wie die vollen. Jede gibt einen kleinen Bonus in einem der vier Kanäle, die auch die Werkstatt bedient (Kampfkraft, Schiffsverluste, Splitter, Beute) – <strong>addiert</strong> zu den Werkstatt-Stufen, nicht multipliziert, und je Kanal gedeckelt. Dazu vier <strong>Satz-Boni</strong> bei 3, 6, 9 und 12 gesammelten Stücken. Die zwölfte Reliquie liegt in <strong>Tiefe 120</strong>; danach wiederholen sich die Wächter, und das Kabinett bleibt vollständig.' },
       { title:'Ausrüstung aus der Tiefe – vier Standortmodule', body:'Vier Standortmodule fallen <strong>ausschließlich bei Tauchgängen</strong>: nicht im Markt, nicht bei Expeditionen, nicht aus Kisten, nicht als Allianz-Belohnung. Wirken tun sie dafür <strong>oben, im normalen Spiel</strong> – sie sind der Grund abzutauchen, nicht die Belohnung dafür, unten zu bleiben.<br><br><strong>Drucktank</strong> erhöht die Lagerkapazität, und seine Wirkung wächst als einzige im Spiel mit deiner <strong>Rekordtiefe</strong>: bei Tiefe 40 doppelt, ab Tiefe 120 vierfach (dort ist Schluss). Ein früh gefundener Drucktank wird von selbst besser.<br><strong>Echolotmast</strong> verlängert die Frist aufgefangener <strong>Peilungen</strong> um bis zu +150% (statt der üblichen zwei Stunden), imperiumsweit. Die Frist steht beim Auffangen fest – bereits liegende Peilungen behalten ihre.<br><strong>Splitterofen</strong> schmilzt nach jedem gewonnenen Tauchgang zusätzlich <strong>Modulfragmente</strong> in Höhe von 30% des Bergungsguts (gedeckelt bei 100%). Das Bergungsgut bleibt dir vollständig – er nimmt nichts weg, er gibt etwas dazu.<br><strong>Nullfeldanker</strong> verstärkt die Verteidigung eines Standorts, aber <strong>nur gegen NPC-Angriffe</strong> und <strong>nur bei Unterzahl</strong>: Bei gleicher Stärke tut er nichts, bei doppelter Übermacht des Angreifers wirkt er voll (bis +50%). Gegen echte Spieler wirkt er ausdrücklich nicht. Sein Beitrag steht erst fest, wenn die Stärke des Angreifers bekannt ist – er erscheint deshalb <strong>nicht</strong> in deiner angezeigten Verteidigungssumme, sondern im Überfallbericht.<br><br><strong>Fundchance:</strong> rund 8% je gewonnenem Tauchgang in Tiefe 1, steigend bis 35% ganz unten, bei Wächtern doppelt. Auch die <strong>Seltenheit</strong> hängt an der Tiefe – ein Modul aus Tiefe 5 ist gewöhnlich, eins aus Tiefe 60 meist episch. Der Fund hängt bewusst nicht am Wächter, damit der Abgrund auch für eine kleinere Flotte etwas hergibt.' },
       { title:'Die zweite Fundstufe – ab Tiefe 40', body:'Seit dem 31.07.2026 gibt es <strong>sechs weitere Module aus der Tiefe</strong>, und sie fallen erst <strong>ab Tiefe 40</strong>. Das ist Absicht: Wären sie von Anfang an im selben Topf, wäre jedes der zehn bekannten schlagartig um ein Drittel seltener geworden, ohne dass jemand etwas dafür bekommt. So zerfällt der Abstieg in zwei Abschnitte – bis 39 die bekannten zehn, ab 40 kommen sechs dazu. Die Fundchance je Tauchgang ändert sich dadurch nicht.<br><br><strong>Vier Standortmodule, die oben wirken:</strong><br><strong>Taktschmiede</strong> verkürzt die <em>Umbauzeit von Werftmarken</em> (bis −35%, imperiumsweit) – und nur die; der normale Schiffsbau bleibt beim Werftmodul.<br><strong>Krustenpresse</strong> verkürzt eine <em>Terraforming-Stufe</em> (bis −30%). Sie wirkt nur an ihrem eigenen Standort, weil Terraforming ein Vorhaben je Standort ist.<br><strong>Wrackleser</strong> erhöht, was deine <em>Recycler aus Trümmerfeldern</em> holen (bis +45%, imperiumsweit). Er vergrößert das Feld nicht, nur die Abbaurate.<br><strong>Prisenwaage</strong> erhöht das <em>Prisengut</em> gekaperter Schiffe (bis +40%, imperiumsweit). Auf Kaperplätze und Enterchance wirkt sie ausdrücklich nicht – nur auf den Erlös.' },
+      { title:'Klassen-Sets – drei bestimmte Module derselben Klasse', body:'Jede der '+SHIP_MODULE_SET_DEFS.length+' Schiffsklassen hat ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – beides <strong>additiv</strong> zu den Modulen selbst. Weil eine Klasse höchstens drei Slots hat, kostet das volle Set alle drei: Die Zwischenstufe lässt dir einen Platz frei, etwa für ein Abgrund-Modul oder einen anderen Kanal. Das ist die eigentliche Entscheidung – ein Set ist keine reine Zugabe, sondern ein Verzicht auf Vielseitigkeit.<br><br>'+SHIP_MODULE_SET_DEFS.map(sd => { const cn = (SHIP_CLASS_DEFS.find(c=>c.key===sd.klasse)||{}).name || sd.klasse; const wirk = sd.stufen.map(st => st.teile+' Teile: '+Object.keys(st.bonuses).map(e => (e==='fuel'?'−':'+')+Math.round(st.bonuses[e]*100)+'% '+(SHIP_MODULE_EFFECT_LABEL[e]||e)).join(' und ')).join(' · '); return '<strong>'+cn+'</strong> – „'+sd.name+'": '+wirk; }).join('<br>')+'<br><br>Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.' },
       { title:'Drucklot und Ballastspiegel – die zwei Schiffsmodule der zweiten Fundstufe', body:'Beide fallen wie die vier Standortmodule erst <strong>ab Tiefe 40</strong> und wirken ausschließlich im Abgrund. Sie sind bewusst <em>Entscheidungen</em> statt Prozentwerten: Kampfkraft, Verluste, Beute, Splitter und Anflug sind durch die sechs Schiffsmodule von v8.335.0 und die neun Tiefenschiffe längst belegt.<br><br><strong>Drucklot</strong> (Tier-2-Schiffe) schenkt dir vor jedem Tauchgang <em>einen Bann</em>: Du streichst einen Mutator des Sektors, ohne eine Gegenmaßnahme zu verbrauchen. Es benutzt dieselben Knöpfe wie die gekaufte Gegenmaßnahme und geht ihr vor, damit dein Vorrat nicht unbemerkt aufgebraucht wird. Es <em>stapelt nicht</em> – ein zweites Drucklot streicht keinen zweiten Mutator.<br><strong>Ballastspiegel</strong> (Frachter) rettet bei einem <em>verlorenen</em> Tauchgang bis zu 40% der Rohstoffbeute, die ein Sieg gebracht hätte – begrenzt durch deinen Frachtraum wie bei einem Sieg. Abgrundsplitter, Bergungsgut, Modul- und Gegenstandsfunde bleiben dem Sieg vorbehalten. Er macht Erfolg nicht stärker, sondern Scheitern weniger bitter.<br><br><strong>Keins der sechs lässt sich nachbauen.</strong> Weder aus Modulfragmenten noch in der Mythischen Schmiede – wie schon die ersten zehn sind sie ausschließlich Tauchbeute.<br><br><strong>Keins der sechs lässt sich nachbauen.</strong> Weder aus Modulfragmenten noch in der Mythischen Schmiede – wie schon die ersten zehn sind sie ausschließlich Tauchbeute.' },
       { title:'Die Tiefenflotte – Schiffe, die nach unten gehören', body:'Neun Schiffe lassen sich bauen, sobald du tief genug warst – freigeschaltet über deine <strong>Rekordtiefe</strong>, bezahlt in <strong>Bergungsgut</strong>. Sie kommen in drei Staffeln: Die erste macht den Abstieg machbar, die zweite macht ihn steuerbar, die dritte geht die drei Härten an, die bis dahin unverhandelbar waren.<br><br>Was ein einzelnes Schiff bringt, steht auf seiner Karte in der <strong>Werft</strong> – die Balken für Angriff, Abwehr und Schild stehen bei allen neun auf null, die Wirkung liegt vollständig in der Zeile darüber. Derselbe Text steht auch im Abgrund unter „Bau" hinter „Was es bringt".<br><br><strong>Staffel I</strong><br><strong>Lotsenboot</strong> (ab Tiefe 10) verkürzt den Anflug jedes Tauchgangs und erweitert die Reichweite der Tiefensonde um eine Tiefe. Es ist ein Auge, keine Waffe.<br><strong>Kessel</strong> (ab Tiefe 10) senkt die eigenen Schiffsverluste, je mehr davon mitfliegen. Er gewinnt keinen Kampf, er bringt die Flotte heim.<br><strong>Bergungskran</strong> (ab Tiefe 15) trägt weit mehr Ladung als ein Großer Frachter <em>und</em> hebt die geborgene Rohstoffmenge. Ohne ihn bleibt ab mittlerer Tiefe ein Teil der Beute im Sektor liegen.<br><br><strong>Im PvP zählen sie nicht.</strong> Deine Angriffs- und Verteidigungspunkte werden aus einer festen Liste von Schiffstypen gebildet, in der die Tiefenflotte nicht steht – sie kann dort also gar nicht auftauchen. Das ist Absicht: Abtauchen soll dich unten stärker machen, nicht gegen andere Spieler. Aus demselben Grund tragen alle neun weder Angriffs- noch Verteidigungswert.<br><br><strong>Mitfliegen:</strong> Im Flottenwahl-Feld des Tauchgangs stehen sie als eigene Zeilen, standardmäßig voll ausgewählt. Verluste treffen weiterhin nur die Kampfflotte – die Tiefenschiffe kehren zurück. Mindestens ein Kampfschiff bleibt Pflicht.' },
       { title:'Tiefenflotte, Staffel II – gegen die Sektorbedingungen', body:'Die zweite Staffel ist nicht stärker als die erste, sie arbeitet gegen die <strong>Mutatoren</strong> des Sektors – die einzige Sorte Gegner, die es unten wirklich gibt.<br><br><strong>Presslufthai</strong> (ab Tiefe 40) ist das einzige Tiefenschiff mit Kampfkraft, und seine Stärke hängt am <em>Ort</em> statt an seiner Bauart: In geringer Tiefe schwächer als ein Jäger, ab Tiefe 80 die wirksamste Waffe, die du mitnehmen kannst. Damit hängt deine Flottenwahl zum ersten Mal davon ab, wie tief du gehst.<br><strong>Ankerwerfer</strong> (ab Tiefe 50) dämpft alle Sektorbedingungen, die den Anflug verlängern – Gravitationstrichter, Resonanzader, Magnetklemme, Kristallschlund. Er nimmt nur den <em>Aufschlag</em>: unter die normale Flugzeit drückt er nie, und einen verkürzenden Sektor lässt er in Ruhe.<br><strong>Echoschnitter</strong> (ab Tiefe 55) hebt die Splitterausbeute jedes gewonnenen Tauchgangs. Er zahlt sich über Wochen aus und ist der erste Grund, eine bequeme Tiefe noch einmal zu tauchen, statt immer nur tiefer zu wollen.<br><br>Auch diese drei zählen <strong>im PvP nicht</strong> – ausdrücklich auch der Presslufthai: Seine Kampfkraft liegt vollständig in der Abgrund-Rechnung und taucht in keiner Angriffs- oder Verteidigungszahl auf.<br><br>Die verkürzte Anflugzeit von Lotsenboot und Ankerwerfer siehst du schon in der Vorschau am Sektor, bevor du startest.' },
@@ -64018,8 +64146,9 @@
             synHtml += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ${syn.icon}" aria-hidden="true"></i> Synergie „${syn.name}": nur noch ${fehlt} fehlt für ${gibtText}</div>`;
           }
         }
-        // Klassen-Umschalter (Module wirken klassenweit - hier wählt man, welche Klasse man bearbeitet).
-        let html = (synHtml ? `<div style="margin-bottom:10px;">${synHtml}</div>` : '') + `<div data-hscroll="shipmodcls" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        const setHtml = shipModuleSetZeilenHtml(klasse, equipped);
+    // Klassen-Umschalter (Module wirken klassenweit - hier wählt man, welche Klasse man bearbeitet).
+        let html = (synHtml || setHtml ? `<div style="margin-bottom:10px;">${setHtml}${synHtml}</div>` : '') + `<div data-hscroll="shipmodcls" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
         html += SHIP_CLASS_DEFS.map(c => {
           const active = c.key===klasse;
           const eq = equippedShipModulesAt(c.key).length, sl = shipModuleSlotCount(c.key);
