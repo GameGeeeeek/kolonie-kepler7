@@ -58,7 +58,13 @@ function backend(store) {
     const p = req.url().split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok: true });
-    if (p === 'galaxy') return j({ alienNester: NESTER });
+    /* Das Wurmloch gehoert in die Fixture, seit GR-1 (21.08.2026) das Portal eine eigene
+       Beschriftung hat. Sie ist ein text.planet-label wie jede andere, liegt aber AUSSERHALB der
+       <g data-map-wurmloch>-Gruppe - fuer kbLabelsEntflechten also eine FREISTEHENDE Beschriftung
+       ohne eigenes Objekt (Richtung nach unten, kein Ausnahme-Abstand zum eigenen Objekt). Ohne
+       sie misst dieser Test einen Fall weniger, als das Spiel kennt, und die neue Beschriftung
+       koennte andere verdraengen, ohne dass es je auffaellt. */
+    if (p === 'galaxy') return j({ alienNester: NESTER, activeWormhole: { from: 'kepler', to: 'vega' } });
     if (p === 'me') return j({ userId: 'u', username: 'A', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
     if (p.startsWith('storage/')) {
       const k = decodeURIComponent(p.slice(8));
@@ -147,7 +153,19 @@ async function messe(page) {
     // Größter Abstand eines Labels zu SEINEM Objekt - die Kennzahl für die Zuordnung.
     const weiteste = texte.filter(t => t.abstandZumEigenen !== null)
       .sort((a, b) => b.abstandZumEigenen - a.abstandZumEigenen)[0] || null;
-    return { texte: texte.length, aufScheibe, aufMarker, textPaare, markerAufScheibe,
+    /* Form der ZEICHNUNG in Sektor-Einheiten (rund ~0,8 gegen flach ~0,35), aus den echten
+       Planetenknoten statt aus einer Konstante: getBBox() liefert in der transformierten
+       Systemgruppe genau die Koordinaten von kbOrbitMass. Traegt die Vorab-Pruefung, dass die
+       drei Formfaktoren wirklich verschiedene Zeichnungen messen. */
+    const formKnoten = [...svg.querySelectorAll('.planet-node[data-planet]')];
+    let fx0 = 1e9, fx1 = -1e9, fy0 = 1e9, fy1 = -1e9;
+    for (const k of formKnoten){ let b; try { b = k.getBBox(); } catch (e) { continue; }
+      fx0 = Math.min(fx0, b.x); fx1 = Math.max(fx1, b.x + b.width);
+      fy0 = Math.min(fy0, b.y); fy1 = Math.max(fy1, b.y + b.height); }
+    const zeichnungVerh = (fx1 > fx0) ? +((fy1 - fy0) / (fx1 - fx0)).toFixed(2) : null;
+
+    return { texte: texte.length, wurmlochLabel: texte.some(t => t.text === 'Wurmloch'), zeichnungVerh,
+             aufScheibe, aufMarker, textPaare, markerAufScheibe,
              weiteste: weiteste ? { text: weiteste.text, eigen: weiteste.eigen, abstand: +weiteste.abstandZumEigenen.toFixed(1) } : null };
   });
 }
@@ -182,8 +200,17 @@ async function messe(page) {
   // Scheibe) plus Reserve - siehe Prüfung 4.
   const ABSTAND_MAX = 48;
 
+  /* DREI Formfaktoren, nicht zwei - und der dritte ist seit KB-20 noetig.
+     Bis dahin gab es genau zwei Zeichnungen und sie hingen an der Fensterbreite: schmal = rund,
+     breit = flach. Seit KB-20 entscheidet kbRunderKasten() ueber das Verhaeltnis des KASTENS,
+     und damit bekommt der bisherige PC-Lauf bei 1280x900 die RUNDE Zeichnung (gemessen: Kasten
+     738x725, Verhaeltnis 0,98; Zeichnung 287x233 Sektor-Einheiten, also 0,81). Die FLACHE
+     Zeichnung, fuer die dieser Test urspruenglich kalibriert wurde, maesse danach niemand mehr.
+     1920x700 liegt im flachen Band (Zielhoehe 525 gegen 1258 Kastenbreite = 0,42) - derselbe
+     Formfaktor, den test_kartengroesse Abschnitt 5 als PAAR prueft. */
   for (const [name, viewport, mobil] of [['Handy', { width: 390, height: 844 }, true],
-                                         ['PC', { width: 1280, height: 900 }, false]]) {
+                                         ['PC', { width: 1280, height: 900 }, false],
+                                         ['PC flach', { width: 1920, height: 700 }, false]]) {
     const ctx = await browser.newContext(Object.assign({ viewport }, mobil ? { hasTouch: true, isMobile: true, deviceScaleFactor: 2 } : {}));
     const page = await ctx.newPage();
     const fehler = [];
@@ -218,6 +245,25 @@ async function messe(page) {
     check(`0-vorab: ${name} - alle Zielsysteme geöffnet und beschriftet`,
       offen.length === ziele.length && offen.every(e => e.texte >= 4),
       ergebnisse.map(e => ({ s: e.system, offen: !e.nichtGeoeffnet, texte: e.texte })));
+
+    /* Und das Wurmloch-Label ist wirklich dabei. Ohne diese Zeile bliebe eine entfernte
+       activeWormhole-Fixture unbemerkt, und der Test maesse still einen Fall weniger, als das
+       Spiel kennt - genau die Sorte stiller Luecke, die KB-19 an diesem Test aufgedeckt hat.
+       Gemessen mit der Fixture: kepler 12 -> 13 Texte, vega 7 -> 8 (die zwei Endpunkte des
+       Wurmlochs). */
+    const mitWurmloch = offen.filter(e => e.wurmlochLabel).map(e => e.system);
+    check(`0-vorab: ${name} - das Wurmloch-Portal traegt seine Beschriftung und wird mitgemessen`,
+      mitWurmloch.length >= 1, { mitWurmloch, texteJeSystem: offen.map(e => e.system + ':' + e.texte) });
+
+    /* Und dieser Formfaktor zeichnet wirklich das, was sein Name sagt. Ohne die Zeile waere "PC
+       flach" ein stilles Duplikat von "PC", sobald jemand die Schwelle kbRunderKasten() oder den
+       Viewport verschiebt - und der Test haette wieder nur eine der zwei Zeichnungen abgedeckt.
+       Gemessen: rund 0,81, flach 0,35; die Schranke 0,5 ist dieselbe, die kbRunderKasten benutzt. */
+    const verh = offen.map(e => e.zeichnungVerh).filter(v => v !== null);
+    const rundErwartet = name !== 'PC flach';
+    check(`0-vorab: ${name} - die Zeichnung ist ${rundErwartet ? 'rund' : 'flach'}`,
+      verh.length === offen.length && verh.every(v => rundErwartet ? v > 0.5 : v < 0.5),
+      { verhaeltnisse: verh, erwartet: rundErwartet ? '> 0,5 (rund)' : '< 0,5 (flach)' });
 
     // Genau EINE dokumentierte Ausnahme: "Deine Basis" auf Rhea im Heimatsystem. Dort ist innerhalb
     // des erlaubten Versatzes wirklich kein freier Platz (gemessen), und der Durchgang lässt das

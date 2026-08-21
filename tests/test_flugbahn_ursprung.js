@@ -133,14 +133,55 @@ function backend(store) {
   // VERSCHOBENE Marker ist (kbMarkerFrei, KB-13) und nicht die rohe Slot-Position: Der Schieber
   // rueckt ihn ueber die 50 Einheiten der Rohbahn hinaus.
   const heim = await lies('kepler');
+  /* Wo steht der GEZEICHNETE Heimatmarker? Aus dem DOM abgelesen statt aus einer Zahl - und zwar
+     am MARKER selbst, nicht an seinem Label.
+     KORREKTUR 21.08.2026: Hier wurde das Label gegriffen ("Deine Basis", y minus 20 Einheiten).
+     Das war eine Zeitbombe: kbLabelsEntflechten (KB-16) darf ein Label um bis zu 21 Einheiten
+     senkrecht und 12 seitlich verschieben, waehrend 3b darunter 1,0 Einheiten Toleranz verlangt.
+     Der Test war also nur so lange gruen, wie dieses eine Label zufaellig an seiner natuerlichen
+     Stelle bleibt - und im Heimatsystem am Handy weicht genau dieses aus (in
+     test_kartenbeschriftung als bekannte Ausnahme namentlich hinterlegt).
+     Gegriffen werden die DIREKTEN circle-Kinder der Heimat-Gruppe. Sie tragen alle dieselbe
+     Mitte (hc.x/hc.y). Bewusst nicht ueber einen Radius oder eine Farbe (Hausregel 51: die
+     Textur-Maske in <clipPath> traegt denselben Radius ein zweites Mal) - aber die liegt in
+     einem clipPath und ist damit kein direktes Kind, ebenso der Mondkreis und der Orbitalring,
+     die in eigenen <g> stecken. Die Vorab-Pruefung belegt, dass die Kinder wirklich
+     uebereinstimmen; sonst waere der Griff selbst nur geraten. */
+  const marker = await page.evaluate(() => {
+    const g = document.querySelector('#galaxyMapSvg .planet-node[data-planet="__home__"]');
+    if (!g) return null;
+    const kreise = [...g.querySelectorAll(':scope > circle')]
+      .map(c => ({ x: +c.getAttribute('cx'), y: +c.getAttribute('cy') }))
+      .filter(p => isFinite(p.x) && isFinite(p.y));
+    if (!kreise.length) return null;
+    const streuung = Math.max.apply(null, kreise.map(p =>
+      Math.hypot(p.x - kreise[0].x, p.y - kreise[0].y)));
+    return { x: kreise[0].x, y: kreise[0].y, kreise: kreise.length, streuung: +streuung.toFixed(2) };
+  });
   check('3-vorab: im Heimatsystem liegt genau EINE Missionslinie der Systemebene vor',
     heim.systemLinien === 1 && !!heim.start, heim);
   if (heim.systemLinien === 1) {
     const d = abstand(heim.start);
     check('3: im Heimatsystem startet die Flugbahn weiterhin am Heimatmarker, nicht auf der Sonne',
       d > 20, { start: heim.start, abstandZurSonne: d.toFixed(1) });
-    check('3b: und zwar am kollisionsverschobenen Marker, nicht an der rohen Slot-Position',
-      d > 50.5, { abstandZurSonne: d.toFixed(1), roheSlotBahn: 50 });
+    /* 3b prueft, dass die Linie am GEZEICHNETEN Marker haengt - also an dem, den kbMarkerFrei
+       verschoben hat (KB-13), und nicht an einer daneben gerechneten Position.
+       KORREKTUR 21.08.2026 (KB-20): Hier stand "d > 50.5" mit dem Kommentar "die rohe Slot-Bahn
+       ist 50 Einheiten". Das war eine Momentaufnahme (Hausregel 2/3): Die Heimatbahn wird seit
+       KB-13 aus kbOrbitRx(1) abgeleitet, und seit KB-20 liegen die Bahnen auch am hohen
+       PC-Kasten rund - kbOrbitRx(1) faellt damit von 85 auf 48, die rohe Slot-Bahn von 50 auf
+       28,2. Der Test fiel auf voellig richtigem Code durch (gemessen 43,3).
+       Gemessen wird jetzt die REGEL: Der Linienstart liegt AUF dem gezeichneten Marker. Das ist
+       zugleich schaerfer - es faellt auch dann, wenn die Linie an einer beliebigen anderen Stelle
+       ansetzt, waehrend die alte Schranke jede Position jenseits von 50 durchgelassen haette. */
+    check('3b-vorab: der gezeichnete Heimatmarker ist auffindbar und seine Kreise sind sich einig',
+      !!marker && marker.kreise >= 1 && marker.streuung <= 0.2, marker);
+    if (marker){
+      const dm = Math.hypot(heim.start.x - marker.x, heim.start.y - marker.y);
+      check('3b: und zwar exakt am gezeichneten (kollisionsverschobenen) Heimatmarker',
+        dm <= 1.0, { linienStart: heim.start, marker, abweichung: dm.toFixed(2),
+                     abstandMarkerZurSonne: Math.hypot(marker.x - SONNE.x, marker.y - SONNE.y).toFixed(1) });
+    }
   }
 
   check('4: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));

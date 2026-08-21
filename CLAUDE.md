@@ -1238,6 +1238,239 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
   **Die eigentliche Lehre steckt aber im WÄCHTER:** `test_kartenbeschriftung` trug dieselbe Namensliste wie der Code und hatte damit exakt denselben blinden Fleck – der Fehler konnte ihm gar nicht auffallen. **Eine Prüfung, die die Namensliste der Implementierung spiegelt, erbt deren Lücke.** Er greift jetzt über dieselbe Klasse und hat eine neue Prüfung **1b** für die Richtung, die KB-19 behoben hat (Text auf einem NICHT-Planeten) – die alte Prüfung 1 steigt bei `!o.istPlanet` aus und misst nur Planetenscheiben. Dazu kamen drei Alien-Nester und eine Festung ins Fixture: Ohne sie war die Erweiterung **vacuous**, die Gegenprobe am alten Stand blieb grün (genau so gemessen, und das war der Befund – Regel 26). Beidseitig gefahren: 15 Prüfungen in beiden Richtungen, am alten Stand fallen genau die zwei 1b-Prüfungen.
   **Ein neuer bekannter Fall, gemessen statt weggeblendet:** Mit drei Nestern im Heimatsystem liegt „Schwarmstock" auf der Scheibe von Rhea-Nachbar `vesna`. Das ist kein Fehler, sondern der Deckel aus KB-16: Alle drei Nest-Namen sitzen bei dy = −20,3 an ihrer natürlichen Stelle über dem Marker, „Sporenherd" wich um dx = 8 seitlich aus, „Schwarmstock" fand innerhalb von 21 senkrecht bzw. 12 seitlich keinen freien Platz und bleibt deshalb an seinem eigenen Objekt. Er steht NAMENTLICH in der Ausnahmeliste, mit der Messung als Begründung – wer den Deckel anhebt, prüft zuerst Abschnitt 4 (Abstand zum eigenen Objekt).
 
+**KB-20 (21.08.2026, Spieler-Report Sascha mit zwei Screenshots: „karten sind unterschiedlich groß bitte selbe größe wie die größere karte"): Der Kartenkasten ist am PC in beiden Ansichten gleich hoch – und die Zeichnung wächst mit.** Beide Höhen kamen aus EINER Zeile: `kbWrap.style.height = kbSektorModus ? 'max(480px, calc(100dvh - 175px))' : kbSystemKastenHoehe()`. Gemessen bei 1920×1040: Sektoransicht 1258×**865** px, offene Systemebene 1258×**420** px (der Deckel aus KB-11). Am Handy 390×844: 348×669 gegen 348×271.
+
+**Drei Varianten gebaut und EINZELN gemessen, bevor eine ausgeliefert wurde** – die Zahlen sind der Grund für die Wahl, nicht eine nachträgliche Begründung:
+
+| Variante | Ausschnitt | Skala | Planet | Kasten |
+|---|---|---|---|---|
+| nur die Kastenhöhe angehoben | 572×393 | 2,20 | 28 px | zu 54 % leer |
+| dazu den Skala-Deckel weglassen | 223×153 | 5,65 | 73 px | Inhalt **beschnitten** |
+| Höhe + runde Bahnen + Ausschnitt, der beide Richtungen fasst | 284×195 | 4,43 | **57 px** | gefüllt, nichts beschnitten |
+
+Sascha hat die dritte gewählt (beide Bilder vorgelegt) und ausdrücklich: **das Handy bleibt, wie es ist.**
+
+**Der Befund, der die ganze Etappe erklärt: Mehr Kastenhöhe heißt nicht mehr Karte.** Die Vergrößerung hängt an `GALAXY_SYSTEM_MAX_SCALE` (2,2) und wird aus der BREITE gerechnet – ein höherer Kasten fügt nur senkrechten Leerraum hinzu. Erst die runde Bahn-Geometrie macht den Inhalt schmaler (380 statt 600 Einheiten) und lässt ihn den Kasten füllen. Das ist geometrisch dieselbe Einsicht wie KB-12, nur auf den PC übertragen.
+
+**Vier Stellen, alle an EINER benannten Schranke** (Regel 50):
+- **`kbRunderKasten()`** – die Schranke selbst: `kbSchmalerKasten() || Kastenhöhe/Kastenbreite > 0,5`. Die 0,5 ist gerechnet, nicht gewählt: Die flache Zeichnung hat das Verhältnis 0,30 und füllt einen Kasten mit Verhältnis r nur zu 0,30/r – ab 0,5 bleiben also 40 % leer. **Nicht mehr an der Fensterbreite:** Ein Hochformat-Handy und ein hoher PC-Kasten haben dasselbe geometrische Problem. Sehr breite Bildschirme bleiben dadurch von selbst bei der flachen Zeichnung.
+- **`kbOrbitMass()`** hängt daran statt an `kbSchmalerKasten()`.
+- **`galaxyCamTarget`**: `kbEng = kbRunderKasten()`, dazu eine Korrektur, die den Ausschnitt in BEIDER Richtung fassen lässt – sie gilt bewusst nur am breiten Kasten (`kbEng && !kbSchmalerKasten()`), weil sie am Handy die Skala von 1,56 auf 1,39 drücken, die Karte also VERKLEINERN würde. Der Skala-Deckel gilt nur noch für die flache Zeichnung; am Handy hat er nie gebunden (gemessen 1,56 gegen 2,2).
+- **`KB_SEKTOR_KASTEN_HOEHE`** als benannte Konstante, die beide Anzeigestellen benutzen – genau die zwei Stellen mit verschiedenen Zahlen waren der Report.
+
+**Warum das Handy unangetastet bleibt, gemessen statt angenommen:** Dort ist die BREITE die bindende Richtung. Ein gleich hoher Kasten (669 px) ließe die Planeten bei 20 px und den Kasten zu 63 % leer – genau der tote Raum, den KB-10 entfernt hat.
+
+**Drei Bestandstests hielten das ALTE Verhalten als Regel fest** (Regel 45) und sind mitgezogen worden, jeder auf die EIGENSCHAFT statt auf eine Momentaufnahme:
+- `test_kartengroesse` 3 verlangte „der PC-Kasten bleibt flach (h/b ≤ 0,5) – sonst wieder toter Raum". Genau das ist absichtlich aufgehoben. Geprüft wird jetzt, was die Schranke MEINTE: kein toter Raum, gemessen als Anteil der Kastenhöhe, den die Zeichnung belegt. **Die neue Schranke ist gemessen**, alle drei Werte bei 900×1000: Stand davor 0,556 (Planet 23 px), KB-20 0,514 (Planet 43 px), nur-die-Höhe-angehoben **0,219** – der Fall, den die Prüfung fangen muss. 0,40 liegt mit Abstand dazwischen. Die Füllung bleibt durch KB-20 also praktisch gleich, während die Planeten fast doppelt so groß werden.
+- `test_kartengroesse` 3b und `test_kartenbedienung` 2 griffen die GEOMETRISCHE Kastenmitte. Der Kasten ist jetzt höher als der sichtbare Fensterausschnitt – genau wie die Sektoransicht das seit jeher ist –, die Mitte liegt also darunter (gemessen y=1016 bei 1000 px Fensterhöhe). Gegriffen wird jetzt die SICHTBARE Mitte: die Stelle, an der ein echter Zeiger ankommt. Bei einem Kasten, der ganz ins Fenster passt, ist es derselbe Punkt wie vorher. **Gegengeprobt an einer Kopie mit abgeschaltetem Ziehen: 2a/2b fallen weiterhin mit Treue 0** – die Prüfung ist nicht aufgeweicht.
+- `test_flugbahn_ursprung` 3b verglich gegen die feste Zahl 50 („die rohe Slot-Bahn"). Die Heimatbahn wird seit KB-13 aus `kbOrbitRx(1)` abgeleitet; mit runden Bahnen fällt die von 85 auf 48, die Slot-Bahn von 50 auf 28,2 – der Test fiel auf völlig richtigem Code durch (gemessen 43,3). Er misst jetzt, dass der Linienstart AUF dem gezeichneten Marker liegt (Abweichung 0,00), was zugleich schärfer ist: Die alte Schranke hätte jede Position jenseits von 50 durchgelassen.
+- `test_galaxiekarte` 2 verlangte eine Ausschnittsbreite zwischen 300 und 500; der korrekte runde Ausschnitt ist 222,6. Geprüft wird jetzt „unter 500" (also ein System statt der 950 Einheiten breiten Galaxie) plus die neue Zeile 2b: kein Planet ragt aus dem Kasten.
+
+**Neu als Wächter für den Report selbst:** `test_kartengroesse` Abschnitt 4 misst die Kastenhöhe der Sektoransicht VOR dem Öffnen und hält sie gegen die der Systemebene – auf einem breiten Fenster (1600×1040), wo der alte 420er-Deckel wirklich bindet. Gegenprobe gegen den Stand davor: 13 Prüfungen in beiden Richtungen bei identischen Prüfnamen (per `diff` verglichen), rot sind genau 3a (Planet 23 px) und 4 mit `{"sektoransicht":865,"systemebene":420}` – also Saschas Meldung als Messwert. Zeile 4b hält die Gegenrichtung fest: Am Handy MUSS die Systemebene flacher bleiben; fällt sie, hat jemand das Handy mitangeglichen, ohne den Absatz darüber zu lesen.
+
+**Ein Fund nebenbei, unabhängig von KB-20** (Regel 34): `test_kartenbedienung` starb bei der Gegenprobe mit einem `TypeError`, statt einen benannten Fehlschlag zu melden – 6 statt 15 Prüfungen, keine einzige FAIL-Zeile, und der rote Exit-Code sah aus wie eine gelungene Gegenprobe. Die Wache dafür ist eingebaut.
+
+**KB-20b + GR-1 (21.08.2026): Das Wurmloch-Portal bekommt eine abgeleitete Position und eine neue Zeichnung – und der erste Teil war eine Regression, die KB-20 erzeugt hat.** Das Portal saß fest bei `(665, 28)` von 700×230 Sektor-Einheiten, also am äußersten Rand des alten, breiten Systemfelds. Mit dem engeren Ausschnitt von KB-20 lag es gemessen **241 px hinter der rechten Kastenkante – vollständig unsichtbar, nicht angeschnitten** (am Stand davor: ganz im Kasten). **Am HANDY war es schon seit KB-12 draußen** (v8.553.0, 17.08.2026, gemessen 133 px) – ein vier Tage lang ausgelieferter Fehler, den niemand gemeldet hat, weil ein Wurmloch selten ist.
+
+Das ist Regel 52 in Reinform. **Gefunden hat es kein Test, sondern ein Durchgang über ALLE Kinder der Systemebene**, der ausgibt, was aus dem Kasten fällt – genau vier Dinge: drei Sternenfeld-Punkte von r=1,1 (vom SVG ohnehin abgeschnitten, kein Spielobjekt) und das Portal. **Dieser Durchgang gehört nach jedem Geometrie-Umbau dazu**; die vorhandenen Tests messen nur `.planet-node`-Gruppen und hätten es nie gesehen.
+
+Behoben wie bei allen anderen Markern: Die Bahn kommt aus `kbOrbitRx(maxOrbit) * 0,92` bei 325°, das Portal läuft durch `kbMarkerFrei()` und meldet sich in `platzierteMarker` an. Der Faktor 0,92 hält es in BEIDEN Zeichnungen im Bild – rund bei 144 von 242 sichtbaren Einheiten, flach bei 316 von 350; die Bahn ist runder als die Planetenbahn (mindestens 0,55), damit es nicht auf der Ekliptik zwischen den Planeten klebt.
+
+**Die Zeichnung** ist eine Akkretionsscheibe (Spieler-Wunsch Sascha: „soll wie ein wurmloch aussehen", dann „gefallen mir nicht mehr details mehr farbe", nach acht vorgelegten Entwürfen „entwurf a gefällt mir aber vielleicht doch zu knallig mit den farben ändern so das es ins spiel passt"). Der Sog liest sich an der Geometrie – die glühende Innenkante ist vor dem dunklen Zentrum hochgebogen –, nicht an einem Ring. **Die Farben sind auf die gemessene Spielpalette umgestellt**: Lavendel `#af9ce6` (die Farbe, die das Portal schon vorher trug), Violett `#7f77dd`, Cyan `#5ce1ff`, Gold `#fac775`. Alle 40 Farben des Entwurfs liefen durch eine Zuordnungstabelle, die abbricht, wenn eine Farbe keine Entsprechung hat ODER die Tabelle eine Farbe führt, die es gar nicht gibt. **Rot bleibt bewusst draußen** – es ist im Spiel die Farbe für Gefahr (`#e24b4a`), und ein Wurmloch ist kein Gegner.
+
+**Die Gruppe trägt bewusst KEIN `planet-node`, und das ist gemessen:** Sie ist die einzige Kartenobjekt-Gruppe mit einer `scale`-Transformation (die Zeichnung ist für viewBox 0 0 100 100 gebaut). `kbLabelsEntflechten` misst belegte Flächen mit `getBBox()`, und das liefert die EIGENEN Nutzerkoordinaten **ohne** die Transformation – im Browser nachgemessen meldet der größte Kreis **82** Einheiten, während das Portal auf der Karte **27,9** Einheiten breit ist (vorher r=14, also 28). Mit der Klasse hätte der Entflechter eine fast dreimal zu große Fläche angenommen. **Wer das Portal später doch aufnehmen will, macht zuerst den Entflechter transform-fest** – nicht die Klasse hier setzen.
+
+Wächter: `tests/test_wurmloch_portal.js` (11 Prüfungen, PC und Handy). Gegenprobe an einer Kopie mit der festen Position: 11 Prüfungen in beiden Richtungen bei identischen Prüfnamen, rot sind genau 1 und 2 mit `ueberRechts` 225 bzw. 127. `test_kartenmarker` 3b/3b2 führt das Portal seither in seiner **namentlichen** Erlaubnisliste – genau dieser Wächter hat die neue Aufrufstelle beim ersten Lauf als „überzählig" gemeldet, also gearbeitet wie gebaut.
+
+
+**KB-20c bis KB-20e (21.08.2026) sind die drei Befunde einer adversarischen Durchsicht VOR dem
+Merge – und der schwerste war einer, den mein eigener „was fällt aus dem Kasten"-Durchgang übersehen
+hatte.** Er fand vier Dinge (drei Sternenfeld-Punkte und das Portal) und meldete alles andere als
+sauber. Die **Allianzbasis** stand aber genauso auf einem festen Punkt (`translate(165,52)`) – sie
+fehlte in der Messung schlicht, weil die Fixture gar keine Allianz hatte. **Ein Durchgang über „alle
+Objekte" misst nur die Objekte, die die Fixture erzeugt** – wer so einen Sweep fährt, prüft zuerst,
+welche Objektarten unter seinen Bedingungen überhaupt entstehen können.
+
+- **KB-20c – die Allianzbasis kommt auf eine abgeleitete Bahn.** Nachgerechnet lag Sektor-x 165 bei
+  **18 von 69** Systemen ganz außerhalb des Ausschnitts und bei **37 weiteren** angeschnitten – nur
+  14 wären vollständig im Bild. (Unabhängig nachgerechnet: Links der Sonne sind
+  `kbOrbitRx(maxOrbit) + 34` Sektor-Einheiten sichtbar, bei maxOrbit 5 also 154; die Basis braucht
+  185 für ihre Mitte und 215 für ihren sichtbaren Modellrand von 30. Die Zahl hängt nicht am
+  Formfaktor, weil der Ausschnitt in Sektor-Einheiten gerechnet wird. **Hier stand zuerst „23
+  weitere" – die ließ sich beim Nachrechnen nicht reproduzieren und ist korrigiert**; Regel 41 gilt
+  auch für die eigenen Zahlen von gestern.) Die
+  Basis hat auf der Karte **keine zweite Darstellung** – fällt sie aus dem Ausschnitt, ist sie für
+  den Spieler weg. Behoben wie beim Portal: `kbOrbitRx(kbMaxOrbit) * 0,80` bei 205°, durch
+  `kbMarkerFrei` geschoben, in `platzierteMarker` angemeldet. 0,80 statt 0,92 hält sie **innerhalb**
+  der Portalbahn, damit sich die zwei großen Strukturen nicht am selben Rand drängen; der Radius 30
+  ist der **sichtbare** Rand des größten Modells, nicht sein Zeichenradius (dieselbe Lehre wie beim
+  Boss-Puls und beim Nest). `kbMaxOrbit` steht seither als EINE Quelle direkt hinter `sysPlanets` –
+  Portal und Basis lasen ihn vorher jeweils selbst.
+- **KB-20d – die Schranke misst die ZIELhöhe, nicht die aktuelle.** Ohne das entschieden Kastenhöhe
+  und Zeichnung getrennt: Bei einem breiten, flachen Fenster (ab 1472 px Breite) bekam der Kasten
+  die volle Sektor-Höhe, während die Zeichnung flach blieb. Gemessen bei 1920×804: Kasten 1258×629,
+  Verhältnis exakt 0,500, Füllung 0,351 – **zwei Pixel Fensterhöhe mehr kippen die Zeichnung von
+  flach auf rund** (die zunächst notierten „47 %" hielten 0,351 gegen eine Füllung aus einem
+  ANDEREN Viewport und waren damit keine Messung, sondern eine Mischung zweier). `kbRunderKasten()` misst deshalb `max(480, innerHeight − 175)` gegen die gemessene
+  Kastenbreite (kein Zirkelschluss: die Breite hängt nicht an der Höhe), hat einen 200-ms-Zwischen-
+  speicher (es läuft ~677-mal je Kartenaufbau) und behält bei einem VERSTECKTEN Reiter den zuletzt
+  gültigen Stand, statt eine Antwort zu erfinden. `kbSystemKastenHoehe()` gibt die volle
+  Sektor-Höhe nur noch zurück, wo auch die runde Zeichnung gilt.
+- **KB-20e – eine Fenstergrößenänderung bei OFFENEM System zog nichts nach.** Bis KB-20 war das
+  folgenlos (Ausschnitt und Kastenhöhe hingen beide an der Breite); seither können Kastenhöhe,
+  Zeichnung und Kamera aus **drei verschiedenen Momenten** stammen. Gemessen 1920×1040 → 1920×780
+  an einem System mit Orbit 10: Direkt nach der Änderung sieht alles unauffällig aus. Erst der
+  nächste Neuaufbau – **ein Zoom-Klick genügt** – löst alles auf einmal ein, und dann liegen
+  **sechs von zehn Planeten außerhalb des Kastens** (`["gx031"…"gx036"]`). `kbFensterNachziehen()`
+  setzt deshalb entprellt (220 ms) Höhe, Zeichnung und Kamera in genau dieser Reihenfolge neu; der
+  Zwischenspeicher aus KB-20d wird dabei ausdrücklich verworfen, damit die Zusage nicht an der
+  Reihenfolge zweier Zahlen hängt. Die zwei Sektor-Ansichten brauchen nichts davon – ihre Höhe ist
+  ein CSS-Ausdruck mit `100dvh` und folgt dem Fenster von selbst.
+
+**Wächter:** `tests/test_kartenresize.js` (7 Prüfungen). Er prüft **nicht** einzelne Zahlen, sondern
+die Eigenschaft: *Nach einer Größenänderung steht die Karte so da, wie sie stünde, wenn das Fenster
+von Anfang an diese Größe gehabt hätte.* Jede Messung läuft deshalb als PAAR gegen eine Kontrolle,
+die direkt in der Zielgröße startet – gemessen ist die viewBox danach zeichengleich
+(`199.8 92.8 571.8 190.9`). Dazu `test_kartengroesse` Abschnitt 5 für das **flache Band** (1920×700:
+flache Zeichnung UND flache Kastenhöhe als PAAR – die Gegenprobe mit zurückgenommenem KB-20d meldet
+`{"zeichnungVerh":0.32,"kasten":{"h":525}}`) und `test_kartenmarker` **1c**.
+
+**`test_kartenmarker` 1c ist die eigentliche Lehre dieser Runde.** Der Test maß bis dahin
+ausschließlich Abstände ZWISCHEN Objekten und stellte die Frage „liegt das überhaupt im Kasten?" nie
+– genau deshalb hat er weder gesehen, dass das Portal am Handy seit KB-12 **vier Tage** unsichtbar
+war, noch die Allianzbasis. 1c misst das jetzt **datengetrieben über alle sechs Markerarten**, eine
+neue erbt den Schutz automatisch (Regel 40). Beide Gegenproben fallen spezifisch und mit sprechendem
+Beleg: Basis zurück auf den festen Punkt → 29 px (Handy) bzw. 61 px (PC) über die linke Kante;
+Portal zurück → 127 bzw. 270 px über die rechte.
+
+**Zwei Werkzeugfehler aus dieser Runde, beide über den Einzelfall hinaus:**
+1. **Zwei Messläufe teilten sich EIN Speicher-Objekt.** `test_kartenmarker` fährt Handy und PC
+   nacheinander gegen dasselbe `store`, und das Spiel schreibt darin während des Laufs herum. Im
+   Handy-Lauf stand die Allianzbasis auf der Karte, im PC-Lauf danach nicht mehr – bei identischem
+   Code und identischer Fixture. **Ein Messwerkzeug, dessen erster Lauf den zweiten verändert, misst
+   nicht zweimal dasselbe** (dieselbe Familie wie Regel 15/17/19). Jeder Lauf bekommt seither eine
+   eigene Kopie.
+2. **Eine Fixture-Ergänzung im Spielstand allein genügt nicht, wenn ein Lade-Pfad sie überschreibt.**
+   `loadAllianceBase` setzt `state.allianceBase` beim Boot **bedingungslos** auf das, was der Server
+   liefert – bei fehlendem Schlüssel also auf `null`. Die Basis muss deshalb im *geteilten Speicher*
+   der Fixture liegen, nicht nur im Spielstand. Gefunden hat es die eigene Vorab-Prüfung
+   (`gemesseneArten` ohne `allianzbasis`), nicht das Nachdenken – Regel 37 in der Anwendung.
+
+**Und ein Beinahe-Fehler in eigener Sache, gemessen statt geglaubt:** In den Kommentar am
+Entflechter war zunächst „in 2,3 % der Fälle überlappt eine Beschriftung das Portal" geschrieben –
+eine Zahl aus einer Zusammenfassung, die eine ganz andere Größe gemessen hatte. Sie ist wieder raus,
+bevor sie ausgeliefert wurde: **eine Zahl, die man nicht selbst gemessen hat, gehört nicht in den
+Quelltext** (Regel 41). Der offene Befund selbst steht jetzt dort ausformuliert – `kbLabelsEntflechten`
+misst mit `getBBox()`, das die `scale`-Transformation des Portals **nicht** kennt (gemessen 82 gegen
+27,9 Einheiten), und wer das Portal dort aufnehmen will, macht den Entflechter **zuerst**
+transform-fest.
+
+**KB-20f bis KB-20i (21.08.2026) sind die Befunde einer ZWEITEN adversarischen Durchsicht – und
+drei der vier waren Regressionen, die mein eigener Änderungssatz erzeugt hatte.** Der Wert dieser
+Runde liegt genau darin: Die erste Durchsicht hatte den Änderungssatz von KB-20c/d/e geprüft, die
+zweite prüfte, was er selbst kaputtgemacht hat.
+
+- **KB-20f – jede Fenstergrößenänderung warf den ZOOM weg.** Der Handler aus KB-20e rief Höhe,
+  `buildMap()` und `galaxyCamFahre(true)` **bedingungslos**. Zoom und Verschiebung leben aber
+  ausschließlich in `galaxyMapViewBox`, und `galaxyCamFahre(true)` ersetzt dieses Objekt durch den
+  Vorgabe-Ausschnitt. Am PC traf das jedes Ziehen am Fensterrahmen, am Handy schon das Auf- und
+  Zuklappen der Bildschirmtastatur (der Viewport-meta trägt `interactive-widget=resizes-content`,
+  und das Suchfeld der Karte öffnet sie). Neu gezielt wird nur noch, wenn sich wirklich etwas
+  Kamerarelevantes geändert hat – sonst zieht `galaxyVerhaeltnisAngleichen()` nur die HÖHE des
+  Ausschnitts nach und lässt die Breite, also die Zoomstufe, stehen. **Diese zoom-erhaltende
+  Antwort existierte längst; KB-20e hatte eine zerstörende danebengestellt.**
+  Der erste Entwurf ließ die zwei Zeilen weg, weil ich annahm, das erledige der nächste
+  `buildGalaxyMap()`. Gemessen läuft der gar nicht, wenn sich sonst nichts geändert hat –
+  `test_kartenresize` 3 hat es gefangen (Kastenverhältnis 0,576 gegen Kameraverhältnis 0,688).
+  **Eine Annahme ist kein Messwert** (Regel 48).
+- **KB-20g – am PC scrollte beim Öffnen nichts, und die Karte stand außerhalb des Fensters.** Der
+  Scroll aus KB-7/KB-10 galt nur am Handy (`innerWidth <= 700`). Seit KB-20 ist der Kasten am PC so
+  hoch wie in den Sektor-Ansichten: gemessen bei 1600×1040 stehen nach dem Öffnen **325 von 865 px**
+  der Karte im Bild und **alle vier** Overlay-Knöpfe (‹ › + −) außerhalb des Fensters. Die
+  Breiten-Schranke bleibt als ODER stehen (das Handy verhält sich exakt wie bisher), dazu kommt die
+  Frage nach der SACHE: Ist genug vom Kasten im Bild? Gemessen gegen das hier maximal Erreichbare –
+  ein Kasten, der höher als das Fenster ist, kann nie ganz sichtbar sein, und ein Scroll darf nicht
+  daran hängen, dass er Unmögliches verlangt. **Ein Bestandsfall kam dabei mit heraus:** Bei
+  1920×700 war die Karte schon vor KB-20 zu **0 px** sichtbar.
+- **KB-20h – der Kollisionsschieber schob die Allianzbasis aus dem Bild.** `kbMarkerFrei` wich
+  ausschließlich nach AUSSEN aus. Mit den echten Funktionen der Datei nachgemessen (ausgeführt,
+  nicht nachgebaut): Bei der runden Zeichnung landeten **14 von 138** Markern draußen – alle die
+  Allianzbasis, bis zu 18,2 Einheiten über die linke Kante, weil ihr fester Winkel 205° fast auf dem
+  Bahnwinkel −160° der Orbits 3, 9 und 15 liegt und sie deshalb um 71 bis 81 Einheiten nach außen
+  wandert. Bei der flachen Zeichnung waren es 0. Wer eine Obergrenze mitgibt, bekommt jetzt einen
+  zweiten Durchgang nach INNEN; findet sich auch dort nichts, wird gekappt – ein Marker, der eine
+  Scheibe überlappt, aber IM BILD steht, ist ehrlicher als einer, den niemand sieht (dieselbe
+  Abwägung wie beim Label-Deckel von KB-16). Ohne `maxRadius` verhält sich die Funktion byte-genau
+  wie vorher; das ist die Zusage für die fünf übrigen Markerarten.
+  **Der erste Entwurf war wirkungslos und sah richtig aus:** Er prüfte die Grenze nur am
+  SCHLEIFENENDE – im Anlassfall findet die Schleife aber nach vier bis fünf Schritten einen freien
+  Platz, nur eben einen außerhalb des Bildes. Aufgefallen ist es allein daran, dass dieselbe Messung
+  danach WIEDERHOLT wurde und unverändert 14 von 138 meldete (Regel 48).
+- **KB-20i – der KB-20e-Kommentar beschrieb einen Mechanismus, den der Code nicht hat.** Er sagte,
+  die Kastenhöhe stehe „als fester Pixelwert im style-Attribut" und der Schaden sei ein Beschnitt
+  oben und unten. Beides ist nachgemessen falsch: Am breiten runden Kasten ist die Höhe
+  `KB_SEKTOR_KASTEN_HOEHE`, also ein CSS-Ausdruck mit `100dvh`, und das SVG hat kein
+  `preserveAspectRatio` – es gilt `xMidYMid meet`, das nie beschneidet. **Direkt nach der Änderung
+  ist gemessen gar nichts draußen**; die Karte wird nur unnötig klein (1920×1040 → 1920×810: Kasten
+  folgt 865 → 635 px, die Kamera behält ihre 362×248,9 Einheiten, der Planetendurchmesser fällt von
+  87 auf 56 px). Der Schaden kommt beim nächsten Neuaufbau – ein Zoom-Klick genügt: 1920×1040 →
+  1920×780 ohne den Handler springt der Kasten von 605 auf 420 px, die Zeichnung kippt von rund
+  (358×323 Einheiten) auf flach (755×262), während die Kamera weiter den engen runden Ausschnitt von
+  258,6 Einheiten hält – danach liegen **alle sechs** gemessenen Planeten außerhalb, bis zu 1713 px
+  weit. Die Kontrolle, die von Anfang an 1920×780 groß ist, hat nach demselben Zoom-Klick zwei
+  Objekte knapp am Rand (139 bzw. 83 px) – das ist der normale Preis des Hineinzoomens und der
+  Beleg, dass die sechs nicht vom Klick kommen.
+  **Die Lehre ist nicht der Einzelfall:** Ein Kommentar, der eine Begründung nennt, die man nicht
+  gemessen hat, ist eine zweite Anzeigestelle mit Ablaufdatum – beim nächsten Lesen wird er als
+  REGEL gelesen. Dasselbe ist in dieser Sitzung schon zweimal passiert (die „23 weiteren"
+  angeschnittenen Systeme und die „47 %", beide korrigiert).
+
+**Zwei Lücken am Portal, beide aus derselben Durchsicht:**
+Der Systemname aus der Serverantwort ging **ohne `escapeHtml`** in ein Attribut (jetzt escaped, wie
+jede andere Serverzeichenkette), und das Portal ignorierte die Ebene **„Ereignisse"**, obwohl zwei
+Texte sie versprechen – das Gate umschließt jetzt auch `kbMarkerFrei` und die Anmeldung in
+`platzierteMarker`, damit ein abgeschaltetes Portal auch keinen Platz mehr belegt.
+Dazu ein **`prefers-reduced-motion`-Gate** (`kbBewegungAus()`): Wer Bewegung abbestellt hat, bekommt
+das Portal statisch statt mit 36 Dauerschleifen – die Zeichnung bleibt vollständig, nur die
+Animations-Tags fallen weg (alle 36 sind selbstschließend, nachgemessen; gemessen 0 Animationen und
+41 Formen gegen 36/41).
+**Die Kostenmessung dazu ist ehrlich unentschieden und steht so auch im Quelltext:** Unter
+4-facher CPU-Drosselung kostet das Portal nachweislich (mit 4.478–8.600 ms Long Tasks je 10 s, ohne
+1.083–1.330, also Faktor 3–6). **WELCHER Bestandteil, ließ sich NICHT auflösen** – die Variante ohne
+die `<animate>`-Tags streute 2.628–5.947 und überlappte die unveränderte vollständig; ein erster
+Lauf hatte sie als Hauptkostenträger gemeldet, die Wiederholung hat das widerlegt (Regel 20). Ohne
+Drosselung sind es in beiden Fällen 0 Long Tasks, und das Portal steht in höchstens zwei von 69
+Systemen. **Ein blinder Umbau der Zeichnung wäre damit nicht gedeckt.**
+
+**Drei Bestandstests waren auf dieselbe Weise blind und sind mitgezogen worden:**
+- `test_flugbahn_ursprung` 3b leitete die Markerposition aus dem LABEL ab (`y − 20`). `kbLabelsEntflechten`
+  darf ein Label aber um bis zu 21 Einheiten senkrecht und 12 seitlich verschieben (KB-16), während
+  3b darunter 1,0 Einheiten Toleranz verlangt – der Test war also nur so lange grün, wie dieses eine
+  Label zufällig an seiner natürlichen Stelle bleibt. Gegriffen werden jetzt die **direkten
+  `circle`-Kinder** der Heimat-Gruppe (der Maskenkreis liegt in einem `clipPath`, der Mondkreis und
+  der Orbitalring in eigenen `<g>` – Regel 51), und eine Vorab-Prüfung belegt, dass sie sich einig
+  sind. Beidseitig gegengeprüft an einer Kopie, in der jedes Label um 21 Einheiten ausweicht: der
+  alte Griff fällt mit `abweichung 21.00` auf völlig korrektem Code, der neue bleibt grün; und mit
+  der Linie zurück auf der rohen Slot-Position fällt der neue mit `abweichung 15.10`.
+- `test_kartenbeschriftung` hatte **kein `activeWormhole`** in seiner Galaxie-Antwort und sah die
+  neue Portal-Beschriftung deshalb nie – obwohl sie ein `text.planet-label` ist, das AUSSERHALB der
+  Portal-Gruppe liegt und für den Entflechter damit eine freistehende Beschriftung ohne eigenes
+  Objekt ist, die andere verdrängen kann. Gemessen mit der Fixture: kepler 12 → 13 Texte, vega
+  7 → 8. Eine Vorab-Prüfung hält fest, dass sie wirklich mitgemessen wird.
+- Und sein **„PC"-Lauf bei 1280×900 bekommt seit KB-20 die RUNDE Zeichnung** (gemessen: Kasten
+  738×725, Verhältnis 0,98; Zeichnung 0,81) – die flache, für die er ursprünglich kalibriert wurde,
+  maß danach niemand mehr. Dazu ein dritter Formfaktor **„PC flach" (1920×700)**, und weil ein
+  dritter Lauf nur dann einer ist, wenn er wirklich etwas anderes zeichnet, misst eine
+  Vorab-Prüfung das Zeichnungsverhältnis je Formfaktor gegen dieselbe 0,5-Schranke, die
+  `kbRunderKasten` benutzt (gemessen rund 0,54–0,83, flach 0,21–0,33). Am flachen PC gibt es
+  übrigens **null** bekannte Ausnahmen – kein Fehlschlag, der vom ersten Tag an rot wäre (Regel 53).
+
+**Wächter:** `test_kartenresize` (12 Prüfungen, Zoom-Erhalt als eigenes PAAR),
+`test_karte_handy_bedienung` (Overlay-Knöpfe per `elementFromPoint`, jetzt auch am PC),
+`test_kartenmarker` 1c (datengetrieben über alle sechs Markerarten),
+`test_wurmloch_portal` (21 Prüfungen: Ereignisse-Ebene als PAAR über den Spielerweg, Reduced-Motion
+als PAAR aus Animationszahl UND Formzahl) und `test_kartenbeschriftung` (24 Prüfungen).
+
 **Tests navigieren über `tests/lib/karte.js`** (`oeffneSystemUeberSektoren`/`oeffneSektorMitSystem` – Spielerweg per DOM-Klicks, Region wird nie geraten, wartet die Kamerafahrt samt Folge-Tick ab).
 - **Kennwert-Balken sind EINE Bildsprache für Schiffe UND Verteidigungsanlagen** (VT-1, 18.08.2026, Auftrag Sascha „bei verteidigung auch wie bei flotte die balken"). Die Werft zeichnet je Schiff vier beschriftete Mikro-Balken (`shipStatBarsHtml`, CSS-Klasse `.sstat`, Balken im Verhältnis zum besten Wert der Flotte); die Verteidigungskarten standen bis dahin auf dem Stand davor – eine Fließtext-Zeile mit Mitteldots. `defenseStatBarsHtml(def, lvl)` zeichnet jetzt drei Balken je Anlage: **Angriff** (`atkVal`), **Vert.** (`defVal`) und **Schild** (`def.shield`, beim Laden als `round(defVal*0,4)` abgeleitet und in `defensePower` ein eigener Summand – also eine echte Größe, keine erfundene). Bewusste Entscheidungen dabei: (a) **dieselbe CSS-Klasse und dieselben Farben** wie die Schiffe (Angriff rot, Schild cyan, Verteidigung violett) – eine zweite Balken-Klasse wäre die typische zweite Anzeigestelle, die beim nächsten Umbau ausei­nanderläuft; (b) **kein vierter Balken „Bauzeit"** – dort ist weniger besser, ein langer Balken läse sich aber wie ein guter Wert; (c) die Balken zeigen den Wert **je Stufe** (die zwischen Anlagen vergleichbare Größe, wie „je Schiff" bei der Flotte), die vorhandene Zeile „aktuell → nach Ausbau" bleibt daneben, weil sie eine andere Frage beantwortet; (d) **Abhorchposten und Mondschild bekommen keine Balken** – sie tragen ihre Wirkung in eigenen Regeln (`atkVal`/`defVal` beide 0), drei Nullbalken wären dort nichtssagend (dieselbe Ausnahme kennt `defenseLockedPreview()` schon). Die Balken hängen im Kartenkörper, **nicht** hinter dem „Details"-Griff – siehe Regel 55, das war der Fehler des ersten Anlaufs. Wächter: `tests/test_verteidigungsbalken.js` (Erwartungswerte aus `BUILDING_DEFS` gelesen, Sichtbarkeit statt Existenz geprüft).
 - **Signatur-Cache-Muster für `render*Box()`-Funktionen ohne Live-Countdown**: `let lastXSig = null;` vor der Funktion, am Anfang eine Signatur aus allen angezeigten Werten bilden, bei Gleichheit zum Vorlauf `return` statt `innerHTML` neu zu schreiben (Beispiele: `renderAllianceBaseHero`, `renderDominance`, `renderGalaxyNews`, `renderReportsBox`, `renderAllianceTitlesBox`/`renderAllianceSkinsBox`, `renderDailyLoginBox`, `renderFpAllianceDonation`, `renderFpLeaderboard`). **Nur anwenden, wenn die Box KEINEN Live-Countdown (`Date.now()`-Differenz, die sichtbar hochzählt) enthält** – sonst würde die Anzeige sichtbar einfrieren; bei Countdown-Boxen stattdessen `setBoxHtml` (Markup-Signatur, selbstkorrigierend – siehe unten). **Korrektur 16.08.2026:** Hier stand, `renderAutoExploreTourBox`/`renderAbhorchpostenBox` nutzten „stattdessen `isTypingIn()`" – das war falsch, beide schreiben nacktes `innerHTML` ohne jeden Schutz (nachgesehen, nicht erinnert; sie enthalten Live-Countdowns, weshalb die WERTLISTEN-Signatur dort zu Recht fehlt – ein Tipp-Schutz war nie da und ist mangels Eingabefeldern auch nicht nötig). `renderFactions`/`renderMarket`/`renderTradeRoutes` nutzen tatsächlich `bedienungLaeuft()`/`isTypingIn()`, Markt und Routen seit v8.538.0 zusätzlich `setBoxHtml`. Neue `render*Box()`-Funktionen ohne Countdown sollten dieses Muster von Anfang an übernehmen statt jeden Tick blind neu aufzubauen.
@@ -2900,6 +3133,28 @@ fehlende Beschreibung).
   DERSELBEN Zeile und fand hier null Treffer. Richtig ist, vom Eintragsanfang bis zum NÄCHSTEN
   Eintragsanfang zu suchen – dann kann der Treffer nie aus einem fremden Eintrag stammen
   (Hausregel 39/59 in der mehrzeiligen Variante).
+- **TX-3** (v8.593.0, 21.08.2026): `SHIP_MODULE_DEFS`, sechs Abgrund-Texte, 2.129 → 1.637 Zeichen
+  (`ab_ballastspiegel` 446→288, `ab_schwarmoptik` 387→334, `ab_stillgaenger` 342→290,
+  `ab_bergungsklaue` 341→240, `ab_resonanzlanze` 320→258, `ab_tiefenkiel` 293→227). Der Block hat
+  44 `desc`-Texte, Median 108 – die meisten sind längst knapp, gekürzt wurden nur die zehn über
+  250 Zeichen, und dort nur Muster 1 (Selbstlob/Einordnung: „ein Aufklärer, der vorausschaut, statt
+  zu kämpfen"; „macht aus den schwersten Sektoren die lohnendsten") und Muster 4 (Erklärungen über
+  das SPIEL statt über den Gegenstand).
+
+  **Die Testbedingung ist hier GEGENLÄUFIG zu TX-2 und muss vorher gelesen werden:**
+  `test_abgrund_schiffsmodule` prüft **genau sechs** Schlüssel (`ab_tiefenkiel`, `ab_schwarmoptik`,
+  `ab_resonanzlanze`, `ab_bergungsklaue`, `ab_stillgaenger`, `ab_waechterbann`) auf
+  `desc.length >= 200` **und** darauf, dass `/gedeckelt|Obergrenze/` dort *nicht* vorkommt – während
+  `test_abgrund_module2` bei den MODULEN genau umgekehrt eine Deckel-Aussage verlangt.
+  `ab_ballastspiegel` gehört NICHT zu den sechs; sein „gedeckelt bei 40%" ist eine echte Zahl und
+  bleibt. Der Ersetzer führt deshalb eine Untergrenze von 210 Zeichen (Luft zur 200er-Schranke) und
+  bricht bei jeder Verletzung ab, bevor er schreibt.
+
+  **Bewusst NICHT angefasst:** `ab_drucklot` und `ab_waechterbann` – dort trägt jeder Satz eine
+  eigene Auskunft (wie viele Mutatoren ein Sektor hat, dass genau einer gestrichen wird, die
+  Abgrenzung „hilft beim Feststecken, nicht beim Abernten"); dazu die zwei Event-Module, deren
+  Schiffslisten Information sind und keine Füllung. Dieselbe Entscheidung wie bei den 20
+  Boss-Set-Texten in TX-2.
 ## Passwort-Mindestlänge 8 (19.08.2026, Sicherheits-Audit P5, v8.579.0)
 
 Die Regel selbst steht im Backend (`PASSWORT_MIN`, sechs Prüfungen inklusive einer Liste von 2.122
