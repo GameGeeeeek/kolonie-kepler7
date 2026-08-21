@@ -14710,9 +14710,16 @@
          ohne Kampf als verschwundene Schiffe - der Server hat in diesem Fall auch nichts gebucht.
          HIER FEHLT KEIN CODE: Die Schiffe stehen die ganze Mission ueber in `fleet`, ein leeres
          `verluste` ist also genau die vollzaehlige Rueckkehr (siehe pveVerlusteBuchen). */
-      log('Die Anfechtung bei '+asteroidName({sorte:m.sorte, groesse:m.groesse})+' kam nicht zustande'
-        + (status === 403 ? ' (Schutzfrist, Abklingzeit oder Allianz)' : status === 404 ? ' – der Server kennt Anfechtungen noch nicht' : '')
-        + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      const zielName = asteroidName({sorte:m.sorte, groesse:m.groesse});
+      const grund = 'Die Anfechtung kam nicht zustande'
+        + (status === 403 ? ' – Schutzfrist, Abklingzeit oder Allianz'
+         : status === 404 ? ' – der Server kennt Anfechtungen noch nicht'
+         : ' – der Server war nicht erreichbar') + '.';
+      log('Die Anfechtung bei '+zielName+' kam nicht zustande – die Flotte kehrt vollzählig zurück.',
+        'ti-alert-triangle', 'warn');
+      angriffOhneKampf('asteroid-contest', zielName, grund,
+        { fleetName:m.fleetName, sorte:m.sorte, groesse:m.groesse, system:m.system,
+          systemName:(STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name, platz:m.platz });
     } else {
       for (const [k, v] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
@@ -14762,14 +14769,23 @@
     const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
     const v = nestVolk(m.volk);
     if (!daten){
+      const nestGrund = 'Der Angriff kam nicht zustande'
+        + (status === 403 ? ' – die Abklingzeit an diesem Nest lief noch'
+         : status === 404 ? ' – der Server kennt Alien-Nester noch nicht'
+         : ' – der Server war nicht erreichbar') + '.';
       log('Der Angriff auf das Nest der '+v.name+' bei '+sysName+' kam nicht zustande'
         + (status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Alien-Nester noch nicht' : '')
         + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      angriffOhneKampf('nest-angriff', 'Nest der '+v.name+' bei '+sysName, nestGrund,
+        { fleetName:m.fleetName, system:m.system, systemName:sysName, volk:m.volk });
     } else if (daten.verpasst){
       /* Vollzaehlig zurueck, keine Verluste, keine Abklingzeit - und der Grund steht in der Meldung.
          Auch hier fehlt kein Code: leeres `verluste` heisst unversehrte Rueckkehr. */
       log(daten.text || ('Das Nest bei '+sysName+' war nicht mehr da – dein Verband kehrt vollzählig zurück.'),
         'ti-arrows-shuffle', 'wichtig');
+      angriffOhneKampf('nest-angriff', 'Nest bei '+sysName,
+        daten.text || 'Das Nest war bei der Ankunft nicht mehr da – gefallen oder weitergezogen.',
+        { fleetName:m.fleetName, system:m.system, systemName:sysName, volk:m.volk });
     } else {
       for (const [k, val] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
@@ -14818,9 +14834,16 @@
     const verluste = {};
     const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
     if (!daten){
+      const festGrund = 'Der Angriff kam nicht zustande'
+        + (status === 409 ? ' – die Festung war bereits gefallen'
+         : status === 403 ? ' – die Abklingzeit an dieser Festung lief noch'
+         : status === 404 ? ' – der Server kennt Asteroidenfestungen noch nicht'
+         : ' – der Server war nicht erreichbar') + '.';
       log('Der Angriff auf die '+(m.stufeName||'Festung')+' bei '+sysName+' kam nicht zustande'
         + (status === 409 ? ' – sie ist bereits gefallen' : status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Festungen noch nicht' : '')
         + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      angriffOhneKampf('festung-angriff', (m.stufeName||'Festung')+' bei '+sysName, festGrund,
+        { fleetName:m.fleetName, system:m.system, systemName:sysName, stufe:m.stufeName||'' });
     } else {
       for (const [k, v] of Object.entries(m.composition||{})){
         const weg = (daten.eigeneVerluste || {})[k] || 0;
@@ -19617,7 +19640,12 @@
         body: JSON.stringify({ systemId })
       });
       const data = await res.json();
-      if (!res.ok){ log('Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); return; }
+      if (!res.ok){
+        log('Angriff fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle');
+        angriffOhneKampf('faction-attack', 'System '+systemId+' ('+owner.name+')',
+          'Der Server hat den Angriff abgelehnt: '+(data.error||'unbekannter Grund')+'.', { system: systemId, factionName: owner.name });
+        return;
+      }
       // Was der Angriff an der Front bewirkt hat, meldet der Server mit - und zwar den WIRKSAMEN
       // Wert nach der Tagesdegression. Die rohe Zahl zu zeigen waere eine Zusage, die der Server
       // nicht einhaelt: Wer heute schon viel beigetragen hat, bekommt weniger davon angerechnet.
@@ -19644,6 +19672,13 @@
         state.credits = (state.credits||0) + (data.creditReward||0);
         log('System '+systemId+' von den '+data.factionName+' erobert! +40 Kampfpunkte, +'+fmt(data.creditReward||0)+' Kredite. Das System gehört jetzt dir.', 'ti-flag');
         playSound('win');
+        /* Der Fraktionsangriff kannte bis v8.588.0 GAR KEINEN Bericht - weder bei Erfolg noch bei
+           Misserfolg, und der Misserfolg kostet echte Schiffe. Alles stand nur im `#log`, das sich
+           mit der naechsten Meldung selbst ueberschreibt (Hausregel 47). */
+        pushReport({ type:'faction-attack', result:'win', system: systemId,
+          factionName: data.factionName || owner.name, attackPower: data.attackPower,
+          factionDefense: data.factionDefense, creditReward: data.creditReward||0,
+          battlePoints: 40, ownLostShips: {} });
       } else {
         const lostTxt = Object.entries(data.lost||{}).map(([k,v])=>v+'× '+((SHIP_DEFS.find(d=>d.key===k)||{}).name||k)).join(', ') || 'keine';
         // Flottenverluste auch lokal anwenden (Server hat sie schon in unserem Spielstand gebucht). Der
@@ -19664,13 +19699,21 @@
         state.commandPoints = (state.commandPoints||0) + 5;
         log('Angriff auf '+systemId+' gescheitert. Verluste: '+lostTxt+'. (Angriffskraft '+data.attackPower+' vs. Verteidigung '+data.factionDefense+')', 'ti-shield');
         playSound('lose');
+        pushReport({ type:'faction-attack', result:'loss', system: systemId,
+          factionName: data.factionName || owner.name, attackPower: data.attackPower,
+          factionDefense: data.factionDefense, creditReward: 0, battlePoints: 5,
+          ownLostShips: data.lost||{}, lostText: lostTxt });
       }
       await loadGalaxyState();
       // Kein zusätzlicher save()-Aufruf hier (siehe ausführlicher Kommentar bei doMarketTrade) -
       // Kredite/Kampfpunkte sind bereits serverseitig persistiert, der reguläre 10s-Timer holt den
       // Rest (z.B. commandPoints, das der Server nicht kennt) nach.
       render();
-    } catch(e){ log('Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle'); }
+    } catch(e){
+      log('Angriff fehlgeschlagen (Verbindungsfehler).', 'ti-alert-triangle');
+      angriffOhneKampf('faction-attack', 'System '+systemId+' ('+owner.name+')',
+        'Die Verbindung brach ab, bevor der Angriff ausgewertet werden konnte.', { system: systemId, factionName: owner.name });
+    }
   }
 
   let offenerFraktionsladen = null; // sitzungslokal, wie state.showExpCodex beim Expeditions-Kodex
@@ -33946,6 +33989,12 @@
     // Schadensrechnung, serverseitig) - sie zaehlt als gewonnener Kampf, wie beim Basis-Angriff
     // jeder Treffer. Der Musterangriff kennt dagegen echtes Abgewehrt-Werden.
     if (r.type === 'alliance-raid') return 'win';
+    /* Die Mondbelagerung fehlte hier bis v8.588.0 - eine gewonnene zaehlte weder in die
+       Kampf-Bilanz noch loeste sie die Kampf-Nachwirkung aus. `destroyed` heisst beim ANGREIFER
+       Sieg, beim VERTEIDIGER das Gegenteil (siehe reportIsPositive), deshalb zwei Zeilen. */
+    if (r.type === 'moon-siege') return r.result === 'destroyed' ? 'win' : 'loss';
+    if (r.type === 'moon-siege-defense') return r.result === 'survived' ? 'win' : 'loss';
+    if (r.type === 'faction-attack') return r.result === 'win' ? 'win' : 'loss';
     if (r.type === 'alliance-muster-attack') return (r.result === 'win' || r.result === 'destroyed') ? 'win' : 'loss';
     return null;
   }
@@ -33994,6 +34043,25 @@
     }
     if (!useBackend()) return;
     try { await backendFetch('/reports', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ report }) }); } catch(e){}
+  }
+  /* EIN Angriff, der gar nicht erst zum Kampf kam, ist trotzdem ein Ereignis, das der Spieler
+     nachvollziehen koennen muss (Auftrag Sascha 19.08.2026, zweite Etappe).
+
+     WARUM DAS EINE EIGENE FUNKTION IST UND KEINE NEUN EINZELFIXES (Hausregel 43): Neun Stellen
+     hatten denselben Ausgang und dieselbe Luecke - Server nicht erreichbar, Abklingzeit, Ziel
+     schon gefallen, Nest weitergezogen, zu spaet angekommen. Jede schrieb ihren Grund AUSSCHLIESS-
+     LICH ins `#log`. Das hat keinen Stapel: `log()` schreibt per innerHTML und ueberschreibt sich
+     mit der naechsten Meldung selbst (Hausregel 47). Der Grund war also nach Sekunden weg - und
+     beim OFFLINE-NACHHOLEN, wo `showLog` auf false steht, ist er nie erschienen.
+
+     Der Bericht traegt denselben `type` wie der geglueckte Angriff. Damit landet er in derselben
+     Kategorie, und die Knoepfe der Karte (z.B. "Zeigen, wo das war") greifen unveraendert. Der
+     Zeichner faengt `keinKampf` in EINEM Zweig ganz vorn ab, statt in jedem Typ-Zweig erneut.
+
+     Das `log()` an der Aufrufstelle bleibt bewusst stehen - es ist die sofortige Rueckmeldung,
+     der Bericht das bleibende Protokoll. Zwei verschiedene Fragen, zwei verschiedene Orte. */
+  function angriffOhneKampf(typ, ziel, grund, felder){
+    pushReport(Object.assign({ type: typ, keinKampf: true, ziel: ziel || '', grund: grund || '' }, felder || {}));
   }
   // Auto-Wiedergabe für AUSGEHENDE Angriffe des Spielers (13.07.2026, Feature-Wunsch: die animierte
   // Kampf-Wiedergabe soll standardmäßig erscheinen, wenn man selbst angreift, nicht nur bei
@@ -39921,7 +39989,7 @@
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
@@ -39952,6 +40020,11 @@
        einer Kolonie und 'Verloren' ueber einer geglueckten Abwehr - in BEIDE Richtungen falsch.
        Die Zeile steht deshalb VOR der generischen Regel, wie die zwei Zweige darueber. */
     if (r.type === 'moon-siege-defense') return r.result === 'survived';
+    /* Ein Angriff ohne Kampf ist weder Sieg noch Niederlage. Ohne diese Zeile faerbte ihn die
+       generische Regel unten nach `result` ein - ein Feld, das er gar nicht traegt - und die
+       Karte truege die Pille "Verloren" ueber einem Ausgang, der den Spieler nichts gekostet
+       hat. Er gilt deshalb als neutral-positiv: nichts ist schiefgegangen. */
+    if (r.keinKampf) return true;
     if (r.type === 'nest-angriff') return true;
     // 'destroyed' (zerstoerte gegnerische Basis - der beste Ausgang) galt hier bis v8.430.0 als
     // negativ: rote Karte, "Verloren"-Pille. battleCardData hatte den Fall laengst richtig, diese
@@ -40140,7 +40213,14 @@
       const when = new Date(r.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       const won = r.result === 'win' || r.result === 'destroyed';
       let title = '', body = '', actionsHtml = '';
-      if (r.type === 'attack-sent'){
+      /* Ein Angriff, der nicht zum Kampf kam, wird EINMAL hier abgefangen - nicht in jedem
+         Typ-Zweig erneut. Der Bericht traegt den Typ des geglueckten Angriffs, damit Kategorie
+         und Kartenknoepfe unveraendert greifen; nur der Rumpf ist ein anderer. */
+      if (r.keinKampf){
+        title = '⃠ Kein Kampf' + (r.ziel ? ' – ' + escapeHtml(r.ziel) : '');
+        body = '<strong>' + escapeHtml(r.grund || 'Der Angriff kam nicht zustande.') + '</strong>'
+             + '<br>Dein Verband ist vollzählig zurückgekehrt – keine Verluste, keine Abklingzeit.';
+      } else if (r.type === 'attack-sent'){
         title = (won?'Sieg':'Niederlage')+' – Angriff auf '+escapeHtml(r.targetName);
         body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Verteidigungspunkte: '+r.defensePower;
         // Kampfverlauf, Konter und die Aufstellung des Ziels (01.08.2026). Der Server schickt alle
@@ -40250,6 +40330,19 @@
         body = '<strong>'+(r.result==='destroyed' ? 'Die Allianzbasis wurde von ['+escapeHtml(r.attackerTag||'??')+'] ZERSTÖRT! Alle Boni sind bis zur Reparatur deaktiviert.' : '['+escapeHtml(r.attackerTag||'??')+'] hat die Allianzbasis angegriffen - '+fmt(r.damage||0)+' Hüllenschaden.')+'</strong>';
         if (r.lostText) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine stationierten Verluste: '+r.lostText;
         body += '<br>Details und Reparatur im Allianz-Tab.';
+      } else if (r.type === 'faction-attack'){
+        title = (r.result==='win'?'🏴 ':'🛡 ')+'Angriff auf '+escapeHtml(r.factionName||'eine Fraktion');
+        body = '<strong>'+(r.result==='win'
+          ? 'System '+escapeHtml(r.system||'')+' erobert.'
+          : 'Der Angriff auf '+escapeHtml(r.system||'das System')+' ist gescheitert.')+'</strong>';
+        if (r.attackPower !== undefined && r.factionDefense !== undefined)
+          body += '<br>Deine Angriffskraft: '+fmt(r.attackPower)+' vs. Verteidigung: '+fmt(r.factionDefense)+'.';
+        if (r.lostText && r.lostText !== 'keine')
+          body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+escapeHtml(r.lostText);
+        else if (r.result !== 'win') body += '<br>Keine Schiffe verloren.';
+        if (r.creditReward) body += '<br>Beute: '+fmt(r.creditReward)+' Kredite.';
+        if (r.battlePoints) body += '<br>+'+fmt(r.battlePoints)+' Kampfpunkte.';
+        body += '<br><span class="bmeta">Der Ruf bei dieser Fraktion sinkt unabhängig vom Ausgang.</span>';
       } else if (r.type === 'moon-siege'){
         /* Bis v8.585.0 hatte KEINE der beiden Mondbelagerungs-Arten einen Zweig hier - und die
            Kette endet ohne Abschluss-`else`. `title` und `body` blieben also auf '', gemessen
@@ -51613,6 +51706,11 @@
               const data = await res.json();
               if (!res.ok || !data.ok){
                 if (showLog !== false) log('Weltboss-Mission konnte nicht ausgewertet werden: '+(data.error||'unbekannt'), 'ti-alert-triangle');
+                /* Der Bericht ist hier WICHTIGER als das log: `showLog` steht beim Offline-Nachholen
+                   auf false, der Spieler erfuhr in genau dem Fall also gar nichts. */
+                angriffOhneKampf('npc-attack', worldBossName(bLevel),
+                  'Der Server konnte die Weltboss-Mission nicht auswerten: '+(data.error||'unbekannter Grund')+'.',
+                  { fleetName:m.fleetName, npcName: worldBossName(bLevel), npcLevel: bLevel });
                 return;
               }
               state.credits = data.newCredits;
@@ -51623,6 +51721,11 @@
               if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
               if (data.arrivedTooLate){
                 if (showLog !== false) log(data.onCooldown ? 'Weltboss-Angriff einmal pro Tag: die Abklingzeit war bei Ankunft noch aktiv (+50 Kredite Spesen).' : 'Der Leviathan war bei Ankunft bereits gefallen - deine Flotte kehrt um (+50 Kredite Spesen).', 'ti-skull');
+                angriffOhneKampf('npc-attack', worldBossName(bLevel),
+                  data.onCooldown
+                    ? 'Bei der Ankunft lief die tägliche Abklingzeit noch – der Angriff wurde nicht gewertet.'
+                    : 'Der Weltboss war bei der Ankunft nicht mehr da – er wurde vorher erlegt oder das Zeitfenster war zu.',
+                  { fleetName:m.fleetName, npcName: worldBossName(bLevel), npcLevel: bLevel });
               } else {
                 // Verluste lokal nachziehen (Server hat sie bereits im gespeicherten Spielstand
                 // abgezogen; der nächste reguläre Speichervorgang gleicht alles endgültig ab, siehe
@@ -51644,7 +51747,15 @@
               // Kredite/Kampfpunkte sind bereits serverseitig persistiert, der reguläre 10s-Timer holt
               // den Rest nach.
               render();
-            } catch(e){}
+            } catch(e){
+              /* Bis v8.588.0 stand hier `catch(e){}` - ein Netzabbruch oder eine Antwort, die kein
+                 JSON ist (z.B. eine 502-Seite des nginx), liess die Weltboss-Mission SPURLOS
+                 verschwinden: kein Bericht, kein log, kein Toast. Der Spieler sah nur, dass seine
+                 Flotte weg war und nichts passiert ist. */
+              angriffOhneKampf('npc-attack', worldBossName(bLevel),
+                'Die Verbindung brach ab, bevor der Angriff ausgewertet werden konnte – deine Flotte ist unversehrt.',
+                { fleetName:m.fleetName, npcName: worldBossName(bLevel), npcLevel: bLevel });
+            }
           })();
         } else if (m.type === 'piratelair'){
           const stage = m.targetId || 1;
