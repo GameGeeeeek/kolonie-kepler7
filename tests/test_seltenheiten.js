@@ -82,8 +82,12 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
   const qNext = fnAus('function nextRarityOf(rarity){');
   // Seit v8.444.0 (Wert-Streuung) matcht die Schmelze GESCHWISTER - die beiden Helfer
   // gehoeren mit in die Sandbox, sonst wirft fuseModules einen ReferenceError (Arbeitsregel 9).
+  // fuseAnzahl delegiert seit dem Inventar-Deckel (21.08.2026) an fuseGruppeVon und nimmt einen
+  // optionalen Zaehler-Index entgegen - die Abhaengigkeit wird ebenfalls AUS DER DATEI
+  // geschnitten, nie nachgebaut (Hausregel 36).
   const qFuse = fnAus('function fuseGeschwister(inv, instKey){') + '\n' +
-                fnAus('function fuseAnzahl(inv, instKey){') + '\n' +
+                fnAus('function fuseGruppeVon(instKey){') + '\n' +
+                fnAus('function fuseAnzahl(inv, instKey, idx){') + '\n' +
                 fnAus('function fuseModules(isShip, instKey){');
   check('3a: nextRarityOf und fuseModules gefunden', qNext.length > 100 && qFuse.length > 900);
   const naechste = new Function('MODULE_RARITY', qNext + '\nreturn nextRarityOf;')(RAR);

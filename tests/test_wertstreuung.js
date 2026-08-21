@@ -75,8 +75,12 @@ check('3b: die Fragment-Fertigung bleibt bei 100% (kein Token im gefertigten Sch
 
 // ---- 4) Schmelze ausgefuehrt: Geschwister + bester Wurf
 {
+  // fuseAnzahl delegiert seit dem Inventar-Deckel (21.08.2026) an fuseGruppeVon und nimmt einen
+  // optionalen Index entgegen - die Abhaengigkeit wird ebenfalls AUS DER DATEI geschnitten,
+  // nicht nachgebaut (Hausregel 36).
   const quelle = fnAus('function fuseGeschwister(inv, instKey){') + '\n' +
-                 fnAus('function fuseAnzahl(inv, instKey){') + '\n' +
+                 fnAus('function fuseGruppeVon(instKey){') + '\n' +
+                 fnAus('function fuseAnzahl(inv, instKey, idx){') + '\n' +
                  fnAus('function fuseModules(isShip, instKey){');
   check('4a: fuseGeschwister/fuseAnzahl/fuseModules gefunden', quelle.length > 1200, quelle.length);
   const RAR = { selten: { label: 'Selten' }, episch: { label: 'Episch' } };

@@ -3554,7 +3554,73 @@ so gelassen.
 **Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
 Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.
 
-### Wer sein Schürfrecht verteidigt (21.08.2026, v8.597.0) – die Lücke war nicht der Text
+### Bonuscodes (21.08.2026, v8.598.0 · Backend #155)
+
+**Auftrag Sascha:** „ich will ab und zu mal bonuscodes posten wo die spieler kleine geschenke
+bekommen die codes sollen aber nur eine gewisse gültigkeit haben also max 1 mal pro account einlösbar
+und nur 1 woche etc aktiv am liebsten baust du mir das in den admin bereich ein."
+
+Fünfter Reiter im Admin-Overlay („Codes"), Eingabefeld unter **Einstellungen → Bonuscode einlösen**,
+Gutschrift über die Belohnungs-Warteschlange. Die serverseitigen Regeln und ihre Begründungen stehen
+in der **Backend-CLAUDE.md**; hier nur, was das Frontend angeht.
+
+### Der eigene `type:'bonuscode'` in `claimPendingRewards` ist PFLICHT, nicht Kosmetik
+
+`claimPendingRewards` weist einen unbekannten Belohnungstyp **nicht ab** – er fällt in den
+Rückfall-Zweig, und der meldet wörtlich **„Dankeschön vom Team: +500 Kredite für deinen
+Bug-Report!"**. Bei einem Code ohne `credits` steht dort sogar **„+NaN Kredite"**, weil die Meldung
+außerhalb des `if (r.credits)` liegt. Beides in der Gegenprobe gemessen (`3a`/`3f`), nicht vermutet.
+
+**Der Zweig darf außerdem nicht werfen.** `claimPendingRewards` läuft komplett in einem stillen
+`try/catch`, und der Server hat den Eintrag beim Abholen **bereits aus der Warteschlange entfernt** –
+eine Ausnahme bricht die Schleife ab und die Belohnung ist unwiederbringlich weg. Deshalb filtert
+der Zweig jeden Wert einzeln (`Math.floor`, `> 0`), statt dem Server zu vertrauen.
+
+Roh addiert wie der `festung`-Zweig darüber, also **ohne Lagerdeckel**: Ein Geschenk, das am vollen
+Lager verpufft, wäre die unfreundlichere Auslegung, und die Beträge sind klein.
+
+### Die Fläche folgt dem Referral-Block – bis auf einen Punkt
+
+Das Eingabefeld liegt im vorhandenen `prog-section data-sec="konto"` (kein eigener Abschnitt, sonst
+bräuchte es einen Eintrag in `PROG_SECTIONS.einstellungen`), mit derselben Sichtbarkeitsbedingung
+`useBackend() && accountUsername`. **Der Unterschied ist die Ablehnung:** Der Einladungs-Bonus
+verschweigt seine bewusst – er löst sich im Hintergrund ein, ohne dass der Spieler etwas angeklickt
+hat, und der Kommentar dort begründet es. Ein Bonuscode ist eine **bewusste Bedienhandlung**; ein
+stiller Fehlschlag wäre genau die tote Fläche, gegen die Regel 35 geschrieben ist. Der Grund steht
+deshalb in einer **bleibenden** Zeile (`#bonusCodeStatus`) – `log()` überschreibt sich mit der
+nächsten Meldung selbst.
+
+Dazu ein **Bericht** (`type:'bonuscode'`, ohne Gewonnen/Verloren-Pille, eigenes Symbol `ti-award`) –
+die dauerhafte Auskunft, was gutgeschrieben wurde.
+
+### Zwei Fallen, beide beim Bauen aufgetreten
+
+- **Die Verdrahtung MUSS `onclick =` sein, nie `addEventListener`.** Sie liegt in `render()`, und das
+  läuft jede Sekunde – ein `addEventListener` hätte nach einer Minute 60 Handler und schickte den
+  Code 60-mal ab. `test_bonuscodes` 5a misst das über den Spielerweg: ein Klick nach mehreren Ticks
+  darf genau **eine** Anfrage auslösen.
+- **`resName` gibt es nicht, die Funktion heißt `resLabel`** (Regel 4: Namen ablesen, nicht raten).
+  Der Syntax-Check hätte das nicht gefangen – `new Function` parst nur.
+
+### Die Gaben-Felder im Admin-Bereich kommen VOM SERVER
+
+`GET /admin/bonuscodes` liefert `gaben` und `laufzeiten` mit; das Frontend zeichnet die Eingabefelder
+daraus. Eine Tabelle hier wäre die zweite Kopie der Obergrenzen, die beim nächsten Umbau
+auseinanderläuft – dieselbe Entscheidung wie bei den Kosmetik-Bedingungen. `test_bonuscodes` 6b/6c
+hält das fest.
+
+Wächter: `tests/test_bonuscodes.js` (27 Prüfungen, zwei Gegenproben). **Die zweite Gegenprobe ist die
+aussagekräftige:** Nur den `bonuscode`-Zweig entfernt, alles andere gelassen – dann meldet das Spiel
+`{"zeilen":["Dankeschön vom Team: +500 Kredite für deinen Bug-Report!"]}` bzw. `+NaN Kredite`, und
+Erz wie Kampfpunkte kommen gar nicht erst an.
+
+**Und ein eigener Werkzeugfehler, der Regel 34 belegt:** Die erste Gegenprobe gegen `origin/main`
+lief mit **24 statt 27** Prüfungen – der Test starb beim Aufbau von Abschnitt 6e, weil es die
+Admin-Felder dort nicht gibt, und `6e`/`6f` liefen nie. Der rote Exit-Code sah wie eine vollständige
+Gegenprobe aus. Der Aufbau steht seitdem in `try/catch` und meldet seinen Fehlschlag als eigene
+Prüfung `6e-bau`.
+
+## Wer sein Schürfrecht verteidigt (21.08.2026, v8.597.0) – die Lücke war nicht der Text
 
 Der letzte offene Punkt der Berichts-Familie. Nachgemessen im Browser war er **zwei** Befunde, und
 der zweite ist der schwerere:
@@ -4073,3 +4139,178 @@ Der „nginx auf dem Pi" ist **kein systemd-nginx**, sondern läuft als **Docker
 - Der Host `certbot.timer` (systemd) ist eine **harmlose Altlast** und kennt die Docker-Volume-Zertifikate nicht – ignorieren.
 
 **PRs sofort mergen**: Offene PRs nach dem Push ohne Rückfrage direkt mergen (nicht als Draft offen lassen) – sonst landen Änderungen nicht auf `main`. Gilt für Frontend- und Backend-Repo gleichermaßen. **Seit der Webhook bekannt ist, wiegt das schwerer als gedacht**: Der Merge ist nicht bloß ein Zwischenschritt zu einem späteren manuellen Deploy, sondern die Auslieferung selbst – was gemerged wird, steht Sekunden später auf `gamegeeeeek.de`. Der Prüflauf (`node tests/run.js`, grün) ist deshalb keine Formalie, sondern das einzige, was zwischen einer Änderung und den Spielern steht.
+
+## Das Inventar hing nach einem Massenkauf (21.08.2026, Spieler-Report)
+
+**Wortlaut Sascha:** „problem entstanden ich hatte 200millioen credits und hab bei modulblaupausen
+alles auf einmal gekauft jettzt hängt das spiel sobald ich ins inventar will!"
+
+Kein Wackeln, kein Ladefehler – **das Spiel stand wirklich**. Gemessen im Browser an einem
+Fixture, das den gemeldeten Fall nachstellt, Aufbau bis zur ersten Modulkarte:
+
+| Module | vorher | nachher | Markup vorher → nachher |
+|---|---|---|---|
+| 50 | 62 ms | 60 ms | 0,25 MB → 0,25 MB |
+| 4.000 | **30.628 ms** | 158 ms | 20,1 MB → 0,60 MB |
+| 5.000 | 30.343 ms | 109 ms | 24,6 MB → 0,60 MB |
+| 20.000 | **485.186 ms** | 206 ms | 100 MB → 0,62 MB |
+
+Härter noch als der Aufbau ist der längste EINZELNE Long Task – die Zeit, in der der Browser auf
+gar nichts mehr reagiert: bei 4.000 Modulen **15.186 ms gegen 90 ms**.
+
+### Die Ursache war dreiteilig, und nur der erste Teil ist die eigentliche Überraschung
+
+**(A) Der Schlüssel enthält einen ZUFALLSWURF – gekaufte Module stapeln deshalb nie.** Seit der
+Wert-Streuung (v8.444.0) baut `grantRandomModule` den Schlüssel als
+`typ:seltenheit:1:<subs>.w<wurf>`; darin stecken die gewürfelten Zweitwerte UND der
+Hauptwert-Wurf. Zwei Blaupausen desselben Typs landen damit praktisch immer auf zwei
+verschiedenen Schlüsseln. 20.000 Käufe sind also 20.000 Inventar-Einträge, nicht ein Stapel mit
+`×20000`. Der Kommentar an `fuseGeschwister` sagt das sogar wörtlich („identische Schluessel gibt
+es bei Funden faktisch nicht mehr") – nur hatte niemand die Folge für die LISTE zu Ende gedacht.
+
+**(B) Darauf lief eine quadratische Schleife.** Jede gezeichnete Modulkarte rief `fuseAnzahl`, und
+das lief über `fuseGeschwister` durch **alle** Inventar-Schlüssel. 20.000 Karten × 20.000
+Schlüssel = 400 Mio Vergleiche – je Neuzeichnung, und die Box wird im Sekundentakt geschrieben.
+
+**(C) Der „Max"-Knopf des Kredit-Shops hatte gar keine Obergrenze** (`Math.floor(credits / cost)`).
+Bei 200 Mio Krediten waren das 20.000 Blaupausen in einem Klick.
+
+### Behoben in drei Teilen – und keiner davon allein hätte gereicht
+
+1. **`fuseIndexBauen(inv, isShip)`** baut den Zähler EINMAL je Renderdurchgang statt einmal je
+   Karte; `fuseAnzahl(inv, instKey, idx)` nimmt ihn optional entgegen. Der Einzelaufruf in
+   `fuseModules` läuft weiter ohne Index – er feuert genau einmal je Klick. Die Gruppe eines
+   Moduls (Typ, Seltenheit, Stufe) steht als `fuseGruppeVon` an EINER Stelle, damit Index und
+   `fuseGeschwister` nicht auseinanderlaufen können.
+2. **`modulInventarZuschnitt(keys)`** zeichnet höchstens `MODUL_INVENTAR_MAX_KARTEN` = 120
+   Einträge und **beziffert den Rest** statt ihn zu verschweigen. Der Hinweis nennt beide Zahlen,
+   sagt, dass nichts verloren ist, und zeigt auf die Schnell-verschrotten-Knöpfe.
+3. **`MODUL_INVENTAR_KAUF_DECKEL` = 3.000** begrenzt, wie viele Einträge ein KAUF hinterlassen
+   darf. `shopMaxMenge(item)` ist dabei die EINE Stelle, die „wie viel geht höchstens"
+   beantwortet – vorher stand die Rechnung zweimal da (Kartenbeschriftung und Max-Knopf), und
+   **beide kannten weder das Tageslimit noch den Inventar-Platz**: Der Knopf versprach eine Menge,
+   die der Kauf danach stillschweigend kürzte.
+
+**Der Zuschnitt sortiert bei großen Beständen FACHWEISE, und das ist der halbe Gewinn.** Volles
+Sortieren ruft `moduleInvVergleich` n·log(n)-mal, und der ruft je Vergleich `moduleLevelOf` und
+`moduleWertOf` – bei 20.000 Modulen rund 285.000 Vergleiche für eine Liste, von der 120 Einträge
+gezeichnet werden. **Die Reihenfolge bleibt dabei identisch, und das ist keine Hoffnung, sondern
+folgt aus der Bauart des Vergleichs:** Seine erste Stufe ist der Seltenheitsrang. Wer die Fächer
+in Rangordnung abarbeitet und jedes mit demselben Vergleich sortiert, bekommt exakt die Ordnung
+des vollen Sortierens. `test_inventar_deckel` 2c misst das als Paar gegen das volle Sortieren.
+
+Nebenbei: `moduleInvVergleich` zog bei **jedem** Vergleich zweimal ein frisches
+`Object.keys(MODULE_RARITY)`. Die Rangordnung wird jetzt einmal in `rarRang` abgeleitet – bewusst
+ABGELEITET und nicht als Namensliste hingeschrieben, `MODULE_RARITY` ist die einzige Quelle der
+Rangfolge (siehe `nextRarityOf`).
+
+### Die Zahlen sind gemessen, nicht gegriffen
+
+- **120 Karten:** Bei 5.000 gezeichneten Einträgen stand der Aufbau bei 30 s und 25 MB, bei 120 bei
+  0,06 s und 0,6 MB. Weit über jedem regulären Inventar – wer so viele hält, hat sie gekauft.
+- **3.000 Einträge:** 3.000 sind gemessen **0 Long Tasks** und 159 kB Spielstand, 5.000 schon
+  588 ms/10 s und 257 kB, 20.000 dann 1.557 ms/10 s und 980 kB (normal sind 17 kB). 3.000 ist die
+  höchste gemessene Stufe ohne messbare Belastung. **Der Spielstand wiegt dabei schwerer als die
+  Bildrate: Er reist bei JEDEM Speichern zum Server.**
+
+**Gedeckelt wird nur das HINZUFÜGEN durch Kauf.** Funde aus Expeditionen und Sonden bleiben
+unberührt, und wer heute schon darüber liegt, verliert nichts – dieselbe Regel wie bei den
+Komfort-Grenzen. Ebenfalls außen vor sind Tagesangebot und Wochen-Angebot: Die liefern ein Modul
+je Tag bzw. Woche und können den Bestand bauartbedingt nicht sprengen. Die Unterscheidung läuft
+**datengetrieben über das Feld `toModules`**, nicht über eine Namensliste.
+
+### Zwei Anzeigestellen, die still falsch geworden wären
+
+- Der Titel des Max-Knopfes sagte „Höchste mit deinen Krediten kaufbare Menge" – mit dem Deckel
+  eine Falschaussage.
+- Der Hilfe-Abschnitt „Kredit-Shop" behauptete „Alles andere ist beliebig oft kaufbar". Das war
+  seit dem Fragment-Tageslimit (17.08.2026) schon falsch und wurde es jetzt ein zweites Mal.
+
+Beide nennen jetzt ihre Grenzen, und der Hilfetext leitet die Zahl aus der Konstante ab
+(Reihenfolge vorher gemessen: beide Konstanten stehen vor `HELP_SECTIONS`, Regel 38 geprüft).
+
+### Wächter: `tests/test_inventar_deckel.js` (32 Prüfungen, fünf Gegenproben)
+
+Er misst die WIRKUNG, nicht die Beschriftung – und zwar als **Paar**: Lauf A weit über dem Deckel
+(Kauf wird abgelehnt, Grund genannt, Bestand wächst nicht), Lauf B knapp darunter (Kauf findet
+statt und füllt **genau** bis an den Deckel). **Ohne Lauf B wäre auch ein Deckel grün, der immer
+ablehnt.** Alle fünf Gegenproben beidseitig gefahren, jede mit ihrer eigenen „was muss fallen"-Liste
+und `WERKZEUGFEHLER`-Meldung (Regel 71); überall 32 Prüfungen in beide Richtungen.
+
+**Fünf Werkzeugfehler beim Bau dieses Tests – jeder eine bekannte Familie, und der vierte ist der
+lehrreichste:**
+
+1. **Geschnittene Funktionen ohne ihre Abhängigkeiten** (Regel 36), gleich viermal: `rarRang`
+   fehlte `moduleInvVergleich`, `fuseGruppeVon` fehlte `fuseAnzahl` (in **drei** Bestandstests:
+   `test_wertstreuung`, `test_seltenheiten`, und im neuen Test selbst), `MODULE_LEVEL_MAX` fehlte
+   `moduleLevelOf`. Letzteres warf erst beim AUFRUF – also außerhalb des Bau-`try/catch`; seitdem
+   ist auch das Ausführen eine eigene, benannte Prüfung (`2a-lauf`, Regel 34).
+   `test_seltenheiten` lief dadurch mit **10 statt 21** Prüfungen und meldete trotzdem nur „rot".
+2. **Indizes aus zwei verschiedenen Strings verglichen:** Die Prüfung „niemand sortiert am
+   Zuschnitt vorbei" suchte in `JS_OHNE_HISTORIE`, hielt die Treffer aber gegen Blockgrenzen aus
+   `JS` – der herausgeschnittene Patchnotes-Block verschiebt alle Indizes, also lag **jede**
+   Fundstelle scheinbar außerhalb.
+3. **Den Spielstand aus `localStorage` gelesen**, obwohl er beim Backend-Mock liegt (Regel 65):
+   gemessen wurden 0 Einträge, was wie ein Befund aussah.
+4. **Einen Kürzungspfad gemessen, den der gewählte Weg gar nicht erreichen kann.** Über „Max"
+   deckelt der Knopf ja bereits richtig – `qty > platz` ist dann nie wahr. Der Pfad ist nur über
+   einen festen Mengenknopf (×10 bei 5 freien Plätzen) oder einen veralteten Wert erreichbar.
+   Das ist Regel 67: **ein unerreichbarer Pfad ist kein Testproblem, sondern eine Aussage über das
+   Bauwerk** – hier eine gute, denn sie heißt, dass der Normalweg gar nicht erst in die Kürzung
+   läuft.
+5. **Den MutationObserver den Endstand lesen lassen statt der Records:** Ein Kauf löst eine
+   Erfolgs-Salve im selben synchronen Block aus, und der Callback läuft als Microtask danach – die
+   Kürzungs-Meldung war von „Erfolg freigeschaltet: Perfekter Wurf" überschrieben. Muster jetzt wie
+   in `test_markt_kontingent.js`, per `addInitScript` und über die Records.
+   Dazu war der BELEG einer grünen Prüfung falsch: `slice(-2)` zeigte zweimal „Erfolg
+   freigeschaltet", während die geprüfte Zeile weiter vorn stand – eine grüne Prüfung, deren
+   Beleg etwas anderes behauptet (Regel 37).
+
+75. **Ein Erwartungswert, der die geprüfte KONSTANTE aus derselben Datei liest, lässt sich durch
+    Ändern der Konstante entschärfen – das ist Regel 62 an einer Schranke statt an einer Formel.**
+    Vorfall 21.08.2026: `3b` prüfte „höchstens `MODUL_INVENTAR_MAX_KARTEN` Karten gezeichnet" und
+    las den Deckel aus der Spieldatei. Die Gegenprobe setzte ihn auf 999999 – und die Prüfung
+    blieb **grün**, völlig folgerichtig: Die sabotierte Konstante wurde ja eingehalten. Gemeldet
+    hat es nur die „was muss fallen"-Liste der Gegenprobe (Regel 71); ohne sie wäre der Test mit
+    einer Lücke ausgeliefert worden, die genau den Anlassfall durchlässt.
+    **Vorgehen:** Zu jeder Prüfung gegen eine Konstante aus der geprüften Datei gehört eine zweite
+    mit einem **absoluten, begründeten Anker** – hier `3b2` („höchstens 500 Karten, egal was die
+    Konstante sagt") und `1-vorab2`/`1-vorab3` („der Deckel liegt im gemessen vertretbaren
+    Bereich"). Die absoluten Zahlen kommen aus der Messung, nicht aus dem Gefühl. Dasselbe galt für
+    das Fixture selbst: Seine Vorab-Prüfung hing an `MAX_KARTEN * 5` und wanderte damit mit.
+
+76. **Ein Zufallswurf im SCHLÜSSEL macht aus einem Stapel eine Liste – und aus jeder Schleife
+    darüber eine quadratische.** Aus demselben Vorfall, und es ist die Ursache dahinter: Der
+    Modul-Schlüssel trägt seit v8.444.0 die gewürfelten Zweitwerte und den Hauptwert-Wurf. Damit
+    ist `state.modules` kein Stapelzähler mehr (`typ → Anzahl`), sondern eine Liste von Unikaten,
+    und jede Rechnung „je Eintrag über alle Einträge" wächst quadratisch. Der Kommentar an
+    `fuseGeschwister` benannte die Eigenschaft korrekt – gefehlt hat die Frage, was sie für die
+    ANZEIGE bedeutet.
+    **Vorgehen:** Wer einem Schlüssel ein gewürfeltes Segment hinzufügt, prüft anschließend jede
+    Stelle, die über die Schlüssel dieser Sammlung iteriert, auf ihre Ordnung – und jede Stelle,
+    die eine Obergrenze für die Sammlung annimmt (Renderlisten, Sortierungen, der Spielstand
+    selbst). Die Kosten treten erst bei einem Spieler auf, der die Sammlung wirklich füllt, also
+    Monate nach der Auslieferung und außerhalb jedes Tests mit Normal-Fixture.
+
+77. **Ein `\uXXXX`-Escape im Patchnote-Text macht die dateiweiten Zeichenprüfungen BLIND.**
+    Vorfall 21.08.2026: Der Patchnote zu v8.599.0 entstand über ein Python-Skript, das seine
+    Umlaute als `ä`/`ß` schrieb (23 Stück). Das ist zur Laufzeit korrekt – JavaScript
+    löst die Escapes in einem String-Literal auf, und die erzeugte `patchnotes.html` zeigte
+    einwandfrei „Sehr große Inventare…". Trotzdem war es ein Fehler, und zwar ein unsichtbarer:
+    Die Pflichtprüfung „Anführungszeichen im Hausstil" sucht nach dem **Literal** U+201C im
+    Quelltext. Fünf falsche Anführungszeichen standen als `“` da und wurden deshalb **nicht
+    gefunden** – der Prüflauf war grün, und v8.599.0 wäre mit demselben Hausstil-Verstoß live
+    gegangen, der schon v8.564.0 mit rotem Prüflauf ausgeliefert hat (Regel 58).
+    Aufgefallen ist es nur, weil die Escapes als STIL-Abweichung auffielen (1.473 echte Umlaute in
+    der Datei gegen 23 Escapes) und ich sie vor dem Merge ersetzt habe – erst danach schlug die
+    Prüfung an.
+    **Vorgehen:** Wer Spielertext über ein Skript einfügt, schreibt die Sonderzeichen **direkt**
+    hinein (Python-Quelldateien sind UTF-8, `io.open(..., encoding='utf-8')` genügt) – nie als
+    Escape. Ein Escape ist kein Schreibfehler, sondern eine TARNUNG: Er versteckt das Zeichen vor
+    jeder Prüfung, die den Quelltext liest, und genau solche Prüfungen sind hier die
+    Pflichtprüfungen. Und wer einen Patchnote noch vor dem Merge umschreibt, fährt danach
+    `--nummer` erneut – die Änderung sieht harmlos aus und kann eine dateiweite Prüfung kippen.
+    **Die zweite Hälfte ist die eigentliche Lehre:** Ein Prüflauf, der grün ist, weil das Gesuchte
+    in einer anderen Kodierung dasteht, ist die Familie aus Regel 32 (Literal gesucht, Rechenform
+    übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
+    das Werkzeug Sauberkeit, wo keine ist.
