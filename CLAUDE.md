@@ -2708,25 +2708,62 @@ Gegenprobe gegen den ausgelieferten Stand: **5 rot bei identischen 15 Prüfnamen
 verglichen, nicht gezählt – Regel 60), und jede benennt ihren Fall: `["moon-siege",
 "moon-siege-defense"]`, `["pvp-fleet-loss"]`, `["Gewonnen","Verloren"]`.
 
+### Zweite Etappe (v8.589.0): `angriffOhneKampf` – EIN Helfer für neun Stellen
+
+Neun Ausgänge schrieben ihren Grund **ausschließlich** ins `#log`: Server nicht erreichbar,
+Abklingzeit, Ziel schon gefallen, Nest weitergezogen, zu spät angekommen. Alle neun waren
+strukturgleich, also gab es dafür eine Funktion statt neun Einzelkorrekturen (Regel 43):
+
+```js
+function angriffOhneKampf(typ, ziel, grund, felder){
+  pushReport(Object.assign({ type: typ, keinKampf: true, ziel, grund }, felder || {}));
+}
+```
+
+**Der Bericht trägt denselben `type` wie der geglückte Angriff.** Damit landet er in derselben
+Kategorie, und die Kartenknöpfe („Zeigen, wo das war") greifen unverändert. Der Zeichner fängt
+`keinKampf` in **einem** Zweig ganz vorn ab, statt in jedem Typ-Zweig erneut — und
+`reportIsPositive` gibt dafür `true` zurück: Ein Ausgang, der nichts gekostet hat, ist keine
+Niederlage. Am Stand davor gemessen las die Karte **„Angriff auf undefined (Stufe undefined) ·
+Verloren"**.
+
+**Das `log()` an der Aufrufstelle bleibt bewusst stehen** – es ist die sofortige Rückmeldung, der
+Bericht das bleibende Protokoll. Zwei verschiedene Fragen, zwei verschiedene Orte.
+
+**Der Weltboss war der schlimmste Fall, und zwar wegen einer Zeile daneben.** Sein `catch(e){}`
+war leer — ein Netzabbruch oder eine nicht-JSON-Antwort (die 502-Seite des nginx) ließ die Mission
+**spurlos** verschwinden. Und seine zwei anderen Ausgänge hängen an `showLog !== false`: Beim
+**Offline-Nachholen** steht das auf `false`, der Spieler erfuhr dort also auch vorher schon gar
+nichts. Genau deshalb ist der Bericht dort wichtiger als die Meldung.
+
+**`faction-attack` bekam einen ganz neuen Berichtstyp** – er kannte bis dahin **keinen einzigen**
+`pushReport`, obwohl sein Misserfolg echte Schiffe kostet und der Server Angriffskraft,
+Verteidigung und Verlustliste mitliefert. Dazu ein Zeichner-Zweig und ein Eintrag in der
+Kampf-Kategorie.
+
+**`battleOutcomeOf` kannte drei Arten nicht** (`moon-siege`, `moon-siege-defense`,
+`faction-attack`) – eine gewonnene Mondbelagerung zählte weder in die Kampf-Bilanz noch löste sie
+die Kampf-Nachwirkung aus. Beim Mond stehen **zwei** Zeilen da, weil `destroyed` beim Angreifer
+Sieg und beim Verteidiger das Gegenteil heißt.
+
+Der Wächter wuchs dafür auf **23 Prüfungen**: `4a` (der Helfer existiert genau einmal), `4c` (der
+Weltboss-`catch` verschluckt nichts mehr — geprüft wird die URSACHE, nicht die Schreibweise),
+`5`/`5b` gemessen im Spiel (die Karte nennt den Grund UND gilt nicht als Niederlage). Gegenprobe
+gegen v8.588.0: **6 rot bei identischen 23 Prüfnamen**.
+
 ### Was NOCH offen ist – gemessen, aber nicht behoben
 
-Ein Prüf-Durchgang über alle Angriffsarten hat weitere Lücken der Klasse (1) bestätigt. Sie stehen
-hier namentlich, damit sie nicht verlorengehen; keine davon ist ein Absturz, alle sind
-„der Spieler erfährt den Grund nicht":
-
-- **`worldboss`**: leerer `catch(e){}` um die ganze Auflösung – bei Netzabbruch verschwindet die
-  Mission spurlos, ohne Bericht, ohne `log`, ohne Toast. Dazu zwei weitere Zweige ohne Bericht
-  (zu spät angekommen, Server lehnt ab).
-- **`nest-angriff` / `festung-angriff` / `asteroid-contest`**: Ausgang „verpasst", „schon
-  gefallen", „Abklingzeit", „Server nicht erreichbar" – je nur `log()`. Und der präzise Fehlertext
-  des Servers wird dabei weggeworfen.
 - **`attack-player`** hat drei Ausgänge, die die Flotte ohne Bericht heimschicken;
-  **`attack-alliance-base`** schweigt bei Netzfehler und Serverablehnung.
-- **`faction-attack`** erzeugt überhaupt keinen Bericht – nur eine `log()`-Zeile.
+  **`attack-alliance-base`** schweigt bei Netzfehler und Serverablehnung. Beide sind
+  strukturgleich zu den neun oben — `angriffOhneKampf` steht bereit, es fehlt nur der Aufruf.
 - **Verteidiger-Seiten ohne Bericht**: wer ausgespäht wird (nur Postfach-Meldung, während das
-  Störmanöver daneben einen echten Bericht erzeugt) und wer als Schürfrecht-Halter angefochten wird.
-- **`battleOutcomeOf` kennt `moon-siege` nicht** – eine gewonnene Mondbelagerung zählt nicht in die
-  Kampf-Bilanz.
+  Störmanöver daneben einen echten Bericht erzeugt) und wer als Schürfrecht-Halter angefochten
+  wird.
+
+**Ausdrücklich KEINE Lücke sind die Start-Prüfungen** (`sendAllianceBaseAttack` &Co.: „nicht genug
+Treibstoff", „alle Kampfschiffe im Einsatz", „Abklingzeit"). Dort ist die Flotte nie geflogen — ein
+Bericht über einen Angriff, den es nicht gab, wäre selbst eine Falschaussage. Geprüft und bewusst
+so gelassen.
 
 **Wer eine dieser Stellen anfasst, baut den Bericht ein, statt nur zu loggen** – und `1a` des
 Wächters sorgt dafür, dass die neue Art dann auch gezeichnet wird.

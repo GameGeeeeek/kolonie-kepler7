@@ -197,6 +197,69 @@ const felder = t => ({
   check('3: mein zerstoerter Mond gilt NICHT als Sieg', urteile[0] === 'Verloren', { urteile });
   check('3b: mein verteidigter Mond gilt als Sieg', urteile[1] === 'Gewonnen', { urteile });
 
+  // ---- Abschnitt 4: ein Angriff OHNE Kampf nennt seinen Grund --------------------------------
+  //
+  // Neun Stellen schrieben ihren Grund bis v8.588.0 ausschliesslich ins `#log` - und das hat keinen
+  // Stapel, `log()` ueberschreibt sich mit der naechsten Meldung selbst (Hausregel 47). Beim
+  // OFFLINE-Nachholen (showLog === false) erschien er nie. Sie delegieren jetzt an
+  // `angriffOhneKampf`; der Zeichner faengt `keinKampf` in EINEM Zweig ab.
+  const einmal = (OHNE_HISTORIE.match(/function angriffOhneKampf\(/g) || []).length;
+  check('4a: angriffOhneKampf ist genau EINMAL definiert', einmal === 1, { definitionen: einmal,
+    hinweis: 'eine zweite Kopie kann wieder auseinanderlaufen - das war der Vorfall (Hausregel 43)' });
+
+  const aufrufer = (OHNE_HISTORIE.match(/angriffOhneKampf\(/g) || []).length - einmal;
+  check('4b: der Helfer hat Aufrufer', aufrufer >= 8, { aufrufer });
+
+  // Der Weltboss-Zweig hatte ein leeres `catch(e){}` - ein Netzabbruch liess die Mission SPURLOS
+  // verschwinden. Geprueft wird die URSACHE, nicht die Schreibweise (Hausregel 40): Der catch des
+  // Weltboss-Aufrufs muss einen Bericht erzeugen.
+  const wbA = OHNE_HISTORIE.indexOf("'/worldboss/resolve'");
+  check('4-anker: Weltboss-Aufloesung gefunden', wbA > 0, { index: wbA });
+  const wbBlock = wbA > 0 ? OHNE_HISTORIE.slice(wbA, wbA + 6000) : '';
+  const wbCatch = /\} catch\(e\)\{\s*\}/.test(wbBlock);
+  check('4c: der Weltboss-catch verschluckt den Fehler NICHT mehr', !wbCatch,
+    { leererCatch: wbCatch, hinweis: 'ein leerer catch laesst die Mission spurlos verschwinden' });
+  check('4d: der Weltboss-Block erzeugt Berichte fuer seine Ausgaenge ohne Kampf',
+    (wbBlock.match(/angriffOhneKampf\(/g) || []).length >= 3,
+    { treffer: (wbBlock.match(/angriffOhneKampf\(/g) || []).length });
+
+  // ---- Abschnitt 5: gemessen im Spiel ---------------------------------------------------------
+  const ohneKampf = [
+    { id:'k1', time:Date.now(), type:'nest-angriff', keinKampf:true, ziel:'Nest der Kryll bei Chronos',
+      grund:'Das Nest war bei der Ankunft nicht mehr da – gefallen oder weitergezogen.' },
+    { id:'k2', time:Date.now(), type:'npc-attack', keinKampf:true, ziel:'Weltboss',
+      grund:'Die Verbindung brach ab, bevor der Angriff ausgewertet werden konnte – deine Flotte ist unversehrt.' }
+  ];
+  const ctx3 = await browser.newContext({ viewport:{ width:1100, height:1600 } });
+  const page3 = await ctx3.newPage();
+  await page3.route('**/api/**', backend(ohneKampf));
+  await page3.addInitScript(() => { localStorage.setItem('kepler7_token','tok'); });
+  await page3.goto(SPIEL_URL);
+  await page3.waitForTimeout(3000);
+  await page3.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay',
+    'kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay']
+    .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }));
+  await page3.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="berichte"]'); if (b) b.click(); });
+  await page3.waitForTimeout(2000);
+  const karten3 = await page3.evaluate(() => {
+    const box = document.getElementById('reportsBox');
+    return [...box.children].filter(el => /\d\d\.\d\d\., \d\d:\d\d/.test(el.textContent))
+      .map(el => el.textContent.replace(/\s+/g,' ').trim());
+  });
+  check('5-vorab: beide Karten ohne Kampf gezeichnet', karten3.length === 2, { anzahl: karten3.length });
+
+  // Die eigentliche Aussage: der GRUND steht auf der Karte. Geprueft wird die Regel (der Grundtext
+  // taucht auf), nicht eine Schreibweise (Hausregel 3).
+  const grundFehlt = ohneKampf.filter((r, i) => !(karten3[i] || '').includes(r.grund.slice(0, 40)));
+  check('5: die Karte nennt den GRUND, warum kein Kampf stattfand', grundFehlt.length === 0,
+    { ohneGrund: grundFehlt.map(r => r.type), gemessen: karten3.map(t => t.slice(0, 70)) });
+
+  // Gegenrichtung: Ein Ausgang, der nichts gekostet hat, darf nicht als Niederlage dastehen.
+  const alsVerlust = karten3.filter(t => /Verloren/.test(t));
+  check('5b: kein Kampf gilt NICHT als Niederlage', alsVerlust.length === 0,
+    { alsVerlust: alsVerlust.map(t => t.slice(0, 60)) });
+
+  await ctx3.close();
   await ctx.close(); await ctx2.close(); await browser.close();
   await ende();
 })();
