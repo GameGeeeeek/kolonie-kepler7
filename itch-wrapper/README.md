@@ -59,7 +59,8 @@ Messwerkzeug messen statt die Seite.
 
 1. **NUR `index.html`** als ZIP packen — nicht den Ordner, und nicht die übrigen Dateien darin.
    Der Ordner enthält inzwischen vier Dateien, von denen drei **nicht** hochgeladen werden dürfen:
-   `README.md` (diese Datei), `cover.html` (die Coverbild-Vorlage) und `cover-bauen.js`. Ein
+   `README.md` (diese Datei), die vier Bild-Vorlagen (`cover.html`, `theme-banner.html`,
+   `theme-hintergrund.html`, `theme-embed.html`) und `theme-bauen.js`. Ein
    `zip -r` über den Ordner lädt sie mit hoch, und `cover.html` wäre auf itch.io dann als
    `/cover.html` öffentlich abrufbar — eine zweite Seite, die niemand erwartet.
 
@@ -77,7 +78,9 @@ Messwerkzeug messen statt die Seite.
    `docs/marketing-einreichungen.md`, Abschnitt „itch.io" — am Original geprüft, mit Begründung
    für die drei Felder, bei denen der naheliegende Wert der falsche wäre.
 6. **Coverbild** (itch.io verlangt das Seitenverhältnis 315:250, empfohlen 630×500):
-   `node itch-wrapper/cover-bauen.js` erzeugt `presse-bilder/itch-cover.png`. Die Vorlage ist
+   `node itch-wrapper/theme-bauen.js` erzeugt ALLE vier itch.io-Bilder nach `presse-bilder/`
+   (Cover, Banner, Seitenhintergrund, Embed-BG); `node itch-wrapper/theme-bauen.js banner`
+   baut nur eines. Die Vorlage ist
    `cover.html` — wer sie ändert, sieht sich das Ergebnis in **Thumbnail-Größe** an, nicht nur
    gross: Das Bild erscheint in Suche und Stöbern als kleine Kachel, und genau darauf ist es
    ausgelegt.

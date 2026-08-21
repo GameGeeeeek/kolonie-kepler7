@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Kolonie Kepler-7 – Seitenhintergrund</title>
+<!--
+  SEITENHINTERGRUND fuer itch.io. Gerendert auf 1600x1000.
+
+  ZU DEN MASSEN: itch.io nennt auch hier KEINE Pixelmasse (itch.io/docs/creators/design,
+  geprueft 21.08.2026); die Doku sagt nur, der Hintergrund solle "more subtle" sein und
+  erwaehnt einen "vertically-repeating background". Er WIEDERHOLT sich also - und daraus
+  folgt die einzige harte Anforderung an dieses Bild:
+
+  ER MUSS NAHTLOS SEIN, sonst zieht sich bei jedem Spieler eine sichtbare Kante quer ueber
+  die Seite. Deshalb zwei bewusste Entscheidungen:
+
+  (a) KEIN grossflaechiger Verlauf, keine Nebel, keine Vignette. So etwas laesst sich nicht
+      kachelen - an der Wiederholungskante trifft hell auf dunkel. Der Grund ist deshalb
+      eine FLACHE Farbe (#0B1020, dieselbe wie Startkarte, Cover und Spiel).
+  (b) Die Sterne werden am Rand UMGESCHLAGEN gezeichnet (jeder Stern, der ueber eine Kante
+      ragt, wird auf der Gegenseite noch einmal gemalt). Damit passt die Kachel an allen vier
+      Kanten auf sich selbst - waagerecht wie senkrecht.
+
+  Er ist bewusst ZURUECKHALTEND: Der Seitenhintergrund liegt hinter dem Text der Spielseite.
+  Was dort um Aufmerksamkeit kaempft, macht die Beschreibung schlechter lesbar - und die
+  Beschreibung ist das, was den Spieler zum Klicken bringt, nicht die Tapete.
+
+  Rendern:  node itch-wrapper/theme-bauen.js
+-->
+<style>
+  html,body{margin:0;padding:0;width:1600px;height:1000px;overflow:hidden;background:#0B1020;}
+  canvas{position:absolute;inset:0;}
+</style>
+</head>
+<body>
+<canvas id="sterne" width="1600" height="1000"></canvas>
+<script>
+(function () {
+  var B = 1600, H = 1000;
+  var c = document.getElementById('sterne'), x = c.getContext('2d');
+
+  // Deutlich duenner gestreut als auf Cover und Banner (dort 1 Stern je 2600 px2, hier je
+  // 9000): Die Flaeche ist zehnmal so gross und liegt hinter Text - dieselbe Dichte waere
+  // ein Rauschteppich.
+  var n = Math.round(B * H / 9000);
+
+  function stern(sx, sy, r, a, farbe) {
+    // Umschlag: der Stern wird zusaetzlich um +/-B bzw. +/-H versetzt gemalt. Nur die
+    // Kopien, die wirklich ins Bild ragen, werden sichtbar - alle anderen liegen ausserhalb
+    // der Leinwand und kosten nichts. Das macht die Kachel an ALLEN vier Kanten nahtlos.
+    for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) {
+      x.globalAlpha = a; x.fillStyle = farbe;
+      x.beginPath(); x.arc(sx + dx * B, sy + dy * H, r, 0, 6.284); x.fill();
+    }
+  }
+
+  for (var i = 0; i < n; i++) {
+    stern(Math.random() * B, Math.random() * H, Math.random() * 1.3 + .4,
+          Math.random() * .34 + .12, '#CBD6F0');
+  }
+  // Eine Handvoll groesserer, waermerer Sterne - sonst wirkt die Flaeche wie Rauschen
+  // statt wie Sternenhimmel.
+  for (var k = 0; k < 14; k++) {
+    stern(Math.random() * B, Math.random() * H, Math.random() * 1.1 + 1.6, .40, '#F0C89A');
+  }
+  x.globalAlpha = 1;
+})();
+</script>
+</body>
+</html>

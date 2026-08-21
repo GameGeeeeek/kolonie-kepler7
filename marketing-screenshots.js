@@ -35,19 +35,64 @@ function spielstand() {
     // Bewusst UNTER dem Lagerdeckel: Bei vollem Lager steht in jeder Karte "+0/s (Lager voll)",
     // und ein Werbebild, das Stillstand zeigt, wirbt für Stillstand. Gemessen fasst das Lager
     // bei diesen Gebäudestufen rund 20.3k je Grundstoff.
-    resources: { energie: 12400, erz: 13800, kristalle: 9100, deuterium: 6400, antimaterie: 2900, forschungspunkte: 7300 },
-    buildings: { solar: 24, mine: 22, kristallmine: 20, deuteriumsynth: 18, labor: 16, lager: 30, werft: 16, roboter: 14 },
+    // Tier-2-Bestaende sind PFLICHT, nicht Deko: Ohne sie stand unter vier Forschungszeilen rot
+    // "Nanolegierungen wird nicht produziert". Gemessen an der Bedingung (Zeile ~23772) erscheint
+    // die Zeile nur, wenn der Stoff FEHLT *und* die Rate 0 ist - ein Bestand genuegt also.
+    // Schluessel aus TIER2_DEFS gemessen; bewusst nur die vier vorderen Stufen, die zu einem
+    // Konto dieser Groesse passen, und bewusst klein - Tier 2 hat einen eigenen, engen Deckel.
+    resources: { energie: 12400, erz: 13800, kristalle: 9100, deuterium: 6400, antimaterie: 2900, forschungspunkte: 7300,
+                 nanolegierungen: 940, quantenchips: 310, hochenergiekristalle: 175, fusionskerne: 60 },
+    // Verteidigungs-Schluessel gemessen aus BUILDING_DEFS (category:'defense'), nicht geraten.
+    // Ohne sie stand auf dem Verteidigungs-Bild JEDE Anlage auf "Lv. 0" - acht Nullzeilen
+    // untereinander, und das war der Stand vor dem 21.08.2026.
+    // ALLE Schluessel sind block-gescopt aus BUILDING_DEFS gemessen (Regel 39 - `werft` und
+    // `festung` kommen auch in anderen Tabellen vor). Vorher standen hier VIER Schluessel, die
+    // es gar nicht gibt: kristallmine, deuteriumsynth, roboter und werft. Das Spiel ignoriert
+    // sie stillschweigend - im Bild sah man das nur daran, dass Kristalle, Deuterium und
+    // Antimaterie trotz "Stufe 20" auf +0/s standen (Hausregel 4).
+    // Die echten Namen: raffinerie -> Kristalle, synth -> Deuterium, fusionsreaktor ->
+    // Antimaterie, werftkern -> Werft. Einen Roboter-Bau gibt es im Spiel nicht.
+    buildings: { solar: 31, mine: 22, raffinerie: 20, synth: 18, fusionsreaktor: 12,
+                 labor: 16, lager: 30, kryolager: 8, habitat: 12, werftkern: 14, aufbereitung: 9,
+                 // Tier-2-Kette: ohne sie sind die vier T2-Bestaende unten ein Standbild.
+                 nanolegierungsfabrik: 11, quantenchipfabrik: 8, kristalllabor: 6, fusionsschmiede: 4,
+                 turm: 18, flak: 16, schild: 14, ionenschild: 11, laser: 13, plasma: 10,
+                 raketen: 9, gauss: 8, railgun: 7, voidbarriere: 5, bunker: 6, nanoplattform: 4 },
     // Die drei Freischalt-Forschungen sind PFLICHT, nicht Deko: Ohne sie steht auf dem
     // Verteidigungs-Bild jede einzelne Anlage auf "gesperrt" - acht Schlösser untereinander,
     // und das war der erste Entwurf. Schlüssel gemessen aus RESEARCH_DEFS, nicht geraten.
     research: { rlaser: 8, rschild: 7, rantrieb: 9, rspionage: 6,
-                rpanzer: 6, rschildmatrix: 5, rnanotech: 4 },
+                rpanzer: 6, rschildmatrix: 5, rnanotech: 4,
+                rsolar: 14, rerz: 13, rkristall: 12, rdeuterium: 11, rlager: 10, rlager2: 6,
+                rsolar2: 8, rerz2: 7, rantimaterie: 5, rfusion: 9, rkampf: 8, rkristall2: 6 },
     fleet: { jaeger: 140, cruisers: 46, destroyers: 18, frachter: 30, missions: [] },
-    colonies: {}, activeBasePlanet: 'home', player: { id: 'u', name: 'Kommandant', avatarKey: null },
+    colonies: {
+      rhea:     { buildings: { solar: 17, mine: 15, raffinerie: 13, synth: 16, lager: 20, habitat: 7, werftkern: 5, turm: 11, flak: 9,  schild: 8 },  fleet: { jaeger: 24, cruisers: 8,  frachter: 6 } },
+      aion:     { buildings: { solar: 15, mine: 12, raffinerie: 18, synth: 11, lager: 18, habitat: 6, werftkern: 4, turm: 9,  flak: 8,  schild: 6 },  fleet: { jaeger: 18, cruisers: 5,  frachter: 4 } },
+      draconis: { buildings: { solar: 19, mine: 11, raffinerie: 10, synth: 20, fusionsreaktor: 9, lager: 22, habitat: 8, turm: 12, flak: 10, schild: 9 },  fleet: { jaeger: 30, cruisers: 11, frachter: 8 } }
+    }, activeBasePlanet: 'home', player: { id: 'u', name: 'Kommandant', avatarKey: null },
+    activeResearch: { key: 'rsolar2', targetLevel: 9, endTime: jetzt + 41 * 60 * 1000 },
+    buildQueue: [{ planet: 'home', key: 'raffinerie' }, { planet: 'rhea', key: 'lager' }],
+    constructionQueue: [{ id: 'b1', kind: 'ship', planet: 'home', key: 'cruisers', qty: 6, paid: true,
+                          startTime: jetzt - 3 * 60 * 1000, endTime: jetzt + 12 * 60 * 1000, totalDur: 900,
+                          label: 'Kreuzer', icon: 'ti-rocket', cost: {} }],
     xp: 1.4e6, credits: 8e5, buffs: [], lastTick: jetzt, colonyNames: {}, modules: {}, shipModules: {},
     nextPlanetEventCheck: jetzt + 3600000, nextTraderCheck: jetzt + 3600000
   });
 }
+
+// Demo-Bestenliste fuer die Seitenleiste. Sie steht auf ALLEN Motiven und sagte vorher
+// "Noch keine Eintraege" - eine Box, die leer ist, liest sich wie eine kaputte Funktion, nicht
+// wie eine leere Liste. Bewusst nur FUENF Eintraege und der eigene irgendwo in der Mitte: Das
+// zeigt, wie die Rangliste aussieht, ohne eine Spielerzahl zu behaupten, die niemand gemessen hat.
+// Die Namen sind erfunden - wie der ganze Spielstand hier auch.
+const BESTENLISTE = [
+  { id: 'p1', name: 'Vega-Konsortium', allianceTag: 'VKS', score: 9120, level: 214, avatarKey: null },
+  { id: 'p2', name: 'Nordlicht',       allianceTag: 'VKS', score: 7480, level: 191, avatarKey: null },
+  { id: 'u',  name: 'Kommandant',      allianceTag: '',    score: 5740, level: 167, avatarKey: null },
+  { id: 'p3', name: 'Tiefenlotse',     allianceTag: 'ORB', score: 4260, level: 148, avatarKey: null },
+  { id: 'p4', name: 'Silberkiel',      allianceTag: '',    score: 3110, level: 129, avatarKey: null }
+];
 
 // Der Solo-Betrieb zeigt in mehreren Boxen "nur mit Serververbindung". Für ein Werbebild ist das
 // die falsche Aussage - deshalb ein Mock, der die Boxen füllt, statt sie zu sperren.
@@ -63,6 +108,19 @@ function backend(save) {
     // Mit gesetztem Token ist der SERVER die Quelle des Spielstands - ein 404 hier lässt das
     // Spiel bei null anfangen (gemessen: 130 Erz statt der gesetzten 1,4 Mio).
     if (p === 'storage/' + SAVE_KEY) return j({ value: save, version: 1 });
+    // ZWEI gemessene Fallstricke, beide beim ersten Anlauf zugeschlagen:
+    // (a) storageList liefert { keys: [...] } mit ZEICHENKETTEN - ein Array von Objekten
+    //     laesst `listRes.keys` undefined und die Box bleibt leer, ohne Fehlermeldung.
+    // (b) storageGet kodiert den Schluessel (`leaderboard%3Ap1`) - ein startsWith auf
+    //     'storage/leaderboard:' trifft deshalb NIE. Deshalb erst dekodieren, dann pruefen.
+    if (p === 'storage-list') return j({ keys: BESTENLISTE.map(e => 'leaderboard:' + e.id) });
+    if (p.startsWith('storage/')) {
+      const key = decodeURIComponent(p.slice('storage/'.length));
+      if (key.startsWith('leaderboard:')) {
+        const e = BESTENLISTE.find(x => x.id === key.slice('leaderboard:'.length));
+        return e ? j({ value: JSON.stringify(e), version: 1 }) : j({ e: 1 }, 404);
+      }
+    }
     if (p.startsWith('storage/')) return j({ e: 1 }, 404);
     return j({ ok: true });
   };

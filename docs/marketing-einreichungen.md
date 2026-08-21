@@ -293,9 +293,56 @@ Ressourcen nur über HTTPS (wir haben genau eine, den Link aufs Spiel) und keine
 | Fullscreen button | **aus** – eine Startkarte braucht keinen |
 | Genre | **Strategy** |
 | Tags | `browser`, `space`, `idle`, `incremental`, `multiplayer`, `strategy`, `management`, `german`, `no-pay-to-win`, `4x` (itch.io erlaubt **bis zu 10**) |
-| Cover image | `presse-bilder/itch-cover.png` (630×500 – erzeugt mit `node itch-wrapper/cover-bauen.js`) |
+| Cover image | `presse-bilder/itch-cover.png` (630×500 – erzeugt mit `node itch-wrapper/theme-bauen.js`) |
 | Screenshots | 3–5 aus `presse-bilder/` (`node marketing-screenshots.js`) |
 | Visibility | erst **Draft**, dann **Public** |
+
+### Die Theme-Seite (Dashboard → *Edit theme*)
+
+Alle Bilder liegen nach `node itch-wrapper/theme-bauen.js` in `presse-bilder/`.
+
+| Feld auf der Theme-Seite | Datei | Größe |
+|---|---|---|
+| **Banner** | `itch-banner.png` | 960×300 (Datei 1920×600) |
+| **Background** | `itch-hintergrund.png` | 1600×1000 (Datei 3200×2000), kachelbar |
+| **Embed BG** | `itch-embed-bg.png` | 960×600 – **zeigt derzeit nichts**, siehe unten |
+
+**Die Größen sind abgeleitet, nicht abgeschrieben.** itch.io nennt für diese drei in seiner
+Doku (`itch.io/docs/creators/design`, geprüft 21.08.2026) **keine** Pixelmaße – nur, dass der
+Banner „replaces the title otherwise shown just above the description" und der Hintergrund
+„more subtle" sein soll. Die 960 sind an der fertigen Seite **gemessen**: Die 960 px breite
+Einbettung füllt die Inhaltsspalte exakt von Kante zu Kante.
+
+**Der Banner ersetzt die Überschrift.** Deshalb steht der Spielname darin. Ein Banner ohne
+Namen löscht den Titel der Seite, statt ihn zu schmücken – das ist keine Geschmacksfrage.
+
+**Der Hintergrund kachelt, und das ist die einzige harte Anforderung an ihn.** Er hat deshalb
+keinen großflächigen Verlauf (der ergäbe an der Wiederholungskante hell-auf-dunkel), sondern
+eine flache Grundfarbe und am Rand umgeschlagene Sterne. `theme-bauen.js` **misst** das nach
+und meldet es je Lauf (`Naht x=0.000/innen 0.158 … [nahtlos]`); die Gegenprobe ohne Umschlag
+liefert `Naht x=1.315` und `[NAHT SICHTBAR]`, Exit 1. Ein Blick auf die einzelne Kachel könnte
+eine Naht gar nicht zeigen – die entsteht erst beim Wiederholen.
+
+**Die Embed BG zeigt bei der eingestellten Einbettung NICHTS.** Die Doku
+(`itch.io/docs/creators/html5`) beschreibt sie wörtlich als „A image that takes up the size of
+the viewport that sits behind the *Play* button" – und den Play-Knopf gibt es nur im Modus
+**„Click to play"**. Die Seite steht auf **„Embed in page"** (Tabelle oben), die Startkarte
+lädt also sofort und füllt ihre 960×600 vollständig. Die Datei ist trotzdem dabei, damit sie
+da ist, falls der Modus je wechselt.
+**Von „Click to play" wird abgeraten, und das ist gerechnet:** Die Einbettung *ist* schon eine
+Startkarte mit Knopf. Mit „Click to play" bräuchte ein Spieler **drei** Klicks bis ins Spiel
+(Play → Startkarte → eigener Tab) statt zwei.
+
+**Farben dazu (Bereich COLOR auf derselben Seite).** Der Hintergrund ist dunkel, die Seite
+steht aber auf Hellgrau – ohne Anpassung blitzt vor dem Laden des Bildes eine helle Fläche auf
+und der Rand bleibt hell, wo das Bild nicht reicht:
+
+| Feld | bisher | empfohlen | warum |
+|---|---|---|---|
+| BG | `#eeeeee` | `#0B1020` | dieselbe Farbe wie das Hintergrundbild – kein Aufblitzen, keine helle Kante |
+| BG 2 | `#ffffff` | **unverändert** | der Inhaltskasten bleibt weiß, die Beschreibung damit gut lesbar |
+| Text | `#222222` | **unverändert** | steht auf BG 2, nicht auf dem Bild |
+| Link | `#fa5c5c` | `#F09849` | die Akzentfarbe des Spiels statt itch.ios Vorgaberot |
 
 **Drei Feldwerte mit Begründung, weil der naheliegende falsch wäre:**
 
