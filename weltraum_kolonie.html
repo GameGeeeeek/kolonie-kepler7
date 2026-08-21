@@ -7146,8 +7146,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.588.0';
+  const VERSION = '8.589.0';
   const PATCHNOTES = [
+    { version:'8.589.0', date:'21.08.2026', changes:[
+      '<strong>Behoben: Namen auf der Systemkarte lagen auf Alien-Nestern und Asteroiden.</strong> Die Karte rückt Beschriftungen seit v8.566.0 zur Seite, wenn sie auf einem Objekt liegen würden – sie kannte dabei aber nur Planeten, NPCs und fremde Spieler. Asteroiden, Alien-Nester und Asteroidenfestungen kamen später dazu und waren für sie unsichtbar. Gemessen lag am Handy der Planetenname „Vesna" auf einem Nest und am PC „Abyssos" auf einem Asteroiden im Randsystem. Jetzt zählt jedes Kartenobjekt als belegte Fläche, und jede künftige Objektart ist automatisch dabei.',
+      'Wo im erlaubten Rahmen kein freier Platz ist, bleibt eine Beschriftung weiterhin bewusst an ihrem eigenen Objekt stehen und überlappt lieber, als beim falschen Planeten zu landen – das ist unverändert und beabsichtigt.'
+    ]},
     { version:'8.588.0', date:'21.08.2026', changes:[
       '<strong>Behoben: Jede Expedition mit Feindbegegnung ist abgestürzt – ohne Bericht, ohne Erklärung.</strong> Traf dein Verband unterwegs auf eine feindliche Flotte, brach die Auswertung mitten drin ab. Die Expedition war danach ersatzlos weg: Verluste und teils sogar die Beute waren schon gebucht, aber du hast nie erfahren, was passiert ist. Gemessen an zwei Läufen mit identischer Flotte: mit Begegnung <strong>kein einziger Bericht</strong>, ohne Begegnung ein sauberer. Der Fehler war seit dem 16.08.2026 im Spiel.',
       '<strong>Und er hat mehr mitgerissen als die Expedition.</strong> Der Abbruch traf den gesamten Durchlauf, in dem auch Missionen, Asteroiden-Nachschub, Piraten-Trümmerräuber und Leerenrisse abgearbeitet werden – die blieben in diesem Takt ebenfalls liegen. Ab jetzt läuft die Auswertung durch, und jeder der vier Ausgänge (Rückzug, Verband vernichtet, geschwächt, abgewehrt) schreibt wieder seinen Bericht.',
@@ -56184,11 +56188,21 @@
     let texte;
     try { texte = [...svg.querySelectorAll('text.planet-label')]; } catch (e) { return; }
     if (!texte.length) return;
-    // Belegte Flächen: die Planetenscheiben und die Marker-Kreise. Beide über ihre BENANNTE Rolle
-    // greifen, nie über den Radius - die clipPath-Maske texturierter Planeten trägt denselben
-    // Radius und liefert eine leere Box (Regel 51).
+    // Belegte Flächen: alles, was als Objekt auf der Karte steht. Die Scheibe wird über ihre
+    // BENANNTE Rolle gegriffen, nie über den Radius - die clipPath-Maske texturierter Planeten
+    // trägt denselben Radius und liefert eine leere Box (Regel 51).
+    //
+    // KB-19: Hier stand eine NAMENSLISTE aus drei Selektoren (data-planet, data-map-npc,
+    // data-map-player). Gemessen gibt es sechs Arten von Kartenobjekten - dazu Asteroiden,
+    // Alien-Nester und Asteroidenfestungen, die alle erst nach KB-16 dazukamen und den Schutz nie
+    // geerbt haben: Ein Planetenname lag im gerenderten Bild auf einer Nest-Scheibe. Eine Liste um
+    // drei Namen zu ergänzen hätte die NÄCHSTE neue Art wieder durchfallen lassen (Regel 40),
+    // deshalb hängt der Entflechter an der Klasse: Alle sechs Arten sind `planet-node`-Gruppen,
+    // und keine solche Gruppe existiert ohne data-Attribut. Eine neue Markerart erbt den Schutz
+    // damit automatisch - genau wie beim Kollisionsschieber kbMarkerFrei (Regel 52).
+    const OBJEKTE = '.planet-node';
     const flaechen = [];
-    svg.querySelectorAll('.planet-node[data-planet], [data-map-npc], [data-map-player]').forEach(g => {
+    svg.querySelectorAll(OBJEKTE).forEach(g => {
       let el = g.querySelector('image') || g.querySelector('circle.body');
       if (!el){
         const kreise = [...g.querySelectorAll('circle')];
@@ -56205,7 +56219,7 @@
     for (const t of texte){
       let b; try { b = t.getBBox(); } catch (e) { continue; }
       if (!b || !b.width) continue;
-      const eigen = t.closest('.planet-node[data-planet], [data-map-npc], [data-map-player]');
+      const eigen = t.closest(OBJEKTE);
       const eigenF = eigen ? flaechen.find(f => f.g === eigen) : null;
       // Richtung: weg vom eigenen Objekt. Ohne eigenes Objekt (freistehende Beschriftung) nach unten.
       const richtung = eigenF ? (b.y + b.height/2 >= eigenF.my ? 1 : -1) : 1;
@@ -56470,7 +56484,7 @@
     const orbitsPresent = [...new Set(sysPlanets.map(p=>p.orbit||3))].sort((a,b)=>a-b);
     // Rohe Heimatposition; sie wird unten durch die kollisionsvermeidende Position ersetzt,
     // sobald das Heimatsystem tatsächlich sichtbar ist (siehe "Eigene Heimatbasis" weiter unten).
-    // Hier stand bis KB-17, dieser Rohwert diene als Rückfall für Missionslinien, "wenn das
+    // Hier stand bis KB-18, dieser Rohwert diene als Rückfall für Missionslinien, "wenn das
     // Heimatsystem gerade nicht angezeigt wird" - genau das war der gemeldete Fehler: Im fremden
     // System bezeichnet dieser Punkt nichts. Die Flugbahn nimmt ihn seitdem nur noch, wenn die
     // Heimat wirklich im Bild ist; sonst steht dort die Sonne als Platzhalter.
@@ -56860,7 +56874,7 @@
         if (!targetInView && !originInView) continue;
         const targetPos = targetInView ? ziel.pos : { x: SUN_X, y: SUN_Y };
         let originX, originY;
-        // Reihenfolge ist der Kern der Behebung (KB-17, Spieler-Report mit Screenshot): ZUERST
+        // Reihenfolge ist der Kern der Behebung (KB-18, Spieler-Report mit Screenshot): ZUERST
         // wird gefragt, ob der Ursprung ueberhaupt im Bild liegt. Vorher stand der 'home'-Zweig
         // davor und fragte originInView gar nicht ab - eine Mission von der Heimatbasis bekam
         // deshalb in JEDEM fremden System einen Startpunkt auf der Heimat-Slot-Bahn, also eine

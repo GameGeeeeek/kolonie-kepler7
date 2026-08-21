@@ -1,5 +1,9 @@
-// Wo eine Missionslinie ANFAENGT (KB-17, Spieler-Report Sascha mit Screenshot, 18.08.2026:
+// Wo eine Missionslinie ANFAENGT (KB-18, Spieler-Report Sascha mit Screenshot, 18.08.2026:
 // "bug gefunden flotte ist von meiner heimatbasis gestartet").
+//
+// (Diese Etappe hiess bei der Auslieferung von v8.583.0 versehentlich KB-17 - der Name war schon
+// von der Alien-Nester-Arbeit desselben Tages belegt, die Marker gegen Marker schiebt. Der Code
+// heisst seit v8.584.0 KB-18; die Patchnotes bleiben als unveraenderliche Historie stehen.)
 //
 // DER FEHLER: Im Chronos-System stand eine Flugbahn, deren Startpunkt IN diesem System lag -
 // obwohl die Heimatbasis in einem ganz anderen System steht. Ursache war die Reihenfolge der
