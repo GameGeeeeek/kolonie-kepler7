@@ -46521,7 +46521,14 @@
     const rang = d && Array.isArray(d.ranking) ? d.ranking : null;
     const eigen = state.player && state.player.id;
     if (!rang || !rang.length || !eigen) return '';
-    const idx = rang.findIndex(e => e && e.playerId === eigen);
+    // Das Feld heisst `id`, NICHT `playerId` - abgelesen an der einzigen Stelle, die die Liste
+    // baut (server.js: `.map(p => ({ id: p.playerId, name, power }))`), und bestaetigt durch den
+    // Server selbst, der sie eine Funktion weiter mit `e.id === req.userId` wieder liest.
+    // Der erste Entwurf suchte `e.playerId`; ausgefuehrt gemessen lieferte findIndex damit IMMER
+    // -1 und die ganze Vorschau eine leere Zeichenkette - das Feature war live und wirkungslos.
+    // Gefangen hat es kein Test: Die Fixture des Waechters erfand `playerId` im ranking und mass
+    // damit eine Datenform, die es in der Produktion nicht gibt (Hausregel 36).
+    const idx = rang.findIndex(e => e && e.id === eigen);
     if (idx < 0) return '';
     const anzahl = rang.length;
     const platz = idx + 1;

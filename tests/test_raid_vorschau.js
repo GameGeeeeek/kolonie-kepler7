@@ -5,12 +5,19 @@
 //
 // WAS DIESER TEST MISST UND WARUM SO
 // ----------------------------------
-// Die RECHNUNG haelt tests/test_raid_belohnung_paritaet.js gegen das Backend. Hier geht es um
-// etwas anderes: ob die Vorschau ANGESCHLOSSEN ist und ob sie schweigt, wo sie nichts zu sagen
-// hat. Eine Pruefung auf "das Wort Beute steht da" waere gruen, egal welche Zahlen darunter
-// stehen (Hausregel 61) - gemessen wird deshalb ein PAAR aus zwei Laeufen und der Unterschied
-// zwischen den zwei Spalten.
-const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
+// Die FORMEL haelt tests/test_raid_belohnung_paritaet.js gegen das Backend. Hier geht es um die
+// Anzeige: ob die Vorschau angeschlossen ist, ob sie schweigt, wo sie nichts zu sagen hat - und
+// seit dem 22.08.2026 auch, ob die Zahlen auf dem Bildschirm DIE DER SERVERFORMEL sind.
+//
+// Diese dritte Frage war die Luecke zwischen den beiden Tests, und in ihr lebte ein Fehler, mit
+// dem v8.607.0 live gegangen ist: Die Formel stimmte (der Paritaetstest war gruen), die Anzeige
+// war da (dieser Test war gruen) - nur zeigte sie GAR NICHTS, weil die Funktion `e.playerId`
+// suchte und der Server das Feld `id` nennt. Zwei gruene Tests, ein totes Feature.
+// Eine Pruefung auf "das Wort Beute steht da" waere gruen, egal welche Zahlen darunter stehen
+// (Hausregel 61) - gemessen wird deshalb ein PAAR aus zwei Laeufen, der Unterschied zwischen den
+// zwei Spalten UND jeder einzelne Betrag gegen die ausgefuehrte Serverformel.
+const fs = require('fs');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, SERVER_JS } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -95,18 +102,121 @@ async function zeichne(browser, raid, rolle){
   return m;
 }
 
+// Die ranking-Eintraege tragen `id`, NICHT `playerId` - so und nur so baut sie der Server
+// (server.js: `.map(p => ({ id: p.playerId, name, power }))`, und er liest sie eine Funktion
+// weiter selbst als `e.id === req.userId`).
+//
+// Der erste Entwurf dieser Fixture schrieb `playerId`, und genau daran ist die Belohnungsvorschau
+// in v8.607.0 LIVE gegangen, ohne je zu erscheinen: Die Funktion suchte `e.playerId`, bekam von
+// findIndex immer -1 und lieferte eine leere Zeichenkette. Der Test war dabei die ganze Zeit
+// gruen, weil er eine Datenform mass, die es in der Produktion nicht gibt (Hausregel 36: wer eine
+// Sache durch etwas Aehnliches ersetzt, misst nicht mehr das Spiel).
+//
+// Wer hier etwas aendert, liest zuerst nach, wie der Server das Feld WIRKLICH nennt.
+
+// Die Erwartung kommt aus der SERVERFORMEL, nicht aus der Frontend-Kopie: Der Server entscheidet,
+// was ausgezahlt wird, und die Tafel verspricht es dem Spieler. Die Eingaben sind aus der Fixture
+// ABGELEITET (Ranglisten-Kraefte, Stufe des raidDoc), nicht eingetippt (Hausregel 2).
+const FIX_LEVEL = 2, FIX_KRAEFTE = [52000, 26000, 12000], FIX_ICH = 1;   // Index in FIX_KRAEFTE
+// Die acht Wertzeilen samt Zuordnung zum Serverfeld - aus allianceRaidVorschauHtml abgelesen,
+// nicht geraten (Hausregel 4).
+const TAFEL = [
+  { name:'Kredite',        wert: r => r.credits },
+  { name:'Kampfpunkte',    wert: r => r.battlePoints },
+  { name:'Erfahrung',      wert: r => r.xp },
+  { name:'Erz',            wert: r => r.resources.erz },
+  { name:'Kristalle',      wert: r => r.resources.kristalle },
+  { name:'Deuterium',      wert: r => r.resources.deuterium },
+  { name:'Antimaterie',    wert: r => r.resources.antimaterie },
+  { name:'Modulfragmente', wert: r => r.fragments }
+];
+
+function schneideFunktion(q, kopf){
+  const von = q.indexOf(kopf);
+  if (von < 0) return null;
+  let i = q.indexOf('{', von), t = 0;
+  // Ueber die echte Klammertiefe, nie ueber ein geratenes Zeichenfenster.
+  for (; i < q.length; i++){
+    if (q[i] === '{') t++;
+    else if (q[i] === '}'){ t--; if (!t) return q.slice(von, i + 1); }
+  }
+  return null;
+}
+
+function zahlenPruefen(zeilen){
+  if (!SERVER_JS){
+    // Kein stiller Skip: Ohne Nachbar-Repo entfaellt die halbe Aussage dieses Tests, und ein
+    // gruener Lauf saehe genauso aus wie ein vollstaendiger (Hausregel 34).
+    check('1d: das Backend-Repo liegt daneben (sonst sind die Zahlen ungeprueft)', false,
+      { hinweis: 'kolonie-kepler7-backend/server.js nicht gefunden' });
+    return;
+  }
+  let sieg = null, flucht = null, fmt = null, bauFehler = null;
+  try {
+    const srv = fs.readFileSync(SERVER_JS, 'utf8');
+    const spread = (srv.match(/const ALLIANCE_RAID_RANK_SPREAD = ([\d.]+);/) || [])[1];
+    const lohn = new Function('const ALLIANCE_RAID_RANK_SPREAD = ' + spread + ';\n' +
+      schneideFunktion(srv, 'function allianceRaidRankFactor(') + '\n' +
+      schneideFunktion(srv, 'function allianceRaidRankShare(') + '\n' +
+      schneideFunktion(srv, 'function allianceRaidRewardFor(') + '\nreturn allianceRaidRewardFor;')();
+    const spiel = fs.readFileSync(SPIELDATEI, 'utf8');
+    // fmt() aus der SPIELDATEI geschnitten statt nachgebaut - es kuerzt ab 1000 auf "2.0k", und
+    // eine eigene Nachbildung waere die zweite Wahrheit (Hausregel 36).
+    fmt = new Function('return ' + schneideFunktion(spiel, 'function fmt('))();
+    const bTab = schneideFunktion(spiel, 'function allianceRaidBoss(');
+    const bosse = new Function('return ' + (spiel.match(/const ALLIANCE_RAID_BOSSE = \[[\s\S]*?\n  \];/) || ['[]'])[0].replace(/^const ALLIANCE_RAID_BOSSE = /, '').replace(/;$/, ''))();
+    const boss = bosse[(Math.max(1, FIX_LEVEL) - 1) % bosse.length];
+    const gesamt = FIX_KRAEFTE.reduce((a, k) => a + k, 0);
+    const share = FIX_KRAEFTE[FIX_ICH] / gesamt;
+    sieg = lohn(FIX_LEVEL, share, FIX_ICH + 1, FIX_KRAEFTE.length, true, boss);
+    flucht = lohn(FIX_LEVEL, share, FIX_ICH + 1, FIX_KRAEFTE.length, false, boss);
+  } catch(e){ bauFehler = String(e).split('\n')[0]; }
+  check('1d-bau: Serverformel, fmt und Boss-Tabelle lassen sich ausfuehren',
+    !!sieg && !!flucht && !!fmt, bauFehler || undefined);
+  if (!sieg || !flucht || !fmt) return;
+
+  const finde = name => zeilen.find(z => z.name.indexOf(name) >= 0);
+  const fehlt = [], falschSieg = [], falschFlucht = [];
+  for (const posten of TAFEL){
+    const z = finde(posten.name);
+    if (!z || !z.werte.length){ fehlt.push(posten.name); continue; }
+    const sollS = String(fmt(posten.wert(sieg)));
+    const b = posten.wert(flucht);
+    const sollF = b > 0 ? String(fmt(b)) : '–';
+    if (z.werte[0] !== sollS) falschSieg.push(posten.name + ': "' + z.werte[0] + '" statt "' + sollS + '"');
+    if (z.werte[1] !== sollF) falschFlucht.push(posten.name + ': "' + z.werte[1] + '" statt "' + sollF + '"');
+  }
+  check('1e: alle acht Posten stehen als eigene Zeile in der Tafel', fehlt.length === 0, fehlt);
+  check('1f: jede Zahl der Sieg-Spalte stimmt zur Serverformel',
+    fehlt.length === 0 && falschSieg.length === 0, falschSieg.length ? falschSieg : undefined);
+  // Das PAAR dazu: Ohne die zweite Spalte faellt ein vertauschtes Spaltenpaar nicht auf, und der
+  // Ueberlebt-Faktor waere ueberhaupt nicht gemessen.
+  check('1g: und jede Zahl der Ueberlebt-Spalte ebenso',
+    fehlt.length === 0 && falschFlucht.length === 0, falschFlucht.length ? falschFlucht : undefined);
+}
+
 (async () => {
   const browser = await starteBrowser();
   try {
     // --- 1. Mit Rangliste, in der ich stehe: die Vorschau ist da und nennt Platz und Anteil ---
     const mit = await zeichne(browser, versand([
-      { playerId:'x', name:'X', power:52000 }, { playerId:'u', name:'A', power:26000 }, { playerId:'c', name:'C', power:12000 }]));
+      { id:'x', name:'X', power:52000 }, { id:'u', name:'A', power:26000 }, { id:'c', name:'C', power:12000 }]));
     check('1-vorab: die Box wurde ueberhaupt gezeichnet', !mit.fehlt && mit.txt.length > 40, { zeichen: mit.txt && mit.txt.length });
     check('1-vorab2: und sie ist fuer den Spieler SICHTBAR, nicht nur im DOM', mit.sichtbar === true,
           { sichtbar: mit.sichtbar });
     check('1a: die Vorschau erscheint', mit.hatVorschau === true);
     check('1b: sie nennt den eigenen Platz', /Platz 2 von 3/.test(mit.txt), mit.txt.slice(mit.txt.indexOf('Deine Beute'), mit.txt.indexOf('Deine Beute')+60));
     check('1c: sie nennt den Kraftanteil', /29 % der Kraft/.test(mit.txt));
+
+    // --- 1d-1g: die angezeigten Zahlen SIND die der Serverformel ---
+    //
+    // Bis hierher mass dieser Test nur, DASS zwei verschiedene Zahlen dastehen (2a) und dass
+    // Antimaterie/Fragmente nur beim Fall erscheinen (2b). Ob es die RICHTIGEN Zahlen sind, hat
+    // niemand geprueft: `test_raid_belohnung_paritaet` haelt zwar Frontend- und Backend-FORMEL
+    // gegeneinander, aber keine Pruefung verband die Formel mit dem, was auf dem Bildschirm steht.
+    // Genau in dieser Luecke lebte der Fehler, mit dem v8.607.0 live ging - die Tafel haette jede
+    // beliebige Zahl zeigen koennen (Hausregel 61: die Wirkung messen, nicht die Beschriftung).
+    zahlenPruefen(mit.zeilen);
 
     // --- 2. Das PAAR: beide Spalten muessen sich unterscheiden ---
     const werte = mit.zeilen.filter(z => z.werte.length === 2 && /^[0-9]/.test(z.werte[0]));
@@ -127,7 +237,7 @@ async function zeichne(browser, raid, rolle){
       dispatch:{ arrivalAt: Date.now()+5e5, participantCount:3, totalShips:500, totalPower:90000 } }));
     check('3a: ohne Rangliste steht KEINE Vorschau da', ohneListe.hatVorschau === false, ohneListe.txt && ohneListe.txt.slice(-80));
     const ohneMich = await zeichne(browser, versand([
-      { playerId:'x', name:'X', power:40000 }, { playerId:'c', name:'C', power:20000 }]));
+      { id:'x', name:'X', power:40000 }, { id:'c', name:'C', power:20000 }]));
     check('3b: wer nicht mitgeflogen ist, sieht KEINE Vorschau', ohneMich.hatVorschau === false, ohneMich.txt && ohneMich.txt.slice(-80));
 
     // --- 4. Weniger Text: der Bossname steht im Kopf nur noch EINMAL ---
