@@ -144,7 +144,13 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
        - verschwindet eine erlaubte Stelle, faellt es auf (sie rechnet dann ohne Wurf);
        - kommt eine UNBEKANNTE dazu, faellt es auf (sie gehoert bewusst eingetragen). */
   const WURF_STELLEN = ['shipModulKlassenBoni', 'shipModuleBonus', 'raidlossProtectionMult'];
-  const srvOhneKommentar = srv.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  /* Kommentare LEEREN, nicht entfernen - sonst faltet ein mehrzeiliger Blockkommentar auf eine
+     Zeile zusammen und JEDE gemeldete Zeilennummer stimmt nicht mehr. Gemessen am 22.08.2026:
+     raidlossProtectionMult wurde als "Zeile 2243" gemeldet und steht in server.js bei 3577 - eine
+     Fehlermeldung, die auf die falsche Zeile zeigt, schickt den Naechsten an den falschen Ort. */
+  const srvOhneKommentar = srv
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, v) => v + ' '.repeat(m.length - v.length));
   const srvZeilen = srvOhneKommentar.split('\n');
   function funktionVor(nr){
     for (let i = nr - 1; i >= 0; i--){
@@ -164,6 +170,29 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
   check('6e2: und keine UNBEKANNTE Stelle tut es (eine neue gehoert eingetragen)',
     unbekannt.length === 0,
     unbekannt.length ? { unbekannt, zeilen: wurfZeilen.filter(x => unbekannt.indexOf(funktionVor(x.nr)) >= 0).map(x => x.nr) } : undefined);
+
+  /* 6e3 - die DRITTE Richtung, und sie ist die gefaehrlichste. 6e/6e2 gehen von den Zeilen aus,
+     die den Wurf ENTHALTEN. Eine neue Stelle, die Seltenheit x Stufe rechnet und den Wurf
+     VERGISST, steht in dieser Liste gar nicht - sie ist weder "fehlend" (nicht in WURF_STELLEN)
+     noch "unbekannt" (hat den Wurf ja nicht) und faellt durch beide Maschen. Genau dann rechnet
+     der Server aber anders als der Client, und das entscheidet PvP.
+     Gemessen an einer Backend-Kopie mit einer vierten Stelle ohne Wurf: 6e und 6e2 bleiben gruen,
+     6e3 faellt und nennt die Zeile.
+     Ausgegangen wird deshalb von der RECHENFORM (Seltenheit mal Stufe), nicht vom Wurf - das ist
+     die Groesse, welche die Regel verletzt, nicht ihre Erscheinungsform (Arbeitsregel 40). Die
+     Vorab-Pruefung belegt, dass die Form ueberhaupt gefunden wird; ohne sie waere 6e3 an einem
+     Stand, der die Rechnung gar nicht kennt, trivial erfuellt (Arbeitsregel 28). */
+  const RECHENFORM = 'MODULE_RARITY_MULT[rarity] || 1) * moduleLevelMultServer(instKey)';
+  const formZeilen = srvZeilen
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(x => x.z.indexOf(RECHENFORM) >= 0);
+  const ohneWurf = formZeilen.filter(x => x.z.indexOf('moduleWertMultServer(instKey)') < 0);
+  check('6e3-vorab: die Rechenform (Seltenheit mal Stufe) wird ueberhaupt gefunden',
+    formZeilen.length >= 2, { gefunden: formZeilen.length });
+  check('6e3: und JEDE Stelle mit dieser Rechenform nimmt den Wurf mit',
+    formZeilen.length > 0 && ohneWurf.length === 0,
+    ohneWurf.length ? { stellen: formZeilen.length,
+      ohneWurf: ohneWurf.map(x => 'Zeile ' + x.nr + ' (' + funktionVor(x.nr) + '): ' + x.z.trim().slice(0, 90)) } : undefined);
 }
 
 // ---- 7) Hilfe (zweite Anzeigestelle)
