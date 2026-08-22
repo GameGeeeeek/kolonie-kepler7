@@ -86,6 +86,20 @@ check('3-vorab: Tier-2-Tabelle und Fabrik-Maximalstufe gelesen', !!TIER2 && fabr
 if (TIER2 && fabrikMax > 0 && T3) {
   const deckel = {};
   for (const t of TIER2) deckel[t.key] = t.storageBase + fabrikMax * t.storagePerLevel;
+  /* Etappe D (21.08.2026): Stufe 8 verlangt PROTOMATERIE, und die haengt nicht an einer
+     Tier-2-Fabrik, sondern an der Aufbereitungsanlage. Ohne diesen Deckel liefe sie oben in
+     `deckel[res] || 0` und waere als "ueber dem Speicher" gemeldet worden - die Pruefung haette
+     also aus dem RICHTIGEN Grund rot gestanden, nur mit der falschen Begruendung. Gelesen wird
+     der Deckel aus der Spieldatei, nicht eingetippt (Arbeitsregel 2). */
+  const protoBasis = Number((S.match(/const PROTOMATERIE_LAGER_BASIS = (\d+)/) || [])[1]);
+  const protoJeStufe = Number((S.match(/const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = (\d+)/) || [])[1]);
+  // Spanne gemessen, nicht geschaetzt: Zwischen key:'aufbereitung' und maxLevel liegen 488
+  // Zeichen (baseCost, costMult, Farben, effectDesc). 400 waren zu wenig - die Vorab-Pruefung
+  // darunter hat das mit `aufMax: null` sofort benannt, statt es in Folgefehlern zu verstecken.
+  const aufMax = Number((S.match(/key:'aufbereitung'[\s\S]{0,900}?maxLevel: ?(\d+)/) || [])[1]);
+  check('3-proto-vorab: Protomaterie-Deckel aus der Datei gelesen',
+    protoBasis > 0 && protoJeStufe > 0 && aufMax > 0, { protoBasis, protoJeStufe, aufMax });
+  if (protoBasis > 0 && protoJeStufe > 0 && aufMax > 0) deckel.protomaterie = protoBasis + aufMax * protoJeStufe;
   const drueber = [];
   for (const [lvl, need] of Object.entries(T3))
     for (const [res, menge] of Object.entries(need))
@@ -94,10 +108,21 @@ if (TIER2 && fabrikMax > 0 && T3) {
     drueber.length === 0, { drueber, deckel: { hohlraumgitter: deckel.hohlraumgitter, kausalanker: deckel.kausalanker } });
   // Und jeder Schlüssel ist eine echte Tier-3-Kette - ein Tippfehler wäre eine Kostenposition,
   // die niemand je bezahlen kann.
+  /* Etappe D: Neben den veredelten Ketten-Ressourcen ist jetzt GENAU EINE weitere erlaubt -
+     Protomaterie (Stufe 8, der erste direkte Bergbau-Abnehmer der Leiter). Bewusst NAMENTLICH
+     und nicht als Lockerung auf "irgendein Ressourcenschluessel": Der Zweck dieser Pruefung ist,
+     einen Tippfehler zu fangen, der eine unbezahlbare Kostenposition ergaebe. */
+  const ZUSAETZLICH_ERLAUBT = ['protomaterie'];
   const unbekannt = [];
   for (const need of Object.values(T3)) for (const res of Object.keys(need))
-    if (!TIER2.some(t => t.key === res)) unbekannt.push(res);
-  check('3b: jeder verwendete Schlüssel ist eine echte veredelte Ressource', unbekannt.length === 0, unbekannt);
+    if (!TIER2.some(t => t.key === res) && !ZUSAETZLICH_ERLAUBT.includes(res)) unbekannt.push(res);
+  check('3b: jeder verwendete Schlüssel ist eine veredelte Ressource oder Protomaterie',
+    unbekannt.length === 0, unbekannt);
+  /* Gegenrichtung (Arbeitsregel 33): Verschwindet die Protomaterie aus der Leiter, ist das
+     genauso ein Befund - dann hat jemand den einzigen direkten Bergbau-Abnehmer entfernt und
+     die Ausnahme oben steht sinnlos da. */
+  const nutztProto = Object.values(T3).some(need => Object.keys(need).includes('protomaterie'));
+  check('3b2: die Leiter hat weiterhin eine Protomaterie-Stufe', nutztProto, { nutztProto });
 }
 
 // ---- 4) Das Muster der Stufen 4-5 wird eingehalten -------------------------------------------
@@ -143,8 +168,13 @@ if (FOCI && maxLevel >= 7) {
 
 // ---- 6) Der Hilfetext, die klassische zweite Anzeigestelle ------------------------------------
 check('6a: die Hilfe nennt die neue Stufenzahl', new RegExp('Orbitalstation</strong> in ' + maxLevel + ' Stufen').test(S));
+/* Die Stufenspanne wird aus maxLevel ABGELEITET wie in 6a - sie stand hier als "6-7" fest und
+   riss, als Etappe D die achte Stufe brachte, obwohl der Hilfetext korrekt mitgezogen war
+   (Arbeitsregel 3: die REGEL pruefen, nicht die Momentaufnahme). */
 check('6b: und sie nennt die neue Bedingung beim Namen',
-  /Stufen <strong>6-7<\/strong> zusätzlich die Forschung <em>Kausalanker-Theorie<\/em>/.test(S));
+  new RegExp('Stufen <strong>6-' + maxLevel + '<\\/strong> zusätzlich die Forschung <em>Kausalanker-Theorie<\\/em>').test(S));
+check('6b2: und die Protomaterie-Stufe steht mit ihrer Menge im Hilfetext',
+  /60 Protomaterie/.test(S) && /Protomaterie/.test(S));
 check('6c: und sie sagt ausdrücklich, dass die Stufen 1-5 unverändert sind',
   /Die Stufen 1-5 sind dabei unverändert geblieben/.test(S));
 /* Warum der Hilfetext hier NICHT ableiten darf, steht als Kommentar daneben - und diese Prüfung
