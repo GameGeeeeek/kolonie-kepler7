@@ -239,6 +239,20 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
   const fehlend = teile.map((t, i) => t ? null : i).filter(i => i !== null);
   check('4-bau: alle Backend-Bausteine gefunden', fehlend.length === 0, { fehlendeIndizes: fehlend });
 
+  /* Und die Wache DARUEBER: Ein Laufzeitfehler IN den Messaufrufen muss eine BENANNTE Pruefung
+     reissen, nicht den Test toeten. Der Aufbau-try/catch in fuehreAus() genuegt dafuer nicht - er
+     umschliesst nur das ERZEUGEN der Funktion, waehrend eine fehlende Konstante erst beim AUFRUF
+     auffaellt. Genau so ist der Test am 22.08.2026 gestorben: 15 statt 22 Pruefungen, KEINE
+     FAIL-Zeile, und der rote Exit sah aus wie ein Befund (Arbeitsregel 34).
+     Die URSACHE jenes Vorfalls ist im Sammler behoben (er schneidet ueber die Klammertiefe und
+     kennt damit auch die Form, an die niemand gedacht hat). Diese Wache ist die zweite Linie: Sie
+     gilt fuer JEDEN Laufzeitfehler, nicht nur fuer eine fehlende Konstante - jede Messung liefert
+     dann null, die einzelnen Pruefungen fallen mit {"gemessen":null}, und 4-bau3 nennt den Grund. */
+  let laufFehler = null;
+  const sicher = fn => (typeof fn !== 'function') ? fn : function(){
+    try { return fn.apply(null, arguments); }
+    catch (e) { if (!laufFehler) laufFehler = String((e && e.message) || e); return null; }
+  };
   let W = null, S = null;
   if (fehlend.length === 0) {
     /* Auch hier KEINE Namensliste als Abhaengigkeitsangabe: Die Bausteine oben ziehen ihrerseits
@@ -246,8 +260,8 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
        der Test genau daran mitten im Abschnitt abgestuerzt - 4b bis 4f liefen nie, und der rote
        Exit sah aus wie ein Befund, Arbeitsregel 34). Gesammelt wird deshalb wieder transitiv. */
     const code = mitAbhaengigkeitenBackend(BACK, teile.join('\n'));
-    W = fuehreAus(code, 'weightedFleetDefensePower');
-    S = fuehreAus(code, 'fleetShieldSum');
+    W = sicher(fuehreAus(code, 'weightedFleetDefensePower'));
+    S = sicher(fuehreAus(code, 'fleetShieldSum'));
   }
   check('4-bau2: die zwei Rechenfunktionen laufen', typeof W === 'function' && typeof S === 'function');
 
@@ -304,6 +318,10 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
     const ohneSub = W(nurSS, null, save('schlachtschiff', ['ss_panzerung:gewoehnlich:1']));
     check('4f: Zweitwerte (Substats) zaehlen auf denselben Kanal', mitSub > ohneSub,
       { mitSubstat: mitSub, ohneSubstat: ohneSub });
+
+    // Ist irgendein Messaufruf oben in eine Ausnahme gelaufen, steht der Grund hier - statt dass
+    // der Test mitten im Abschnitt stirbt und die restlichen Pruefungen nie fahren.
+    check('4-bau3: kein Laufzeitfehler in den Messaufrufen', laufFehler === null, { fehler: laufFehler });
   }
 }
 ende();
