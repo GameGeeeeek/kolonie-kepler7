@@ -46329,21 +46329,29 @@
     const lvl = doc.level || 1;
     const faellt = allianceRaidRewardFor(lvl, share, platz, anzahl, true, boss);
     const bleibt = allianceRaidRewardFor(lvl, share, platz, anzahl, false, boss);
-    const zeile = (name, a, b) => `<tr><td style="padding:1px 8px 1px 0; color:#9aa0b5;">${name}</td>`
-      + `<td style="padding:1px 8px 1px 0; text-align:right; color:#7fd88f; font-variant-numeric:tabular-nums;">${fmt(a)}</td>`
-      + `<td style="padding:1px 0; text-align:right; color:#8a8fa3; font-variant-numeric:tabular-nums;">${b > 0 ? fmt(b) : '–'}</td></tr>`;
+    // Symbole aus dem Haus: miniResIcon fuer alles, was in RES_ICONS steht (es kennt
+    // 'credits' als Sonderfall), fuer die drei uebrigen die im Spiel dafuer etablierten
+    // ti-Symbole (gemessen: Kampfpunkte ti-sword 14 Fundstellen, Erfahrung ti-star,
+    // Modulfragmente ti-box).
+    const sym = k => k === 'battlePoints' ? '<i class="ti ti-sword" aria-hidden="true" style="color:#e28b8b;"></i>'
+      : k === 'xp' ? '<i class="ti ti-star" aria-hidden="true" style="color:#9fe1f5;"></i>'
+      : k === 'fragments' ? '<i class="ti ti-box" aria-hidden="true" style="color:#c9a7f0;"></i>'
+      : miniResIcon(k);
+    const zeile = (name, key, a, b) => `<tr><td style="padding:2px 8px 2px 0; color:#9aa0b5; white-space:nowrap;">${sym(key)} ${name}</td>`
+      + `<td style="padding:2px 0; text-align:right; font-variant-numeric:tabular-nums;"><strong style="color:#7fd88f;">${fmt(a)}</strong>`
+      + `<span style="color:#6b6f85; margin-left:6px;">(${b > 0 ? fmt(b) : '–'})</span></td></tr>`;
     return `<div class="bmeta" style="margin-top:6px; border-top:var(--bw-1) solid rgba(255,255,255,0.08); padding-top:6px;">
       <div style="margin-bottom:3px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i><strong>Deine Beute</strong> · Platz ${platz} von ${anzahl} (${Math.round(share*100)} % der Kraft)</div>
       <table style="border-collapse:collapse; font-size:11px;">
-        <tr><td></td><td style="padding:0 8px 2px 0; text-align:right; color:#7fd88f;">Boss fällt</td><td style="padding:0 0 2px; text-align:right; color:#8a8fa3;">überlebt</td></tr>
-        ${zeile('Kredite', faellt.credits, bleibt.credits)}
-        ${zeile('Kampfpunkte', faellt.battlePoints, bleibt.battlePoints)}
-        ${zeile('Erfahrung', faellt.xp, bleibt.xp)}
-        ${zeile('Erz', faellt.resources.erz, bleibt.resources.erz)}
-        ${zeile('Kristalle', faellt.resources.kristalle, bleibt.resources.kristalle)}
-        ${zeile('Deuterium', faellt.resources.deuterium, bleibt.resources.deuterium)}
-        ${zeile('Antimaterie', faellt.resources.antimaterie, bleibt.resources.antimaterie)}
-        ${zeile('Modulfragmente', faellt.fragments, bleibt.fragments)}
+        <tr><td></td><td style="padding:0 0 3px; text-align:right; color:#7fd88f; font-weight:600;">Boss fällt <span style="color:#6b6f85; font-weight:400;">(überlebt)</span></td></tr>
+        ${zeile('Kredite', 'credits', faellt.credits, bleibt.credits)}
+        ${zeile('Kampfpunkte', 'battlePoints', faellt.battlePoints, bleibt.battlePoints)}
+        ${zeile('Erfahrung', 'xp', faellt.xp, bleibt.xp)}
+        ${zeile('Erz', 'erz', faellt.resources.erz, bleibt.resources.erz)}
+        ${zeile('Kristalle', 'kristalle', faellt.resources.kristalle, bleibt.resources.kristalle)}
+        ${zeile('Deuterium', 'deuterium', faellt.resources.deuterium, bleibt.resources.deuterium)}
+        ${zeile('Antimaterie', 'antimaterie', faellt.resources.antimaterie, bleibt.resources.antimaterie)}
+        ${zeile('Modulfragmente', 'fragments', faellt.fragments, bleibt.fragments)}
       </table>
     </div>`;
   }

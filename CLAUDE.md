@@ -4743,6 +4743,32 @@ betroffen — auch wenn der eigene Bereich mit CSS nichts zu tun hat.** Der Betr
 Eigenschaften, die man im Markup gerade benutzt (`border`, `border-radius`, Farbliterale) — zwei
 Minuten `grep -c "border-top:var(--bw-1)"` hätten die Hausform sofort genannt.
 
+### Die Optik: Variante C, und warum drei gebaut wurden
+
+Der erste Halbsatz des Auftrags („deutlich optisch attraktiver") war nach der ersten Runde noch
+offen – geliefert waren nur die Belohnungen und die Textentdopplung. Nachgeholt am 22.08.2026 nach
+dem Verfahren von GR-3: **drei Varianten gebaut, gerendert und vorgelegt**, Sascha hat gewählt.
+
+| Variante | Höhe | warum nicht |
+|---|---|---|
+| JETZT | 376 px | Tabelle ohne Symbole, beide Spalten gleich gewichtet |
+| A – Tabelle mit Symbolen, Erfolgsspalte grün hinterlegt | 413 px | mehr Fläche, zwei Spalten bleiben |
+| B – Kacheln | **287 px** | 24 % niedriger, braucht dafür eine Erklärzeile; nicht spaltenweise vergleichbar |
+| **C – eine Spalte, Überlebt-Wert in Klammern** | 413 px | **gewählt** |
+
+**Die Symbole sind gemessen, nicht gewählt.** `miniResIcon` ist der Hausbaustein und kennt
+`credits` als Sonderfall; für die drei Größen ohne `RES_ICONS`-Eintrag wurden die im Spiel
+etablierten Symbole ausgezählt statt ausgesucht – Kampfpunkte `ti-sword` (14 Fundstellen),
+Erfahrung `ti-star`, Modulfragmente `ti-box`. Alle im Subset-Font, `check-icons.js` sauber.
+
+**Der Wächter wurde dabei STÄRKER, nicht passend gemacht** (Regel 43/68): Er las die zwei Werte als
+*zweite und dritte Tabellenzelle* – mit C gibt es nur noch eine Wertzelle, die Prüfung wäre auf
+korrektem Code durchgefallen. Sie liest jetzt **alle Zahlen der Wertzellen** und prüft damit die
+Regel statt der Spaltenzahl (Regel 3); ein künftiger Spaltenumbau kann ihr den Gegenstand nicht
+mehr still entziehen. Dazu `2c`, das das Neue misst – jede Beutezeile trägt ihr Symbol; die
+Gegenprobe mit entfernten Symbolen fällt genau daran und benennt alle acht Zeilen, bei 17
+identischen Prüfnamen in beiden Richtungen.
+
 **Ein sechster Fund, beim Rendern der Optik-Varianten – und er saß in MEINER eigenen Fixture:**
 Sie setzte den Allianz-Unterreiter auf `'krieg'`. Den Schlüssel hat es **nie** gegeben (über die
 Historie gemessen: `git log -S 'data-alliance-subtab="krieg"'` liefert null Treffer); die vier

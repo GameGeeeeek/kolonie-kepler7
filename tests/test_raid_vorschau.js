@@ -69,8 +69,18 @@ async function zeichne(browser, raid, rolle){
     const txt = (b.textContent || '').replace(/\s+/g, ' ').trim();
     // Die ZWEI Spalten der Vorschau getrennt einsammeln - eine Tabelle, deren beide Spalten
     // gleich sind, waere eine Vorschau ohne Aussage.
-    const zeilen = [...b.querySelectorAll('table tr')].map(tr =>
-      [...tr.children].map(td => (td.textContent||'').trim()));
+    // Je Zeile: der Name aus der ersten Zelle, und ALLE Zahlen aus den uebrigen Zellen
+    // zusammen. Bewusst nicht "die zweite und die dritte Zelle": Die Vorschau darf ihre
+    // Spalten umbauen (sie hat es am 22.08.2026 getan - aus zwei Wertspalten wurde eine
+    // mit dem Ueberlebt-Wert in Klammern), ohne dass die Pruefung dabei still ihren
+    // Gegenstand verliert (Hausregel 3: die REGEL pruefen, nicht die Momentaufnahme).
+    const zeilen = [...b.querySelectorAll('table tr')].map(tr => {
+      const tds = [...tr.children];
+      const roh = tds.slice(1).map(td => (td.textContent||'').trim()).join(' ');
+      return { name: (tds[0] ? tds[0].textContent : '').trim(),
+               werte: roh.match(/[0-9][0-9.,]*[kM]?|–/g) || [],
+               symbol: !!(tds[0] && tds[0].querySelector('i.ti, svg')) };
+    });
     // SICHTBAR, nicht bloss vorhanden (Hausregel 55): textContent liefert auch bei
     // display:none Text. Genau daran hing hier ein sechs Tage alter Fehlgriff - die
     // Fixture setzte den Unterreiter 'krieg', den es nie gab, und bei einem unbekannten
@@ -99,13 +109,18 @@ async function zeichne(browser, raid, rolle){
     check('1c: sie nennt den Kraftanteil', /29 % der Kraft/.test(mit.txt));
 
     // --- 2. Das PAAR: beide Spalten muessen sich unterscheiden ---
-    const werte = mit.zeilen.filter(z => z.length === 3 && /^[0-9]/.test(z[1] || ''));
+    const werte = mit.zeilen.filter(z => z.werte.length === 2 && /^[0-9]/.test(z.werte[0]));
     check('2-vorab: die Tabelle hat Wertzeilen', werte.length >= 6, { zeilen: werte.length });
-    const verschieden = werte.filter(z => z[1] !== z[2]).length;
+    const verschieden = werte.filter(z => z.werte[0] !== z.werte[1]).length;
     check('2a: "Boss faellt" und "ueberlebt" nennen verschiedene Zahlen', verschieden >= 5,
-          { verschieden, beispiel: werte.slice(0, 3) });
-    const nurBeiFall = werte.filter(z => z[2] === '–');
-    check('2b: Antimaterie und Fragmente gibt es NUR beim Fall', nurBeiFall.length === 2, nurBeiFall);
+          { verschieden, beispiel: werte.slice(0, 3).map(z => [z.name].concat(z.werte)) });
+    const nurBeiFall = werte.filter(z => z.werte[1] === '–');
+    check('2b: Antimaterie und Fragmente gibt es NUR beim Fall', nurBeiFall.length === 2,
+          nurBeiFall.map(z => z.name));
+    // Die Symbole sind der optische Teil des Auftrags (22.08.2026) - und eine Pruefung auf
+    // "das Wort Erz steht da" waere auch ohne sie gruen (Hausregel 61).
+    const ohneSymbol = werte.filter(z => !z.symbol).map(z => z.name);
+    check('2c: jede Beutezeile traegt ihr Symbol', ohneSymbol.length === 0, ohneSymbol);
 
     // --- 3. Die Gegenrichtungen: schweigen, wo nichts zu sagen ist ---
     const ohneListe = await zeichne(browser, raidDoc({ phase:'enroute',
