@@ -4731,6 +4731,18 @@ Raid, einmal im **Musterangriff**. Zwei verschiedene Mechaniken mit demselben Wo
 Wache hätte ich die Vorschau in den Musterangriff geschrieben; die Ersetzung ist seither auf den
 Block von `renderAllianceRaidBox` gescopt (Regel 39).
 
+**Ein fünfter Fund, und er kam aus dem vollen Prüflauf statt aus dem eigenen Durchgang:** Die
+Trennlinie über der Vorschau stand als `border-top:1px` da — die einzige feste Pixelzahl der ganzen
+Datei neben dem begründeten Zierring. `test_formensprache` 1 zählt genau das über die **ganze**
+Spieldatei und meldete `["border:3px","border-top:1px"]`. Gemessen gibt es dieselbe Trennlinie mit
+derselben Farbe im Haus **18-mal** als `border-top:var(--bw-1)`; ich hatte also nicht eine Lücke
+gefüllt, sondern eine zweite Schreibweise neben eine etablierte gestellt.
+**Übertragbar: Wer neues Markup mit INLINE-Stilen schreibt, ist von den dateiweiten Stilwächtern
+betroffen — auch wenn der eigene Bereich mit CSS nichts zu tun hat.** Der Betroffenheits-Sweep
+(Regel 40/45) muss deshalb nicht nur nach der geänderten Konstante greppen, sondern auch nach den
+Eigenschaften, die man im Markup gerade benutzt (`border`, `border-radius`, Farbliterale) — zwei
+Minuten `grep -c "border-top:var(--bw-1)"` hätten die Hausform sofort genannt.
+
 **Die Wächter:** `tests/test_raid_belohnung_paritaet.js` (10 Prüfungen) führt BEIDE Fassungen aus
 und rechnet sie über ein Raster aus Stufe, Anteil, Platz, Teilnehmerzahl, Ausgang und allen fünf
 Bossen gegeneinander – **1.800 Kombinationen, null Abweichung**. Verglichen werden ZAHLEN, nicht
