@@ -5404,3 +5404,157 @@ Klammertiefen-Schnitt statt eines dritten Endankers, Regel 40). **Wer eine ROTE 
 vorfindet, sieht zuerst nach, ob dafür schon ein PR offen ist** — ein roter Test ist die Sorte
 Befund, die mehrere Sitzungen gleichzeitig sehen, und anders als bei einem Feature merkt man die
 Dopplung erst am Ende.
+
+## Abgrund C2: die zweite Reliquienreihe zahlt in Sternenessenz (22.08.2026)
+
+Teil C des Beute-Konzepts, Etappe C2. Das Konzept nennt sie „reines Schreiben" — sechs weitere
+Reliquien in derselben Form wie die zwölf vorhandenen. **Gemessen stimmt das nicht, und der Befund
+hat die ganze Bauform entschieden.**
+
+### Der Befund: die vier Reliquien-Kanäle sind GEDECKELT, und einer stand schon bei 83 %
+
+`ABGRUND_RELIKT_DECKEL` begrenzt, was das Kabinett je Kanal geben darf. Der Kommentar daneben
+begründete das mit „eine Bremse für den Fall, dass später weitere Reliquien dazukommen und niemand
+mehr nachrechnet" — **genau dieser Fall trat jetzt ein.** Gemessen VOR C2 (zwölf Reliquien plus die
+vier Satz-Stufen):
+
+| Kanal | Summe | Deckel | Auslastung |
+|---|---|---|---|
+| `splitter` | 0,290 | 0,35 | **83 %** |
+| `kraft` | 0,145 | 0,25 | 58 % |
+| `beute` | 0,180 | 0,35 | 51 % |
+| `verlust` | 0,090 | 0,20 | 45 % |
+
+Der Splitter-Kanal hatte also **0,06 Luft**, und eine Reihe im Stil der ersten hätte ihn gerissen.
+Die Rechnung dazu ist eine KONSTRUKTION und steht deshalb ausgeschrieben statt als blanke Zahl
+(die Lehre aus KB-20i): Die erste Reihe verteilt je Kanal genau drei Stücke zu 0,04–0,05, und der
+Satz bedient `splitter` zweimal. Eine gleich gebaute zweite Reihe gäbe ihm zwei weitere Stücke
+(2 × 0,05) plus eine Satz-Stufe (0,05) — also 0,290 + 0,15 = **0,44 gegen einen Deckel von 0,35**.
+Neun Prozentpunkte wären still im Deckel verschwunden: **eine Belohnung, die der Spieler bekommt,
+sieht und nie erhält.** Das ist die Wirkung-ohne-Anzeige, gegen die Regel 59 geschrieben ist.
+
+### Die Entscheidung (Sascha): Sternenessenz-Meilensteine
+
+Vorgelegt mit drei Optionen; gewählt wurde **kleine, deckelverträgliche Prozente PLUS
+Tiefen-Meilensteine in Sternenessenz**. Der Grund, warum gerade diese Währung: Sie ist die einzige,
+die **Prestige UND Aufstieg übersteht** (`state.ascension.essence`) — eine Belohnung für eine
+Sammlung, die über Wochen entsteht, darf nicht beim nächsten Reset verschwinden. Und sie hat
+**keinen Deckel**, unterliegt also nicht dem Befund, der die Etappe ausgelöst hat.
+
+Gemessen NACH C2 (18 Reliquien, sechs Satz-Stufen): `kraft` 78 %, `verlust` 75 %, `splitter` 83 %,
+`beute` 77 % — **kein Kanal gerissen, und je Kanal bleiben 0,05 bis 0,08 Luft für eine dritte
+Reihe.** Der Splitter-Kanal wird von der zweiten Reihe bewusst **gar nicht** bedient; er ist der
+engste, und sein Anteil ist deshalb unverändert bei 83 %.
+
+`ABGRUND_TIEFEN_MEILENSTEINE` zahlt bei Rekordtiefe 25/50/75/100/125/150/180 zusammen **58
+Sternenessenz und 17.800 Kredite**. Die Schwellen stehen bewusst schon ab Tiefe 25 — die zweite
+Reihe beginnt zwar erst bei 130, aber ein Belohnungspfad, der erst dort einsetzt, wäre für jeden
+unerreichbar, der die erste Reihe noch sammelt.
+
+### Vier Entscheidungen, die man beim Anfassen kennen muss
+
+- **Die erste Reihe steht geschlossen VORNE** (`reihe:1`, dann `reihe:2`). Der Index entscheidet
+  über `i % length`, welche Tiefe welches Stück fallen lässt — ein Reihe-2-Stück dazwischen
+  veränderte **rückwirkend** die Beute einer Tiefe, die ein Spieler längst geholt hat.
+  `test_abgrund_meilensteine` 1d hält das fest.
+- **Der Bestandserfolg `abgrundkabinett` ist auf `reihe === 1` gescopt, und das war Pflicht.**
+  Ohne diesen Zusatz hätte die Erweiterung sein Ziel still von zwölf auf achtzehn verschoben — für
+  einen Spieler bei 11 von 12 wäre der Erfolg über Nacht in weite Ferne gerückt, ohne dass er etwas
+  getan hätte. Die vollständige Sammlung bekommt deshalb einen **zweiten** Erfolg
+  (`abgrundkabinett2`, „Kurator beider Reihen"). Das ist derselbe Gedanke wie „Deckel dürfen niemals
+  Daten löschen": Eine Erweiterung darf niemandem etwas wegnehmen, das er schon fast hatte.
+- **`ABGRUND_RELIKT_SATZ` hängt an den REIHEN, nicht an einer Zahl.** Alle vier alten Stufennamen
+  sind mitgezogen worden, und das war keine Kosmetik: „Vollständiges Kabinett" bei zwölf Stücken war
+  ab dem Moment eine Falschaussage, in dem das Kabinett achtzehn Fächer hat — genau die zweite
+  Anzeigestelle, die eine Erweiterung stehen lässt (Checkliste Punkt 6).
+- **Der Hilfetext kann seine Summen NICHT ableiten**, und das ist gemessen statt geschätzt
+  (Regel 38): `HELP_SECTIONS` steht rund 2,4 Mio Zeichen VOR `ABGRUND_TIEFEN_MEILENSTEINE`, ein
+  Zugriff träfe die Tabelle in ihrer temporalen Todeszone und das Spiel startete gar nicht.
+  Dort stehen deshalb feste Werte MIT Kommentar — und `test_abgrund_meilensteine` 4a/4b/4c hält sie
+  gegen die gerechnete Summe der Tabelle (Regel 72: eine Aufzählung neben der Liste wird sonst
+  still falsch).
+
+### Zwei Kommentare waren falsch — beide korrigiert
+
+**1. „Die Reliquie steht im selben Eintrag wie Name und Portrait, nicht in einer dritten Liste."**
+Nachgemessen gibt es **drei** parallele Listen: `ABGRUND_WAECHTER_NAMEN` (Z. 49487),
+`ABGRUND_WAECHTER_BILDER` (Z. 49951) und `ABGRUND_RELIKTE` — und alle drei sind über `i % length`
+gekoppelt, mit je einer eigenen Aufrufstelle. Genau die Konstruktion, vor der der Satz zu schützen
+vorgab, IST die gebaute Lösung. Das ist die KB-20i-Familie: eine erfundene Begründung, die beim
+nächsten Lesen als REGEL gelesen wird.
+
+**2. Die Deckel-Begründung stammte aus der Zeit der zwölf Reliquien** („sie greifen erst weit hinter
+dem, was zwölf Reliquien zusammen geben"). Seit C2 binden sie fast. Der Kommentar nennt jetzt die
+gemessene Auslastung je Kanal und sagt ausdrücklich: **Wer eine dritte Reihe baut, rechnet zuerst
+dort nach.**
+
+### Der Wächter — und die Lehre aus seiner einen roten Prüfung
+
+`tests/test_abgrund_meilensteine.js` (29 Prüfungen, vier Gegenproben, alle beidseitig gefahren bei
+identischer Prüfliste). Er misst die drei parallelen Listen, die Deckel-Auslastung **ausgeführt**,
+die Monotonie der Meilenstein-Tabelle, die Hilfetext-Summen, die Verdrahtung und die **Wirkung im
+gerenderten Spiel als PAAR**: Ein Konto mit Rekordtiefe 180 bekommt beim Laden alle sieben Marken
+und die gemessenen 58 Essenz, ein Konto ohne Tiefe keine — und ein **zweiter** Lauf auf demselben
+Stand zahlt nichts nach.
+
+**Prüfung `2d` war zuerst rot, und meine Prüfung war schuld, nicht die Tabelle.** Sie verlangte,
+kein Stück der zweiten Reihe gebe mehr als das schwächste der ersten — global über alle Kanäle
+gerechnet, und damit `{"groesstesZweite":0.03,"kleinstesErste":0.025}`. Beide Zahlen stammen aber
+aus **verschiedenen Kanälen**: 0,03 ist ein `beute`-Wert der zweiten Reihe, 0,025 ein
+`verlust`-Wert der ersten. Die Kanäle haben von Haus aus verschiedene Größenordnungen
+(`beute` 0,03–0,05 gegen `verlust` 0,02–0,035), der Vergleich maß also den KANAL-Unterschied statt
+der Reihen-Abstufung. Je Kanal gerechnet ist die zweite Reihe überall schwächer, wie beabsichtigt.
+**Das ist Regel 21 an einer Testerwartung: Wer zwei Werte vergleicht, prüft zuerst, ob ihre
+Bezugsgröße dieselbe ist** — sonst misst man eine Eigenschaft der Achse statt der Sache. Die Prüfung
+läuft jetzt je Kanal und hat eine Vorab-Zeile (`2d-vorab`), die belegt, dass es überhaupt Kanäle
+gibt, in denen beide Reihen vertreten sind; ohne sie wäre sie über einer leeren Menge trivial grün.
+
+Die vier Gegenproben, jede mit ihrer „was fallen MUSS"-Liste und `WERKZEUGFEHLER`-Meldung
+(Regel 71), 29 Prüfungen in jeder Richtung:
+
+| Sabotage | fällt | Beleg |
+|---|---|---|
+| `ABGRUND_RELIKT_DECKEL.splitter` auf 0,25 | `2a` | `{"gerissen":["splitter"]}` |
+| Marke aus `abgrundUeberReset` entfernt | `5a` | der Rumpf ohne sie |
+| `checkAbgrundMeilensteine` an der Ladestelle entfernt | `5b`, `6a`, `6b` | `{"bekommen":0,"erwartet":7}` |
+| Erfolg zurück auf die ganze Tabelle | `5c` | die Erfolgs-Zeile |
+
+**Die dritte Zeile ist die aussagekräftigste**: Quelltext-Verdrahtung (`5b`) und gemessene Wirkung
+(`6a`/`6b`) fallen zusammen und meinen damit nachweislich dasselbe. `6c` bleibt dabei grün und muss
+es — es ist der Negativfall (kein Nachtrag ohne Tiefe) und ohne den Aufruf trivial erfüllt.
+
+### Der Betroffenheits-Sweep hat die Hälfte übersehen — und der volle Lauf hat die Rechnung gestellt
+
+Vor dem vollen Lauf lief der Sweep nach Regel 40/45: `grep -ln` über die geänderten KONSTANTEN
+(`ABGRUND_RELIKTE`, `ABGRUND_RELIKT_DECKEL`, `ABGRUND_CHRONIK`, `abgrundkabinett` …), 14 Treffer,
+alle grün. Der volle Lauf fiel trotzdem — an `test_abgrund_prestige` 3, der keine dieser Konstanten
+liest, sondern die FUNKTION `ensureAbgrund` zerlegt.
+
+**Der Sweep muss beide Seiten greppen: die geänderten Tabellen UND die geänderten Funktionen.**
+Eine zweite Runde über `ensureAbgrund|abgrundUeberReset|abgrundReliktDef|ascension` fand acht
+weitere Tests — zwei Minuten Arbeit gegen einen 50-Minuten-Lauf, der nach dem ersten Fehlschlag
+ohnehin wertlos ist (Regel 14). Das ist derselbe Befund wie beim Nachtrag zu Regel 45, dort für ein
+DOM-Merkmal statt für einen Containernamen: **Man greppt, woran man gerade denkt, und das ist beim
+Bauen die Tabelle — kaputt geht aber die Funktion daneben.**
+
+**Der Fehlschlag selbst war der Test in seiner besten Form.** `test_abgrund_prestige` 3 führt eine
+handgepflegte Liste der Felder, die `ensureAbgrund` anlegen darf, und macht jedes unbekannte rot —
+mit dem Hinweis „Neues Feld? In `abgrundUeberReset` entscheiden, ob es den Aufstieg überlebt". Er
+ERZWINGT also die Entscheidung, statt sie zu erraten, und genau deshalb ist die Namensliste hier
+richtig und keine Schwäche: Eine Ableitung könnte „bewusst zurückgesetzt" nicht von „vergessen"
+unterscheiden.
+**Behoben wurde er trotzdem nicht durch das Eintragen des Namens** — das hätte die Wache nur
+stillgestellt, ohne dass irgendwo geprüft wäre, WIE entschieden wurde (Regel 43). Das Feld steht
+jetzt zusätzlich in der Fixture UND in der Bleib-Prüfung von Abschnitt 2; die Gegenprobe (Marke aus
+`abgrundUeberReset` entfernt) reißt `2: der Aufstieg behaelt meilensteine` bei identischen 36
+Prüfnamen. Erst damit ist die Entscheidung gemessen statt quittiert.
+**Und die Prüflisten wurden per `diff` verglichen, nicht gezählt** — der erste Vergleich meldete
+„verschieden", und der einzige Unterschied war die SCHLUSSZEILE (`Alles gruen` gegen
+`FEHLGESCHLAGEN`). Regel 60, zum wiederholten Mal.
+
+**Vier Bestandstests halten die Kopplung mit:** `test_relikte` 86 (RELIKTE == NAMEN),
+`test_abgrund_symbole` 74 (NAMEN == BILDER), `test_kompendium` und `test_erfolgsicons` (der zweite
+Erfolg braucht ein Symbol in `ACH_ICONS`). In `test_relikte` sind dabei vier festgenagelte
+SCHREIBWEISEN zu REGELN geworden (Regel 3): Die Wiederkehr wird nicht mehr gegen die feste Tiefe
+130 geprüft, sondern als Periode über alle Tiefen, und die Zahl der Reliquien im Hilfetext kommt
+aus einer Zahlwort-Zuordnung statt aus dem Wort „zwölf".

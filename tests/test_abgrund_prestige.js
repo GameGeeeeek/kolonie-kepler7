@@ -72,6 +72,7 @@ const voll = {
   woche:{ key:'2026-07-27', best:64 }, wochePraemie:{ key:'2026-07-20', tiefe:60 },
   allianzMarken:{ '2026-07-27|50':true }, gegenmassnahmen:7, bann:'sog',
   lotBis:74, spule:true, ruf:true, grund:true, werkstattGesehen:true, allianzMeldungFehler:null,
+  meilensteine:{ t25:true, t50:true, t75:true },
   reiter:'sammlung'
 };
 {
@@ -84,7 +85,7 @@ const voll = {
   for (const [feld, wert] of [['best',87], ['tauchgaenge',412]]){
     check('2: der Aufstieg behaelt '+feld.padEnd(12), rest[feld] === wert, rest[feld]);
   }
-  for (const feld of ['gesehen','konstGesehen','relikte','waechterTage']){
+  for (const feld of ['gesehen','konstGesehen','relikte','waechterTage','meilensteine']){
     check('2: der Aufstieg behaelt '+feld.padEnd(12),
       JSON.stringify(rest[feld]) === JSON.stringify(voll[feld]), rest[feld]);
   }
@@ -113,7 +114,7 @@ const voll = {
   const felder = [...eA.matchAll(/a\.([a-zA-ZäöüÄÖÜ]+)\s*(?:=|!==|===)/g)].map(m => m[1]);
   const bekannt = new Set(['tiefe','best','splitter','bergung','tauchgaenge','gesehen','konstGesehen',
     'relikte','waechterTage','werkstatt','woche','wochePraemie','allianzMarken','gegenmassnahmen',
-    'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler']);
+    'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler','meilensteine']);
   const neu = [...new Set(felder)].filter(f => !bekannt.has(f));
   check('3: ensureAbgrund fuehrt keine dem Reset unbekannten Felder',
     neu.length === 0, { unbekannt:neu, hinweis:'Neues Feld? In abgrundUeberReset entscheiden, ob es den Aufstieg ueberlebt.' });

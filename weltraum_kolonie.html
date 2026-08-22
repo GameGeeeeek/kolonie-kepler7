@@ -7204,8 +7204,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.609.0';
+  const VERSION = '8.610.0';
   const PATCHNOTES = [
+    { version:'8.610.0', date:'22.08.2026', changes:[
+      '<strong>Der Abgrund hat eine zweite Reliquienreihe.</strong> Ab Tiefe 130 warten sechs neue Wächter mit eigenem Namen, eigenem Porträt und einer eigenen Reliquie – vom Spant der Unfertigen bis zur Streichung im Ersten Auftrag. Das Kabinett hat damit achtzehn Fächer statt zwölf, und die Chronik reicht bis Tiefe 180.',
+      '<strong>Neu: Tiefen-Meilensteine.</strong> Bei Rekordtiefe 25, 50, 75, 100, 125, 150 und 180 gibt es Sternenessenz und Kredite – zusammen 58 Sternenessenz und 17.800 Kredite. Sie gehören dir dauerhaft: Sternenstaub der Tiefe ist die einzige Währung, die Prestige UND Aufstieg übersteht. Wer schon tief war, bekommt seine Marken beim nächsten Spielstart nachgetragen.',
+      'Warum die neuen Reliquien kleinere Prozente geben als die alten: Die vier Kanäle der Werkstatt sind gedeckelt, und der Splitter-Kanal lag schon bei 83 Prozent seiner Obergrenze. Sechs weitere Stücke im alten Zuschnitt wären zum Teil still im Deckel verschwunden – eine Belohnung, die du bekommst und nie spürst. Die Bezahlung der zweiten Reihe sind deshalb die Meilensteine.',
+      'Der Erfolg „Kurator der Tiefe" bleibt bei den zwölf Reliquien der ersten Reihe – wer bei 11 von 12 steht, hat sein Ziel nicht über Nacht verloren. Für die vollständige Sammlung gibt es den neuen Erfolg „Kurator beider Reihen".'
+    ] },
     { version:'8.609.0', date:'22.08.2026', changes:[
       '<strong>Die Belohnungsvorschau des Allianz-Raids erscheint jetzt wirklich.</strong> Seit v8.607.0 stand sie im Spiel, war aber bei jedem Verband unsichtbar: Sie suchte den eigenen Eintrag in der Rangliste unter einem Feldnamen, den der Server dort gar nicht ablegt – gefunden wurde damit nie jemand, und die ganze Tafel blieb leer. Nach dem Abflug siehst du wieder deinen Platz, deinen Anteil an der Angriffskraft und beide Spalten: was es bei einem Sieg gibt und was, wenn der Boss überlebt.',
       'Für die Zukunft abgesichert: Der Prüflauf hält jetzt jede angezeigte Zahl der Tafel gegen die Formel des Servers, statt nur zu prüfen, dass überhaupt etwas dasteht. Genau in dieser Lücke war der Fehler durchgekommen – die Rechnung stimmte, die Anzeige war da, nur zeigte sie nichts.'
@@ -21090,7 +21096,17 @@
     // Erfolg stillschweigend unerfuellbar zu lassen.
     { key:'tiefenflotte1', name:'Eigenes Gerät', desc:'Baue dein erstes Tiefenschiff – die Flotte, die nur im Abgrund etwas taugt und dort alles.', check: s => SHIP_DEFS.some(d => d.tiefenschiff && ((s.fleet||{})[d.key]||0) > 0), progress: s => [Math.min(1, SHIP_DEFS.filter(d => d.tiefenschiff && ((s.fleet||{})[d.key]||0) > 0).length), 1], reward:{erz:15000,kristalle:10000,credits:800}, xpReward:300 },
     { key:'tiefenflotteAll', name:'Die ganze Tiefenflotte', desc:'Besitze von jedem Tiefenschiff mindestens eines – alle drei Staffeln, freigeschaltet über die Rekordtiefe und bezahlt in Bergungsgut.', check: s => SHIP_DEFS.filter(d => d.tiefenschiff).every(d => ((s.fleet||{})[d.key]||0) > 0), progress: s => [SHIP_DEFS.filter(d => d.tiefenschiff && ((s.fleet||{})[d.key]||0) > 0).length, SHIP_DEFS.filter(d => d.tiefenschiff).length], reward:{kristalle:80000,deuterium:40000,antimaterie:400,credits:5000}, xpReward:1200 },
-    { key:'abgrundkabinett', name:'Kurator der Tiefe', desc:'Berge alle zwölf Reliquien des Abgrunds – je eine von jedem Wächter, die letzte in Tiefe 120.', check: s => ABGRUND_RELIKTE.every(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]), progress: s => [ABGRUND_RELIKTE.filter(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]).length, ABGRUND_RELIKTE.length], reward:{kristalle:60000,deuterium:30000,antimaterie:300,credits:4000}, xpReward:1000 },
+    // Dieser Erfolg haengt seit der zweiten Reliquienreihe an reihe===1 statt an der ganzen
+    // Tabelle - und das war Pflicht, nicht Geschmack: Ohne die Einschraenkung waere das Ziel eines
+    // Spielers, der bei 11 von 12 steht, still auf 18 gesprungen. Eine Erweiterung darf einen fast
+    // erreichten Fortschritt nicht zurueckwerfen (dieselbe Ueberlegung wie "Deckel duerfen niemals
+    // Daten loeschen"). Die zweite Reihe hat mit 'abgrundkabinett2' ihr eigenes Ziel.
+    // Die ZAHLEN in desc stehen fest und werden nicht aus ABGRUND_RELIKTE abgeleitet: Diese Tabelle
+    // steht rund 2,4 Millionen Zeichen WEITER UNTEN in der Datei, ein Zugriff hier traefe sie in
+    // ihrer temporalen Todeszone und das Spiel startete gar nicht erst (Arbeitsregel 38, gemessen).
+    // Die check/progress-Funktionen duerfen zugreifen - sie laufen spaeter.
+    { key:'abgrundkabinett', name:'Kurator der Tiefe', desc:'Berge alle zwölf Reliquien der ersten Reihe – je eine von jedem Wächter, die zwölfte in Tiefe 120.', check: s => ABGRUND_RELIKTE.filter(r => r.reihe === 1).every(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]), progress: s => { const e = ABGRUND_RELIKTE.filter(r => r.reihe === 1); return [e.filter(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]).length, e.length]; }, reward:{kristalle:60000,deuterium:30000,antimaterie:300,credits:4000}, xpReward:1000 },
+    { key:'abgrundkabinett2', name:'Kurator beider Reihen', desc:'Berge alle achtzehn Reliquien des Abgrunds – die achtzehnte liegt in Tiefe 180, hinter dem Ersten Auftrag.', check: s => ABGRUND_RELIKTE.every(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]), progress: s => [ABGRUND_RELIKTE.filter(r => ((s.abgrund&&s.abgrund.relikte)||{})[r.key]).length, ABGRUND_RELIKTE.length], reward:{kristalle:140000,deuterium:70000,antimaterie:700,credits:9000}, xpReward:2200 },
     { key:'abgrundkonst', name:'Sternenleser', desc:'Erlebe alle neun Konstellationen des Abgrunds mindestens einmal – benannte Mutator-Kombinationen mit eigener Wirkung.', check: s => ABGRUND_KONSTELLATIONEN.every(k => ((s.abgrund&&s.abgrund.konstGesehen)||{})[k.key]), progress: s => [ABGRUND_KONSTELLATIONEN.filter(k => ((s.abgrund&&s.abgrund.konstGesehen)||{})[k.key]).length, ABGRUND_KONSTELLATIONEN.length], reward:{kristalle:40000,antimaterie:200,credits:2500}, xpReward:700 },
     { key:'abgrundmutatoren', name:'Vollständiges Verzeichnis', desc:'Begegne allen 24 Mutatoren des Abgrunds mindestens einmal.', check: s => ABGRUND_MUTATOREN.every(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]), progress: s => [ABGRUND_MUTATOREN.filter(m => ((s.abgrund&&s.abgrund.gesehen)||{})[m.key]).length, ABGRUND_MUTATOREN.length], reward:{kristalle:25000,antimaterie:120,credits:1500}, xpReward:500 },
     { key:'allresearchmax', name:'Forschungs-Meister', desc:'Bringe alle Forschungszweige auf ihre jeweilige Maximalstufe.', check: s => RESEARCH_DEFS.filter(r=>!isEndlessResearch(r)).every(r => (s.research[r.key]||0) >= r.maxLevel), progress: s => [RESEARCH_DEFS.filter(r=>(s.research[r.key]||0)>=r.maxLevel).length, RESEARCH_DEFS.length], reward:{erz:12000,kristalle:8000,deuterium:4000,antimaterie:150,credits:500}, xpReward:500 },
@@ -21141,7 +21157,7 @@
   const ACH_CAT = {
     firstbuild:'aufbau', firstcolony:'aufbau', nanopionier:'aufbau', industriemagnat:'aufbau', kettenmeister:'aufbau', verbrauchsstratege:'aufbau', modulschmied:'aufbau', terraform1:'aufbau', terraform10:'aufbau', erdweltmaster:'aufbau', leerenweltmaster:'aufbau', colonizer10:'aufbau', allcolonyslots:'aufbau', allcolonyslots15:'aufbau', credits5k:'aufbau', planetrole:'aufbau', allroles:'aufbau',
     astfirst:'aufbau', ast50:'aufbau', astmillion:'aufbau', astrevier:'krieg',
-    abgrund10:'krieg', abgrund25:'krieg', abgrund50:'krieg', abgrundmutatoren:'krieg', abgrundkonst:'krieg', abgrundkabinett:'krieg',
+    abgrund10:'krieg', abgrund25:'krieg', abgrund50:'krieg', abgrundmutatoren:'krieg', abgrundkonst:'krieg', abgrundkabinett:'krieg', abgrundkabinett2:'krieg',
     tiefenflotte1:'krieg', tiefenflotteAll:'krieg',
     allresearch:'forschung', allresearchmax:'forschung', allexotic:'forschung', skilltreemax:'forschung', forschungsnexus:'forschung', allmegaprojects:'forschung', module1:'forschung', module_legendary:'forschung', module_unikate:'meister', module_exotic:'forschung', module_primordial:'forschung', module_wurf110:'forschung', module_vorlage:'forschung', raffinerieoptimierer:'forschung',
     synthesemeister:'aufbau', singularitaetsarchitekt:'aufbau',
@@ -21191,7 +21207,7 @@
     fquest10:'ti-list-details', fquestgold5:'ti-trophy', fquest50:'ti-medal', kriegspartei:'ti-sword', erzfeind:'ti-alert-triangle', botschaft1:'ti-building-bank', botschaft3:'ti-building-bank', rangfuenf:'ti-medal', ranggeachtet:'ti-trophy', gunst10:'ti-diamond', gunstvorrat:'ti-star', shop5:'ti-diamond', credits5k:'ti-diamond',
     skilltreemax:'ti-star', allveteran:'ti-medal', allexotic:'ti-atom-2',
     erdweltmaster:'ti-plant', leerenweltmaster:'ti-mountain', allianzeinsatz:'ti-bell',
-    abgrund10:'ti-infinity', abgrund25:'ti-infinity', abgrund50:'ti-infinity', abgrundmutatoren:'ti-microscope', abgrundkonst:'ti-star', abgrundkabinett:'ti-diamond',
+    abgrund10:'ti-infinity', abgrund25:'ti-infinity', abgrund50:'ti-infinity', abgrundmutatoren:'ti-microscope', abgrundkonst:'ti-star', abgrundkabinett:'ti-diamond', abgrundkabinett2:'ti-diamond',
     tiefenflotte1:'ti-ship', tiefenflotteAll:'ti-ship',
     allcolonyslots:'ti-home', allcolonyslots15:'ti-planet', allresearchmax:'ti-microscope',
     forschungsnexus:'ti-building-broadcast-tower', allmegaprojects:'ti-building-castle',
@@ -31349,7 +31365,11 @@
     return {
       best: a.best||0, tauchgaenge: a.tauchgaenge||0,
       gesehen: a.gesehen||{}, konstGesehen: a.konstGesehen||{},
-      relikte: a.relikte||{}, waechterTage: a.waechterTage||{}
+      relikte: a.relikte||{}, waechterTage: a.waechterTage||{},
+      // Die Meilenstein-Marken MUESSEN hier stehen: Sie haengen an a.best, und das ueberlebt den
+      // Aufstieg. Ohne sie wuerde jeder Aufstieg dieselben Meilensteine erneut auszahlen - aus
+      // einer einmaligen Belohnung waere eine wiederholbare geworden.
+      meilensteine: a.meilensteine||{}
     };
   }
   function doPrestige(){
@@ -40871,8 +40891,8 @@
       { title:'Was eine Niederlage kostet – und warum es sie auch mit Übermacht gibt', body:'Ein verlorener Tauchgang kostet <strong>Schiffe</strong> (18–32 %, von den Sektorbedingungen und deiner Ausrüstung verschoben) und bringt <strong>keine Beute</strong>: keine Abgrundsplitter, kein Bergungsgut, kein Modul, keine Reliquie, keinen Gegenstand. Was du behältst, sind <strong>Kampfpunkte</strong> und <strong>Veteranen-Erfahrung</strong> für den Startplaneten – und die Tiefe bleibt erreichbar, du kannst sie sofort erneut angehen. Die einzige Ausnahme ist der <strong>Ballastspiegel</strong>: Er rettet einen Teil der <em>Rohstoff</em>beute, die ein Sieg gebracht hätte. Splitter und Bergungsgut bleiben dem Sieg vorbehalten, sonst wäre eine Niederlage keine.<br><br><strong>Sicher ist ein Tauchgang nie.</strong> Der Kampf läuft wie überall in drei Phasen, und jede einzelne ist bei <strong>86 %</strong> gedeckelt – auch mit hundertfacher Übermacht. Weil zwei von drei Phasen entscheiden, liegt die Gesamtchance damit bei höchstens rund <strong>95 %</strong>: Unter dem Strich bleibt rund ein verlorener Tauchgang unter zwanzig. Die Erfolgschance, die vor dem Start und im Bericht steht, meint genau das: Sie erreicht nie 100 %, und die fehlenden Prozent treffen irgendwann zu.' },
       { title:'Mutatoren – warum keine zwei Tiefen gleich sind', body:'Auf jedem Sektor liegen <strong>Mutatoren</strong>: Umgebungsregeln, die den Kampf wirklich verändern. Der <strong>Ionensturm</strong> nimmt dir ein Viertel deiner Kampfkraft, die <strong>Wracklinie</strong> schenkt 80% mehr Rohstoffbeute und gibt dem Gegner Deckung, die <strong>Phosphorwolke</strong> frisst Rohstoffe und lässt dafür mehr Splitter auskristallisieren. Es gibt <strong>24</strong> davon; bis Tiefe 5 liegt einer auf einem Sektor, danach zwei, ab Tiefe 15 immer drei. Jeder Mutator hat ein <strong>eigenes gezeichnetes Symbol</strong>; in der Tiefensonde und auf der Sektorkarte erkennst du die Lage damit, bevor du einen Satz gelesen hast. Welche Flotte sich lohnt, entscheidet sich damit bei jeder Tiefe neu. Ein Sektor wird aus seiner Tiefe <strong>berechnet</strong>, nicht gewürfelt: Tiefe 47 ist für jeden Spieler dieselbe, mit demselben Namen, denselben Mutatoren und demselben Siegel – und ein Neuladen würfelt keinen bequemeren Sektor. Genau deshalb kannst du dich in der Allianz über Tiefen austauschen. Über der Sektorkarte steht ein <strong>Abstiegs-Panorama</strong>: ein gezeichneter Schnitt durch den Sektor, der mit der Tiefe dunkler und enger wird und auf dem die anwesenden Mutatoren mitmalen.' },
       { title:'Konstellationen – wenn Mutatoren zusammengehören', body:'Bestimmte Mutatoren gehören zusammen. Liegen sie auf demselben Sektor, entsteht eine <strong>Konstellation</strong>: ein benannter Ort mit eigenem Zeichen, eigenem Text und einer Wirkung <em>obendrauf</em>. <strong>Die Glutader</strong> (Hitzeblase + Kristallsporen) bringt zusätzlich 30% Rohstoffe und 25% Splitter, <strong>Totes Wasser</strong> (Sensorblindheit + Nullzone) gibt dir 25% mehr Kampfkraft und schwächt zugleich den Gegner – die Blindheit trifft beide Seiten. Es gibt <strong>neun</strong>: sechs Paare, die ungefähr jeden sechzehnten Sektor treffen, und drei <strong>Triaden</strong> aus drei Mutatoren, die so selten sind, dass man sie suchen muss. Genau dafür gibt es den <strong>Sucher</strong> im Register „Sammlung" unter „Konstellationen": Er rechnet die nächsten 3000 Tiefen ab deiner Tauchtiefe durch und sagt dir, in welcher Tiefe die nächste liegt. Das geht nur, weil Sektoren berechnet und nicht gewürfelt werden – die Antwort gilt für jeden Spieler gleich. <strong>Achtung bei der Gegenmaßnahme:</strong> Streicht sie einen beteiligten Mutator, löst sich die Konstellation auf. Das ist eine echte Entscheidung – den teuersten Nachteil loswerden oder das Sternbild behalten.' },
-      { title:'Wächter – jede zehnte Tiefe ist eine Wegmarke', body:'Auf jeder zehnten Tiefe wartet ein <strong>Wächter</strong>: ein benannter Gegner mit eigenem Text und <strong>eigenem Portrait</strong>, beides liest du im Sektor gleich mit. Die Zeichnung zeigt nicht ein Monster, sondern das, was im Text steht – die Stille Masse ist ein Körper ohne jedes Merkmal, der Chor sind Bugspitzen nach innen, das Offene Tor steht offen. Es gibt zwölf – <em>Die Stille Masse</em>, <em>Der Wandelnde Riss</em>, <em>Chor der Verlorenen</em> und neun weitere –, danach kehren sie mit Zählnummer wieder. Der Abstieg endet nie, die Namensliste schon. Ein Wächter ist <strong>60% stärker</strong> als der Sektor sonst wäre, lässt dafür aber <strong>garantiert ein Modul</strong> fallen und gibt die <strong>dreifache</strong> Splitterausbeute. Er kämpft nicht anders als alles andere – was ihn ausmacht, ist Stärke und Belohnung, keine Sonderregel. Im <strong>Tiefenprofil</strong> über der Sektorkarte siehst du alle Wächter als Rauten: gefüllt heißt bezwungen, grau heißt, dort liegt dein nächstes Ziel. Im <strong>Kartenraum</strong> weiter unten steht jede Wächtertiefe als Station deines Abstiegs – mit Portrait, Sektornamen, Siegel und dem Tag der Ersteroberung.' },
-      { title:'Reliquien – was ein Wächter zurücklässt', body:'Jeder der zwölf Wächter lässt beim <strong>ersten</strong> Sieg seine eigene <strong>Reliquie</strong> zurück: ein benanntes, gezeichnetes Stück mit einem Satz darüber, was es war. Der <em>Kalte Anker</em> hinterlässt einen Ankerstein, der <em>Zählende</em> ein Zählwerk, das ihn nicht mehr anhalten lässt, die <em>Schwelle</em> eine Navigationstafel, auf der die Rückflugbahn fehlt – nicht gelöscht, nie eingetragen. Ab dem zweiten Sieg über denselben Wächter fällt wieder ein Modul wie bisher; du verlierst also nichts. Die zwölf Reliquien stehen im <strong>Reliquienkabinett</strong> unter der Sektorkarte, und die leeren Plätze sind dort genauso sichtbar wie die vollen. Jede gibt einen kleinen Bonus in einem der vier Kanäle, die auch die Werkstatt bedient (Kampfkraft, Schiffsverluste, Splitter, Beute) – <strong>addiert</strong> zu den Werkstatt-Stufen, nicht multipliziert, und je Kanal gedeckelt. Dazu vier <strong>Satz-Boni</strong> bei 3, 6, 9 und 12 gesammelten Stücken. Die zwölfte Reliquie liegt in <strong>Tiefe 120</strong>; danach wiederholen sich die Wächter, und das Kabinett bleibt vollständig.' },
+      { title:'Wächter – jede zehnte Tiefe ist eine Wegmarke', body:'Auf jeder zehnten Tiefe wartet ein <strong>Wächter</strong>: ein benannter Gegner mit eigenem Text und <strong>eigenem Portrait</strong>, beides liest du im Sektor gleich mit. Die Zeichnung zeigt nicht ein Monster, sondern das, was im Text steht – die Stille Masse ist ein Körper ohne jedes Merkmal, der Chor sind Bugspitzen nach innen, das Offene Tor steht offen. Es gibt <strong>achtzehn</strong>, in zwei Reihen: die ersten zwölf bis Tiefe 120 – <em>Die Stille Masse</em>, <em>Der Wandelnde Riss</em>, <em>Chor der Verlorenen</em> und neun weitere –, dann ab Tiefe 130 sechs weitere, die den Faden der Chronik aufnehmen: <em>Die Unfertige</em>, <em>Das Richtmaß</em>, <em>Die Zweite Schwelle</em>, <em>Der Abgleich</em>, <em>Die Bauleitung</em> und <em>Der Erste Auftrag</em>. Erst ab Tiefe 190 kehren sie mit Zählnummer wieder. Der Abstieg endet nie, die Namensliste schon. Ein Wächter ist <strong>60% stärker</strong> als der Sektor sonst wäre, lässt dafür aber <strong>garantiert ein Modul</strong> fallen und gibt die <strong>dreifache</strong> Splitterausbeute. Er kämpft nicht anders als alles andere – was ihn ausmacht, ist Stärke und Belohnung, keine Sonderregel. Im <strong>Tiefenprofil</strong> über der Sektorkarte siehst du alle Wächter als Rauten: gefüllt heißt bezwungen, grau heißt, dort liegt dein nächstes Ziel. Im <strong>Kartenraum</strong> weiter unten steht jede Wächtertiefe als Station deines Abstiegs – mit Portrait, Sektornamen, Siegel und dem Tag der Ersteroberung.' },
+      { title:'Reliquien – was ein Wächter zurücklässt', body:'Jeder der achtzehn Wächter lässt beim <strong>ersten</strong> Sieg seine eigene <strong>Reliquie</strong> zurück: ein benanntes, gezeichnetes Stück mit einem Satz darüber, was es war. Der <em>Kalte Anker</em> hinterlässt einen Ankerstein, der <em>Zählende</em> ein Zählwerk, das ihn nicht mehr anhalten lässt, die <em>Schwelle</em> eine Navigationstafel, auf der die Rückflugbahn fehlt – nicht gelöscht, nie eingetragen. Ab dem zweiten Sieg über denselben Wächter fällt wieder ein Modul wie bisher; du verlierst also nichts. Die achtzehn Reliquien stehen im <strong>Reliquienkabinett</strong> unter der Sektorkarte, und die leeren Plätze sind dort genauso sichtbar wie die vollen. Jede gibt einen kleinen Bonus in einem der vier Kanäle, die auch die Werkstatt bedient (Kampfkraft, Schiffsverluste, Splitter, Beute) – <strong>addiert</strong> zu den Werkstatt-Stufen, nicht multipliziert, und je Kanal gedeckelt. Dazu sechs <strong>Satz-Boni</strong> bei 3, 6, 9, 12, 15 und 18 gesammelten Stücken. Die zwölfte Reliquie liegt in <strong>Tiefe 120</strong> und schließt die erste Reihe; die achtzehnte in <strong>Tiefe 180</strong>. Danach wiederholen sich die Wächter, und das Kabinett bleibt vollständig.<br><br>Die Stücke der <strong>zweiten Reihe</strong> geben bewusst kleinere Prozente als die der ersten – ihre eigentliche Belohnung sind die <strong>Tiefen-Meilensteine</strong>: sieben Marken bei Rekordtiefe 25, 50, 75, 100, 125, 150 und 180, die zusammen <strong>58 Sternenessenz</strong> und 17.800 Kredite zahlen. Sternenessenz ist die einzige Währung, die Prestige <em>und</em> Aufstieg übersteht – bis dahin zahlte der Abgrund ausschließlich in Größen, die jeder Aufstieg löscht. Du findest die Marken im Abgrund unter „Ränge" neben der Chronik; sie stehen dort <em>vor</em> dem Erreichen mit ihrer Belohnung, damit die Tiefe eine Entscheidung ist und keine Überraschung. Jede gibt es einmal.' },
       { title:'Ausrüstung aus der Tiefe – vier Standortmodule', body:'Vier Standortmodule fallen <strong>ausschließlich bei Tauchgängen</strong>: nicht im Markt, nicht bei Expeditionen, nicht aus Kisten, nicht als Allianz-Belohnung. Wirken tun sie dafür <strong>oben, im normalen Spiel</strong> – sie sind der Grund abzutauchen, nicht die Belohnung dafür, unten zu bleiben.<br><br><strong>Drucktank</strong> erhöht die Lagerkapazität, und seine Wirkung wächst als einzige im Spiel mit deiner <strong>Rekordtiefe</strong>: bei Tiefe 40 doppelt, ab Tiefe 120 vierfach (dort ist Schluss). Ein früh gefundener Drucktank wird von selbst besser.<br><strong>Echolotmast</strong> verlängert die Frist aufgefangener <strong>Peilungen</strong> um bis zu +150% (statt der üblichen zwei Stunden), imperiumsweit. Die Frist steht beim Auffangen fest – bereits liegende Peilungen behalten ihre.<br><strong>Splitterofen</strong> schmilzt nach jedem gewonnenen Tauchgang zusätzlich <strong>Modulfragmente</strong> in Höhe von 30% des Bergungsguts (gedeckelt bei 100%). Das Bergungsgut bleibt dir vollständig – er nimmt nichts weg, er gibt etwas dazu.<br><strong>Nullfeldanker</strong> verstärkt die Verteidigung eines Standorts, aber <strong>nur gegen NPC-Angriffe</strong> und <strong>nur bei Unterzahl</strong>: Bei gleicher Stärke tut er nichts, bei doppelter Übermacht des Angreifers wirkt er voll (bis +50%). Gegen echte Spieler wirkt er ausdrücklich nicht. Sein Beitrag steht erst fest, wenn die Stärke des Angreifers bekannt ist – er erscheint deshalb <strong>nicht</strong> in deiner angezeigten Verteidigungssumme, sondern im Überfallbericht.<br><br><strong>Fundchance:</strong> rund 8% je gewonnenem Tauchgang in Tiefe 1, steigend bis 35% ganz unten, bei Wächtern doppelt. Auch die <strong>Seltenheit</strong> hängt an der Tiefe – ein Modul aus Tiefe 5 ist gewöhnlich, eins aus Tiefe 60 meist episch. Der Fund hängt bewusst nicht am Wächter, damit der Abgrund auch für eine kleinere Flotte etwas hergibt.' },
       { title:'Die zweite Fundstufe – ab Tiefe 40', body:'Seit dem 31.07.2026 gibt es <strong>sechs weitere Module aus der Tiefe</strong>, und sie fallen erst <strong>ab Tiefe 40</strong>. Das ist Absicht: Wären sie von Anfang an im selben Topf, wäre jedes der zehn bekannten schlagartig um ein Drittel seltener geworden, ohne dass jemand etwas dafür bekommt. So zerfällt der Abstieg in zwei Abschnitte – bis 39 die bekannten zehn, ab 40 kommen sechs dazu. Die Fundchance je Tauchgang ändert sich dadurch nicht.<br><br><strong>Vier Standortmodule, die oben wirken:</strong><br><strong>Taktschmiede</strong> verkürzt die <em>Umbauzeit von Werftmarken</em> (bis −35%, imperiumsweit) – und nur die; der normale Schiffsbau bleibt beim Werftmodul.<br><strong>Krustenpresse</strong> verkürzt eine <em>Terraforming-Stufe</em> (bis −30%). Sie wirkt nur an ihrem eigenen Standort, weil Terraforming ein Vorhaben je Standort ist.<br><strong>Wrackleser</strong> erhöht, was deine <em>Recycler aus Trümmerfeldern</em> holen (bis +45%, imperiumsweit). Er vergrößert das Feld nicht, nur die Abbaurate.<br><strong>Prisenwaage</strong> erhöht das <em>Prisengut</em> gekaperter Schiffe (bis +40%, imperiumsweit). Auf Kaperplätze und Enterchance wirkt sie ausdrücklich nicht – nur auf den Erlös.' },
       { title:'Klassen-Sets – drei bestimmte Module derselben Klasse', body:'Jede der '+SHIP_MODULE_SET_DEFS.length+' Schiffsklassen hat ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – beides <strong>additiv</strong> zu den Modulen selbst. Weil eine Klasse höchstens drei Slots hat, kostet das volle Set alle drei: Die Zwischenstufe lässt dir einen Platz frei, etwa für ein Abgrund-Modul oder einen anderen Kanal. Das ist die eigentliche Entscheidung – ein Set ist keine reine Zugabe, sondern ein Verzicht auf Vielseitigkeit.<br><br>'+SHIP_MODULE_SET_DEFS.map(sd => { const cn = (SHIP_CLASS_DEFS.find(c=>c.key===sd.klasse)||{}).name || sd.klasse; const wirk = sd.stufen.map(st => st.teile+' Teile: '+Object.keys(st.bonuses).map(e => (e==='fuel'?'−':'+')+Math.round(st.bonuses[e]*100)+'% '+(SHIP_MODULE_EFFECT_LABEL[e]||e)).join(' und ')).join(' · '); return '<strong>'+cn+'</strong> – „'+sd.name+'": '+wirk; }).join('<br>')+'<br><br>Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.' },
@@ -47412,6 +47432,11 @@
     // waere also bestenfalls wirkungslos und schlimmstenfalls verwirrend. Diese Stelle hier ist die
     // Ladestelle und laeuft genau einmal je Sitzung.
     if (checkResearchMilestones() > 0) save();
+    // Tiefen-Meilensteine (C2) genauso nachziehen, und aus demselben Grund: Sie haengen an
+    // state.abgrund.best, und das steigt nur beim ERSTEN Sieg ueber eine tiefere Tiefe. Wer schon
+    // auf Tiefe 150 steht und nicht weiter absteigt, haette einen neu hinzugekommenen Meilenstein
+    // sonst nie bekommen - also genau der Spieler, fuer den diese Etappe gebaut ist.
+    if (checkAbgrundMeilensteine() > 0) save();
     setTimeout(()=>{ document.getElementById('loadstate').textContent=''; }, 4000);
   }
 
@@ -49497,7 +49522,16 @@
     { name:'Die Zweite Stille', text:'Wie die Stille Masse, aber größer, und sie war vorher nicht da.' },
     { name:'Der Letzte Wächter', text:'Der Name stammt aus einem Logbuch aus Tiefe 12. Wer ihn vergab, war nie hier unten.' },
     { name:'Nachhall', text:'Was hier steht, ist die Erinnerung eines Wächters, den jemand anders längst besiegt hat.' },
-    { name:'Das Offene Tor', text:'Es blockiert nichts. Es steht offen. Genau das ist beunruhigend.' }
+    { name:'Das Offene Tor', text:'Es blockiert nichts. Es steht offen. Genau das ist beunruhigend.' },
+    // Zweite Reihe (Tiefen 130-180). Sie nimmt den Faden auf, den der Chronik-Eintrag bei Tiefe 130
+    // ausgelegt hat: irgendwo weiter unten steht eine Werft, die keine Auftraege bekommt und
+    // trotzdem baut. Die sechs Namen erzaehlen sie von ihrem Ergebnis zurueck zu ihrem Anfang.
+    { name:'Die Unfertige', text:'Ein Rumpf im Bau, mitten im Nichts, die Nähte frisch. Während man danebensteht, kommt eine weitere hinzu – und es ist niemand zu sehen, der sie zieht.' },
+    { name:'Das Richtmaß', text:'Ein Stab von genau einer Länge, die im keplerischen Normwerk nicht vorkommt. Was in seiner Nähe vermessen wird, stimmt danach mit sich selbst überein und mit nichts sonst.' },
+    { name:'Die Zweite Schwelle', text:'Wie die Schwelle, nur andersherum: Ab hier rechnen die Rückflugbahnen wieder sauber. Wohin sie führen, ist nicht nach Hause.' },
+    { name:'Der Abgleich', text:'Etwas hält die eigene Flotte gegen eine Liste. Die Liste ist älter als die Flotte, und sie stimmt bis auf das letzte Schiff.' },
+    { name:'Die Bauleitung', text:'Ein Kommandostand ohne Kommandanten. Auf der Tafel steht ein Bauplan, und während man hinsieht, wird der nächste Punkt abgehakt.' },
+    { name:'Der Erste Auftrag', text:'Das Blatt, mit dem hier unten alles angefangen hat. Der Auftraggeber ist ausgestrichen – in derselben Handschrift, in der der Auftrag geschrieben ist.' }
   ];
   function abgrundIstWaechter(tiefe){ return tiefe > 0 && tiefe % ABGRUND_WAECHTER_ALLE === 0; }
   // Waechterruf (v8.336.0): macht die naechste anzusteuernde Tiefe zur Waechtertiefe. Er wirkt
@@ -49964,7 +49998,20 @@
     // Nachhall: die Erinnerung eines Waechters, den jemand anders laengst besiegt hat.
     '<path d="M14 90 V44 A18 18 0 0 1 50 44 V90"/><path d="M34 90 V50 A14 14 0 0 1 62 50 V90" opacity="0.5"/><path d="M52 90 V56 A10 10 0 0 1 72 56 V90" opacity="0.24"/>',
     // Das Offene Tor: es blockiert nichts. Genau das ist beunruhigend.
-    '<path d="M18 88 V44 A32 32 0 0 1 82 44 V88"/><path d="M8 88 H92"/><path d="M18 60 L4 52" opacity="0.6"/><path d="M82 60 L96 52" opacity="0.6"/>'
+    '<path d="M18 88 V44 A32 32 0 0 1 82 44 V88"/><path d="M8 88 H92"/><path d="M18 60 L4 52" opacity="0.6"/><path d="M82 60 L96 52" opacity="0.6"/>',
+    // ---- Zweite Reihe (Tiefen 130-180) ----
+    // Die Unfertige: ein Rumpf im Bau, offene Spanten, die Aussenhaut erst zur Haelfte drueber.
+    '<path d="M20 76 Q50 92 80 76 L74 30 H26 Z"/><path d="M34 30 V70" opacity="0.55"/><path d="M50 30 V78" opacity="0.55"/><path d="M66 30 V70" opacity="0.55"/><path d="M26 46 H74" opacity="0.35"/>',
+    // Das Richtmass: ein Stab mit Marken, die sich nach oben hin verdichten statt gleich zu bleiben.
+    '<path d="M50 8 V92"/><path d="M36 20 H64"/><path d="M38 38 H62"/><path d="M40 52 H60"/><path d="M41 62 H59"/><path d="M42 70 H58"/><path d="M43 76 H57"/>',
+    // Die Zweite Schwelle: ein Torbogen wie die Schwelle, aber gespiegelt - die Bahn fuehrt hinaus.
+    '<path d="M16 86 V46 A34 34 0 0 1 84 46 V86"/><path d="M6 86 H94"/><path d="M50 86 V38" opacity="0.4"/><path d="M62 24 L86 8" opacity="0.7"/><path d="M78 8 H90 V20" opacity="0.7"/>',
+    // Der Abgleich: zwei Reihen Marken nebeneinander, eine davon vollstaendig, die andere nicht.
+    '<path d="M30 14 V86"/><path d="M70 14 V86"/><path d="M20 26 H40 M20 42 H40 M20 58 H40 M20 74 H40"/><path d="M60 26 H80 M60 42 H80 M60 58 H80" opacity="0.5"/>',
+    // Die Bauleitung: eine Tafel mit abgehakten Zeilen, die letzte noch offen.
+    '<path d="M14 18 H86 V80 H14 Z"/><path d="M26 34 L32 40 L44 28"/><path d="M52 34 H74"/><path d="M26 52 L32 58 L44 46"/><path d="M52 52 H74"/><path d="M26 70 H38" opacity="0.5"/><path d="M52 70 H74" opacity="0.5"/>',
+    // Der Erste Auftrag: ein Blatt mit Schrift, quer darueber die Streichung.
+    '<path d="M24 10 H76 V90 H24 Z"/><path d="M34 28 H66 M34 42 H66 M34 56 H58"/><path d="M28 74 L72 66"/><path d="M28 66 L72 74"/>'
   ];
   // Portrait eines Waechters. Der Index kommt aus derselben Rechnung wie sein Name, damit Bild und
   // Text bei der zyklischen Wiederkehr ("2. Wiederkehr") nicht auseinanderlaufen.
@@ -50298,6 +50345,7 @@
     const a = state.abgrund;
     if (typeof a.tiefe !== 'number' || a.tiefe < 1) a.tiefe = 1;
     if (typeof a.best !== 'number' || a.best < 0) a.best = 0;
+    if (!a.meilensteine || typeof a.meilensteine !== 'object') a.meilensteine = {};
     if (typeof a.splitter !== 'number' || a.splitter < 0) a.splitter = 0;
     // Bergungsgut (v8.333.0): der ZWEITE Abgrund-Werkstoff, getrennt von den Splittern.
     //
@@ -50488,58 +50536,106 @@
   // Aufschaukeln, vor dem CLAUDE.md warnt. Additiv und je Kanal gedeckelt bleibt es eine spuerbare,
   // aber begrenzte Belohnung fuer eine Sammlung, die zwoelf Waechtertiefen braucht.
   //
-  // Die Reihenfolge MUSS zu ABGRUND_WAECHTER_NAMEN passen - deshalb steht die Reliquie im selben
-  // Eintrag wie Name und Portrait, nicht in einer dritten Liste, die auseinanderlaufen koennte.
+  // Die Reihenfolge MUSS zu ABGRUND_WAECHTER_NAMEN passen. KORREKTUR 22.08.2026: Hier stand,
+  // die Reliquie stehe "im selben Eintrag wie Name und Portrait, nicht in einer dritten Liste".
+  // Das ist nachgemessen falsch - es sind DREI parallele Listen (ABGRUND_WAECHTER_NAMEN Z. 49487,
+  // ABGRUND_WAECHTER_BILDER Z. 49951, diese hier), und alle drei sind ueber `i % length` gekoppelt
+  // (drei Aufrufstellen, je eine je Liste). Genau die Kopplung, vor der der alte Satz zu schuetzen
+  // vorgab, ist also die gebaute Loesung. Der Satz war eine erfundene Begruendung und waere beim
+  // naechsten Lesen als REGEL gelesen worden (dieselbe Familie wie KB-20i).
+  // Der Waechter dafuer ist `test_relikte` 86 (RELIKTE == NAMEN) und `test_abgrund_symbole` 74
+  // (NAMEN == BILDER) sowie `test_abgrund_meilensteine` 1a, das alle drei auf einmal haelt.
   const ABGRUND_RELIKTE = [
-    { key:'wachstab', name:'Der Wachstab', kanal:'kraft', wert:0.03,
+    { key:'wachstab', name:'Der Wachstab', kanal:'kraft', wert:0.03, reihe:1,
       bild:'<path d="M50 10 V90"/><path d="M26 30 Q50 20 74 30"/><ellipse cx="50" cy="50" rx="16" ry="9"/><circle cx="50" cy="50" r="4" fill="currentColor"/>',
       text:'Er stand aufrecht in der Leere, ohne Halterung, ohne Antrieb. Am oberen Ende sitzt etwas, das aussieht wie eine Linse und sich nicht öffnen lässt.' },
-    { key:'lotkegel', name:'Der Lotkegel', kanal:'beute', wert:0.04,
+    { key:'lotkegel', name:'Der Lotkegel', kanal:'beute', wert:0.04, reihe:1,
       bild:'<path d="M50 8 V34"/><path d="M34 34 H66 L50 82 Z"/><path d="M42 58 H58"/>',
       text:'Ein Senklot, mit dem jemand die Stille Masse vermessen wollte. Die eingeritzten Marken hören nach der vierzehnten auf.' },
-    { key:'nahtstein', name:'Der Nahtstein', kanal:'splitter', wert:0.04,
+    { key:'nahtstein', name:'Der Nahtstein', kanal:'splitter', wert:0.04, reihe:1,
       bild:'<path d="M22 22 H78 V78 H22 Z"/><path d="M46 22 L56 40 L40 56 L58 70 L48 78"/>',
       text:'Aus dem Rand des Wandelnden Risses geschnitten. Der Bruch verläuft mitten hindurch und schließt sich nicht, egal wie man die Hälften hält.' },
-    { key:'bugspitze', name:'Die Bugspitze', kanal:'kraft', wert:0.03,
+    { key:'bugspitze', name:'Die Bugspitze', kanal:'kraft', wert:0.03, reihe:1,
       bild:'<path d="M50 8 L72 60 H28 Z"/><path d="M38 60 V86 H62 V60"/><path d="M44 34 H56"/>',
       text:'Von einem der zweihundert Wracks im Chor. Alle Bugspitzen zeigten nach innen – diese hier ist die einzige, die jemand herausgeholt hat.' },
-    { key:'ankerstein', name:'Der Ankerstein', kanal:'verlust', wert:0.025,
+    { key:'ankerstein', name:'Der Ankerstein', kanal:'verlust', wert:0.025, reihe:1,
       bild:'<path d="M50 14 V78"/><path d="M22 42 H78"/><path d="M18 60 Q50 92 82 60"/><circle cx="50" cy="14" r="7"/>',
       text:'Er wiegt nichts und lässt sich nicht bewegen. Flotten, die ihn an Bord haben, melden ruhigere Anflüge – niemand weiß, warum.' },
-    { key:'bauplakette', name:'Die Bauplakette', kanal:'beute', wert:0.04,
+    { key:'bauplakette', name:'Die Bauplakette', kanal:'beute', wert:0.04, reihe:1,
       bild:'<path d="M16 26 H84 V74 H16 Z"/><path d="M26 40 H62 M26 52 H74 M26 64 H48"/>',
       text:'Vom Rumpf des Vaterschiffs. Werft, Baunummer, Datum – keplerische Normschrift, und das Datum liegt vierzig Jahre in der Zukunft.' },
-    { key:'zaehlwerk', name:'Das Zählwerk', kanal:'splitter', wert:0.05,
+    { key:'zaehlwerk', name:'Das Zählwerk', kanal:'splitter', wert:0.05, reihe:1,
       bild:'<path d="M22 82 V26"/><path d="M38 82 V38"/><path d="M54 82 V50"/><path d="M70 82 V62"/><path d="M12 90 H88"/>',
       text:'Es zählt weiter. Man kann es nicht anhalten, und die Zahl hat mit nichts zu tun, was in der Nähe geschieht.' },
-    { key:'rueckflugtafel', name:'Die Rückflugtafel', kanal:'verlust', wert:0.03,
+    { key:'rueckflugtafel', name:'Die Rückflugtafel', kanal:'verlust', wert:0.03, reihe:1,
       bild:'<path d="M20 20 H80 V80 H20 Z"/><path d="M32 36 H68 M32 50 H60"/><path d="M32 64 L44 64 M56 64 L68 64" opacity="0.5"/><path d="M46 58 L54 70 M54 58 L46 70"/>',
       text:'Eine Navigationstafel von jenseits der Schwelle. Die Hinflugbahn ist sauber eingetragen. Die Rückflugbahn fehlt – nicht gelöscht, nie eingetragen.' },
-    { key:'zwillingsstein', name:'Der Zwillingsstein', kanal:'kraft', wert:0.035,
+    { key:'zwillingsstein', name:'Der Zwillingsstein', kanal:'kraft', wert:0.035, reihe:1,
       bild:'<circle cx="38" cy="56" r="24"/><circle cx="66" cy="46" r="30"/>',
       text:'Zwei Körper, verwachsen. Der größere war vorher nicht da – das steht so im Bergungsprotokoll, und niemand hat widersprochen.' },
-    { key:'reif', name:'Der Reif', kanal:'beute', wert:0.05,
+    { key:'reif', name:'Der Reif', kanal:'beute', wert:0.05, reihe:1,
       bild:'<path d="M22 62 L30 24 L44 44 L58 20 L72 44 L84 26 L88 62 Z"/><path d="M22 74 H88"/>',
       text:'Der Letzte Wächter trug ihn nicht. Er lag daneben, als wäre er abgelegt worden.' },
-    { key:'echoglas', name:'Das Echoglas', kanal:'splitter', wert:0.05,
+    { key:'echoglas', name:'Das Echoglas', kanal:'splitter', wert:0.05, reihe:1,
       bild:'<circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="22" opacity="0.6"/><circle cx="50" cy="50" r="11" opacity="0.35"/>',
       text:'Hält man es ans Ohr, hört man einen Kampf, den jemand anders längst gewonnen hat.' },
-    { key:'torscherbe', name:'Die Torscherbe', kanal:'verlust', wert:0.035,
+    { key:'torscherbe', name:'Die Torscherbe', kanal:'verlust', wert:0.035, reihe:1,
       bild:'<path d="M18 84 V46 A32 32 0 0 1 82 46 V84"/><path d="M8 84 H92"/><path d="M50 84 V52" opacity="0.5"/>',
-      text:'Ein Stück des Offenen Tors. Es blockiert nichts – auch als Scherbe nicht, und das ist der beunruhigende Teil.' }
+      text:'Ein Stück des Offenen Tors. Es blockiert nichts – auch als Scherbe nicht, und das ist der beunruhigende Teil.' },
+    // ---- Zweite Reihe (Tiefen 130-180), reihe:2 --------------------------------------------
+    // Ihre Werte sind KLEINER als die der ersten Reihe, und das ist kein Versehen: Die Belohnung
+    // der zweiten Reihe sind die Tiefen-Meilensteine in Sternenessenz, die Prozente sind Beiwerk.
+    // Gemessen gegen ABGRUND_RELIKT_DECKEL steht danach kein Kanal ueber 83 %, und fuer eine
+    // dritte Reihe bleibt in jedem 0,05 bis 0,08 Luft. Der SPLITTER-Kanal wird bewusst GAR NICHT
+    // bedient - er stand mit 0,290 von 0,35 schon vorher am engsten, und ein Deckel, der greift,
+    // schluckt die Belohnung still (genau die Wirkung-ohne-Anzeige, die dieses Projekt vermeidet).
+    { key:'spant', name:'Der Spant', kanal:'kraft', wert:0.025, reihe:2,
+      bild:'<path d="M28 16 V78 Q50 92 72 78 V16"/><path d="M28 40 H72" opacity="0.5"/><path d="M28 60 H72" opacity="0.5"/>',
+      text:'Ein Spantring aus der Unfertigen, mit der Trennscheibe herausgeschnitten. Die Schnittkante ist warm. Sie ist es geblieben.' },
+    { key:'massstange', name:'Die Maßstange', kanal:'beute', wert:0.03, reihe:2,
+      bild:'<path d="M50 10 V90"/><path d="M38 24 H62"/><path d="M40 44 H60"/><path d="M42 60 H58"/><path d="M44 72 H56"/>',
+      text:'Abgebrochen vom Richtmaß. Zwei Frachtmeister, die damit dieselbe Ladung vermessen, kommen auf dieselbe Zahl – und die ist größer als das, was in den Laderaum passt.' },
+    { key:'zweitetafel', name:'Die Zweite Tafel', kanal:'verlust', wert:0.02, reihe:2,
+      bild:'<path d="M20 20 H80 V80 H20 Z"/><path d="M32 36 H68 M32 50 H68 M32 64 H68"/><path d="M74 26 L88 14" opacity="0.6"/>',
+      text:'Das Gegenstück zur Rückflugtafel: Hier ist die Rückflugbahn sauber eingetragen. Der Zielpunkt liegt an keiner Stelle, die eine Karte kennt.' },
+    { key:'liste', name:'Die Liste', kanal:'kraft', wert:0.025, reihe:2,
+      bild:'<path d="M26 12 H74 V88 H26 Z"/><path d="M36 30 H64 M36 44 H64 M36 58 H64 M36 72 H52"/><path d="M32 30 L34 33" opacity="0.6"/><path d="M32 44 L34 47" opacity="0.6"/>',
+      text:'Jedes Schiff, das je in die Tiefe geflogen ist, steht darauf – in der Reihenfolge, in der es geflogen ist. Die letzten Zeilen sind noch leer und schon liniert.' },
+    { key:'bauplan', name:'Der Bauplan', kanal:'beute', wert:0.03, reihe:2,
+      bild:'<path d="M12 24 H88 V76 H12 Z"/><path d="M24 38 H50 V62 H24 Z"/><path d="M58 38 H78 M58 50 H78 M58 62 H70"/>',
+      text:'Von der Tafel der Bauleitung abgenommen. Er beschreibt kein Schiff, sondern eine Werft – und die Werft baut Werften.' },
+    { key:'streichung', name:'Die Streichung', kanal:'verlust', wert:0.02, reihe:2,
+      bild:'<path d="M28 14 H72 V86 H28 Z"/><path d="M38 32 H62 M38 46 H62"/><path d="M34 68 L66 60"/><path d="M34 60 L66 68"/>',
+      text:'Der ausgestrichene Teil des Ersten Auftrags, herausgetrennt. Unter der Streichung steht ein Name. Er ist keplerisch, und es gibt ihn noch nicht.' }
   ];
   const ABGRUND_RELIKT_KANAELE = { kraft:'Kampfkraft', verlust:'Schiffsverluste', splitter:'Abgrundsplitter', beute:'Rohstoffbeute' };
-  // Deckel je Kanal. Sie greifen erst weit hinter dem, was zwoelf Reliquien zusammen geben - sie
-  // sind kein Balance-Werkzeug, sondern eine Bremse fuer den Fall, dass spaeter weitere Reliquien
-  // dazukommen und niemand mehr nachrechnet.
+  // Deckel je Kanal. Sie waren als Bremse fuer den Fall gedacht, "dass spaeter weitere Reliquien
+  // dazukommen und niemand mehr nachrechnet" - genau dieser Fall ist mit der zweiten Reihe (C2,
+  // 22.08.2026) eingetreten, und die Bremse BINDET jetzt fast. Gemessen bei vollstaendiger
+  // Sammlung: kraft 78 %, verlust 75 %, splitter 83 %, beute 77 %. Der Splitter-Kanal ist der
+  // engste; er wird von der zweiten Reihe deshalb gar nicht mehr bedient.
+  // WER EINE DRITTE REIHE BAUT, RECHNET ZUERST HIER NACH - es bleiben je Kanal 0,05 bis 0,08 Luft,
+  // und was darueber liegt, verschwindet still im Deckel statt beim Spieler anzukommen.
+  // Ausgefuehrt gemessen von `test_abgrund_meilensteine` 2a (kein Kanal reisst) und 2b (kein Kanal
+  // unter 50 % - ein Deckel, der nie greifen kann, ist keine Bremse mehr, sondern Zierwerk).
   const ABGRUND_RELIKT_DECKEL = { kraft:0.25, verlust:0.20, splitter:0.35, beute:0.35 };
   // Satz-Boni: nicht je Reliquie, sondern fuer VOLLSTAENDIGKEIT. Sie sind der Grund, die letzten
   // drei auch noch zu holen, wenn die einzelnen Boni laengst nicht mehr ins Gewicht fallen.
+  // Die NAMEN sind mit der zweiten Reihe mitgezogen worden, und das war Pflicht statt Kosmetik:
+  // "Vollstaendiges Kabinett" bei zwoelf Stuecken war ab dem Moment eine Falschaussage, in dem das
+  // Kabinett achtzehn Faecher hat - genau die zweite Anzeigestelle, die eine Erweiterung stehen
+  // laesst (Checkliste Punkt 6). Sie haengen jetzt an den REIHEN der Reliquien (reihe:1/reihe:2)
+  // statt an Anteilen einer Gesamtzahl, die sich wieder aendern kann.
   const ABGRUND_RELIKT_SATZ = [
-    { ab:3,  kanal:'splitter', wert:0.05, name:'Erste Reihe' },
-    { ab:6,  kanal:'kraft',    wert:0.05, name:'Halbe Vitrine' },
-    { ab:9,  kanal:'beute',    wert:0.05, name:'Fast vollzählig' },
-    { ab:12, kanal:'splitter', wert:0.10, name:'Vollständiges Kabinett' }
+    { ab:3,  kanal:'splitter', wert:0.05, name:'Erste Funde' },
+    { ab:6,  kanal:'kraft',    wert:0.05, name:'Halbe erste Reihe' },
+    { ab:9,  kanal:'beute',    wert:0.05, name:'Fast die erste Reihe' },
+    { ab:12, kanal:'splitter', wert:0.10, name:'Erste Reihe vollständig' },
+    // Die zwei Stufen der zweiten Reihe zahlen bewusst KLEINER als die vier davor - dieselbe
+    // Begruendung wie bei den Reliquien selbst: Die Belohnung der zweiten Reihe sind die
+    // Tiefen-Meilensteine in Sternenessenz.
+    { ab:15, kanal:'verlust',  wert:0.02, name:'Halbe zweite Reihe' },
+    { ab:18, kanal:'beute',    wert:0.03, name:'Vollständiges Kabinett' }
   ];
   function abgrundReliktDef(tiefe){
     if (!abgrundIstWaechter(tiefe)) return null;
@@ -50687,11 +50783,66 @@
     { tiefe:95,  titel:'Die Zählung stimmt nicht', text:'Zwei Flotten vermessen dieselbe Strecke und kommen auf verschiedene Tiefen. Beide Messungen sind wiederholbar. Beide sind richtig.' },
     { tiefe:110, titel:'Antwort auf eine ungestellte Frage', text:'Das alte Signal aus Tiefe 15 sendet weiter. Hier unten ist es kein Notruf mehr, sondern eine Anweisung – und sie ist an niemanden gerichtet, den es schon gibt.' },
     { tiefe:130, titel:'Werften', text:'Die Wracks in dieser Tiefe sind nicht gesunken. Sie sind unfertig. Irgendwo weiter unten steht eine Werft, die keine Aufträge bekommt und trotzdem baut.' },
-    { tiefe:150, titel:'Der Grund, warum man weitergeht', text:'Es gibt nichts mehr zu entdecken, was sich in Berichte fassen ließe. Was bleibt, ist die Zahl, die größer wird, und die Gewissheit, dass sie das immer tun wird.' }
+    // Der Eintrag bei 150 hiess bis zur zweiten Reihe "Der Grund, warum man weitergeht" und sagte
+    // woertlich, es gebe "nichts mehr zu entdecken, was sich in Berichte fassen liesse". Das war
+    // ehrlich geschrieben, solange die Waechterliste bei zwoelf endete - mit sechs weiteren
+    // Waechtern darunter ist es eine Falschaussage geworden, und zwar an genau der Stelle, an der
+    // ein Langzeitspieler aufhoert (Checkliste Punkt 6). Er markiert jetzt die WENDE statt das Ende.
+    { tiefe:150, titel:'Die Werft', text:'Sie steht. Kein Dock, keine Halle – eine Ordnung im Raum, in der Rümpfe entstehen, während man zusieht. Was hier gebaut wird, ist nicht für die Tiefe bestimmt. Es zeigt nach oben.' },
+    { tiefe:165, titel:'Der Bauplan liest sich rückwärts', text:'Die abgehakten Punkte auf der Tafel der Bauleitung ergeben, von unten gelesen, eine Bestandsliste. Es ist die Liste unserer eigenen Werften – vollständig, in der Reihenfolge ihrer Gründung, und die letzten drei Zeilen sind noch leer.' },
+    { tiefe:180, titel:'Der Grund, warum man weitergeht', text:'Auf dem Ersten Auftrag steht unter der Streichung ein keplerischer Name, den es noch nicht gibt. Darunter ein Datum. Wer bis hierher gekommen ist, weiß jetzt, dass der Abgrund nicht endet – er wartet darauf, dass wir ihn einholen.' }
   ];
   function abgrundChronikOffen(){
     const best = ensureAbgrund().best || 0;
     return ABGRUND_CHRONIK.filter(e => best >= e.tiefe);
+  }
+  // ---- Tiefen-Meilensteine (C2) ----------------------------------------------------------------
+  // Der Abgrund zahlte bis hierher in Punkte, Splitter, Bergungsgut und einen logarithmischen
+  // Produktionsbonus - also in NICHTS, was den Aufstieg ueberlebt. Wer zwanzigmal aufgestiegen ist,
+  // hat seine Rekordtiefe behalten und alles verloren, was er dafuer bekommen hat.
+  //
+  // Warum Sternenessenz und nicht mehr Prozente in die vier Reliquien-Kanaele: Die sind gedeckelt,
+  // und gemessen stand der Splitter-Kanal schon vor der zweiten Reihe bei 83 % seines Deckels. Neue
+  // Prozente waeren dort still geschluckt worden - eine Belohnung, die der Spieler nicht bekommt,
+  // aber angekuendigt sieht. Essenz hat diesen Deckel nicht und ist die einzige Waehrung, die
+  // Prestige UND Aufstieg uebersteht.
+  //
+  // Die Betraege sind gegen RESEARCH_MILESTONES kalibriert, nicht gegriffen: Die Forschung gibt
+  // gemessen 127 Essenz ueber 20 Meilensteine (Schnitt 6,4). Diese sieben geben 58 (Schnitt 8,3) -
+  // hoeher je Stueck, weil eine Waechtertiefe zaeher ist als eine Forschungsgruppe, aber in der
+  // Summe klar darunter, weil die Forschung der breitere Weg bleibt.
+  const ABGRUND_TIEFEN_MEILENSTEINE = [
+    { key:'t25',  tiefe:25,  essence:2,  credits:400,  name:'Grenzgänger',      desc:'Rekordtiefe 25 – der Abstieg ist kein Ausflug mehr.' },
+    { key:'t50',  tiefe:50,  essence:3,  credits:700,  name:'Ohne Boden',       desc:'Rekordtiefe 50 – die Messung zeigt einen Grund, und darunter beginnt eine neue Skala.' },
+    { key:'t75',  tiefe:75,  essence:4,  credits:1200, name:'Grenze der Sprache', desc:'Rekordtiefe 75 – die Berichte werden kürzer, je tiefer sie waren.' },
+    { key:'t100', tiefe:100, essence:6,  credits:2000, name:'Dreistellig',      desc:'Rekordtiefe 100 – die Zählung stimmt nicht mehr, und beide Messungen sind richtig.' },
+    { key:'t125', tiefe:125, essence:9,  credits:3000, name:'Jenseits des Tors', desc:'Rekordtiefe 125 – hinter dem Offenen Tor, wo die Wächter zum zweiten Mal beginnen.' },
+    { key:'t150', tiefe:150, essence:14, credits:4500, name:'In den Werften',   desc:'Rekordtiefe 150 – dort, wo die Wracks nicht gesunken, sondern unfertig sind.' },
+    { key:'t180', tiefe:180, essence:20, credits:6000, name:'Der Erste Auftrag', desc:'Rekordtiefe 180 – das Blatt, mit dem hier unten alles angefangen hat. Tiefer war noch niemand, der zurückkam.' }
+  ];
+  // Vergibt jeden noch offenen Tiefen-Meilenstein und gibt zurueck, wie viele NEU dazukamen - die
+  // Aufrufstelle beim Laden braucht die Zahl, um nur dann zu speichern, wenn wirklich etwas
+  // gutgeschrieben wurde (dasselbe Muster wie checkResearchMilestones).
+  function checkAbgrundMeilensteine(){
+    const a = ensureAbgrund();
+    if (!a.meilensteine) a.meilensteine = {};
+    const best = a.best || 0;
+    let neu = 0;
+    for (const m of ABGRUND_TIEFEN_MEILENSTEINE){
+      if (a.meilensteine[m.key]) continue;
+      if (best < m.tiefe) continue;
+      a.meilensteine[m.key] = true;
+      if (!state.ascension) state.ascension = { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0,grenzen:0} };
+      state.ascension.essence = (state.ascension.essence||0) + m.essence;
+      state.credits = (state.credits||0) + m.credits;
+      log('Tiefen-Meilenstein erreicht: '+m.name+'! +'+m.essence+' Sternenessenz, +'+fmt(m.credits)+' Kredite.', 'ti-medal', 'ok');
+      pushReport({ type:'item-found', itemName:'Tiefen-Meilenstein: '+m.name+' (+'+m.essence+' Sternenessenz, +'+fmt(m.credits)+' Kredite)', itemIcon:'ti-medal', rare:true, foundAt:'Abgrund, Tiefe '+m.tiefe });
+      // Nur EIN Ton, auch wenn beim Nachtragen eines Bestandskontos mehrere gleichzeitig fallen -
+      // dieselbe Ueberlegung wie bei den Forschungs-Meilensteinen.
+      if (neu === 0) playSound('achieve');
+      neu++;
+    }
+    return neu;
   }
 
   // ---- Allianz-Tiefenlauf (v8.322.0) ----
@@ -51145,6 +51296,21 @@
       ? chronik.slice().reverse().map(e => `<div style="margin-bottom:8px;"><strong style="color:#c3bef5;">Tiefe ${e.tiefe} · ${e.titel}</strong><br><span class="bmeta">${e.text}</span></div>`).join('')
       : '<div class="bmeta">Noch kein Eintrag. Der erste Bericht entsteht bei Rekordtiefe 3.</div>';
     const naechste = ABGRUND_CHRONIK.find(e => e.tiefe > (a.best||0));
+    // Tiefen-Meilensteine (C2): Ein Meilenstein, den man erst kennt, wenn er faellt, ist keine
+    // Entscheidung - deshalb stehen ALLE sieben da, auch die offenen, mit ihrer Belohnung. Dieselbe
+    // Haltung wie beim Reliquienkabinett, wo die leeren Faecher genauso viel Raum bekommen wie die
+    // vollen: Eine Sammlung, die ihre Luecken versteckt, ist keine Sammlung.
+    const msMarken = a.meilensteine || {};
+    const msErreicht = ABGRUND_TIEFEN_MEILENSTEINE.filter(m => msMarken[m.key]).length;
+    const msHtml = ABGRUND_TIEFEN_MEILENSTEINE.map(m => {
+      const hat = !!msMarken[m.key];
+      return `<div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; opacity:${hat?1:0.6};">
+        <i class="ti ${hat?'ti-medal':'ti-lock'}" aria-hidden="true" style="font-size:17px; color:${hat?'#e0a548':'#3a3f56'}; flex-shrink:0; margin-top:2px;"></i>
+        <span style="flex:1;"><span class="bname" style="font-size:13px; color:${hat?'#e0a548':'#9aa0b5'};">Tiefe ${m.tiefe} · ${m.name}</span>
+        <br><span class="bmeta">${m.desc}</span>
+        <br><span class="bmeta" style="color:${hat?'#9fe1cb':'#5a5f78'};">${hat?'Erhalten:':'Belohnung:'} ${m.essence} Sternenessenz · ${fmt(m.credits)} Kredite</span></span>
+      </div>`;
+    }).join('');
     const gesehen = ABGRUND_MUTATOREN.filter(m => (a.gesehen||{})[m.key]);
     // Wochenlauf: einmal pflegen (Wochenwechsel erkennen), dann anzeigen. Der Aufruf gehoert hierher
     // und nicht nur in die Tauchgang-Aufloesung - sonst saehe jemand, der eine Woche pausiert, seine
@@ -51436,6 +51602,13 @@
         <div style="margin-top:8px;">${bestiarHtml}</div>
       </details>`}
       ${reiter!=='raenge' ? '' : `
+      <details data-keep-open="abgrundMeilensteine"${detailsOpenAttr('abgrundMeilensteine')} style="margin-bottom:0.75rem;">
+        <summary class="bname" style="cursor:pointer;"><i class="ti ti-medal" aria-hidden="true" style="color:#e0a548;"></i> Tiefen-Meilensteine · ${msErreicht}/${ABGRUND_TIEFEN_MEILENSTEINE.length}</summary>
+        <div style="margin-top:8px;">
+          <div class="bmeta" style="margin-bottom:10px;">Sternenessenz ist die einzige Währung, die Prestige <em>und</em> Aufstieg übersteht – was du hier unten holst, nimmst du in jedes neue Imperium mit. Jede Marke gibt es einmal.</div>
+          ${msHtml}
+        </div>
+      </details>
       <details data-keep-open="abgrundChronik"${detailsOpenAttr('abgrundChronik')} style="margin-bottom:0.75rem;">
         <summary class="bname" style="cursor:pointer;"><i class="ti ti-list-details" aria-hidden="true" style="color:#c3bef5;"></i> Chronik des Abstiegs · ${chronik.length}/${ABGRUND_CHRONIK.length}</summary>
         <div style="margin-top:8px;">
@@ -53352,6 +53525,10 @@
             if (tiefe > (a.best||0)){
               a.best = tiefe;
               a.tiefe = tiefe + 1;
+              // Tiefen-Meilensteine pruefen, sobald der Rekord wirklich gestiegen ist. Bewusst
+              // HIER und nicht am Ende der Auswertung: a.best ist die einzige Groesse, an der sie
+              // haengen, und sie hat sich genau in dieser Zeile geaendert.
+              checkAbgrundMeilensteine();
               tiefenMsg = ' Neue Rekordtiefe '+tiefe+' – Tiefe '+(tiefe+1)+' ist jetzt erreichbar.';
               registerShareMoment('Abgrund Tiefe '+tiefe, sektor.name+' bezwungen', '🌀');
             } else {
