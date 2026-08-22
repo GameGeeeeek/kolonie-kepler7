@@ -7204,8 +7204,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.608.0';
+  const VERSION = '8.609.0';
   const PATCHNOTES = [
+    { version:'8.609.0', date:'22.08.2026', changes:[
+      '<strong>Die Belohnungsvorschau des Allianz-Raids erscheint jetzt wirklich.</strong> Seit v8.607.0 stand sie im Spiel, war aber bei jedem Verband unsichtbar: Sie suchte den eigenen Eintrag in der Rangliste unter einem Feldnamen, den der Server dort gar nicht ablegt – gefunden wurde damit nie jemand, und die ganze Tafel blieb leer. Nach dem Abflug siehst du wieder deinen Platz, deinen Anteil an der Angriffskraft und beide Spalten: was es bei einem Sieg gibt und was, wenn der Boss überlebt.',
+      'Für die Zukunft abgesichert: Der Prüflauf hält jetzt jede angezeigte Zahl der Tafel gegen die Formel des Servers, statt nur zu prüfen, dass überhaupt etwas dasteht. Genau in dieser Lücke war der Fehler durchgekommen – die Rechnung stimmte, die Anzeige war da, nur zeigte sie nichts.'
+    ] },
     { version:'8.608.0', date:'22.08.2026', changes:[
       '<strong>Die Abzeichenzeile einer Region ist jetzt antippbar.</strong> Sie sagte bisher nur im Tooltip, WELCHES System den Hinweis trägt – am Handy also gar nicht, denn dort gibt es kein Überfahren mit der Maus. Ein Tipp darauf öffnete stattdessen die Region. Jetzt bekommst du jedes betroffene System namentlich mit seinem Hinweis, und ein Tipp bringt dich direkt hin. Im Kepler-Kern stehen so 10 von 15 Systemen auf einen Blick da, statt sie einzeln aufzuklappen.',
       '<strong>Dafür findet das Suchfeld über der Karte keine Landmarken mehr</strong> (Wunsch Sascha: „Die Suche soll nur Planeten zeigen keine Gegner das wäre zu einfach man soll schon bisschen suchen auf der Karte"). Festungen, Nester und Gegner waren seit v8.582.0 über Wörter wie <em>Festung</em> oder <em>Nest</em> auffindbar – gesucht wird jetzt wieder auf der Karte. Systeme und Planeten findet das Feld unverändert.',
@@ -46521,7 +46525,14 @@
     const rang = d && Array.isArray(d.ranking) ? d.ranking : null;
     const eigen = state.player && state.player.id;
     if (!rang || !rang.length || !eigen) return '';
-    const idx = rang.findIndex(e => e && e.playerId === eigen);
+    // Das Feld heisst `id`, NICHT `playerId` - abgelesen an der einzigen Stelle, die die Liste
+    // baut (server.js: `.map(p => ({ id: p.playerId, name, power }))`), und bestaetigt durch den
+    // Server selbst, der sie eine Funktion weiter mit `e.id === req.userId` wieder liest.
+    // Der erste Entwurf suchte `e.playerId`; ausgefuehrt gemessen lieferte findIndex damit IMMER
+    // -1 und die ganze Vorschau eine leere Zeichenkette - das Feature war live und wirkungslos.
+    // Gefangen hat es kein Test: Die Fixture des Waechters erfand `playerId` im ranking und mass
+    // damit eine Datenform, die es in der Produktion nicht gibt (Hausregel 36).
+    const idx = rang.findIndex(e => e && e.id === eigen);
     if (idx < 0) return '';
     const anzahl = rang.length;
     const platz = idx + 1;
