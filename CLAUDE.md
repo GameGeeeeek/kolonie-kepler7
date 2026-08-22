@@ -4254,10 +4254,30 @@ verdrahtete den BACKEND-Pfad fest** und ignorierte `KEPLER_BACKEND_SERVER` still
 
 **Gemessen sind zwölf Tests betroffen** – zehn ganz, und zwei (`test_raid_bosswahl`,
 `test_verstrickungen`) **trotz** vorhandenem `SERVER_JS`-Import, also halb umgeleitet: Bei ihnen
-liefe der Browser auf der Kopie und die Backend-Prüfung auf dem Original. Behoben ist bisher nur
-`test_pvp_deckel`; die übrigen elf sind ein eigener Durchgang. **Wer nach dieser Fehlerklasse
-sucht, sucht nach der LESESTELLE (`kolonie-kepler7-backend'` im `path.join`), nicht nach dem
-fehlenden `require`** – sonst findet er wieder nur die Hälfte.
+liefe der Browser auf der Kopie und die Backend-Prüfung auf dem Original. **Wer nach dieser
+Fehlerklasse sucht, sucht nach der LESESTELLE (`kolonie-kepler7-backend'` im `path.join`), nicht
+nach dem fehlenden `require`** – sonst findet er wieder nur die Hälfte.
+
+**ERLEDIGT am 22.08.2026, und die Zahl „zwölf" oben war schon beim Schreiben eine Momentaufnahme.**
+Zehn hat eine Parallelsitzung mit #481 umgestellt, `test_pvp_deckel` kam über #484, und der letzte
+war `test_werftmarken` – der einzige, der KEINEN `SERVER_JS`-Import hatte, sondern eine **eigene
+Kandidatenliste** mit veralteten `/workspace`-Pfaden. Sie funktionierte heute noch, weil ihr
+dritter Kandidat zufällig griff; die Umleitung ignorierte sie trotzdem still.
+
+**Der Beleg gehört zur Behebung, nicht daneben** – am alten Stand waren beide Läufe (normal und
+`KEPLER_BACKEND_SERVER=/tmp/leer_server.js`) **byte-identisch**, danach Exit 0 / 323 Prüfungen
+gegen Exit 1 / 312 mit `FAIL - Markenblock im Backend gefunden`, bei identischer Prüfliste zum
+alten Stand (per `diff` verglichen, nicht gezählt – Regel 60). Die 323 → 312 sind erklärbar und
+kein verdeckter Abbruch: Ohne gefundenen Block laufen die davon abhängigen Prüfungen nicht.
+
+**Die Klasse ist damit geschlossen, und auch das ist gemessen statt angenommen:** Alle **elf**
+Tests, die `server.js` lesen, wurden einmal normal und einmal umgeleitet gefahren – jeder liefert
+umgeleitet eine ANDERE Ausgabe. Wäre sie gleich, würde die Env-Variable weiterhin still ignoriert,
+und genau das sieht aus wie eine bestandene Gegenprobe.
+
+Nebenbei mitgenommen: `test_werftmarken` bezog seine Pfade aus `lib/umgebung` und zog damit
+Playwright hoch (gemessen 282 ms), obwohl es **keinen Browser** benutzt (0 Treffer auf
+`playwright`/`starteBrowser`/`SPIEL_URL`). Es liest jetzt aus `lib/spieldatei`.
 
 ### Ein Nebenbefund, der NICHT behoben ist
 
