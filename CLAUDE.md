@@ -4346,8 +4346,8 @@ unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zähl
   `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
   3a schlägt sonst an.
 
-Wächter: `tests/test_schiffsmodul_paritaet.js` (22 Prüfungen, vier Gegenproben — jede speist eine
-der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 22 gelaufenen
+Wächter: `tests/test_schiffsmodul_paritaet.js` (23 Prüfungen, vier Gegenproben — jede speist eine
+der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 23 gelaufenen
 Prüfungen).
 
 **Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
@@ -4358,6 +4358,19 @@ hat es nur die `WERKZEUGFEHLER`-Wache des Messskripts (Regel 71). Der Sammler ho
 Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektliteral und IIFE)
 und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
 geschrumpft.
+
+**Seit dem 22.08.2026 fängt der Test das selbst** (`4-bau3: kein Laufzeitfehler in den
+Messaufrufen`): Die zwei Messaufrufe laufen durch einen Wrapper, der einen geworfenen Fehler
+festhält, `null` zurückgibt und den Lauf weiterlaufen lässt. Beidseitig gegengeprüft: ohne die
+Wache **15 Prüfungen und keine einzige FAIL-Zeile** — ein roter Exit-Code ohne jede Aussage —, mit
+ihr 23 Prüfungen und der Grund im Protokoll
+(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`).
+**Die übertragbare Lehre geht über diesen Test hinaus: Ein `try/catch` um den AUFBAU (Regel 34)
+genügt nicht, wenn die geschnittene Funktion erst beim AUFRUF wirft.** Genau daran ist es hier
+gescheitert — der Aufbau war längst gefasst, der Lauf starb trotzdem mittendrin. Wer Funktionen
+aus der Spieldatei schneidet und ausführt, fasst BEIDE Seiten: das Zusammensetzen und jeden
+einzelnen Aufruf. Sonst hängt die Diagnose daran, dass zufällig ein Messskript mit
+„was muss fallen"-Liste danebensteht (Regel 71) — und im Suite-Lauf steht dort keines.
 
 ## Etappe D: Protomaterie bekommt Abnehmer (21.08.2026)
 
