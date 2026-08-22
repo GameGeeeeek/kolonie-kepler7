@@ -4933,3 +4933,52 @@ Wächter: `tests/test_bildruhe.js` (9 Prüfungen). Er misst das **Paar**: unsich
 steht (Drift 0, Ausgleich über `scrollY`), sichtbare Änderung → **nichts** wird gescrollt. Ohne die
 zweite Hälfte wäre ein viel zu breiter Ausgleich grün. Beidseitig gegengeprüft: am Stand davor
 fallen genau `1a` und `1b` mit `{"drift":-172,"scrollAusgleich":0}`, bei identischen Prüfnamen.
+
+## Drei Richtungen für EINE Regel — und die dritte ist die gefährlichste (22.08.2026)
+
+Nach Backend-#156 stand `test_wertstreuung` 6e rot, ohne dass ein Fehler vorlag: Die Prüfung
+**zählte** die Stellen, an denen der Server einen Modulbeitrag nachrechnet, und verlangte genau
+zwei. Eine völlig richtige dritte (`shipModulKlassenBoni`) ließ sie durchfallen — eine
+Momentaufnahme statt einer Regel (Regel 3/33).
+
+**Die Regel lautet: Wer einen Modulbeitrag aus Seltenheit UND Stufe rechnet, muss den Wurf
+mitnehmen.** Sonst rechnet der Server für ein gewürfeltes Modul einen anderen Wert als der Client,
+und das entscheidet PvP.
+
+**Zwei Sitzungen haben sie am selben Tag unabhängig behoben, mit verschiedenen Zuschnitten — und
+die sind komplementär, keiner ist der bessere.** Das ist gemessen, nicht abgewogen: an drei
+sabotierten Backend-Kopien, jede mit ihrer „was fallen MUSS"-Liste (Regel 71).
+
+| eingespeister Fehler | Musterliste (`6e`/`6e2`) | Rechenform (`6e3`) |
+|---|---|---|
+| eine erlaubte Stelle **verliert** den Wurf | fällt | fällt |
+| eine **neue** Stelle **hat** den Wurf | fällt („gehört eingetragen") | grün — die Regel gilt ja |
+| eine **neue** Stelle rechnet Seltenheit × Stufe und **vergisst** den Wurf | **grün** | fällt, nennt die Zeile |
+
+**Die dritte Zeile ist der gefährliche Fall, und die Musterliste sieht ihn strukturell nicht.** Sie
+geht von den Zeilen aus, die den Wurf ENTHALTEN — eine Stelle ohne ihn steht in dieser Liste gar
+nicht, ist also weder „fehlend" noch „unbekannt" und fällt durch beide Maschen. Die zweite Zeile
+ist dafür der historische Fall von #156, und den sieht nur sie: Sie erzwingt, dass eine neue Stelle
+bewusst eingetragen wird.
+
+**Deshalb stehen seit dem 22.08.2026 alle drei nebeneinander** (`6e`, `6e2`, `6e3`), und wer hier
+aufräumt, misst vorher die drei Zeilen der Tabelle nach. Der Unterschied im Zuschnitt: `6e`/`6e2`
+gehen von der ERSCHEINUNGSFORM aus (wo steht der Wurf?), `6e3` von der Größe, welche die Regel
+verletzt (wo wird Seltenheit × Stufe gerechnet?) — das ist der Nachtrag zu Regel 40 in der
+Anwendung.
+
+**Ein Fund nebenbei, und er betrifft jede Fehlermeldung dieses Tests:** Der Kommentar-Filter
+ersetzte Blockkommentare durch **ein** Leerzeichen und faltete damit jeden mehrzeiligen Kommentar
+auf eine Zeile zusammen. Gemessen meldete der Test „Zeile 2243" für `raidlossProtectionMult`, das
+in `server.js` bei **3577** steht — 1.334 Zeilen daneben. Kommentare werden deshalb **geleert**
+(jedes Zeichen außer dem Zeilenumbruch durch ein Leerzeichen ersetzt), nicht entfernt. Eine
+Fehlermeldung, die auf die falsche Zeile zeigt, schickt den Nächsten an den falschen Ort — und sie
+sieht dabei aus wie eine gute Meldung.
+
+**Die Arbeitsteilung selbst ist die zweite Lehre, und sie ist Regel 69 zum zweiten Mal.** Ich hatte
+alle drei roten Tests parallel zu einer anderen Sitzung gebaut, deren PR seit dem Vorabend offen
+war; zwei davon habe ich wieder zurückgenommen, weil ihre Antworten besser waren (der
+Klammertiefen-Schnitt statt eines dritten Endankers, Regel 40). **Wer eine ROTE Prüfung auf `main`
+vorfindet, sieht zuerst nach, ob dafür schon ein PR offen ist** — ein roter Test ist die Sorte
+Befund, die mehrere Sitzungen gleichzeitig sehen, und anders als bei einem Feature merkt man die
+Dopplung erst am Ende.
