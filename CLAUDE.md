@@ -5558,3 +5558,104 @@ Erfolg braucht ein Symbol in `ACH_ICONS`). In `test_relikte` sind dabei vier fes
 SCHREIBWEISEN zu REGELN geworden (Regel 3): Die Wiederkehr wird nicht mehr gegen die feste Tiefe
 130 geprüft, sondern als Periode über alle Tiefen, und die Zahl der Reliquien im Hilfetext kommt
 aus einer Zahlwort-Zuordnung statt aus dem Wort „zwölf".
+## Der Betreiber erfährt, wenn ein neuer Spieler anfängt (22.08.2026)
+
+Auftrag Sascha: „füge hinzu wenn sich neuer spieler anmeldet und spielt bekommt gamegeeeeek eine
+push nachricht." Über `AskUserQuestion` gewählt: **Auslöser ist das erste Öffnen des Spiels**
+(nicht die Registrierung) und **eine Meldung je Neuling, sofort** (keine Bündelung).
+
+Die serverseitige Hälfte samt Begründungen steht in der **Backend-CLAUDE.md**. Hier nur, was das
+Frontend angeht — und der Fund, der dabei herausfiel.
+
+### Vier Stellen, und die vierte ist die, die man übersieht
+
+`neuspieler` in `notifPrefsCache`, ein `NOTIF_EVENT_INFO`-Eintrag, eine Zeile im Markup der
+Benachrichtigungs-Box, und die **Sichtbarkeit** dieser Zeile. Die Kategorien-Aufzählung steht im
+Spiel an fünf Stellen (`getNotifPrefs` und `POST /api/notification-prefs` im Backend,
+`notifPrefsCache`, das `data-notif-cat`-Markup und `NOTIF_EVENT_INFO` hier) — wer eine davon
+vergisst, bekommt keinen Fehler, sondern eine stille Lücke.
+
+**Der `NOTIF_EVENT_INFO`-Eintrag ist Pflicht, nicht Zierde.** Ohne ihn zeichnet das Postfach die
+Zeile über den Rückfall am Ende: Glocke, graue Farbe und wörtlich das Wort **„Ereignis"** statt
+einer Auskunft. Gemessen, nicht vermutet — die Gegenprobe mit entferntem Eintrag zeigt genau das.
+
+**Der Schalter ist NUR für das Betreiberkonto sichtbar**, und das folgt aus Saschas zweiter Wahl:
+Ohne Bündelung bekommt das Postfach je Neuling einen Eintrag, und es hält 30. Ein Schalter, den
+jeder sieht, aber nur einer je auslöst, wäre eine tote Fläche mit einem Versprechen daran — genau
+die Sorte Falschaussage, gegen die Regel 35 geschrieben ist. Die Prüfung ist **bewusst keine
+Sicherheitsgrenze** und muss keine sein: Der Server schlägt die Kategorie ohnehin nur am
+Betreiberkonto nach; ein fremdes Konto kann sie setzen, gelesen wird sie dort nie.
+
+**Der Text sagt „geöffnet", nicht „spielt".** Der Auslöser ist der erste Spielstand-Save, und der
+feuert automatisch beim ersten Boot — die Meldung behauptet damit nur, was sie belegen kann.
+
+### Der Fund: der Kategorie-Wächter war seit dem 02.08.2026 blind
+
+`test_pushkategorien` prüfte den Postfach-Text nur für **einen** Typ — mit dem Kommentar „geprüft
+wird deshalb nur, dass der NEUE Typ einen hat". Der „neue Typ" war `alliance-raid` vom 02.08.2026;
+**jeder Typ danach war ungeprüft**. Belegt an einer Sabotage: Der Eintrag des neuen
+`neuer-spieler` ließ sich entfernen, und der Test blieb grün.
+
+Gemessen fehlt der Text bei **fünf** Bestandstypen (`alliance-application`, `feedback-received`,
+`message`, `player-reported`, `referral-milestone`) — alle fünf zeigen im Postfach „Ereignis". Sie
+stehen jetzt als **namentliche** Ausnahmeliste da, nicht mehr als „u. ä." im Kommentar: Ein
+sechster fällt damit auf, ohne dass jemand an ihn gedacht haben muss (Regel 40), und die Lücke
+bleibt sichtbar statt in einer Floskel zu verschwinden. Dazu die Gegenrichtung (`2c`, Regel 33):
+Wer einen der fünf Texte nachträgt, muss den Namen aus der Liste nehmen — sonst wächst eine Liste
+mit, die niemand mehr liest.
+
+**Die übertragbare Lehre steht unten als Arbeitsregel 79**, weil sie über diesen Test hinausgeht.
+
+### Zwei Fallen beim Bau des Frontend-Wächters
+
+- **`data-tab="einstellungen"` gibt es nicht.** Ein geratener Reiter-Name (Regel 4), und
+  `if (b) b.click()` verschluckt ihn still — der Test klickte nichts und maß trotzdem etwas. Der
+  Weg zu den Benachrichtigungs-Einstellungen läuft über `headerProfileBtn`; die Berichte-Box über
+  `headerReportsBtn`. **Die Vorlage, aus der ich kopiert hatte (`test_chatpush_schalter.js`),
+  trägt denselben Fehler und merkt ihn nie**, weil sie nur `className` liest. Seitdem stehen
+  `1-vorab` und `3-vorab` davor, die belegen, dass die Fläche überhaupt offen ist.
+- **Die Sichtbarkeit wird als PAAR gemessen** (Regel 61): Betreiberkonto sieht den Schalter,
+  ein anderes Konto nicht. Jede Hälfte allein wäre auch dann grün, wenn die Zeile ganz fehlt.
+
+Wächter: `tests/test_neuspieler_meldung.js` (17 Prüfungen — Sichtbarkeits-Paar, Schalterzustand,
+Postfach-Zeile) und `tests/test_pushkategorien.js` (erweitert). Die Backend-Hälfte prüft
+`tests/test_neuspieler_push_http.js` im Nachbar-Repo (30 Prüfungen, Port 3231).
+
+Gegenprobe gegen `origin/main` per `KEPLER_SPIELDATEI`: **9 rot bei identischen 17 Prüfnamen** (per
+`diff` verglichen, nicht gezählt — Regel 60). `3c` zeigt den Anlassfall wörtlich, statt ihn zu
+behaupten: `"Ereignis22.08., 19:07 · tippen zum Öffnen"` — genau die Zeile, die das Postfach ohne
+`NOTIF_EVENT_INFO`-Eintrag zeichnet.
+
+**Die zwei PRs gehören zusammen gemerged**, obwohl die Reihenfolge sonst gleichgültig wäre (ein
+Frontend ohne Server-Kategorie zeigt einen Schalter ohne Wirkung, ein Server ohne Frontend schickt
+eine Meldung, die das Postfach als „Ereignis" zeichnet — beides harmlos): `test_pushkategorien`
+hält Backend-Kategorien und Frontend-Schalter zusammen und fällt bei einer Seite allein.
+
+78. **Ein Test, der PERSISTENZ über einen Serverstopp misst, darf nicht SIGTERM benutzen — der
+    Graceful Shutdown schreibt genau den Eintrag mit, dessen Verlust gemessen werden soll.**
+    Vorfall 22.08.2026: Abschnitt 6 von `test_neuspieler_push_http` sollte belegen, dass die
+    Meldung einen Neustart überlebt. Sie tut das nur, weil `pushNotificationEvent` in `db.private`
+    schreibt und `saveDb()` folgt — die Prüfung wäre also die Absicherung gegen einen Umbau auf
+    reines RAM. Mit `SIGTERM` ist sie **wertlos**: Der Handler flusht die Datenbank auf Platte,
+    also auch einen Eintrag, der nur im Speicher stand. Ein Umbau auf RAM-only bliebe grün.
+    Verschärfend hatte ich in den Kommentar geschrieben, SIGKILL „misst etwas anderes" — das war
+    ungemessen und falsch herum. Gemeldet hat es allein die `WERKZEUGFEHLER`-Wache der Gegenprobe
+    (Regel 71): Die Sabotage „nur im RAM halten" ließ Abschnitt 6 grün.
+    **Vorgehen:** Wer Persistenz misst, beendet den Prozess so, wie er im Ernstfall stirbt —
+    `SIGKILL`, kein Aufräumen, kein Flush. Und die Gegenrichtung gehört dazu (`6a3`): Nach einem
+    SIGKILL muss der Eintrag da sein, weil er WIRKLICH auf Platte lag, nicht weil ihn der Stopp
+    noch hingeschrieben hat.
+
+79. **Ein Wächter, der nur „den NEUEN Fall" prüft, ist ab dem übernächsten Fall blind — und sein
+    eigener Kommentar tarnt das als Absicht.** Vorfall 22.08.2026: `test_pushkategorien` prüfte den
+    Postfach-Text für genau einen Typ, mit der Begründung „geprüft wird deshalb nur, dass der NEUE
+    Typ einen hat". Das war beim Schreiben (02.08.2026) richtig und ab dem nächsten Typ falsch;
+    gemessen fehlten fünf. Ein „u. ä." im Kommentar verschleiert dabei doppelt: Es behauptet
+    Vollständigkeit („und ähnliche"), ohne eine einzige Zahl zu nennen, und es macht die Lücke
+    unsichtbar für den, der später den Test liest.
+    **Vorgehen:** Ein Wächter prüft die MENGE, nicht das jüngste Mitglied. Bestandslücken werden
+    **namentlich** ausgenommen (nie als Sammelbegriff), mit dem Datum der Messung — dann fällt ein
+    neuer Fall auf, ohne dass jemand an ihn gedacht haben muss (Regel 40), und die Ausnahmeliste
+    braucht ihre Gegenrichtung (Regel 33): Ein Name, der längst behoben ist, gehört heraus.
+    Das ist die Familie von Regel 68, eine Ebene höher: Dort hält ein Test einen FEHLER als Regel
+    fest, hier hält er eine LÜCKE als Absicht fest.
