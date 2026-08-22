@@ -80,11 +80,27 @@ const npcAufl = ausschnitt("const hasWeakness = npcWeaknessAusgenutzt(npc, fleet
 check('3a: die NPC-Auflösung bildet ihre Phasenbasis mit weaknessPhasenBasis',
   /const phasenBasis = weaknessPhasenBasis\(powerRoh, hasWeakness\)/.test(npcAufl));
 
-const npcVor = ausschnitt("const schwaecheGenutzt = npcWeaknessAusgenutzt(n, attackFleet);", "const flightTime = missionDurationFor(n.duration", 'NPC-Vorschau');
+/* MITGEZOGEN AM 22.08.2026 (E1b) - und dabei SCHAERFER geworden, nicht passend gemacht.
+   Die NPC-Vorschau-Rechnung stand bis dahin inline in renderGalaxy; dieser Ausschnitt suchte sie
+   ueber ihre dortigen Variablennamen (powerRohPreview, schwaecheGenutzt, attackFleet). Seit E1b
+   liegt sie in npcKampfLage(), weil die KARTE dieselben Zahlen braucht - der Ausschnitt fand
+   seine Marken nicht mehr und meldete {"a":-1,"b":-1} auf voellig korrektem Code.
+   Die bequeme Loesung waere gewesen, einfach die neuen Namen einzusetzen. Geprueft wird jetzt
+   stattdessen die EIGENSCHAFT, die dieser Test schuetzen soll - und zwar in beide Richtungen:
+   die eine Vorschau-Rechnung bildet ihre Basis mit weaknessPhasenBasis (3b/3c), UND es gibt sie
+   nur EINMAL (3b2). Eine zweite Vorschau, die die Basis anders bildet, faellt damit auf; vorher
+   waere sie unbemerkt geblieben, solange die alte Stelle noch stimmte. */
+const npcVor = ausschnitt("function npcKampfLage(npc, flotte){", "\n  /* Die Enterphase", 'NPC-Kampflage');
 check('3b: die NPC-Vorschau rechnet ihre Chance über dieselbe Basis',
-  /battleWinChance\(weaknessPhasenBasis\(powerRohPreview, schwaecheGenutzt\)/.test(npcVor));
+  /battleWinChance\(weaknessPhasenBasis\(powerRoh, schwaecheGenutzt\), effDefense, konter\)/.test(npcVor));
 check('3c: und sie zeigt die Angriffskraft mit demselben Aufschlag wie die Auflösung',
-  /powerRohPreview \* npcCounterPreview \* \(schwaecheGenutzt \? WEAKNESS_POWER_MULT : 1\)/.test(npcVor));
+  /powerRoh \* konter \* \(schwaecheGenutzt \? WEAKNESS_POWER_MULT : 1\)/.test(npcVor));
+// Die Gegenrichtung: Sobald jemand die Chance ein zweites Mal ausrechnet, laufen die beiden
+// Stellen frueher oder spaeter auseinander - genau der Vorfall, der diesen Test hervorgebracht hat.
+{
+  const n = (S.match(/battleWinChance\(weaknessPhasenBasis\(/g) || []).length;
+  check('3b2: und sie tut es an genau EINER Stelle', n === 1, { stellen: n });
+}
 
 const nestVor = ausschnitt("const plSchwaeche = pirateLairWeakness(stage);", "const plBusy = cf.missions.some", 'Nest-Vorschau');
 check('3d: die Piratennest-Vorschau rechnet ihre Chance über dieselbe Basis',

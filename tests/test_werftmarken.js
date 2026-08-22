@@ -615,9 +615,25 @@ check('alle sechs Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ue
   berichte === 6, berichte);
 check('der Ueberfall-Bericht nennt ausdruecklich die Flottenverteidigung',
   /markReportLine\(r\.marken, r\.markAtkShare, 'Flottenverteidigung'\)/.test(src));
+/* MITGEZOGEN AM 22.08.2026 (E1b) - und dabei SCHAERFER geworden, nicht passend gemacht.
+   Hier stand die WORTFORM `const markenPreview = totalSelected > 0 ? fleetMarksSnapshot(...)`,
+   also die Zeile, in der die Marken-Vorschau inline im Galaxie-Reiter berechnet wurde. Seit E1b
+   liegt die Rechnung in npcKampfLage(), weil die KARTE dieselben Zahlen braucht - die Zeile gibt
+   es dort nicht mehr, und die Pruefung fiel auf voellig korrektem Code durch (Arbeitsregel 3).
+   Der eigentliche Punkt ist derselbe wie bei test_enterung: Bis E1b nannte NUR der Galaxie-Reiter
+   die Marken. Geprueft wird deshalb die Eigenschaft (die Rechnung existiert und weist sie als
+   eingerechnet aus) UND ihre Reichweite (beide Angriffs-Vorschauen zeigen sie). */
 check('auch die NPC-Angriffsvorschau nennt die Marken',
-  /const markenPreview = totalSelected > 0 \? fleetMarksSnapshot\(attackFleet\) : null;/.test(src)
+  /const marken = gewaehlt > 0 \? fleetMarksSnapshot\(f\) : null;/.test(src)
+  && /markAnteil: marken \? fleetMarkAtkShare\(f\) : 0/.test(src)
   && /bereits eingerechnet/.test(src));
+{
+  /* Die Reichweite: Kartenvorschau UND Galaxie-Reiter zeichnen die Marken-Zeile. `Werftmarken: ${`
+     kommt gemessen genau an diesen beiden Stellen vor - der Kampfbericht baut dieselbe Liste in
+     einer anderen Form und ist hier bewusst nicht mitgezaehlt. */
+  const n = (src.match(/Werftmarken: \$\{/g) || []).length;
+  check('und zwar in BEIDEN Angriffs-Vorschauen', n === 2, { stellen: n });
+}
 check('die Hilfe sagt, dass Vorschau und Bericht sie ausweisen',
   /<strong>Im Kampf sind sie ausgewiesen:<\/strong>/.test(src));
 

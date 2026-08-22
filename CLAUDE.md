@@ -3163,6 +3163,110 @@ Versatzes. Das ist tragbare Komplexität – aber nicht für ein Problem, das im
    wird jetzt `[data-map-wurmloch]`, also die BENANNTE Rolle (Regel 4/51). **Ein Messwert, der die
    erwartete Größenordnung um das Vierzehnfache verfehlt, ist ein Werkzeugfehler, kein Befund.**
 
+## E1b: die Gegnerstärke steht endlich auf der Karte (22.08.2026)
+
+Die zweite Hälfte der Landmarken-Etappe. **E1 hat beantwortet, WAS wo steht** (Festung, Nest,
+Gegner als Abzeichen); **E1b beantwortet, WIE STARK es ist.**
+
+**Der Befund ist am gerenderten Spiel gemessen, nicht aus dem Quelltext geschlossen.** Wer einen
+Gegner über die KARTE angriff — also über den Weg, den KB-4 zum Hauptweg gemacht hat —, flog
+blind:
+
+| | Kartenweg | Galaxie-Reiter |
+|---|---|---|
+| Kartenmenü | ein Eintrag („Angreifen"), **keine einzige Zahl** | — |
+| Erfolgschance | **fehlt** | ~5% |
+| Gegner-Verteidigung | **fehlt** | 30 |
+| Gegnerflotte | **fehlt** | 2 Schiffe |
+| Schwachstelle | **fehlt** | „Jäger – nicht mitgeführt" |
+| Enterphase | **fehlt** | „~78% · bis zu 3 Schiffe kaperbar" |
+| Frachtwarnung | **fehlt** | „ohne Frachter geht die Beute verloren!" |
+| Beute | **fehlt** | 40 Erz 20 Energie |
+| Flugzeit / Treibstoff | ja | ja |
+
+Sieben Auskünfte fehlten. Der Gegner war damit das einzige **Angriffsziel** ohne Infoblock im
+Kartenmenü — datengetrieben gemessen: von sieben Kartenmenüs tragen vier einen (Region, Nest,
+Festung, Asteroid), und ausgerechnet die drei ohne (Planet, Mond, fremder Spieler) sind die, bei
+denen man keinen Verband gegen eine bekannte Stärke abwägt.
+
+### Gebaut als EINE Rechenstelle, nicht als zweite Vorschau daneben
+
+`npcKampfLage(npc, flotte)` ist die eine Quelle. Der Galaxie-Reiter hatte seine **fünfzehn**
+Zwischenwerte inline stehen; eine Kopie davon in der Kartenvorschau wäre genau die zweite
+Anzeigestelle gewesen, die beim nächsten Balance-Schritt auseinanderläuft (Checkliste Punkt 6) —
+und der Kommentar an der alten Stelle sagte das selbst: *„die Vorschau und der Kampf benutzen
+dieselbe Funktion"*. Beide Anzeigestellen ziehen ihre Zahlen jetzt dort heraus; verschieden ist
+nur das Markup. Dasselbe gilt für `npcEnterZeileHtml` — die Enterphase stand ebenfalls inline und
+fehlte der Karte deshalb vollständig.
+
+**Der Beleg dafür steht im Test und ist die zentrale Prüfung**: dieselbe Flotte, derselbe Gegner,
+BEIDE Wege — die genannte Erfolgschance muss zeichengleich sein (gemessen 71% und 71%, mit
+Bombern 86% und 86%).
+
+**Und die Gegenprobe hat nebenbei belegt, dass der Umbau die Zahl nicht verschoben hat**: Am Stand
+vor E1b meldet dieselbe Prüfung `{"karte":null,"galaxieReiter":71}` — der Galaxie-Reiter nennt vor
+wie nach dem Umbau 71%. Das ist ein Anker, den der Umbau nicht berühren konnte (Regel 62).
+
+### Vier Entscheidungen, die man beim Anfassen kennen muss
+
+- **Der Infoblock im Kartenmenü zeigt NUR, was ohne gewählte Flotte gilt** (Stufe, Verteidigung,
+  feindliche Flotte, Schwachstelle, Beute). Alles, was an der eigenen Auswahl hängt —
+  Erfolgschance, Konter, Treibstoff, Fracht — steht eine Ebene weiter in der Flottenwahl und zieht
+  dort live mit; im Menü wäre es auf den Stand beim Öffnen eingefroren, also genau die Sorte Zahl,
+  die später nicht mehr stimmt. `openKarteMenu` hatte den `infoHtml`-Parameter längst, nur nutzte
+  ihn der Gegner nicht.
+- **Die Vorschau MISST ihre Aussagen, statt sie zu benennen** (Regel 61): Die Schwachstellen-Zeile
+  sagt, ob die passende Klasse wirklich im Verband steht, und die Frachtzeile warnt nur, wenn es
+  wirklich keinen Laderaum gibt.
+- **`ti-gift` gibt es im Subset-Font nicht.** `check-icons.js` hat es vor dem Commit gefangen —
+  genau der Fehlertyp, für den das Skript nach dem `ti-gift`-Bug (v8.77.1) gebaut wurde. Ersetzt
+  durch `ti-diamond`, statt den Font zu vergrößern.
+- **Das Konzept nannte `state.npcIntel` — dieses Feld gibt es nicht** (gemessen: 0 Treffer). Die
+  Aufklärung heißt `state.spyIntel` und betrifft ausgespähte SPIELER, nicht NPCs; die
+  Gegnerstärke kommt aus `npcEffectiveDefense`. Ein Konzept beschreibt die Absicht, nicht den Code
+  (Regel 4/41).
+
+### Ein Bestandstest ist mitgezogen worden — und dabei SCHÄRFER geworden
+
+`test_vorschau_schwaeche` 3b/3c suchte die Vorschau-Rechnung über ihre Variablennamen in
+`renderGalaxy` (`powerRohPreview`, `schwaecheGenutzt`, `attackFleet`). Seit E1b liegt sie in
+`npcKampfLage`; der Ausschnitt fand seine Marken nicht mehr und meldete `{"a":-1,"b":-1}` auf
+völlig korrektem Code — also eine festgenagelte FUNDSTELLE statt der Regel (Regel 3).
+
+Die bequeme Lösung wäre gewesen, die neuen Namen einzusetzen. Geprüft wird stattdessen die
+Eigenschaft, und zwar in **beide** Richtungen: Die Vorschau bildet ihre Basis mit
+`weaknessPhasenBasis` (3b/3c) **und** es gibt sie nur EINMAL (3b2). Eine zweite Vorschau, die die
+Basis anders bildet, fällt damit auf — vorher wäre sie unbemerkt geblieben, solange die alte
+Stelle noch stimmte (Regel 43). Beidseitig gegengeprüft an einer Kopie mit eingebauter
+Zweitrechnung: `{"stellen":2}`, bei 20 Prüfungen in allen drei Läufen.
+
+### Zwei Fixture-Fallen, beide beim Bauen aufgetreten und beide dokumentiert
+
+1. **`storageGet` kehrt bei 404 ausdrücklich ZURÜCK**, statt auf localStorage zurückzufallen. Wer
+   alle `/api/`-Aufrufe pauschal auf 404 legt — was mehrere Kartentests tun, weil sie nur Abzeichen
+   messen —, bootet ein **leeres** Spiel: Die Flottenwahl meldete „An diesem Standort stehen keine
+   passenden Schiffe", und jede Vorschau-Prüfung wäre aus dem falschen Grund grün gewesen
+   (Regel 28). Der Spielstand kommt deshalb über die geroutete Storage-Antwort.
+2. **`capFighterSelection` kappt Jäger UND Bomber auf die Trägerkapazität, und
+   `deployableFighters` bedient dabei ZUERST die Jäger.** Der erste Entwurf hatte 10 Träger
+   (= 60 Plätze) bei 60 Jägern — für die 18 Bomber blieb nichts, sie flogen gar nicht mit, und die
+   Schwachstellen-Prüfungen fielen auf korrektem Code durch. Die Vorabprüfung `5-hangar` belegt
+   seither MESSEND, dass der zweite Verband wirklich größer ist.
+
+### Und der Deckel, den man beim Messen einer Chance immer trifft
+
+`5c` („die Erfolgschance ist eine andere") fiel zunächst mit `{"ohneBomber":95,"mitBomber":95}`.
+Kein Fehler: `battleWinChance` deckelt bei 95%, und der Messverband stand mit 3,9k Angriffskraft
+gegen 600 Verteidigung in **beiden** Läufen am Anschlag — gemessen wurde also der Deckel statt der
+Bomber-Wirkung (Regel 7). Gewählt ist seither die **Solmark-Kriegsflotte** (2200 Verteidigung,
+Schwachstelle Bomber, keine Forschungssperre — sonst fände Abschnitt 4 sie nicht in der NPC-Liste
+des Galaxie-Reiters). `5-deckel` hält die Bedingung als eigene Vorabprüfung fest: **Wer eine
+gedeckelte Größe misst, prüft zuerst, dass die Messung nicht am Anschlag steht.**
+
+Wächter: `tests/test_gegnerlage.js` (30 Prüfungen). Gegenprobe gegen `origin/main` per
+`KEPLER_SPIELDATEI`: **25 rot bei identischen 30 Prüfnamen** (per `diff` verglichen, nicht gezählt
+— Regel 60).
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit

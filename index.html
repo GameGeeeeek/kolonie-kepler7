@@ -7200,8 +7200,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.605.0';
+  const VERSION = '8.606.0';
   const PATCHNOTES = [
+    { version:'8.606.0', date:'22.08.2026', changes:[
+      '<strong>Wer einen Gegner über die Karte angreift, sieht endlich, worauf er sich einlässt.</strong> Bis jetzt trug das Kartenmenü einen einzigen Eintrag („Angreifen") und keine einzige Zahl; die Flottenwahl darunter nannte nur Flugzeit und Treibstoff. Im Galaxie-Reiter standen dieselben Gegner seit jeher mit Verteidigung, Erfolgschance, feindlicher Flotte, Schwachstelle, Enterphase, Frachtwarnung und Beute – wer über die Karte ging, flog blind.',
+      'Jetzt steht beides am selben Ort. Das Kartenmenü nennt Stufe, Verteidigung, die gegnerische Flotte, die Schwachstelle und die mögliche Beute. Die Flottenwahl darunter rechnet zusätzlich Erfolgschance, Konterwirkung, Enterphase, Treibstoff und Frachtraum live mit, während du deinen Verband zusammenstellst – samt der Warnung, wenn ohne Frachter die Beute verloren ginge.',
+      'Beide Wege ziehen ihre Zahlen aus derselben Rechenstelle wie der Kampf selbst. Karte und Galaxie-Reiter können damit nicht mehr auseinanderlaufen – vorher standen fünfzehn Zwischenwerte nur im Galaxie-Reiter, und eine zweite Vorschau daneben wäre beim nächsten Balance-Schritt still falsch geworden.'
+    ] },
     { version:'8.605.0', date:'22.08.2026', changes:[
       '<strong>Protomaterie hat endlich Abnehmer, die nicht nach einem Kauf verschwinden.</strong> Bisher war sie eine reine Einmalzahlungs-Währung: zwei Fabriken, die Mega-Ausbaustufen – wer die durch hatte, brauchte den Asteroidenbergbau nicht mehr. Neu sind eine achte Stufe der Orbitalstation (60 Protomaterie je Standort, einmalig) und der <strong>Urmaterie-Koloss</strong>, ein Schiff, das je Stück 30 Protomaterie kostet und damit laufend Nachschub verlangt.',
       'Damit das überhaupt bezahlbar ist, wächst zuerst der Speicher: Die Aufbereitungsanlage trägt jetzt 150 statt 100 Protomaterie je Stufe bei, der Deckel steigt also von 2.500 auf 3.500. Der Anteil der Mega-Ausbaustufen zieht im Gleichschritt nach (400 → 600) – er bleibt damit bei denselben 17 Prozent deines Speichers, und die Stufen 26 bis 35 tragen weiter, statt auf einem festen Betrag stehenzubleiben.',
@@ -23443,6 +23448,105 @@
      Die Vorschau rechnet Flugzeit und Treibstoff mit der GERADE GEWAEHLTEN Flotte - jedes +/-
      zeichnet das Feld neu, die Zahlen ziehen also live mit. Genau diese Zahlen standen bisher nur
      im Kartenmenue, eingefroren auf den Stand beim Oeffnen. */
+  /* ===== Gegner-Kampflage: EINE Rechnung fuer alle Anzeigestellen (E1b) ======================
+     Der Befund, gemessen am gerenderten Spiel: Wer einen Gegner ueber die KARTE angreift, flog
+     blind. Das Kartenmenue trug genau einen Eintrag ("Angreifen") und keine einzige Zahl, die
+     Flottenwahl darunter nur Flugzeit und Treibstoff - waehrend die NPC-Karte im Galaxie-Reiter
+     seit jeher Erfolgschance, Gegnerstaerke, feindliche Flotte, Konterwirkung, Schwachstelle,
+     Frachtwarnung und Beute nennt. Sechs Auskuenfte fehlten auf dem Weg, den die Sektorkarte
+     seit KB-4 zum Hauptweg gemacht hat.
+     Gebaut ist es deshalb als EINE Rechenstelle und nicht als zweite Vorschau daneben: Der
+     Galaxie-Reiter hatte seine fuenfzehn Zwischenwerte inline stehen, und eine Kopie davon waere
+     genau die zweite Anzeigestelle, die beim naechsten Balance-Schritt auseinanderlaeuft (der
+     Kommentar an der alten Stelle sagte das selbst - "die Vorschau und der Kampf benutzen
+     dieselbe Funktion"). Beide Anzeigestellen ziehen ihre Zahlen jetzt hier heraus; verschieden
+     ist nur das Markup.
+     Alle Werte kommen aus denselben Funktionen wie die Kampfaufloesung (npcEffectiveDefense,
+     counterMultiplier, npcWeaknessAusgenutzt, weaknessPhasenBasis, battleWinChance) - nicht aus
+     einer nachgebauten Formel. */
+  function npcKampfLage(npc, flotte){
+    if (!npc) return null;
+    const f = flotte || {};
+    const gewaehlt = ATTACK_SHIP_KEYS.reduce((a,k) => a + (f[k]||0), 0);
+    const npcFlotte = npcFleetFor(npc).fleet;
+    const konter = counterMultiplier(f, npcFlotte);
+    const powerRoh = attackPower(f);
+    const schwaecheGenutzt = npcWeaknessAusgenutzt(npc, f);
+    const effDefense = npcEffectiveDefense(npc);
+    const flug = missionDurationFor(npc.duration, f, ATTACK_SHIP_KEYS, npc.system);
+    const marken = gewaehlt > 0 ? fleetMarksSnapshot(f) : null;
+    return {
+      npc: npc,
+      gewaehlt: gewaehlt,
+      npcFlotte: npcFlotte,
+      konter: konter,
+      konterVerdikt: gewaehlt > 0 ? counterVerdict(konter) : null,
+      powerRoh: powerRoh,
+      power: Math.round(powerRoh * konter * (schwaecheGenutzt ? WEAKNESS_POWER_MULT : 1)),
+      schwaecheGenutzt: schwaecheGenutzt,
+      effDefense: effDefense,
+      effLoot: npcEffectiveLoot(npc),
+      siege: npcScalingCount(npc.id),
+      chance: Math.round(battleWinChance(weaknessPhasenBasis(powerRoh, schwaecheGenutzt), effDefense, konter) * 100),
+      flug: flug,
+      treibstoff: missionFuelCostSplit(flug, f),
+      fracht: fleetCargoCapacity(f),
+      marken: marken,
+      markAnteil: marken ? fleetMarkAtkShare(f) : 0,
+      enterSchiffe: f.enterschiff || 0,
+      flotte: f
+    };
+  }
+
+  /* Die Enterphase, ebenfalls aus EINER Quelle (E1b). Sie stand inline im Galaxie-Reiter und
+     fehlte der Karte damit vollstaendig - dabei ist "ohne Enterschiffe entfaellt die Enterphase"
+     genau die Auskunft, die man VOR dem Start braucht und nicht hinterher im Bericht.
+     Gerechnet wird mit demselben boardingChance() wie spaeter im Kampf; als Widerstand dient der
+     Erwartungswert des ueberlebenden Rests bei dieser Kraefteverteilung - dieselbe Formel wie in
+     der Kampfaufloesung (effDefense * (1 - npcLossPct)). */
+  function npcEnterZeileHtml(L){
+    if (!L) return '';
+    if (L.enterSchiffe > 0){
+      const verlustPct = Math.max(0.4, Math.min(0.9, L.power/(L.power+L.effDefense||1)));
+      const rest = Math.max(1, Math.round(L.effDefense * (1 - verlustPct)));
+      const eChance = Math.round(boardingChance(L.flotte, rest)*100);
+      const platz = boardingCapacity(L.flotte);
+      return `<div class="bmeta" style="color:#fac775;"><i class="ti ti-anchor" aria-hidden="true"></i> Enterphase nach gewonnenem Kampf: ~${eChance}% · bis zu ${platz} Schiff${platz===1?'':'e'} kaperbar${platz<=0?' (zu wenige Enterschiffe für einen Kaperplatz)':''} · Fehlschlag kostet ${Math.round(BOARD_FAIL_LOSS*100)}% der Enterschiffe</div>`;
+    }
+    // Wer Enterschiffe besitzt, sie aber nicht mitschickt, soll das VOR dem Start sehen und
+    // nicht erst hinterher im Bericht - das ist der billigere Zeitpunkt fuer den Hinweis.
+    if (ownsEnterschiffe())
+      return '<div class="bmeta" style="color:#7d8199;"><i class="ti ti-anchor" aria-hidden="true"></i> Keine Enterschiffe in dieser Flotte \u2013 ohne sie entfällt die Enterphase.</div>';
+    return '';
+  }
+
+  /* Die Vorschau der Gegner-Flottenwahl. Vorbild ist nestVorschauHtml daneben: dieselben
+     .bmeta-Zeilen, dieselbe Reihenfolge (was passiert - wie stark ist es - was hilft - was
+     kostet es - was bringt es). Sie MISST ihre Aussagen, statt sie zu benennen (Arbeitsregel
+     61): Die Schwachstelle sagt, ob die passende Klasse wirklich im Verband steht, und die
+     Frachtzeile warnt nur, wenn es wirklich keinen Laderaum gibt. */
+  function npcVorschauHtml(flotte, npcId){
+    const npc = NPCS.find(n => n.id === npcId);
+    if (!npc) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Diesen Gegner gibt es nicht mehr.</div>';
+    const L = npcKampfLage(npc, flotte);
+    if (!L.gewaehlt) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+    const chFarbe = L.chance >= 60 ? '#5dcaa5' : (L.chance >= 30 ? '#fac775' : '#e24b4a');
+    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-target" aria-hidden="true"></i> Erfolgschance <strong style="color:${chFarbe};">~${L.chance}%</strong> · deine Angriffskraft <strong>${fmt(L.power)}</strong> gegen <strong>${fmt(L.effDefense)}</strong> Verteidigung${L.siege ? ' (nach ' + L.siege + ' Siegen skaliert)' : ''}</div>`;
+    html += `<div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(L.npcFlotte)}</div>`;
+    if (L.konterVerdikt && L.konter !== 1)
+      html += `<div class="bmeta" style="color:${L.konterVerdikt.farbe};"><i class="ti ${L.konterVerdikt.icon}" aria-hidden="true"></i> ${L.konterVerdikt.text} (${L.konterVerdikt.pct>0?'+':''}${L.konterVerdikt.pct}% Angriffskraft, bereits eingerechnet)</div>`;
+    if (npc.weakness)
+      html += `<div class="bmeta" style="color:${L.schwaecheGenutzt?'#5dcaa5':'#e0a548'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: <strong>${weaknessName(npc.weakness)}</strong> \u2013 `
+            + (L.schwaecheGenutzt ? 'im Verband dabei (+25% Angriffskraft, bereits eingerechnet).' : 'fehlt im Verband \u2013 ohne sie schlägst du ohne Bonus zu.') + '</div>';
+    if (L.marken && Object.keys(L.marken).length)
+      html += `<div class="bmeta" style="color:#f0b556;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Werftmarken: ${Object.entries(L.marken).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(', ')}${L.markAnteil>0?` (+${(Math.round(L.markAnteil*1000)/10).toString().replace('.',',')}% Angriffskraft, bereits eingerechnet)`:''}</div>`;
+    html += npcEnterZeileHtml(L);
+    html += `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(L.flug)} · Treibstoff ${fuelCostText(L.treibstoff)}${!canAfford(L.treibstoff)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>`;
+    html += `<div class="bmeta" style="${L.fracht<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität ${fmt(L.fracht)}${L.fracht<=0?' \u2013 ohne Frachter geht die Beute verloren!':''}</div>`;
+    html += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute bei Sieg: ${rewardHtml(L.effLoot)}</div>`;
+    return html;
+  }
+
   function oeffneNpcAngriff(npcId){
     const npc = NPCS.find(n => n.id === npcId);
     if (!npc) return;
@@ -23451,10 +23555,7 @@
       titel: npc.name + ' angreifen',
       keys: ATTACK_SHIP_KEYS,
       fracht: true,
-      vorschau: (flotte) => {
-        const dur = missionDurationFor(npc.duration, flotte, ATTACK_SHIP_KEYS, npc.system);
-        return `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(dur)} · Treibstoff ${fuelCostText(missionFuelCostSplit(dur, flotte))}</div>`;
-      },
+      vorschau: (flotte) => npcVorschauHtml(flotte, npcId),
       startLabel: 'Angriff starten',
       sperre: fwahlMindestensEins,
       start: () => sendAttackMission(npcId)
@@ -57296,14 +57397,30 @@
     const eintraege = [
       // Seit v8.425.0 oeffnet der Eintrag das Flottenwahl-Feld - die alte Sperre "erst im
       // Galaxie-Tab Schiffe waehlen" ist damit gegenstandslos, genau dafuer ist das Feld da.
-      // Flugzeit/Treibstoff stehen jetzt IM Feld und ziehen live mit der Auswahl mit, statt hier
-      // auf den Stand beim Oeffnen eingefroren zu sein.
+      // Alles, was an der Auswahl haengt (Erfolgschance, Konter, Flugzeit, Treibstoff, Fracht),
+      // steht IM Feld und zieht live mit; der Infoblock unten traegt die Zahlen, die ohne Auswahl
+      // gelten. Beide Seiten rechnen ueber npcKampfLage - siehe dort.
       { icon:'ti-sword', label:'Angreifen',
         grund: 'Öffnet die Flottenwahl.',
         disabled: false,
         fn: () => oeffneNpcAngriff(npcId) }
     ];
-    openKarteMenu(ev, npc && npc.boss ? 'Gegner · Boss' : 'Gegner', npcName || (npc?npc.name:'NPC'), eintraege);
+    /* Infoblock statt eines nackten "Angreifen" (E1b). Das Menue trug bis dahin KEINE einzige
+       Zahl - wer ueber die Karte angriff, wusste nicht einmal, wie stark der Gegner ist. Gezeigt
+       werden hier nur die Auskuenfte, die OHNE gewaehlte Flotte gelten: Stufe, Verteidigung,
+       feindliche Flotte, Schwachstelle, Beute. Alles, was von der eigenen Auswahl abhaengt
+       (Erfolgschance, Konter, Treibstoff, Fracht), steht eine Ebene weiter in der Flottenwahl und
+       zieht dort live mit - hier waere es auf den Stand beim Oeffnen eingefroren, also genau die
+       Sorte Zahl, die spaeter nicht mehr stimmt. */
+    let infoHtml = '';
+    if (npc){
+      const L = npcKampfLage(npc, {});
+      infoHtml = `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Stufe ${npc.level} · <strong>${fmt(L.effDefense)}</strong> Verteidigung${L.siege ? ' (nach ' + L.siege + ' Siegen skaliert)' : ''}</div>`
+        + `<div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte: ${fleetIconRowHtml(L.npcFlotte)}</div>`;
+      if (npc.weakness) infoHtml += `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: <strong>${weaknessName(npc.weakness)}</strong> (+25% Angriffskraft)</div>`;
+      infoHtml += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute bei Sieg: ${rewardHtml(L.effLoot)}</div>`;
+    }
+    openKarteMenu(ev, npc && npc.boss ? 'Gegner · Boss' : 'Gegner', npcName || (npc?npc.name:'NPC'), eintraege, infoHtml);
   }
 
   const SUN_X = 350, SUN_Y = 115;
@@ -64556,49 +64673,28 @@
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
       const canSendN = slotsFreeN && !busy && totalSelected > 0;
-      // Die Konterwirkung MUSS hier genauso einfliessen wie bei der Auflösung (resolveMission,
-      // npcCounterMult) - sonst zeigt die Karte eine Erfolgschance an, die der tatsächliche Kampf
-      // anders ausrechnet. Genau dieser Auseinanderlauf ist der Grund, warum die Vorschau und der
-      // Kampf dieselbe Funktion benutzen.
-      const npcFleetPreview = npcFleetFor(n).fleet;
-      const npcCounterPreview = counterMultiplier(attackFleet, npcFleetPreview);
-      const powerRohPreview = attackPower(attackFleet);
-      // Schwachstelle: dieselbe Pruefung und dieselbe Phasenbasis wie die Aufloesung - sie ist der
-      // Grund, warum diese Karte bis v8.507.0 zu niedrige Chancen nannte.
-      const schwaecheGenutzt = npcWeaknessAusgenutzt(n, attackFleet);
-      const power = Math.round(powerRohPreview * npcCounterPreview * (schwaecheGenutzt ? WEAKNESS_POWER_MULT : 1));
-      const effDefense = npcEffectiveDefense(n);
-      const effLoot = npcEffectiveLoot(n);
-      const wins = npcScalingCount(n.id);
-      // Dieselbe Rechnung wie die Auflösung (resolveBattlePhases/battleWinChance) - "zwei von drei
-      // Phasen" ergibt eine andere Zahl als ein einzelner Wurf, und die Karte muss die echte nennen.
-      const chance = Math.round(battleWinChance(weaknessPhasenBasis(powerRohPreview, schwaecheGenutzt), effDefense, npcCounterPreview)*100);
-      const flightTime = missionDurationFor(n.duration, attackFleet, ATTACK_SHIP_KEYS, n.system);
-      const atkFuel = missionFuelCostSplit(flightTime, attackFleet);
-      const atkCargoCapacity = fleetCargoCapacity(attackFleet);
-      const kv = totalSelected > 0 ? counterVerdict(npcCounterPreview) : null;
-      // Werftmarken in der Vorschau (31.07.2026, Regel 6): Der Kampfbericht weist sie seit dieser
-      // Version aus - stuenden sie NUR dort, waere die Vorschau die Anzeigestelle, die die alte
-      // Annahme behaelt. Gerechnet wird mit derselben Funktion, die auch der Bericht nutzt.
-      const markenPreview = totalSelected > 0 ? fleetMarksSnapshot(attackFleet) : null;
-      const markAnteilPreview = markenPreview ? fleetMarkAtkShare(attackFleet) : 0;
-      // Enter-Vorschau (26.07.2026): Ohne sie waere die Enterphase eine Ueberraschung im Bericht.
-      // Gerechnet wird mit demselben boardingChance() wie spaeter im Kampf; als Widerstand dient der
-      // Erwartungswert des ueberlebenden Rests bei dieser Kraefteverteilung - dieselbe Formel wie in
-      // der Kampfaufloesung (effDefense * (1 - npcLossPct)).
-      const enterSchiffePreview = attackFleet.enterschiff||0;
-      let enterZeile = '';
-      if (enterSchiffePreview > 0){
-        const verlustPct = Math.max(0.4, Math.min(0.9, power/(power+effDefense||1)));
-        const restPreview = Math.max(1, Math.round(effDefense * (1 - verlustPct)));
-        const eChance = Math.round(boardingChance(attackFleet, restPreview)*100);
-        const platz = boardingCapacity(attackFleet);
-        enterZeile = `<div class="bmeta" style="color:#fac775;"><i class="ti ti-anchor" aria-hidden="true"></i> Enterphase nach gewonnenem Kampf: ~${eChance}% · bis zu ${platz} Schiff${platz===1?'':'e'} kaperbar${platz<=0?' (zu wenige Enterschiffe für einen Kaperplatz)':''} · Fehlschlag kostet ${Math.round(BOARD_FAIL_LOSS*100)}% der Enterschiffe</div>`;
-      } else if (ownsEnterschiffe()){
-        // Wer Enterschiffe besitzt, sie aber nicht mitschickt, soll das VOR dem Start sehen und
-        // nicht erst hinterher im Bericht - das ist der billigere Zeitpunkt fuer den Hinweis.
-        enterZeile = `<div class="bmeta" style="color:#7d8199;"><i class="ti ti-anchor" aria-hidden="true"></i> Keine Enterschiffe in dieser Flotte – ohne sie entfällt die Enterphase.</div>`;
-      }
+      /* Die fuenfzehn Zwischenwerte standen bis E1b hier inline. Sie liegen jetzt in
+         npcKampfLage(), weil die Kartenvorschau dieselben Zahlen braucht - eine zweite Rechnung
+         daneben waere genau die Anzeigestelle, die beim naechsten Balance-Schritt die alte
+         Annahme behaelt (Checkliste Punkt 6). Die Begruendungen der einzelnen Werte - warum der
+         Konter mitzaehlt, warum die Schwachstelle in die Phasenbasis geht, warum die Werftmarken
+         hier stehen muessen - sind mit ihnen in die Funktion gewandert. */
+      const L = npcKampfLage(n, attackFleet);
+      const npcFleetPreview = L.npcFlotte;
+      const npcCounterPreview = L.konter;
+      const schwaecheGenutzt = L.schwaecheGenutzt;
+      const power = L.power;
+      const effDefense = L.effDefense;
+      const effLoot = L.effLoot;
+      const wins = L.siege;
+      const chance = L.chance;
+      const flightTime = L.flug;
+      const atkFuel = L.treibstoff;
+      const atkCargoCapacity = L.fracht;
+      const kv = L.konterVerdikt;
+      const markenPreview = L.marken;
+      const markAnteilPreview = L.markAnteil;
+      const enterZeile = npcEnterZeileHtml(L);
       return `
         <div class="card-row">
           <div class="left">
