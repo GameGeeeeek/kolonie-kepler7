@@ -1094,6 +1094,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
     (Ausgabe in Datei umleiten, `echo EXIT=$?` direkt dahinter) oder `${PIPESTATUS[0]}` nutzen –
     dieselbe Familie wie Regel 15/17: nie ein Messwerkzeug, das sich selbst im Weg steht.
+
+    **Nachtrag 22.08.2026 – dieselbe Familie ohne jede Pipe: eine Kommandosubstitution VOR dem
+    `$?`.** Ein Betroffenheits-Durchgang über 17 Tests meldete „alle grün" und war es nicht –
+    einer war rot. Die Schleife lautete
+
+    ```sh
+    node tests/$t.js > log 2>&1; echo "$(printf '%-32s' $t) EXIT=$?"
+    ```
+
+    Die Substitution `$(printf …)` steht **links** vom `$?`, läuft also während der Expansion
+    zuerst und setzt `$?` auf ihren eigenen Status. **Jedes gemeldete `EXIT=0` war der Status von
+    `printf`.** Weder eine Pipe noch ein `;`-Kommando dazwischen – die bisherigen Formulierungen
+    dieser Regel greifen hier also beide nicht, und genau deshalb ist es durchgerutscht.
+    **Vorgehen:** Der Status wird UNMITTELBAR nach dem Befehl in eine Variable gelesen, bevor
+    irgendeine andere Expansion läuft – danach darf beliebig formatiert werden:
+
+    ```sh
+    node tests/$t.js > log 2>&1
+    rc=$?
+    n=$(grep -cE '^(OK|FAIL) +- ' log)
+    printf '%-32s EXIT=%s Pruefungen=%s\n' "$t" "$rc" "$n"
+    ```
+
+    Zweite Hälfte desselben Vorfalls, beim Vergleich zweier Läufe: `grep -oE '^(OK|FAIL) +- …'`
+    nimmt das VERDIKT mit in den Vergleich – der `diff` meldet dann genau die eine Prüfung als
+    Unterschied, die kippen SOLL, und „identische Prüfliste" ist nie erfüllt. Verglichen wird der
+    reine Prüf-NAME (`sed -E 's/^(OK|FAIL) +- //'`).
 54. **Ein Sicherungs-Patch vor einem Rebase wird mit `git diff HEAD -- datei` gebildet, nie mit
     `git diff -- datei` – und man prüft seine GRÖSSE, bevor man den Arbeitsbaum wegwirft.**
     Vorfall 17.08.2026, beim zweiten Rebase-Zyklus von KB-13: Die CLAUDE.md-Ergänzungen waren nach
