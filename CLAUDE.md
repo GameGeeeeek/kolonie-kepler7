@@ -4588,18 +4588,47 @@ Seiten nicht vorhanden:
 `ATTACK_SHIP_KEYS` ab — und dort fehlte der Koloss ebenfalls. Er fiel damit durch **beide** Netze
 desselben Wächters. Gemeldet hat ihn erst `test_eskorte_schiffe` 3 von der anderen Seite. Zwei der
 acht (`SHIP_ATK_VALUES`, `SHIP_DEF_WEIGHTS`) hat **gar kein Test** gefunden — die fielen erst beim
-Durchgehen aller Tabellen auf, die eine Schiffsklasse führen.
+Durchgehen aller Tabellen auf, die eine Schiffsklasse führen. **Diese Flanke ist seit dem 22.08.2026
+geschlossen**, siehe den Abschnitt darunter: `test_paritaet_tabellen` Abschnitt 5 liest sie.
 **Übertragbar: Ein Wächter, der Soll und Ist aus DERSELBEN Liste zieht, ist blind für eine Lücke in
 genau dieser Liste.** Wer eine neue Schiffsklasse anlegt, zählt sie in beiden Repos nach —
 `grep -c "<schluessel>"` muss **10** im Frontend und **6** im Backend ergeben.
 
-**Zwei Klassen sind bewusst NICHT ergänzt worden**, obwohl derselbe Durchgang sie als „fehlend"
+**Zwei Klassen waren bewusst NICHT ergänzt worden**, obwohl derselbe Durchgang sie als „fehlend"
 zeigte: `mondzerstoerer` fehlt in `SHIP_ATK_VALUES`/`SHIP_DEF_WEIGHTS` als **dokumentierte Absicht**
 (der Backend-Kommentar sagt, ihn aufzunehmen „wäre eine ungewollte Änderung der PvP-Kampfkraft"),
-und `kausalitaetsbrecher` fehlt in `SHIP_DEF_WEIGHTS`/`SHIP_SHIELD_EXPLICIT`. Das zweite ist ein
-kleiner Bestands-Balancefall (Vorgabe 1 statt 1,8 bzw. 170 statt 120) — gemessen, benannt, und
-ausdrücklich **nicht** nebenbei geändert: Eine PvP-Zahl im Vorbeigehen zu verschieben ist genau die
-unbestellte Zweitänderung aus dem Schiffskosten-Nachtrag.
+und `kausalitaetsbrecher` fehlte in `SHIP_DEF_WEIGHTS`/`SHIP_SHIELD_EXPLICIT`. Das zweite war ein
+Bestands-Balancefall — gemessen, benannt, und ausdrücklich **nicht** nebenbei geändert: Eine PvP-Zahl
+im Vorbeigehen zu verschieben ist genau die unbestellte Zweitänderung aus dem Schiffskosten-Nachtrag.
+**Sascha hat sie am 22.08.2026 entschieden: angleichen** (Backend #168, `defWeight` 1,8 und Schild
+120). Er war größer als hier stand: „170 statt 120" war die halbe Angriffskraft, also genau die
+**erfundene Schildbasis, die `shipShield()` bis zum 21.08.2026 lieferte** — nach dessen Entfernung
+trug das Schiff **0** Schild. Ausgeführt gemessen (die zwei Server-Funktionen geschnitten und
+gefahren, nicht nachgerechnet): **136 statt 365** Verteidigungspunkte je Schiff, mit voller
+Kampfforschung 267 statt 600. Nicht +19 %, sondern **+168 %**.
+
+### Der Wächter dafür: `test_paritaet_tabellen` Abschnitt 5 (22.08.2026)
+
+Sieben Prüfungen über `SHIP_ATK_VALUES`, `SHIP_DEF_WEIGHTS` und `SHIP_SHIELD_EXPLICIT`. Geprüft wird
+die **WIRKUNG, nicht die Tabellenmitgliedschaft**: Ein Schiff ohne Eintrag ist kein Fehler, es
+bekommt den Vorgabewert (defWeight 1, Schild 0); falsch ist erst ein abweichender wirksamer Wert.
+Drei Richtungen, die eine Feld-für-Feld-Prüfung nicht hätte — **5c2** (ein Eintrag, den
+`SHIP_ATK_VALUES` nicht kennt, wird von beiden Schleifen nie gelesen: stiller toter Code, Regel 59),
+**5d** (ein Schiff MIT Kampfwerten, das dort fehlt, trägt null ohne jeden Vorgabewert — die Richtung,
+an der der Urmaterie-Koloss beinahe gescheitert wäre) und **5b** (das Superschlachtschiff hat keinen
+`SHIP_DEFS`-Eintrag und wird trotzdem verglichen, aus `SUPERSCHLACHTSCHIFF_SHIELD`/
+`SUPERSCHLACHTSCHIFF_DEF_WEIGHT`/`shipBaseAtk` — es blind auszunehmen wäre die schwächere Lösung).
+Sieben Gegenproben, jede mit ihrer „was muss fallen"-Liste (Regel 71), alle mit 37 gelaufenen
+Prüfungen in beide Richtungen.
+
+**Der Werkzeugfehler beim Bau ist die eigentliche Lehre:** Die erste Messung las `SHIP_DEFS`
+**zeilenweise** — wie Abschnitt 4 direkt daneben, wo das richtig ist — und meldete drei Abweichungen
+bei Paktkorvette, Bundeskreuzer und Sternenbanner. Die drei Allianzschiffe tragen ihr `defWeight`
+aber auf der **zweiten Zeile** ihres Eintrags; es gab keine einzige Abweichung. Beinahe wären drei
+erfundene Befunde weitergegeben worden (Regel 10 hat sie abgefangen). Das ist dieselbe Familie wie
+die zweizeiligen Modul-Einträge aus TX-2: Geschnitten wird vom Eintragsanfang bis zum **nächsten**
+Eintragsanfang, und `5-vorab` belegt an der Paktkorvette, dass die mehrzeilige Lesung greift — sonst
+wäre der Abschnitt still blind für jedes mehrzeilig definierte Schiff.
 
 ### Frachtraum UND Angriff: die erste Ausnahme von „Frachter kämpfen nicht"
 
