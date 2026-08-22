@@ -20,6 +20,35 @@ Designer, KI-Kampfberichte, Mission Generator, NPCs, Wiki-Assistent):
 verändern langfristig, wie an diesem Repo gearbeitet wird – vor größeren Vorhaben lohnt
 ein Blick.
 
+### Graphify (`/graphify`) – Wissensgraph-Skill, eingecheckt seit 22.08.2026
+
+Auftrag Sascha („installiere graphyfi"): Die Claude-Code-Skill **Graphify** liegt als
+`.claude/skills/graphify/` im Repo (SKILL.md + `references/`, Stand 0.9.48 laut
+`.graphify_version`) und ist damit in jeder Session verfügbar, die dieses Repo enthält –
+lokal wie im Remote-Container. `/graphify <pfad>` baut aus einem Ordner einen abfragbaren
+Wissensgraphen (`graphify-out/`: interaktives `graph.html`, `GRAPH_REPORT.md`,
+`graph.json`); `/graphify query "<frage>"` beantwortet Fragen aus dem bestehenden Graphen.
+
+Drei Dinge, die man vor der Benutzung wissen muss (alle gemessen, nicht aus der README
+übernommen):
+
+- **Das CLI installiert sich selbst nach.** Die SKILL.md prüft beim Aufruf, ob das
+  `graphify`-Kommando existiert, und installiert sonst das PyPI-Paket **`graphifyy`**
+  (doppeltes y – der Name `graphify` auf PyPI gehört jemand anderem und ist NICHT dieses
+  Werkzeug) per `uv`/`pip` nach. Deshalb genügt die eingecheckte Skill auch im frischen
+  Container. Für die eigenen Rechner: `pipx install graphifyy && graphify install`.
+- **`weltraum_kolonie.html` ist für Graphify ein DOKUMENT, kein Code.** `graphify.detect`
+  klassifiziert `.html` als `document` (gemessen 22.08.2026) – die Spieldatei liefe also
+  durch die LLM-Extraktion statt durch den tree-sitter-AST: bei 4,9 MB teuer und ohne
+  Call-Graph. Für „wo steht was in der Spieldatei" bleibt der RAG-Index oben
+  (`POST /kepler/ask`) das Werkzeug. Graphifys Stärke liegt bei echten Code-Dateien:
+  `tests/*.js` hier, `server.js` im Backend, Social Hub (TypeScript), AI Core (Python).
+- **Aktualisieren heißt neu kopieren:** `pip install -U graphifyy && graphify install`
+  schreibt die neue Fassung nach `~/.claude/skills/graphify/`; von dort SKILL.md,
+  `references/` und `.graphify_version` hierher übernehmen. Die Kopie ist bewusst nur in
+  DIESEM Repo eingecheckt – die Nachbar-Repos hängen in den Sessions ohnehin mit daneben,
+  und vier gleichnamige Kopien würden getrennt veralten.
+
 ## Kritische Regel: zwei Dateien synchron halten
 
 Der Pi-Deploy kopiert `weltraum_kolonie.html` (nicht `index.html`) ins Ausgabeverzeichnis. **Bei jeder Änderung müssen beide Dateien identisch sein** – am Ende jeder Session:
