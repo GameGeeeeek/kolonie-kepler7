@@ -300,6 +300,24 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     alle sieben Testdateien byte-identisch zum Fernstand, CLAUDE.md um die 161 Zeilen der fremden
     Doku gewachsen. Ohne diese Zählung ist „der Rebase lief sauber" eine Behauptung.
 
+    **Nachtrag 22.08.2026 – `git checkout --theirs` auf eine TESTDATEI ist genau die stille
+    Löschung, vor der diese Regel warnt.** Beim Merge von `origin/main` standen drei Testdateien im
+    Konflikt, alle drei von einer Parallelsitzung angefasst. Für zwei davon war die fremde Fassung
+    beim Lesen erkennbar besser, für die dritte nicht – und ich habe trotzdem alle drei pauschal auf
+    `--theirs` gesetzt. Das hat `test_schiffsmodul_paritaet.js` um einen **ganzen Abschnitt mit neun
+    Prüfungen** gekürzt (`5-anker` bis `5f`, die Set-Parität), ohne einen Konflikt, ohne eine
+    Meldung, und der Prüflauf wäre danach grün gewesen – der Test misst dann eben weniger.
+    **Gemerkt habe ich es nur, weil ich danach die Prüf-NAMEN verglichen habe**, nicht die Datei:
+    32 gegen 23. Aufgesetzt statt ersetzt sind es 33, und beide Seiten sind vollständig drin.
+    **Vorgehen:** Nach jedem Konflikt in einer Testdatei die Prüfnamen aller drei Fassungen
+    (`HEAD`, `origin/main`, Ergebnis) per `comm` gegeneinander halten – `comm -23 <(HEAD) <(jetzt)`
+    muss LEER sein, und dasselbe für die fremde Seite. Das kostet zehn Sekunden und ist die einzige
+    Messung, die „ich habe nichts verloren" belegt statt behauptet. Die zwei anderen Dateien haben
+    diese Messung übrigens **bestätigt**, nicht widerlegt: Meine eine `test_pvp_deckel`-Prüfung
+    steht dort als vier (Hülle hart UND Schild ungedeckelt, je Repo einzeln), meine
+    Rechenform-Prüfung als `6e3` neben ihrer Musterliste `6e`/`6e2` – die fremde Fassung war
+    wirklich die stärkere, und jetzt ist das gemessen und nicht geglaubt.
+
 24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
     Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
     gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
@@ -4346,9 +4364,10 @@ unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zähl
   `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
   3a schlägt sonst an.
 
-Wächter: `tests/test_schiffsmodul_paritaet.js` (23 Prüfungen, vier Gegenproben — jede speist eine
-der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 23 gelaufenen
-Prüfungen).
+Wächter: `tests/test_schiffsmodul_paritaet.js` (heute **32 gelaufene Prüfungen**, vier Gegenproben —
+jede speist eine der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils
+gleicher Prüfungszahl). Die vier Gegenproben sind seinerzeit bei 23 gefahren worden; der Abschnitt
+zu den Klassen-Sets weiter unten hat neun weitere Prüfungen hinzugefügt.
 
 **Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
 Bausteinliste war eine Liste von 21 benannten Blöcken. Die Gegenprobe zur Schild-Basis baute
@@ -4364,7 +4383,8 @@ Messaufrufen`): Die zwei Messaufrufe laufen durch einen Wrapper, der einen gewor
 festhält, `null` zurückgibt und den Lauf weiterlaufen lässt. Beidseitig gegengeprüft: ohne die
 Wache **15 Prüfungen und keine einzige FAIL-Zeile** — ein roter Exit-Code ohne jede Aussage —, mit
 ihr 23 Prüfungen und der Grund im Protokoll
-(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`).
+(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`) — beides gemessen an dem Stand, den
+der Test damals hatte; heute sind es 32.
 **Die übertragbare Lehre geht über diesen Test hinaus: Ein `try/catch` um den AUFBAU (Regel 34)
 genügt nicht, wenn die geschnittene Funktion erst beim AUFRUF wirft.** Genau daran ist es hier
 gescheitert — der Aufbau war längst gefasst, der Lauf starb trotzdem mittendrin. Wer Funktionen
@@ -4523,6 +4543,115 @@ Wächter dieser Etappe: `tests/test_protomaterie.js` (Schürfer-Faktor, Vorschau
 Preiskurve), `tests/test_angriffssumme.js` und `tests/test_flotte_v8375.js` (die Hybrid-Regel),
 dazu `test_eskorte_schiffe`, `test_konter_paritaet`, `test_paritaet_tabellen` und `test_werftmarken`
 für die Backend-Parität.
+
+## Klassen-Sets für die Schiffsmodule (Teil A, 21.08.2026, v8.603.0)
+
+Auftrag Sascha: „Findbare Module die zusammen set Bonus geben." Set-Boni gab es im Spiel schon –
+aber ausschließlich bei den STANDORT-Modulen (`MODULE_SET_DEFS`) und den Boss-Sets. Die 44
+Schiffsklassen-Module hatten **keinen einzigen** (gemessen: 0 Treffer). Jede der acht Klassen hat
+jetzt ein Set aus drei namentlich festgelegten Modulen, gestaffelt bei zwei und drei Teilen.
+
+### Drei Entscheidungen, alle vorher gemessen
+
+- **Bestimmte Schlüssel statt „N beliebige".** Der erste Entwurf wollte nach ANZAHL staffeln wie
+  die Boss-Sets. Gemessen ist das hier **keine Entscheidung**: `equipShipModule` verbietet zwei
+  Module desselben TYPS an einer Klasse („je Typ ist nur EIN Modul erlaubt"), es gibt also gar
+  keine Stapel-Alternative – „zwei beliebige" wäre schlicht eine Belohnung dafür, einen zweiten
+  Slot gekauft zu haben. Mit benannten Schlüsseln entsteht die Wahl: Bei drei Slots kostet das
+  volle Set ALLE drei, die Zwischenstufe lässt einen Platz frei.
+- **Kein Set trägt einen Kanal, den seine Klasse nicht verbraucht.** Gemessen:
+  `hull`/`shield`/`speed`/`fuel` wirken in **allen** Klassen (generisch über `cls`), `atk` nur in
+  `schlachtschiff` und `raffiniert`, `cargo` nur in `frachter`, `siegechance` im Frontend
+  **gar nicht**. Ein Set-Bonus auf `atk` für die Schwere Linie wäre ein Tabellenfeld, das nur der
+  Anzeigetext liest (Regel 59). `test_schiffsmodul_paritaet.js` 5d **leitet diese Zuordnung aus
+  der Spieldatei ab** statt sie einzutippen – führt jemand einen Kanal neu generisch ein, wird die
+  Wache automatisch lockerer; schafft jemand eine Verbrauchsstelle ab, schlägt sie an.
+- **Der Mondzerstörer bekommt bewusst kein `atk`.** Der Server verbraucht es (Mondangriff), das
+  Frontend nicht – die Vorschau verschwiege sonst eine Wirkung, die im Kampf eintritt.
+
+### Zwei Stellen, die man kennen muss
+
+**Der Bonus fließt an EINER Stelle ein:** `shipModuleBonusFor`. Damit erreicht er jede
+Verbrauchsstelle automatisch – Tempo, Treibstoff, Laderaum, Hülle, Schild, Angriff. Eine eigene
+Addition je Rechenstelle wäre die übliche zweite Wahrheit.
+
+**Die Anzeige liegt in einer eigenen Funktion** (`shipModuleSetZeilenHtml`), damit sie ohne den
+ganzen Renderer messbar ist – und weil ein Set ohne Anzeige eine versteckte Mechanik wäre: Der
+Spieler könnte nicht erkennen, warum sich sein Angriffswert beim Modultausch ändert.
+
+**PvP-Parität ist Pflicht.** Der Set-Bonus trägt `atk`/`hull`/`shield`; die Tabelle liegt als Kopie
+in `server.js`, eingespeist in BEIDE Verbrauchspfade (`shipModuleBonus` für `atk`,
+`shipModulKlassenBoni` für `hull`/`shield`), jeweils **vor** dem Deckel wie vorne.
+
+### Drei Bestandstests hielten das ALTE Verhalten fest
+
+Alle drei sind mitgezogen worden, und zwar **schärfer** statt passend (Regel 43/68):
+
+- **`test_pvp_deckel`** verlangte, dass `'hull'` im Backend **gar nicht vorkommt** („solange der
+  Server ihn nicht kennt"). Das war richtig und ist überholt. Geprüft wird jetzt die Parität:
+  **beide Seiten deckeln hart** – aus „eine Seite kennt ihn nicht" wird „beide deckeln gleich".
+- **`test_wertstreuung` 6e** zählte Aufrufstellen und verlangte genau **2**. Meine dritte war
+  korrekt (ohne sie zählte der gewürfelte Hauptwert in der Verteidigung nicht). Ein Zähler kann
+  nicht zwischen „eine Stelle vergisst den Wurf" und „es gibt eine mehr" unterscheiden (Regel 33);
+  geprüft wird jetzt die REGEL, und der Fehlschlag **nennt die Zeile**.
+- **`test_schiffssynergien`** schnitt `shipModuleBonusFor` aus und starb an
+  `shipModuleSetBonus is not defined` – dieselbe Bausteinlisten-Falle wie `test_protomaterie` am
+  selben Tag. Die zwei Funktionen und die Tabelle werden jetzt mitgeschnitten.
+
+### Der Befund, der die Gegenprobe fast unmöglich gemacht hätte
+
+Die Gegenprobe zum Hüllen-Deckel blieb grün, obwohl das Backend sabotiert war: **`test_pvp_deckel`
+verdrahtete den BACKEND-Pfad fest** und ignorierte `KEPLER_BACKEND_SERVER` still. Der Durchgang vom
+21.08.2026 hatte 25 Tests von genau diesem Defekt befreit – aber er suchte die Leser der
+**Spieldatei**; die Leser von `server.js` blieben unberührt.
+
+**Gemessen sind zwölf Tests betroffen** – zehn ganz, und zwei (`test_raid_bosswahl`,
+`test_verstrickungen`) **trotz** vorhandenem `SERVER_JS`-Import, also halb umgeleitet: Bei ihnen
+liefe der Browser auf der Kopie und die Backend-Prüfung auf dem Original. **Wer nach dieser
+Fehlerklasse sucht, sucht nach der LESESTELLE (`kolonie-kepler7-backend'` im `path.join`), nicht
+nach dem fehlenden `require`** – sonst findet er wieder nur die Hälfte.
+
+**ERLEDIGT am 22.08.2026, und die Zahl „zwölf" oben war schon beim Schreiben eine Momentaufnahme.**
+Zehn hat eine Parallelsitzung mit #481 umgestellt, `test_pvp_deckel` kam über #484, und der letzte
+war `test_werftmarken` – der einzige, der KEINEN `SERVER_JS`-Import hatte, sondern eine **eigene
+Kandidatenliste** mit veralteten `/workspace`-Pfaden. Sie funktionierte heute noch, weil ihr
+dritter Kandidat zufällig griff; die Umleitung ignorierte sie trotzdem still.
+
+**Der Beleg gehört zur Behebung, nicht daneben** – am alten Stand waren beide Läufe (normal und
+`KEPLER_BACKEND_SERVER=/tmp/leer_server.js`) **byte-identisch**, danach Exit 0 / 323 Prüfungen
+gegen Exit 1 / 312 mit `FAIL - Markenblock im Backend gefunden`, bei identischer Prüfliste zum
+alten Stand (per `diff` verglichen, nicht gezählt – Regel 60). Die 323 → 312 sind erklärbar und
+kein verdeckter Abbruch: Ohne gefundenen Block laufen die davon abhängigen Prüfungen nicht.
+
+**Die Klasse ist damit geschlossen, und auch das ist gemessen statt angenommen:** Alle **elf**
+Tests, die `server.js` lesen, wurden einmal normal und einmal umgeleitet gefahren – jeder liefert
+umgeleitet eine ANDERE Ausgabe. Wäre sie gleich, würde die Env-Variable weiterhin still ignoriert,
+und genau das sieht aus wie eine bestandene Gegenprobe.
+
+Nebenbei mitgenommen: `test_werftmarken` bezog seine Pfade aus `lib/umgebung` und zog damit
+Playwright hoch (gemessen 282 ms), obwohl es **keinen Browser** benutzt (0 Treffer auf
+`playwright`/`starteBrowser`/`SPIEL_URL`). Es liest jetzt aus `lib/spieldatei`.
+
+### Ein Nebenbefund, der NICHT behoben ist
+
+Das Event-Modul **`ev_erzgreifer`** („Erzgreifer-Ausleger", `cargo`, `base:0.25` – der höchste
+Frachtwert der Tabelle) bewirkt **nichts**. `cargo` wird ausschließlich für die Frachter-Klasse
+gelesen, und alle drei Frachtschiffe (`frachter`, `frachtergross`, `bergungsfrachter`) gehören
+dorthin – **Event-Schiffe haben überhaupt keine Frachtkapazität** (`CARGO_PER_SHIP` führt genau
+diese drei). Seine Beschreibung verspricht ausdrücklich „erhöht die Frachtkapazität aller
+Event-Schiffe deutlich … Exklusiv". Eine per-Klasse-Umstellung von `fleetCargoCapacity` änderte
+daran nichts; es bräuchte Frachtraum für Event-Schiffe oder eine Umwidmung des Moduls. **Das ist
+eine Entscheidung über die Identität eines Event-Gegenstands und liegt bei Sascha.**
+
+Wächter: `tests/test_schiffsmodul_sets.js` (17 Prüfungen, drei Gegenproben) und
+`tests/test_schiffsmodul_paritaet.js` (32 Prüfungen, davon neun aus Abschnitt 5).
+
+**Eine Lücke im eigenen Wächter, die nur die Gegenprobe gezeigt hat:** Abschnitt 1 rief
+`shipModuleSetBonus` **direkt** auf und blieb deshalb grün, als die Einspeisung in
+`shipModuleBonusFor` entfernt wurde – er maß die Mechanik, aber nicht, dass sie ANGESCHLOSSEN ist.
+Das ist Regel 61 am eigenen Test; gefangen hat es die `WERKZEUGFEHLER`-Wache des Messskripts
+(Regel 71). Prüfung `1e` schließt es, **gescopt auf den Rumpf** von `shipModuleBonusFor` – ein
+Aufruf irgendwo sonst in der Datei zählt nicht (Regel 39).
 
 ## Proaktive Vorschläge
 
@@ -4871,11 +5000,12 @@ lehrreichste:**
     übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
     das Werkzeug Sauberkeit, wo keine ist.
 
-## Vorarbeit: die Belohnungsvorschau des Allianz-Raids IST rechenbar (gemessen 21.08.2026)
+## Die Belohnungsvorschau des Allianz-Raids (22.08.2026)
 
 Auftrag Sascha: „allianz raid deutlich optisch aktraktiver gestalkten weniger text und vsl.
-belohnungen einblenden." Die Etappe ist noch nicht gebaut; hier steht nur, was die Vorabmessung
-ergeben hat – **und sie widerlegt meine eigene erste Einschätzung.**
+belohnungen einblenden." **Gebaut am 22.08.2026**; der Abschnitt darunter ist die Vorabmessung
+vom 21.08., die die Etappe möglich gemacht hat – **sie widerlegt meine eigene erste
+Einschätzung.**
 
 Notiert hatte ich, eine exakte Vorschau sei unmöglich, weil die Belohnung am Platz ALLER
 Teilnehmer hängt. Gemessen stimmt das nicht: `ranking` wird **beim Abflug** gebildet und nach
@@ -4905,6 +5035,127 @@ Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die 
 der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
 die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
 TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.
+
+### Was daraus gebaut wurde – und die vier Funde dabei
+
+**Entschieden von Sascha (22.08.2026): Frontend-Kopie mit Paritätstest**, nicht ein Serverfeld. Die
+Abwägung wurde vorher gemessen statt geschätzt, und die Messung hat sie deutlich verschoben: Die
+**teure Hälfte der Kopie gibt es längst** – `ALLIANCE_RAID_BOSSE` mit `beuteMult`/`schwerpunkt`
+steht in beiden Repos und wird von `test_raid_bosswahl` schon Feld für Feld verglichen. Neu
+hinzugekommen sind nur EINE Zahl (`ALLIANCE_RAID_RANK_SPREAD = 0.9`) und drei Funktionen. Dazu kam
+die Lage: Ein Serverfeld hätte einen Backend-Deploy gebraucht, und der hing zu dem Zeitpunkt seit
+zehn Stunden (Ausfall Nr. 9).
+
+**Die Vorschau ist ein PAAR, kein Schätzwert mit Spanne.** Nach dem Abflug ist von den sechs
+Eingaben der Formel genau EINE offen – ob der Boss fällt. Beide Werte sind exakt. Sie steht
+deshalb im `enroute`-Zweig und nicht in der Sammelphase: `/checkdispatch` friert die Rangliste
+beim Abflug ein, und dieselbe Liste liest später `/claim` für den Platz. Vorher stünde dort eine
+Zahl, die sich noch ändert.
+
+**Wer nicht mitgeflogen ist, sieht NICHTS statt einer Null** – dieselbe Entscheidung wie bei der
+Weltlage-Zeile: Gibt es nichts zu sagen, wird nichts gesagt. Ebenso bei einem Dokument ohne
+`ranking` (älterer Server).
+
+**Vier Funde beim Bauen, jeder gemessen:**
+
+1. **Meine eigene Notiz über den Textumfang war falsch.** Hier stand „elf Erklär-Blöcke mit
+   zusammen ~1.100 Zeichen Prosa". Sauber gemessen – HTML-Tags und `${…}`-Ausdrücke entfernt,
+   Kommentare raus – sind es **6 Sätze mit 430 Zeichen**. Die alte Zahl stammte von einem
+   Extraktor, der Code für Prosa hielt. **Ein Messwerkzeug, das die falsche Größe misst, ist
+   schlimmer als keins** – es liefert eine Zahl, die man später glaubt.
+2. **„Zu viel Text" war die DOPPLUNG, nicht die Menge.** Im Zustand „kein Raid" stand der
+   Bossname **dreimal** sichtbar (Kopfzeile, Regelzeile, geschlossenes Auswahlfeld, das seine
+   gewählte Option anzeigt) und der Beutetext **zweimal**. Die Regelzeile trägt jetzt nur noch die
+   KAMPFREGEL – sie steht nirgends sonst, und genau sie muss die Allianz vor dem Ausrufen
+   einplanen können. Gemessen: `textContent` 526 → 483 Zeichen. **Das ist ehrlich wenig**, und der
+   Grund gehört dazu: Der Großteil des scheinbaren Textes sind die **eingeklappten**
+   Auswahl-Optionen, die `textContent` mitzählt und der Spieler gar nicht sieht.
+3. **Die Ausnahme, die eine stille Verschlechterung verhindert:** Ein einfaches Mitglied sieht
+   **kein** Auswahlfeld. Ohne Sonderfall wäre ihm die Beute-Auskunft ersatzlos genommen worden –
+   der Beutetext bleibt dort deshalb stehen (`test_raid_vorschau` 5-vorab/5a, beidseitig grün und
+   genau deshalb ein Beleg).
+4. **Die zwei Konstanten heißen NICHT gleich:** vorne `ALLIANCE_RAID_BOSSE`, hinten
+   `ALLIANCE_RAID_BOSSES`. Mein Paritätstest suchte einen Namen für beide Seiten und fand die
+   Backend-Tabelle nicht. Wer hier greppt, greppt zweimal.
+
+**Und ein Fehlgriff, den die `count != 1`-Wache abgefangen hat** (Hausregel 16): Die Zeile
+„…Angriffskraft – trifft geschlossen am Ziel ein." steht **zweimal** in der Datei – einmal im
+Raid, einmal im **Musterangriff**. Zwei verschiedene Mechaniken mit demselben Wortlaut. Ohne die
+Wache hätte ich die Vorschau in den Musterangriff geschrieben; die Ersetzung ist seither auf den
+Block von `renderAllianceRaidBox` gescopt (Regel 39).
+
+**Ein fünfter Fund, und er kam aus dem vollen Prüflauf statt aus dem eigenen Durchgang:** Die
+Trennlinie über der Vorschau stand als `border-top:1px` da — die einzige feste Pixelzahl der ganzen
+Datei neben dem begründeten Zierring. `test_formensprache` 1 zählt genau das über die **ganze**
+Spieldatei und meldete `["border:3px","border-top:1px"]`. Gemessen gibt es dieselbe Trennlinie mit
+derselben Farbe im Haus **18-mal** als `border-top:var(--bw-1)`; ich hatte also nicht eine Lücke
+gefüllt, sondern eine zweite Schreibweise neben eine etablierte gestellt.
+**Übertragbar: Wer neues Markup mit INLINE-Stilen schreibt, ist von den dateiweiten Stilwächtern
+betroffen — auch wenn der eigene Bereich mit CSS nichts zu tun hat.** Der Betroffenheits-Sweep
+(Regel 40/45) muss deshalb nicht nur nach der geänderten Konstante greppen, sondern auch nach den
+Eigenschaften, die man im Markup gerade benutzt (`border`, `border-radius`, Farbliterale) — zwei
+Minuten `grep -c "border-top:var(--bw-1)"` hätten die Hausform sofort genannt.
+
+### Die Optik: Variante C, und warum drei gebaut wurden
+
+Der erste Halbsatz des Auftrags („deutlich optisch attraktiver") war nach der ersten Runde noch
+offen – geliefert waren nur die Belohnungen und die Textentdopplung. Nachgeholt am 22.08.2026 nach
+dem Verfahren von GR-3: **drei Varianten gebaut, gerendert und vorgelegt**, Sascha hat gewählt.
+
+| Variante | Höhe | warum nicht |
+|---|---|---|
+| JETZT | 376 px | Tabelle ohne Symbole, beide Spalten gleich gewichtet |
+| A – Tabelle mit Symbolen, Erfolgsspalte grün hinterlegt | 413 px | mehr Fläche, zwei Spalten bleiben |
+| B – Kacheln | **287 px** | 24 % niedriger, braucht dafür eine Erklärzeile; nicht spaltenweise vergleichbar |
+| **C – eine Spalte, Überlebt-Wert in Klammern** | 413 px | **gewählt** |
+
+**Die Symbole sind gemessen, nicht gewählt.** `miniResIcon` ist der Hausbaustein und kennt
+`credits` als Sonderfall; für die drei Größen ohne `RES_ICONS`-Eintrag wurden die im Spiel
+etablierten Symbole ausgezählt statt ausgesucht – Kampfpunkte `ti-sword` (14 Fundstellen),
+Erfahrung `ti-star`, Modulfragmente `ti-box`. Alle im Subset-Font, `check-icons.js` sauber.
+
+**Der Wächter wurde dabei STÄRKER, nicht passend gemacht** (Regel 43/68): Er las die zwei Werte als
+*zweite und dritte Tabellenzelle* – mit C gibt es nur noch eine Wertzelle, die Prüfung wäre auf
+korrektem Code durchgefallen. Sie liest jetzt **alle Zahlen der Wertzellen** und prüft damit die
+Regel statt der Spaltenzahl (Regel 3); ein künftiger Spaltenumbau kann ihr den Gegenstand nicht
+mehr still entziehen. Dazu `2c`, das das Neue misst – jede Beutezeile trägt ihr Symbol; die
+Gegenprobe mit entfernten Symbolen fällt genau daran und benennt alle acht Zeilen, bei 17
+identischen Prüfnamen in beiden Richtungen.
+
+**Ein sechster Fund, beim Rendern der Optik-Varianten – und er saß in MEINER eigenen Fixture:**
+Sie setzte den Allianz-Unterreiter auf `'krieg'`. Den Schlüssel hat es **nie** gegeben (über die
+Historie gemessen: `git log -S 'data-alliance-subtab="krieg"'` liefert null Treffer); die vier
+echten heißen `uebersicht`/`mitglieder`/`ausbau`/`verwaltung`, und der Raid-Kasten wohnt in
+`uebersicht`. Bei einem unbekannten Schlüssel blendet die Anzeige **alle** Allianz-Panels aus –
+wörtlich die Falle aus Regel 4, nur mit einem anderen Schlüssel. Erfunden wurde er am 16.08. in
+`test_allianzraid_anzeige.js`, und ich habe ihn beim Kopieren der Fixture in
+`test_raid_vorschau.js` weitergetragen.
+**Beide Tests maßen den Kasten also, während er unsichtbar war** – `textContent` liefert auch bei
+`display:none` Text (Regel 55). Aufgefallen ist es nicht am Quelltext, sondern daran, dass der
+Screenshot **leer** war (Regel 42). Beide Fixturen sind korrigiert, und `test_raid_vorschau` hat
+jetzt `1-vorab2`, das die SICHTBARKEIT misst; die Gegenprobe mit dem alten Schlüssel fällt genau
+daran (`{"sichtbar":false}`), bei identischen 16 Prüfnamen.
+**Zwei Werkzeugfehler derselben Runde, beide über den Einzelfall hinaus:** (a) Der Screenshot war
+auch nach der Korrektur leer, weil `welcomeBackOverlay` sich nach dem `style.display='none'`
+**wieder einblendet** – weggeräumt wird es jetzt über den Spielerweg (seinen eigenen Knopf,
+Regel 70), und der Beleg ist `elementFromPoint` auf die Kastenmitte statt bloßer Sichtbarkeit
+(Regel 49). (b) Ein Element-Screenshot eines Kastens bei y=2698 in einem 1400 px hohen Fenster
+liefert ein leeres Bild, ohne zu scheitern – die Dateigröße verrät es (516 Bytes gegen 49 kB).
+**Ein Bild, das man nicht ansieht, ist kein Messwert; und ein leeres Bild ist erst dann ein
+Befund, wenn das Werkzeug nachweislich funktioniert.**
+
+**Die Wächter:** `tests/test_raid_belohnung_paritaet.js` (10 Prüfungen) führt BEIDE Fassungen aus
+und rechnet sie über ein Raster aus Stufe, Anteil, Platz, Teilnehmerzahl, Ausgang und allen fünf
+Bossen gegeneinander – **1.800 Kombinationen, null Abweichung**. Verglichen werden ZAHLEN, nicht
+Text: Ein Textvergleich schlüge an jeder Kommentaränderung fehl und wäre eine Momentaufnahme
+(Regel 3). Gegenprobe mit `ALLIANCE_RAID_RANK_SPREAD` auf 0,8: genau `2a` fällt, mit
+`{"front":{"credits":284},"back":{"credits":299}}`.
+
+`tests/test_raid_vorschau.js` (15 Prüfungen) misst am gerenderten Spiel. Sein Kern ist `2a`: Die
+zwei Spalten müssen **verschiedene Zahlen** nennen – eine Vorschau, deren beide Hälften gleich
+sind, sagt nichts aus, und eine Prüfung auf „das Wort Beute steht da" wäre in beiden Fällen grün
+(Regel 61). Gegenprobe gegen `origin/main`: **8 rot bei identischer Prüfliste** (per `diff`
+verglichen, nicht gezählt – Regel 60).
 
 ## Das Bild bleibt still, wenn sich Unsichtbares darüber ändert (21.08.2026)
 

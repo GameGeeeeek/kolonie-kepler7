@@ -324,4 +324,85 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
     check('4-bau3: kein Laufzeitfehler in den Messaufrufen', laufFehler === null, { fehler: laufFehler });
   }
 }
+// ---- 5) Die Klassen-Sets (21.08.2026) -------------------------------------------------------
+{
+  const fSetB = block(FRONT, '  const SHIP_MODULE_SET_DEFS = [', '\n  ];');
+  const bSetB = block(BACK, 'const SHIP_MODULE_SET_DEFS = [', '\n];');
+  check('5-anker: beide Set-Tabellen sind abgegrenzt', !!fSetB && !!bSetB, { front: !!fSetB, back: !!bSetB });
+  const FS = fSetB ? fuehreAus(mitAbhaengigkeiten(FRONT, fSetB, ['SHIP_MODULE_SET_DEFS']), 'SHIP_MODULE_SET_DEFS') : null;
+  const BS = bSetB ? fuehreAus(bSetB, 'SHIP_MODULE_SET_DEFS') : null;
+  check('5-bau: beide Set-Tabellen lassen sich ausfuehren', !!FS && !!BS, { front: !!FS, back: !!BS });
+
+  if (FS && BS) {
+    const fk = FS.map(x => x.key).sort(), bk = BS.map(x => x.key).sort();
+    check('5a: beide Seiten kennen dieselben Sets', JSON.stringify(fk) === JSON.stringify(bk), { front: fk, back: bk });
+
+    const abweichung = [];
+    for (const f of FS) {
+      const b = BS.find(x => x.key === f.key);
+      if (!b) continue;
+      if (b.klasse !== f.klasse) abweichung.push({ set: f.key, feld: 'klasse', front: f.klasse, back: b.klasse });
+      const fr = [...f.req].sort(), br = [...(b.req || [])].sort();
+      if (JSON.stringify(fr) !== JSON.stringify(br)) abweichung.push({ set: f.key, feld: 'req', front: fr, back: br });
+      const norm = (st) => (st || []).map(x => x.teile + ':' + Object.keys(x.bonuses || {}).sort()
+        .map(k => k + '=' + x.bonuses[k]).join(',')).join(' | ');
+      if (norm(f.stufen) !== norm(b.stufen)) abweichung.push({ set: f.key, feld: 'stufen', front: norm(f.stufen), back: norm(b.stufen) });
+    }
+    check('5b: Klasse, Teileliste und Stufenboni stimmen je Set ueberein', abweichung.length === 0, abweichung);
+
+    // Jedes verlangte Modul muss es geben UND zu dieser Klasse gehoeren - sonst ist das Set
+    // unerfuellbar, und zwar unsichtbar: Es fehlt einfach immer ein Teil.
+    const kaputt = [];
+    for (const f of FS) for (const r of f.req) {
+      const mod = F_MOD.find(m => m.key === r);
+      if (!mod) kaputt.push({ set: f.key, modul: r, problem: 'gibt es nicht' });
+      else if (mod.klasse !== f.klasse) kaputt.push({ set: f.key, modul: r, problem: 'gehoert zu ' + mod.klasse });
+    }
+    check('5c: jedes verlangte Modul existiert und gehoert zur Klasse des Sets', kaputt.length === 0, kaputt);
+
+    /* 5d ist die eigentliche Wache: Ein Set darf keinen Kanal vergeben, den seine Klasse gar nicht
+       VERBRAUCHT - sonst steht in der Beschreibung eine Wirkung, die nirgends ankommt
+       (Arbeitsregel 59). Welche Kanaele wo wirken, wird aus der Spieldatei ABGELEITET, nicht
+       eingetippt: `shipModuleBonusFor(cls, 'x')` ist generisch, `shipModuleBonusFor('klasse','x')`
+       gilt nur dort. Fuehrt jemand einen Kanal neu generisch ein, wird die Wache automatisch
+       lockerer - und schafft jemand eine Verbrauchsstelle ab, schlaegt sie an. */
+    const generisch = new Set(), jeKlasse = {};
+    for (const m of FRONT.matchAll(/shipModuleBonusFor\(\s*(?:'([a-z_]+)'|([A-Za-z_][A-Za-z0-9_]*))\s*,\s*'([a-zA-Z_]+)'\s*\)/g)) {
+      const kanal = m[3];
+      if (m[1]) (jeKlasse[kanal] = jeKlasse[kanal] || new Set()).add(m[1]);
+      else generisch.add(kanal);            // ueber eine Variable -> gilt fuer jede Klasse
+    }
+    check('5d-vorab: die Verbrauchsstellen lassen sich ueberhaupt ableiten',
+      generisch.size >= 3 && Object.keys(jeKlasse).length >= 2,
+      { generisch: [...generisch], jeKlasse: Object.keys(jeKlasse) });
+    const inert = [];
+    for (const f of FS) for (const st of f.stufen) for (const kanal of Object.keys(st.bonuses || {})) {
+      if (generisch.has(kanal)) continue;
+      const erlaubt = jeKlasse[kanal];
+      if (!erlaubt || !erlaubt.has(f.klasse)) inert.push({ set: f.key, klasse: f.klasse, kanal });
+    }
+    check('5d: kein Set vergibt einen Kanal, den seine Klasse nicht verbraucht', inert.length === 0, inert);
+
+    // Und die WIRKUNG serverseitig: zwei Teile des Linienschiff-Sets muessen den Huellenbonus
+    // heben, drei Teile zusaetzlich den Angriff (Arbeitsregel 61 - nicht die Tabelle, die Zahl).
+    // Eigener Aufbau statt `teile` aus Abschnitt 4 - das liegt in dessen Blockscope. Der Sammler
+    // holt ohnehin alles Weitere transitiv, es genuegt die eine Zielfunktion.
+    const B = fuehreAus(mitAbhaengigkeitenBackend(BACK, block(BACK, 'function shipModulKlassenBoni(', '\n}')),
+      'shipModulKlassenBoni');
+    if (typeof B === 'function') {
+      const mk = (...keys) => ({ equippedShipModules: { schlachtschiff: keys.map(k => k + ':gewoehnlich:1') }, research: {} });
+      const eins = B(mk('ss_panzerung'), 'hull').schlachtschiff;
+      const zwei = B(mk('ss_panzerung', 'ss_zielcomputer'), 'hull').schlachtschiff;
+      check('5e: zwei Set-Teile heben den Huellenbonus serverseitig', zwei > eins + 0.07,
+        { einTeil: eins, zweiTeile: zwei });
+      const atk2 = B(mk('ss_panzerung', 'ss_zielcomputer'), 'atk').schlachtschiff;
+      const atk3 = B(mk('ss_panzerung', 'ss_zielcomputer', 'ss_schildverstaerker'), 'atk').schlachtschiff;
+      check('5f: erst das DRITTE Teil bringt den Angriffsbonus', atk3 > atk2 + 0.05,
+        { zweiTeile: atk2, dreiTeile: atk3 });
+    } else {
+      check('5e/5f: shipModulKlassenBoni laesst sich ausfuehren', false, 'Aufbau gescheitert');
+    }
+  }
+}
+
 ende();

@@ -7200,8 +7200,19 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.606.0';
+  const VERSION = '8.607.0';
   const PATCHNOTES = [
+  
+  
+    { version:'8.607.0', date:'22.08.2026', changes:[
+      '<strong>Der Allianz-Raid zeigt dir jetzt, was der Anflug dir bringt.</strong> Sobald der Verband abgeflogen ist, steht unter dem Countdown deine voraussichtliche Beute – Kredite, Kampfpunkte, Erfahrung, Erz, Kristalle, Deuterium, Antimaterie und Modulfragmente, jede Zeile mit ihrem Symbol. Daneben in Klammern der Fall, dass der Boss überlebt: Er kostet dich 40 Prozent, und Antimaterie wie Fragmente fallen dann ganz aus.',
+      'Die Zahlen sind exakt, keine Spanne. Nach dem Abflug steht alles fest, was sie bestimmt – dein Platz, dein Anteil an der Angriffskraft, die Zahl der Kommandanten und der Gegner. Offen ist nur noch, ob der Boss fällt, und genau das sind die zwei Werte. Wer nicht mitgeflogen ist, sieht nichts statt einer Null.',
+      '<strong>Weniger Text an derselben Stelle:</strong> Im Zustand ohne laufenden Raid stand der Name des nächsten Gegners dreimal gleichzeitig da – in der Kopfzeile, in der Regelzeile und im geschlossenen Auswahlfeld, das seine Wahl ohnehin anzeigt –, der Beutetext zweimal. Die Regelzeile trägt jetzt nur noch die Kampfregel; sie steht nirgends sonst, und genau sie muss die Allianz vor dem Ausrufen einplanen können.',
+      '<strong>Neu: Klassen-Sets für die Schiffsmodule.</strong> Jede der acht Schiffsklassen hat jetzt ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – additiv zu den Modulen selbst. Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.',
+      '<strong>Das volle Set kostet alle drei Slots – und das ist die Entscheidung.</strong> Eine Klasse hat höchstens drei Plätze. Wer das Set komplettiert, verzichtet auf den freien Platz für ein Abgrund-Modul oder einen anderen Kanal; wer bei zwei Teilen bleibt, behält ihn. Ein Set ist deshalb keine reine Zugabe.',
+      '<strong>Behoben: Der Server rechnete deine Flottenverteidigung anders aus, als dein Spiel sie anzeigt.</strong> Gemessen an einer Flotte aus 200 Schlachtschiffen, 300 Kreuzern, 200 Zerstörern und 100 Metamaterial-Titanen schrieb er dir ohne Module <strong>47% zu viel</strong> gut und mit Modulen <strong>25% zu wenig</strong> – die beiden Fehler haben einander verdeckt. Vier Ursachen: eine erfundene Schild-Basis für die 34 Schiffstypen ohne eigenen Schildwert, fehlende Hüllen- und Schildmodule, fehlende Kampfforschung am Flottenanteil und Jäger, die ohne Trägerhangar mitzählten.',
+      '<strong>Was das für dich heißt:</strong> Verteidigung ist ab jetzt <em>modulabhängig</em>. Wer seine Klassen ausgerüstet hat, steht im Kampf spürbar besser da als bisher – wer keine Module eingebaut hat, schlechter. Anzeige und Kampf sagen dafür zum ersten Mal dasselbe.'
+    ] },
     { version:'8.606.0', date:'22.08.2026', changes:[
       '<strong>Wer einen Gegner über die Karte angreift, sieht endlich, worauf er sich einlässt.</strong> Bis jetzt trug das Kartenmenü einen einzigen Eintrag („Angreifen") und keine einzige Zahl; die Flottenwahl darunter nannte nur Flugzeit und Treibstoff. Im Galaxie-Reiter standen dieselben Gegner seit jeher mit Verteidigung, Erfolgschance, feindlicher Flotte, Schwachstelle, Enterphase, Frachtwarnung und Beute – wer über die Karte ging, flog blind.',
       'Jetzt steht beides am selben Ort. Das Kartenmenü nennt Stufe, Verteidigung, die gegnerische Flotte, die Schwachstelle und die mögliche Beute. Die Flottenwahl darunter rechnet zusätzlich Erfolgschance, Konterwirkung, Enterphase, Treibstoff und Frachtraum live mit, während du deinen Verband zusammenstellst – samt der Warnung, wenn ohne Frachter die Beute verloren ginge.',
@@ -26389,6 +26400,122 @@
     // doppelt falsch: Es hat gar keinen Prozentwert (base:1 = ein Bann je Tauchgang), die
     // Slot-Karte zeigte aber "+100% drucklot".
     drucklot:'Mutator-Bann je Tauchgang', ballast:'gerettete Beute bei verlorenem Tauchgang' };
+  /* ===== Klassen-Sets fuer die Schiffsmodule (21.08.2026, Auftrag Sascha) ====================
+     Der Auftrag lautete "findbare Module die zusammen set Bonus geben". Set-Boni gab es im Spiel
+     schon - aber ausschliesslich bei den STANDORT-Modulen (MODULE_SET_DEFS) und den Boss-Sets.
+     Die 44 Schiffsklassen-Module hatten keinen einzigen (gemessen: 0 Treffer).
+
+     WARUM BESTIMMTE SCHLUESSEL UND NICHT "N BELIEBIGE". Der erste Entwurf wollte nach ANZAHL
+     staffeln, wie die Boss-Sets. Gemessen ist das hier keine Entscheidung: `equipShipModule`
+     verbietet zwei Module desselben TYPS an einer Klasse ("je Typ ist nur EIN Modul erlaubt"), es
+     gibt also gar keine Stapel-Alternative - "zwei beliebige" waere schlicht eine Belohnung dafuer,
+     einen zweiten Slot gekauft zu haben. Mit benannten Schluesseln entsteht die Wahl: Bei drei
+     Slots (SHIP_MODULE_MAX_SLOT_LEVEL) kostet das volle Set ALLE drei, die Zwischenstufe laesst
+     einen Platz frei - fuer ein Abgrund-Modul, ein Event-Stueck oder einen anderen Kanal.
+
+     WELCHE KANAELE UEBERHAUPT WIRKEN, vorher gemessen statt angenommen (Arbeitsregel 59 - ein
+     Tabellenfeld, das nur der Anzeigetext liest, ist keine Mechanik):
+       hull/shield/speed/fuel  -> ALLE Klassen (generisch ueber `cls`)
+       atk                     -> NUR schlachtschiff und raffiniert
+       cargo                   -> NUR frachter
+       siegechance             -> im Frontend gar nicht (nur serverseitig beim Mondangriff)
+     Deshalb traegt kein Set einen Kanal, den seine Klasse nicht verbraucht. Der Mondzerstoerer
+     bekommt bewusst KEIN atk: Der Server verbraucht es, das Frontend nicht - die Vorschau wuerde
+     eine Wirkung verschweigen, die im Kampf eintritt.
+
+     ABGRUND-MODULE (ab_*) STEHEN IN KEINEM SET. Sie haben eine eigene Herkunft und eigene
+     Sonderkanaele; ein Set, das eines verlangt, waere fuer jeden unerreichbar, der nicht taucht.
+     Die Event-Flotte ist die eine Ausnahme, bei der ALLE Module Event-Stuecke sind - dort ist das
+     Set zwangslaeufig eine Event-Sammlung, und der Text sagt das.
+
+     PvP: `atk`, `hull` und `shield` entscheiden Kaempfe. Die Tabelle liegt deshalb als Kopie in
+     server.js; tests/test_schiffsmodul_paritaet.js haelt beide Seiten zusammen. */
+  const SHIP_MODULE_SET_DEFS = [
+    { key:'linienschiff', klasse:'schlachtschiff', name:'Linienschiff-Doktrin', icon:'ti-shield',
+      req:['ss_panzerung','ss_zielcomputer','ss_schildverstaerker'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ atk:0.06 } }],
+      desc:'Panzerung, Zielcomputer und Schildverstärker zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +6% Angriff. Additiv zu den Modulen selbst.' },
+    { key:'handelskonvoi', klasse:'frachter', name:'Handelskonvoi', icon:'ti-truck',
+      req:['fr_frachtraum','fr_treibstoff','fr_triebwerke'],
+      stufen:[{ teile:2, bonuses:{ cargo:0.10 } }, { teile:3, bonuses:{ fuel:0.08 } }],
+      desc:'Frachtraum, Treibstoffoptimierung und Triebwerke zusammen: ab zwei Teilen +10% Laderaum, mit allen dreien zusätzlich +8% Treibstoffersparnis.' },
+    { key:'spaehverband', klasse:'aufklaerer', name:'Spähverband', icon:'ti-antenna-bars-5',
+      req:['au_sensoren','au_tarnmodul','au_scanner'],
+      stufen:[{ teile:2, bonuses:{ speed:0.10 } }, { teile:3, bonuses:{ fuel:0.08 } }],
+      desc:'Langstreckensensoren, Tarnmodul und Scanner zusammen: ab zwei Teilen +10% Tempo, mit allen dreien zusätzlich +8% Treibstoffersparnis.' },
+    { key:'belagerungsflotte', klasse:'mondzerstoerer', name:'Belagerungsflotte', icon:'ti-planet',
+      req:['mz_huelle','mz_schildmatrix','mz_antrieb'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Verstärkte Hülle, Schildmatrix und Antriebsoptimierung zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'singularitaet', klasse:'raffiniert', name:'Singularitäts-Synthese', icon:'ti-atom',
+      req:['t2_kristallhuelle','t2_singularitaetsfokus','t2_quantenkondensator'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ atk:0.06 } }],
+      desc:'Kristallmatrix-Hülle, Fokusarray und Quantenfeld-Kondensator zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +6% Angriff. Alle drei werden in der Tier-2-Fertigung hergestellt.' },
+    { key:'schwarmtaktik', klasse:'jagdgeschwader', name:'Schwarmtaktik', icon:'ti-rocket',
+      req:['jg_leichtbau','jg_staffelpanzer','jg_deflektor'],
+      stufen:[{ teile:2, bonuses:{ speed:0.10 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Leichtbau-Zelle, Staffel-Panzerung und Geschwader-Deflektor zusammen: ab zwei Teilen +10% Tempo, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'sturmlinie', klasse:'schwerelinie', name:'Sturmlinie', icon:'ti-sword',
+      req:['sl_kompositpanzer','sl_schildgitter','sl_marschtriebwerk'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ shield:0.08 } }],
+      desc:'Komposit-Panzerung, Schildgitter und Marschtriebwerke zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +8% Schild.' },
+    { key:'beutezug', klasse:'eventflotte', name:'Beutezug-Ausrüstung', icon:'ti-box',
+      req:['ev_enterhaken','ev_risskern','ev_phasenfeld'],
+      stufen:[{ teile:2, bonuses:{ hull:0.08 } }, { teile:3, bonuses:{ speed:0.10 } }],
+      desc:'Enterhaken, Riss-Kern und Phasenfeld-Stabilisator zusammen: ab zwei Teilen +8% Hülle, mit allen dreien zusätzlich +10% Tempo. Alle drei sind Event-Stücke – dieses Set sammelt sich über mehrere Events.' }
+  ];
+  // Wie viele Teile des Sets einer Klasse sind gerade ausgerüstet? (Der Typ, nicht die Instanz -
+  // equipShipModule verbietet zwei Module desselben Typs ohnehin.)
+  function shipModuleSetTeile(klasse){
+    const def = SHIP_MODULE_SET_DEFS.find(s => s.klasse === klasse);
+    if (!def) return { def:null, teile:0 };
+    const typen = equippedShipModulesAt(klasse).map(k => String(k).split(':')[0]);
+    return { def, teile: def.req.filter(r => typen.indexOf(r) >= 0).length };
+  }
+  /* Der Set-Bonus fliesst in shipModuleBonusFor() ein und damit AUTOMATISCH in jede Verbrauchs-
+     stelle - Tempo, Treibstoff, Laderaum, Huelle, Schild, Angriff. Eine eigene Addition an jeder
+     Rechenstelle waere die uebliche zweite Wahrheit, die beim naechsten Umbau auseinanderlaeuft. */
+  function shipModuleSetBonus(klasse, effect){
+    const { def, teile } = shipModuleSetTeile(klasse);
+    if (!def) return 0;
+    let sum = 0;
+    for (const st of def.stufen) if (teile >= st.teile) sum += (st.bonuses[effect] || 0);
+    return sum;
+  }
+
+  /* Die Anzeige des Klassen-Sets - eine eigene Funktion, damit sie ohne den ganzen Renderer
+     messbar ist (tests/test_schiffsmodul_sets.js fuehrt sie mit echten Tabellen aus).
+     Sprache und Aufbau sind bewusst dieselben wie bei den Synergien im selben Panel: aktive
+     Stufen gruen mit ihrer Wirkung, die naechste gedimmt mit dem konkret fehlenden Teil - und
+     ohne ein einziges eingebautes Teil GAR NICHTS, sonst stuende dort eine Dauerzeile fuer jeden,
+     der die Klasse noch nicht ausbaut.
+     Ein Set ohne Anzeige waere eine versteckte Mechanik: Der Spieler koennte nicht erkennen,
+     warum sich sein Angriffswert aendert, wenn er ein Modul tauscht. */
+  function shipModuleSetZeilenHtml(klasse, equipped){
+    const sDef = SHIP_MODULE_SET_DEFS.find(x => x.klasse === klasse);
+    if (!sDef) return '';
+    const typen = (equipped || []).map(k => String(k).split(':')[0]);
+    const drin = sDef.req.filter(r => typen.indexOf(r) >= 0);
+    if (!drin.length) return '';
+    const wirkung = (b) => Object.keys(b).map(e =>
+      (e === 'fuel' ? '−' : '+') + Math.round(b[e]*100) + '% ' + (SHIP_MODULE_EFFECT_LABEL[e] || e)).join(' · ');
+    const modName = (k) => (SHIP_MODULE_DEFS.find(x => x.key === k) || {}).name || k;
+    const aktiv = sDef.stufen.filter(st => drin.length >= st.teile);
+    const offen = sDef.stufen.find(st => drin.length < st.teile);
+    let out = '';
+    if (aktiv.length){
+      out += `<div class="bmeta" style="color:#5dcaa5; margin-bottom:4px;"><i class="ti ${sDef.icon}" aria-hidden="true"></i> `
+           + `Set „${escapeHtml(sDef.name)}" · ${drin.length}/${sDef.req.length} Teile · `
+           + escapeHtml(aktiv.map(st => wirkung(st.bonuses)).join(' · ')) + `</div>`;
+    }
+    if (offen){
+      const fehlt = sDef.req.filter(r => typen.indexOf(r) < 0).map(modName).join(', ');
+      out += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ${sDef.icon}" aria-hidden="true"></i> `
+           + `Set „${escapeHtml(sDef.name)}": mit ${escapeHtml(fehlt)} dazu ${escapeHtml(wirkung(offen.bonuses))}</div>`;
+    }
+    return out;
+  }
+
   function shipModuleEffectLabel(effect){ return SHIP_MODULE_EFFECT_LABEL[effect] || effect; }
   // Nicht jeder Moduleffekt ist ein Prozentwert. Das Drucklot wird als Ja/Nein gelesen
   // (drucklotAktiv: abgrundSchiffsmodul(...) > 0) und hat base:1 - die Anzeige rechnete daraus
@@ -27728,6 +27855,11 @@
     // Synergien (v8.437.0): ebenfalls atk-frei (nur speed/fuel/cargo, siehe SHIP_SYNERGY_DEFS) -
     // die PvP-Paritaets-Aussage der Zeile darueber bleibt damit unveraendert wahr.
     sum += shipSynergyBonusFor(klasse, effect);
+    /* Klassen-Set (21.08.2026): Hier und NUR hier, damit jede Verbrauchsstelle ihn automatisch
+       bekommt. Anders als Substats und Synergien traegt er auch `atk` - die Aussage der zwei
+       Kommentare darueber ("atk-frei, PvP-Paritaet bleibt") gilt fuer SIE weiterhin, aber nicht
+       mehr fuer diese Funktion als Ganzes: server.js fuehrt die Set-Tabelle deshalb als Kopie. */
+    sum += shipModuleSetBonus(klasse, effect);
     return sum;
   }
   /* Klassen-Vorlagen (v8.447.0, Task #38): das Standort-Vorlagen-System (drei Profile A/B/C,
@@ -40730,6 +40862,7 @@
       { title:'Reliquien – was ein Wächter zurücklässt', body:'Jeder der zwölf Wächter lässt beim <strong>ersten</strong> Sieg seine eigene <strong>Reliquie</strong> zurück: ein benanntes, gezeichnetes Stück mit einem Satz darüber, was es war. Der <em>Kalte Anker</em> hinterlässt einen Ankerstein, der <em>Zählende</em> ein Zählwerk, das ihn nicht mehr anhalten lässt, die <em>Schwelle</em> eine Navigationstafel, auf der die Rückflugbahn fehlt – nicht gelöscht, nie eingetragen. Ab dem zweiten Sieg über denselben Wächter fällt wieder ein Modul wie bisher; du verlierst also nichts. Die zwölf Reliquien stehen im <strong>Reliquienkabinett</strong> unter der Sektorkarte, und die leeren Plätze sind dort genauso sichtbar wie die vollen. Jede gibt einen kleinen Bonus in einem der vier Kanäle, die auch die Werkstatt bedient (Kampfkraft, Schiffsverluste, Splitter, Beute) – <strong>addiert</strong> zu den Werkstatt-Stufen, nicht multipliziert, und je Kanal gedeckelt. Dazu vier <strong>Satz-Boni</strong> bei 3, 6, 9 und 12 gesammelten Stücken. Die zwölfte Reliquie liegt in <strong>Tiefe 120</strong>; danach wiederholen sich die Wächter, und das Kabinett bleibt vollständig.' },
       { title:'Ausrüstung aus der Tiefe – vier Standortmodule', body:'Vier Standortmodule fallen <strong>ausschließlich bei Tauchgängen</strong>: nicht im Markt, nicht bei Expeditionen, nicht aus Kisten, nicht als Allianz-Belohnung. Wirken tun sie dafür <strong>oben, im normalen Spiel</strong> – sie sind der Grund abzutauchen, nicht die Belohnung dafür, unten zu bleiben.<br><br><strong>Drucktank</strong> erhöht die Lagerkapazität, und seine Wirkung wächst als einzige im Spiel mit deiner <strong>Rekordtiefe</strong>: bei Tiefe 40 doppelt, ab Tiefe 120 vierfach (dort ist Schluss). Ein früh gefundener Drucktank wird von selbst besser.<br><strong>Echolotmast</strong> verlängert die Frist aufgefangener <strong>Peilungen</strong> um bis zu +150% (statt der üblichen zwei Stunden), imperiumsweit. Die Frist steht beim Auffangen fest – bereits liegende Peilungen behalten ihre.<br><strong>Splitterofen</strong> schmilzt nach jedem gewonnenen Tauchgang zusätzlich <strong>Modulfragmente</strong> in Höhe von 30% des Bergungsguts (gedeckelt bei 100%). Das Bergungsgut bleibt dir vollständig – er nimmt nichts weg, er gibt etwas dazu.<br><strong>Nullfeldanker</strong> verstärkt die Verteidigung eines Standorts, aber <strong>nur gegen NPC-Angriffe</strong> und <strong>nur bei Unterzahl</strong>: Bei gleicher Stärke tut er nichts, bei doppelter Übermacht des Angreifers wirkt er voll (bis +50%). Gegen echte Spieler wirkt er ausdrücklich nicht. Sein Beitrag steht erst fest, wenn die Stärke des Angreifers bekannt ist – er erscheint deshalb <strong>nicht</strong> in deiner angezeigten Verteidigungssumme, sondern im Überfallbericht.<br><br><strong>Fundchance:</strong> rund 8% je gewonnenem Tauchgang in Tiefe 1, steigend bis 35% ganz unten, bei Wächtern doppelt. Auch die <strong>Seltenheit</strong> hängt an der Tiefe – ein Modul aus Tiefe 5 ist gewöhnlich, eins aus Tiefe 60 meist episch. Der Fund hängt bewusst nicht am Wächter, damit der Abgrund auch für eine kleinere Flotte etwas hergibt.' },
       { title:'Die zweite Fundstufe – ab Tiefe 40', body:'Seit dem 31.07.2026 gibt es <strong>sechs weitere Module aus der Tiefe</strong>, und sie fallen erst <strong>ab Tiefe 40</strong>. Das ist Absicht: Wären sie von Anfang an im selben Topf, wäre jedes der zehn bekannten schlagartig um ein Drittel seltener geworden, ohne dass jemand etwas dafür bekommt. So zerfällt der Abstieg in zwei Abschnitte – bis 39 die bekannten zehn, ab 40 kommen sechs dazu. Die Fundchance je Tauchgang ändert sich dadurch nicht.<br><br><strong>Vier Standortmodule, die oben wirken:</strong><br><strong>Taktschmiede</strong> verkürzt die <em>Umbauzeit von Werftmarken</em> (bis −35%, imperiumsweit) – und nur die; der normale Schiffsbau bleibt beim Werftmodul.<br><strong>Krustenpresse</strong> verkürzt eine <em>Terraforming-Stufe</em> (bis −30%). Sie wirkt nur an ihrem eigenen Standort, weil Terraforming ein Vorhaben je Standort ist.<br><strong>Wrackleser</strong> erhöht, was deine <em>Recycler aus Trümmerfeldern</em> holen (bis +45%, imperiumsweit). Er vergrößert das Feld nicht, nur die Abbaurate.<br><strong>Prisenwaage</strong> erhöht das <em>Prisengut</em> gekaperter Schiffe (bis +40%, imperiumsweit). Auf Kaperplätze und Enterchance wirkt sie ausdrücklich nicht – nur auf den Erlös.' },
+      { title:'Klassen-Sets – drei bestimmte Module derselben Klasse', body:'Jede der '+SHIP_MODULE_SET_DEFS.length+' Schiffsklassen hat ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – beides <strong>additiv</strong> zu den Modulen selbst. Weil eine Klasse höchstens drei Slots hat, kostet das volle Set alle drei: Die Zwischenstufe lässt dir einen Platz frei, etwa für ein Abgrund-Modul oder einen anderen Kanal. Das ist die eigentliche Entscheidung – ein Set ist keine reine Zugabe, sondern ein Verzicht auf Vielseitigkeit.<br><br>'+SHIP_MODULE_SET_DEFS.map(sd => { const cn = (SHIP_CLASS_DEFS.find(c=>c.key===sd.klasse)||{}).name || sd.klasse; const wirk = sd.stufen.map(st => st.teile+' Teile: '+Object.keys(st.bonuses).map(e => (e==='fuel'?'−':'+')+Math.round(st.bonuses[e]*100)+'% '+(SHIP_MODULE_EFFECT_LABEL[e]||e)).join(' und ')).join(' · '); return '<strong>'+cn+'</strong> – „'+sd.name+'": '+wirk; }).join('<br>')+'<br><br>Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.' },
       { title:'Drucklot und Ballastspiegel – die zwei Schiffsmodule der zweiten Fundstufe', body:'Beide fallen wie die vier Standortmodule erst <strong>ab Tiefe 40</strong> und wirken ausschließlich im Abgrund. Sie sind bewusst <em>Entscheidungen</em> statt Prozentwerten: Kampfkraft, Verluste, Beute, Splitter und Anflug sind durch die sechs Schiffsmodule von v8.335.0 und die neun Tiefenschiffe längst belegt.<br><br><strong>Drucklot</strong> (Tier-2-Schiffe) schenkt dir vor jedem Tauchgang <em>einen Bann</em>: Du streichst einen Mutator des Sektors, ohne eine Gegenmaßnahme zu verbrauchen. Es benutzt dieselben Knöpfe wie die gekaufte Gegenmaßnahme und geht ihr vor, damit dein Vorrat nicht unbemerkt aufgebraucht wird. Es <em>stapelt nicht</em> – ein zweites Drucklot streicht keinen zweiten Mutator.<br><strong>Ballastspiegel</strong> (Frachter) rettet bei einem <em>verlorenen</em> Tauchgang bis zu 40% der Rohstoffbeute, die ein Sieg gebracht hätte – begrenzt durch deinen Frachtraum wie bei einem Sieg. Abgrundsplitter, Bergungsgut, Modul- und Gegenstandsfunde bleiben dem Sieg vorbehalten. Er macht Erfolg nicht stärker, sondern Scheitern weniger bitter.<br><br><strong>Keins der sechs lässt sich nachbauen.</strong> Weder aus Modulfragmenten noch in der Mythischen Schmiede – wie schon die ersten zehn sind sie ausschließlich Tauchbeute.<br><br><strong>Keins der sechs lässt sich nachbauen.</strong> Weder aus Modulfragmenten noch in der Mythischen Schmiede – wie schon die ersten zehn sind sie ausschließlich Tauchbeute.' },
       { title:'Die Tiefenflotte – Schiffe, die nach unten gehören', body:'Neun Schiffe lassen sich bauen, sobald du tief genug warst – freigeschaltet über deine <strong>Rekordtiefe</strong>, bezahlt in <strong>Bergungsgut</strong>. Sie kommen in drei Staffeln: Die erste macht den Abstieg machbar, die zweite macht ihn steuerbar, die dritte geht die drei Härten an, die bis dahin unverhandelbar waren.<br><br>Was ein einzelnes Schiff bringt, steht auf seiner Karte in der <strong>Werft</strong> – die Balken für Angriff, Abwehr und Schild stehen bei allen neun auf null, die Wirkung liegt vollständig in der Zeile darüber. Derselbe Text steht auch im Abgrund unter „Bau" hinter „Was es bringt".<br><br><strong>Staffel I</strong><br><strong>Lotsenboot</strong> (ab Tiefe 10) verkürzt den Anflug jedes Tauchgangs und erweitert die Reichweite der Tiefensonde um eine Tiefe. Es ist ein Auge, keine Waffe.<br><strong>Kessel</strong> (ab Tiefe 10) senkt die eigenen Schiffsverluste, je mehr davon mitfliegen. Er gewinnt keinen Kampf, er bringt die Flotte heim.<br><strong>Bergungskran</strong> (ab Tiefe 15) trägt weit mehr Ladung als ein Großer Frachter <em>und</em> hebt die geborgene Rohstoffmenge. Ohne ihn bleibt ab mittlerer Tiefe ein Teil der Beute im Sektor liegen.<br><br><strong>Im PvP zählen sie nicht.</strong> Deine Angriffs- und Verteidigungspunkte werden aus einer festen Liste von Schiffstypen gebildet, in der die Tiefenflotte nicht steht – sie kann dort also gar nicht auftauchen. Das ist Absicht: Abtauchen soll dich unten stärker machen, nicht gegen andere Spieler. Aus demselben Grund tragen alle neun weder Angriffs- noch Verteidigungswert.<br><br><strong>Mitfliegen:</strong> Im Flottenwahl-Feld des Tauchgangs stehen sie als eigene Zeilen, standardmäßig voll ausgewählt. Verluste treffen weiterhin nur die Kampfflotte – die Tiefenschiffe kehren zurück. Mindestens ein Kampfschiff bleibt Pflicht.' },
       { title:'Tiefenflotte, Staffel II – gegen die Sektorbedingungen', body:'Die zweite Staffel ist nicht stärker als die erste, sie arbeitet gegen die <strong>Mutatoren</strong> des Sektors – die einzige Sorte Gegner, die es unten wirklich gibt.<br><br><strong>Presslufthai</strong> (ab Tiefe 40) ist das einzige Tiefenschiff mit Kampfkraft, und seine Stärke hängt am <em>Ort</em> statt an seiner Bauart: In geringer Tiefe schwächer als ein Jäger, ab Tiefe 80 die wirksamste Waffe, die du mitnehmen kannst. Damit hängt deine Flottenwahl zum ersten Mal davon ab, wie tief du gehst.<br><strong>Ankerwerfer</strong> (ab Tiefe 50) dämpft alle Sektorbedingungen, die den Anflug verlängern – Gravitationstrichter, Resonanzader, Magnetklemme, Kristallschlund. Er nimmt nur den <em>Aufschlag</em>: unter die normale Flugzeit drückt er nie, und einen verkürzenden Sektor lässt er in Ruhe.<br><strong>Echoschnitter</strong> (ab Tiefe 55) hebt die Splitterausbeute jedes gewonnenen Tauchgangs. Er zahlt sich über Wochen aus und ist der erste Grund, eine bequeme Tiefe noch einmal zu tauchen, statt immer nur tiefer zu wollen.<br><br>Auch diese drei zählen <strong>im PvP nicht</strong> – ausdrücklich auch der Presslufthai: Seine Kampfkraft liegt vollständig in der Abgrund-Rechnung und taucht in keiner Angriffs- oder Verteidigungszahl auf.<br><br>Die verkürzte Anflugzeit von Lotsenboot und Ankerwerfer siehst du schon in der Vorschau am Sektor, bevor du startest.' },
@@ -45857,6 +45990,75 @@
   // einen falschen Countdown.
   const ALLIANCE_RAID_RESTART_COOLDOWN_MS = 6*60*60*1000;
   const ALLIANCE_RAID_WAVE_COOLDOWN_MS = 2*60*60*1000;
+  // ===== Die Belohnungsformel des Allianz-Raids - KOPIE aus server.js =====
+  //
+  // Auftrag Sascha: "vsl. belohnungen einblenden". Der Kommentar ueber der Backend-Fassung sagt
+  // seit jeher, sie sei EINE Funktion, "damit die Vorschau im Spiel (Frontend) und die Auszahlung
+  // nicht auseinanderlaufen koennen" - die Vorschau gab es nur nie. Ein Versprechen im Kommentar,
+  // das kein Code einloest.
+  //
+  // WARUM ALS KOPIE und nicht als Serverfeld (Entscheidung Sascha, 22.08.2026): Nach dem Abflug
+  // stehen ALLE Eingaben der Formel fest und liegen bereits im Versand-Dokument - Rangliste,
+  // Gesamtkraft, Bossstufe. Es fehlte allein die Rechnung. Die teure Haelfte der Kopie gibt es
+  // ausserdem laengst: ALLIANCE_RAID_BOSSE mit beuteMult/schwerpunkt steht in beiden Repos und
+  // wird von test_raid_bosswahl schon Feld fuer Feld verglichen. Hinzu kommen nur diese eine Zahl
+  // und drei Funktionen.
+  //
+  // DER PREIS ist die uebliche zweite Wahrheit - abgesichert wie FESTUNG_STUFEN und
+  // SHIP_MODULE_SET_DEFS durch tests/test_raid_belohnung_paritaet.js, der BEIDE Fassungen
+  // ausfuehrt und ihre Zahlen gegeneinander rechnet. Wer hier etwas aendert, aendert es dort mit.
+  const ALLIANCE_RAID_RANK_SPREAD = 0.9;
+
+  function allianceRaidRankFactor(platz, anzahl){
+    if (!(anzahl > 1)) return 1 + ALLIANCE_RAID_RANK_SPREAD;
+    const p = Math.max(1, Math.min(anzahl, platz | 0));
+    return 1 + ALLIANCE_RAID_RANK_SPREAD * ((anzahl - p) / (anzahl - 1));
+  }
+
+  function allianceRaidRankShare(platz, anzahl){
+    if (!(anzahl > 1)) return 1;
+    return (anzahl - Math.max(1, Math.min(anzahl, platz | 0))) / (anzahl - 1);
+  }
+
+  function allianceRaidRewardFor(level, share, platz, anzahl, destroyed, boss){
+    const lvl = Math.max(1, level | 0);
+    const rang = allianceRaidRankFactor(platz, anzahl);
+    const rShare = allianceRaidRankShare(platz, anzahl);
+    const anteil = 0.35 + 0.65 * Math.max(0, Math.min(1, share));
+    const siegMult = destroyed ? 1 : 0.6;
+    const bMult = (boss && boss.beuteMult) || 1;
+    const schwer = (boss && boss.schwerpunkt) || null;
+    const gesamt = anteil * rang * siegMult * bMult;
+    // Der Schwerpunkt verschiebt die ZUSAMMENSETZUNG, nicht die Gesamtmenge: Die betonte Ressource
+    // bekommt 70 % ihrer eigenen Grundmenge dazu, und genau dieser Betrag wird den anderen beiden
+    // im Verhaeltnis ihrer Grundmengen abgezogen.
+    const basis = { erz: 600 + lvl * 500, kristalle: 380 + lvl * 320, deuterium: 180 + lvl * 160 };
+    const anteilig = Object.assign({}, basis);
+    if (schwer && basis[schwer] !== undefined){
+      const extra = basis[schwer] * 0.7;
+      const restSumme = Object.keys(basis).reduce((a, k) => k === schwer ? a : a + basis[k], 0);
+      anteilig[schwer] = basis[schwer] + extra;
+      for (const k of Object.keys(basis)){
+        if (k === schwer) continue;
+        anteilig[k] = Math.max(0, basis[k] - extra * (basis[k] / restSumme));
+      }
+    }
+    // Antimaterie steht ausserhalb der Umverteilung - sie faellt nur bei erlegtem Boss.
+    const amFaktor = schwer === 'antimaterie' ? 1.7 : 1;
+    return {
+      credits: Math.round((300 + lvl * 150) * gesamt),
+      battlePoints: Math.round((8 + lvl * 4) * gesamt),
+      xp: Math.round((10 + lvl * 6) * gesamt),
+      resources: {
+        erz: Math.round(anteilig.erz * gesamt),
+        kristalle: Math.round(anteilig.kristalle * gesamt),
+        deuterium: Math.round(anteilig.deuterium * gesamt),
+        antimaterie: destroyed ? Math.max(1, Math.round((2 + lvl * 1.2) * (0.15 + 0.85 * rShare) * bMult * amFaktor)) : 0
+      },
+      fragments: destroyed ? (1 + Math.round((2 + lvl * 0.7) * rShare * bMult)) : 0
+    };
+  }
+
   function allianceRaidHpFor(level){ return Math.round(ALLIANCE_RAID_BASE_HP * Math.pow(1.4, Math.max(0, level-1))); }
   // Ist an diesem Raid-Dokument nichts mehr dran? (v8.379.1, Spieler-Report "immer noch nicht
   // startbar")
@@ -46293,6 +46495,62 @@
     state.allianceRaidContribution = null;
     render(); save();
   }
+  // Die voraussichtliche Beute des EIGENEN Kontos, sobald der Verband abgeflogen ist.
+  //
+  // WARUM ERST HIER und nicht schon in der Sammelphase: Der Server friert die Rangliste beim
+  // Abflug ein (/checkdispatch sortiert nach Angriffskraft), und dieselbe Liste liest spaeter
+  // /claim fuer den Platz. Vorher steht weder Platz noch Gesamtkraft fest - eine Vorschau waere
+  // dort eine Zahl, die sich noch aendert, also eine Falschaussage.
+  //
+  // ES IST EIN PAAR, kein Schaetzwert mit Spanne: Von den sechs Eingaben der Formel ist nach dem
+  // Abflug genau EINE offen - ob der Boss faellt. Beide Werte sind exakt.
+  //
+  // Wer nicht mitgeflogen ist, bekommt NICHTS zu sehen statt einer Null - dieselbe Entscheidung
+  // wie bei der Weltlage-Zeile: Gibt es nichts zu sagen, wird nichts gesagt.
+  function allianceRaidVorschauHtml(doc){
+    const d = doc && doc.dispatch;
+    const rang = d && Array.isArray(d.ranking) ? d.ranking : null;
+    const eigen = state.player && state.player.id;
+    if (!rang || !rang.length || !eigen) return '';
+    const idx = rang.findIndex(e => e && e.playerId === eigen);
+    if (idx < 0) return '';
+    const anzahl = rang.length;
+    const platz = idx + 1;
+    // Gesamtkraft aus dem Dokument, mit der Rangliste als Rueckfall - ein aelteres Dokument ohne
+    // totalPower soll die Vorschau nicht verstummen lassen.
+    const gesamt = d.totalPower > 0 ? d.totalPower : rang.reduce((a, e) => a + ((e && e.power) || 0), 0);
+    const share = gesamt > 0 ? ((rang[idx].power || 0) / gesamt) : 0;
+    const boss = allianceRaidBossVon(doc);
+    const lvl = doc.level || 1;
+    const faellt = allianceRaidRewardFor(lvl, share, platz, anzahl, true, boss);
+    const bleibt = allianceRaidRewardFor(lvl, share, platz, anzahl, false, boss);
+    // Symbole aus dem Haus: miniResIcon fuer alles, was in RES_ICONS steht (es kennt
+    // 'credits' als Sonderfall), fuer die drei uebrigen die im Spiel dafuer etablierten
+    // ti-Symbole (gemessen: Kampfpunkte ti-sword 14 Fundstellen, Erfahrung ti-star,
+    // Modulfragmente ti-box).
+    const sym = k => k === 'battlePoints' ? '<i class="ti ti-sword" aria-hidden="true" style="color:#e28b8b;"></i>'
+      : k === 'xp' ? '<i class="ti ti-star" aria-hidden="true" style="color:#9fe1f5;"></i>'
+      : k === 'fragments' ? '<i class="ti ti-box" aria-hidden="true" style="color:#c9a7f0;"></i>'
+      : miniResIcon(k);
+    const zeile = (name, key, a, b) => `<tr><td style="padding:2px 8px 2px 0; color:#9aa0b5; white-space:nowrap;">${sym(key)} ${name}</td>`
+      + `<td style="padding:2px 0; text-align:right; font-variant-numeric:tabular-nums;"><strong style="color:#7fd88f;">${fmt(a)}</strong>`
+      + `<span style="color:#6b6f85; margin-left:6px;">(${b > 0 ? fmt(b) : '–'})</span></td></tr>`;
+    return `<div class="bmeta" style="margin-top:6px; border-top:var(--bw-1) solid rgba(255,255,255,0.08); padding-top:6px;">
+      <div style="margin-bottom:3px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i><strong>Deine Beute</strong> · Platz ${platz} von ${anzahl} (${Math.round(share*100)} % der Kraft)</div>
+      <table style="border-collapse:collapse; font-size:11px;">
+        <tr><td></td><td style="padding:0 0 3px; text-align:right; color:#7fd88f; font-weight:600;">Boss fällt <span style="color:#6b6f85; font-weight:400;">(überlebt)</span></td></tr>
+        ${zeile('Kredite', 'credits', faellt.credits, bleibt.credits)}
+        ${zeile('Kampfpunkte', 'battlePoints', faellt.battlePoints, bleibt.battlePoints)}
+        ${zeile('Erfahrung', 'xp', faellt.xp, bleibt.xp)}
+        ${zeile('Erz', 'erz', faellt.resources.erz, bleibt.resources.erz)}
+        ${zeile('Kristalle', 'kristalle', faellt.resources.kristalle, bleibt.resources.kristalle)}
+        ${zeile('Deuterium', 'deuterium', faellt.resources.deuterium, bleibt.resources.deuterium)}
+        ${zeile('Antimaterie', 'antimaterie', faellt.resources.antimaterie, bleibt.resources.antimaterie)}
+        ${zeile('Modulfragmente', 'fragments', faellt.fragments, bleibt.fragments)}
+      </table>
+    </div>`;
+  }
+
   function renderAllianceRaidBox(){
     const box = document.getElementById('allianceRaidBox');
     // SPIELER-REPORT Sascha (05.08.2026): "der die Dropdown-Funktion geht nicht - du klickst sie
@@ -46337,7 +46595,14 @@
       // Die Kampfregel des naechsten Bosses VOR dem Ausrufen (02.08.2026) - eine Schwaeche, die
       // man erst nach der Welle erfaehrt, kann die Allianz nicht einplanen, und genau das
       // Einplanen ist der Zweck der Bosse.
-      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${gewaehlterBoss.icon}" aria-hidden="true" style="margin-right:3px;"></i><strong>${gewaehlterBoss.name}</strong> – ${gewaehlterBoss.trait} <span style="color:#9fe1f5;">Beute: ${bossBeuteText(gewaehlterBoss)}.</span></div>`;
+      // ENTDOPPELT (22.08.2026, Auftrag Sascha "weniger text"). Gemessen stand im Zustand "kein
+      // Raid" der Bossname DREIMAL sichtbar - Kopfzeile, diese Zeile, und das geschlossene
+      // Auswahlfeld, das seine gewaehlte Option anzeigt -, der Beutetext zweimal. Hier bleibt
+      // deshalb nur die KAMPFREGEL: Sie steht nirgends sonst, und genau sie muss die Allianz vor
+      // dem Ausrufen einplanen koennen.
+      // Der Beutetext bleibt nur, wenn es KEIN Auswahlfeld gibt - ein einfaches Mitglied sieht
+      // keins, und ohne diese Ausnahme waere die Auskunft fuer es ersatzlos weg.
+      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${gewaehlterBoss.icon}" aria-hidden="true" style="margin-right:3px;"></i>${gewaehlterBoss.trait}${canLead ? '' : ` <span style="color:#9fe1f5;">Beute: ${bossBeuteText(gewaehlterBoss)}.</span>`}</div>`;
       if (canLead){
         html += `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><select id="raidBossSelect" data-keep-value="raidBoss" style="font-size:12px; flex:1 1 200px; min-width:0;">${bossOptions}</select><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
       } else {
@@ -46447,6 +46712,7 @@
       box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(226,75,74,0.4);">${hpBarHtml}
         <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
         <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
+        ${allianceRaidVorschauHtml(doc)}
       </div>`;
       return;
     }
@@ -64263,8 +64529,9 @@
             synHtml += `<div class="bmeta" style="opacity:0.75; margin-bottom:4px;"><i class="ti ${syn.icon}" aria-hidden="true"></i> Synergie „${syn.name}": nur noch ${fehlt} fehlt für ${gibtText}</div>`;
           }
         }
-        // Klassen-Umschalter (Module wirken klassenweit - hier wählt man, welche Klasse man bearbeitet).
-        let html = (synHtml ? `<div style="margin-bottom:10px;">${synHtml}</div>` : '') + `<div data-hscroll="shipmodcls" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
+        const setHtml = shipModuleSetZeilenHtml(klasse, equipped);
+    // Klassen-Umschalter (Module wirken klassenweit - hier wählt man, welche Klasse man bearbeitet).
+        let html = (synHtml || setHtml ? `<div style="margin-bottom:10px;">${setHtml}${synHtml}</div>` : '') + `<div data-hscroll="shipmodcls" style="display:flex; overflow-x:auto; margin-bottom:10px; padding-bottom:4px;">`;
         html += SHIP_CLASS_DEFS.map(c => {
           const active = c.key===klasse;
           const eq = equippedShipModulesAt(c.key).length, sl = shipModuleSlotCount(c.key);

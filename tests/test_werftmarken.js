@@ -17,7 +17,7 @@
 //   5. EIN WERT, DER DEN SAVE SPRENGT. Ein zu hoher shipMarks-Wert wuerde vom Backend abgelehnt -
 //      und eine Ablehnung friert das Speichern KOMPLETT ein (Vorfall 21.07.2026). Der Test prueft
 //      den Deckel im Frontend und die Existenz der Sanity-Grenze im Backend.
-const { SPIELDATEI } = require('./lib/umgebung');
+const { SPIELDATEI, SERVER_JS } = require('./lib/spieldatei');
 const fs = require('fs');
 const path = require('path');
 
@@ -321,13 +321,12 @@ const jaegerGesamt = [...Array(9)].reduce((a,_,i)=> a + fe.shipMarkCost('jaeger'
 check('Jaeger-Gesamtweg kostet ~2,26 Mio Erz', jaegerGesamt > 2.2e6 && jaegerGesamt < 2.35e6, jaegerGesamt);
 
 // ---------------------------------------------------------------- 6. FE/BE-Gleichstand (Fund 3)
-const backend = path.resolve(__dirname, '../../../workspace/kolonie-kepler7-backend/server.js');
-const bePfade = [
-  backend,
-  '/workspace/kolonie-kepler7-backend/server.js',
-  path.resolve(__dirname, '../../kolonie-kepler7-backend/server.js')
-];
-const bePfad = bePfade.find(p => { try { return fs.existsSync(p); } catch(e){ return false; } });
+// Der Pfad kommt aus lib/spieldatei, NICHT aus einer eigenen Kandidatenliste. Vorher stand hier
+// eine mit veralteten /workspace-Pfaden, und die ignorierte KEPLER_BACKEND_SERVER still: Eine
+// Gegenprobe gegen eine sabotierte Backend-Kopie las die ECHTE Datei und sah damit aus wie
+// bestanden (gemessen 22.08.2026 - beide Laeufe byte-identisch). Dieselbe Falle wie bei
+// test_pvp_deckel; die Pfadlogik gehoert an EINE Stelle.
+const bePfad = SERVER_JS;
 if (!bePfad){
   console.log('SKIP - Backend nicht im Arbeitsbereich, FE/BE-Vergleich ausgelassen');
 } else {

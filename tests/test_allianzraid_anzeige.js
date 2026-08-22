@@ -44,7 +44,7 @@ function backend(store){ return async r => {
 };}
 
 const spielstand = () => JSON.stringify({
-  tutorialSeen:true, newbieWelcomeSeen:true, allianceSubTab:'krieg',
+  tutorialSeen:true, newbieWelcomeSeen:true, allianceSubTab:'uebersicht',
   resources:{ energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:2e4, forschungspunkte:3e4 },
   buildings:{ solar:20, mine:18, lager:20, werft:12, labor:12 },
   research:{}, colonies:{}, activeBasePlanet:'home',
