@@ -300,6 +300,24 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     alle sieben Testdateien byte-identisch zum Fernstand, CLAUDE.md um die 161 Zeilen der fremden
     Doku gewachsen. Ohne diese Zählung ist „der Rebase lief sauber" eine Behauptung.
 
+    **Nachtrag 22.08.2026 – `git checkout --theirs` auf eine TESTDATEI ist genau die stille
+    Löschung, vor der diese Regel warnt.** Beim Merge von `origin/main` standen drei Testdateien im
+    Konflikt, alle drei von einer Parallelsitzung angefasst. Für zwei davon war die fremde Fassung
+    beim Lesen erkennbar besser, für die dritte nicht – und ich habe trotzdem alle drei pauschal auf
+    `--theirs` gesetzt. Das hat `test_schiffsmodul_paritaet.js` um einen **ganzen Abschnitt mit neun
+    Prüfungen** gekürzt (`5-anker` bis `5f`, die Set-Parität), ohne einen Konflikt, ohne eine
+    Meldung, und der Prüflauf wäre danach grün gewesen – der Test misst dann eben weniger.
+    **Gemerkt habe ich es nur, weil ich danach die Prüf-NAMEN verglichen habe**, nicht die Datei:
+    32 gegen 23. Aufgesetzt statt ersetzt sind es 33, und beide Seiten sind vollständig drin.
+    **Vorgehen:** Nach jedem Konflikt in einer Testdatei die Prüfnamen aller drei Fassungen
+    (`HEAD`, `origin/main`, Ergebnis) per `comm` gegeneinander halten – `comm -23 <(HEAD) <(jetzt)`
+    muss LEER sein, und dasselbe für die fremde Seite. Das kostet zehn Sekunden und ist die einzige
+    Messung, die „ich habe nichts verloren" belegt statt behauptet. Die zwei anderen Dateien haben
+    diese Messung übrigens **bestätigt**, nicht widerlegt: Meine eine `test_pvp_deckel`-Prüfung
+    steht dort als vier (Hülle hart UND Schild ungedeckelt, je Repo einzeln), meine
+    Rechenform-Prüfung als `6e3` neben ihrer Musterliste `6e`/`6e2` – die fremde Fassung war
+    wirklich die stärkere, und jetzt ist das gemessen und nicht geglaubt.
+
 24. **Ein pauschaler Ersetzer über TESTDATEIEN braucht dieselbe Sorgfalt wie einer über den
     Spielcode.** Beim Umbenennen der Aufrufstelle (`weicherDeckel(` → `deckelWeich(`) am 10.08.2026
     gingen in einem Rutsch drei Dinge schief: (a) eine zu breite Ausnahme (`weicherDeckel(d`)
@@ -4346,9 +4364,10 @@ unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zähl
   `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
   3a schlägt sonst an.
 
-Wächter: `tests/test_schiffsmodul_paritaet.js` (23 Prüfungen, vier Gegenproben — jede speist eine
-der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 23 gelaufenen
-Prüfungen).
+Wächter: `tests/test_schiffsmodul_paritaet.js` (heute **32 gelaufene Prüfungen**, vier Gegenproben —
+jede speist eine der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils
+gleicher Prüfungszahl). Die vier Gegenproben sind seinerzeit bei 23 gefahren worden; der Abschnitt
+zu den Klassen-Sets weiter unten hat neun weitere Prüfungen hinzugefügt.
 
 **Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
 Bausteinliste war eine Liste von 21 benannten Blöcken. Die Gegenprobe zur Schild-Basis baute
@@ -4364,7 +4383,8 @@ Messaufrufen`): Die zwei Messaufrufe laufen durch einen Wrapper, der einen gewor
 festhält, `null` zurückgibt und den Lauf weiterlaufen lässt. Beidseitig gegengeprüft: ohne die
 Wache **15 Prüfungen und keine einzige FAIL-Zeile** — ein roter Exit-Code ohne jede Aussage —, mit
 ihr 23 Prüfungen und der Grund im Protokoll
-(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`).
+(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`) — beides gemessen an dem Stand, den
+der Test damals hatte; heute sind es 32.
 **Die übertragbare Lehre geht über diesen Test hinaus: Ein `try/catch` um den AUFBAU (Regel 34)
 genügt nicht, wenn die geschnittene Funktion erst beim AUFRUF wirft.** Genau daran ist es hier
 gescheitert — der Aufbau war längst gefasst, der Lauf starb trotzdem mittendrin. Wer Funktionen
@@ -4624,7 +4644,7 @@ daran nichts; es bräuchte Frachtraum für Event-Schiffe oder eine Umwidmung des
 eine Entscheidung über die Identität eines Event-Gegenstands und liegt bei Sascha.**
 
 Wächter: `tests/test_schiffsmodul_sets.js` (17 Prüfungen, drei Gegenproben) und
-`tests/test_schiffsmodul_paritaet.js` (31 Prüfungen).
+`tests/test_schiffsmodul_paritaet.js` (32 Prüfungen, davon neun aus Abschnitt 5).
 
 **Eine Lücke im eigenen Wächter, die nur die Gegenprobe gezeigt hat:** Abschnitt 1 rief
 `shipModuleSetBonus` **direkt** auf und blieb deshalb grün, als die Einspeisung in
