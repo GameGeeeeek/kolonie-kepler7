@@ -14,8 +14,9 @@
 //      das Ergebnis traegt den besten Wurf der verbrauchten drei.
 //   5) Reroll laesst den Hauptwert stehen.
 //   6) SERVER: MODULE_INSTKEY_RE akzeptiert das Token (ausgefuehrt gegen die echte Regex),
-//      moduleWertMultServer liest es identisch (ausgefuehrt), und BEIDE Nachrechnungs-
-//      stellen (PvP-Kampfmodule, Ueberfall-Schutz) multiplizieren ihn.
+//      moduleWertMultServer liest es identisch (ausgefuehrt), und JEDE Nachrechnungsstelle
+//      multipliziert ihn - namentlich gefuehrt in WURF_STELLEN, mit beiden Richtungen
+//      (eine erlaubte darf nicht verschwinden, eine neue gehoert eingetragen).
 //   7) Hilfe nennt Spanne, Fertigungs-Ausnahme und die neue Schmelzregel.
 //
 // GEGENPROBE (Arbeitsregel 1, beim Einfuehren ausgefuehrt): am alten Stand fallen 1, 2, 4
@@ -133,8 +134,36 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
   check('6d: der Server liest den Wurf identisch (104 -> 1.04, ohne Token -> 1, geklammert)',
     Math.abs(srvWert('waffen:selten:1:prod15.w104') - 1.04) < 1e-9 &&
     srvWert('waffen:selten') === 1 && Math.abs(srvWert('x:y:1:w999') - 1.1) < 1e-9);
-  check('6e: BEIDE Nachrechnungsstellen multiplizieren den Wurf (PvP-Kampfmodule + Ueberfall-Schutz)',
-    (srv.match(/\* moduleWertMultServer\(instKey\);/g) || []).length === 2);
+  /* Die Nachrechnungsstellen NAMENTLICH statt als Zaehler (Arbeitsregel 33).
+     Hier stand `...length === 2`. Backend #156 hat mit `shipModulKlassenBoni` eine dritte,
+     voellig legitime Stelle hinzugefuegt - ein Modul mit 104 % Wurf muss auch in der
+     Verteidigung 104 % bringen, sonst rechnet der Kampf anders als die Anzeige - und der
+     Zaehler fiel auf richtigem Code durch. Er sagte dabei nicht einmal, WELCHE Stelle
+     dazugekommen war; das musste von Hand gesucht werden.
+     Die Musterliste faengt MEHR als die Zahl, und zwar in beide Richtungen:
+       - verschwindet eine erlaubte Stelle, faellt es auf (sie rechnet dann ohne Wurf);
+       - kommt eine UNBEKANNTE dazu, faellt es auf (sie gehoert bewusst eingetragen). */
+  const WURF_STELLEN = ['shipModulKlassenBoni', 'shipModuleBonus', 'raidlossProtectionMult'];
+  const srvOhneKommentar = srv.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  const srvZeilen = srvOhneKommentar.split('\n');
+  function funktionVor(nr){
+    for (let i = nr - 1; i >= 0; i--){
+      const m = srvZeilen[i].match(/^function ([a-zA-Z0-9_]+)\s*\(/);
+      if (m) return m[1];
+    }
+    return '(unbekannt)';
+  }
+  const wurfZeilen = srvZeilen
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(x => x.z.indexOf('* moduleWertMultServer(instKey);') >= 0);
+  const gefundeneStellen = wurfZeilen.map(x => funktionVor(x.nr));
+  const unbekannt = gefundeneStellen.filter(f => WURF_STELLEN.indexOf(f) < 0);
+  const fehlend = WURF_STELLEN.filter(f => gefundeneStellen.indexOf(f) < 0);
+  check('6e: jede bekannte Nachrechnungsstelle multipliziert den Wurf',
+    fehlend.length === 0, fehlend.length ? { fehlend, gefunden: gefundeneStellen } : undefined);
+  check('6e2: und keine UNBEKANNTE Stelle tut es (eine neue gehoert eingetragen)',
+    unbekannt.length === 0,
+    unbekannt.length ? { unbekannt, zeilen: wurfZeilen.filter(x => unbekannt.indexOf(funktionVor(x.nr)) >= 0).map(x => x.nr) } : undefined);
 }
 
 // ---- 7) Hilfe (zweite Anzeigestelle)
