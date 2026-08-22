@@ -45795,6 +45795,75 @@
   // einen falschen Countdown.
   const ALLIANCE_RAID_RESTART_COOLDOWN_MS = 6*60*60*1000;
   const ALLIANCE_RAID_WAVE_COOLDOWN_MS = 2*60*60*1000;
+  // ===== Die Belohnungsformel des Allianz-Raids - KOPIE aus server.js =====
+  //
+  // Auftrag Sascha: "vsl. belohnungen einblenden". Der Kommentar ueber der Backend-Fassung sagt
+  // seit jeher, sie sei EINE Funktion, "damit die Vorschau im Spiel (Frontend) und die Auszahlung
+  // nicht auseinanderlaufen koennen" - die Vorschau gab es nur nie. Ein Versprechen im Kommentar,
+  // das kein Code einloest.
+  //
+  // WARUM ALS KOPIE und nicht als Serverfeld (Entscheidung Sascha, 22.08.2026): Nach dem Abflug
+  // stehen ALLE Eingaben der Formel fest und liegen bereits im Versand-Dokument - Rangliste,
+  // Gesamtkraft, Bossstufe. Es fehlte allein die Rechnung. Die teure Haelfte der Kopie gibt es
+  // ausserdem laengst: ALLIANCE_RAID_BOSSE mit beuteMult/schwerpunkt steht in beiden Repos und
+  // wird von test_raid_bosswahl schon Feld fuer Feld verglichen. Hinzu kommen nur diese eine Zahl
+  // und drei Funktionen.
+  //
+  // DER PREIS ist die uebliche zweite Wahrheit - abgesichert wie FESTUNG_STUFEN und
+  // SHIP_MODULE_SET_DEFS durch tests/test_raid_belohnung_paritaet.js, der BEIDE Fassungen
+  // ausfuehrt und ihre Zahlen gegeneinander rechnet. Wer hier etwas aendert, aendert es dort mit.
+  const ALLIANCE_RAID_RANK_SPREAD = 0.9;
+
+  function allianceRaidRankFactor(platz, anzahl){
+    if (!(anzahl > 1)) return 1 + ALLIANCE_RAID_RANK_SPREAD;
+    const p = Math.max(1, Math.min(anzahl, platz | 0));
+    return 1 + ALLIANCE_RAID_RANK_SPREAD * ((anzahl - p) / (anzahl - 1));
+  }
+
+  function allianceRaidRankShare(platz, anzahl){
+    if (!(anzahl > 1)) return 1;
+    return (anzahl - Math.max(1, Math.min(anzahl, platz | 0))) / (anzahl - 1);
+  }
+
+  function allianceRaidRewardFor(level, share, platz, anzahl, destroyed, boss){
+    const lvl = Math.max(1, level | 0);
+    const rang = allianceRaidRankFactor(platz, anzahl);
+    const rShare = allianceRaidRankShare(platz, anzahl);
+    const anteil = 0.35 + 0.65 * Math.max(0, Math.min(1, share));
+    const siegMult = destroyed ? 1 : 0.6;
+    const bMult = (boss && boss.beuteMult) || 1;
+    const schwer = (boss && boss.schwerpunkt) || null;
+    const gesamt = anteil * rang * siegMult * bMult;
+    // Der Schwerpunkt verschiebt die ZUSAMMENSETZUNG, nicht die Gesamtmenge: Die betonte Ressource
+    // bekommt 70 % ihrer eigenen Grundmenge dazu, und genau dieser Betrag wird den anderen beiden
+    // im Verhaeltnis ihrer Grundmengen abgezogen.
+    const basis = { erz: 600 + lvl * 500, kristalle: 380 + lvl * 320, deuterium: 180 + lvl * 160 };
+    const anteilig = Object.assign({}, basis);
+    if (schwer && basis[schwer] !== undefined){
+      const extra = basis[schwer] * 0.7;
+      const restSumme = Object.keys(basis).reduce((a, k) => k === schwer ? a : a + basis[k], 0);
+      anteilig[schwer] = basis[schwer] + extra;
+      for (const k of Object.keys(basis)){
+        if (k === schwer) continue;
+        anteilig[k] = Math.max(0, basis[k] - extra * (basis[k] / restSumme));
+      }
+    }
+    // Antimaterie steht ausserhalb der Umverteilung - sie faellt nur bei erlegtem Boss.
+    const amFaktor = schwer === 'antimaterie' ? 1.7 : 1;
+    return {
+      credits: Math.round((300 + lvl * 150) * gesamt),
+      battlePoints: Math.round((8 + lvl * 4) * gesamt),
+      xp: Math.round((10 + lvl * 6) * gesamt),
+      resources: {
+        erz: Math.round(anteilig.erz * gesamt),
+        kristalle: Math.round(anteilig.kristalle * gesamt),
+        deuterium: Math.round(anteilig.deuterium * gesamt),
+        antimaterie: destroyed ? Math.max(1, Math.round((2 + lvl * 1.2) * (0.15 + 0.85 * rShare) * bMult * amFaktor)) : 0
+      },
+      fragments: destroyed ? (1 + Math.round((2 + lvl * 0.7) * rShare * bMult)) : 0
+    };
+  }
+
   function allianceRaidHpFor(level){ return Math.round(ALLIANCE_RAID_BASE_HP * Math.pow(1.4, Math.max(0, level-1))); }
   // Ist an diesem Raid-Dokument nichts mehr dran? (v8.379.1, Spieler-Report "immer noch nicht
   // startbar")
@@ -46231,6 +46300,54 @@
     state.allianceRaidContribution = null;
     render(); save();
   }
+  // Die voraussichtliche Beute des EIGENEN Kontos, sobald der Verband abgeflogen ist.
+  //
+  // WARUM ERST HIER und nicht schon in der Sammelphase: Der Server friert die Rangliste beim
+  // Abflug ein (/checkdispatch sortiert nach Angriffskraft), und dieselbe Liste liest spaeter
+  // /claim fuer den Platz. Vorher steht weder Platz noch Gesamtkraft fest - eine Vorschau waere
+  // dort eine Zahl, die sich noch aendert, also eine Falschaussage.
+  //
+  // ES IST EIN PAAR, kein Schaetzwert mit Spanne: Von den sechs Eingaben der Formel ist nach dem
+  // Abflug genau EINE offen - ob der Boss faellt. Beide Werte sind exakt.
+  //
+  // Wer nicht mitgeflogen ist, bekommt NICHTS zu sehen statt einer Null - dieselbe Entscheidung
+  // wie bei der Weltlage-Zeile: Gibt es nichts zu sagen, wird nichts gesagt.
+  function allianceRaidVorschauHtml(doc){
+    const d = doc && doc.dispatch;
+    const rang = d && Array.isArray(d.ranking) ? d.ranking : null;
+    const eigen = state.player && state.player.id;
+    if (!rang || !rang.length || !eigen) return '';
+    const idx = rang.findIndex(e => e && e.playerId === eigen);
+    if (idx < 0) return '';
+    const anzahl = rang.length;
+    const platz = idx + 1;
+    // Gesamtkraft aus dem Dokument, mit der Rangliste als Rueckfall - ein aelteres Dokument ohne
+    // totalPower soll die Vorschau nicht verstummen lassen.
+    const gesamt = d.totalPower > 0 ? d.totalPower : rang.reduce((a, e) => a + ((e && e.power) || 0), 0);
+    const share = gesamt > 0 ? ((rang[idx].power || 0) / gesamt) : 0;
+    const boss = allianceRaidBossVon(doc);
+    const lvl = doc.level || 1;
+    const faellt = allianceRaidRewardFor(lvl, share, platz, anzahl, true, boss);
+    const bleibt = allianceRaidRewardFor(lvl, share, platz, anzahl, false, boss);
+    const zeile = (name, a, b) => `<tr><td style="padding:1px 8px 1px 0; color:#9aa0b5;">${name}</td>`
+      + `<td style="padding:1px 8px 1px 0; text-align:right; color:#7fd88f; font-variant-numeric:tabular-nums;">${fmt(a)}</td>`
+      + `<td style="padding:1px 0; text-align:right; color:#8a8fa3; font-variant-numeric:tabular-nums;">${b > 0 ? fmt(b) : '–'}</td></tr>`;
+    return `<div class="bmeta" style="margin-top:6px; border-top:1px solid rgba(255,255,255,0.08); padding-top:6px;">
+      <div style="margin-bottom:3px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#e0a548;"></i><strong>Deine Beute</strong> · Platz ${platz} von ${anzahl} (${Math.round(share*100)} % der Kraft)</div>
+      <table style="border-collapse:collapse; font-size:11px;">
+        <tr><td></td><td style="padding:0 8px 2px 0; text-align:right; color:#7fd88f;">Boss fällt</td><td style="padding:0 0 2px; text-align:right; color:#8a8fa3;">überlebt</td></tr>
+        ${zeile('Kredite', faellt.credits, bleibt.credits)}
+        ${zeile('Kampfpunkte', faellt.battlePoints, bleibt.battlePoints)}
+        ${zeile('Erfahrung', faellt.xp, bleibt.xp)}
+        ${zeile('Erz', faellt.resources.erz, bleibt.resources.erz)}
+        ${zeile('Kristalle', faellt.resources.kristalle, bleibt.resources.kristalle)}
+        ${zeile('Deuterium', faellt.resources.deuterium, bleibt.resources.deuterium)}
+        ${zeile('Antimaterie', faellt.resources.antimaterie, bleibt.resources.antimaterie)}
+        ${zeile('Modulfragmente', faellt.fragments, bleibt.fragments)}
+      </table>
+    </div>`;
+  }
+
   function renderAllianceRaidBox(){
     const box = document.getElementById('allianceRaidBox');
     // SPIELER-REPORT Sascha (05.08.2026): "der die Dropdown-Funktion geht nicht - du klickst sie
@@ -46275,7 +46392,14 @@
       // Die Kampfregel des naechsten Bosses VOR dem Ausrufen (02.08.2026) - eine Schwaeche, die
       // man erst nach der Welle erfaehrt, kann die Allianz nicht einplanen, und genau das
       // Einplanen ist der Zweck der Bosse.
-      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${gewaehlterBoss.icon}" aria-hidden="true" style="margin-right:3px;"></i><strong>${gewaehlterBoss.name}</strong> – ${gewaehlterBoss.trait} <span style="color:#9fe1f5;">Beute: ${bossBeuteText(gewaehlterBoss)}.</span></div>`;
+      // ENTDOPPELT (22.08.2026, Auftrag Sascha "weniger text"). Gemessen stand im Zustand "kein
+      // Raid" der Bossname DREIMAL sichtbar - Kopfzeile, diese Zeile, und das geschlossene
+      // Auswahlfeld, das seine gewaehlte Option anzeigt -, der Beutetext zweimal. Hier bleibt
+      // deshalb nur die KAMPFREGEL: Sie steht nirgends sonst, und genau sie muss die Allianz vor
+      // dem Ausrufen einplanen koennen.
+      // Der Beutetext bleibt nur, wenn es KEIN Auswahlfeld gibt - ein einfaches Mitglied sieht
+      // keins, und ohne diese Ausnahme waere die Auskunft fuer es ersatzlos weg.
+      html += `<div class="bmeta" style="margin-bottom:8px; color:#e0a548;"><i class="ti ${gewaehlterBoss.icon}" aria-hidden="true" style="margin-right:3px;"></i>${gewaehlterBoss.trait}${canLead ? '' : ` <span style="color:#9fe1f5;">Beute: ${bossBeuteText(gewaehlterBoss)}.</span>`}</div>`;
       if (canLead){
         html += `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><select id="raidBossSelect" data-keep-value="raidBoss" style="font-size:12px; flex:1 1 200px; min-width:0;">${bossOptions}</select><select id="raidDurationSelect" data-keep-value="raidDuration" style="font-size:12px;">${durOptions}</select><button data-start-alliance-raid ${restartCdLeft>0?'disabled':''}><i class="ti ti-alert-triangle" aria-hidden="true" style="margin-right:4px;"></i>${restartCdLeft>0?'Bereit in '+fmtDuration(restartCdLeft/1000):'Raid ausrufen'}</button></div>`;
       } else {
@@ -46385,6 +46509,7 @@
       box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:rgba(226,75,74,0.4);">${hpBarHtml}
         <div class="bname"><i class="ti ti-rocket" aria-hidden="true" style="color:#e24b4a;"></i> Verband unterwegs <span class="lvl-pill">${fmtDuration(remainArr/1000)}</span></div>
         <div class="bmeta">${doc.dispatch.participantCount} Kommandanten, ${fmt(doc.dispatch.totalShips)} Schiffe, ${fmt(doc.dispatch.totalPower)} Angriffskraft - trifft geschlossen am Ziel ein.</div>
+        ${allianceRaidVorschauHtml(doc)}
       </div>`;
       return;
     }

@@ -4647,11 +4647,12 @@ lehrreichste:**
     übersehen) – nur umgekehrt gefährlich: Dort wird ein Fund zu Unrecht verworfen, hier meldet
     das Werkzeug Sauberkeit, wo keine ist.
 
-## Vorarbeit: die Belohnungsvorschau des Allianz-Raids IST rechenbar (gemessen 21.08.2026)
+## Die Belohnungsvorschau des Allianz-Raids (22.08.2026)
 
 Auftrag Sascha: „allianz raid deutlich optisch aktraktiver gestalkten weniger text und vsl.
-belohnungen einblenden." Die Etappe ist noch nicht gebaut; hier steht nur, was die Vorabmessung
-ergeben hat – **und sie widerlegt meine eigene erste Einschätzung.**
+belohnungen einblenden." **Gebaut am 22.08.2026**; der Abschnitt darunter ist die Vorabmessung
+vom 21.08., die die Etappe möglich gemacht hat – **sie widerlegt meine eigene erste
+Einschätzung.**
 
 Notiert hatte ich, eine exakte Vorschau sei unmöglich, weil die Belohnung am Platz ALLER
 Teilnehmer hängt. Gemessen stimmt das nicht: `ranking` wird **beim Abflug** gebildet und nach
@@ -4681,6 +4682,67 @@ Zeilen; darin stehen elf Erklär-Blöcke mit zusammen ~1.100 Zeichen Prosa. Die 
 der Beitritts-Hinweis („Wer beitritt, lässt seine Flotte erst zur Allianzbasis fliegen…", 126) und
 die Verband-Zusammenfassung (167). Wer hier kürzt, prüft vorher jede Zeile gegen die
 TX-Muster – Muster 1 und 4 dürfen weg, jede ZAHL bleibt.
+
+### Was daraus gebaut wurde – und die vier Funde dabei
+
+**Entschieden von Sascha (22.08.2026): Frontend-Kopie mit Paritätstest**, nicht ein Serverfeld. Die
+Abwägung wurde vorher gemessen statt geschätzt, und die Messung hat sie deutlich verschoben: Die
+**teure Hälfte der Kopie gibt es längst** – `ALLIANCE_RAID_BOSSE` mit `beuteMult`/`schwerpunkt`
+steht in beiden Repos und wird von `test_raid_bosswahl` schon Feld für Feld verglichen. Neu
+hinzugekommen sind nur EINE Zahl (`ALLIANCE_RAID_RANK_SPREAD = 0.9`) und drei Funktionen. Dazu kam
+die Lage: Ein Serverfeld hätte einen Backend-Deploy gebraucht, und der hing zu dem Zeitpunkt seit
+zehn Stunden (Ausfall Nr. 9).
+
+**Die Vorschau ist ein PAAR, kein Schätzwert mit Spanne.** Nach dem Abflug ist von den sechs
+Eingaben der Formel genau EINE offen – ob der Boss fällt. Beide Werte sind exakt. Sie steht
+deshalb im `enroute`-Zweig und nicht in der Sammelphase: `/checkdispatch` friert die Rangliste
+beim Abflug ein, und dieselbe Liste liest später `/claim` für den Platz. Vorher stünde dort eine
+Zahl, die sich noch ändert.
+
+**Wer nicht mitgeflogen ist, sieht NICHTS statt einer Null** – dieselbe Entscheidung wie bei der
+Weltlage-Zeile: Gibt es nichts zu sagen, wird nichts gesagt. Ebenso bei einem Dokument ohne
+`ranking` (älterer Server).
+
+**Vier Funde beim Bauen, jeder gemessen:**
+
+1. **Meine eigene Notiz über den Textumfang war falsch.** Hier stand „elf Erklär-Blöcke mit
+   zusammen ~1.100 Zeichen Prosa". Sauber gemessen – HTML-Tags und `${…}`-Ausdrücke entfernt,
+   Kommentare raus – sind es **6 Sätze mit 430 Zeichen**. Die alte Zahl stammte von einem
+   Extraktor, der Code für Prosa hielt. **Ein Messwerkzeug, das die falsche Größe misst, ist
+   schlimmer als keins** – es liefert eine Zahl, die man später glaubt.
+2. **„Zu viel Text" war die DOPPLUNG, nicht die Menge.** Im Zustand „kein Raid" stand der
+   Bossname **dreimal** sichtbar (Kopfzeile, Regelzeile, geschlossenes Auswahlfeld, das seine
+   gewählte Option anzeigt) und der Beutetext **zweimal**. Die Regelzeile trägt jetzt nur noch die
+   KAMPFREGEL – sie steht nirgends sonst, und genau sie muss die Allianz vor dem Ausrufen
+   einplanen können. Gemessen: `textContent` 526 → 483 Zeichen. **Das ist ehrlich wenig**, und der
+   Grund gehört dazu: Der Großteil des scheinbaren Textes sind die **eingeklappten**
+   Auswahl-Optionen, die `textContent` mitzählt und der Spieler gar nicht sieht.
+3. **Die Ausnahme, die eine stille Verschlechterung verhindert:** Ein einfaches Mitglied sieht
+   **kein** Auswahlfeld. Ohne Sonderfall wäre ihm die Beute-Auskunft ersatzlos genommen worden –
+   der Beutetext bleibt dort deshalb stehen (`test_raid_vorschau` 5-vorab/5a, beidseitig grün und
+   genau deshalb ein Beleg).
+4. **Die zwei Konstanten heißen NICHT gleich:** vorne `ALLIANCE_RAID_BOSSE`, hinten
+   `ALLIANCE_RAID_BOSSES`. Mein Paritätstest suchte einen Namen für beide Seiten und fand die
+   Backend-Tabelle nicht. Wer hier greppt, greppt zweimal.
+
+**Und ein Fehlgriff, den die `count != 1`-Wache abgefangen hat** (Hausregel 16): Die Zeile
+„…Angriffskraft – trifft geschlossen am Ziel ein." steht **zweimal** in der Datei – einmal im
+Raid, einmal im **Musterangriff**. Zwei verschiedene Mechaniken mit demselben Wortlaut. Ohne die
+Wache hätte ich die Vorschau in den Musterangriff geschrieben; die Ersetzung ist seither auf den
+Block von `renderAllianceRaidBox` gescopt (Regel 39).
+
+**Die Wächter:** `tests/test_raid_belohnung_paritaet.js` (10 Prüfungen) führt BEIDE Fassungen aus
+und rechnet sie über ein Raster aus Stufe, Anteil, Platz, Teilnehmerzahl, Ausgang und allen fünf
+Bossen gegeneinander – **1.800 Kombinationen, null Abweichung**. Verglichen werden ZAHLEN, nicht
+Text: Ein Textvergleich schlüge an jeder Kommentaränderung fehl und wäre eine Momentaufnahme
+(Regel 3). Gegenprobe mit `ALLIANCE_RAID_RANK_SPREAD` auf 0,8: genau `2a` fällt, mit
+`{"front":{"credits":284},"back":{"credits":299}}`.
+
+`tests/test_raid_vorschau.js` (15 Prüfungen) misst am gerenderten Spiel. Sein Kern ist `2a`: Die
+zwei Spalten müssen **verschiedene Zahlen** nennen – eine Vorschau, deren beide Hälften gleich
+sind, sagt nichts aus, und eine Prüfung auf „das Wort Beute steht da" wäre in beiden Fällen grün
+(Regel 61). Gegenprobe gegen `origin/main`: **8 rot bei identischer Prüfliste** (per `diff`
+verglichen, nicht gezählt – Regel 60).
 
 ## Das Bild bleibt still, wenn sich Unsichtbares darüber ändert (21.08.2026)
 
