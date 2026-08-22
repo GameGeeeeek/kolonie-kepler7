@@ -4228,6 +4228,158 @@ Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektl
 und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
 geschrumpft.
 
+## Etappe D: Protomaterie bekommt Abnehmer (21.08.2026)
+
+Der Befund, aus dem die Etappe entstand, ist derselbe wie beim Kausalitätsbrecher: **Protomaterie
+war eine reine EINMALZAHLUNGS-Währung.** Zwei Fabriken, die Mega-Ausbaustufen — wer die durch hatte,
+hatte für den Bergbau keinen Grund mehr. Eine Ressource ohne wiederkehrenden Abnehmer ist kein
+Wirtschaftskreislauf, sondern eine Checkliste.
+
+**Fünf Posten, und die Reihenfolge ist Absicht:**
+
+| | Posten | gemessen |
+|---|---|---|
+| D1 | Lagerdeckel je Aufbereitungsanlage 100 → 150 | Deckel 2.500 → 3.500 |
+| D2 | Mega-Ausbaustufen-Anteil 400 → 600 | bleibt bei 17 % des Speichers statt 16 % |
+| D3 | Orbitalstation Stufe 8 als erste **direkte** Proto-Stufe | 60 je Standort, über elf Standorte 660 = 26–78 Stunden |
+| D4 | **Urmaterie-Koloss** — der erste wiederkehrende Abnehmer | 30 Protomaterie je Schiff |
+| D5 | Schürfer-Faktor: volle Ausbeute erst ab 10 Schürfschiffen | schließt die Ein-Schiff-Pendelroute |
+
+**D1 steht bewusst VORNE** (Regel 57): Der Lagerdeckel ist die Schranke, an der jede Proto-Senke
+hängt — er wird angehoben, *bevor* unten neue Abnehmer dazukommen. Und angehoben wird die
+**Stufenrate**, nicht die Basis, damit der Zuwachs am Ausbau der Aufbereitungsanlage hängt statt
+geschenkt zu sein. D2 zieht im Gleichschritt nach, sonst verschöbe sich still das Verhältnis
+„der Betrag lässt sich ansparen".
+
+**D5 ist eine Behebung, kein Balance-Schritt.** Die Protomaterie je Fuhre hängt allein an der
+GRÖSSE des Vorkommens, nie an der Ladung — eine Fuhre mit EINEM Schürfschiff brachte deshalb exakt
+so viel wie eine mit fünfzig. Wer Flottenplätze hatte, konnte sie in lauter Ein-Schiff-Pendelrouten
+zerlegen und die Ausbeute vervielfachen, ohne je eine Bergbauflotte zu bauen. Drei Entscheidungen
+dabei, jede gegen einen naheliegenden Fehler:
+
+- **Keine Skalierung ÜBER der Schwelle.** Der feste Fuhren-Charakter bleibt; sonst wäre die
+  Protomaterie plötzlich mengenskaliert und liefe genau in die Falle aus Regel 41.
+- **Gezählt werden echte Schürfschiffe, nicht `MINE_SHIP_KEYS`.** Dort stehen auch die drei
+  Frachter — zehn Frachter mit einem Schürfschiff wären wieder dieselbe Pendelroute.
+- **Der Faktor steht IN `protoJeFuhre`, nicht an ihren zwei Aufrufstellen.** Vorschau und
+  Missionsstart dürfen nicht auseinanderlaufen; `test_protomaterie` 6c hat genau diese Dopplung
+  schon einmal gefangen.
+
+### Der Urmaterie-Koloss — und die acht Stellen, an denen er nicht existierte
+
+`atk:250`, Frachtraum 2.000, Bauzeit 30 Minuten, `defWeight:1.8`, Punktegewicht 175, hinter
+`rkausalanker`; Kosten 30 Protomaterie + 8 Hohlraumgitter + 6 Kausalanker. Die Kosten sind
+**gemessen**, nicht aus dem Konzept übernommen (Regel 41): gegen die gefittete Preiskurve der
+Kampfschiffe, nicht gegen das Gefühl.
+
+**Der eigentliche Inhalt dieses Abschnitts ist aber der Fund.** Ein Schiff lebt in diesem Projekt an
+**16 Stellen**, verteilt über zwei Repos — gemessen, nicht geschätzt: zehn im Frontend, sechs im
+Backend. Beim Anlegen waren **acht** davon gepflegt, alle im Frontend (Icon, Rumpfzeichnung,
+Kostenfunktion, `SHIP_DEFS`, `CARGO_PER_SHIP`, `COUNTER_ROLE_OF`, `COUNTER_ROLE_ATK`,
+`SHIP_SCORE_WEIGHTS`). Die **acht fehlenden** sind genau die, in denen ein fehlender Eintrag still
+0 oder einen falschen Vorgabewert ergibt — der Koloss wäre baubar gewesen und im Kampf auf beiden
+Seiten nicht vorhanden:
+
+| Tabelle | Repo | ohne Eintrag |
+|---|---|---|
+| `ATTACK_SHIP_KEYS` | Frontend | nicht mitwählbar für Angriff, Eskorte, Expedition, Abbau |
+| `attackPowerRaw` | Frontend | trägt **0** Angriff bei |
+| `rawFleetPower` | Backend | trägt **0** Angriff bei (PvP) |
+| `SHIP_ATK_VALUES` | Backend | **0** in Verteidigung UND `fleetShieldSum` — ohne Vorgabewert |
+| `SHIP_DEF_WEIGHTS` | Backend | Vorgabegewicht 1 statt 1,8 |
+| `COUNTER_ROLE_ATK` | Backend | zählt nicht in die Flottenbalance |
+| `COUNTER_ROLE_OF` | Backend | Werftmarken-Schild 0,03 statt kapital 0,04 |
+| `SHIP_SCORE_WEIGHTS` | Backend | Punktestand seiner Besitzer zu niedrig |
+
+**Warum `test_angriffssumme` das nicht melden konnte, ist die Lehre:** Er leitet seine Erwartung aus
+`ATTACK_SHIP_KEYS` ab — und dort fehlte der Koloss ebenfalls. Er fiel damit durch **beide** Netze
+desselben Wächters. Gemeldet hat ihn erst `test_eskorte_schiffe` 3 von der anderen Seite. Zwei der
+acht (`SHIP_ATK_VALUES`, `SHIP_DEF_WEIGHTS`) hat **gar kein Test** gefunden — die fielen erst beim
+Durchgehen aller Tabellen auf, die eine Schiffsklasse führen.
+**Übertragbar: Ein Wächter, der Soll und Ist aus DERSELBEN Liste zieht, ist blind für eine Lücke in
+genau dieser Liste.** Wer eine neue Schiffsklasse anlegt, zählt sie in beiden Repos nach —
+`grep -c "<schluessel>"` muss **10** im Frontend und **6** im Backend ergeben.
+
+**Zwei Klassen sind bewusst NICHT ergänzt worden**, obwohl derselbe Durchgang sie als „fehlend"
+zeigte: `mondzerstoerer` fehlt in `SHIP_ATK_VALUES`/`SHIP_DEF_WEIGHTS` als **dokumentierte Absicht**
+(der Backend-Kommentar sagt, ihn aufzunehmen „wäre eine ungewollte Änderung der PvP-Kampfkraft"),
+und `kausalitaetsbrecher` fehlt in `SHIP_DEF_WEIGHTS`/`SHIP_SHIELD_EXPLICIT`. Das zweite ist ein
+kleiner Bestands-Balancefall (Vorgabe 1 statt 1,8 bzw. 170 statt 120) — gemessen, benannt, und
+ausdrücklich **nicht** nebenbei geändert: Eine PvP-Zahl im Vorbeigehen zu verschieben ist genau die
+unbestellte Zweitänderung aus dem Schiffskosten-Nachtrag.
+
+### Frachtraum UND Angriff: die erste Ausnahme von „Frachter kämpfen nicht"
+
+`KAMPF_SHIP_KEYS` leitete sich seit v8.497.0 als „alles aus `ATTACK_SHIP_KEYS` außer den Frachtern"
+ab. Gemessen tragen alle drei Frachter `atk:0` — die Gleichsetzung „hat Frachtraum" = „kämpft nicht"
+war also nie eine Annahme, sondern ein Messwert. Der Koloss ist der erste Rumpf, für den sie nicht
+mehr gilt.
+
+**Sascha hat die Hybrid-Fassung gewählt** (drei Optionen vorgelegt: Hybrid behalten, Frachtraum
+streichen, Angriff streichen). Umgesetzt datengetrieben statt als Namensliste:
+
+```js
+function schiffTraegtAngriff(key){ const d = SHIP_DEFS.find(s => s.key === key); return !!(d && d.atk > 0); }
+const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS.filter(k => !CARGO_SHIP_KEYS.includes(k) || schiffTraegtAngriff(k));
+```
+
+Reihenfolge vorher **gemessen**, nicht geschätzt (Regel 38): `SHIP_DEFS` bei Zeichen 2.771.655,
+`KAMPF_SHIP_KEYS` bei 2.859.336 — die Ableitung ist gedeckt. Ein zweiter solcher Rumpf erbt die
+Ausnahme automatisch.
+
+**Beide Wächter sind dadurch STÄRKER geworden, nicht nachgiebiger** (Regel 43). Das ist der Punkt,
+an dem eine Ausnahme zur Lockerung verkommen kann: Ohne die Gegenrichtung hätte man den Koloss
+später aus der Angriffssumme nehmen können, und niemand hätte es bemerkt.
+
+- `test_angriffssumme` teilt die Frachter jetzt datengetrieben in **bewaffnet** und **unbewaffnet**
+  (`atk` aus dem `SHIP_DEFS`-Block gelesen) und verlangt für die bewaffneten ausdrücklich, dass sie
+  in der Summe UND in `KAMPF_SHIP_KEYS` stehen — die neuen Zeilen 1 und 2b.
+- `test_flotte_v8375` 3 prüfte die Ableitung **Zeichen für Zeichen als Regex** und fiel damit auf
+  völlig korrektem Code durch (Regel 3: eine Momentaufnahme statt der Eigenschaft). Geprüft werden
+  jetzt die drei Bestandteile einzeln; eine handgeschriebene Klassenliste fällt weiterhin auf, eine
+  legitime Erweiterung nicht.
+
+### Zwei eigene Werkzeugfehler, beide vor der Weitergabe gefangen
+
+1. **Ein geratener Exportname.** `tests/lib/spieldatei.js` exportiert `SERVER_JS`, nicht
+   `SERVERDATEI` — der geratene Name lief in einen `TypeError`. Regel 4, und die Umgebung sagt es,
+   wenn man sie liest.
+2. **Ein geratener Endanker beim Schneiden von `COUNTER_ROLE_OF`/`COUNTER_ROLE_ATK`.** Der zu große
+   Ausschnitt ließ mich schließen, der Kausalitätsbrecher sei eine „Rolle ohne Gewicht" — ein
+   Befund, der schon fast weitergegeben war. Über die echte Klammertiefe nachgemessen sind beide
+   Tabellen vollständig konsistent, und der Kausalitätsbrecher steht in **keiner** von beiden.
+   Wörtlich der Abschnitt „Ein GERATENES Fenster ist kein Scope" — zum dritten Mal innerhalb weniger
+   Tage, und nur das Nachrechnen VOR dem Weitergeben hat den Fehlalarm verhindert (Regel 10).
+
+### Der Rebase-Moment — und die Warnzeile, die diesmal gelesen wurde
+
+Beim Start des vollen Laufs meldete Pflichtprüfung 5: *„Backend-Klon auf Höhe von origin/master,
+aber origin/master ist alt (geholt vor 20,7 Stunden)."* Der Nachtrag vom 17.08.2026 zu Regel 22
+beschreibt genau diesen Fall — dort stand die Warnung ebenfalls in Zeile fünf des Protokolls, und
+der Lauf fiel zwanzig Minuten später. Diesmal ist sie **direkt nach dem Start** gelesen und der Lauf
+sofort gestoppt worden (Regel 14/17); ein `git fetch` zeigte:
+
+- **Backend vier Commits weiter** (#155, #156, #158, #159) — darunter #156 „Flottenverteidigung:
+  vier Abweichungen zum Frontend angeglichen", also mitten im eigenen Bereich.
+- **Frontend sieben Commits weiter**, vier davon mit Versionsnummer (v8.601.0 – v8.604.0).
+
+Gemessen statt vermutet: #156 fasst die **Funktionen** an (`fleetShieldSum`,
+`weightedFleetDefensePower`), nicht die Tabellen-**Definitionen** — beide Änderungssätze liegen in
+verschiedenen Zeilen, der Rebase lief in beiden Repos konfliktfrei. Danach beide Seiten belegt
+(Nachtrag zu Regel 13): vier fremde Patchnotes vorhanden, sechs eigene Marken im Backend vorhanden,
+und der
+eigene Änderungssatz gegen `origin/main` enthält nichts als Etappe D.
+
+**Die Lehre ist nicht neu, aber sie hat diesmal getragen:** Ein 50-Minuten-Lauf gegen einen
+veralteten Nachbarn ist nicht bloß langsam, er ist für jede Paritätsprüfung **wertlos** — und die
+einzige Stelle, an der man das rechtzeitig sieht, ist Zeile fünf des Protokolls.
+
+Wächter dieser Etappe: `tests/test_protomaterie.js` (Schürfer-Faktor, Vorschau-Parität),
+`tests/test_orbital_tier3.js` (Stufe 8), `tests/test_schiffskosten.js` (der Koloss in der
+Preiskurve), `tests/test_angriffssumme.js` und `tests/test_flotte_v8375.js` (die Hybrid-Regel),
+dazu `test_eskorte_schiffe`, `test_konter_paritaet`, `test_paritaet_tabellen` und `test_werftmarken`
+für die Backend-Parität.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
