@@ -292,8 +292,29 @@ check('2: ohne Enterschiff keine Chance', K.boardingChance({}, 100) === 0);
   // gar nicht gewuerfelt wurde, und seine Erklaerung ("X Versuche gescheitert") waere gelogen.
   check('7: eine entfallene Enterphase zählt nicht als Enterversuch',
     /if \(enterung && enterung\.grund !== 'nicht_dabei'\) state\.boardAttempts/.test(src));
-  check('7: die Angriffs-Vorschau warnt vor dem Start, wenn kein Enterschiff mitfliegt',
-    /\} else if \(ownsEnterschiffe\(\)\)\{/.test(src) && /ohne sie entfällt die Enterphase/.test(src));
+  /* MITGEZOGEN AM 22.08.2026 (E1b) - und dabei SCHAERFER geworden, nicht passend gemacht.
+     Hier stand die WORTFORM `} else if (ownsEnterschiffe()){`, also die Schreibweise, in der die
+     Warnung damals inline im Galaxie-Reiter stand. Seit E1b liegt die Enterzeile in
+     npcEnterZeileHtml() - der Zweig ist ein frueher return statt eines else-if, und die Pruefung
+     fiel auf voellig korrektem Code durch (Arbeitsregel 3: die REGEL pruefen, nicht die
+     Momentaufnahme).
+     Der eigentliche Punkt ist, dass sie damit eine VERBESSERUNG als Fehler gemeldet hat: Bis E1b
+     gab es diese Warnung ausschliesslich im Galaxie-Reiter; wer ueber die Karte angriff, bekam sie
+     nie zu sehen. Geprueft wird deshalb jetzt die Eigenschaft UND ihre Reichweite. */
+  check('7: die Warnung haengt an ownsEnterschiffe() und nennt die Folge',
+    /ownsEnterschiffe\(\)/.test(src) && /ohne sie entfällt die Enterphase/.test(src));
+  {
+    const n = (src.match(/ohne sie entfällt die Enterphase/g) || []).length;
+    check('7: und es gibt sie an genau EINER Stelle', n === 1, { stellen: n });
+  }
+  // Die Reichweite: BEIDE Anzeigestellen binden dieselbe Zeile ein - die Kartenvorschau
+  // (npcVorschauHtml) und die NPC-Karte des Galaxie-Reiters. Vor E1b kannte nur letztere sie.
+  {
+    // AUFRUFE zaehlen, nicht die Definition: `function npcEnterZeileHtml(L){` enthaelt denselben
+    // Text und wuerde als dritte Einbindung mitgezaehlt.
+    const n = (src.match(/(?<!function )npcEnterZeileHtml\(L\)/g) || []).length;
+    check('7: und beide Angriffs-Vorschauen binden sie ein', n === 2, { aufrufe: n });
+  }
   // Die Hilfe sagte bis v8.301.2 noch, der Prisenhof erscheine "nach der ersten Enterung" - seit
   // v8.301.1 stimmt das nicht mehr. Zweite Anzeigestelle mit der alten Annahme.
   check('7: die Hilfe nennt die aktuelle Sichtbarkeitsregel des Prisenhofs',

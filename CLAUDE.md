@@ -1094,6 +1094,33 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     09.08.2026: Ein roter Test schien dadurch grün gemeldet. Exit-Codes immer ohne Pipe messen
     (Ausgabe in Datei umleiten, `echo EXIT=$?` direkt dahinter) oder `${PIPESTATUS[0]}` nutzen –
     dieselbe Familie wie Regel 15/17: nie ein Messwerkzeug, das sich selbst im Weg steht.
+
+    **Nachtrag 22.08.2026 – dieselbe Familie ohne jede Pipe: eine Kommandosubstitution VOR dem
+    `$?`.** Ein Betroffenheits-Durchgang über 17 Tests meldete „alle grün" und war es nicht –
+    einer war rot. Die Schleife lautete
+
+    ```sh
+    node tests/$t.js > log 2>&1; echo "$(printf '%-32s' $t) EXIT=$?"
+    ```
+
+    Die Substitution `$(printf …)` steht **links** vom `$?`, läuft also während der Expansion
+    zuerst und setzt `$?` auf ihren eigenen Status. **Jedes gemeldete `EXIT=0` war der Status von
+    `printf`.** Weder eine Pipe noch ein `;`-Kommando dazwischen – die bisherigen Formulierungen
+    dieser Regel greifen hier also beide nicht, und genau deshalb ist es durchgerutscht.
+    **Vorgehen:** Der Status wird UNMITTELBAR nach dem Befehl in eine Variable gelesen, bevor
+    irgendeine andere Expansion läuft – danach darf beliebig formatiert werden:
+
+    ```sh
+    node tests/$t.js > log 2>&1
+    rc=$?
+    n=$(grep -cE '^(OK|FAIL) +- ' log)
+    printf '%-32s EXIT=%s Pruefungen=%s\n' "$t" "$rc" "$n"
+    ```
+
+    Zweite Hälfte desselben Vorfalls, beim Vergleich zweier Läufe: `grep -oE '^(OK|FAIL) +- …'`
+    nimmt das VERDIKT mit in den Vergleich – der `diff` meldet dann genau die eine Prüfung als
+    Unterschied, die kippen SOLL, und „identische Prüfliste" ist nie erfüllt. Verglichen wird der
+    reine Prüf-NAME (`sed -E 's/^(OK|FAIL) +- //'`).
 54. **Ein Sicherungs-Patch vor einem Rebase wird mit `git diff HEAD -- datei` gebildet, nie mit
     `git diff -- datei` – und man prüft seine GRÖSSE, bevor man den Arbeitsbaum wegwirft.**
     Vorfall 17.08.2026, beim zweiten Rebase-Zyklus von KB-13: Die CLAUDE.md-Ergänzungen waren nach
@@ -1272,6 +1299,7 @@ Das Skript zieht die Icon-Liste **aus der Spieldatei selbst** (alle `.ti-*:befor
 - Ein einziges `state`-Objekt, per `save()`/localStorage bzw. Server-Sync persistiert
 - Backend-Kommunikation optional (`useBackend()`) – Solo-Modus funktioniert ohne Server, Allianzen/Markt/Weltboss brauchen ihn
 - Geteilter Speicher (Allianzen, Markt, Weltboss) läuft über generische `storageGet/storageSet/storageList`-Aufrufe gegen das Backend, mit Schlüsselpräfixen wie `alliance:<TAG>:...`
+- **Weltboss-Archetypen sind ein Frontend/Backend-PAAR mit separater Reihenfolge-Tabelle** (v8.565.0, fünfter Archetyp „Piratenboss"): `WORLDBOSS_ARCHETYPEN` + `WORLDBOSS_ARCHETYP_FOLGE` in der Spieldatei spiegeln `WORLDBOSS_ARCHETYPES_PLAYABLE` + `WORLDBOSS_ARCHETYPE_FOLGE` in `server.js` – der Kampf wird serverseitig gerechnet, die Boss-Karte zeigt nur an; laufen die beiden auseinander, verspricht die Vorschau andere Faktoren, als der Kampf benutzt. Die Reihenfolge steht bewusst NICHT als nacktes Modulo über der Archetypen-Tabelle: Der Bossname läuft im Fünferzyklus, und die Paarung Name×Archetyp soll sich erst nach 20 Stufen wiederholen (kgV-Argument als Kommentar an der Tabelle; ein fünfter Archetyp im `% length` hätte den Zyklus von 20 auf 5 einbrechen lassen – die Erweiterung hätte die Abwechslung geviertelt, obwohl sie eine Variante HINZUFÜGT). Wer einen Archetyp ergänzt: BEIDE Tabellen und BEIDE Folgen erweitern, Paar-Periode ≥ 20 halten, HP nicht anfassen (die Belohnung hängt an der Stufe, ein zäherer/dünnerer Boss verschöbe still die Belohnungsrate). Der Galaxie-Nachrichten-Boss (`WORLD_BOSS_ARCHETYPES` in `server.js`, `spawnWorldBoss`) ist ein DRITTER, eigener Satz mit `hpMult`/`durH` – sein `trait`-Text landet wörtlich in der Galaxie-Nachricht und muss beschreiben, was diese zwei Werte wirklich tun (der erste Entwurf des Piraten-Traits erfand „Agilität" und „Flankenfeuer", zwei Mechaniken, die es nicht gibt). Wächter: `tests/test_inhalt_v8373.js` – Deckungsgleichheit über 60 Stufen, „jeder Tabelleneintrag kommt im Stufenlauf vor", Paar-Periode frühestens 20.
 - Rendering: kein virtuelles DOM, direktes `innerHTML`-Neuschreiben pro Box, getriggert vom Haupt-Tick (1×/Sekunde) und bei Nutzeraktionen
 - **Die Sektoren-Karte ist seit KB-4 (16.08.2026, Auftrag Sascha: „Es soll nur noch die Sektoren Modus Karte geben") die EINZIGE Karte.** Feste Ansichten: Übersicht (8 Regionen, `SEKTOR_DEFS`/`sektorVon`) → Sektoransicht (`sektorAnsichtBauen`, daumengroße Plätze) → aufgeklapptes System. Die frühere Freiflug-Zeichnung in `buildGalaxyMap` ist **nicht tot** – sie ist der Renderer der GEÖFFNETEN Systemebene (`galaxyOpenSystem`) samt Zoom/Pan, Kartenmenü, Routen, Territorien, Wurmloch, Frontsegmenten. Die Einstellung `uiSektorKarte` existiert nicht mehr (altes Feld im Spielstand ist inert). Knoten-Extras (Abzeichen, Fraktions-Wappen/-Ring, Kontroll-Ring, Kollaps, Randkriege-Balken) kommen für BEIDE Renderer aus `karteSystemBadges()`/`karteFrontStand()` – wer dort etwas ergänzt, versorgt automatisch beide (Regel 44). Seit KB-5 zeigt die Übersicht je Region die aggregierten Hinweis-Icons ihrer Systeme (`data-sektor-hinweise`, Tooltip nennt das System), und das 🔎-Abzeichen der Sektoransicht trägt die stärkste bekannte Verteidigung (`data-kb-intel-dp`, Farbcodierung wie am Spieler-Marker: cyan frisch, grau veraltet, amber entdeckt). Die Frontsegmente der Randkriege sind seit KB-5b ersatzlos entfernt (sie waren für die Galaxie-Übersicht gebaut und müllten die Systemebene zu – Spieler-Report mit Screenshot); die Front lebt am Kontrollbalken der Sektoransicht. Mit KB-6 ist die GESAMTE Galaxie-Kulisse aus der Systemebene raus (Territoriums-terrGlow-Flächen, Spiralarm-Deko, Galaxie-Zentrum, Wurmloch-Linie – zweiter Spieler-Report „Immernoch die alte Ansicht"): Die Systemebene zeigt nur noch Raum, Sternenfeld, Sonne/Planeten/Marker und die Nachbar-Punkte; NPC-Besitz = Ring+Wappen der Sektoransicht, Wurmloch = 🌀-Abzeichen an beiden Endpunkten (karteSystemBadges). KB-7 („Karte fährt nach unten", am Messprotokoll nachvollzogen): Das mobile Scroll-Ziel beim System-Öffnen ist der KARTENKASTEN, nicht mehr die Tafel; galaxyOeffne stellt die Kastenhöhe VOR der Kamera-Zielberechnung um; galaxyCamFahre(sofort) springt aus Sektor-Ansichten (Fahrt nur System→System), galaxySchliesse bricht die Fahrt ab; der „fokussierte Start-Ausschnitt" (galaxyMapFocused) ist entfernt – er kaperte seit KB-4 das erste geöffnete System. galaxyCamTarget hat eine Mindesthöhe von 190 Einheiten (KB-7c) – auf breiten PC-Kästen wäre h=w×Verhältnis kleiner als die ~135 Einheiten der Systemebene und die Ansicht massiv überzoomt; breite Kästen zeigen stattdessen seitlich mehr Nachbarschaft. Mit KB-8 (17.08.2026, Auftrag Sascha: „entferne die asteroiden gürtel … jedes system Durchklicken") sind die Gürtelansicht (KB-3) und die frei liegenden Gürtel-Felder der Sektoransicht ersatzlos entfernt – Asteroiden leben NUR noch im aufgeklappten System (buildMap, `data-map-asteroid`; das Kartenmenü `asteroidMapMenu` zeigt Sorte, Vorrat und Schürfrecht), das Gürtelsystem markiert der gestrichelte goldene Ring + „Gürtelsystem"-Untertitel am Systemknoten (`istGuertelSystem` bleibt in Gebrauch). Bewusst entfallen sind die Dauer-Anzeige freier Plätze („X von 10 belegt") und der immer sichtbare Vorrats-Balken – im Patchnote ehrlich benannt (Regel-44-Inventar aus dem Workflow-Bericht). KB-8b: `sektorAnsichtBauen` errechnet eine adaptive Breite `W = clamp(400..1200, H·Kastenverhältnis)` – am PC füllt die Sektoransicht den Kasten, am Handy bleibt W exakt 400; Spalten, Spiegelung, Titel/Fußzeile und ›-Knopf skalieren mit W. Wächter: `tests/test_sektorbreite.js` (Erwartung aus dem GEMESSENEN Kastenverhältnis) und `tests/test_guertel_im_system.js` (Ersatz für den entfernten `test_guertelansicht.js`). KB-9 (17.08.2026, Auftrag Sascha „bessere bedienbarkeit … steckt im zoom einige sekunden … system nach system durchsucht"): (a) Der Zoom-Hänger war NICHT die Karte – die zwei Deko-NEBEL des Seitenhintergrunds komponierten sich 30×/s als Vollbild-Verläufe und belegten gemessen ~89 % des Hauptthreads (Ausschluss-Messung; Details Regel 48). Sie liegen seit KB-9a als vorgerenderte Kacheln auf einer eigenen Leinwand `#bgnebel` UNTER `#bgstars`, die nur bei geändertem 6-px-quantisiertem Drift-Versatz neu gemalt wird (`nebelZeichnen`); Wächter `tests/test_hintergrund_maler.js` (createRadialGradient-Zählhaken, BEWUSST auf die zwei Leinwände gescopt – ungescopt zählte er die legitimen 40-px-Mini-Icon-Maler mit und fiel auf korrektem Code durch). (b) System-Blättern ohne Zurück-Knopf (KB-9b): ‹ ›-Overlay-Knöpfe direkt am Kartenkasten (`galaxySysPrev/NextBtn`, Sichtbarkeit über `updateGalaxyBackButton`), und BEIDE Knopfpaare (Karte + Tafel-◀/▶) blättern in EINER geografischen Reihenfolge `karteSystemReihenfolge()` (Sektor für Sektor, innerhalb Nord→Süd/West→Ost; vorher Spiral-Layout-Ordnung, die kreuz und quer sprang). Wer Tests baut, die per ▶ zu einem BESTIMMTEN System navigieren: Spielerweg über `tests/lib/karte.js` nehmen, nie Klickzahlen der Reihenfolge (genau daran fiel `test_systemstatus` 3 – ein ▶-Klick war dort als „führt nach vega" verdrahtet). Die Ebenen-Leiste wirkt und erscheint auch in der Sektoransicht; nur der Routen-Knopf gehört der Systemebene (dort verborgen = keine Falschaussage). `galaxyOeffne` merkt sich die Region des Systems – jeder Sprung (Suchfeld, Berichte-Knöpfe, Allianz) landet beim Schließen in der richtigen Sektoransicht. KB-10 (17.08.2026, Video-Report „Immernoch schlecht bedienbar am Handy"): Die Kastenhöhe der OFFENEN Systemebene folgt am Hochformat der Kastenbreite (`kbSystemKastenHoehe()` = clamp(230..420, Breite×0,6), EINE Helferfunktion für galaxyOeffne UND Tick-Pfad) – die feste 420px-Höhe war bei ~135 Einheiten Inhalt zu ~70 % toter Raum (gemessen: Kamera 410×495 Einheiten am 390er-Viewport). Und das KB-7-Scroll-Ziel zieht die Höhe der Sticky-Reiter-Leiste des kompakten Kopfs ab (`.tabs` ist dort position:sticky und verdeckte sonst 118 px Kartenoberkante samt Sonne); test_karte_mobil 2b misst die Schranke seither an der GEMESSENEN Leiste statt als feste Zahl. KB-11 (17.08.2026, dritter Video-Report derselben Runde): Drei Nachwehen von KB-10, alle gemessen – (a) der ›-Blätterknopf (rechts mittig) und der SENKRECHTE Zoomstapel (120 px hoch, rechts unten) überlappten im kompakten Kasten so, dass `elementFromPoint` auf der Knopfmitte `galaxyZoomInBtn` lieferte: Der Knopf war nicht verdeckt, sondern **untippbar**. Der Stapel steht am Handy jetzt WAAGERECHT (`.map-zoom` unter 700 px, `flex-direction:row-reverse`). (b) Die 190er-Kamera-Mindesthöhe aus KB-7c wirkt am schmalen Kasten genau falsch herum – sie vergrößert dort die BREITE und verkleinert die Karte; ersetzt durch `GALAXY_SYSTEM_MAX_SCALE` (2,2 = der Wert, den die alte Regel am PC erzeugte), dazu am Handy ein auf den echten Planeteninhalt eingezogener Ausschnitt (370 statt 410 Einheiten, +11 % Darstellung); die Kastenhöhe folgt jetzt 0,44×Breite (clamp 190..420) statt 0,6. (c) Der KB-10-Scroll lief bei JEDEM `galaxyOeffne` – auch beim Blättern, wo die Karte längst im Bild steht (gemessen: hochgescrollt auf 300, ein ›-Klick sprang auf 843 zurück); er hängt jetzt an `!kbWarOffen`. Wächter: `tests/test_karte_handy_bedienung.js` prüft die Knöpfe per `elementFromPoint` statt auf Sichtbarkeit – **ein Sichtbarkeits-Test hätte diesen Fehler nie gefunden** – und beide Scroll-Richtungen (Blättern ruhig, erstes Öffnen weiterhin zur Karte). Browser-SEITEN-Zoom ist abgestellt (Viewport-Meta `maximum-scale=1`/`user-scalable=no`, `touch-action:manipulation` auf html/body, `gesturestart`-Abfang für iOS) – der Karten-Zoom lebt im Spiel. **KB-12 (17.08.2026, Screenshot-Report „die Karte ist wirklich extrem mini … genauso groß wie die Karte davor"): Am schmalen Kasten wird die SYSTEMZEICHNUNG SELBST umgestellt, nicht mehr nur der Ausschnitt.** KB-10 und KB-11 hatten beide an Kastenhöhe bzw. Skala-Deckel gedreht und beide Male blieb es zu klein – geometrisch zwingend: Die Systemebene zeichnete einen 600×180-Einheiten-STREIFEN (`rx = 42+orbit*43`, `ry = rx*0,3`), und wer davon alle Planeten zeigen will, kann auf 348 px Kastenbreite höchstens 0,85 vergrößern, EGAL wie hoch der Kasten ist (begrenzend ist die Breite, nicht die Höhe). Seit KB-12 liegen die Bahnen am Handy enger und runder (`kbOrbitMass()` = `{30, 18, ry 0,85}` statt `{42, 43, ry 0,3}`) – aus dem Streifen wird ein 364×262-Feld, also die Form eines Hochformat-Bildschirms; gemessen 12 → 20 px Planetendurchmesser, und die zwei äußeren Planeten (Moryth, Draconis) waren vorher am Kastenrand abgeschnitten. `kbOrbitMass()`/`kbOrbitRx()` sind die EINE Quelle für Planetenbahnen, Gürtelbahn (`guertelRx()`, ersetzt die Konstante `GUERTEL_RX`), Peilringe und Orbit-Ringe. Der Kamera-Ausschnitt kommt am Handy aus den TATSÄCHLICH vorhandenen Orbits des Systems (`kbOrbitRx(maxOrbit)+34`, mal `GALAXY_SYSTEM_SCALE`) statt aus dem Maximum – ein System mit drei Planeten wird stärker vergrößert als eines mit acht. **Alle drei Umschaltstellen hängen an `kbSchmalerKasten()` (`window.innerWidth <= 700`, dieselbe Schranke wie die `.map-zoom`-Media-Query und das Scroll-Gate) – auch die Kastenhöhe: 0,78×Breite (clamp 240..480) am Handy, weiter 0,44 (clamp 190..420) am PC.** Die Kastenhöhe bedingungslos umzustellen war der eine Fehler dieser Etappe und hat das Ziehen der Karte am PC getötet (Regel 50). Wächter: `tests/test_kartengroesse.js` misst den Planetendurchmesser in PIXELN auf dem Report-Gerät (390×844) plus die PC-Gegenrichtung. **KB-13 (17.08.2026) ist die Nachwehe von KB-12 und war ein ausgelieferter Fehler:** Die Marker liegen auf EIGENEN Bahnen (`homeSlotXY` Kreis r=50, `npcMarkerXY` Ellipse 78×24), die KB-12 nicht mitgezogen hatte – über alle 77 Systeme gemessen lagen danach 15 von 15 Markern auf einer Planetenscheibe (vorher 0), Mittenabstand 17,1 bei nötigen 22–27,7 Sektor-Einheiten. Seitdem leiten beide Bahnen ihre Maße aus `kbOrbitRx(1)` ab (Faktoren 0,588 bzw. 0,918 – am PC exakt die alten 50 bzw. 78/24 Einheiten; nachgemessen sind dort alle Planetenpositionen byte-identisch), und der Kollisionsschieber, den es bis dahin nur als Einzelkopie an der Heimatbasis gab, ist als `kbMarkerFrei()` die EINE Quelle für Heimatbasis, fremde Spieler und NPCs (Regel 43/52). Er kennt den sichtbaren Markerradius, weil der Boss-Puls-Ring bis r=19 geht; seine zwei Kennzahlen (Mindestabstand, Schrittweite) hängen an `kbOrbitMass().schritt`, sonst schöbe er am Handy über das halbe System. NPC-Namen stehen seither ÜBER dem Marker – unter ihm konkurrierten sie mit den Planetennamen (gemessen: 11 von 15 Systemen). Wächter: `tests/test_kartenmarker.js` prüft Marker×Scheibe und Text×Text auf beiden Formfaktoren und schreibt Text×Scheibe als INFO-Zeile mit (dieser Fall ist älter als KB-12 und hängt an der Textlänge – siehe Regel 53). **KB-14 (18.08.2026, Auftrag Sascha „bedienung über pfeiltasten wenn man am pc ist"): Tastatur-Bedienung der offenen Systemebene** – `←`/`→` blättern durch die Systeme (über `systemNachbarOeffnen`, also dieselbe geografische Reihenfolge wie die ‹ ›-Knöpfe), `+`/`−` zoomen. Der Tastatur-Zoom ruft NICHT eine zweite Kopie der Rechnung, sondern das `zoomBy` des Karten-IIFE, das sich dafür als `galaxyTastenZoom` nach außen meldet (Regel 43). **`↑`/`↓` sind bewusst NICHT belegt**: Sie scrollen die Seite, und unter der Karte steht die Detailtafel, die man bei offenem System liest – wer sie kapert, nimmt dem Spieler genau dann das Scrollen. `←`/`→` scrollen nur waagerecht, wo es auf dieser Seite nichts zu scrollen gibt, kosten also niemanden etwas; dieselbe Abwägung wie beim Mausrad, das nur MIT Strg zoomt. Die Tasten wirken ausschließlich bei OFFENEM System (in den Sektor-Ansichten gibt es kein „nächstes System"), nicht bei gesetztem Strg/Meta/Alt (Browser-Kürzel bleiben) und nicht mit Fokus in `INPUT`/`TEXTAREA`/`SELECT`/contentEditable; das `preventDefault` steht bewusst HINTER diesen Prüfungen, sonst schluckte die Karte fremde Tastendrücke. Die Belegung hängt an keiner Bildschirmbreite – wer eine Tastatur hat, soll sie benutzen können. Auffindbar über den Hilfe-Abschnitt „Karte bedienen (Maus, Finger, Tastatur)" und die Tooltips der ‹ ›-Knöpfe; ein Kürzel, das nirgends steht, gibt es für den Spieler nicht. Wächter: `tests/test_kartentasten.js` – prüft die belegten Tasten UND die Gegenrichtungen (↓ scrollt weiterhin, mit Fokus im Suchfeld blättert nichts, in der Sektoransicht öffnet nichts). **KB-15 (18.08.2026) vervollständigt das: ein SICHTBARER Fokusring auf den Kartenknoten.** Alle drei tastaturerreichbaren Knotenarten – Regionen (`[data-sektor]`), Systemknoten (`.sektor-sys`) und die Ebenen-Knöpfe (`[data-kb-knopf]`) – trugen längst `role="button" tabindex="0" aria-label`; gemessen hatten sie auch einen Ring, nämlich den des Browsers in `rgb(16,16,16)`, auf dem dunklen Kartengrund also unsichtbar (Details Regel 57). Die Regel steht bei ihrem Vorbild `.card-row[role="button"]:focus-visible` und gilt über `#galaxyMapSvg [role="button"]` für alle drei Arten auf einmal – ein neuer Knotentyp erbt sie automatisch, statt dass drei Einzelregeln auseinanderlaufen. `box-shadow` scheidet aus (`inset` gibt es auf SVG-Elementen nicht), `outline` dagegen trägt auf einem `<g>` nachweislich; `:focus-visible` statt `:focus` aus demselben Grund wie beim Vorbild – sonst bekäme jeder MAUSKLICK auf ein System einen Ring, der bis zum nächsten Klick stehen bliebe. Wächter: `tests/test_kartenfokus.js` (misst alle drei Knotenarten, echtes Tabben und die Maus-Gegenrichtung). **KB-16 (18.08.2026) schließt den seit KB-13 offenen Beschriftungs-Fall: `kbLabelsEntflechten(svg)` schiebt Labels aus belegten Flächen heraus.** Der Durchgang läuft NACH dem Einfügen des Markups (erst dann steht die echte Textbreite fest – aus der Zeichenzahl geschätzt wäre sie bei einer Proportionalschrift geraten) und misst mit `getBBox()` in SVG-Nutzerkoordinaten, also zoom-unabhängig. Jedes Label weicht WEG von seinem eigenen Objekt aus (Planetennamen nach unten, Marker-Namen nach oben), senkrecht höchstens 21 Einheiten, danach seitlich höchstens 12; findet sich darin kein freier Platz, bleibt es an seinem Objekt. Der Aufruf steht bewusst HINTER dem `lastSystemLayerMarkup`-Cache-Riegel – bei einem übersprungenen Neuaufbau stehen die entflochtenen Texte ohnehin noch da. Kosten gemessen: 0,012 ms je Durchgang bei 9 Texten und 9 Flächen, keine zusätzlichen Long Tasks. Gemessen über alle 77 Systeme: Text-auf-Scheibe am Handy 11 → 1, am PC 1 → 0, ohne neue Text-auf-Text- oder Marker-Kollisionen. Der eine Rest („Deine Basis" auf Rhea im Heimatsystem am Handy) ist in `tests/test_kartenbeschriftung.js` NAMENTLICH als bekannte Ausnahme hinterlegt, nicht pauschal ausgeblendet – jeder andere Fall schlägt an. **KB-17 (19.08.2026) ist die Nachwehe der Alien-Nester und war der erste Fall, in dem sich zwei MARKER begegnet sind:** Phase 3 setzt bis zu drei Nester in dasselbe System; alle drei liefen durch `kbMarkerFrei()` und lagen im gerenderten Bild trotzdem übereinander, weil der Schieber nur Sonne und Planeten kannte und jeden auf dieselbe freie Stelle schob. `buildMap` führt seither `platzierteMarker` – Festung, Asteroiden, Nester, Heimatbasis, fremde Spieler und NPCs melden sich dort an, und jeder neue Marker erbt den Schutz automatisch. Dazu drei Ursachen, jede allein hinreichend (Details Regel 53): die Nestbahn ist RUNDER als die Planetenbahn (`Math.max(0.60, kbOrbitMass().ry)`), weil auf einer flachen Ellipse selbst 60° Winkelabstand nur 27 statt der nötigen 43 Einheiten ergeben; `markerR` ist der SICHTBARE Radius (der Nest-Knoten pulst auf das Doppelte, `sichtR = r*2`); und die Schieber-Schleife hat 24 statt 14 Anläufe, weil sie sonst an den VERSUCHEN scheitert statt am Platz (die Königin blieb bei 32,1 statt 41 Einheiten stehen und gab auf). `test_kartenmarker.js` prüft Marker×Marker seither als eigene Zeile (1b). **KB-18 (19.08.2026, v8.583.0, Spieler-Report Sascha mit Screenshot: „bug gefunden flotte ist von meiner heimatbasis gestartet"): Eine Missionslinie startete an einer Heimatbasis, die es im gezeigten System gar nicht gibt.** Die Ursache war die REIHENFOLGE der Verzweigung, die den Ursprung der Flugbahn bestimmt: Der `originKey === 'home'`-Zweig stand VORNE und fragte `originInView` gar nicht ab, während der Kolonie-Zweig daneben längst auf die Sonne zurückfiel. `homeMarkerPos` ist ein Punkt auf der Heimat-Slot-Bahn (Kreis r=50 um die Sonne) – im fremden System bezeichnet er nichts. Gemessen (Heimat in `kepler`, Erkundung nach `thessa` im System `vega`): im fremden System vorher **50,0** Einheiten neben der Sonne, nachher **0,0**; im Heimatsystem vorher wie nachher **74,1** (der echte, kollisionsverschobene Marker). Behoben, indem ZUERST nach `originInView` gefragt wird – damit steht die Regel „Ursprung nicht im Bild → Sonne als Platzhalter" nur noch an EINER Stelle. **Die Gegenrichtung ist der eigentliche Punkt:** Der naheliegende Fix („immer die Sonne nehmen") hätte die Linie auch im Heimatsystem von der Basis losgelöst; `tests/test_flugbahn_ursprung.js` prüft deshalb beide Systeme und zusätzlich, dass es der VERSCHOBENE Marker ist und nicht die rohe Slot-Position.
   **Zwei Dinge zum Namen und zum Kommentar, weil beide wiederkehren können:** (a) Der Kommentar an `homeMarkerPos` beschrieb das Fehlverhalten ausdrücklich als Absicht („rohe Heimatposition als Fallback, z.B. Missionslinien, wenn das Heimatsystem gerade nicht angezeigt wird") – genau deshalb hat es so lange überlebt, und genau deshalb ist er mitgezogen worden; ein Kommentar, der eine alte Annahme festhält, ist eine zweite Anzeigestelle (Punkt 6). (b) Die Etappe hieß bei der Auslieferung versehentlich **KB-17** – der Name war am selben Tag schon von der Alien-Nester-Arbeit belegt (Marker×Marker, siehe oben). Der Code heißt seit v8.584.0 KB-18, die Patchnotes bleiben als unveränderliche Historie stehen. **Bei parallel arbeitenden Sitzungen ist die nächste freie Etappennummer genauso zu prüfen wie die Versionsnummer** – ein `grep -c "KB-<n>" CLAUDE.md weltraum_kolonie.html` vor der Vergabe kostet Sekunden.
@@ -3099,6 +3127,146 @@ nach dem ersten Screenshot von „Kern" auf „Rest" geändert – und das Bild 
 angesehen. Eine Änderung an genau der Eigenschaft, die eine Gestaltungsentscheidung trägt, verlangt
 denselben Blick noch einmal (Regel 48, hier auf eine Anzeige statt auf eine Messung angewandt).
 
+## GR-4 wurde gemessen und NICHT gebaut (21.08.2026)
+
+Seit KB-20b steht im Quelltext, `kbLabelsEntflechten` müsse „zuerst transform-fest" gemacht werden,
+damit das Wurmloch-Portal in den Entflechter aufgenommen werden kann – `getBBox()` liefert für das
+Portal 82 statt der gezeichneten 27,9 Einheiten, weil es die `scale`-Transformation nicht kennt.
+Der Satz stand da als offene Baustelle, mit der Begründung „eine Beschriftung kann das Portal
+überlappen".
+
+**Nachgemessen ist das nicht der Fall.** In allen VIER Fällen – PC und Handy, beide
+Wurmloch-Systeme – überlappt **keine** der 8 bis 10 Beschriftungen das Portal. Gemessen wurde in
+BILDSCHIRM-Koordinaten (`getBoundingClientRect`), also mit allen Transformationen drin: genau das,
+was der Spieler sieht.
+
+**Der Umbau bleibt deshalb ungebaut, und das ist die Entscheidung, nicht ein Aufschub.** Er hätte
+eine CTM-Rechnung gekostet, deren Referenzsystem man erst wählen muss – und die naheliegende Wahl
+ist gemessen falsch: `svg.getCTM()` liefert **3,315**, während Knoten und Texte **1,942** tragen
+(das SVG-Wurzelelement misst zu seinem ELTERN-viewport, nicht zu seiner eigenen viewBox). Man
+bräuchte also ein Referenzelement aus dem Zielsystem oder eine Rückrechnung des 21-Einheiten-
+Versatzes. Das ist tragbare Komplexität – aber nicht für ein Problem, das im Bild nicht vorkommt.
+
+**Zwei Lehren, beide über den Einzelfall hinaus:**
+
+1. **Ein Kommentar, der eine offene Baustelle beschreibt, muss ihren Schaden BEZIFFERN, nicht
+   behaupten.** „Kann überlappen" ist eine Vermutung; „überlappt in 0 von 4 gemessenen Fällen" ist
+   eine Entscheidungsgrundlage. Der Kommentar trägt jetzt die Messung samt Datum – wer den Umbau
+   später doch braucht (etwa weil eine neue Objektart mit eigener Skalierung dazukommt), misst
+   ZUERST neu. Das ist dieselbe Familie wie KB-20i, nur in der nützlichen Richtung: Dort stand eine
+   erfundene Begründung im Kommentar, hier eine ungemessene.
+2. **Der Werkzeugfehler bei der Messung selbst ist der Grund, warum sie fast schiefging.** Der erste
+   Selektor suchte die Portal-Gruppe als „`<g>` mit `scale` im transform" und traf einen
+   Zoom-Container: Portalbreite **786 px** statt 54, und *jede* der zehn Beschriftungen wurde als
+   Überlappung gemeldet. Das Ergebnis sah aus wie ein dringender Befund. Verraten hat es allein die
+   Größenordnung – ein Objekt von 27,9 Sektor-Einheiten kann keine 786 px breit sein. Gegriffen
+   wird jetzt `[data-map-wurmloch]`, also die BENANNTE Rolle (Regel 4/51). **Ein Messwert, der die
+   erwartete Größenordnung um das Vierzehnfache verfehlt, ist ein Werkzeugfehler, kein Befund.**
+
+## E1b: die Gegnerstärke steht endlich auf der Karte (22.08.2026)
+
+Die zweite Hälfte der Landmarken-Etappe. **E1 hat beantwortet, WAS wo steht** (Festung, Nest,
+Gegner als Abzeichen); **E1b beantwortet, WIE STARK es ist.**
+
+**Der Befund ist am gerenderten Spiel gemessen, nicht aus dem Quelltext geschlossen.** Wer einen
+Gegner über die KARTE angriff — also über den Weg, den KB-4 zum Hauptweg gemacht hat —, flog
+blind:
+
+| | Kartenweg | Galaxie-Reiter |
+|---|---|---|
+| Kartenmenü | ein Eintrag („Angreifen"), **keine einzige Zahl** | — |
+| Erfolgschance | **fehlt** | ~5% |
+| Gegner-Verteidigung | **fehlt** | 30 |
+| Gegnerflotte | **fehlt** | 2 Schiffe |
+| Schwachstelle | **fehlt** | „Jäger – nicht mitgeführt" |
+| Enterphase | **fehlt** | „~78% · bis zu 3 Schiffe kaperbar" |
+| Frachtwarnung | **fehlt** | „ohne Frachter geht die Beute verloren!" |
+| Beute | **fehlt** | 40 Erz 20 Energie |
+| Flugzeit / Treibstoff | ja | ja |
+
+Sieben Auskünfte fehlten. Der Gegner war damit das einzige **Angriffsziel** ohne Infoblock im
+Kartenmenü — datengetrieben gemessen: von sieben Kartenmenüs tragen vier einen (Region, Nest,
+Festung, Asteroid), und ausgerechnet die drei ohne (Planet, Mond, fremder Spieler) sind die, bei
+denen man keinen Verband gegen eine bekannte Stärke abwägt.
+
+### Gebaut als EINE Rechenstelle, nicht als zweite Vorschau daneben
+
+`npcKampfLage(npc, flotte)` ist die eine Quelle. Der Galaxie-Reiter hatte seine **fünfzehn**
+Zwischenwerte inline stehen; eine Kopie davon in der Kartenvorschau wäre genau die zweite
+Anzeigestelle gewesen, die beim nächsten Balance-Schritt auseinanderläuft (Checkliste Punkt 6) —
+und der Kommentar an der alten Stelle sagte das selbst: *„die Vorschau und der Kampf benutzen
+dieselbe Funktion"*. Beide Anzeigestellen ziehen ihre Zahlen jetzt dort heraus; verschieden ist
+nur das Markup. Dasselbe gilt für `npcEnterZeileHtml` — die Enterphase stand ebenfalls inline und
+fehlte der Karte deshalb vollständig.
+
+**Der Beleg dafür steht im Test und ist die zentrale Prüfung**: dieselbe Flotte, derselbe Gegner,
+BEIDE Wege — die genannte Erfolgschance muss zeichengleich sein (gemessen 71% und 71%, mit
+Bombern 86% und 86%).
+
+**Und die Gegenprobe hat nebenbei belegt, dass der Umbau die Zahl nicht verschoben hat**: Am Stand
+vor E1b meldet dieselbe Prüfung `{"karte":null,"galaxieReiter":71}` — der Galaxie-Reiter nennt vor
+wie nach dem Umbau 71%. Das ist ein Anker, den der Umbau nicht berühren konnte (Regel 62).
+
+### Vier Entscheidungen, die man beim Anfassen kennen muss
+
+- **Der Infoblock im Kartenmenü zeigt NUR, was ohne gewählte Flotte gilt** (Stufe, Verteidigung,
+  feindliche Flotte, Schwachstelle, Beute). Alles, was an der eigenen Auswahl hängt —
+  Erfolgschance, Konter, Treibstoff, Fracht — steht eine Ebene weiter in der Flottenwahl und zieht
+  dort live mit; im Menü wäre es auf den Stand beim Öffnen eingefroren, also genau die Sorte Zahl,
+  die später nicht mehr stimmt. `openKarteMenu` hatte den `infoHtml`-Parameter längst, nur nutzte
+  ihn der Gegner nicht.
+- **Die Vorschau MISST ihre Aussagen, statt sie zu benennen** (Regel 61): Die Schwachstellen-Zeile
+  sagt, ob die passende Klasse wirklich im Verband steht, und die Frachtzeile warnt nur, wenn es
+  wirklich keinen Laderaum gibt.
+- **`ti-gift` gibt es im Subset-Font nicht.** `check-icons.js` hat es vor dem Commit gefangen —
+  genau der Fehlertyp, für den das Skript nach dem `ti-gift`-Bug (v8.77.1) gebaut wurde. Ersetzt
+  durch `ti-diamond`, statt den Font zu vergrößern.
+- **Das Konzept nannte `state.npcIntel` — dieses Feld gibt es nicht** (gemessen: 0 Treffer). Die
+  Aufklärung heißt `state.spyIntel` und betrifft ausgespähte SPIELER, nicht NPCs; die
+  Gegnerstärke kommt aus `npcEffectiveDefense`. Ein Konzept beschreibt die Absicht, nicht den Code
+  (Regel 4/41).
+
+### Ein Bestandstest ist mitgezogen worden — und dabei SCHÄRFER geworden
+
+`test_vorschau_schwaeche` 3b/3c suchte die Vorschau-Rechnung über ihre Variablennamen in
+`renderGalaxy` (`powerRohPreview`, `schwaecheGenutzt`, `attackFleet`). Seit E1b liegt sie in
+`npcKampfLage`; der Ausschnitt fand seine Marken nicht mehr und meldete `{"a":-1,"b":-1}` auf
+völlig korrektem Code — also eine festgenagelte FUNDSTELLE statt der Regel (Regel 3).
+
+Die bequeme Lösung wäre gewesen, die neuen Namen einzusetzen. Geprüft wird stattdessen die
+Eigenschaft, und zwar in **beide** Richtungen: Die Vorschau bildet ihre Basis mit
+`weaknessPhasenBasis` (3b/3c) **und** es gibt sie nur EINMAL (3b2). Eine zweite Vorschau, die die
+Basis anders bildet, fällt damit auf — vorher wäre sie unbemerkt geblieben, solange die alte
+Stelle noch stimmte (Regel 43). Beidseitig gegengeprüft an einer Kopie mit eingebauter
+Zweitrechnung: `{"stellen":2}`, bei 20 Prüfungen in allen drei Läufen.
+
+### Zwei Fixture-Fallen, beide beim Bauen aufgetreten und beide dokumentiert
+
+1. **`storageGet` kehrt bei 404 ausdrücklich ZURÜCK**, statt auf localStorage zurückzufallen. Wer
+   alle `/api/`-Aufrufe pauschal auf 404 legt — was mehrere Kartentests tun, weil sie nur Abzeichen
+   messen —, bootet ein **leeres** Spiel: Die Flottenwahl meldete „An diesem Standort stehen keine
+   passenden Schiffe", und jede Vorschau-Prüfung wäre aus dem falschen Grund grün gewesen
+   (Regel 28). Der Spielstand kommt deshalb über die geroutete Storage-Antwort.
+2. **`capFighterSelection` kappt Jäger UND Bomber auf die Trägerkapazität, und
+   `deployableFighters` bedient dabei ZUERST die Jäger.** Der erste Entwurf hatte 10 Träger
+   (= 60 Plätze) bei 60 Jägern — für die 18 Bomber blieb nichts, sie flogen gar nicht mit, und die
+   Schwachstellen-Prüfungen fielen auf korrektem Code durch. Die Vorabprüfung `5-hangar` belegt
+   seither MESSEND, dass der zweite Verband wirklich größer ist.
+
+### Und der Deckel, den man beim Messen einer Chance immer trifft
+
+`5c` („die Erfolgschance ist eine andere") fiel zunächst mit `{"ohneBomber":95,"mitBomber":95}`.
+Kein Fehler: `battleWinChance` deckelt bei 95%, und der Messverband stand mit 3,9k Angriffskraft
+gegen 600 Verteidigung in **beiden** Läufen am Anschlag — gemessen wurde also der Deckel statt der
+Bomber-Wirkung (Regel 7). Gewählt ist seither die **Solmark-Kriegsflotte** (2200 Verteidigung,
+Schwachstelle Bomber, keine Forschungssperre — sonst fände Abschnitt 4 sie nicht in der NPC-Liste
+des Galaxie-Reiters). `5-deckel` hält die Bedingung als eigene Vorabprüfung fest: **Wer eine
+gedeckelte Größe misst, prüft zuerst, dass die Messung nicht am Anschlag steht.**
+
+Wächter: `tests/test_gegnerlage.js` (30 Prüfungen). Gegenprobe gegen `origin/main` per
+`KEPLER_SPIELDATEI`: **25 rot bei identischen 30 Prüfnamen** (per `diff` verglichen, nicht gezählt
+— Regel 60).
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
@@ -4178,8 +4346,8 @@ unter „Die Flottenverteidigung war eine Vereinfachung". Für dieses Repo zähl
   `hull`/`shield`/`atk` anlegt, muss sie im Backend nachziehen** — `tests/test_schiffsmodul_paritaet.js`
   3a schlägt sonst an.
 
-Wächter: `tests/test_schiffsmodul_paritaet.js` (22 Prüfungen, vier Gegenproben — jede speist eine
-der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 22 gelaufenen
+Wächter: `tests/test_schiffsmodul_paritaet.js` (23 Prüfungen, vier Gegenproben — jede speist eine
+der vier Abweichungen wieder ein und reißt ihre eigene Prüfung, bei jeweils 23 gelaufenen
 Prüfungen).
 
 **Und eine Arbeitsregel-Bestätigung aus dem Bau dieses Tests, zum dritten Mal an einem Tag:** Seine
@@ -4190,6 +4358,171 @@ hat es nur die `WERKZEUGFEHLER`-Wache des Messskripts (Regel 71). Der Sammler ho
 Konstanten **und Funktionen** transitiv, kennt beide Deklarationsformen (Objektliteral und IIFE)
 und leert Kommentare vor dem Sammeln (Regel 33) — die Liste ist auf die zwei Zielfunktionen
 geschrumpft.
+
+**Seit dem 22.08.2026 fängt der Test das selbst** (`4-bau3: kein Laufzeitfehler in den
+Messaufrufen`): Die zwei Messaufrufe laufen durch einen Wrapper, der einen geworfenen Fehler
+festhält, `null` zurückgibt und den Lauf weiterlaufen lässt. Beidseitig gegengeprüft: ohne die
+Wache **15 Prüfungen und keine einzige FAIL-Zeile** — ein roter Exit-Code ohne jede Aussage —, mit
+ihr 23 Prüfungen und der Grund im Protokoll
+(`4-bau3 | {"fehler":"SHIP_MODULE_SET_DEFS is not defined"}`).
+**Die übertragbare Lehre geht über diesen Test hinaus: Ein `try/catch` um den AUFBAU (Regel 34)
+genügt nicht, wenn die geschnittene Funktion erst beim AUFRUF wirft.** Genau daran ist es hier
+gescheitert — der Aufbau war längst gefasst, der Lauf starb trotzdem mittendrin. Wer Funktionen
+aus der Spieldatei schneidet und ausführt, fasst BEIDE Seiten: das Zusammensetzen und jeden
+einzelnen Aufruf. Sonst hängt die Diagnose daran, dass zufällig ein Messskript mit
+„was muss fallen"-Liste danebensteht (Regel 71) — und im Suite-Lauf steht dort keines.
+
+## Etappe D: Protomaterie bekommt Abnehmer (21.08.2026)
+
+Der Befund, aus dem die Etappe entstand, ist derselbe wie beim Kausalitätsbrecher: **Protomaterie
+war eine reine EINMALZAHLUNGS-Währung.** Zwei Fabriken, die Mega-Ausbaustufen — wer die durch hatte,
+hatte für den Bergbau keinen Grund mehr. Eine Ressource ohne wiederkehrenden Abnehmer ist kein
+Wirtschaftskreislauf, sondern eine Checkliste.
+
+**Fünf Posten, und die Reihenfolge ist Absicht:**
+
+| | Posten | gemessen |
+|---|---|---|
+| D1 | Lagerdeckel je Aufbereitungsanlage 100 → 150 | Deckel 2.500 → 3.500 |
+| D2 | Mega-Ausbaustufen-Anteil 400 → 600 | bleibt bei 17 % des Speichers statt 16 % |
+| D3 | Orbitalstation Stufe 8 als erste **direkte** Proto-Stufe | 60 je Standort, über elf Standorte 660 = 26–78 Stunden |
+| D4 | **Urmaterie-Koloss** — der erste wiederkehrende Abnehmer | 30 Protomaterie je Schiff |
+| D5 | Schürfer-Faktor: volle Ausbeute erst ab 10 Schürfschiffen | schließt die Ein-Schiff-Pendelroute |
+
+**D1 steht bewusst VORNE** (Regel 57): Der Lagerdeckel ist die Schranke, an der jede Proto-Senke
+hängt — er wird angehoben, *bevor* unten neue Abnehmer dazukommen. Und angehoben wird die
+**Stufenrate**, nicht die Basis, damit der Zuwachs am Ausbau der Aufbereitungsanlage hängt statt
+geschenkt zu sein. D2 zieht im Gleichschritt nach, sonst verschöbe sich still das Verhältnis
+„der Betrag lässt sich ansparen".
+
+**D5 ist eine Behebung, kein Balance-Schritt.** Die Protomaterie je Fuhre hängt allein an der
+GRÖSSE des Vorkommens, nie an der Ladung — eine Fuhre mit EINEM Schürfschiff brachte deshalb exakt
+so viel wie eine mit fünfzig. Wer Flottenplätze hatte, konnte sie in lauter Ein-Schiff-Pendelrouten
+zerlegen und die Ausbeute vervielfachen, ohne je eine Bergbauflotte zu bauen. Drei Entscheidungen
+dabei, jede gegen einen naheliegenden Fehler:
+
+- **Keine Skalierung ÜBER der Schwelle.** Der feste Fuhren-Charakter bleibt; sonst wäre die
+  Protomaterie plötzlich mengenskaliert und liefe genau in die Falle aus Regel 41.
+- **Gezählt werden echte Schürfschiffe, nicht `MINE_SHIP_KEYS`.** Dort stehen auch die drei
+  Frachter — zehn Frachter mit einem Schürfschiff wären wieder dieselbe Pendelroute.
+- **Der Faktor steht IN `protoJeFuhre`, nicht an ihren zwei Aufrufstellen.** Vorschau und
+  Missionsstart dürfen nicht auseinanderlaufen; `test_protomaterie` 6c hat genau diese Dopplung
+  schon einmal gefangen.
+
+### Der Urmaterie-Koloss — und die acht Stellen, an denen er nicht existierte
+
+`atk:250`, Frachtraum 2.000, Bauzeit 30 Minuten, `defWeight:1.8`, Punktegewicht 175, hinter
+`rkausalanker`; Kosten 30 Protomaterie + 8 Hohlraumgitter + 6 Kausalanker. Die Kosten sind
+**gemessen**, nicht aus dem Konzept übernommen (Regel 41): gegen die gefittete Preiskurve der
+Kampfschiffe, nicht gegen das Gefühl.
+
+**Der eigentliche Inhalt dieses Abschnitts ist aber der Fund.** Ein Schiff lebt in diesem Projekt an
+**16 Stellen**, verteilt über zwei Repos — gemessen, nicht geschätzt: zehn im Frontend, sechs im
+Backend. Beim Anlegen waren **acht** davon gepflegt, alle im Frontend (Icon, Rumpfzeichnung,
+Kostenfunktion, `SHIP_DEFS`, `CARGO_PER_SHIP`, `COUNTER_ROLE_OF`, `COUNTER_ROLE_ATK`,
+`SHIP_SCORE_WEIGHTS`). Die **acht fehlenden** sind genau die, in denen ein fehlender Eintrag still
+0 oder einen falschen Vorgabewert ergibt — der Koloss wäre baubar gewesen und im Kampf auf beiden
+Seiten nicht vorhanden:
+
+| Tabelle | Repo | ohne Eintrag |
+|---|---|---|
+| `ATTACK_SHIP_KEYS` | Frontend | nicht mitwählbar für Angriff, Eskorte, Expedition, Abbau |
+| `attackPowerRaw` | Frontend | trägt **0** Angriff bei |
+| `rawFleetPower` | Backend | trägt **0** Angriff bei (PvP) |
+| `SHIP_ATK_VALUES` | Backend | **0** in Verteidigung UND `fleetShieldSum` — ohne Vorgabewert |
+| `SHIP_DEF_WEIGHTS` | Backend | Vorgabegewicht 1 statt 1,8 |
+| `COUNTER_ROLE_ATK` | Backend | zählt nicht in die Flottenbalance |
+| `COUNTER_ROLE_OF` | Backend | Werftmarken-Schild 0,03 statt kapital 0,04 |
+| `SHIP_SCORE_WEIGHTS` | Backend | Punktestand seiner Besitzer zu niedrig |
+
+**Warum `test_angriffssumme` das nicht melden konnte, ist die Lehre:** Er leitet seine Erwartung aus
+`ATTACK_SHIP_KEYS` ab — und dort fehlte der Koloss ebenfalls. Er fiel damit durch **beide** Netze
+desselben Wächters. Gemeldet hat ihn erst `test_eskorte_schiffe` 3 von der anderen Seite. Zwei der
+acht (`SHIP_ATK_VALUES`, `SHIP_DEF_WEIGHTS`) hat **gar kein Test** gefunden — die fielen erst beim
+Durchgehen aller Tabellen auf, die eine Schiffsklasse führen.
+**Übertragbar: Ein Wächter, der Soll und Ist aus DERSELBEN Liste zieht, ist blind für eine Lücke in
+genau dieser Liste.** Wer eine neue Schiffsklasse anlegt, zählt sie in beiden Repos nach —
+`grep -c "<schluessel>"` muss **10** im Frontend und **6** im Backend ergeben.
+
+**Zwei Klassen sind bewusst NICHT ergänzt worden**, obwohl derselbe Durchgang sie als „fehlend"
+zeigte: `mondzerstoerer` fehlt in `SHIP_ATK_VALUES`/`SHIP_DEF_WEIGHTS` als **dokumentierte Absicht**
+(der Backend-Kommentar sagt, ihn aufzunehmen „wäre eine ungewollte Änderung der PvP-Kampfkraft"),
+und `kausalitaetsbrecher` fehlt in `SHIP_DEF_WEIGHTS`/`SHIP_SHIELD_EXPLICIT`. Das zweite ist ein
+kleiner Bestands-Balancefall (Vorgabe 1 statt 1,8 bzw. 170 statt 120) — gemessen, benannt, und
+ausdrücklich **nicht** nebenbei geändert: Eine PvP-Zahl im Vorbeigehen zu verschieben ist genau die
+unbestellte Zweitänderung aus dem Schiffskosten-Nachtrag.
+
+### Frachtraum UND Angriff: die erste Ausnahme von „Frachter kämpfen nicht"
+
+`KAMPF_SHIP_KEYS` leitete sich seit v8.497.0 als „alles aus `ATTACK_SHIP_KEYS` außer den Frachtern"
+ab. Gemessen tragen alle drei Frachter `atk:0` — die Gleichsetzung „hat Frachtraum" = „kämpft nicht"
+war also nie eine Annahme, sondern ein Messwert. Der Koloss ist der erste Rumpf, für den sie nicht
+mehr gilt.
+
+**Sascha hat die Hybrid-Fassung gewählt** (drei Optionen vorgelegt: Hybrid behalten, Frachtraum
+streichen, Angriff streichen). Umgesetzt datengetrieben statt als Namensliste:
+
+```js
+function schiffTraegtAngriff(key){ const d = SHIP_DEFS.find(s => s.key === key); return !!(d && d.atk > 0); }
+const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS.filter(k => !CARGO_SHIP_KEYS.includes(k) || schiffTraegtAngriff(k));
+```
+
+Reihenfolge vorher **gemessen**, nicht geschätzt (Regel 38): `SHIP_DEFS` bei Zeichen 2.771.655,
+`KAMPF_SHIP_KEYS` bei 2.859.336 — die Ableitung ist gedeckt. Ein zweiter solcher Rumpf erbt die
+Ausnahme automatisch.
+
+**Beide Wächter sind dadurch STÄRKER geworden, nicht nachgiebiger** (Regel 43). Das ist der Punkt,
+an dem eine Ausnahme zur Lockerung verkommen kann: Ohne die Gegenrichtung hätte man den Koloss
+später aus der Angriffssumme nehmen können, und niemand hätte es bemerkt.
+
+- `test_angriffssumme` teilt die Frachter jetzt datengetrieben in **bewaffnet** und **unbewaffnet**
+  (`atk` aus dem `SHIP_DEFS`-Block gelesen) und verlangt für die bewaffneten ausdrücklich, dass sie
+  in der Summe UND in `KAMPF_SHIP_KEYS` stehen — die neuen Zeilen 1 und 2b.
+- `test_flotte_v8375` 3 prüfte die Ableitung **Zeichen für Zeichen als Regex** und fiel damit auf
+  völlig korrektem Code durch (Regel 3: eine Momentaufnahme statt der Eigenschaft). Geprüft werden
+  jetzt die drei Bestandteile einzeln; eine handgeschriebene Klassenliste fällt weiterhin auf, eine
+  legitime Erweiterung nicht.
+
+### Zwei eigene Werkzeugfehler, beide vor der Weitergabe gefangen
+
+1. **Ein geratener Exportname.** `tests/lib/spieldatei.js` exportiert `SERVER_JS`, nicht
+   `SERVERDATEI` — der geratene Name lief in einen `TypeError`. Regel 4, und die Umgebung sagt es,
+   wenn man sie liest.
+2. **Ein geratener Endanker beim Schneiden von `COUNTER_ROLE_OF`/`COUNTER_ROLE_ATK`.** Der zu große
+   Ausschnitt ließ mich schließen, der Kausalitätsbrecher sei eine „Rolle ohne Gewicht" — ein
+   Befund, der schon fast weitergegeben war. Über die echte Klammertiefe nachgemessen sind beide
+   Tabellen vollständig konsistent, und der Kausalitätsbrecher steht in **keiner** von beiden.
+   Wörtlich der Abschnitt „Ein GERATENES Fenster ist kein Scope" — zum dritten Mal innerhalb weniger
+   Tage, und nur das Nachrechnen VOR dem Weitergeben hat den Fehlalarm verhindert (Regel 10).
+
+### Der Rebase-Moment — und die Warnzeile, die diesmal gelesen wurde
+
+Beim Start des vollen Laufs meldete Pflichtprüfung 5: *„Backend-Klon auf Höhe von origin/master,
+aber origin/master ist alt (geholt vor 20,7 Stunden)."* Der Nachtrag vom 17.08.2026 zu Regel 22
+beschreibt genau diesen Fall — dort stand die Warnung ebenfalls in Zeile fünf des Protokolls, und
+der Lauf fiel zwanzig Minuten später. Diesmal ist sie **direkt nach dem Start** gelesen und der Lauf
+sofort gestoppt worden (Regel 14/17); ein `git fetch` zeigte:
+
+- **Backend vier Commits weiter** (#155, #156, #158, #159) — darunter #156 „Flottenverteidigung:
+  vier Abweichungen zum Frontend angeglichen", also mitten im eigenen Bereich.
+- **Frontend sieben Commits weiter**, vier davon mit Versionsnummer (v8.601.0 – v8.604.0).
+
+Gemessen statt vermutet: #156 fasst die **Funktionen** an (`fleetShieldSum`,
+`weightedFleetDefensePower`), nicht die Tabellen-**Definitionen** — beide Änderungssätze liegen in
+verschiedenen Zeilen, der Rebase lief in beiden Repos konfliktfrei. Danach beide Seiten belegt
+(Nachtrag zu Regel 13): vier fremde Patchnotes vorhanden, sechs eigene Marken im Backend vorhanden,
+und der
+eigene Änderungssatz gegen `origin/main` enthält nichts als Etappe D.
+
+**Die Lehre ist nicht neu, aber sie hat diesmal getragen:** Ein 50-Minuten-Lauf gegen einen
+veralteten Nachbarn ist nicht bloß langsam, er ist für jede Paritätsprüfung **wertlos** — und die
+einzige Stelle, an der man das rechtzeitig sieht, ist Zeile fünf des Protokolls.
+
+Wächter dieser Etappe: `tests/test_protomaterie.js` (Schürfer-Faktor, Vorschau-Parität),
+`tests/test_orbital_tier3.js` (Stufe 8), `tests/test_schiffskosten.js` (der Koloss in der
+Preiskurve), `tests/test_angriffssumme.js` und `tests/test_flotte_v8375.js` (die Hybrid-Regel),
+dazu `test_eskorte_schiffe`, `test_konter_paritaet`, `test_paritaet_tabellen` und `test_werftmarken`
+für die Backend-Parität.
 
 ## Klassen-Sets für die Schiffsmodule (Teil A, 21.08.2026, v8.603.0)
 
@@ -4844,3 +5177,52 @@ Wächter: `tests/test_bildruhe.js` (9 Prüfungen). Er misst das **Paar**: unsich
 steht (Drift 0, Ausgleich über `scrollY`), sichtbare Änderung → **nichts** wird gescrollt. Ohne die
 zweite Hälfte wäre ein viel zu breiter Ausgleich grün. Beidseitig gegengeprüft: am Stand davor
 fallen genau `1a` und `1b` mit `{"drift":-172,"scrollAusgleich":0}`, bei identischen Prüfnamen.
+
+## Drei Richtungen für EINE Regel — und die dritte ist die gefährlichste (22.08.2026)
+
+Nach Backend-#156 stand `test_wertstreuung` 6e rot, ohne dass ein Fehler vorlag: Die Prüfung
+**zählte** die Stellen, an denen der Server einen Modulbeitrag nachrechnet, und verlangte genau
+zwei. Eine völlig richtige dritte (`shipModulKlassenBoni`) ließ sie durchfallen — eine
+Momentaufnahme statt einer Regel (Regel 3/33).
+
+**Die Regel lautet: Wer einen Modulbeitrag aus Seltenheit UND Stufe rechnet, muss den Wurf
+mitnehmen.** Sonst rechnet der Server für ein gewürfeltes Modul einen anderen Wert als der Client,
+und das entscheidet PvP.
+
+**Zwei Sitzungen haben sie am selben Tag unabhängig behoben, mit verschiedenen Zuschnitten — und
+die sind komplementär, keiner ist der bessere.** Das ist gemessen, nicht abgewogen: an drei
+sabotierten Backend-Kopien, jede mit ihrer „was fallen MUSS"-Liste (Regel 71).
+
+| eingespeister Fehler | Musterliste (`6e`/`6e2`) | Rechenform (`6e3`) |
+|---|---|---|
+| eine erlaubte Stelle **verliert** den Wurf | fällt | fällt |
+| eine **neue** Stelle **hat** den Wurf | fällt („gehört eingetragen") | grün — die Regel gilt ja |
+| eine **neue** Stelle rechnet Seltenheit × Stufe und **vergisst** den Wurf | **grün** | fällt, nennt die Zeile |
+
+**Die dritte Zeile ist der gefährliche Fall, und die Musterliste sieht ihn strukturell nicht.** Sie
+geht von den Zeilen aus, die den Wurf ENTHALTEN — eine Stelle ohne ihn steht in dieser Liste gar
+nicht, ist also weder „fehlend" noch „unbekannt" und fällt durch beide Maschen. Die zweite Zeile
+ist dafür der historische Fall von #156, und den sieht nur sie: Sie erzwingt, dass eine neue Stelle
+bewusst eingetragen wird.
+
+**Deshalb stehen seit dem 22.08.2026 alle drei nebeneinander** (`6e`, `6e2`, `6e3`), und wer hier
+aufräumt, misst vorher die drei Zeilen der Tabelle nach. Der Unterschied im Zuschnitt: `6e`/`6e2`
+gehen von der ERSCHEINUNGSFORM aus (wo steht der Wurf?), `6e3` von der Größe, welche die Regel
+verletzt (wo wird Seltenheit × Stufe gerechnet?) — das ist der Nachtrag zu Regel 40 in der
+Anwendung.
+
+**Ein Fund nebenbei, und er betrifft jede Fehlermeldung dieses Tests:** Der Kommentar-Filter
+ersetzte Blockkommentare durch **ein** Leerzeichen und faltete damit jeden mehrzeiligen Kommentar
+auf eine Zeile zusammen. Gemessen meldete der Test „Zeile 2243" für `raidlossProtectionMult`, das
+in `server.js` bei **3577** steht — 1.334 Zeilen daneben. Kommentare werden deshalb **geleert**
+(jedes Zeichen außer dem Zeilenumbruch durch ein Leerzeichen ersetzt), nicht entfernt. Eine
+Fehlermeldung, die auf die falsche Zeile zeigt, schickt den Nächsten an den falschen Ort — und sie
+sieht dabei aus wie eine gute Meldung.
+
+**Die Arbeitsteilung selbst ist die zweite Lehre, und sie ist Regel 69 zum zweiten Mal.** Ich hatte
+alle drei roten Tests parallel zu einer anderen Sitzung gebaut, deren PR seit dem Vorabend offen
+war; zwei davon habe ich wieder zurückgenommen, weil ihre Antworten besser waren (der
+Klammertiefen-Schnitt statt eines dritten Endankers, Regel 40). **Wer eine ROTE Prüfung auf `main`
+vorfindet, sieht zuerst nach, ob dafür schon ein PR offen ist** — ein roter Test ist die Sorte
+Befund, die mehrere Sitzungen gleichzeitig sehen, und anders als bei einem Feature merkt man die
+Dopplung erst am Ende.

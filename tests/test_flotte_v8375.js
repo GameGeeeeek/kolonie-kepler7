@@ -115,8 +115,16 @@ function rollen(text, muster){
   // Die Ausnahme wird seit v8.497.0 nicht mehr aufgezaehlt, sondern aus CARGO_SHIP_KEYS gelesen -
   // sonst haette der dritte Frachter hier still als Kampfschiff gezaehlt. Geprueft wird weiterhin
   // die Eigenschaft "aus den Angriffsklassen ABGELEITET, Transporter ausgenommen".
+  //
+  // Bis zum 21.08.2026 stand hier die ZEILE Zeichen fuer Zeichen als Regex - also eine
+  // Momentaufnahme statt der Eigenschaft, die der Absatz darueber beschreibt. Sie fiel prompt auf
+  // voellig korrektem Code durch, als der Urmaterie-Koloss (Frachtraum UND Angriff) eine
+  // datengetriebene Ausnahme noetig machte. Geprueft werden jetzt die drei Bestandteile einzeln;
+  // eine handgeschriebene Klassenliste faellt damit weiterhin auf, eine legitime Erweiterung nicht.
+  const kampfZeile = schnitt(src, 'const KAMPF_SHIP_KEYS', ';');
   check('3: es gibt eine Kampfschiff-Liste, aus den Angriffsklassen abgeleitet',
-    /const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS\.filter\(k => !CARGO_SHIP_KEYS\.includes\(k\)\);/.test(src));
+    /ATTACK_SHIP_KEYS\s*\.filter\(/.test(kampfZeile) && /CARGO_SHIP_KEYS/.test(kampfZeile)
+    && !/\['[a-z]+',\s*'[a-z]+'/.test(kampfZeile), kampfZeile.replace(/\s+/g, ' ').slice(0, 160));
   const ab = schnitt(src, 'const vetMit = (() => {', '})();');
   check('3: der Abzug beim Abflug existiert', ab.length > 200);
   check('3: er rechnet nur mit Kampfschiffen', /KAMPF_SHIP_KEYS\.includes\(shipKey\)/.test(ab));

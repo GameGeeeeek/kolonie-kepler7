@@ -43,6 +43,34 @@ function block(quelle, anfang, endeMarke){
   const bis = von < 0 ? -1 : quelle.indexOf(endeMarke, von);
   return (von < 0 || bis < 0) ? null : quelle.slice(von, bis + endeMarke.length);
 }
+/* Eine Deklaration ueber ihre KLAMMERTIEFE schneiden statt ueber einen Endanker.
+   Der Sammler kannte zwei Endanker - `\n};` (Objektliteral) und `\n})();` (IIFE) - und lief an
+   allem anderen vorbei bis zum naechsten fremden Blockende; die Wache "Anker traf zu spaet"
+   verwarf die Deklaration dann still, und der Aufbau starb an "is not defined". Genau so am
+   22.08.2026 mit `const SHIP_MODULE_SET_DEFS = [` aus Backend #158 passiert: ein ARRAY, also die
+   dritte Form. Ein dritter Anker waere wieder eine Schreibweise mehr gewesen (Arbeitsregel 40) -
+   die Tiefe faengt auch die vierte, an die niemand gedacht hat. */
+function schneideDeklaration(quelle, von){
+  const zeilenende = quelle.indexOf('\n', von);
+  const ersteZeile = quelle.slice(von, zeilenende < 0 ? quelle.length : zeilenende);
+  if (/;\s*(\/\/.*)?$/.test(ersteZeile)) return ersteZeile;      // einzeilig
+  const auf = { '{': '}', '[': ']', '(': ')' };
+  let i = von, tiefe = 0, gesehen = false;
+  for (; i < quelle.length; i++){
+    const c = quelle[i];
+    if (auf[c]){ tiefe++; gesehen = true; }
+    else if (c === '}' || c === ']' || c === ')'){
+      tiefe--;
+      if (gesehen && tiefe === 0){
+        // hinter der schliessenden Klammer noch das Semikolon (und ggf. `)();` der IIFE) mitnehmen
+        let j = i + 1;
+        while (j < quelle.length && /[)(;\s]/.test(quelle[j]) && quelle[j] !== '\n') j++;
+        return quelle.slice(von, j);
+      }
+    }
+  }
+  return null;
+}
 function fuehreAus(code, rueckgabe){
   try { return new Function(code + '\nreturn ' + rueckgabe + ';')(); } catch (e) { return null; }
 }
@@ -67,17 +95,8 @@ function mitAbhaengigkeiten(quelle, code, schonDa){
         const marke = '\n  const ' + n + ' = ';
         const von = quelle.indexOf(marke);
         if (von < 0) continue;
-        const zeilenende = quelle.indexOf('\n', von + 1);
-        const ersteZeile = quelle.slice(von + 1, zeilenende);
-        let d;
-        if (/;\s*(\/\/.*)?$/.test(ersteZeile)) d = ersteZeile;
-        else {
-          const bis = quelle.indexOf('\n  };', von);
-          if (bis < 0) continue;
-          const blk = quelle.slice(von + 1, bis + 5);
-          if ((blk.match(/\n  const [A-Z][A-Z0-9_]* = /g) || []).length) continue;   // Anker traf zu spaet
-          d = blk;
-        }
+        const d = schneideDeklaration(quelle, von + 1);
+        if (!d) continue;
         gefunden.set(n, d);
         naechste.push(d);
       }
@@ -106,27 +125,8 @@ function mitAbhaengigkeitenBackend(quelle, code){
         const marke = '\nconst ' + n + ' = ';
         const von = quelle.indexOf(marke);
         if (von < 0) continue;
-        const zeilenende = quelle.indexOf('\n', von + 1);
-        const ersteZeile = quelle.slice(von + 1, zeilenende);
-        let d;
-        if (/;\s*(\/\/.*)?$/.test(ersteZeile)) d = ersteZeile;
-        else {
-          /* Mehrzeilig - und der Endanker gehoert selbst geprueft (Arbeitsregel 6). Es gibt ZWEI
-             Formen: das gewoehnliche Objektliteral (\n};) und die IIFE (\n})();). SHIP_KLASSE_VON
-             ist eine IIFE, und mit nur der ersten Form lief der Sammler an ihr vorbei bis zum
-             naechsten fremden Blockende - der Aufbau starb dann an "is not defined". */
-          /* DREI Formen, und jede ist beim Bauen dieses Tests schon aufgetreten: Objektliteral
-             (\n};), Array (\n];) und IIFE (\n})();). Genommen wird der NAECHSTE Treffer - ein zu
-             spaeter Anker schluckt die naechste Deklaration mit (Arbeitsregel 6). */
-          const enden = ['\n};', '\n];', '\n})();'];
-          const kandidaten = enden.map(e => quelle.indexOf(e, von)).filter(x => x >= 0);
-          if (!kandidaten.length) continue;
-          const bis = Math.min.apply(null, kandidaten);
-          const laenge = (enden.find(e => quelle.startsWith(e, bis)) || '\n};').length;
-          const blk = quelle.slice(von + 1, bis + laenge);
-          if ((blk.match(/\nconst [A-Z][A-Z0-9_]* = /g) || []).length) continue;
-          d = blk;
-        }
+        const d = schneideDeklaration(quelle, von + 1);
+        if (!d) continue;
         gefunden.set(n, d);
         naechste.push(d);
       }
@@ -239,6 +239,20 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
   const fehlend = teile.map((t, i) => t ? null : i).filter(i => i !== null);
   check('4-bau: alle Backend-Bausteine gefunden', fehlend.length === 0, { fehlendeIndizes: fehlend });
 
+  /* Und die Wache DARUEBER: Ein Laufzeitfehler IN den Messaufrufen muss eine BENANNTE Pruefung
+     reissen, nicht den Test toeten. Der Aufbau-try/catch in fuehreAus() genuegt dafuer nicht - er
+     umschliesst nur das ERZEUGEN der Funktion, waehrend eine fehlende Konstante erst beim AUFRUF
+     auffaellt. Genau so ist der Test am 22.08.2026 gestorben: 15 statt 22 Pruefungen, KEINE
+     FAIL-Zeile, und der rote Exit sah aus wie ein Befund (Arbeitsregel 34).
+     Die URSACHE jenes Vorfalls ist im Sammler behoben (er schneidet ueber die Klammertiefe und
+     kennt damit auch die Form, an die niemand gedacht hat). Diese Wache ist die zweite Linie: Sie
+     gilt fuer JEDEN Laufzeitfehler, nicht nur fuer eine fehlende Konstante - jede Messung liefert
+     dann null, die einzelnen Pruefungen fallen mit {"gemessen":null}, und 4-bau3 nennt den Grund. */
+  let laufFehler = null;
+  const sicher = fn => (typeof fn !== 'function') ? fn : function(){
+    try { return fn.apply(null, arguments); }
+    catch (e) { if (!laufFehler) laufFehler = String((e && e.message) || e); return null; }
+  };
   let W = null, S = null;
   if (fehlend.length === 0) {
     /* Auch hier KEINE Namensliste als Abhaengigkeitsangabe: Die Bausteine oben ziehen ihrerseits
@@ -246,8 +260,8 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
        der Test genau daran mitten im Abschnitt abgestuerzt - 4b bis 4f liefen nie, und der rote
        Exit sah aus wie ein Befund, Arbeitsregel 34). Gesammelt wird deshalb wieder transitiv. */
     const code = mitAbhaengigkeitenBackend(BACK, teile.join('\n'));
-    W = fuehreAus(code, 'weightedFleetDefensePower');
-    S = fuehreAus(code, 'fleetShieldSum');
+    W = sicher(fuehreAus(code, 'weightedFleetDefensePower'));
+    S = sicher(fuehreAus(code, 'fleetShieldSum'));
   }
   check('4-bau2: die zwei Rechenfunktionen laufen', typeof W === 'function' && typeof S === 'function');
 
@@ -304,6 +318,10 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
     const ohneSub = W(nurSS, null, save('schlachtschiff', ['ss_panzerung:gewoehnlich:1']));
     check('4f: Zweitwerte (Substats) zaehlen auf denselben Kanal', mitSub > ohneSub,
       { mitSubstat: mitSub, ohneSubstat: ohneSub });
+
+    // Ist irgendein Messaufruf oben in eine Ausnahme gelaufen, steht der Grund hier - statt dass
+    // der Test mitten im Abschnitt stirbt und die restlichen Pruefungen nie fahren.
+    check('4-bau3: kein Laufzeitfehler in den Messaufrufen', laufFehler === null, { fehler: laufFehler });
   }
 }
 // ---- 5) Die Klassen-Sets (21.08.2026) -------------------------------------------------------

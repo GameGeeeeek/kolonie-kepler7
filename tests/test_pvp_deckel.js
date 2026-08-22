@@ -52,19 +52,32 @@ for (const [name, muster] of [
   ['Ueberfall-Schutz',   "Math.max(0.4, 1 - moduleBonusAt(targetPlanet, 'raidloss')"]
 ]) check('1: der harte Deckel bei ' + name.padEnd(24) + ' ist entfernt', !JS.includes(muster));
 
-/* Und die Gegenrichtung: Der Huellen-Bonus MUSS hart gedeckelt bleiben - jetzt auf BEIDEN Seiten.
-   Hier stand bis zum 21.08.2026 "solange der Server ihn nicht kennt" mit der Pruefung, dass 'hull'
-   im Backend GAR NICHT vorkommt. Das war richtig und ist ueberholt: Seit der Angleichung der
-   Flottenverteidigung rechnet der Server den Huellen-Bonus mit (er hatte dem Verteidiger vorher
-   bis zu 100 % unterschlagen). Die Pruefung ist damit nicht schwaecher geworden, sondern
-   STAERKER - aus "eine Seite kennt ihn nicht" wird "beide deckeln ihn gleich hart".
-   Faellt sie, hat jemand eine der zwei Seiten einseitig auf den weichen Deckel umgestellt, und
-   Anzeige und Kampf laufen wieder auseinander. */
-check('1: der Huellen-Bonus ist auf BEIDEN Seiten hart gedeckelt',
-  JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))")
-  && /Math\.min\(1\.0, huelle\[klasse\] \|\| 0\)/.test(BE),
-  { frontend: JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))"),
-    backend: /Math\.min\(1\.0, huelle\[klasse\] \|\| 0\)/.test(BE) });
+// Und die Gegenrichtung: Huellen- und Schild-Kanal muessen auf BEIDEN Seiten gleich behandelt
+// werden.
+//
+// HIER STAND BIS ZUM 22.08.2026 eine Momentaufnahme (Hausregel 3): "der Huellen-Bonus bleibt hart,
+// SOLANGE der Server ihn nicht kennt", geprueft als `!/'hull'/.test(BE)`. Backend #156 hat die
+// serverseitige Verteidigung angeglichen und kennt 'hull'/'shield' seither - die Pruefung fiel
+// damit auf voellig richtigem Code durch, und zwar auf `origin/main`. Die geprueften Deckel
+// stimmten die ganze Zeit ueberein; falsch war die BEDINGUNG, nicht die Sache. Nachgemessen:
+//     Frontend  Math.min(1.0, shipModuleBonusFor(cls, 'hull'))   Schild ungedeckelt
+//     Backend   Math.min(1.0, huelle[klasse] || 0)               Schild ungedeckelt
+// (der Backend-Kommentar sagt es woertlich: "bewusst UNGEDECKELT, wie im Frontend").
+//
+// Geprueft wird jetzt die Sache, und das faengt MEHR als vorher (Hausregel 43): Frontend und
+// Backend muessen den Huellen-Bonus beide hart deckeln UND den Schild beide ungedeckelt lassen.
+// Ein einseitiges Umstellen faellt damit in BEIDE Richtungen auf - vorher war nur die eine
+// Richtung abgedeckt, und auch die nur, solange der Server den Kanal gar nicht kannte.
+const fHuelleHart  = JS.includes("Math.min(1.0, shipModuleBonusFor(cls, 'hull'))");
+const fSchildWeich = /const shieldBonus = cls \? shipModuleBonusFor\(cls, 'shield'\)/.test(JS);
+const bHuelleHart  = /Math\.min\(1\.0,\s*huelle\[klasse\]/.test(BE);
+const bSchildWeich = /const sb = schild && klasse \? \(schild\[klasse\] \|\| 0\)/.test(BE);
+check('1: der Huellen-Deckel ist im Frontend hart', fHuelleHart);
+check('1: der Schild bleibt im Frontend ungedeckelt', fSchildWeich);
+if (hatBackend){
+  check('1: der Huellen-Deckel ist auch im Backend hart', bHuelleHart, { frontend: fHuelleHart, backend: bHuelleHart });
+  check('1: der Schild bleibt auch im Backend ungedeckelt', bSchildWeich, { frontend: fSchildWeich, backend: bSchildWeich });
+}
 
 // ---- 2) PARITAET: beide Fassungen ausgefuehrt und verglichen
 if (hatBackend){

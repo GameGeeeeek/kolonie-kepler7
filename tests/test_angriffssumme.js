@@ -49,7 +49,19 @@ check('ATTACK_SHIP_KEYS gefunden', ATTACK.length >= 20, ATTACK.length);
 const CARGO_TABELLE = schnitt('const CARGO_PER_SHIP = {', '};');
 const NUR_TRANSPORT = (CARGO_TABELLE.match(/(\w+)\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
 check('Transport-Ausnahme aus CARGO_PER_SHIP gelesen', NUR_TRANSPORT.length >= 2, NUR_TRANSPORT);
-const KAMPF = ATTACK.filter(k => NUR_TRANSPORT.indexOf(k) < 0);
+// Seit dem Urmaterie-Koloss (21.08.2026, Etappe D) ist "hat Frachtraum" NICHT mehr gleichbedeutend
+// mit "kaempft nicht": Er traegt 250 Angriff bei 2.000 Frachtraum und ist ausdruecklich als Hybrid
+// gebaut. Die Grenze laeuft deshalb am eigenen Angriffswert aus SHIP_DEFS - datengetrieben, damit
+// ein zweiter solcher Rumpf hier nicht wieder von Hand nachgetragen werden muss.
+const SHIP_BLOCK = schnitt('const SHIP_DEFS = [', '\n  ];');
+check('SHIP_DEFS-Block gelesen', SHIP_BLOCK.length > 5000, SHIP_BLOCK.length);
+const atkAus = k => { const z = new RegExp("\\{ ?key:'" + k + "'[^\\n]*").exec(SHIP_BLOCK);
+  if (!z) return null; const m = /atk:(\d+)/.exec(z[0]); return m ? +m[1] : 0; };
+const TRANSPORT_OHNE_WAFFEN = NUR_TRANSPORT.filter(k => !(atkAus(k) > 0));
+const TRANSPORT_BEWAFFNET   = NUR_TRANSPORT.filter(k =>   atkAus(k) > 0);
+check('die Aufteilung greift (es gibt reine Transporter)', TRANSPORT_OHNE_WAFFEN.length >= 2,
+  { ohneWaffen: TRANSPORT_OHNE_WAFFEN, bewaffnet: TRANSPORT_BEWAFFNET });
+const KAMPF = ATTACK.filter(k => TRANSPORT_OHNE_WAFFEN.indexOf(k) < 0);
 
 // ---- 1) attackPowerRaw(): jede Kampfklasse trägt einen Angriffswert bei
 {
@@ -61,9 +73,15 @@ const KAMPF = ATTACK.filter(k => NUR_TRANSPORT.indexOf(k) < 0);
   // Gegenprobe: Der Ausschnitt muss wirklich die Summe enthalten, sonst waere obiges still gruen.
   check('1: die Gegenprobe greift (der Ausschnitt enthaelt die Summe)',
     /dm\('cruisers'/.test(fn) && /dm\('destroyers'/.test(fn), fn.slice(0, 80));
-  // Frachter gehoeren AUSDRUECKLICH nicht hinein - sie transportieren, sie kaempfen nicht.
-  check('1: Frachter tragen weiterhin keine Angriffskraft bei',
-    NUR_TRANSPORT.every(k => fn.indexOf("dm('" + k + "'") < 0), NUR_TRANSPORT);
+  // Reine Frachter gehoeren AUSDRUECKLICH nicht hinein - sie transportieren, sie kaempfen nicht.
+  check('1: reine Frachter tragen weiterhin keine Angriffskraft bei',
+    TRANSPORT_OHNE_WAFFEN.every(k => fn.indexOf("dm('" + k + "'") < 0), TRANSPORT_OHNE_WAFFEN);
+  // Die Gegenrichtung, und sie ist der eigentliche Zuwachs dieser Runde: Ein Frachtschiff MIT
+  // eigenem Angriffswert muss sehr wohl in der Summe stehen. Ohne diese Zeile waere die Ausnahme
+  // oben eine reine Lockerung - man koennte den Koloss aus der Summe nehmen, und niemand merkte es.
+  check('1: ein bewaffneter Transporter steht sehr wohl in der Summe',
+    TRANSPORT_BEWAFFNET.every(k => fn.indexOf("dm('" + k + "'") >= 0),
+    TRANSPORT_BEWAFFNET.map(k => k + (fn.indexOf("dm('" + k + "'") >= 0 ? ' (drin)' : ' (FEHLT)')));
 }
 
 // ---- 2) combatFleetCount(): aus der Liste abgeleitet, nicht von Hand gefuehrt
@@ -77,6 +95,13 @@ const KAMPF = ATTACK.filter(k => NUR_TRANSPORT.indexOf(k) < 0);
     /KAMPF_SHIP_KEYS/.test(fn), fn.replace(/\s+/g, ' ').slice(0, 200));
   check('2: und zaehlt Jaeger/Bomber weiterhin nur mit Hangarplatz',
     /df\.jaeger/.test(fn) && /df\.bomber/.test(fn), fn.replace(/\s+/g, ' ').slice(0, 200));
+  // Ein bewaffneter Transporter muss auch in KAMPF_SHIP_KEYS landen - sonst traegt er zwar
+  // Angriffskraft bei, faellt aber aus Vorauswahl, Kampfschiff-Sperre, Verteidigung, Allianz-
+  // Entsendung und Veteranen-XP heraus. Gemessen an der ABLEITUNG, nicht am Namen des Schiffs.
+  const kampfZeile = schnitt('const KAMPF_SHIP_KEYS', ';');
+  check('2b: KAMPF_SHIP_KEYS nimmt bewaffnete Transporter auf',
+    TRANSPORT_BEWAFFNET.length === 0 || /CARGO_SHIP_KEYS\.includes\(k\) \|\|/.test(kampfZeile),
+    kampfZeile.replace(/\s+/g, ' ').slice(0, 160));
 }
 
 // ---- 3) Das Backend kennt dieselben Klassen

@@ -112,8 +112,15 @@ for (const m of S.matchAll(/if \(keepProto > 0\) state\.resources\.protomaterie 
 check('3b: und zwar NACH applyStateDefaults, sonst löscht die es sofort wieder', reihenfolgeOk, stellen);
 
 // ---- 4) Niemals unbezahlbar -------------------------------------------------------------------
-const K = block('4', '  const PROTOMATERIE_JE_FUHRE = ', '\n  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = 100;', '',
-  '{ fuhre: PROTOMATERIE_JE_FUHRE, basis: PROTOMATERIE_LAGER_BASIS, jeStufe: PROTOMATERIE_LAGER_JE_AUFBEREITUNG }');
+/* Endanker auf die NAECHSTE Funktion statt auf den WERT der letzten Konstante (21.08.2026):
+   Er lautete '= 100;' und wurde von Etappe D (100 -> 150) entwertet - der Block war damit
+   unauffindbar. Ein Anker, der einen Balance-Wert zitiert, ist eine Momentaufnahme
+   (Arbeitsregel 3); die Funktionszeile daneben ist eine Grenze, die nur ein Umbau verschiebt.
+   Sie steht VOLLSTAENDIG da, weil block() den Marker an den Ausschnitt ANHAENGT - ein halber
+   Funktionskopf als Marker ergaebe einen Syntaxfehler statt eines Messwerts. */
+const K = block('4', '  const PROTOMATERIE_SORTE = ', '\n  function asteroidSorte(k){ return ASTEROID_SORTEN.find(s => s.key === k) || ASTEROID_SORTEN[0]; }', '',
+  '{ fuhre: PROTOMATERIE_JE_FUHRE, basis: PROTOMATERIE_LAGER_BASIS, jeStufe: PROTOMATERIE_LAGER_JE_AUFBEREITUNG, '
+  + 'jeFuhre: protoJeFuhre, faktor: protoSchuerferFaktor, vollAb: PROTO_VOLL_AB_SCHUERFERN, sorte: PROTOMATERIE_SORTE }');
 const M = block('4m', '  const MEGA_PROTO_AB_STUFE = ', '\n  }', 'const MEGA_STAGE_COST_MULT = 2.6;\nconst MEGA_T2_AB_STUFE = 2;\n',
   '{ ab: MEGA_PROTO_AB_STUFE, jeStufe: MEGA_PROTO_JE_STUFE, max: MEGA_PROTO_MAX, proto: megaStageProto }');
 // Die Maximalstufe der Aufbereitungsanlage aus den Daten holen, nicht eintippen: Sie bestimmt den
@@ -172,6 +179,41 @@ if (SC && M && K && aufbMax > 0) {
   const mitgewachsen = T2KEYS.filter(k => t2skaliert[k] !== 1000);
   check('4d: kein veredelter Posten wächst mit dem Imperium (sonst über dem Lagerdeckel)',
     mitgewachsen.length === 0, { mitgewachsen, beispiel: t2skaliert[T2KEYS[0]] });
+}
+
+/* ===== 9) Das Farming-Loch (Etappe D, 21.08.2026) =========================================
+   Die Protomaterie haengt allein an der GROESSE des Vorkommens - eine Fuhre mit EINEM
+   Schuerfschiff brachte deshalb exakt so viel wie eine mit fuenfzig. Wer Flottenplaetze hatte,
+   konnte sie in Ein-Schiff-Pendelrouten zerlegen und die Ausbeute vervielfachen, ohne je eine
+   Bergbauflotte zu bauen.
+   Gemessen wird die WIRKUNG, nicht die Beschriftung (Arbeitsregel 61): dasselbe Vorkommen,
+   verschiedene Schuerferzahlen, und die Menge muss sich unterscheiden. Ein `grep` nach dem
+   Faktornamen waere auch dann gruen, wenn er nirgends multipliziert wird.
+   Ausgefuehrt statt gelesen (Arbeitsregel 43) - der Block kommt aus der Spieldatei selbst. */
+if (K) {
+  const koloss = { sorte: K.sorte, groesse: 'koloss' };
+  const voll  = K.jeFuhre(koloss, { schuerfschiff: K.vollAb });
+  const halb  = K.jeFuhre(koloss, { schuerfschiff: Math.floor(K.vollAb / 2) });
+  const eins  = K.jeFuhre(koloss, { schuerfschiff: 1 });
+  const drueber = K.jeFuhre(koloss, { schuerfschiff: K.vollAb * 5 });
+  check('9-vorab: die Funktion ist mit Flotte ausfuehrbar', voll > 0, { voll, vollAb: K.vollAb });
+  check('9a: ab der Schwelle gibt es die VOLLE Menge', voll === K.fuhre.koloss, { voll, erwartet: K.fuhre.koloss });
+  check('9b-WIRKUNG: eine Ein-Schiff-Fuhre bringt messbar WENIGER', eins < voll && eins > 0,
+    { eins, voll, verhaeltnis: +(eins / voll).toFixed(3) });
+  check('9c: und zwar linear - die halbe Flotte bringt die halbe Menge',
+    Math.abs(halb - voll * (Math.floor(K.vollAb / 2) / K.vollAb)) < 0.01, { halb, voll });
+  /* Die Gegenrichtung ist der eigentliche Balance-Punkt: KEINE Skalierung ueber der Schwelle.
+     Ohne sie waere die Protomaterie ploetzlich mengenskaliert - genau die Falle aus Regel 41,
+     gegen die der fixe Fuhren-Charakter gebaut ist. */
+  check('9d-Gegenrichtung: ueber der Schwelle bringt mehr Flotte NICHT mehr',
+    drueber === voll, { drueber, voll });
+  /* Frachter duerfen nicht zaehlen - sonst waere zehn Frachter plus ein Schuerfschiff wieder
+     dieselbe Pendelroute, nur teurer. */
+  const nurFrachter = K.jeFuhre(koloss, { schuerfschiff: 1, frachter: 50, frachtergross: 50 });
+  check('9e: Frachter zaehlen NICHT auf die Schwelle', nurFrachter === eins, { nurFrachter, eins });
+  /* Und eine Sorte ohne Protomaterie bleibt bei 0, egal wie gross die Flotte ist. */
+  check('9f: eine fremde Sorte bringt weiterhin nichts',
+    K.jeFuhre({ sorte: 'eisen', groesse: 'koloss' }, { schuerfschiff: 99 }) === 0, {});
 }
 
 // ---- 5) Niemand wird blockiert ----------------------------------------------------------------
@@ -237,19 +279,32 @@ if (K) {
    geblieben und sogar wichtiger geworden: Beide Stellen muessen `protoJeFuhre(a)` rufen UND den
    Faktor anwenden. Genau hier hat diese Pruefung beim Bau der Phase 1 einen echten Fehler
    gefangen - die Vorschau drosselte, der Missionsstart fror die volle Menge ein. */
-const rufe = (S.match(/protoJeFuhre\(a\)/g) || []).length;
+/* 21.08.2026 (Etappe D): Die Muster hier hingen an der AUFRUFFORM `protoJeFuhre(a)` und rissen,
+   als die Funktion mit dem Schuerfer-Faktor eine zweite Angabe bekam - obwohl die geprueefte
+   Eigenschaft unveraendert galt (Arbeitsregel 3: die REGEL pruefen, nicht die Schreibweise).
+   Sie sind jetzt signaturunabhaengig UND um eine Richtung staerker: Keine Aufrufstelle darf die
+   FLOTTE weglassen. Ohne sie liefert protoSchuerferFaktor still 1 - die Vorschau versprraeche die
+   volle Menge und die Buchung kuerzte, also genau die Dopplung, gegen die dieser Block gebaut ist. */
+const rufe = (S.match(/protoJeFuhre\(a[,)]/g) || []).length;
 check('6c: Vorschau und Missionsstart rufen dieselbe Funktion (mind. 2 Fundstellen)', rufe >= 2, { gefunden: rufe });
-const mitFaktor = (S.match(/Math\.round\(protoJeFuhre\(a\) \* [\w.]+\)/g) || []);
+const mitFaktor = (S.match(/Math\.round\(protoJeFuhre\(a[^)]*\) \* [\w.]+\)/g) || []);
 check('6c-faktor: und BEIDE wenden den Festungs-Faktor an', mitFaktor.length === 2,
   { gefunden: mitFaktor, hinweis: 'eine Stelle ohne Faktor heisst: Vorschau und Buchung laufen auseinander' });
+const ohneFlotte = (S.match(/protoJeFuhre\(a\)/g) || []).length;
+check('6c-flotte: KEINE Aufrufstelle laesst die Flotte weg', ohneFlotte === 0,
+  { ohneFlotte, hinweis: 'ohne Flotte ist der Schuerfer-Faktor still 1 - Vorschau und Buchung laufen auseinander' });
 const defs = (S.match(/function protoJeFuhre\(/g) || []).length;
 check('6c2: und es gibt genau eine Definition davon', defs === 1, { definitionen: defs });
 // Der Kern der Umstellung: Die Funktion fragt die SORTE, nicht nur die Groesse. Ohne diese
 // Pruefung waere 6c auch dann gruen, wenn protoJeFuhre die Sorte gar nicht ansieht.
-const rumpf = (() => { const v = S.indexOf('  function protoJeFuhre(a){'); const b = v < 0 ? -1 : S.indexOf('\n  }', v); return v >= 0 && b > v ? S.slice(v, b) : ''; })();
+const rumpf = (() => { const v = S.indexOf('  function protoJeFuhre(a, flotte){'); const b = v < 0 ? -1 : S.indexOf('\n  }', v); return v >= 0 && b > v ? S.slice(v, b) : ''; })();
 check('6d-anker: protoJeFuhre ist auffindbar', rumpf.length > 0, { laenge: rumpf.length });
+/* Geprueft wird die EIGENSCHAFT, nicht die Schreibweise des Vergleichs: Seit Etappe D steigt die
+   Funktion mit `a.sorte !== PROTOMATERIE_SORTE` frueh aus, statt `===` in einem Ternaer zu fuehren.
+   Beides erfuellt dieselbe Zusage - ein Muster auf genau ein Zeichen waere eine Momentaufnahme
+   (Arbeitsregel 3). Verlangt bleibt: Die Sorte wird ueberhaupt befragt UND die Groesse geht ein. */
 check('6d: sie entscheidet an der SORTE, nicht an der Größe allein',
-  /a\.sorte === PROTOMATERIE_SORTE/.test(rumpf) && /PROTOMATERIE_JE_FUHRE\[a\.groesse\]/.test(rumpf), rumpf);
+  /a\.sorte\s*[!=]==\s*PROTOMATERIE_SORTE/.test(rumpf) && /PROTOMATERIE_JE_FUHRE\[a\.groesse\]/.test(rumpf), rumpf);
 // Und die Sorte, auf die sie zeigt, muss es in ASTEROID_SORTEN wirklich geben - ein Tippfehler
 // im Schluesselnamen ergaebe eine Ressource, die NIE anfaellt, und kein Test wuerde es merken.
 const sorteKey = (S.match(/const PROTOMATERIE_SORTE = '([a-z]+)'/) || [])[1];

@@ -74,15 +74,33 @@ try {
   process.exit(1);
 }
 
+/* GEFOERDERTE Ressourcen haben kein T1-Aequivalent, und das ist kein Mangel, sondern ihre Natur:
+   Protomaterie entsteht nicht aus einem Rezept, sondern aus Flugzeit an einem Asteroiden. Ein
+   Wert dafuer waere erfunden (Arbeitsregel 41), und ohne Wert fiel das ganze Schiff aus der
+   Kurvenpruefung - der Urmaterie-Koloss (Etappe D) entkam damit dem Ausreisser-Waechter komplett.
+   Gemessen wird deshalb der AUFLOESBARE Teil, und der gefoerderte Anteil wird getrennt gefuehrt
+   (Pruefung 2f unten haelt ihn gegen seinen Lagerdeckel - fuer eine Tor-Ressource ist das die
+   richtige Schranke, nicht ein Preisvergleich).
+   Die Liste ist NAMENTLICH: Ein Tippfehler in einem Ressourcenschluessel muss weiterhin dazu
+   fuehren, dass das Schiff als unmessbar gilt - genau das faengt 1a-abdeckung. */
+const NUR_GEFOERDERT = ['protomaterie'];
 function aufwand(key) {
+  const z = aufwandDetail(key);
+  return z ? z.wert : null;
+}
+function aufwandDetail(key) {
   let f = fns[key] || fns[key === 'frachtergross' ? 'frachterGross' : key];
   if (!f) return null;
   const mm = f.match(/scaledShipCost\(\s*(\{[^}]*\})/) || f.match(/(\{[^}]*\})/);
   if (!mm) return null;
   let o; try { o = eval('('+mm[1]+')'); } catch (e) { return null; }
-  let s = 0;
-  for (const [r, a] of Object.entries(o)) { if (wert[r] === undefined) return null; s += wert[r]*a; }
-  return s;
+  let s = 0; const gefoerdert = {};
+  for (const [r, a] of Object.entries(o)) {
+    if (wert[r] !== undefined) { s += wert[r]*a; continue; }
+    if (NUR_GEFOERDERT.includes(r)) { gefoerdert[r] = a; continue; }
+    return null;   // unbekannter Schluessel: weiterhin unmessbar, damit ein Tippfehler auffaellt
+  }
+  return { wert: s, gefoerdert };
 }
 
 // ===== 1: Kampfschiffe - Aufwand je Angriffspunkt =========================================
@@ -200,7 +218,15 @@ check('2a-abdeckung: alle Frachttypen sind messbar', fracht.length === Object.ke
 
 // Die beiden GROSSEN Frachter müssen zueinander passen - genau hier lag der Fehler (b).
 // Der kleine Frachter darf teurer je Einheit sein: er ist das Einstiegsschiff.
-const gross = fracht.filter(f => f.cargo >= 1000).sort((a,b) => a.cargo - b.cargo);
+/* Verglichen werden nur Schiffe, deren ZWECK Fracht ist - also die ohne Angriffswert. Der
+   Urmaterie-Koloss (Etappe D) traegt 2.000 Fracht UND 250 Angriff; sein Preis kauft beides, und
+   je Frachteinheit liegt er gemessen 11,7-fach ueber dem Grossfrachter. Ihn hier mitzuzaehlen
+   verglich Kampfschiff mit Transporter und haette die Pruefung dauerhaft rot stehen lassen -
+   ein Fehlschlag vom ersten Tag an entwertet den ganzen Lauf (Arbeitsregel 53).
+   Abgegrenzt wird DATENGETRIEBEN ueber den Angriffswert, nicht ueber eine Namensliste: Ein
+   kuenftiges Fracht-Kampf-Schiff faellt automatisch heraus, ein neuer reiner Frachter automatisch
+   hinein. Die Kurvenpruefung oben fasst den Koloss weiterhin an - dort gehoert er hin. */
+const gross = fracht.filter(f => f.cargo >= 1000 && !(atkTab[f.k] > 0)).sort((a,b) => a.cargo - b.cargo);
 check('2b-vorab: es gibt mindestens zwei grosse Frachttypen zum Vergleichen', gross.length >= 2,
   { gross: gross.map(g => g.k) });
 if (gross.length >= 2) {
@@ -227,6 +253,35 @@ if (kampfJePunkt.length && fracht.length) {
   check('2e-keine Punkte-Abkürzung: kein Frachter ist je Punktegewicht billiger als das billigste Kampfschiff',
     billigsterFracht >= billigsterKampf * 0.5,
     { billigsterFrachter: +billigsterFracht.toFixed(1), billigstesKampfschiff: +billigsterKampf.toFixed(1) });
+}
+
+/* ===== 2f: gefoerderte Kostenanteile passen unter ihren Speicher ==========================
+   Arbeitsregel 57: Eine Zahlung muss in den SPEICHER passen, nicht nur in den Zufluss. Fuer eine
+   gefoerderte Tor-Ressource ist das die einzige sinnvolle Schranke - ein Preisvergleich gegen
+   T1-Aequivalente gibt es fuer sie nicht. Der Deckel wird aus der Spieldatei GELESEN, nicht
+   eingetippt (Arbeitsregel 2). Ein Schiff, dessen Tor-Anteil ueber dem Speicher laege, waere
+   nicht teuer, sondern unbaubar. */
+{
+  const protoBasis = Number((js.match(/const PROTOMATERIE_LAGER_BASIS = (\d+)/) || [])[1]);
+  const protoJeStufe = Number((js.match(/const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = (\d+)/) || [])[1]);
+  const aufMax = Number((js.match(/key:'aufbereitung'[\s\S]{0,900}?maxLevel: ?(\d+)/) || [])[1]);
+  const deckel = { protomaterie: (protoBasis > 0 && protoJeStufe > 0 && aufMax > 0) ? protoBasis + aufMax * protoJeStufe : 0 };
+  check('2f-vorab: der Protomaterie-Deckel ist aus der Datei lesbar', deckel.protomaterie > 0,
+    { protoBasis, protoJeStufe, aufMax, deckel: deckel.protomaterie });
+  const drueber = [], mitTor = [];
+  for (const k of Object.keys(fns)) {
+    const d = aufwandDetail(k);
+    if (!d || !Object.keys(d.gefoerdert).length) continue;
+    mitTor.push(k);
+    for (const [r, a] of Object.entries(d.gefoerdert))
+      if (!(a < (deckel[r] || 0))) drueber.push({ schiff: k, res: r, menge: a, deckel: deckel[r] || 0 });
+  }
+  check('2f: jeder gefoerderte Kostenanteil passt unter seinen Lagerdeckel',
+    drueber.length === 0, { drueber, geprueft: mitTor });
+  /* Gegenrichtung (Arbeitsregel 33): Verschwindet der letzte Tor-Anteil, steht die
+     NUR_GEFOERDERT-Ausnahme oben sinnlos da - und niemand merkt es. */
+  check('2f2: es gibt weiterhin mindestens ein Schiff mit gefoerdertem Kostenanteil',
+    mitTor.length > 0, { mitTor });
 }
 
 // ===== 3: die Reform selbst - der Stückpreis hängt NICHT mehr am Bestand ==================
