@@ -3414,6 +3414,92 @@ am alten Stand fallen genau die zwei.
    und fiel auf korrektem Code durch. Ersetzt durch einen auf den Verdrahtungsblock **gescopten**
    Ausschnitt (Regel 39): Ein `stopPropagation` irgendwo sonst in der Datei belegt hier nichts.
 
+## KB-21: die Regionsübersicht war am Handy nicht lesbar (22.08.2026)
+
+Der offene Rest aus E1b Teil 2 — dort stand als benannte Grenze: „Am Handy sind **alle**
+Beschriftungen der Übersicht 6–9 px hoch, also kaum lesbar. Das ist eine eigene Etappe wert."
+
+**Die Ursache ist eine Einheit, nicht eine Zahl.** Die vier Beschriftungen standen in
+SVG-**Nutzerkoordinaten** fest (15 / 10,5 / 10 / 13), während die Skala am Formfaktor hängt.
+Gemessen:
+
+| | Kasten | Skala | Regionsname | Metazeile |
+|---|---|---|---|---|
+| PC 1600×1040 | 1088 px | 0,785 | 11,8 px | 7,9 px |
+| Handy 390×844 | 348 px | 0,313 | **4,7 px** | **3,1 px** |
+
+Dieselbe Zeichnung, ein Drittel der Größe. Und der Konturstrich (`paint-order:stroke`,
+3 Nutzereinheiten) ist bei dieser Schriftgröße fast so breit wie die Glyphen — die drei Zeilen in
+27 Einheiten Abstand fraßen einander an. Gezählt über **alle** Textpaare der acht Regionen:
+**8 Überlappungen** bei 390×844 und **14** bei 360×640.
+
+### Zwei Änderungen, und die zweite ist die wirksamere
+
+- **`KB_UEBERSICHT_MIN_PX` = 9** ist die eine benannte Größe, aus der Schriftgrößen,
+  Zeilenabstände, Konturstriche und das Trefferfeld der Abzeichenzeile abgeleitet werden
+  (Regel 50). Der Faktor kommt aus der **gemessenen** Skala (`uRect.width / (x1-x0)`) und ist
+  nach unten **bei 1 gedeckelt**: Am PC ist er gerechnet 0,76, dort bleibt also alles byte-genau
+  wie vorher. Eine Schrift, die wächst, während ihr Zeilenabstand steht, klebt zusammen — deshalb
+  hängt beides an derselben Zahl.
+- **Am schmalen Kasten fällt die Zeile „N Systeme" weg** und wandert in `<title>` und
+  `aria-label`. Sie ist die einzige der drei, die der Spieler auch abzählen kann (die Punkte
+  stehen daneben); die Eigenschaft dagegen ist eine Spielmechanik und bleibt — sie war Gegenstand
+  einer eigenen Etappe mit der ausdrücklichen Begründung „ein Bonus, den nur der Quelltext kennt,
+  gibt es für den Spieler nicht".
+
+Gemessen danach, an vier Fensterbreiten:
+
+| | Regionsname | Metazeile | Überlappungen |
+|---|---|---|---|
+| Handy 390×844 | 4,7 → **9,0 px** | 3,1 → **6,0 px** | 8 → **2** |
+| Handy 360×640 | — | — | 14 → **3** |
+| PC 1600×1040 | 11,8 (unverändert) | 7,9 (unverändert) | 8 (unverändert) |
+
+### Der Block-Schieber wurde gebaut, gemessen und WIEDER ENTFERNT
+
+Der naheliegende dritte Schritt war ein Entflechter für die Beschriftungsblöcke — dasselbe Muster
+wie `kbLabelsEntflechten` (KB-16) und `kbMarkerFrei` (KB-13), nur eine Ebene größer: den ganzen
+Block (Name, Eigenschaft, Abzeichen) verschieben, gedeckelt, erst senkrecht und dann seitlich.
+Er war fertig, lief und **brachte gemessen 3 auf 2 an genau einer Fensterbreite und sonst nichts.**
+
+**Der Grund ist geometrisch und deshalb übertragbar: Ein Schieber löst gar nichts, wenn die zu
+trennenden Objekte zusammen breiter sind als ihr Abstand.** Der Solmark-Block ist bei dieser
+Schriftgröße 322 Sektor-Einheiten breit, der Obsidian-Block 244, und ihre Regionen liegen rund 200
+Einheiten auseinander — 566 gegen 200. Es gibt keine Position, in der sie sich nicht überlappen;
+der Deckel von 50 Einheiten war dabei nicht einmal die bindende Schranke. Was hier wirkt, sind
+kürzere **Namen** oder mehr Abstand, nicht mehr Rechnung.
+
+Sechzig Zeilen für eine Überlappung an einer Breite sind keine Behebung. Der Schieber ist deshalb
+raus, und die Begründung steht als Kommentar an `KB_UEBERSICHT_MIN_PX` — wer die Zahl anhebt,
+liest dort zuerst, warum Schieben die Antwort nicht ist.
+
+**Die verbleibende Solmark/Obsidian-Überlappung steht NAMENTLICH im Wächter** (`4c`), nicht
+pauschal ausgeblendet — dieselbe Behandlung wie „Deine Basis"/Rhea in KB-16. Jede andere fällt auf.
+
+### Drei Fehler am eigenen Wächter, jeder eine bekannte Familie
+
+1. **`getComputedStyle(text).fontSize` liefert an einem SVG-Text NUTZERkoordinaten, nicht
+   Bildschirmpixel** — also genau die Größe, um die es in dieser Etappe geht, in der falschen
+   Einheit. Die erste Fassung verglich 15 gegen eine Pixel-Schranke und fiel auf korrektem Code
+   durch. Die effektive Größe ist erst `fontSize × Skala`.
+2. **Der Namensfilter traf die Abzeichenzeile mit.** Sie setzt nur `font-size` und **erbt**
+   `system-ui` vom SVG; ein Filter auf die Schriftfamilie meldete deshalb am PC 13 px statt der 15
+   des Namens (Regel 51: über die benannte Rolle greifen, nie über einen Wert, den auch Nachbarn
+   tragen). Gegriffen wird jetzt über `data-sektor-hinweise`.
+3. **Die Tipp-Prüfung ließ `null` als Bestehen durchgehen** — und `null` heißt, dass
+   `elementFromPoint` gar nichts getroffen hat, weil die Zeile außerhalb des Fensters lag. Der
+   Kommentar daneben behauptete sogar, es werde vorher hereingescrollt; der Code tat es nicht
+   (Regel 28, dazu ein Kommentar, der eine ungemessene Begründung führt).
+
+**Und die Kollisionszählung war aus dem falschen Grund grün.** Sie zählte zuerst nur Paare
+zwischen **verschiedenen** Regionen — und die waren am alten Stand genauso 2 wie heute. Der ganze
+gemessene Gewinn liegt **innerhalb** der Regionen, wo die drei Zeilen einander anfraßen. Eine
+Prüfung, die den Gegenstand ihrer Etappe nicht misst, ist keine, auch wenn sie plausibel aussieht.
+
+Wächter: `tests/test_uebersicht_schrift.js` (14 Prüfungen). Gegenprobe gegen `origin/main`:
+**9 rot bei identischer Prüfliste** (per `diff` über die reinen Prüfnamen verglichen, nicht
+gezählt — Regel 60).
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
@@ -3449,8 +3535,12 @@ Fehler, den dieses Projekt bei den Bonusgruppen schon einmal gemacht hat. Gemess
 
 **Die vier gemessenen Lücken** (das ist das eigentliche Projekt):
 
-1. `SHIP_MODULE_DEFS` (44 Module) hat **keinen einzigen** Set-Bonus — 0 Treffer. Die direkteste
-   Umsetzung des Auftrags, auf einem System, das die Mechanik noch nicht hat.
+1. ~~`SHIP_MODULE_DEFS` (44 Module) hat **keinen einzigen** Set-Bonus — 0 Treffer.~~
+   **ERLEDIGT am 21.08.2026 mit v8.607.0** (`SHIP_MODULE_SET_DEFS`, acht Klassen-Sets, Wächter
+   `tests/test_schiffsmodul_sets.js` — eigener Abschnitt weiter unten). Der Satz stand hier noch
+   als offene Lücke, während die Etappe längst live war, und hat mich am 22.08.2026 dazu
+   gebracht, sie ein zweites Mal vorzuschlagen — **eine Doku-Zeile ist kein Messwert**
+   (Regel 10/69): Vor jedem Vorschlag aus einer solchen Liste einmal `grep` gegen die Spieldatei.
 2. Alle 20 Boss-Set-Teile fallen **ausschließlich** nach einer Allianz-Raid-Welle. Solo ist keines
    davon je erreichbar — die größte inhaltliche Sperre im Modulsystem.
 3. Keine gestufte Schwierigkeit mit **eigenem** Beutetisch: Ein Boss lässt dieselben Teile fallen,

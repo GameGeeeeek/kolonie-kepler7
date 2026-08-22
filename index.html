@@ -7204,8 +7204,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.610.0';
+  const VERSION = '8.611.0';
   const PATCHNOTES = [
+    { version:'8.611.0', date:'22.08.2026', changes:[
+      '<strong>Die Regionsnamen auf der Karte sind am Handy endlich lesbar.</strong> Sie standen in festen Zeichenmaßen, während die Karte je nach Bildschirmbreite unterschiedlich stark verkleinert wird – am PC kamen davon 11,8 Bildpunkte an, am Handy 4,7. Die Schrift richtet sich jetzt nach der tatsächlichen Darstellungsgröße: Der Regionsname wächst am Handy von 4,7 auf 9,0 Bildpunkte, die Zeile mit der Sektor-Eigenschaft von 3,1 auf 6,0. Am PC ändert sich nichts.',
+      '<strong>Am Handy fällt die Zeile „N Systeme" weg.</strong> Drei Zeilen samt Konturstrich passten dort nicht nebeneinander – über alle acht Regionen überlappten sich acht Textpaare (auf schmalen Geräten vierzehn), jetzt sind es zwei bzw. drei. Die Zahl ist nicht verloren: Sie steht im Tooltip und in der Vorlesehilfe. Die Sektor-Eigenschaft bleibt sichtbar, sie ist eine Spielregel und kein Beiwerk.',
+      'Eine Überlappung bleibt und ist Absicht: „Solmark-Reichweite" und „Obsidian-Saum" sind zusammen breiter als der Abstand ihrer Regionen – es gibt keine Position, in der sie sich nicht berühren. Ein Verschieber dafür war gebaut und ist wieder ausgebaut worden, weil er messbar fast nichts gebracht hat.',
+    ]},
     { version:'8.610.0', date:'22.08.2026', changes:[
       '<strong>Der Abgrund hat eine zweite Reliquienreihe.</strong> Ab Tiefe 130 warten sechs neue Wächter mit eigenem Namen, eigenem Porträt und einer eigenen Reliquie – vom Spant der Unfertigen bis zur Streichung im Ersten Auftrag. Das Kabinett hat damit achtzehn Fächer statt zwölf, und die Chronik reicht bis Tiefe 180.',
       '<strong>Neu: Tiefen-Meilensteine.</strong> Bei Rekordtiefe 25, 50, 75, 100, 125, 150 und 180 gibt es Sternenessenz und Kredite – zusammen 58 Sternenessenz und 17.800 Kredite. Sie gehören dir dauerhaft: Sternenstaub der Tiefe ist die einzige Währung, die Prestige UND Aufstieg übersteht. Wer schon tief war, bekommt seine Marken beim nächsten Spielstart nachgetragen.',
@@ -56940,6 +56945,25 @@
     if (zielH > (y1 - y0)){ const d = (zielH - (y1 - y0)) / 2; y0 -= d; y1 += d; }
     else { const zielW = (y1 - y0) / uVerh, d = (zielW - (x1 - x0)) / 2; if (d > 0){ x0 -= d; x1 += d; } }
     svg.setAttribute('viewBox', x0.toFixed(1) + ' ' + y0.toFixed(1) + ' ' + (x1-x0).toFixed(1) + ' ' + (y1-y0).toFixed(1));
+    // KB-21: Die Beschriftungen standen in SVG-NUTZERKOORDINATEN fest (15/10,5/10/13), waehrend
+    // die Skala am Formfaktor haengt. Gemessen ergab das am PC 11,8 px Schriftgroesse und am
+    // Handy 4,7 - der Regionsname war dort 7 px hoch, die zwei Metazeilen je 4 px. Der Faktor
+    // hebt jede Beschriftung auf mindestens KB_UEBERSICHT_MIN_PX echte Pixel und ist nach unten
+    // bei 1 gedeckelt: Der PC bleibt damit unveraendert (dort ist er gemessen 0,76), verkleinert
+    // wird nie. EINE benannte Groesse fuer alle vier Zeilen samt Zeilenabstaenden und
+    // Konturstrichen - eine Schrift, die waechst, waehrend ihr Abstand steht, klebt zusammen
+    // (Regel 50).
+    const uSkala = (uRect.width || 400) / (x1 - x0);
+    const uF = Math.max(1, KB_UEBERSICHT_MIN_PX / (15 * uSkala));
+    const uSchmal = kbSchmalerKasten();
+    // Am schmalen Kasten faellt die Zeile "N Systeme" weg - gemessen ist der Engpass dort
+    // SENKRECHT (die Beschriftungsbloecke stossen aneinander, nicht an den Kastenrand), und von
+    // den drei Zeilen ist die Systemzahl die einzige, die der Spieler auch abzaehlen kann: die
+    // Punkte stehen ja daneben. Die Eigenschaft dagegen ist eine Spielmechanik und bleibt
+    // (Etappe "Sektor-Eigenschaften": ein Bonus, den nur der Quelltext kennt, gibt es nicht).
+    // Verloren geht sie nicht - Titel und aria-label nennen sie an beiden Formfaktoren.
+    const uZeileMeta = uSchmal ? 16 : 27;
+    const uZeileHinweis = uSchmal ? 33 : 44;
     let inner = '', gesamt = 0;
     for (const sk of SEKTOR_DEFS){
       const mg = gruppen.get(sk.key);
@@ -56971,23 +56995,23 @@
         // oeffnete bisher die Region, weil der Elternknoten den Klick bekommt. Das Rechteck
         // liegt UNTER der Zeile im freien Bereich des Knotens (Name +0, Systeme +16,
         // Eigenschaft +27, Abzeichen +44) und kapert deshalb keine andere Beschriftung.
-        const trefferB = Math.max(46, hinweise.size * 15 + 22);
+        const trefferB = Math.max(46, hinweise.size * 15 + 22) * uF;
         hinweisMarkup = '<g class="sektor-hinweise" data-sektor-hinweise-treffer="' + sk.key + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml('Hinweise in ' + sk.name + ' anzeigen') + '">'
-          + '<rect x="' + (schwerX - trefferB/2).toFixed(0) + '" y="' + (schwerY+31).toFixed(0) + '" width="' + trefferB.toFixed(0) + '" height="28" fill="transparent"/>'
-          + '<text data-sektor-hinweise="' + hinweise.size + '" x="' + schwerX.toFixed(0) + '" y="' + (schwerY+44).toFixed(0) + '" text-anchor="middle" style="font-size:13px; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + tip + '</title>' + Array.from(hinweise.keys()).join(' ') + '</text>'
+          + '<rect x="' + (schwerX - trefferB/2).toFixed(0) + '" y="' + (schwerY + (uZeileHinweis-13)*uF).toFixed(0) + '" width="' + trefferB.toFixed(0) + '" height="' + (28*uF).toFixed(0) + '" fill="transparent"/>'
+          + '<text data-sektor-hinweise="' + hinweise.size + '" x="' + schwerX.toFixed(0) + '" y="' + (schwerY + uZeileHinweis*uF).toFixed(0) + '" text-anchor="middle" style="font-size:' + (13*uF).toFixed(1) + 'px; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (3*uF).toFixed(1) + 'px;"><title>' + tip + '</title>' + Array.from(hinweise.keys()).join(' ') + '</text>'
           + '</g>';
       }
       // Die Sektor-Eigenschaft steht als eigene Zeile am Knoten (Kurzform) und vollstaendig im
       // Tooltip/aria-label - ein Bonus, den nur der Quelltext kennt, gibt es fuer den Spieler nicht.
       const eigenKurz = sektorEffektKurz(sk);
       const eigenLang = sektorEffektLang(sk);
-      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + eigenLang) + '">'
-        + '<title>' + escapeHtml(sk.name + ' – ' + eigenLang + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
+      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + mg.length + ' Systeme. ' + eigenLang) + '">'
+        + '<title>' + escapeHtml(sk.name + ' – ' + mg.length + ' Systeme – ' + eigenLang + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
         + '<path d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="#39426b" stroke-width="1.4" stroke-linejoin="round"/>'
         + mg.map(p => '<circle cx="' + p.gx + '" cy="' + p.gy + '" r="2.4" fill="' + sk.tint + '" opacity="0.85"/>').join('')
-        + '<text x="' + schwerX.toFixed(0) + '" y="' + schwerY.toFixed(0) + '" text-anchor="middle" style="font:600 15px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;">' + (heimDrin ? '🏠 ' : '') + sk.name + '</text>'
-        + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+16).toFixed(0) + '" text-anchor="middle" style="font:10.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme</text>'
-        + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+27).toFixed(0) + '" text-anchor="middle" style="font:600 10px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + escapeHtml(eigenKurz) + '</text>'
+        + '<text x="' + schwerX.toFixed(0) + '" y="' + schwerY.toFixed(0) + '" text-anchor="middle" style="font:600 ' + (15*uF).toFixed(1) + 'px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (4*uF).toFixed(1) + 'px;">' + (heimDrin ? '🏠 ' : '') + sk.name + '</text>'
+        + (uSchmal ? '' : '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+16*uF).toFixed(0) + '" text-anchor="middle" style="font:' + (10.5*uF).toFixed(1) + 'px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (3*uF).toFixed(1) + 'px;">' + mg.length + ' Systeme</text>')
+        + '<text x="' + schwerX.toFixed(0) + '" y="' + (schwerY+uZeileMeta*uF).toFixed(0) + '" text-anchor="middle" style="font:600 ' + (10*uF).toFixed(1) + 'px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (3*uF).toFixed(1) + 'px;">' + escapeHtml(eigenKurz) + '</text>'
         + hinweisMarkup
         + '</g>';
     }
@@ -57962,6 +57986,18 @@
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
   function kbSchmalerKasten(){ return window.innerWidth <= 700; }
+  // Kleinste Schriftgroesse der Regionsuebersicht in ECHTEN Pixeln (KB-21). 9 ist gemessen und
+  // nicht gewaehlt: Damit bleibt die Zahl der Text-auf-Text-Ueberlappungen zwischen Regionen
+  // gegenueber der alten, winzigen Schrift UNVERAENDERT (gemessen 2 an beiden Handy-Breiten),
+  // waehrend der Regionsname von 7 auf 10-12 px waechst. Bei 12 px Zielgroesse waren es 14.
+  // WER DIE ZAHL ANHEBT, kann die Ueberlappung nicht durch Verschieben aufloesen: Gemessen ist
+  // der Solmark-Block dann 322 Sektor-Einheiten breit und der Obsidian-Block 244, bei rund 200
+  // Einheiten Abstand ihrer Regionen - zwei Beschriftungen, die zusammen breiter sind als ihr
+  // Abstand, ueberlappen in JEDER Position. Ein probeweise gebauter Block-Schieber (senkrecht
+  // und seitlich, gedeckelt wie kbLabelsEntflechten) brachte deshalb gemessen 3 auf 2 an genau
+  // einer Fensterbreite und sonst nichts; er ist bewusst wieder entfernt worden. Was hier wirkt,
+  // sind kuerzere NAMEN oder mehr Abstand - nicht mehr Rechnung.
+  const KB_UEBERSICHT_MIN_PX = 9;
   /* Ab wann ist der Kasten zu HOCH fuer die flache Streifen-Zeichnung? (KB-20)
      Die flache Systemzeichnung ist 600x180 Sektor-Einheiten, also im Verhaeltnis 0,30. Sie fuellt
      einen Kasten mit Verhaeltnis r immer nur zu 0,30/r seiner Hoehe - bei r = 0,5 bleiben also
