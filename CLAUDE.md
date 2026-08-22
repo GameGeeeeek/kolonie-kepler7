@@ -3099,6 +3099,42 @@ nach dem ersten Screenshot von „Kern" auf „Rest" geändert – und das Bild 
 angesehen. Eine Änderung an genau der Eigenschaft, die eine Gestaltungsentscheidung trägt, verlangt
 denselben Blick noch einmal (Regel 48, hier auf eine Anzeige statt auf eine Messung angewandt).
 
+## GR-4 wurde gemessen und NICHT gebaut (21.08.2026)
+
+Seit KB-20b steht im Quelltext, `kbLabelsEntflechten` müsse „zuerst transform-fest" gemacht werden,
+damit das Wurmloch-Portal in den Entflechter aufgenommen werden kann – `getBBox()` liefert für das
+Portal 82 statt der gezeichneten 27,9 Einheiten, weil es die `scale`-Transformation nicht kennt.
+Der Satz stand da als offene Baustelle, mit der Begründung „eine Beschriftung kann das Portal
+überlappen".
+
+**Nachgemessen ist das nicht der Fall.** In allen VIER Fällen – PC und Handy, beide
+Wurmloch-Systeme – überlappt **keine** der 8 bis 10 Beschriftungen das Portal. Gemessen wurde in
+BILDSCHIRM-Koordinaten (`getBoundingClientRect`), also mit allen Transformationen drin: genau das,
+was der Spieler sieht.
+
+**Der Umbau bleibt deshalb ungebaut, und das ist die Entscheidung, nicht ein Aufschub.** Er hätte
+eine CTM-Rechnung gekostet, deren Referenzsystem man erst wählen muss – und die naheliegende Wahl
+ist gemessen falsch: `svg.getCTM()` liefert **3,315**, während Knoten und Texte **1,942** tragen
+(das SVG-Wurzelelement misst zu seinem ELTERN-viewport, nicht zu seiner eigenen viewBox). Man
+bräuchte also ein Referenzelement aus dem Zielsystem oder eine Rückrechnung des 21-Einheiten-
+Versatzes. Das ist tragbare Komplexität – aber nicht für ein Problem, das im Bild nicht vorkommt.
+
+**Zwei Lehren, beide über den Einzelfall hinaus:**
+
+1. **Ein Kommentar, der eine offene Baustelle beschreibt, muss ihren Schaden BEZIFFERN, nicht
+   behaupten.** „Kann überlappen" ist eine Vermutung; „überlappt in 0 von 4 gemessenen Fällen" ist
+   eine Entscheidungsgrundlage. Der Kommentar trägt jetzt die Messung samt Datum – wer den Umbau
+   später doch braucht (etwa weil eine neue Objektart mit eigener Skalierung dazukommt), misst
+   ZUERST neu. Das ist dieselbe Familie wie KB-20i, nur in der nützlichen Richtung: Dort stand eine
+   erfundene Begründung im Kommentar, hier eine ungemessene.
+2. **Der Werkzeugfehler bei der Messung selbst ist der Grund, warum sie fast schiefging.** Der erste
+   Selektor suchte die Portal-Gruppe als „`<g>` mit `scale` im transform" und traf einen
+   Zoom-Container: Portalbreite **786 px** statt 54, und *jede* der zehn Beschriftungen wurde als
+   Überlappung gemeldet. Das Ergebnis sah aus wie ein dringender Befund. Verraten hat es allein die
+   Größenordnung – ein Objekt von 27,9 Sektor-Einheiten kann keine 786 px breit sein. Gegriffen
+   wird jetzt `[data-map-wurmloch]`, also die BENANNTE Rolle (Regel 4/51). **Ein Messwert, der die
+   erwartete Größenordnung um das Vierzehnfache verfehlt, ist ein Werkzeugfehler, kein Befund.**
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
