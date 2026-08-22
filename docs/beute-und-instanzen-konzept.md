@@ -195,6 +195,16 @@ denen dasselbe passiert.
 - **Abgrund: die zweite Reliquienreihe ab Tiefe 130** (steht bereits als Posten 4.5 in der
   Ideenliste) — sechs weitere Reliquien, zwölf weitere Wächternamen, neue Chronik-Einträge. Das ist
   exakt „mehr Dungeon mit exklusiver Beute" und der billigste Teil dieses Abschnitts.
+  **GEBAUT am 22.08.2026 — und „der billigste Teil" war beim Nachmessen falsch.** Die vier
+  Reliquien-Kanäle sind GEDECKELT (`ABGRUND_RELIKT_DECKEL`), und der Splitter-Kanal stand vor der
+  Erweiterung schon bei 0,290 von 0,35 — also 83 %. Eine zweite Reihe im Stil der ersten (je zwei
+  weitere Stücke zu 0,05 plus eine Satz-Stufe) hätte ihn auf 0,44 getrieben; neun Prozentpunkte
+  wären still im Deckel verschwunden, also eine Belohnung, die der Spieler sieht und nie erhält.
+  Gebaut ist die Reihe deshalb mit kleinen, deckelverträglichen Prozenten **plus Tiefen-Meilensteinen
+  in Sternenessenz** — der einzigen Währung ohne Deckel, die Prestige und Aufstieg übersteht
+  (Entscheidung Sascha). Die Zahlen und der Wächter stehen in der CLAUDE.md unter „Abgrund C2".
+  **Übertragbar für C1 und B: Bevor eine Etappe „reines Schreiben" heißt, wird die Schranke gemessen,
+  in die sie einzahlt** (Regel 41 — ein Konzept ist kein Messergebnis, auch das eigene nicht).
 - **Der Beutetisch je Stufe wird ausgeschrieben**, nicht abgeleitet: Ein Spieler muss vorher sehen
   können, wofür er die schwerere Stufe fliegt. Eine Belohnung, die man erst nach dem Kampf kennt,
   ist keine Entscheidung.
@@ -261,10 +271,10 @@ neben ihnen eine sechste zu führen. Sonst ist sie in drei Monaten die veraltete
 
 ## 10. Vorgeschlagene Reihenfolge
 
-| # | Etappe | Warum hier |
-|---|---|---|
-| 1 | **A** — Schiffsmodul-Sets (+ die 36 Symbole) | Deckt den Auftrag zur Hälfte, kleinster Eingriff, keine neue Mechanik |
-| 2 | **C2** — zweite Abgrund-Reihe ab Tiefe 130 | Reines Schreiben, löst zugleich den ältesten Endgame-Posten der Ideenliste |
-| 3 | **D** — Beschreibungs-Schicht + Sammlungs-Ansicht + `desc`-Prüfung | Ab hier hat jede weitere Etappe eine Anzeige, in der sie auftaucht |
-| 4 | **B** — Boss-Sets aus der Allianz-Sperre lösen | Braucht die Sammlungs-Ansicht, damit der langsame Weg sichtbar ist |
-| 5 | **C1** — Raid-Stufen mit eigenem Beutetisch | Größter Brocken, serverseitige Auflösung, eigener Balance-Durchgang |
+| # | Etappe | Warum hier | Stand |
+|---|---|---|---|
+| 1 | **A** — Schiffsmodul-Sets (+ die 36 Symbole) | Deckt den Auftrag zur Hälfte, kleinster Eingriff, keine neue Mechanik | **fertig** (v8.603.0) |
+| 2 | **C2** — zweite Abgrund-Reihe ab Tiefe 130 | ~~Reines Schreiben~~, löst zugleich den ältesten Endgame-Posten der Ideenliste | **fertig** (22.08.2026) |
+| 3 | **D** — Beschreibungs-Schicht + Sammlungs-Ansicht + `desc`-Prüfung | Ab hier hat jede weitere Etappe eine Anzeige, in der sie auftaucht | offen |
+| 4 | **B** — Boss-Sets aus der Allianz-Sperre lösen | Braucht die Sammlungs-Ansicht, damit der langsame Weg sichtbar ist | offen |
+| 5 | **C1** — Raid-Stufen mit eigenem Beutetisch | Größter Brocken, serverseitige Auflösung, eigener Balance-Durchgang | offen |
