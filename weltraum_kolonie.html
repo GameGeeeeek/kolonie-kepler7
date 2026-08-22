@@ -22857,8 +22857,19 @@
   // Angriffsschiffe OHNE die beiden Frachterklassen - fuer alles, was echte Gefechtsbeteiligung meint
   // (aktuell: der Erfahrungsanteil, den eine Verlegung mitnimmt). Aus ATTACK_SHIP_KEYS abgeleitet
   // statt danebengeschrieben, damit eine neue Kampfklasse nicht an einer zweiten Liste vorbeilaeuft.
-  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','bergungsfrachter','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber','singularitaetsvernichter','paktkorvette','bundeskreuzer','sternenbanner','kausalitaetsbrecher'];
-  const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS.filter(k => !CARGO_SHIP_KEYS.includes(k));
+  const ATTACK_SHIP_KEYS = ['jaeger','cruisers','destroyers','bomber','schlachtschiff','carrier','superschlachtschiff','leerenjaeger','frachter','frachtergross','bergungsfrachter','waechter','kometenjaeger','enterschiff','phantomschiff','riftwaechter','nanoklinge','quantenkreuzer','fusionsdreadnought','hyperjaeger','hyperbomber','singularitaetsvernichter','paktkorvette','bundeskreuzer','sternenbanner','kausalitaetsbrecher','urmateriekoloss'];
+  /* Ein Schiff mit Frachtraum ist normalerweise kein Kampfschiff - seit v8.497.0 leitet sich die
+     Grenze datengetrieben aus CARGO_PER_SHIP ab. Der Urmaterie-Koloss (21.08.2026, Etappe D) ist
+     die erste Ausnahme und ausdruecklich so gebaut: 250 Angriff bei 2.000 Frachtraum, das einzige
+     Schiff, das beides in EINEM Flottenplatz buendelt. Die Ausnahme wird deshalb aus den DATEN
+     abgeleitet - traegt das Schiff einen eigenen Angriffswert? - und nicht als Namensliste
+     gefuehrt; ein zweiter solcher Rumpf erbt sie damit automatisch.
+     Gemessen, bevor die Zeile so aussah: Gegenueber der alten Regel kommt GENAU der Koloss hinzu,
+     kein einziges Bestandsschiff aendert sich (die drei Frachter tragen atk 0). Das Superschlacht-
+     schiff hat gar keinen SHIP_DEFS-Eintrag - es ist aber auch kein Frachter, der erste Term
+     traegt es also unveraendert. */
+  function schiffTraegtAngriff(key){ const d = SHIP_DEFS.find(s => s.key === key); return !!(d && d.atk > 0); }
+  const KAMPF_SHIP_KEYS = ATTACK_SHIP_KEYS.filter(k => !CARGO_SHIP_KEYS.includes(k) || schiffTraegtAngriff(k));
   /* Zweiter, regulaerer Freischaltweg fuer ein Event-Schiff (v8.478.0). Das Schuerfschiff traegt seit
      dem Asteroiden-Bergbau eine KERNMECHANIK - wer das Goldrausch-Event nie mitgenommen hat, kaeme
      sonst gar nicht an eins. Deklarativ ueber SHIP_DEFS.forschungUnlock statt als Sonderfall in den
@@ -25839,6 +25850,18 @@
       // Bewusst ohne t2AtkMult (keine Tier-2-Schiffe) und ohne schlachtschiffAtkMult.
       // tests/test_angriffssumme.js prueft ab sofort, dass JEDER Schluessel aus ATTACK_SHIP_KEYS
       // hier vorkommt - eine vierte Wiederholung faellt damit beim Prueflauf auf, nicht im Spiel.
+      // Urmaterie-Koloss (21.08.2026, Etappe D) - die FUENFTE Luecke dieser Art, gefunden vom
+      // vollen Prueflauf. Bezeichnend, WARUM test_angriffssumme.js sie nicht melden konnte: Der
+      // Waechter prueft "jeder Schluessel aus ATTACK_SHIP_KEYS kommt in dieser Summe vor" - und
+      // der Koloss stand in KEINER der beiden Listen, fiel also durch beide Netze. Gemeldet hat
+      // ihn test_eskorte_schiffe 3, das von der anderen Seite kommt (jedes SHIP_DEFS-Schiff mit
+      // atk > 0 gehoert in ATTACK_SHIP_KEYS). Erst die zwei Waechter zusammen schliessen die Kette.
+      // Bewusst OHNE t2AtkMult: Der Multiplikator kommt aus der Modulgruppe 'raffiniert', und die
+      // fuehrt den Koloss nicht (nachgemessen: nanoklinge/quantenkreuzer/fusionsdreadnought/
+      // metamaterialtitan/singularitaetsvernichter). Ihm den Faktor zu geben hiesse, ihm einen
+      // Modulbonus zu schenken, den seine eigenen Module nie erzeugen - dieselbe Begruendung wie
+      // bei der Allianzflotte darunter.
+      dm('urmateriekoloss',f.urmateriekoloss)*250 +
       dm('paktkorvette',f.paktkorvette)*40 + dm('bundeskreuzer',f.bundeskreuzer)*110 + dm('sternenbanner',f.sternenbanner)*240;
     const kLvl = state.research.rkampf||0, k2Lvl = state.research.rkampf2||0;
     if (kLvl) power *= (1+kLvl*RESEARCH_DEFS.find(r=>r.key==='rkampf').effectPerLevel);
