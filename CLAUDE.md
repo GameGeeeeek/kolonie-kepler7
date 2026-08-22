@@ -3314,6 +3314,106 @@ Wächter: `tests/test_gegnerlage.js` (30 Prüfungen). Gegenprobe gegen `origin/m
 `KEPLER_SPIELDATEI`: **25 rot bei identischen 30 Prüfnamen** (per `diff` verglichen, nicht gezählt
 — Regel 60).
 
+## E1b Teil 2: die Abzeichenzeile ist antippbar — und die Suche zeigt KEINE Landmarken mehr (22.08.2026)
+
+**Zwei Änderungen, die gegenläufig aussehen und dieselbe Absicht haben:** Die Karte soll verraten,
+*wo* etwas los ist — aber nicht als Liste, die man abarbeitet. Auftrag Sascha: „Die Suche soll nur
+Planeten zeigen keine Gegner das wäre zu einfach man soll schon bisschen suchen auf der Karte."
+
+### Der Befund, am gerenderten Spiel gemessen
+
+Die aggregierte Abzeichenzeile der Regionsübersicht nannte das betroffene System **nur im
+`<title>`** — ein Hover-Tooltip, den es am Handy nicht gibt. Ein Tipp darauf öffnete die
+Sektoransicht, weil der Elternknoten `[data-sektor]` den Klick bekam.
+
+| | vor der Etappe | danach |
+|---|---|---|
+| Trefferfläche Handy | 36 px² (6×6) | **126 px²** (14×9) |
+| Trefferfläche PC | 169 px² (13×13) | **731 px²** (34×21) |
+| `elementFromPoint` auf der Mitte | Regionsknoten | **die Zeile selbst** |
+| Tipp | öffnet die Sektoransicht | öffnet das Hinweis-Menü |
+
+**Der schärfste Fall ist gemessen `kepler`: 15 Systeme, EIN Abzeichen, 10 betroffene Systeme.**
+Wer das 🎯 sah, musste sie einzeln durchklicken. `rand` ist die andere Richtung: 12 Systeme, eines
+betroffen — dort ist das Suchen am teuersten.
+
+### Vier Entscheidungen beim Bau
+
+- **Das Menü liest aus derselben Quelle wie der Renderer** (`sektorMitglieder()` +
+  `karteSystemBadges()`). Nichts wandert über `data`-Attribute ins DOM, wo es beim nächsten
+  Kartenaufbau veralten könnte — dieselbe Überlegung wie bei `npcKampfLage` einen Tag vorher.
+- **Das Trefferfeld liegt UNTER der Zeile im freien Bereich des Knotens** (Name +0, Systeme +16,
+  Eigenschaft +27, Abzeichen +44). Es kapert damit keine andere Beschriftung — und der Handler
+  ruft `stopPropagation`, sonst gewinnt der Regionsknoten darunter.
+- **Jeder Eintrag springt in SEIN System**, nicht nur in die Region. Das ist der eigentliche
+  Mehrwert: Die Region öffnet der Knoten daneben ohnehin.
+- **`.kmenu` hat einen Höhendeckel bekommen** (`max-height:min(60vh, 420px)`, `overflow-y:auto`).
+  Bei zehn Einträgen ragte es sonst unten aus dem Bild; bei den bisherigen Menüs mit zwei bis
+  fünf Einträgen ändert sich nichts.
+
+### Die Landmarken sind aus der Kartensuche RAUS — eine Spieldesign-Entscheidung
+
+E1 hatte Festungen, Nester und Gegner am 19.08. in `performSectorSearch` aufgenommen. Sie sind
+seit dem 22.08. wieder draußen: **wer sie finden will, sucht auf der Karte.** Wer das zurückdreht,
+dreht eine Entscheidung zurück, kein Versehen — der Kommentar an der Stelle sagt das mit Saschas
+Wortlaut, damit es beim nächsten Lesen nicht wie eine Lücke aussieht.
+
+**Der Weg dorthin ist die eigentliche Lehre.** Mein erster Vorschlag war das Gegenteil: Gemessen
+fand die Suche Festungen und Nester über generische Wörter („festung" → 1 Treffer, „nest" → 1),
+bei Gegnern aber „Keine Treffer" — es gibt kein generisches Wort für NPCs. Ich hatte das als
+Lücke gemeldet und „gegner"/„npc"/„flotte" ergänzt (gemessen 0 → 8 Treffer). Sascha hat es
+abgelehnt und dabei die Richtung umgedreht. **Eine gemessene Asymmetrie ist nicht automatisch ein
+Fehler** — sie kann auch die Absicht sein, die noch niemand aufgeschrieben hat. Vor dem
+Vereinheitlichen lohnt die Frage, ob die Ungleichheit gewollt ist.
+
+### Zwei Hilfetexte mitgezogen (Checkliste Punkt 6)
+
+Beide standen im selben Abschnitt „Landmarken: was in einem System steht":
+
+1. „Suchen kann man sie ebenfalls: Das Suchfeld über der Karte findet jetzt auch *Sternenfeste*…"
+   — war nach der Entfernung eine **Falschaussage** und sagt jetzt ausdrücklich das Gegenteil.
+2. „der Tooltip nennt das System" — nicht falsch, aber **unvollständig**, seit die Zeile antippbar
+   ist. Sie nennt jetzt beide Wege und sagt dazu, dass der Tooltip die PC-Zugabe ist.
+
+### Die Grenze, die bleibt und benannt gehört
+
+**Am Handy ist die Fläche mit 14×9 px weiterhin kein Fingerziel** (Empfehlung 44×44 = 1936 px²).
+Größer geht nur, wenn das Trefferfeld den halben Regionsknoten kapert — dann öffnete ein Tipp auf
+die Region nicht mehr die Sektoransicht. Die Ursache liegt tiefer: Auf der Übersicht sind am Handy
+**alle** Beschriftungen 6–9 px hoch, also kaum lesbar. Das ist eine eigene Etappe wert und steht
+hier, damit es nicht als übersehen gilt.
+
+**Die Sektoransicht ist bewusst nicht angefasst.** Dort trägt jedes Abzeichen ebenfalls nur einen
+Hover-Tooltip — aber ein Tipp auf den Systemknoten daneben öffnet das System und zeigt alles. Ein
+zweites Trefferfeld über einem bereits klickbaren Knoten wäre genau die Kollision aus KB-11.
+
+### Wächter
+
+`tests/test_regionshinweise.js` (15 Prüfungen). **Der Kern ist das PAAR in Abschnitt 3:** Die Zeile
+öffnet das Menü UND die Fläche daneben öffnet weiterhin die Sektoransicht. Die erste Hälfte allein
+wäre auch dann grün, wenn der normale Regionsklick dabei kaputtgegangen ist — genau die Kollision
+aus Regel 53. Gemessen wird über `elementFromPoint` auf die MITTE, nicht über Sichtbarkeit; ein
+Sichtbarkeits-Test hätte den Anlassfall nie gefunden (KB-11).
+
+Gegenprobe gegen `origin/main`: **12 von 15 fallen, bei identischen Prüfnamen** — und `3b` bleibt
+grün, weil sie ja gerade zusagt, dass sich am Regionsklick nichts geändert hat.
+
+`test_landmarken` 1c und 5 sind mitgezogen und dabei **schärfer** geworden (Regel 43): Aus „die
+Suche findet die Festung" wurde ein PAAR — ein Systemname MUSS eine Trefferzeile liefern, die
+Namen von Festung, Nest und Gegner KEINE. Ohne die erste Hälfte wäre „findet keine Landmarke" auch
+bei einer völlig kaputten Suche grün (Regel 28). Beidseitig gegengeprüft: 20 identische Prüfnamen,
+am alten Stand fallen genau die zwei.
+
+### Zwei eigene Werkzeugfehler beim Bau des Wächters
+
+1. **Eine Prüfung suchte das CSS im `<script>`-Block.** `.kmenu` steht im `<style>`; der Test las
+   `JS` statt der ganzen Datei und meldete den Höhendeckel als fehlend, obwohl er dastand. Seitdem
+   liest er `ROH` für CSS-Fragen — und hat für beide Ausschnitte einen eigenen `*-anker`, damit
+   ein leerer Ausschnitt auffällt statt vacuous grün zu sein (Regel 6).
+2. **Ein Muster kodierte die Klammer-Reihenfolge** (`-treffer']).forEach` statt `-treffer]').forEach`)
+   und fiel auf korrektem Code durch. Ersetzt durch einen auf den Verdrahtungsblock **gescopten**
+   Ausschnitt (Regel 39): Ein `stopPropagation` irgendwo sonst in der Datei belegt hier nichts.
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
