@@ -4743,6 +4743,28 @@ betroffen — auch wenn der eigene Bereich mit CSS nichts zu tun hat.** Der Betr
 Eigenschaften, die man im Markup gerade benutzt (`border`, `border-radius`, Farbliterale) — zwei
 Minuten `grep -c "border-top:var(--bw-1)"` hätten die Hausform sofort genannt.
 
+**Ein sechster Fund, beim Rendern der Optik-Varianten – und er saß in MEINER eigenen Fixture:**
+Sie setzte den Allianz-Unterreiter auf `'krieg'`. Den Schlüssel hat es **nie** gegeben (über die
+Historie gemessen: `git log -S 'data-alliance-subtab="krieg"'` liefert null Treffer); die vier
+echten heißen `uebersicht`/`mitglieder`/`ausbau`/`verwaltung`, und der Raid-Kasten wohnt in
+`uebersicht`. Bei einem unbekannten Schlüssel blendet die Anzeige **alle** Allianz-Panels aus –
+wörtlich die Falle aus Regel 4, nur mit einem anderen Schlüssel. Erfunden wurde er am 16.08. in
+`test_allianzraid_anzeige.js`, und ich habe ihn beim Kopieren der Fixture in
+`test_raid_vorschau.js` weitergetragen.
+**Beide Tests maßen den Kasten also, während er unsichtbar war** – `textContent` liefert auch bei
+`display:none` Text (Regel 55). Aufgefallen ist es nicht am Quelltext, sondern daran, dass der
+Screenshot **leer** war (Regel 42). Beide Fixturen sind korrigiert, und `test_raid_vorschau` hat
+jetzt `1-vorab2`, das die SICHTBARKEIT misst; die Gegenprobe mit dem alten Schlüssel fällt genau
+daran (`{"sichtbar":false}`), bei identischen 16 Prüfnamen.
+**Zwei Werkzeugfehler derselben Runde, beide über den Einzelfall hinaus:** (a) Der Screenshot war
+auch nach der Korrektur leer, weil `welcomeBackOverlay` sich nach dem `style.display='none'`
+**wieder einblendet** – weggeräumt wird es jetzt über den Spielerweg (seinen eigenen Knopf,
+Regel 70), und der Beleg ist `elementFromPoint` auf die Kastenmitte statt bloßer Sichtbarkeit
+(Regel 49). (b) Ein Element-Screenshot eines Kastens bei y=2698 in einem 1400 px hohen Fenster
+liefert ein leeres Bild, ohne zu scheitern – die Dateigröße verrät es (516 Bytes gegen 49 kB).
+**Ein Bild, das man nicht ansieht, ist kein Messwert; und ein leeres Bild ist erst dann ein
+Befund, wenn das Werkzeug nachweislich funktioniert.**
+
 **Die Wächter:** `tests/test_raid_belohnung_paritaet.js` (10 Prüfungen) führt BEIDE Fassungen aus
 und rechnet sie über ein Raster aus Stufe, Anteil, Platz, Teilnehmerzahl, Ausgang und allen fünf
 Bossen gegeneinander – **1.800 Kombinationen, null Abweichung**. Verglichen werden ZAHLEN, nicht

@@ -32,7 +32,7 @@ function backend(store){ return async r => {
 };}
 
 const spielstand = () => JSON.stringify({
-  tutorialSeen:true, newbieWelcomeSeen:true, allianceSubTab:'krieg',
+  tutorialSeen:true, newbieWelcomeSeen:true, allianceSubTab:'uebersicht',
   resources:{ energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:2e4, forschungspunkte:3e4 },
   buildings:{ solar:20, mine:18, lager:20, werft:12, labor:12 },
   research:{}, colonies:{}, activeBasePlanet:'home',
@@ -71,7 +71,15 @@ async function zeichne(browser, raid, rolle){
     // gleich sind, waere eine Vorschau ohne Aussage.
     const zeilen = [...b.querySelectorAll('table tr')].map(tr =>
       [...tr.children].map(td => (td.textContent||'').trim()));
-    return { txt, zeilen, hatVorschau: txt.includes('Deine Beute'), selects: b.querySelectorAll('select').length };
+    // SICHTBAR, nicht bloss vorhanden (Hausregel 55): textContent liefert auch bei
+    // display:none Text. Genau daran hing hier ein sechs Tage alter Fehlgriff - die
+    // Fixture setzte den Unterreiter 'krieg', den es nie gab, und bei einem unbekannten
+    // Schluessel blendet die Anzeige ALLE Allianz-Panels aus (Hausregel 4). Der Kasten
+    // wohnt in 'uebersicht'. Ohne diese Messung koennte der erfundene Schluessel still
+    // zurueckkehren, und der Test waere weiterhin gruen.
+    const r = b.getBoundingClientRect();
+    return { txt, zeilen, hatVorschau: txt.includes('Deine Beute'), selects: b.querySelectorAll('select').length,
+             sichtbar: r.height > 0 && r.width > 0 && getComputedStyle(b).display !== 'none' };
   });
   await ctx.close();
   return m;
@@ -84,6 +92,8 @@ async function zeichne(browser, raid, rolle){
     const mit = await zeichne(browser, versand([
       { playerId:'x', name:'X', power:52000 }, { playerId:'u', name:'A', power:26000 }, { playerId:'c', name:'C', power:12000 }]));
     check('1-vorab: die Box wurde ueberhaupt gezeichnet', !mit.fehlt && mit.txt.length > 40, { zeichen: mit.txt && mit.txt.length });
+    check('1-vorab2: und sie ist fuer den Spieler SICHTBAR, nicht nur im DOM', mit.sichtbar === true,
+          { sichtbar: mit.sichtbar });
     check('1a: die Vorschau erscheint', mit.hatVorschau === true);
     check('1b: sie nennt den eigenen Platz', /Platz 2 von 3/.test(mit.txt), mit.txt.slice(mit.txt.indexOf('Deine Beute'), mit.txt.indexOf('Deine Beute')+60));
     check('1c: sie nennt den Kraftanteil', /29 % der Kraft/.test(mit.txt));
