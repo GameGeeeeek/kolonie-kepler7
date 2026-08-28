@@ -5226,6 +5226,112 @@ Nachladen (|Δ| ≤ 6 px, 1d/1e), Poll hält die Scroll-Position auch bei NEUER 
 Rückfall + Riegel (2a/2b). Gegenprobe gegen v8.615.0 per `KEPLER_SPIELDATEI`: **15 rot bei
 identischen 22 Prüfnamen** (per `diff` über die reinen Prüfnamen verglichen, nicht gezählt —
 Regel 60).
+## Vier neue Admin-Reiter (28.08.2026, Auftrag Sascha)
+
+**Wortlaut:** „mehr adminfähigkeiten in admin bereich hinzu mache vorschläge." Vorgelegt wurden
+sieben gemessene Lücken, gewählt hat Sascha vier: **Feedback, Schalter, Konto, System.** Die
+Server-Hälfte samt Begründungen steht in der Backend-CLAUDE.md; hier nur, was dieses Repo angeht.
+
+**Was VORHER gemessen wurde:** Der Admin-Bereich hatte fünf Reiter und das Backend 13 Routen —
+**alle 13 waren verdrahtet.** Es fehlte keine Anzeigestelle, es fehlten Fähigkeiten. *(Mein erster
+`grep` nach `api/admin/` fand nur 3 von 13 und sah nach zehn toten Routen aus — `backendFetch`
+setzt das `/api`-Präfix selbst. Regel 32 an der eigenen Bestandsaufnahme.)*
+
+### `switchAdminTab` ist datengetrieben geworden — und das war der eigentliche Umbau
+
+Die alte Form führte je Reiter zwei Variablen, zwei `toggle`-Zeilen, eine `display`-Zeile und einen
+`else-if`-Zweig; dasselbe noch einmal in der Verdrahtung. Bei fünf Reitern war das lesbar, bei neun
+wären es rund 36 Zeilen gewesen — und ein zehnter fällt in so einer Namensliste zwangsläufig
+irgendwo durch, ohne dass es auffällt: Ein vergessener Knopf wirft keinen Fehler, er tut einfach
+nichts. `ADMIN_REITER` ist jetzt die eine Quelle für Knopf, Fläche, Untertitel und Ladefunktion;
+die Verdrahtung iteriert darüber (Regel 40/43).
+
+**`laden` ist ein PFEILAUSDRUCK, keine Funktionsreferenz.** Das Array-Literal wird beim LADEN der
+Datei ausgewertet, ein Rumpf erst beim Aufruf — damit ist es gleichgültig, wo die Lade-Funktionen
+stehen. Mit `laden: loadAdminFeedback` hinge es daran, und das ist genau die temporale Todeszone
+aus Regel 38.
+
+### Vier Entscheidungen, die man beim Anfassen kennen muss
+
+- **Alle vier benutzen `adminListenFehler`** für den Fehlerfall. Dort steht der dritte Zustand aus
+  Regel 35 („lädt / da / nicht erreichbar") längst ausformuliert, inklusive des 404-Falls „das
+  Backend auf dem Pi läuft hinterher". Eine eigene Fehlermeldung daneben wäre die zweite Wahrheit,
+  die beim nächsten Deploy-Ausfall etwas anderes sagt — und der ist in diesem Projekt dreizehnmal
+  vorgekommen. Abschnitt 6 des Wächters misst das für alle drei neuen Ladepfade.
+- **Der Schalter-Reiter zeigt DREI Zustände, nicht zwei.** „läuft" / „abgeschaltet" / „im
+  ausgelieferten Stand aus" — ein Ja/Nein könnte nicht sagen, ob etwas abgeschaltet oder nie
+  ausgeliefert wurde, und der Knopf verspräche im zweiten Fall etwas, das er nicht einlöst. Wo der
+  Server-Code selbst deaktiviert ist, steht ausdrücklich, dass das nur eine Auslieferung ändert.
+- **Der Screenshot läuft über `backendFetch` + Blob, nicht über `<img src="/api/…">`.** Das Bild
+  hängt hinter `authMiddleware`; ein `<img>` schickt zwar das Sitzungs-Cookie mit, aber keinen
+  Bearer — für ein Konto, das noch auf dem alten `localStorage`-Token sitzt (Etappe b der
+  Cookie-Umstellung), bliebe es leer.
+- **„Alle Sitzungen beenden" fragt vorher nach.** Es wirft den Spieler aus allen Geräten, und das
+  lässt sich nicht zurücknehmen — dieselbe Abwägung wie beim Baustellen-Konto: Was der Bediener
+  nicht rückgängig machen kann, wird vorher benannt und nicht erst im Protokoll erklärt. Der
+  Wächter prüft **beide** Richtungen (`4d`/`4d2`): Bestätigen löst aus, Abbrechen nicht.
+
+### `adminZahl()` statt `fmt()` — vom eigenen Wächter gefunden
+
+`fmt()` rundet auf „1.2k". Im Admin-Bereich ist die **exakte** Zahl der Gegenstand: 1.234
+Sternenstaub und 2.122 geladene Passwörter sind Messwerte, keine Spielanzeige. Gefunden hat das
+nicht das Lesen des Codes, sondern der Test — `4a` fiel mit „1.2k" statt 1.234 und `5c` mit „2.1"
+statt 2.122. Das ist **Regel 36** an einer neuen Stelle: Dort wurde eine Freischaltschwelle durch
+`fmt()` unbrauchbar, hier ein Kontoblatt.
+
+### Zwei Nachbesserungen kamen erst aus dem gerenderten BILD (Regel 42)
+
+Der Quelltext war in beiden Fällen unauffällig: Das Screenshot-Symbol war `ti-map-2`, also das
+KARTEN-Symbol — semantisch schief, ersetzt durch `ti-microscope`. Und die drei Laufzeit-Zeilen des
+Systemstands standen ohne Trennung unter der Env-Liste und lasen sich, als gehörten sie dazu; sie
+beantworten aber eine andere Frage (**was wirklich geladen ist**, nicht was in der Umgebung steht)
+und haben jetzt ihre eigene Zwischenzeile.
+
+**Fünf Icons waren nicht im 69er-Subset** (`ti-message-2`, `ti-power`, `ti-user-search`,
+`ti-server-2`, `ti-search`, später `ti-bulb`) — `check-icons.js` hat jedes gefangen, also genau der
+Fehlertyp, für den es nach dem `ti-gift`-Bug gebaut wurde. Ersetzt durch vorhandene, **nicht** den
+Font vergrößert: Der lädt bei JEDEM Spieler, und diese Fläche sieht genau ein Konto.
+
+**Die neun Reiter brauchten eine Mindestbreite.** Mit blossem `flex:1` wären neun Knöpfe in der
+560px-Karte rund 60 px breit und die Beschriftungen abgeschnitten; `flex:1 1 96px` lässt die Leiste
+sauber in zwei Zeilen umbrechen (gemessen 106–136 px je Knopf, Leiste 68 px hoch). Die fünf
+Bestands-Knöpfe sind mitgezogen — sonst hätte die zweite Zeile eine andere Form als die erste.
+
+### Der Wächter
+
+`tests/test_adminbereich.js` (33 Prüfungen). Gegenprobe gegen `origin/main` per `KEPLER_SPIELDATEI`:
+**32 von 33 rot bei identischer Prüfliste** (per `diff` über die reinen Prüfnamen verglichen, nicht
+gezählt — Regel 60, in dieser Sitzung zum dritten Mal nötig).
+
+**Abschnitt 1 misst BEDIENBARKEIT, nicht Sichtbarkeit** (`elementFromPoint` auf die Knopfmitte).
+Bei neun Knöpfen in einer engen Karte ist „sichtbar" nicht dasselbe wie „der Tap kommt an" — genau
+diese Unterscheidung war der Anlass von KB-11, und ein Sichtbarkeits-Test hätte den Fehler dort nie
+gefunden.
+
+**Die Kernmessungen sind PAARE** (Regel 61): Der Feedback-Filter muss eine ANDERE Liste zeigen
+(`2b`), die drei Schalter-Zustände müssen VERSCHIEDEN dargestellt werden (`3a`–`3a3`), und genau
+zwei der drei dürfen einen Knopf haben (`3b`). Eine Prüfung auf „das Wort Abschalten steht da" wäre
+in allen drei Fällen grün.
+
+**Drei Werkzeugfehler am eigenen Test, alle von der Gegenprobe gefunden:**
+
+1. **Die Gegenprobe brach ab** — 6 statt 29 Prüfungen, weil der Klick auf einen am alten Stand
+   nicht vorhandenen Knopf wirft. Der rote Exit-Code sah wie eine gelungene Gegenprobe aus
+   (Regel 34). Jeder Browser-Schritt läuft jetzt durch gefasste Helfer, und je Abschnitt belegt
+   eine `-vorab`-Zeile, dass der Reiter sich überhaupt öffnen ließ.
+2. **`4c` und `4d2` waren am alten Stand aus dem falschen Grund grün** — „die Klartext-Adresse
+   steht nicht im Markup" ist über leerem Markup trivial erfüllt, und wer keinen Knopf hat, löst
+   beim Abbrechen naturgemäss nichts aus (Regel 28). Beide verlangen jetzt zuerst einen WERT, dann
+   die Beziehung.
+3. **Der Prüfnamen-Vergleich zählte die Schlusszeile mit** (`FAIL - es gab rote Pruefungen.`).
+   Verglichen wird jetzt über den Namensanfang.
+
+### Auslieferungsreihenfolge: das BACKEND zuerst
+
+Ein Reiter, dessen Route mit 404 antwortet, wäre die tote Fläche aus Regel 35 — auch wenn
+`adminListenFehler` sie benennt statt sie stumm zu lassen. Der Backend-PR gehört vorher gemerged
+und per `/api/health`-Blob belegt. Umgekehrt stellt das Backend Routen bereit, die niemand aufruft:
+folgenlos.
 
 ## Proaktive Vorschläge
 
