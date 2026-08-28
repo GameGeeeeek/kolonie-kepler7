@@ -5269,6 +5269,112 @@ Zusage der Erklärzeile; Abschnitt 4: das Rennen). Gegenprobe gegen v8.617.0 per
 `KEPLER_SPIELDATEI`: **genau 3a/3a2/3b/4a rot** bei identischen 32 Prüfnamen, mit dem Anlassfall
 wörtlich im Beleg (`4a: {"anzahl":30}`); grün bleiben MÜSSEN 3-vorab, 3c, 3z, 4-vorab0, 4-vorab
 und 4z (Regel 71).
+## Vier neue Admin-Reiter (28.08.2026, Auftrag Sascha)
+
+**Wortlaut:** „mehr adminfähigkeiten in admin bereich hinzu mache vorschläge." Vorgelegt wurden
+sieben gemessene Lücken, gewählt hat Sascha vier: **Feedback, Schalter, Konto, System.** Die
+Server-Hälfte samt Begründungen steht in der Backend-CLAUDE.md; hier nur, was dieses Repo angeht.
+
+**Was VORHER gemessen wurde:** Der Admin-Bereich hatte fünf Reiter und das Backend 13 Routen —
+**alle 13 waren verdrahtet.** Es fehlte keine Anzeigestelle, es fehlten Fähigkeiten. *(Mein erster
+`grep` nach `api/admin/` fand nur 3 von 13 und sah nach zehn toten Routen aus — `backendFetch`
+setzt das `/api`-Präfix selbst. Regel 32 an der eigenen Bestandsaufnahme.)*
+
+### `switchAdminTab` ist datengetrieben geworden — und das war der eigentliche Umbau
+
+Die alte Form führte je Reiter zwei Variablen, zwei `toggle`-Zeilen, eine `display`-Zeile und einen
+`else-if`-Zweig; dasselbe noch einmal in der Verdrahtung. Bei fünf Reitern war das lesbar, bei neun
+wären es rund 36 Zeilen gewesen — und ein zehnter fällt in so einer Namensliste zwangsläufig
+irgendwo durch, ohne dass es auffällt: Ein vergessener Knopf wirft keinen Fehler, er tut einfach
+nichts. `ADMIN_REITER` ist jetzt die eine Quelle für Knopf, Fläche, Untertitel und Ladefunktion;
+die Verdrahtung iteriert darüber (Regel 40/43).
+
+**`laden` ist ein PFEILAUSDRUCK, keine Funktionsreferenz.** Das Array-Literal wird beim LADEN der
+Datei ausgewertet, ein Rumpf erst beim Aufruf — damit ist es gleichgültig, wo die Lade-Funktionen
+stehen. Mit `laden: loadAdminFeedback` hinge es daran, und das ist genau die temporale Todeszone
+aus Regel 38.
+
+### Vier Entscheidungen, die man beim Anfassen kennen muss
+
+- **Alle vier benutzen `adminListenFehler`** für den Fehlerfall. Dort steht der dritte Zustand aus
+  Regel 35 („lädt / da / nicht erreichbar") längst ausformuliert, inklusive des 404-Falls „das
+  Backend auf dem Pi läuft hinterher". Eine eigene Fehlermeldung daneben wäre die zweite Wahrheit,
+  die beim nächsten Deploy-Ausfall etwas anderes sagt — und der ist in diesem Projekt dreizehnmal
+  vorgekommen. Abschnitt 6 des Wächters misst das für alle drei neuen Ladepfade.
+- **Der Schalter-Reiter zeigt DREI Zustände, nicht zwei.** „läuft" / „abgeschaltet" / „im
+  ausgelieferten Stand aus" — ein Ja/Nein könnte nicht sagen, ob etwas abgeschaltet oder nie
+  ausgeliefert wurde, und der Knopf verspräche im zweiten Fall etwas, das er nicht einlöst. Wo der
+  Server-Code selbst deaktiviert ist, steht ausdrücklich, dass das nur eine Auslieferung ändert.
+- **Der Screenshot läuft über `backendFetch` + Blob, nicht über `<img src="/api/…">`.** Das Bild
+  hängt hinter `authMiddleware`; ein `<img>` schickt zwar das Sitzungs-Cookie mit, aber keinen
+  Bearer — für ein Konto, das noch auf dem alten `localStorage`-Token sitzt (Etappe b der
+  Cookie-Umstellung), bliebe es leer.
+- **„Alle Sitzungen beenden" fragt vorher nach.** Es wirft den Spieler aus allen Geräten, und das
+  lässt sich nicht zurücknehmen — dieselbe Abwägung wie beim Baustellen-Konto: Was der Bediener
+  nicht rückgängig machen kann, wird vorher benannt und nicht erst im Protokoll erklärt. Der
+  Wächter prüft **beide** Richtungen (`4d`/`4d2`): Bestätigen löst aus, Abbrechen nicht.
+
+### `adminZahl()` statt `fmt()` — vom eigenen Wächter gefunden
+
+`fmt()` rundet auf „1.2k". Im Admin-Bereich ist die **exakte** Zahl der Gegenstand: 1.234
+Sternenstaub und 2.122 geladene Passwörter sind Messwerte, keine Spielanzeige. Gefunden hat das
+nicht das Lesen des Codes, sondern der Test — `4a` fiel mit „1.2k" statt 1.234 und `5c` mit „2.1"
+statt 2.122. Das ist **Regel 36** an einer neuen Stelle: Dort wurde eine Freischaltschwelle durch
+`fmt()` unbrauchbar, hier ein Kontoblatt.
+
+### Zwei Nachbesserungen kamen erst aus dem gerenderten BILD (Regel 42)
+
+Der Quelltext war in beiden Fällen unauffällig: Das Screenshot-Symbol war `ti-map-2`, also das
+KARTEN-Symbol — semantisch schief, ersetzt durch `ti-microscope`. Und die drei Laufzeit-Zeilen des
+Systemstands standen ohne Trennung unter der Env-Liste und lasen sich, als gehörten sie dazu; sie
+beantworten aber eine andere Frage (**was wirklich geladen ist**, nicht was in der Umgebung steht)
+und haben jetzt ihre eigene Zwischenzeile.
+
+**Fünf Icons waren nicht im 69er-Subset** (`ti-message-2`, `ti-power`, `ti-user-search`,
+`ti-server-2`, `ti-search`, später `ti-bulb`) — `check-icons.js` hat jedes gefangen, also genau der
+Fehlertyp, für den es nach dem `ti-gift`-Bug gebaut wurde. Ersetzt durch vorhandene, **nicht** den
+Font vergrößert: Der lädt bei JEDEM Spieler, und diese Fläche sieht genau ein Konto.
+
+**Die neun Reiter brauchten eine Mindestbreite.** Mit blossem `flex:1` wären neun Knöpfe in der
+560px-Karte rund 60 px breit und die Beschriftungen abgeschnitten; `flex:1 1 96px` lässt die Leiste
+sauber in zwei Zeilen umbrechen (gemessen 106–136 px je Knopf, Leiste 68 px hoch). Die fünf
+Bestands-Knöpfe sind mitgezogen — sonst hätte die zweite Zeile eine andere Form als die erste.
+
+### Der Wächter
+
+`tests/test_adminbereich.js` (33 Prüfungen). Gegenprobe gegen `origin/main` per `KEPLER_SPIELDATEI`:
+**32 von 33 rot bei identischer Prüfliste** (per `diff` über die reinen Prüfnamen verglichen, nicht
+gezählt — Regel 60, in dieser Sitzung zum dritten Mal nötig).
+
+**Abschnitt 1 misst BEDIENBARKEIT, nicht Sichtbarkeit** (`elementFromPoint` auf die Knopfmitte).
+Bei neun Knöpfen in einer engen Karte ist „sichtbar" nicht dasselbe wie „der Tap kommt an" — genau
+diese Unterscheidung war der Anlass von KB-11, und ein Sichtbarkeits-Test hätte den Fehler dort nie
+gefunden.
+
+**Die Kernmessungen sind PAARE** (Regel 61): Der Feedback-Filter muss eine ANDERE Liste zeigen
+(`2b`), die drei Schalter-Zustände müssen VERSCHIEDEN dargestellt werden (`3a`–`3a3`), und genau
+zwei der drei dürfen einen Knopf haben (`3b`). Eine Prüfung auf „das Wort Abschalten steht da" wäre
+in allen drei Fällen grün.
+
+**Drei Werkzeugfehler am eigenen Test, alle von der Gegenprobe gefunden:**
+
+1. **Die Gegenprobe brach ab** — 6 statt 29 Prüfungen, weil der Klick auf einen am alten Stand
+   nicht vorhandenen Knopf wirft. Der rote Exit-Code sah wie eine gelungene Gegenprobe aus
+   (Regel 34). Jeder Browser-Schritt läuft jetzt durch gefasste Helfer, und je Abschnitt belegt
+   eine `-vorab`-Zeile, dass der Reiter sich überhaupt öffnen ließ.
+2. **`4c` und `4d2` waren am alten Stand aus dem falschen Grund grün** — „die Klartext-Adresse
+   steht nicht im Markup" ist über leerem Markup trivial erfüllt, und wer keinen Knopf hat, löst
+   beim Abbrechen naturgemäss nichts aus (Regel 28). Beide verlangen jetzt zuerst einen WERT, dann
+   die Beziehung.
+3. **Der Prüfnamen-Vergleich zählte die Schlusszeile mit** (`FAIL - es gab rote Pruefungen.`).
+   Verglichen wird jetzt über den Namensanfang.
+
+### Auslieferungsreihenfolge: das BACKEND zuerst
+
+Ein Reiter, dessen Route mit 404 antwortet, wäre die tote Fläche aus Regel 35 — auch wenn
+`adminListenFehler` sie benennt statt sie stumm zu lassen. Der Backend-PR gehört vorher gemerged
+und per `/api/health`-Blob belegt. Umgekehrt stellt das Backend Routen bereit, die niemand aufruft:
+folgenlos.
 
 ## Proaktive Vorschläge
 
@@ -6409,3 +6515,96 @@ aus dem FALSCHEN Grund grün (leere Liste bzw. `undefined === undefined`, Regel 
 Familie wie bei `test_health_commit_http`: erst einen WERT verlangen, dann die Beziehung), und `3b`
 fiel dort sehr wohl, weil es gegen den in `3a` GEMESSENEN Bestand prüft. Eine Pflichtliste ist
 selbst eine Behauptung, bis die Gegenprobe sie gemessen hat.
+
+## Etappe B: Boss-Set-Teile fallen jetzt auch ohne Allianz (28.08.2026, v8.618.0)
+
+**Auftrag Sascha, über `AskUserQuestion` beantwortet mit „alle 4 optionen":** Alle vier
+vorgeschlagenen PvE-Quellen, nicht eine. Die zwanzig Boss-Set-Teile fallen seither auch an
+**Asteroidenfestung, Alien-Nest und Weltboss**; der Allianz-Raid bleibt der vierte und
+ergiebigste Weg.
+
+Das war die zweite der vier gemessenen Lücken aus `docs/beute-und-instanzen-konzept.md`, und die
+größte inhaltliche Sperre im Modulsystem: `grantBossSetModule()` hatte **genau eine** Aufrufstelle,
+und die lag im Raid-Claim. Wer solo spielt, kam an keines der zwanzig Teile heran.
+
+### Der Client ZIEHT nur — er würfelt nicht
+
+`bosssetAusServerwurf(bs)` ist die EINE Empfangsstelle, drei Zeilen lang: Kommt vom Server ein
+`{ bossKey, seltenheit }`, wird `grantBossSetModule` damit gerufen; kommt nichts, passiert nichts.
+Der Wurf selbst liegt im Backend (Begründung dort). Das ist dieselbe Naht wie beim Raid — und sie
+ist hier zwingend: Ein Boss-Set-Teil ist genau die Beute, die das Herkunfts-Schloss aus jedem
+regulären Fundtopf heraushält; eine Client-Ziehung wäre in fünf Sekunden gefälscht.
+
+**Drei Empfangsstellen, alle über denselben Helfer** (Regel 43): der `festung`- und der
+`alien-nest`-Zweig von `claimPendingRewards`, dazu der Weltboss-Schlag in `resolveWorldBoss`.
+
+**Der Weltboss-Zweig hat ein eigenes `save()`, die zwei anderen nicht** — und das ist kein
+Versehen, sondern Regel 73: Die zwei `claimPendingRewards`-Zweige speichern seit v8.597.0 ohnehin
+selbst. Beim Weltboss speichert `maybeClaimWorldBossReward` nur bei einem KILL; bei jedem anderen
+Schlag niemand. Der Kommentar zwanzig Zeilen darunter („kein zusätzlicher `save()`-Aufruf, der
+10s-Timer holt den Rest nach") gilt für Kredite und Kampfpunkte, die der Server ohnehin
+persistiert hat — **ein Modul im Inventar hat er nicht**, und der Wurf ist mit der Antwort
+verbraucht.
+
+### Vier Anzeigestellen-Gruppen, die still zur Falschaussage geworden wären (Checkliste Punkt 6)
+
+Das ist der eigentliche Umfang der Etappe — die Mechanik sind acht Zeilen, die Texte sind der Rest:
+
+1. **Die 20 Modul-Beschreibungen** sagten „(droppt nur bei &lt;Boss&gt;)". Behalten wird die
+   ZUORDNUNG („vom Sternenfresser"), gestrichen nur die jetzt falsche Exklusivität. Die
+   Herkunfts-Auskunft steht seit Etappe D ohnehin zentral in `HERKUNFT_TEXT` — eine Stelle statt
+   zwanzig (Regel 72).
+2. **`HERKUNFT_TEXT.boss`** nennt jetzt alle vier Wege. Das ist die Zeile, die der
+   Gegenstands-Katalog aus Etappe D für jeden der 20 Einträge rendert.
+3. **Zwei Hilfetexte** („Standort-Module", „Der Fundort ist die eigentliche Auskunft") behaupteten
+   die Raid-Exklusivität wörtlich.
+4. **Drei POSITIVE Halbsätze** bei Festung, Nest und Weltboss — ohne sie wäre die Mechanik da und
+   niemand wüsste davon (Regel 59). Sie nennen bewusst **keine Zahl**: Die Chancen stehen im
+   Backend, und eine Kopie hier wäre beim nächsten Balance-Schritt still falsch.
+
+### Der Wächter und die Lehre aus seiner Gegenprobe
+
+`tests/test_bossset_pve.js` (28 Prüfungen) liest BEIDE Repos über `lib/spieldatei` und ist damit
+für `KEPLER_SPIELDATEI` **und** `KEPLER_BACKEND_SERVER` umleitbar. Er misst den Wurf
+**ausgeführt** statt gelesen (1a–1e2), die drei Backend-Aufrufstellen (2a), die zwei Fehler am
+Weltboss-Zweig als REGEL statt als Schreibweise (2b/2c), die NAHT (3a/3b: jede Quelle in
+`BOSSSET_PVE_CHANCE` braucht eine Frontend-Marke, datengetrieben abgeleitet — eine vierte Quelle
+meldet sich als „unbekannt" und erzwingt die Entscheidung), den Empfang ausgeführt (4a–4c) und die
+Anzeigestellen (5a–5e).
+
+**Die Gegenprobe lief zuerst mit 13 statt 28 Prüfungen — und der rote Exit-Code sah aus wie eine
+vollständige Gegenprobe.** Vier Aufbau-Tore (`if (wurf)`, `if (wbBlock)`, `if (tabelle)`,
+`if (hol)`) unterdrückten am alten Stand zusammen **15** abhängige Prüfungen: 7 + 2 + 2 + 4, exakt
+die Differenz. Das ist Regel 34 in ihrer klassischen Form, und sie ist mir hier passiert, obwohl
+`test_gegenstandskatalog` die Antwort seit Etappe D vormacht.
+**Behoben mit `fehlend(namen, grund)`** — dem Gegenstück zu dessen `versuche()`: Scheitert ein
+Aufbau, wird jede davon abhängige Prüfung **namentlich als rot gemeldet, mit dem Grund**, statt
+still zu verschwinden. Dazu ist der Name von `1-bau` vereinheitlicht; er hieß je nach Fall
+verschieden („server.js liegt daneben" gegen „die drei Blöcke lassen sich ausführen") und hätte
+die Prüflisten selbst dann auseinandergehen lassen, wenn alle Tore hielten.
+Danach: **28 Prüfungen in beide Richtungen, identische Prüfliste** (per `diff` über die reinen
+Namen verglichen — Regel 60; der erste Vergleich meldete einen Unterschied, und der war die
+SCHLUSSZEILE `PASS`/`FAIL`), **25 rot am alten Stand**. Die drei beidseitig grünen sind genau die
+richtigen: die PATCHNOTES-Exzision greift an beiden Ständen (`0-anker`), die Historie bleibt
+unangetastet (`5b`), und `HERKUNFT_TEXT` lässt sich an beiden Ständen schneiden (`5c-anker`).
+
+**Die Auslieferungsreihenfolge ist NICHT gleichgültig** (Regel 60): Die drei Empfangsstellen lesen
+`r.bossset` bzw. `data.bossset` — ein Feld, das nur der neue Server schickt. Das Backend ist
+deshalb zuerst gemergt (#183) und der Pi vor diesem Merge byte-genau belegt worden:
+`commit`/`checkout` `96665e8`, `blob` `45a7b32` (= `git rev-parse 96665e8:server.js`),
+`uptimeSec` 12 — der Selbst-Neustart hatte gefeuert.
+
+**Beim Ausliefern kam eine fremde Lieferung dazwischen** (v8.617.0, Chat live — 239 Zeilen in der
+Spieldatei), und der Ablauf aus Regel 23 hat getragen: sichern (alle vier Zeilen aus
+`git status --short`, Patch-Größen geprüft), `index.html` **verwerfen statt sichern** — sie ist per
+`cp` reproduzierbar und hätte als Kopie der Spieldatei zwangsläufig konfliktet —, dann stash →
+`merge --ff-only` → pop, beides konfliktfrei. Danach **beide Seiten nachgezählt**: eigene Marken
+`bosssetAusServerwurf` 4× und „droppt nur bei" 0× im lebenden Text, fremde `chatBuendel` 4× und
+`8.617.0` 2×. Der Betroffenheits-Sweep über Tabellen **und** Funktionen fand 13 Tests — 11 eigene
+plus 2, die die fremde Chat-Lieferung betrifft; alle grün, danach `--nur-pflicht`.
+
+**Und die Warnzeile in Zeile 5 wurde diesmal gelesen** (Regel 22): `--nummer` meldete den
+Backend-Klon einen Commit hinter `origin/master` — nämlich hinter meinem eigenen, gerade gemergten
+#183. Der Klon stand auf dem inhaltsgleichen Branch-Commit vor dem Squash, deshalb waren die
+`server.js`-lesenden Tests schon vorher grün. Nachgezogen und die vier erneut gefahren, damit das
+gemessen ist statt angenommen.
