@@ -39,18 +39,18 @@
 // davor). GRÜN bleiben MÜSSEN 0a, 1h und 2b - ohne Poll gibt es nichts, was gegen den alten
 // Server pollen könnte; eine dieser drei rot hieße WERKZEUGFEHLER, nicht Befund (Regel 71).
 //
-// ZWEI NACHGEZOGENE BEFUNDE (v8.618.0, verifizierte Bot-Meldungen am Live-Stand v8.617.0):
+// ZWEI NACHGEZOGENE BEFUNDE (v8.620.0, verifizierte Bot-Meldungen am Live-Stand v8.617.0):
 //   * Abschnitt 3: Der Riegel gegen den teuren alten Weg griff NUR bei 404. Jeder andere
 //     Fehlschlag (429/500/502, Netzabbruch, ok-Antwort ohne Nachrichtenliste) fiel je 6-s-Poll
 //     auf storage-list + Einzel-GETs durch - ~51 Anfragen je Durchlauf gegen das 240/min-Limit,
-//     dieselbe Kette wie beim Markt-Sammelauftrag. Seit v8.618.0 liefert der Lader dort null,
+//     dieselbe Kette wie beim Markt-Sammelauftrag. Seit v8.620.0 liefert der Lader dort null,
 //     der Zeichner lässt den Bestand stehen (leere Box: Erklärzeile statt stummer Fläche,
 //     Regel 35), und der Poll versucht das Bündel weiter - die Selbstheilung (3c) ist die
 //     Zusage der Erklärzeile ("neuer Versuch läuft automatisch", Regel 11: Texte sind
 //     Versprechen).
 //   * Abschnitt 4: Der Zeichner konsumierte das chatErweitert-Flag NACH seinem await - ein
 //     langsamer 30er-Poll konnte ein frisch geklicktes "Ältere anzeigen" (130) überschreiben.
-//     Seit v8.618.0 trägt jeder Lauf eine Laufnummer (chatLadeLauf) und wirft sein Ergebnis
+//     Seit v8.620.0 trägt jeder Lauf eine Laufnummer (chatLadeLauf) und wirft sein Ergebnis
 //     weg, wenn inzwischen ein jüngerer gestartet ist. Das Rennen wird DETERMINISTISCH gestellt
 //     (limit=30-Antworten künstlich um 1,5 s verzögert, limit=130 sofort) und 4-vorab belegt am
 //     Antwort-Mitschnitt, dass es wirklich stattfand - sonst wäre 4a auch ohne Rennen grün

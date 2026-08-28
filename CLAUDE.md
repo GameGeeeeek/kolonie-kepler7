@@ -5227,7 +5227,7 @@ Rückfall + Riegel (2a/2b). Gegenprobe gegen v8.615.0 per `KEPLER_SPIELDATEI`: *
 identischen 22 Prüfnamen** (per `diff` über die reinen Prüfnamen verglichen, nicht gezählt —
 Regel 60).
 
-### Nachzug v8.618.0: der Riegel griff nur bei 404, und ein Poll konnte den Klick überholen
+### Nachzug v8.620.0: der Riegel griff nur bei 404, und ein Poll konnte den Klick überholen
 
 Zwei Review-Bot-Befunde am Live-Stand v8.617.0, beide am Code verifiziert (Regel 10), beide
 behoben — und ein dritter Fund kam beim Testen dazu:
@@ -5235,13 +5235,13 @@ behoben — und ein dritter Fund kam beim Testen dazu:
 - **Transiente Fehler fluteten den alten Weg.** `chatBuendelFehlt` wurde ausschließlich bei 404
   gesetzt; jeder ANDERE Fehlschlag (429/500/502, Netzabbruch, ok-Antwort ohne `nachrichten`-Liste)
   fiel je 6-Sekunden-Poll auf storage-list + Einzel-GETs durch — ~51 Anfragen je Durchlauf gegen
-  das 240/min-Limit, exakt die Kette des Markt-Sammelauftrag-Vorfalls. Seit v8.618.0 liefert der
+  das 240/min-Limit, exakt die Kette des Markt-Sammelauftrag-Vorfalls. Seit v8.620.0 liefert der
   Lader dort `null`: Der Zeichner lässt den Bestand stehen, der Poll versucht das **Bündel**
   weiter (Selbstheilung), und der alte Weg bleibt dem echten 404 vorbehalten. Der Rückfall ist
   damit, was er sein sollte: die Antwort auf einen ALTEN Server, nicht auf einen gestörten.
 - **Das Lade-Rennen.** `chatKanalZeichnen` konsumierte das `chatErweitert`-Flag NACH seinem
   `await` — ein langsamer 30er-Poll konnte ein frisch geklicktes „Ältere anzeigen" (130)
-  überschreiben: Die Box sprang zurück auf 30, der Klick wirkte wie tot. Seit v8.618.0 trägt
+  überschreiben: Die Box sprang zurück auf 30, der Klick wirkte wie tot. Seit v8.620.0 trägt
   jeder Lauf eine Laufnummer (`chatLadeLauf`), und wer nach seinem `await` nicht mehr der
   jüngste ist, wirft sein Ergebnis weg. `test_chat_live` 4 stellt das Rennen DETERMINISTISCH
   (30er-Antworten künstlich 1,5 s verzögert, 130er sofort) und belegt es am Antwort-Mitschnitt
