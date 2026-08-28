@@ -1058,6 +1058,38 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Umleitung setzt, prüft am Messergebnis, dass sie GRIFF (z. B. an verschobenen Anker-Indizes
     oder einem Wert, der nur in der Kopie steht) – eine still ignorierte Env-Variable sieht aus
     wie eine bestandene Gegenprobe.
+
+    **Nachtrag 28.08.2026 – ein Merge-VERSUCH ist ein Edit, auch wenn man ihn sofort abbricht.**
+    Während des vollen Laufs wurde ein als konfliktfrei erwarteter `git merge` gefahren (die
+    fremde Seite schien textgleich zur eigenen Basis). Er konfliktete doch, und git schreibt die
+    Konfliktmarker IN DEM MOMENT in die Arbeitsdatei, in dem der Konflikt entsteht – nicht erst
+    beim Auflösen. `git merge --abort` stellte die Datei byte-genau wieder her, aber im Fenster
+    dazwischen bootete `test_gegenstandskatalog` die vermarkerte Datei: totes JS, statische Reiter
+    noch antippbar, Panel leer, zwei rote Prüfungen plus Klick-Timeout – ein Fehlschlag, der wie
+    ein echter aussah und ein Messartefakt war. Verwirrend dabei: Die QUELLTEXT-Prüfungen
+    desselben Tests blieben grün, weil die Marker nur in fremden Hunks saßen.
+    **Vorgehen:** Während eines Laufs ist JEDER git-Befehl tabu, der den Arbeitsbaum schreiben
+    KANN (`merge`, `rebase`, `stash pop`, `checkout <ref> -- datei`, `pull`) – nicht nur Editoren;
+    `commit`, `fetch`, `log`, `diff` sind unbedenklich. Ein so entstandener Einzel-Fehlschlag wird
+    nach Suite-Ende durch einen EINZEL-Nachlauf des betroffenen Tests ersetzt und als Artefakt
+    dokumentiert, statt den 50-Minuten-Lauf wegzuwerfen – Tests davor und danach haben nachweislich
+    die korrekte Datei gelesen (Datei-mtime gegen die Log-Zeitachse gehalten).
+
+    **Zweite Hälfte desselben Vorfalls – die MERGE-BRÜCKE, wenn eine Parallelsitzung den
+    designierten Fernbranch mit alter Historie überschrieben hat.** Der Fernbranch stand auf der
+    VOR-Squash-Historie einer längst gemergten Etappe (Force-Push einer anderen Sitzung); ein
+    normaler Push war damit non-fast-forward, ein Force-Push von der Sicherheitsautomatik
+    gesperrt, und ein normaler Merge KONFLIKTETE (siehe oben) – schlimmer noch: Wo er NICHT
+    konfliktet, mischte er stillschweigend die ALTEN fremden Hunks ein, denn die fremde Seite
+    ist ja gegenüber der merge-base „neuer" als nichts. **Vorgehen, mit Freigabe von Sascha:**
+    (a) ERST messen, dass die Fernspitze keinen eigenen Inhalt trägt – der gerichtete Diff
+    `git diff origin/main <fernspitze>` darf als Plus-Zeilen nur ältere Fassungen bereits
+    gemergter Dateien zeigen; (b) dann die Brücke bauen, die den Baum GAR NICHT anfasst:
+    `git commit-tree HEAD^{tree} -p HEAD -p <fernspitze>` erzeugt einen Merge-Commit mit
+    byte-genau dem eigenen Baum und der Fernhistorie nur als zweitem Elternteil, danach
+    `git merge --ff-only <hash>`; (c) der Beleg ist `git diff <eigener-commit> HEAD` – MUSS
+    leer sein. Der Push ist danach ein gewöhnlicher Fast-Forward, nichts wird überschrieben,
+    und die fremde Historie bleibt erreichbar statt weggeworfen.
 15. **Auf das Suite-Ende über eine Marker-Zeile warten (`EXIT=` in der Log-Datei), nicht per
     `pgrep`** – das eigene Warte-Kommando enthält den Suchbegriff und meldet ewig „läuft".
     Kein `pkill` mit breitem Muster: es traf die eigenen Wartejobs und einmal die eigene Shell
