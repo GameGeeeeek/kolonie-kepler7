@@ -19,7 +19,7 @@
 // Die Prüfungen messen bewusst die REGEL, nicht die Momentaufnahme (Hausregel 3): kein Vergleich
 // gegen feste Pixelfarben oder feste Radien, sondern "Bitmap == Fenster", "unten links ist etwas
 // gemalt, oben rechts nicht" und "zwei verschiedene Standorte ergeben zwei verschiedene Farben".
-const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, pruefer, ruhigeUhren } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 // Überschreibbar, damit die Gegenprobe denselben Test gegen eine ALTE Fassung fahren kann.
@@ -45,6 +45,7 @@ function backend(store) {
 function spielstand(extra) {
   const now = Date.now();
   return Object.assign({
+    ...ruhigeUhren(),
     tutorialSeen: true, newbieWelcomeSeen: true,
     resources: { energie: 48000, erz: 52000, kristalle: 31000, deuterium: 20000, antimaterie: 900, forschungspunkte: 2200 },
     buildings: { solar: 18, mine: 17, kristallmine: 15, labor: 10, lager: 12 },

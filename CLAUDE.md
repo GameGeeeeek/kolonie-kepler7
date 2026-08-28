@@ -2047,8 +2047,12 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     **Der Befund daraus ist am 21.08.2026 nachgemessen und behoben** – siehe den Abschnitt
     „Das Bild bleibt still" weiter unten. Er war größer als hier notiert: Es driftet nicht nur ein
     Sprungziel, sondern die Lesestelle JEDES Spielers, sobald ein Banner über ihm auftaucht oder
-    abläuft. Offen bleibt der zweite Halbsatz: **87 von 160** Tests, die das Spiel mit Spielstand
-    booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+    abläuft. **KORREKTUR 22.08.2026 zum zweiten Halbsatz** („87 von 160 Tests pinnen
+    `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort"): Das war eine Hochrechnung, keine
+    Messung, und sie ist falsch. Von 42 Fensterlage-Tests fällt gegen eine Kopie mit 90 % Spawn je
+    Tick **genau einer**; das Banner steht dort zwar (144 px gemessen), die Tests messen nur nichts,
+    was es verschiebt. Und *pinnen* hilft gegen das Banner ohnehin nicht – der Filter zählte die
+    falsche Eigenschaft. Einzelheiten im Abschnitt „Der Riegel gegen das Ereignis-Banner".
 
 63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
     RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
@@ -2067,7 +2071,10 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     Sprungziel oben): Die Fixture muss die Möbel abschalten, die nur manchmal da sind –
     `seenTabHints` für alle Reiter, `nextPlanetEventCheck`/`nextTraderCheck` gepinnt. Gemessen sind
     **88 von 147** Tests, die das Spiel mit Spielstand booten und `nextPlanetEventCheck` nicht
-    pinnen; die Flanke wartet dort weiter.
+    pinnen. **KORREKTUR 22.08.2026:** Der Halbsatz „die Flanke wartet dort weiter" galt für die
+    Reiter-Hinweisleiste dieses Vorfalls – für das EREIGNIS-BANNER ist er nachgemessen und falsch
+    (41 von 42 Fensterlage-Tests bleiben auch bei 90 % Spawn grün). Und `nextPlanetEventCheck` ist
+    für das Banner ohnehin die falsche Größe; siehe „Der Riegel gegen das Ereignis-Banner".
     **Und die Lehre über die Fixture hinaus:** Ein Fehlschlag, der bei jedem Lauf ein anderes Opfer
     sucht, ist kein Wackeln von drei Tests, sondern EIN Zustand, der drei Tests trifft. Wer ihn je
     Test „stabilisiert", baut drei Pflaster über eine Ursache (genau das war hier zweimal passiert).
@@ -2123,9 +2130,16 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     verglichen, nicht gezählt – Regel 60). Und der Beleg, dass die Behebung wirklich gegriffen hat
     statt zufällig ruhig geblieben zu sein: `streuEreignisWeggeklickt` stand im grünen Lauf auf
     1/2/1, gegen die echte Spieldatei auf 0/0/0.
-    **Die Flanke ist nicht geschlossen, nur an dieser Stelle:** Jeder Test, der FENSTERLAGE misst,
-    ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
-    zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
+    **KORREKTUR 22.08.2026 – hier stand „jeder Test, der FENSTERLAGE misst, ist ihr ausgesetzt", und
+    das ist nachgemessen falsch.** Gegen eine Kopie mit 90 % Spawn je Tick fällt von 42
+    Fensterlage-Tests **genau einer**: dieser hier, und zwar an seiner eigenen Klick-Reparatur. Das
+    Banner steht in den anderen sehr wohl (144 px), sie messen nur INNERHALB von Containern oder
+    scrollen ihr Ziel vorher in den Blick. Ausgesetzt ist, wer eine ABSOLUTE Fensterlage ohne
+    Scrollen misst – hier, weil `.edge-tab` am VIEWPORT hängt. Seit dem 22.08.2026 ist die
+    Reparatur durch einen RIEGEL ersetzt (`ruhigeUhren()` setzt ein unsichtbares `activeEvent` und
+    trifft damit `if (state.activeEvent) return;` in der ersten Zeile derselben Funktion) – die
+    Reparatur war besiegbar, der Riegel nicht. Einzelheiten und beide Gegenproben im Abschnitt
+    „Der Riegel gegen das Ereignis-Banner".
 
 71. **Eine Gegenprobe per Env-Umleitung braucht eine Wache, die sagt, WAS fallen muss – sonst ist
     ihr Grün nicht von einem Werkzeugfehler zu unterscheiden.** Vorfall 19.08.2026 (Phase 4,
@@ -5029,6 +5043,108 @@ Wächter: `tests/test_schiffsmodul_sets.js` (17 Prüfungen, drei Gegenproben) un
 Das ist Regel 61 am eigenen Test; gefangen hat es die `WERKZEUGFEHLER`-Wache des Messskripts
 (Regel 71). Prüfung `1e` schließt es, **gescopt auf den Rumpf** von `shipModuleBonusFor` – ein
 Aufruf irgendwo sonst in der Datei zählt nicht (Regel 39).
+
+## Der Riegel gegen das Ereignis-Banner — und die Flanke, die viel schmaler ist als behauptet (22.08.2026)
+
+Arbeitsregel 70 hielt fest, dass sich `maybeSpawnRandomEvent()` **nicht pinnen** lässt: keine Uhr,
+0,25 % je Tick, und `state.lastEventTime` wird zwar geschrieben, aber nirgends als Sperre gelesen.
+Die dortige Antwort war eine **Reparatur** — das Banner über den „Ignorieren"-Knopf wegklicken.
+Diese Etappe ersetzt sie durch eine **Verhinderung** und misst dabei nebenbei, wie groß die Flanke
+wirklich ist. Das Ergebnis widerlegt meine eigene Ausgangsannahme (Regel 26 in ihrer nützlichen
+Richtung: eine Gegenprobe, die nicht anschlägt, IST der Befund).
+
+### Die Sperre, die es doch gibt — sie stand in der ersten Zeile derselben Funktion
+
+`if (state.activeEvent) return;`. Ein Ereignis mit einem Schlüssel, den `RANDOM_EVENTS` **nicht**
+kennt, legt den Würfel damit still **und bleibt selbst unsichtbar**: Der Renderer findet keine
+Definition und fällt in seinen else-Zweig, der das Banner auf `display:none` setzt. Regel 70 hatte
+nach einer UHR gesucht und war deshalb daran vorbeigelaufen.
+
+`ruhigeUhren()` in `tests/lib/umgebung.js` liefert seither **alle drei** Störquellen auf einmal:
+`nextPlanetEventCheck`, `nextTraderCheck` und `activeEvent: { key: '__testruhe__' }`. Der
+Unterstrich-Rahmen macht den Schlüssel im Spielstand sofort als Test-Riegel erkennbar, das
+Ablaufdatum liegt weit in der Zukunft, damit der Tick ihn nicht per `resolveEvent('B')` auflöst.
+
+**Gemessen an einer Kopie der Spieldatei mit 90 % Spawn je Tick** (die Fixture-Form der
+Fensterlage-Tests, 390×844):
+
+| | Banner |
+|---|---|
+| ohne Riegel | **144 px, sichtbar** |
+| mit Riegel | **0 px, unsichtbar** |
+
+### Die Einbaustelle ist eine Entscheidung: der Spread steht VORNE
+
+`JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, … })` — damit gewinnt alles, was danach
+kommt. Wer ein ECHTES Ereignis messen will, setzt `activeEvent` dahinter und bekommt es.
+Andersherum (Spread am Ende, wie ihn der erste Nutzer `test_benachrichtigung_abgleich` hatte) hätte
+der Helfer ein bewusst gesetztes Ereignis **still überschrieben**, und der Test hätte gemessen,
+dass kein Banner steht, obwohl er eines wollte. `test_klappen_kollision` zeigt beide Hälften in
+einer Datei, gegen dieselbe 90-%-Kopie gemessen: **0 px** ohne Ereignis, **138 px** (390×844) bzw.
+**164 px** (360×740) mit gesetztem. Der Riegel verhindert den ZUFALL, nicht die Absicht.
+
+### Der EINE Test, bei dem sich ein Ergebnis ändert — und warum eine Reparatur dort verliert
+
+`test_klappen_kollision` hatte die Klick-Reparatur, und sie ist **besiegbar**: Gegen die 90-%-Kopie
+erschöpfte sie ihre drei Anläufe und maß danach ein Banner von **153 bzw. 207 px** — genau die
+Störung, gegen die sie klickt, nur mit einem schnelleren Würfel. **Eine Reparatur, die in einer
+Schleife gegen eine weiterlaufende Quelle anläuft, gewinnt nur, solange die Quelle langsam genug
+ist.** Mit dem Riegel: `EXIT=0`, Banner 0 px, bei identischen 16 Prüfnamen (per `diff` verglichen,
+nicht gezählt — Regel 60). Die Reparatur ist deshalb ersatzlos entfernt; der Beleg ist jetzt die
+`bannerHoehe` in der Vorab-Prüfung, die weiterhin 0 zeigen muss.
+
+### Der eigentliche Befund: 41 von 42 Tests sind der Flanke GAR NICHT ausgesetzt
+
+Die Regeln 62, 63 und 70 sagen übereinstimmend, die Flanke sei breit („87 von 160 Tests … dieselbe
+Flanke wartet dort", „jeder Test, der FENSTERLAGE misst, ist ihr ausgesetzt"). **Das war nie
+gemessen, und es stimmt nicht.** Gemessen am 22.08.2026, alle gegen dieselbe 90-%-Kopie:
+
+| Gruppe | Tests | rot |
+|---|---|---|
+| Fensterlage-Tests OHNE gepinnte Uhren | 18 | **0** |
+| Fensterlage-Tests MIT gepinnten Uhren (u. a. die vier aus Regel 63) | 23 | **0** |
+| `test_klappen_kollision` | 1 | **1** |
+
+**Das Banner steht in diesen Tests wirklich** (144 px, oben gemessen) — sie messen nur nichts, was
+es verschiebt. Der Mechanismus dahinter, benannt statt vermutet (Regel 20): Das Banner sitzt im
+Seitenfluss über dem Reiter-Inhalt. Wer INNERHALB eines Containers misst (Rechteck-Differenzen,
+SVG-viewBox, relative Geometrie) oder sein Ziel vorher in den Blick scrollt, merkt davon nichts.
+Ausgesetzt ist nur, wer eine ABSOLUTE Fensterlage ohne Scrollen misst — und das ist die
+Klappen/Reiterleisten-Kollision, weil `.edge-tab` am VIEWPORT hängt.
+
+**Und der Vorfall aus Regel 63 war eine andere Störquelle:** Dort ging es um die
+**Reiter-Hinweisleiste** (166 px), und die ist über `seenTabHints` längst abgeschaltet. Die zwei
+Fälle sind in Regel 70 zusammengezogen worden, obwohl nur einer das Banner betrifft.
+
+### Mein eigenes Auswahlkriterium war zuerst falsch — und zwar auf genau die Weise, vor der Regel 70 warnt
+
+Der erste Durchgang filterte „Tests, die `nextPlanetEventCheck` NICHT pinnen". **Pinnen hilft gegen
+das Banner aber gar nicht** — die 23 Tests, die pinnen, sind ihm genauso ausgesetzt wie die 18, die
+es nicht tun, und ausgerechnet die vier aus Regel 63 waren dadurch AUSGESCHLOSSEN. Wer nach der
+falschen Eigenschaft filtert, bekommt eine Liste, die sich vollständig LIEST und die eigentlich
+betroffenen Fälle nicht enthält (dieselbe Familie wie die Rundflug-Liste, Regel 40).
+
+### Was übernommen wurde — und was ausdrücklich nicht
+
+Übernommen haben den Riegel **20 Tests**: `test_klappen_kollision` (dort ändert er ein Ergebnis)
+und die 18 Fensterlage-Tests ohne gepinnte Uhren, dazu `test_benachrichtigung_abgleich`, das ihn
+schon hatte und nur auf die einheitliche Form gezogen wurde. Für die 18 ist er **prophylaktisch,
+und das steht hier, damit es niemand für eine Behebung hält**: Er greift nachweislich (144 → 0 px),
+ändert aber heute kein einziges Ergebnis. Sein Wert liegt darin, dass eine künftige Prüfung in
+einer dieser Dateien nicht still einem 144-px-Zufall ausgesetzt ist.
+
+**Die 23 Tests mit gepinnten Uhren sind NICHT angefasst** — gemessen 0 rot, und ein Ersetzer über
+weitere 23 Testdateien ist genau der Fall aus Regel 24. Wer sie später doch umstellt, hat mit
+diesem Abschnitt die Messung, gegen die er es begründen muss.
+
+**Kein automatischer Einbau in `starteBrowser`**, obwohl das eine Zeile statt zwanzig wäre: Ein
+Test, der das Zufallsereignis absichtlich messen will, wäre still sabotiert, und niemand fände die
+Ursache in seiner eigenen Datei. Der Riegel steht dort, wo man ihn beim Lesen des Tests sieht.
+
+**Ein Helfer, der es NICHT geworden ist:** `tests/lib/stoerungen.js` (`ereignisBannerWegraeumen`,
+`bannerStehtNoch`) war die ausgebaute Fassung der Klick-Reparatur und ist wieder entfernt worden,
+bevor sie jemand benutzt hat — sie hätte die messbar schwächere Antwort neben der stärkeren stehen
+lassen, und ein unbenutzter Helfer wird beim nächsten Lesen für die Lösung gehalten.
 
 ## Proaktive Vorschläge
 

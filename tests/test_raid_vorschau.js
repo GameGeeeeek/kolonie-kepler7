@@ -17,7 +17,7 @@
 // (Hausregel 61) - gemessen wird deshalb ein PAAR aus zwei Laeufen, der Unterschied zwischen den
 // zwei Spalten UND jeder einzelne Betrag gegen die ausgefuehrte Serverformel.
 const fs = require('fs');
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, SERVER_JS } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, SERVER_JS, ruhigeUhren } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -39,6 +39,7 @@ function backend(store){ return async r => {
 };}
 
 const spielstand = () => JSON.stringify({
+  ...ruhigeUhren(),
   tutorialSeen:true, newbieWelcomeSeen:true, allianceSubTab:'uebersicht',
   resources:{ energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:2e4, forschungspunkte:3e4 },
   buildings:{ solar:20, mine:18, lager:20, werft:12, labor:12 },

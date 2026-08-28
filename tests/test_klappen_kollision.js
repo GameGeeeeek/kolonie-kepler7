@@ -36,7 +36,7 @@
 //   Gegenrichtungs-Prüfungen bleiben grün und belegen damit, dass gemessen wurde und nicht bloß
 //   etwas fehlte.
 const path = require('path');
-const { starteBrowser, SPIELDATEI, pruefer } = require('./lib/umgebung');
+const { starteBrowser, SPIELDATEI, pruefer, ruhigeUhren } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 const FILE = 'file://' + path.resolve(process.env.KEPLER_SPIELDATEI || SPIELDATEI);
 
@@ -65,18 +65,28 @@ function backend(store) {
   };
 }
 
-// Beide Ereignis-Uhren gepinnt (Hausregel 18). Das REICHT hier aber NICHT, und der Satz, der
-// vorher an dieser Stelle stand, war falsch: `maybeSpawnRandomEvent()` - die Funktion, die
-// `state.activeEvent` und damit das Banner setzt - hat GAR KEINE Uhr. Sie würfelt je Tick mit
-// 0,25 % und ist deshalb über den Spielstand nicht stillzulegen (`state.lastEventTime` wird zwar
-// geschrieben, aber nirgends als Sperre gelesen - wer sie pinnt, pinnt nichts). Gemessen am
-// 19.08.2026 im Suite-Lauf: ein 152 px hohes Fremd-Banner in der "ohne Ereignis"-Messung bei
-// 360x740, während 390x844 und 360x640 im selben Lauf sauber waren. Deshalb räumt `messen()`
-// unten ein zufälliges Ereignis über den SPIELERWEG weg und misst neu - und meldet, dass es das
-// getan hat, statt es zu verschweigen.
+// Alle drei Störquellen liegen in `ruhigeUhren()` (Hausregel 18/70). Die zwei UHREN lassen sich
+// pinnen; das Ereignis-Banner nicht - `maybeSpawnRandomEvent()` hat gar keine Uhr, sie würfelt je
+// Tick mit 0,25 %, und `state.lastEventTime` wird zwar geschrieben, aber nirgends als Sperre
+// gelesen. Gemessen am 19.08.2026 im Suite-Lauf: ein 152 px hohes Fremd-Banner in der "ohne
+// Ereignis"-Messung bei 360x740, während 390x844 und 360x640 im selben Lauf sauber waren.
+//
+// Hier stand bis zum 22.08.2026 eine REPARATUR - das Banner über den "Ignorieren"-Knopf
+// wegklicken, bis zu drei Anläufe. Sie ist BESIEGBAR, und das ist gemessen: Gegen eine Kopie der
+// Spieldatei mit 90 % Spawn je Tick erschöpfte sie ihre drei Anläufe und maß danach ein Banner von
+// 153 bzw. 207 px - genau die Störung, gegen die sie klickt, nur mit einem schnelleren Würfel.
+// Eine Reparatur, die gegen eine weiterlaufende Quelle anläuft, gewinnt nur, solange die Quelle
+// langsam genug ist.
+//
+// Seither VERHINDERT `ruhigeUhren()` statt zu reparieren: `activeEvent` mit einem Schlüssel, den
+// RANDOM_EVENTS nicht kennt, trifft die Sperre in der ERSTEN Zeile derselben Funktion
+// (`if (state.activeEvent) return;`) und bleibt selbst unsichtbar. Gegen dieselbe 90-%-Kopie
+// gemessen: EXIT=0, Banner 0 px. Der Spread steht VORNE im Literal, damit das ECHTE `activeEvent`
+// der "mit Ereignis"-Messung darunter gewinnt - gemessen 138 px (390x844) bzw. 164 px (360x740).
 function speicher(mitEreignis) {
   const t = Date.now();
   const s = {
+    ...ruhigeUhren(),
     tutorialSeen: true, newbieWelcomeSeen: true,
     seenTabHints: { basis: 1, verteidigung: 1, forschung: 1, flotte: 1, expedition: 1, karte: 1,
       galaxie: 1, allianz: 1, offiziere: 1, markt: 1, punkte: 1, fortschritt: 1 },
@@ -85,8 +95,7 @@ function speicher(mitEreignis) {
     research: { rsolar: 8, rerz: 8, rkampf: 7 }, fleet: { jaeger: 420, missions: [] },
     colonies: {}, activeBasePlanet: 'home', shipMarks: {},
     player: { id: 'u', name: 'A', allianceTag: '', avatarKey: null }, battleStats: { wins: 5, losses: 1 },
-    xp: 64000, buffs: [], lastTick: t, colonyNames: {}, colonyNotes: {},
-    nextPlanetEventCheck: t + 3600000, nextTraderCheck: t + 3600000
+    xp: 64000, buffs: [], lastTick: t, colonyNames: {}, colonyNotes: {}
   };
   // 'asteroid' ist ein echter RANDOM_EVENTS-Schlüssel. Ein erfundener würde vom else-Zweig des
   // Renderers still ausgeblendet, das Banner bliebe weg und die Messung wäre vacuous.
@@ -151,28 +160,12 @@ async function messen(browser, g, mitEreignis) {
   // den Zustand VOR dem Ausweichen - und das sähe aus wie ein wirkungsloser Fix.
   await page.waitForTimeout(2600);
 
-  /* Ein zufällig gefeuertes Ereignis kapert die "ohne Ereignis"-Messung (Begründung oben). Es wird
-     über den Weg weggeräumt, den auch der Spieler hat - der "Ignorieren"-Knopf des Banners -, nicht
-     über einen Griff in den Modulscope: Der ist von außen gar nicht erreichbar, und ein Test, der
-     Spielinternes nachbaut, misst nicht mehr das Spiel (Hausregel 36/47). Bis zu drei Anläufe, weil
-     der Würfel auch danach weiterläuft; die Restwahrscheinlichkeit liegt damit unter 1 zu 10.000.
-     In der "mit Ereignis"-Messung kann das gar nicht passieren: `maybeSpawnRandomEvent` kehrt bei
-     gesetztem `state.activeEvent` in der ersten Zeile zurück. */
-  let streu = 0;
-  for (let i = 0; !mitEreignis && i < 3; i++) {
-    const steht = await page.evaluate(() => {
-      const eb = document.getElementById('eventBanner');
-      return !!eb && getComputedStyle(eb).display !== 'none';
-    });
-    if (!steht) break;
-    streu++;
-    await page.evaluate(() => { const b = document.getElementById('eventOptB'); if (b) b.click(); });
-    await page.waitForTimeout(1300);          // ein voller Tick: erst der raeumt das Banner ab
-  }
-
+  /* Kein Wegräumen mehr - der Riegel aus `ruhigeUhren()` lässt das Ereignis gar nicht erst
+     entstehen (Begründung und Messung im Dateikopf). Der BELEG dafür ist `bannerHoehe` in der
+     Vorab-Prüfung unten: Steht dort etwas anderes als 0, hat der Riegel nicht gegriffen, und die
+     Messung ist wertlos - genau das sagt die Prüfung dann auch (Hausregel 37). */
   const r = await page.evaluate(lese);
   r.bootfehler = fehler.slice(0, 2);
-  r.streuEreignis = streu;                    // steht im Protokoll, statt still zu bleiben
   await ctx.close();
   return r;
 }
@@ -187,8 +180,7 @@ async function messen(browser, g, mitEreignis) {
 
       check(p + 'Vorab: es gibt überhaupt zwei Klappen und ohne Ereignis kein Banner',
         ohne.klappenAnzahl >= 2 && ohne.bannerHoehe === 0 && ohne.bootfehler.length === 0,
-        { klappen: ohne.klappenAnzahl, bannerHoehe: ohne.bannerHoehe, bootfehler: ohne.bootfehler,
-          streuEreignisWeggeklickt: ohne.streuEreignis });
+        { klappen: ohne.klappenAnzahl, bannerHoehe: ohne.bannerHoehe, bootfehler: ohne.bootfehler });
 
       // Ohne diese Prüfung wäre die Hauptaussage darunter vacuous: Bleibt das Banner weg, ist
       // "nichts verdeckt" trivial erfüllt (Hausregel 37).
