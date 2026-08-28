@@ -5648,3 +5648,72 @@ Erfolg braucht ein Symbol in `ACH_ICONS`). In `test_relikte` sind dabei vier fes
 SCHREIBWEISEN zu REGELN geworden (Regel 3): Die Wiederkehr wird nicht mehr gegen die feste Tiefe
 130 geprüft, sondern als Periode über alle Tiefen, und die Zahl der Reliquien im Hilfetext kommt
 aus einer Zahlwort-Zuordnung statt aus dem Wort „zwölf".
+
+
+## Die Hausstil-Wache war gegen ihre eigene Fehlerklasse blind (28.08.2026)
+
+Arbeitsregel 77 beschreibt seit dem 21.08.2026, dass ein `\uXXXX`-Escape die dateiweiten
+Zeichenprüfungen blind macht. Sie stand als Warnung da, gemessen war sie an einem BEINAHE-Fall
+(v8.599.0, vor dem Merge bemerkt). Beim Nachmessen der ausgelieferten Datei stellte sich heraus:
+Der Fall ist längst eingetreten.
+
+```
+U+201C als LITERAL (wonach die Pflichtprüfung suchte) : 0
+U+201C als ESCAPE  (was sie NICHT sah)                : 8
+```
+
+**Vier der acht standen in LEBENDEM Spielertext** — zwei `log()`-Meldungen der Modulschmiede
+(„benötigt die Forschung …", „…es X geschmiedet") und zweimal die Titelzeile des Teilen-Bildes
+(`ctx.fillText('\u201E'+titleDef.title+'\u201C', …)`). Die anderen vier liegen in PATCHNOTES
+(Versionen 8.526.0 und 8.587.0) und sind unveränderliche Historie.
+
+**Der Kommentar der Prüfung sagte ausdrücklich, das verbotene Zeichen komme „in 6,17 MB Datei und
+986 Patchnote-Einträgen NULL Mal vor".** Das stimmte — für die SCHREIBWEISE, nach der sie suchte.
+Genau die Sorte Satz, die beim nächsten Lesen als Beweis gelesen wird.
+
+### Die Regel liegt jetzt in EINER Datei, nicht in zwei Kopien
+
+`tests/lib/hausstil.js` ist die Implementierung; `tests/run.js` (Pflichtprüfung, läuft in allen
+drei Modi) und `test_forschungstexte.js` sind nur noch die zwei AUSFÜHRUNGSSTELLEN. Bis hierher
+stand an beiden ein eigenes `includes('“')` — solange die Regel eine Zeile war, ging das gut; mit
+der Escape-Behandlung wären die zwei Kopien beim nächsten Anfassen auseinandergelaufen. Der
+Kommentar in `run.js` benannte die Absicht schon vorher richtig („kein zweiter Maßstab, sondern ein
+früherer Zeitpunkt") — jetzt ist sie auch gebaut.
+
+**Die vier historischen Ausnahmen hängen an ihrer VERSION, nicht an einer Zeilennummer.** Eine
+Zeilennummer ist beim nächsten Patchnote falsch; die Version ändert sich nie. Und die Ausnahme gilt
+NUR für diese zwei Versionen, nicht für den ganzen PATCHNOTES-Block — ein NEUER Patchnote mit der
+Escape-Schreibweise fällt weiterhin auf. Das ist genau der Fall, der bei v8.599.0 nur deshalb nicht
+live ging, weil die Escapes zufällig als Stil-Abweichung auffielen.
+
+### Die Messung, die den Wert belegt
+
+| | alte Regel | neue Regel |
+|---|---|---|
+| Escape in lebendem Text (die Anlassfamilie) | **grün — sieht nichts** | rot, nennt Zeile 28130 |
+| Literal U+201C | rot | rot |
+
+Vier Gegenproben, alle beidseitig gefahren, 21 Prüfungen in jeder Richtung bei identischer
+Prüfliste, jede mit `WERKZEUGFEHLER`-Wache (Regel 71):
+
+| Sabotage | Ergebnis |
+|---|---|
+| Escape zurück in den Schmiede-Text | rot, `Escape \u201c Zeile 28130` |
+| Literal U+201C statt des geraden Zeichens | rot, `Literal U+201C Zeile 28130` |
+| NEUER Patchnote (9.999.0) mit Escape | rot — die Ausnahme gilt nicht für den Block |
+| `HISTORIE`-Liste geleert | rot mit den vier historischen Stellen — die Liste ist kein toter Code (Regel 59) |
+
+**Die dritte und die vierte Zeile gehören zusammen:** Ohne die dritte wäre die Ausnahme zu breit
+(jeder künftige Patchnote dürfte tarnen), ohne die vierte wäre sie womöglich wirkungslos und
+niemand hätte es gemerkt.
+
+### Ein Datums-Befund nebenbei, und er ist eine Messregel
+
+Die Pflichtprüfung meldete „Backend-Klon … geholt vor 129,2 Stunden", eine Stunde nachdem ich ihn
+gezogen hatte. Kein Fehler der Prüfung: Die **Containeruhr war um 5,3 Tage weitergesprungen** (die
+Sitzung lag dazwischen still). Nachgemessen an einer unabhängigen Uhr — dem `Date`-Kopf des Pi —
+war wirklich der 28.08., während meine Commits vom selben Sitzungsverlauf den 22.08. tragen.
+**Vorgehen: Wer ein Datum in einen Patchnote oder in diese Datei schreibt, misst es an einer
+EXTERNEN Uhr** (`curl -sI https://www.gamegeeeeek.de/ | grep -i '^date:'`), nicht am Gefühl für
+den Sitzungsverlauf — der kann beliebig lange Pausen enthalten, und ein falsch datierter Patchnote
+ist unveränderliche Historie.
