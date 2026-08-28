@@ -6366,3 +6366,96 @@ aus dem FALSCHEN Grund grün (leere Liste bzw. `undefined === undefined`, Regel 
 Familie wie bei `test_health_commit_http`: erst einen WERT verlangen, dann die Beziehung), und `3b`
 fiel dort sehr wohl, weil es gegen den in `3a` GEMESSENEN Bestand prüft. Eine Pflichtliste ist
 selbst eine Behauptung, bis die Gegenprobe sie gemessen hat.
+
+## Etappe B: Boss-Set-Teile fallen jetzt auch ohne Allianz (28.08.2026, v8.618.0)
+
+**Auftrag Sascha, über `AskUserQuestion` beantwortet mit „alle 4 optionen":** Alle vier
+vorgeschlagenen PvE-Quellen, nicht eine. Die zwanzig Boss-Set-Teile fallen seither auch an
+**Asteroidenfestung, Alien-Nest und Weltboss**; der Allianz-Raid bleibt der vierte und
+ergiebigste Weg.
+
+Das war die zweite der vier gemessenen Lücken aus `docs/beute-und-instanzen-konzept.md`, und die
+größte inhaltliche Sperre im Modulsystem: `grantBossSetModule()` hatte **genau eine** Aufrufstelle,
+und die lag im Raid-Claim. Wer solo spielt, kam an keines der zwanzig Teile heran.
+
+### Der Client ZIEHT nur — er würfelt nicht
+
+`bosssetAusServerwurf(bs)` ist die EINE Empfangsstelle, drei Zeilen lang: Kommt vom Server ein
+`{ bossKey, seltenheit }`, wird `grantBossSetModule` damit gerufen; kommt nichts, passiert nichts.
+Der Wurf selbst liegt im Backend (Begründung dort). Das ist dieselbe Naht wie beim Raid — und sie
+ist hier zwingend: Ein Boss-Set-Teil ist genau die Beute, die das Herkunfts-Schloss aus jedem
+regulären Fundtopf heraushält; eine Client-Ziehung wäre in fünf Sekunden gefälscht.
+
+**Drei Empfangsstellen, alle über denselben Helfer** (Regel 43): der `festung`- und der
+`alien-nest`-Zweig von `claimPendingRewards`, dazu der Weltboss-Schlag in `resolveWorldBoss`.
+
+**Der Weltboss-Zweig hat ein eigenes `save()`, die zwei anderen nicht** — und das ist kein
+Versehen, sondern Regel 73: Die zwei `claimPendingRewards`-Zweige speichern seit v8.597.0 ohnehin
+selbst. Beim Weltboss speichert `maybeClaimWorldBossReward` nur bei einem KILL; bei jedem anderen
+Schlag niemand. Der Kommentar zwanzig Zeilen darunter („kein zusätzlicher `save()`-Aufruf, der
+10s-Timer holt den Rest nach") gilt für Kredite und Kampfpunkte, die der Server ohnehin
+persistiert hat — **ein Modul im Inventar hat er nicht**, und der Wurf ist mit der Antwort
+verbraucht.
+
+### Vier Anzeigestellen-Gruppen, die still zur Falschaussage geworden wären (Checkliste Punkt 6)
+
+Das ist der eigentliche Umfang der Etappe — die Mechanik sind acht Zeilen, die Texte sind der Rest:
+
+1. **Die 20 Modul-Beschreibungen** sagten „(droppt nur bei &lt;Boss&gt;)". Behalten wird die
+   ZUORDNUNG („vom Sternenfresser"), gestrichen nur die jetzt falsche Exklusivität. Die
+   Herkunfts-Auskunft steht seit Etappe D ohnehin zentral in `HERKUNFT_TEXT` — eine Stelle statt
+   zwanzig (Regel 72).
+2. **`HERKUNFT_TEXT.boss`** nennt jetzt alle vier Wege. Das ist die Zeile, die der
+   Gegenstands-Katalog aus Etappe D für jeden der 20 Einträge rendert.
+3. **Zwei Hilfetexte** („Standort-Module", „Der Fundort ist die eigentliche Auskunft") behaupteten
+   die Raid-Exklusivität wörtlich.
+4. **Drei POSITIVE Halbsätze** bei Festung, Nest und Weltboss — ohne sie wäre die Mechanik da und
+   niemand wüsste davon (Regel 59). Sie nennen bewusst **keine Zahl**: Die Chancen stehen im
+   Backend, und eine Kopie hier wäre beim nächsten Balance-Schritt still falsch.
+
+### Der Wächter und die Lehre aus seiner Gegenprobe
+
+`tests/test_bossset_pve.js` (28 Prüfungen) liest BEIDE Repos über `lib/spieldatei` und ist damit
+für `KEPLER_SPIELDATEI` **und** `KEPLER_BACKEND_SERVER` umleitbar. Er misst den Wurf
+**ausgeführt** statt gelesen (1a–1e2), die drei Backend-Aufrufstellen (2a), die zwei Fehler am
+Weltboss-Zweig als REGEL statt als Schreibweise (2b/2c), die NAHT (3a/3b: jede Quelle in
+`BOSSSET_PVE_CHANCE` braucht eine Frontend-Marke, datengetrieben abgeleitet — eine vierte Quelle
+meldet sich als „unbekannt" und erzwingt die Entscheidung), den Empfang ausgeführt (4a–4c) und die
+Anzeigestellen (5a–5e).
+
+**Die Gegenprobe lief zuerst mit 13 statt 28 Prüfungen — und der rote Exit-Code sah aus wie eine
+vollständige Gegenprobe.** Vier Aufbau-Tore (`if (wurf)`, `if (wbBlock)`, `if (tabelle)`,
+`if (hol)`) unterdrückten am alten Stand zusammen **15** abhängige Prüfungen: 7 + 2 + 2 + 4, exakt
+die Differenz. Das ist Regel 34 in ihrer klassischen Form, und sie ist mir hier passiert, obwohl
+`test_gegenstandskatalog` die Antwort seit Etappe D vormacht.
+**Behoben mit `fehlend(namen, grund)`** — dem Gegenstück zu dessen `versuche()`: Scheitert ein
+Aufbau, wird jede davon abhängige Prüfung **namentlich als rot gemeldet, mit dem Grund**, statt
+still zu verschwinden. Dazu ist der Name von `1-bau` vereinheitlicht; er hieß je nach Fall
+verschieden („server.js liegt daneben" gegen „die drei Blöcke lassen sich ausführen") und hätte
+die Prüflisten selbst dann auseinandergehen lassen, wenn alle Tore hielten.
+Danach: **28 Prüfungen in beide Richtungen, identische Prüfliste** (per `diff` über die reinen
+Namen verglichen — Regel 60; der erste Vergleich meldete einen Unterschied, und der war die
+SCHLUSSZEILE `PASS`/`FAIL`), **25 rot am alten Stand**. Die drei beidseitig grünen sind genau die
+richtigen: die PATCHNOTES-Exzision greift an beiden Ständen (`0-anker`), die Historie bleibt
+unangetastet (`5b`), und `HERKUNFT_TEXT` lässt sich an beiden Ständen schneiden (`5c-anker`).
+
+**Die Auslieferungsreihenfolge ist NICHT gleichgültig** (Regel 60): Die drei Empfangsstellen lesen
+`r.bossset` bzw. `data.bossset` — ein Feld, das nur der neue Server schickt. Das Backend ist
+deshalb zuerst gemergt (#183) und der Pi vor diesem Merge byte-genau belegt worden:
+`commit`/`checkout` `96665e8`, `blob` `45a7b32` (= `git rev-parse 96665e8:server.js`),
+`uptimeSec` 12 — der Selbst-Neustart hatte gefeuert.
+
+**Beim Ausliefern kam eine fremde Lieferung dazwischen** (v8.617.0, Chat live — 239 Zeilen in der
+Spieldatei), und der Ablauf aus Regel 23 hat getragen: sichern (alle vier Zeilen aus
+`git status --short`, Patch-Größen geprüft), `index.html` **verwerfen statt sichern** — sie ist per
+`cp` reproduzierbar und hätte als Kopie der Spieldatei zwangsläufig konfliktet —, dann stash →
+`merge --ff-only` → pop, beides konfliktfrei. Danach **beide Seiten nachgezählt**: eigene Marken
+`bosssetAusServerwurf` 4× und „droppt nur bei" 0× im lebenden Text, fremde `chatBuendel` 4× und
+`8.617.0` 2×. Der Betroffenheits-Sweep über Tabellen **und** Funktionen fand 13 Tests — 11 eigene
+plus 2, die die fremde Chat-Lieferung betrifft; alle grün, danach `--nur-pflicht`.
+
+**Und die Warnzeile in Zeile 5 wurde diesmal gelesen** (Regel 22): `--nummer` meldete den
+Backend-Klon einen Commit hinter `origin/master` — nämlich hinter meinem eigenen, gerade gemergten
+#183. Der Klon stand auf dem inhaltsgleichen Branch-Commit vor dem Squash, deshalb waren die
+`server.js`-lesenden Tests schon vorher grün. Nachgezogen und die vier erneut gefahren, damit das
+gemessen ist statt angenommen.
