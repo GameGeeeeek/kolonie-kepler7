@@ -6063,3 +6063,63 @@ hält Backend-Kategorien und Frontend-Schalter zusammen und fällt bei einer Sei
     braucht ihre Gegenrichtung (Regel 33): Ein Name, der längst behoben ist, gehört heraus.
     Das ist die Familie von Regel 68, eine Ebene höher: Dort hält ein Test einen FEHLER als Regel
     fest, hier hält er eine LÜCKE als Absicht fest.
+
+## Der Urmateriekern war unauffindbar — zwei Mechanismen, ein Komplettpaket (28.08.2026)
+
+**Spieler-Report Sascha: „Habe alle Systeme durchgeschaut kein einzigen urmaterie Asteroiden
+gefunden."** Adversarisch geprüft (16 Agenten, Nullhypothese „Pech beim Würfeln" aktiv widerlegt —
+Regel 20): Die Ziehlogik ist korrekt (1 Mio Ziehungen: 2,892 % bei erwarteten 2,91 %), aber ZWEI
+Mechanismen machten den Report trotzdem zwingend statt unglücklich:
+
+1. **Die Zeitlücke.** Die Felder entstanden am 16.08. mit der Sortentabelle VOR Backend #117 — die
+   Startpopulation konnte bauartbedingt keinen Urmateriekern enthalten, und neue Sorten entstehen
+   nur nach vollständiger Leerförderung (p = 3/103 je Neuwurf). Am Messtag lag P(kein einziger
+   Kern in der ganzen Galaxie) bei 55–74 % — **deterministisch null zum Start, danach Tropf**.
+2. **Die Unsichtbarkeit.** Jedes Vorkommen wurde nach GRÖSSE gefärbt (`g.farbe`), nie nach Sorte —
+   ein Urmateriekern sah exakt aus wie ein Eisenbrocken gleicher Größe. Hilfetext („das Symbol die
+   Sorte") und Patchnote („Auf der Karte fällt er sofort auf — goldgeadert") versprachen etwas,
+   das kein Pixel einlöste (Regel 59-Familie: das Versprechen existierte nur im Text).
+
+Sascha hat das **Komplettpaket** gewählt: Sichtbarkeit + einmalige Nachsaat (~3 Kerne) +
+Mindestbestand-Regel. Die Backend-Hälfte steht in der Backend-CLAUDE.md; hier das Frontend.
+
+### Die Zeichnung: Gold hängt an der SORTE, alles andere bleibt bei der Größe
+
+An BEIDEN Zeichenstellen (Gürtel `data-map-asteroid` UND Schürfpeilung — die Peilung ist die
+klassische zweite Anzeigestelle, Punkt 6) gilt: `istUrmaterie = a.sorte === PROTOMATERIE_SORTE`
+→ Körper `#8a5f1c`, Ader-Rand und Innenkreis `#ffe6ab`. **Die Weiche hängt an der Konstante,
+nicht an einem zweiten Literal** — `test_urmaterie_karte` 0b hält das fest. Alle anderen Sorten
+zeichnen unverändert nach Größenfarbe; das ist die Zusage der Etappe (1b misst die Gegenrichtung
+am Eisenbrocken GLEICHER Größe — nur so belegt der Unterschied die Sorte und nicht die Größe).
+
+**Der Kartenmenü-Kopf trägt jetzt das gezeichnete Sortensymbol** (`iconHtmlFor(so.icon,
+'ti-pick')` statt festem `ti-pick`) — damit haben alle zehn `ast_*`-Icons in `ICONS` ihre erste
+LESESTELLE überhaupt (Regel 42/59: ein gezeichnetes Symbol, das niemand einbindet, existiert für
+den Spieler nicht). Die `so`-Deklaration ist dafür VOR den Kopf gezogen; die alte weiter unten ist
+raus (sonst doppeltes `const`).
+
+### Der Hilfetext — und die Falschaussage, die der eigene Screenshot gefangen hat
+
+Der erste Entwurf schrieb „das einzige warme, goldgeaderte Gestein zwischen lauter grauen
+Brocken". **Am gerenderten Bild gemessen ist das falsch** (Regel 11/42): Die GRÖSSENFARBEN sind
+grau nur bei Splitter/Brocken — ein Eisen-KERN ist warmes Orange (`#e0a548`), ein Koloss rosa.
+Das immer wahre Merkmal ist die **helle Ader statt des dunklen Rands** (alle anderen Vorkommen
+tragen `#0a0d1a`), und daran hängt der Text jetzt. Der Patchnote der Sorten-Einführung trägt die
+alte Formulierung weiter — unveränderliche Historie; `test_urmaterie_karte` 0d2 prüft mit
+PATCHNOTES-Exzision (Regel 46), dass sie in den lebenden Text nicht zurückkehrt.
+
+### Wächter und Gegenproben
+
+`tests/test_urmaterie_karte.js` (16 Prüfungen): Quelltext (0a–0d2), Paar-Messung am gerenderten
+Spiel (Urmaterie gold, Eisen gleicher Größe unverändert, die Ader NUR beim Urmaterium), Kartenmenü
+(SVG vorhanden, die zwei Sorten-SVGs VERSCHIEDEN — sonst wäre auch ein festes Bild grün, Regel 61).
+Gegenprobe gegen `origin/main` per `KEPLER_SPIELDATEI`: **9 rot bei identischen 16 Prüfnamen**, und
+`1-vorab` zeigt den Anlassfall wörtlich — beide Vorkommen identisch `#e0a548`, ununterscheidbar.
+`1-vorab` und `1b` MÜSSEN dabei grün bleiben (Werkzeugfehler-Wache, Regel 71).
+
+**Und die erste Pflichtliste der Backend-Gegenprobe war doppelt falsch — die Lehre steht im
+Test-Kopf von `test_urmaterie_boden_http.js` im Nachbar-Repo:** `1b`/`1d`/`3c` waren am alten Stand
+aus dem FALSCHEN Grund grün (leere Liste bzw. `undefined === undefined`, Regel 28 — dieselbe
+Familie wie bei `test_health_commit_http`: erst einen WERT verlangen, dann die Beziehung), und `3b`
+fiel dort sehr wohl, weil es gegen den in `3a` GEMESSENEN Bestand prüft. Eine Pflichtliste ist
+selbst eine Behauptung, bis die Gegenprobe sie gemessen hat.
