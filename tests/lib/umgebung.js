@@ -105,10 +105,12 @@ function pruefer() {
 //     gekommen UND danach ueberschrieben worden waere - also genau in dem Fall, gegen den der
 //     Test gebaut ist.
 //
-// Pinnen hilft nur zur Haelfte: nextPlanetEventCheck und nextTraderCheck lassen sich im
-// Spielstand in die Zukunft legen, maybeSpawnRandomEvent hat aber GAR KEINE Uhr (es wuerfelt je
-// Tick mit 0,25 % und liest state.lastEventTime nirgends als Sperre). Gegen diese Quelle ist der
-// Mitschnitt die einzige Antwort - siehe CLAUDE.md, Arbeitsregel 65.
+// Pinnen hilft gegen zwei der drei Quellen unmittelbar: nextPlanetEventCheck und nextTraderCheck
+// lassen sich im Spielstand in die Zukunft legen. maybeSpawnRandomEvent hat GAR KEINE Uhr (es
+// wuerfelt je Tick mit 0,25 % und liest state.lastEventTime nirgends als Sperre) - seit dem
+// 22.08.2026 legt `ruhigeUhren()` es trotzdem stumm, ueber die `if (state.activeEvent) return;`
+// in seiner ersten Zeile (Begruendung und Messung dort). Fuer den MITSCHNITT bleibt das eine
+// Erleichterung, kein Ersatz: Er faengt auch jede andere Meldung, die eine Zeile ueberschreibt.
 //
 // DREI DINGE, DIE BEIM BAU JE EINEN ANLAUF GEKOSTET HABEN:
 //   (a) Beobachtet wird `document`, NICHT `document.documentElement`. Beim addInitScript ist die
@@ -140,13 +142,46 @@ async function logZeilen(page) {
   return page.evaluate(() => (window.__logMitschnitt || []).slice());
 }
 
-// Die zwei Ereignis-Uhren, die sich SEHR WOHL pinnen lassen. Bei 0 - dem Wert, den ein frischer
-// Spielstand traegt - feuert der erste Check GARANTIERT (Arbeitsregel 18). Das nimmt zwei der drei
-// Stoerquellen weg und macht den Mitschnitt lesbar; die dritte (maybeSpawnRandomEvent) faengt nur
-// der Mitschnitt selbst. In einen Fixture-Spielstand einstreuen: Object.assign(stand, ruhigeUhren())
+// Bewusst ein Schluessel, den RANDOM_EVENTS nie tragen wird - der Unterstrich-Rahmen macht ihn
+// beim Lesen eines Spielstands sofort als Test-Riegel erkennbar.
+const RUHE_EREIGNIS_KEY = '__testruhe__';
+
+// Die Stoerquellen, die eine Fixture-Messung kapern koennen - ALLE DREI. In einen Fixture-
+// Spielstand einstreuen: Object.assign(stand, ruhigeUhren())
+//
+// (1) und (2) sind Uhren und lassen sich pinnen: bei 0 - dem Wert, den ein frischer Spielstand
+// traegt - feuert der erste Check GARANTIERT (Arbeitsregel 18).
+//
+// (3) ist das EREIGNIS-BANNER, und hier stand bis zum 22.08.2026, es "faengt nur der Mitschnitt
+// selbst". Das stimmt fuer eine UHR - `maybeSpawnRandomEvent` hat keine, sie wuerfelt je Tick mit
+// 0,25 %, und `state.lastEventTime` wird zwar geschrieben, aber nirgends als Sperre gelesen
+// (Arbeitsregel 70). Es gibt aber eine ANDERE Sperre, und sie steht in der ersten Zeile der
+// Funktion: `if (state.activeEvent) return;`. Ein Ereignis mit einem Schluessel, den RANDOM_EVENTS
+// nicht kennt, legt den Wuerfel damit still UND bleibt unsichtbar - der Renderer findet keine
+// Definition und faellt in seinen else-Zweig, der das Banner auf display:none setzt. Das
+// Ablaufdatum liegt weit in der Zukunft, damit der Tick es nicht per resolveEvent('B') aufloest.
+//
+// GEMESSEN am 22.08.2026 gegen eine Kopie der Spieldatei mit 90 % Spawn je Tick, beide Richtungen:
+//   ohne Riegel  test_klappen_kollision EXIT=1, Klick-Reparatur nach 3 Anlaeufen erschoepft,
+//                Banner 153 bzw. 207 px, 4 Pruefungen rot
+//   mit Riegel   EXIT=0, streuEreignisWeggeklickt 0, Banner 0 px, alles gruen
+// Der Riegel VERHINDERT also, statt zu reparieren, und ein schnellerer Wuerfel hebelt ihn nicht aus.
+//
+// DIE REGEL DER EINBAUSTELLE: Der Spread steht VORNE im Fixture-Literal
+// (`{ ...ruhigeUhren(), tutorialSeen:true, ... }`), damit alles, was danach kommt, GEWINNT. Wer ein
+// ECHTES Ereignis messen will, setzt `activeEvent` also einfach dahinter auf einen echten
+// RANDOM_EVENTS-Schluessel und bekommt es. Andersherum - Spread am Ende - haette der Helfer ein
+// bewusst gesetztes Ereignis STILL ueberschrieben, und der Test haette gemessen, dass kein Banner
+// steht, obwohl er eines wollte. `test_klappen_kollision` zeigt beide Haelften in einer Datei:
+// Object.assign(s, ruhigeUhren()) und danach das echte `activeEvent` - gemessen Banner 138 px
+// (390x844) bzw. 164 px (360x740) MIT, 0 px OHNE, gegen eine Kopie mit 90 % Spawn je Tick.
 function ruhigeUhren(stunden) {
   const weit = Date.now() + (stunden || 1) * 3600 * 1000;
-  return { nextPlanetEventCheck: weit, nextTraderCheck: weit };
+  return {
+    nextPlanetEventCheck: weit,
+    nextTraderCheck: weit,
+    activeEvent: { key: RUHE_EREIGNIS_KEY, startTime: 0, expiresAt: Date.now() + 86400000 }
+  };
 }
 
 function ueberspringen(grund) {

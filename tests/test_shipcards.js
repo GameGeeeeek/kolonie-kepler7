@@ -1,4 +1,4 @@
-const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const path=require('path');
 const FILE='file://'+path.resolve(SPIELDATEI);
 function backend(store){ return async r => {
@@ -14,7 +14,7 @@ function backend(store){ return async r => {
 const b=await starteBrowser();
 let fail=false; const check=(n,c,x)=>{console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):''));fail=fail||!c;};
 const store={}; const errs=[];
-store['kepler7-save-v3']=JSON.stringify({tutorialSeen:true,newbieWelcomeSeen:true,
+store['kepler7-save-v3']=JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true,newbieWelcomeSeen:true,
  resources:{energie:48000,erz:52000,kristalle:31000,deuterium:20000,antimaterie:900,forschungspunkte:2200},
  buildings:{solar:18,mine:17,labor:10,werft:9,hangar:6,lager:10},research:{rsolar:8,rkampf:6},
  fleet:{jaeger:320,waechter:40,missions:[]},colonies:{},activeBasePlanet:'home',

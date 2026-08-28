@@ -8,7 +8,7 @@
 // (Seit 01.08.2026 kappt .shell mit overflow:CLIP statt hidden. Fuer diesen Test aendert das
 //  nichts - clip beschneidet genauso -, es erzeugt nur keinen Scroll-Container mehr, damit die
 //  klebende Reiterleiste funktioniert. Siehe tests/test_klebeleiste.js.)
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const path = require('path');
 const FILE = SPIEL_URL;
 function backend(store){ return async r => {
@@ -20,7 +20,7 @@ function backend(store){ return async r => {
   if(/leaderboard|reports|messages|ranking|wars|halloffame|bounty|friends|pending-rewards/.test(p))return j(p.includes('pending')?{reward:null}:[]);
   return j({});
 };}
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:3e5,erz:3e5,kristalle:2e5,deuterium:1e5,antimaterie:5e3,forschungspunkte:1e4},
   buildings:{solar:20,mine:18,lager:14,werft:10,hangar:6,labor:12,orbitalstation:3},
   research:{rsolar:6,rerz:6,rmodultechnik:3},

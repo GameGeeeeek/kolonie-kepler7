@@ -14,7 +14,7 @@
 //   2) ändert sich etwas Sichtbares, wird trotzdem neu gebaut - der Speicher friert nichts ein
 //   3) das Sternenfeld steht still
 //   4) Zoom wirkt weiterhin, obwohl er das Markup nicht ändert
-const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 
 function backend(store){ return async r => {
@@ -27,7 +27,7 @@ function backend(store){ return async r => {
   return j({});
 };}
 
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:3e5,erz:3e5,kristalle:2e5,deuterium:1e5,antimaterie:5e3,forschungspunkte:1e4},
   buildings:{solar:20,mine:18,lager:14,werft:10,hangar:6,labor:12,orbitalstation:3},
   research:{rsolar:6,rerz:6,rmodultechnik:3},
