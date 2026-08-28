@@ -1279,6 +1279,21 @@
          endet bei einem festen Pixelwert, die Klappe skaliert mit der Fensterhöhe. 8% hält auf
          allen drei geprüften Größen Abstand. */
       .edge-tab { top:auto; bottom:8%; transform:none; }
+      /* Der dreizehnte Reiter (Sammlung, 28.08.2026) belegt die dritte Rasterzeile ALLEIN. Er
+         nimmt sie deshalb ganz und stellt Symbol und Beschriftung NEBENEINANDER statt uebereinander.
+         Gemessen auf 390x844, jede Variante am gerenderten Bild:
+           6 Spalten, einsamer Knopf : Leiste 172px (+54), Knopf 54x49
+           7 Spalten                 : Leiste 118px (+0),  aber der Text ragt bei drei Knoepfen
+                                       heraus - auf 360px bei sechs, und darunter sind BESTANDS-
+                                       reiter. Genau die Bedingung, auf die diese Leiste
+                                       kalibriert ist (siehe Kommentar oben).
+           volle Breite (gewaehlt)   : Leiste 159px (+41), Knopf 348x36, kein Text ragt heraus.
+         Die volle Breite spart 13px gegenueber dem einsamen Knopf UND ist mit 348x36 das beste
+         Fingerziel der ganzen Leiste. Am PC (Fluss-Layout) greift nichts davon - dort bleibt die
+         Leiste bei 94px. Der Selektor haengt am data-tab, nicht an :last-child: ein spaeterer
+         vierzehnter Reiter soll hier auffallen und nicht still die Regel erben. */
+      .tabs .tab-btn[data-tab="sammlung"] { grid-column:1 / -1; flex-direction:row; justify-content:center;
+                 gap:6px; padding:5px 8px; font-size:11px; }
     }
     .tab-badge { position:absolute; top:2px; right:2px; width:8px; height:8px; border-radius:50%; background:var(--c-danger); box-shadow:0 0 6px var(--c-danger); animation: badgePulse 1.6s ease-in-out infinite; }
     /* Zwei Sorten Punkt (v8.348.0). Rot heißt „etwas ist PASSIERT" und verschwindet beim Hinsehen -
@@ -1376,11 +1391,16 @@
        einer Überschrift, die vollständig hinter der Leiste liegt. Gemessen: zielOben 0 bei
        leisteUnten 108. Dieselbe Klasse wie KB-10 an der Karte, wo die Sticky-Leiste 118 px
        Kartenoberkante verdeckte.
-       `scroll-margin-top` ist die dafür gebaute CSS-Eigenschaft - kein JS, keine zweite Rechnung,
-       und sie wirkt auf JEDES künftige Sprungziel automatisch. 128 px deckt beide gemessenen
-       Leistenhöhen mit etwas Luft; bewusst an `body.compact-head` gehängt, weil die Leiste nur
-       dort klebt und der Abstand sonst grundlos Platz verschenkte. */
-    body.compact-head [data-acc-key] { scroll-margin-top: 128px; }
+       `scroll-margin-top` ist die dafür gebaute CSS-Eigenschaft - keine zweite Rechnung, und sie
+       wirkt auf JEDES künftige Sprungziel automatisch; bewusst an `body.compact-head` gehängt,
+       weil die Leiste nur dort klebt und der Abstand sonst grundlos Platz verschenkte.
+       Hier stand bis zum 28.08.2026 die feste Zahl 128 - "beide gemessenen Leistenhöhen mit etwas
+       Luft". Der dreizehnte Reiter hat die Leiste am Handy auf 159 px gebracht, und damit stand
+       das Sprungziel wieder hinter ihr (gemessen: zielOben 128 bei leisteUnten 158). Eine neue
+       feste Zahl wäre beim vierzehnten Reiter derselbe Fehler; der Wert folgt deshalb der
+       GEMESSENEN Leiste (`sprungAbstandSetzen`, Hausregel 50). Die 128 bleiben als Rückfall für
+       den Moment vor dem ersten Takt stehen - nicht als Entscheidung, sondern als Startwert. */
+    body.compact-head [data-acc-key] { scroll-margin-top: var(--sprung-abstand, 128px); }
     body.compact-head .tabs { position:sticky; top:0; z-index:25; background:#0a0d1a; padding:6px 0 8px; margin-bottom:0.8rem; box-shadow:0 6px 14px -6px rgba(0,0,0,0.85); }
     .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
     @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
@@ -3285,6 +3305,7 @@
         <button class="tab-btn" data-tab="markt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-truck" aria-hidden="true" style="color:#ef9f27;"></i></span>Markt<span class="tab-badge" data-tab-need="markt" style="display:none;"></span></button>
         <button class="tab-btn" data-tab="punkte" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
         <button class="tab-btn" data-tab="fortschritt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt<span class="tab-badge" data-tab-need="fortschritt" style="display:none;"></span></button>
+        <button class="tab-btn" data-tab="sammlung" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-backpack" aria-hidden="true" style="color:#5ce1ff;"></i></span>Sammlung</button>
       </div>
 
       <!-- Kontextbezogener Ersthinweis: erscheint EINMAL je Tab, wenn man ihn zum ersten Mal
@@ -4185,6 +4206,11 @@
             <div id="kosmetikBox"></div>
           </div>
         </div>
+      </div>
+
+      <div class="tab-panel" id="tab-sammlung">
+        <div class="section-title"><i class="ti ti-backpack" aria-hidden="true"></i>Sammlung</div>
+        <div id="sammlungBox"></div>
       </div>
 
       <div class="tab-panel" id="tab-update">
@@ -13923,7 +13949,7 @@
   const MINE_CARGO_JE_SCHIFF = 400;        // eigener Laderaum eines Minenschiffs
   const MINE_SHIP_KEYS = ['schuerfschiff', 'frachter', 'frachtergross', 'bergungsfrachter'];
   const MINE_ONLY_KEYS = ['schuerfschiff'];   // was NUR die Abbaumission kennt (vgl. TIEFEN_SHIP_KEYS)
-  const ABBAU_MAX_SEK = 4 * 3600;          // Rueckfall-Obergrenze, falls eine Groesse fehlt
+  const ABBAU_MAX_SEK = 4 * 3600;          // Rückfall-Obergrenze, falls eine Groesse fehlt
   /* Abbauzeit nach GROESSE (17.08.2026). Vorher galt fuer alle vier dieselbe Vier-Stunden-Grenze
      und gar keine Untergrenze - gemessen war ein Koloss bei gleicher Ladung deshalb ELFMAL
      schneller fertig als ein Splitter (22 gegen 240 Minuten). Das widersprach der Anschauung so
@@ -40959,6 +40985,16 @@
       { title:'Wochenlauf und Allianz-Tiefenlauf', body:'Der Rekord ist eine Einbahnstraße – wer bei Tiefe 60 hängt, hätte sonst wochenlang nichts vorzuweisen. Der <strong>Wochen-Tiefenlauf</strong> wertet deshalb, wie tief du <strong>in dieser Woche</strong> kommst, ausdrücklich auch unterhalb deines Rekords. Montags beginnt er neu, abgerechnet wird in Abgrundsplittern (1,5 je erreichter Tiefe) über einen Knopf in der Abgrund-Box. Bist du in einer <strong>Allianz</strong>, zahlen alle Mitglieder mit ihrer besten Wochentiefe in ein gemeinsames Konto ein. Erreicht die Allianz eine der drei Marken – <strong>Vorstoß</strong> (50 Tiefen), <strong>Tiefenzug</strong> (150), <strong>Abgrundflotte</strong> (300) –, kann sie <strong>jedes</strong> Mitglied abholen, das selbst mitgetaucht ist, einmal pro Woche und Marke. Ihr müsst dafür nicht gleichzeitig online sein.' },
       { title:'Chronik, Verzeichnis, Titel und was der Abgrund draußen bringt', body:'Zwei Sammlungen füllen sich beim Abstieg. Die <strong>Chronik des Abstiegs</strong> gibt an festen Tiefenmarken einen Bericht frei – zwanzig Stück, als durchlaufende Erzählung geschrieben, nicht als Flavour-Schnipsel. Das <strong>Mutatoren-Verzeichnis</strong> füllt sich, sobald du einem Mutator zum ersten Mal begegnet bist; eine Niederlage zählt dabei mit, du warst ja dort. Deine <strong>Rekordtiefe</strong> ist außerdem öffentlich: Sie erscheint als Abzeichen neben deinem Namen in der Bestenliste, im Spielerprofil im Vergleich zu deiner eigenen, und im Abgrund als Rangliste <em>„Die tiefsten Kommandanten"</em> (gewertet werden dort nur die geladenen Top 30). Bei Rekordtiefe 10, 25 und 50 bekommst du dazu einen <strong>Titel</strong>: <em>Tiefenlotse</em>, <em>Grenzgänger der Tiefe</em>, <em>Ohne Boden</em>. Und der einzige Weg, auf dem der Abgrund deine normale Wirtschaft berührt: Deine Rekordtiefe gibt dauerhaft Produktion, logarithmisch wie die Ewigkeitsforschungen – Rekord 20 rund +8,8%, Rekord 100 rund +13,3%.' }
     ]},
+    /* Dieser Abschnitt nennt bewusst KEINE Gesamtzahl der Gegenstaende. Gemessen stehen von den
+       fuenf Listen nur MODULE_DEFS und SHIP_MODULE_DEFS VOR HELP_SECTIONS; ITEM_DEFS, RARE_ITEMS
+       und ABGRUND_RELIKTE liegen dahinter und damit beim Laden in ihrer temporalen Todeszone
+       (CLAUDE.md Regel 38). Eine eingetippte Zahl waere die zweite Anzeigestelle neben der Liste
+       und beim naechsten Eintrag still falsch (Regel 72) - die Ansicht selbst zaehlt ohnehin. */
+    { key:'sammlung', icon:'ti-backpack', title:'Sammlung', entries:[
+      { title:'Was der Reiter zeigt', body:'Das Spiel führt seine Gegenstände in <strong>fünf getrennten Listen</strong>: Standortmodule, Schiffsmodule, Verbrauchsgüter, seltene Materialien und die Reliquien der Tiefe. Der Reiter <strong>Sammlung</strong> ist die einzige Stelle, an der sie zusammen stehen - mit Symbol, Beschreibung, Fundort und deinem Bestand. Was du noch nie besessen hast, steht blass und mit „noch nicht" da; es ist also zugleich eine Liste dessen, was es überhaupt zu finden gibt. Die Knöpfe darüber filtern nach Art, „Nur besessene" blendet alles aus, was dir fehlt.' },
+      { title:'Der Fundort ist die eigentliche Auskunft', body:'Die Zeile mit der Nadel unter jedem Eintrag sagt, <strong>wo ein Stück wirklich fällt</strong>. Das ist keine Kosmetik: Das Spiel hält bestimmte Ausrüstung aus <em>jedem</em> regulären Fundtopf heraus - Abgrund-Ausrüstung fällt ausschließlich bei Tauchgängen, die Boss-Set-Teile ausschließlich bei einer Allianz-Raid-Welle, und die Unikate nur bei ihrer eigenen Jagd. Sie erscheinen deshalb nie bei Expeditionen, nie im Kredit-Shop, nie an der Börse und lassen sich in keiner Schmiede fertigen. Bis zum 28.08.2026 stand diese Regel nirgends im Spiel - man merkte sie nur daran, dass ein Stück partout nicht fallen wollte.' },
+      { title:'Was hier NICHT steht', body:'Die Sammlung zeigt <strong>Typen</strong>, nicht einzelne Exemplare. Ein Modul trägt seine Seltenheit, seine Stufe und seinen Wurf am <em>Exemplar</em>, nicht am Typ - deshalb steht bei den Modulen hier keine Seltenheit, und der Bestand zählt alle Exemplare eines Typs zusammen. Wer einzelne Module vergleichen, aufwerten oder verschmelzen will, tut das weiterhin im Reiter <strong>Offiziere</strong>; wer Verbrauchsgüter einsetzen will, im Fortschritt-Reiter unter „Inventar".' }
+    ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern"). Nach dem Fraktions-Ausbau kommen vier <strong>Fraktions-Aufgaben</strong> dazu: „1 Posten in einem Fraktionsladen kaufen" (sobald mindestens eine Fraktion freundlich ist), „In einem Fraktionskrieg Partei ergreifen" (nur solange wirklich ein Krieg läuft und du noch keine Seite gewählt hast), „1 Fraktionsrang aufsteigen" und „Bei 3 Fraktionen Kontakt halten" – letztere ist die Gegenaufgabe zum Ruf-Verfall: als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen dabei bewusst nicht mit, sonst wäre die Aufgabe von selbst fast erledigt. Seit dem Abgrund-Ausbau kommen zwei <strong>Tiefen-Aufgaben</strong> hinzu: „1 Tauchgang in den Abgrund abschließen" und „Eine neue Rekordtiefe erreichen" – beide erscheinen erst, wenn du den Abgrund freigeschaltet hast. Dazu kommt die <strong>Modul-Werkbank</strong>: „1 Modul aufwerten, verschmelzen, zerlegen oder neu würfeln" – erfüllt mit jeder dieser Werkbank-Aktionen in einem der beiden Modulsysteme (auch dem Hauptwert-Neuschmieden). Seit dem Asteroidenbergbau kommen zwei <strong>Gürtel-Aufgaben</strong> dazu: „2 Abbaumissionen abschließen" und „6.000 Rohstoffe aus Asteroiden schürfen" – beide erscheinen erst, wenn du die Forschung <em>Minentechnik</em> hast, denn ohne Minenschiff wäre keine Abbaumission startbar. Gezählt wird die geschürfte Ladung selbst; der Zuschlag der Aufbereitungsanlage entsteht erst beim Entladen und zählt nicht mit. <strong>Schürfrechte und Anfechtungen sind bewusst keine Tagesaufgabe</strong> – beide brauchen den Server, und im Solo-Betrieb wäre so eine Aufgabe den ganzen Tag unerfüllbar, erscheint, sobald überhaupt ein Modul im Besitz ist; Ausrüsten zählt bewusst nicht. Insgesamt sind es damit 25 Vorlagen – jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen <strong>Komplett-Tag-Bonus</strong>, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt: Kredite (40 je Serientag, also bis 400), <strong>Modulfragmente</strong> (1 je zwei Serientage, mindestens 1, also 1 bis 5) und ab Serientag 3 auch <strong>Kommandopunkte</strong> (1 je drei Serientage, also bis 3). Modulfragmente und Kommandopunkte wachsen bewusst <em>nicht</em> mit deiner Wirtschaft mit – anders als die Einzelbelohnungen, die sich an deiner Produktion orientieren. Genau deshalb bleibt der Bonus auch für ein weit entwickeltes Imperium interessant: Fragmente und Kommandopunkte sind dort das Knappe, nicht Erz. Ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
       { title:'Level & Kommandant', body:'Level ergibt sich aus Erfahrungspunkten (XP): <strong>Level = Wurzel aus (XP/50)</strong>, abgerundet – Level 10 braucht 5.000 XP, Level 30 schon 45.000. Jedes erreichte Level gibt <strong>einen Fähigkeitspunkt</strong> für den Skill-Baum und <strong>+'+Math.round(COMMANDER_PROD_PER_LEVEL*100)+'% auf alle Produktion</strong>, letzteres gedeckelt bei <strong>+'+Math.round(COMMANDER_PROD_CAP*100)+'%</strong> – der Deckel ist auf <strong>Level '+COMMANDER_PROD_CAP_LEVEL+'</strong> erreicht. Dazu kommt die <strong>Belohnungsleiter</strong>: auf '+LEVEL_REWARDS.length+' bestimmten Leveln (von '+LEVEL_REWARDS[0].level+' bis '+LEVEL_REWARDS[LEVEL_REWARDS.length-1].level+') wartet einmalig etwas – erst Ressourcen und Schiffe, später vor allem <strong>seltene Materialien, die sich nicht produzieren lassen</strong> (Kristallherz, Alte Technologie, Resonanzkristall, Urmaterie, Leerensplitter) und die du sonst nur auf Expeditionen findest. Welche Belohnung als Nächstes ansteht, steht in der Levelkarte im Fortschritt-Tab; was der nächste Aufstieg konkret bringt, im Kasten „Nächstes Ziel" auf der Basis.' },
@@ -41074,7 +41110,9 @@
     punkte: { icon:'ti-star', help:'fortschritt',
       text:'Dein Punktestand aufgeschlüsselt - woher die Punkte kommen, wie sie sich über die Zeit entwickelt haben und wie deine Kampfbilanz aussieht. Dieselbe Zahl bestimmt deinen Platz in der Bestenliste und ist die Schwelle für Prestige und Aufstieg.' },
     fortschritt: { icon:'ti-trophy', help:'fortschritt',
-      text:'Erfolge, Fähigkeitsbaum, Prestige und Aufstieg. <strong>Prestige</strong> setzt dein Imperium für dauerhafte Boni zurück; der <strong>Aufstieg</strong> darüber (ab Prestige 3 und 50.000 Punkten) setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz, der einzigen Währung, die jeden Reset überlebt.' }
+      text:'Erfolge, Fähigkeitsbaum, Prestige und Aufstieg. <strong>Prestige</strong> setzt dein Imperium für dauerhafte Boni zurück; der <strong>Aufstieg</strong> darüber (ab Prestige 3 und 50.000 Punkten) setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz, der einzigen Währung, die jeden Reset überlebt.' },
+    sammlung: { icon:'ti-backpack', help:'sammlung',
+      text:'Jeder Gegenstand des Spiels an einer Stelle: Standort- und Schiffsmodule, Verbrauchsgüter, seltene Materialien und die Reliquien der Tiefe. Die Zeile mit der Nadel nennt, <strong>wo ein Stück wirklich fällt</strong> - manche fallen ausschließlich im Abgrund, bei einer Raid-Welle oder auf ihrer eigenen Jagd und tauchen in keinem regulären Fundtopf auf, egal wie lange man sucht.' }
   };
   // Während des Tutorials oder eines Start-Overlays wäre der Hinweis doppelte Ansprache und würde
   // hinter dem Overlay unbemerkt „verbraucht" - deshalb erst danach.
@@ -48718,21 +48756,21 @@
     render(); save();
   }
   const RARE_ITEMS = [
-    { key:'antimateriekern', name:'Antimateriekern', chance:0.006, icon:'ti-atom-2', rarity:'episch' },
-    { key:'kristallherz', name:'Kristallherz', chance:0.006, icon:'ti-diamond', rarity:'episch' },
-    { key:'altetech', name:'Alte Technologie', chance:0.005, icon:'ti-atom-2', rarity:'legendaer' },
+    { key:'antimateriekern', name:'Antimateriekern', chance:0.006, icon:'ti-atom-2', rarity:'episch', desc:'Der gebändigte Kern des Superschlachtschiffs: Jeder Bau verbraucht genau einen. Zusammen mit Kristallherz, Alter Technologie und Leerensplitter gibt er außerdem den Mondzerstörer frei.' },
+    { key:'kristallherz', name:'Kristallherz', chance:0.006, icon:'ti-diamond', rarity:'episch', desc:'Schaltet die Kristallfestung frei und wird bei jedem Bau einer verbraucht. Zählt außerdem zu den vier Materialien, die den Mondzerstörer freigeben.' },
+    { key:'altetech', name:'Alte Technologie', chance:0.005, icon:'ti-atom-2', rarity:'legendaer', desc:'Bruchstücke einer Bauweise, die niemand mehr beherrscht. Schaltet den Dyson-Schwarm-Kollektor und den Void-Reaktor frei und zaehlt zu den vier Materialien für den Mondzerstörer.' },
     // Leerensplitter (17.07.2026, Endgame): einzigartige Endgame-Ressource - KEIN Direktfund bei
     // Expeditionen (chance 0, nur die automatisch erzeugten Fragmente sind dort findbar). Quellen:
     // Leere-NPCs, Weltboss-Kills, Piratenketten-Endboss. Verbraucht je 1x pro gebautem Leerenjäger
     // (SPECIAL_UNIT_ITEMS) und für die Orbitalstufen 4/5.
-    { key:'leerensplitter', name:'Leerensplitter', chance:0, icon:'ti-diamond', rarity:'legendaer' },
+    { key:'leerensplitter', name:'Leerensplitter', chance:0, icon:'ti-diamond', rarity:'legendaer', desc:'Fällt als einziges Material NICHT bei Expeditionen - nur bei Leere-NPCs, Weltbossen und dem Endboss der Piratenkette. Jeder gebaute Leerenjäger verbraucht einen, die Orbitalstation braucht ihn ab Stufe 4.' },
     // Zwei neue Materialien (25.07.2026): Bis hierher gab es DREI per Expedition findbare Materialien
     // (der Leerensplitter hat chance:0) - bei 63 Sonderereignissen viel zu wenig, um das Suchen
     // interessant zu halten. Beide haben eine echte Senke, damit sie nicht bloss im Inventar liegen:
     // je ein Endgame-Gebäude, das sich erst mit dem Material freischaltet (unlockItem, dasselbe
     // Muster wie die Kristallfestung mit dem Kristallherz).
-    { key:'resonanzkristall', name:'Resonanzkristall', chance:0.005, icon:'ti-sparkles', rarity:'episch' },
-    { key:'urmaterie', name:'Urmaterie', chance:0.004, icon:'ti-atom', rarity:'legendaer' }
+    { key:'resonanzkristall', name:'Resonanzkristall', chance:0.005, icon:'ti-sparkles', rarity:'episch', desc:'Ein Kristall, der auf Schildfrequenzen mitschwingt. Schaltet den Resonanzschild-Emitter frei - das einzige Gebäude, das ihn verlangt.' },
+    { key:'urmaterie', name:'Urmaterie', chance:0.004, icon:'ti-atom', rarity:'legendaer', desc:'Materie aus der Zeit vor den Elementen. Schaltet den Urmaterie-Reaktor frei und wird bei jedem Bau eines verbraucht.' }
   ];
   // Fragmente für seltene Gegenstände (16.07.2026, Feature-Wunsch): häufigerer, kleinerer Fund als
   // das volle seltene Material selbst - je FRAGMENTS_NEEDED gesammelte Fragmente eines Typs lassen
@@ -51745,6 +51783,180 @@
       save();
       switchTab('flotte');
     };
+  }
+
+  // ===== Sammlung: EIN Katalog ueber alle fuenf Gegenstands-Listen (Etappe D, 28.08.2026) =====
+  // Auftrag Sascha: "vielleicht macht es Sinn eine item Struktur einzubauen."
+  //
+  // Das Spiel fuehrt gemessen FUENF voneinander unabhaengige Gegenstands-Listen mit zusammen 146
+  // Eintraegen - und keine einzige Stelle, an der ein Spieler sie zusammen sieht. Das Kompendium
+  // ist ein ZAEHLER: zwoelf seiner dreizehn Kategorien geben nur have/total zurueck, allein die
+  // Unikate zeichnen wirklich eine Liste.
+  //
+  // Diese Schicht ist ABGELEITET und ausdruecklich KEINE sechste Liste. Sie fasst nichts zusammen,
+  // was es nicht schon gibt; sie uebersetzt nur drei gemessene Formunterschiede in eine Form:
+  //   - ABGRUND_RELIKTE tragen `text` statt `desc` und `bild` (rohe SVG-Pfade) statt `icon`.
+  //   - RARE_ITEMS trugen ueberhaupt keine Beschreibung; die sechs sind mit dieser Etappe
+  //     ergaenzt worden, weil diese Ansicht die Luecke sonst nur SICHTBAR gemacht haette.
+  //   - Eine Seltenheit fuehren nur ITEM_DEFS und RARE_ITEMS (37 von 146). Bei den Modulen ist die
+  //     Seltenheit eine Eigenschaft des EXEMPLARS (sie steckt im Instanz-Schluessel), nicht des
+  //     Typs - deshalb steht dort bewusst keine, statt eine zu erfinden.
+  // Das Konzept (docs/beute-und-instanzen-konzept.md, Teil D) nennt `seltenheit` als Feld jedes
+  // Eintrags; gemessen tragen 109 der 146 keine. Ein Konzept ist kein Messergebnis.
+  const GEGENSTAND_ARTEN = [
+    { key:'standortmodul', name:'Standortmodule', icon:'ti-adjustments', farbe:'#85b7eb' },
+    { key:'schiffsmodul',  name:'Schiffsmodule',  icon:'ti-rocket',  farbe:'#5dcaa5' },
+    { key:'verbrauch',     name:'Verbrauchsgüter', icon:'ti-flask', farbe:'#f0997b' },
+    { key:'material',      name:'Seltene Materialien', icon:'ti-diamond', farbe:'#fbe08f' },
+    { key:'reliquie',      name:'Reliquien der Tiefe', icon:'ti-infinity', farbe:'#af9ce6' }
+  ];
+  // Der Fundort in Worten. Er ist die eigentliche Auskunft dieser Ansicht: Das Herkunfts-Schloss
+  // (`quelle`) haelt Boss-Set-Teile, Unikate und Abgrund-Beute aus jedem regulaeren Fundtopf
+  // heraus - eine Regel, die im Spiel bisher NIRGENDS stand und die der Spieler nur daran merkte,
+  // dass ein Stueck partout nicht fallen wollte.
+  const HERKUNFT_TEXT = {
+    normal:  'Fällt regulär - Expeditionen, Sonden, Händler, Schmiede.',
+    abgrund: 'Fällt ausschließlich bei Tauchgängen in den Abgrund - nicht schmiedbar, nicht handelbar.',
+    boss:    'Fällt ausschließlich bei einer Allianz-Raid-Welle.',
+    unikat:  'Fällt ausschließlich bei seiner eigenen Jagd (Weltboss bzw. Wächter) - immer mit Spitzenwurf.'
+  };
+  // Lazy, nicht beim Laden: Zwei der fuenf Listen stehen weiter unten in der Datei, und ein
+  // Aufruf waehrend der Modulauswertung traefe sie in ihrer temporalen Todeszone (Arbeitsregel 38).
+  // Ein Zwischenspeicher ist tragfaehig, weil sich keine der fuenf Listen zur Laufzeit aendert.
+  let _gegenstandsKatalog = null;
+  function gegenstandsKatalog(){
+    if (_gegenstandsKatalog) return _gegenstandsKatalog;
+    const aus = [];
+    for (const d of MODULE_DEFS) aus.push({ key:d.key, name:d.name, icon:d.icon, art:'standortmodul',
+      seltenheit:null, herkunft:d.quelle || HERKUNFT_NORMAL, desc:d.desc, bossKey:d.bossKey || null });
+    for (const d of SHIP_MODULE_DEFS) aus.push({ key:d.key, name:d.name, icon:d.icon, art:'schiffsmodul',
+      seltenheit:null, herkunft:d.quelle || HERKUNFT_NORMAL, desc:d.desc, klasse:d.klasse || null });
+    for (const d of ITEM_DEFS) aus.push({ key:d.key, name:d.name, icon:d.icon, art:'verbrauch',
+      seltenheit:d.rarity || null, herkunft:d.quelle || HERKUNFT_NORMAL, desc:d.desc });
+    for (const d of RARE_ITEMS) aus.push({ key:d.key, name:d.name, icon:d.icon, art:'material',
+      seltenheit:d.rarity || null, herkunft:HERKUNFT_NORMAL, desc:d.desc });
+    for (const d of ABGRUND_RELIKTE) aus.push({ key:d.key, name:d.name, icon:null, bild:d.bild,
+      art:'reliquie', seltenheit:null, herkunft:HERKUNFT_ABGRUND, desc:d.text, reihe:d.reihe });
+    _gegenstandsKatalog = aus;
+    return aus;
+  }
+  // Besitz je Art aus der Quelle, die ihn WIRKLICH fuehrt - fuenf verschiedene Ablageorte, und
+  // keiner davon laesst sich aus einem anderen ableiten. Module zaehlen ueber das Schluessel-
+  // PRAEFIX, weil ihr Instanz-Schluessel Seltenheit, Stufe und Wurf mittraegt (`typ:seltenheit:...`).
+  // Der Index wird EINMAL je Zeichnung gebaut, nicht einmal je Eintrag. Ohne ihn liefe ueber
+  // jeden der 146 Eintraege das ganze Modulinventar - bei den 3.000 Schluesseln, die der
+  // Kauf-Deckel zulaesst, sind das 438.000 Vergleiche pro Durchgang. Genau diese quadratische
+  // Form hat am 21.08.2026 das Inventar zum Stehen gebracht (dort `fuseAnzahl`), und der Grund
+  // ist derselbe: Der Modul-Schluessel traegt Seltenheit, Stufe und Wurf mit (`typ:seltenheit:...`),
+  // die Sammlung ist also keine Stapelliste, sondern eine Liste von Unikaten.
+  function gegenstandBesitzIndex(){
+    const idx = { standortmodul: Object.create(null), schiffsmodul: Object.create(null) };
+    for (const [art, inv] of [['standortmodul', state.modules], ['schiffsmodul', state.shipModules]]){
+      for (const k in (inv || {})){
+        const typ = k.split(':')[0];
+        idx[art][typ] = (idx[art][typ] || 0) + (inv[k] || 0);
+      }
+    }
+    return idx;
+  }
+  function gegenstandBesitz(g, idx){
+    if (g.art === 'standortmodul' || g.art === 'schiffsmodul'){
+      if (idx && idx[g.art]) return idx[g.art][g.key] || 0;
+      const inv = (g.art === 'standortmodul' ? state.modules : state.shipModules) || {};
+      let n = 0;
+      for (const k in inv) if (k === g.key || k.split(':')[0] === g.key) n += (inv[k] || 0);
+      return n;
+    }
+    if (g.art === 'verbrauch') return ((state.inventory || {})[g.key]) || 0;
+    if (g.art === 'material')  return ((state.rareItems || {})[g.key]) || 0;
+    if (g.art === 'reliquie')  return (((state.abgrund || {}).relikte || {})[g.key]) ? 1 : 0;
+    return 0;
+  }
+  // Zwei Arten von Symbol in einer Ansicht: ti-Klasse (128 Eintraege) und rohe SVG-Pfade
+  // (die 18 Reliquien). Ein `bild` in ein <i class="ti ..."> zu zwingen ginge nicht, und die
+  // Reliquien deshalb wegzulassen waere genau die Luecke, die diese Ansicht schliessen soll.
+  function gegenstandIconHtml(g){
+    if (g.bild) return '<svg viewBox="0 0 100 100" aria-hidden="true" style="width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:5; stroke-linecap:round; stroke-linejoin:round;">' + g.bild + '</svg>';
+    return '<i class="ti ' + (g.icon || 'ti-box') + '" aria-hidden="true"></i>';
+  }
+
+  // Filterzustand als MODULVARIABLE, nicht im DOM: Die Box wird per setBoxHtml neu geschrieben,
+  // und alles, was nur im erzeugten Markup steht, verliert dabei seinen Wert (dieselbe Falle, an
+  // der beim Allianz-Raid einmal still die Vorgabedauer gestartet ist).
+  let sammlungArt = 'alle';
+  let sammlungNurBesitz = false;
+  function renderSammlung(){
+    const box = document.getElementById('sammlungBox');
+    if (!box) return;
+    const katalog = gegenstandsKatalog();
+    const idx = gegenstandBesitzIndex();
+    const mitBesitz = katalog.map(g => ({ g, n: gegenstandBesitz(g, idx) }));
+    const entdeckt = mitBesitz.filter(x => x.n > 0).length;
+    const pct = Math.round(entdeckt / katalog.length * 100);
+
+    const artZahl = {};
+    for (const a of GEGENSTAND_ARTEN) artZahl[a.key] = mitBesitz.filter(x => x.g.art === a.key && x.n > 0).length;
+    const artGesamt = {};
+    for (const a of GEGENSTAND_ARTEN) artGesamt[a.key] = katalog.filter(g => g.art === a.key).length;
+
+    const knopf = (key, name, have, total) => {
+      const an = sammlungArt === key;
+      return `<button data-sammlung-art="${key}" style="font-size:10.5px; padding:5px 9px; ${an?'border-color:#5ce1ff; color:#5ce1ff;':'opacity:0.75;'}">${escapeHtml(name)} <span style="font-variant-numeric:tabular-nums; opacity:0.8;">${have}/${total}</span></button>`;
+    };
+
+    let liste = mitBesitz;
+    if (sammlungArt !== 'alle') liste = liste.filter(x => x.g.art === sammlungArt);
+    if (sammlungNurBesitz) liste = liste.filter(x => x.n > 0);
+
+    const zeilen = liste.map(({ g, n }) => {
+      const art = GEGENSTAND_ARTEN.find(a => a.key === g.art) || { farbe:'#9aa0b8', name:g.art };
+      const sel = g.seltenheit && MODULE_RARITY[g.seltenheit] ? MODULE_RARITY[g.seltenheit] : null;
+      // Der Fundort ist die eigentliche Auskunft: Das Herkunfts-Schloss haelt Boss-Set-Teile,
+      // Unikate und Abgrund-Beute aus jedem regulaeren Fundtopf heraus, und diese Regel stand
+      // im Spiel bisher nirgends.
+      const herk = HERKUNFT_TEXT[g.herkunft] || HERKUNFT_TEXT.normal;
+      const teile = [art.name];
+      if (sel) teile.push(`<span style="color:${sel.color};">${sel.label}</span>`);
+      if (g.klasse) teile.push('Klasse: ' + escapeHtml(g.klasse));
+      if (g.reihe) teile.push(g.reihe + '. Reihe');
+      const beschr = g.desc ? escapeHtml(g.desc) : '<span style="opacity:0.6;">Ohne Beschreibung.</span>';
+      const pille = n > 0
+        ? `<span class="lvl-pill" style="background:rgba(92,225,255,0.18); color:#5ce1ff;">${g.art === 'reliquie' ? '✓ geborgen' : fmt(n) + 'x'}</span>`
+        : '<span class="lvl-pill" style="opacity:0.45;">noch nicht</span>';
+      return `<div class="card-row" style="${n>0?'':'opacity:0.55;'}">
+        <div class="left" style="min-width:0;">
+          <div class="bicon" style="background:rgba(255,255,255,0.07); color:${art.farbe};">${gegenstandIconHtml(g)}</div>
+          <div style="min-width:0;">
+            <div class="bname">${escapeHtml(g.name)}</div>
+            <div class="bmeta">${teile.join(' · ')}</div>
+            <div class="bmeta" style="opacity:0.85;">${beschr}</div>
+            <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}</div>
+          </div>
+        </div>
+        ${pille}
+      </div>`;
+    }).join('');
+
+    const html = `
+      <div class="card-row" style="flex-direction:column; align-items:stretch; gap:7px; margin-bottom:0.8rem;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+          <div class="bname">Entdeckt</div>
+          <div class="bmeta" style="font-variant-numeric:tabular-nums;">${entdeckt} von ${katalog.length}</div>
+        </div>
+        <div style="height:7px; background:rgba(255,255,255,0.08); overflow:hidden;"><div style="height:100%; width:${pct}%; background:#5ce1ff;"></div></div>
+        <div class="bmeta">Jeder Gegenstand des Spiels an einer Stelle - fünf getrennte Listen, hier zusammengeführt. Die Zeile mit der Nadel nennt, wo das Stück wirklich fällt.</div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:0.7rem;">
+        ${knopf('alle', 'Alle', entdeckt, katalog.length)}
+        ${GEGENSTAND_ARTEN.map(a => knopf(a.key, a.name, artZahl[a.key], artGesamt[a.key])).join('')}
+        <button data-sammlung-besitz="1" style="font-size:10.5px; padding:5px 9px; ${sammlungNurBesitz?'border-color:#5ce1ff; color:#5ce1ff;':'opacity:0.75;'}">Nur besessene</button>
+      </div>
+      ${zeilen || '<div class="bmeta">In dieser Auswahl ist noch nichts dabei.</div>'}`;
+
+    if (!setBoxHtml(box, 'sammlungBox', html)) return;
+    box.querySelectorAll('[data-sammlung-art]').forEach(b => b.onclick = () => { sammlungArt = b.getAttribute('data-sammlung-art'); renderSammlung(); });
+    const bb = box.querySelector('[data-sammlung-besitz]');
+    if (bb) bb.onclick = () => { sammlungNurBesitz = !sammlungNurBesitz; renderSammlung(); };
   }
 
   // ===== Wochenliga =====
@@ -61143,6 +61355,7 @@
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceChronicle(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
+    if (tab === 'sammlung') renderSammlung();
     // Modulbörse frisch laden, wenn der Markt geöffnet wird - sie ändert sich durch ANDERE Spieler
     // und würde sonst einen veralteten Stand zeigen. Bewusst kein Dauer-Polling: renderModuleMarket
     // läuft über setBoxHtml und zeichnet ohnehin nur bei echten Änderungen neu.
@@ -61420,6 +61633,21 @@
     // ausschliesslich Unsichtbares bewegt. scrollBy laesst die Dokumentlage unveraendert
     // (r.top faellt um d, scrollY steigt um d), bildAnkerLage bleibt also gueltig.
     if (r.top <= 0 && r.top - d <= 0) window.scrollBy(0, d);
+  }
+  // Der Abstand fuer Sprungziele haengt an der HOEHE der klebenden Reiterleiste - und die ist
+  // keine Konstante: Sie wechselt mit dem Formfaktor (94 px am PC, 118 bzw. 159 px am Handy) und
+  // waechst mit jedem Reiter. Gemessen statt nachgerechnet, aus demselben Grund wie bei
+  // `klappenFrei`: ein aus dem CSS abgeleiteter Wert waere eine zweite Wahrheit neben dem Layout.
+  let _sprungAbstand = -1;
+  function sprungAbstandSetzen(){
+    const bar = document.querySelector('.tabs');
+    if (!bar) return;
+    const h = Math.round(bar.getBoundingClientRect().height);
+    // Signatur zuerst - der Haupt-Tick laeuft jede Sekunde, und ein Schreibzugriff auf eine
+    // CSS-Variable stoesst das Layout an.
+    if (!h || h === _sprungAbstand) return;
+    _sprungAbstand = h;
+    document.documentElement.style.setProperty('--sprung-abstand', (h + 10) + 'px');
   }
   function klappenFrei(){
     const klappen = document.querySelectorAll('.edge-tab');
@@ -65884,6 +66112,7 @@
        Sekunde lang tote Reiter, fuer einen Test ein Rennen. Der Aufruf ist billig: Er faellt
        ueber seine Signatur sofort wieder heraus, solange die Leiste steht, wo sie stand. */
     klappenFrei();
+    sprungAbstandSetzen();
     bildRuhigHalten();
 
     const avatarEl = document.getElementById('avatarInitials');
@@ -66333,6 +66562,11 @@
       </div>
     `);
     zeichneAbgesichert('dailyLoginBox', renderDailyLoginBox);
+    // Bewusst nur bei OFFENEM Reiter: setBoxHtml deckelt zwar das Schreiben, vergleicht aber erst
+    // NACH dem Bauen - und gebaut wuerde hier Markup ueber 146 Eintraege, jede Sekunde, auch auf
+    // dem Basis-Reiter. Der Wechsel auf den Reiter zeichnet ueber switchTab sofort, damit die
+    // Flaeche nicht eine Sekunde leer steht.
+    if (activeTab === 'sammlung') zeichneAbgesichert('sammlungBox', renderSammlung);
 
     const invBox = document.getElementById('inventoryBox');
     if (invBox){
@@ -66598,7 +66832,21 @@
       if (!items.length){
         setBoxHtml(rareItemsBox, 'rareItemsBox', `<div class="bmeta">Noch keine seltenen Items gefunden. Sehr geringe Chance bei jeder Erkundungsmission.</div>`);
       } else {
-        setBoxHtml(rareItemsBox, 'rareItemsBox', items.map(([k,v]) => `<div class="card-row"><div class="left"><div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ti-diamond" aria-hidden="true"></i></div><div><div class="bname">${k}</div><div class="bmeta">Für Spezialschiffe/-gebäude verwendbar</div></div></div><span class="lvl-pill">${v}x</span></div>`).join(''));
+        // Bis zum 28.08.2026 stand hier ${k} - also der SCHLUESSEL. Der Spieler las
+        // "antimateriekern" statt "Antimateriekern", jede der sechs Zeilen trug dasselbe
+        // ti-diamond statt ihres eigenen Symbols, und darunter fuer alle denselben Satz
+        // "Für Spezialschiffe/-gebäude verwendbar". Die Definition dafuer stand die ganze
+        // Zeit in RARE_ITEMS; sie wurde hier nur nicht nachgeschlagen (die Zeile 40 Bildschirme
+        // weiter oben macht es seit jeher richtig). Faellt ein Schluessel aus einem alten
+        // Spielstand durch, der in RARE_ITEMS nicht mehr steht, bleibt der Schluessel als
+        // ehrlicher Rueckfall stehen - besser eine unschoene Zeile als eine verschwundene.
+        setBoxHtml(rareItemsBox, 'rareItemsBox', items.map(([k,v]) => {
+          const def = RARE_ITEMS.find(r => r.key === k);
+          const nm = def ? def.name : k;
+          const ic = def ? def.icon : 'ti-diamond';
+          const txt = (def && def.desc) ? def.desc : 'Für Spezialschiffe/-gebäude verwendbar';
+          return `<div class="card-row"><div class="left"><div class="bicon" style="background:rgba(126,119,221,0.2); color:#c3bef5;"><i class="ti ${ic}" aria-hidden="true"></i></div><div><div class="bname">${escapeHtml(nm)}</div><div class="bmeta">${escapeHtml(txt)}</div></div></div><span class="lvl-pill">${v}x</span></div>`;
+        }).join(''));
       }
     }
     const megaProjectsBox = document.getElementById('megaProjectsBox');

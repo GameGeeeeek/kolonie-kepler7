@@ -5779,6 +5779,145 @@ SCHREIBWEISEN zu REGELN geworden (Regel 3): Die Wiederkehr wird nicht mehr gegen
 aus einer Zahlwort-Zuordnung statt aus dem Wort „zwölf".
 
 
+## Etappe D: EIN Katalog über die fünf Gegenstands-Listen (28.08.2026)
+
+Teil D des Beute-Konzepts, und der einzige der vier Teile, der nichts Neues erfindet — er macht
+sichtbar, was längst da ist. Auftrag Sascha: „vielleicht macht es Sinn eine item Struktur
+einzubauen."
+
+**Der Befund, gemessen statt geschätzt:** Das Spiel führt **fünf** voneinander unabhängige
+Gegenstands-Listen — `MODULE_DEFS` 47, `SHIP_MODULE_DEFS` 44, `ITEM_DEFS` 31, `RARE_ITEMS` 6,
+`ABGRUND_RELIKTE` 18, zusammen **146 Einträge** — und keine einzige Stelle, an der ein Spieler sie
+zusammen sieht. Das Kompendium ist ein ZÄHLER: zwölf seiner dreizehn Kategorien geben nur
+`have`/`total` zurück, allein die Unikate zeichnen wirklich eine Liste.
+**Die Zahl 182, die das Konzept für `MODULE_DEFS` nennt, ist falsch** — mit zwei unabhängigen
+Schnittmethoden gemessen sind es 47. Ein Konzept ist kein Messergebnis (Regel 41), auch das eigene
+nicht.
+
+**Die Schicht ist ABGELEITET und ausdrücklich KEINE sechste Liste.** Sie fasst nichts zusammen, was
+es nicht schon gibt; sie übersetzt drei gemessene Formunterschiede in eine Form. Das Konzept nennt
+`seltenheit` als Feld jedes Eintrags — gemessen tragen **109 von 146** keine, weil die Seltenheit
+bei den Modulen eine Eigenschaft des EXEMPLARS ist (sie steckt im Instanz-Schlüssel), nicht des
+Typs. Dort steht deshalb bewusst keine, statt eine zu erfinden.
+
+### Der eigene Hauptreiter — und was er am Handy kostet, gemessen
+
+Entscheidung Sascha: **eigener Hauptreiter** (der dreizehnte), nicht das Kompendium und kein
+Fortschritt-Abschnitt. Am Handy ist die Leiste ein Raster mit sechs Spalten; zwölf Reiter sind
+exakt zwei Zeilen, ein dreizehnter erzwingt eine dritte. Drei Varianten am gerenderten Bild
+gemessen, bevor eine gebaut wurde:
+
+| Variante | Leiste | Knopf | Text ragt heraus |
+|---|---|---|---|
+| 6 Spalten, einsamer Knopf | 172 px (+54) | 54×49 | – |
+| 7 Spalten | 118 px (+0) | 45×49 | 390px: drei Knöpfe · 360px: **sechs** |
+| **6 Spalten, dritte Zeile über volle Breite** | **159 px (+41)** | **348×36** | – |
+
+Sieben Spalten kosten keine Höhe und reißen dafür genau die Bedingung, auf die diese Leiste
+kalibriert ist („schneidet bei keinem der zwölf Namen ab" — der Kommentar dort nennt sie als den
+Grund, an dem die Vierspalten-Variante gescheitert ist) — und sie verschlechtern **Bestandsreiter**,
+nicht nur den neuen. Die volle Breite spart 13 px gegenüber dem einsamen Knopf, weil Symbol und
+Text dort **nebeneinander** stehen, und ist mit 348×36 px das beste Fingerziel der ganzen Leiste.
+Am PC (Fluss-Layout) ändert sich nichts: 94 px.
+Der Selektor hängt am `data-tab`, **nicht** an `:last-child` — ein späterer vierzehnter Reiter soll
+hier auffallen und nicht still die Regel erben.
+
+### Die Nachwehe, die die Etappe fast still ausgeliefert hätte
+
+`scroll-margin-top: 128px` für Sprungziele war eine **feste Zahl** („beide gemessenen Leistenhöhen
+mit etwas Luft"). Mit 159 px Leiste stand das Sprungziel wieder dahinter — gemessen `zielOben 128`
+bei `leisteUnten 158`, gefunden von `test_sprungleiste` 2b. Das ist Regel 50 in Reinform: Wer eine
+Fläche vergrößert, muss alles nachmessen, was an ihrer Höhe hängt.
+Behoben **nicht** mit einer neuen festen Zahl (beim vierzehnten Reiter derselbe Fehler), sondern
+mit einer benannten Größe: `sprungAbstandSetzen()` schreibt die GEMESSENE Leistenhöhe + 10 px in
+`--sprung-abstand`, und das CSS hängt daran. Die 128 bleiben als Rückfall für den Moment vor dem
+ersten Takt stehen — als Startwert, nicht als Entscheidung.
+
+### Die quadratische Falle, vor dem Einbau gefangen
+
+`gegenstandBesitz` iterierte je Eintrag über das ganze Modulinventar: 146 Einträge × 3.000
+Schlüssel = **438.000 Vergleiche je Zeichnung**. Das ist exakt die Form, die am 21.08.2026 das
+Inventar zum Stehen gebracht hat (dort `fuseAnzahl`), und aus demselben Grund — der Modul-Schlüssel
+trägt Seltenheit, Stufe und Wurf mit, die Sammlung ist also keine Stapelliste, sondern eine Liste
+von Unikaten (Regel 76). `gegenstandBesitzIndex()` wird **einmal je Zeichnung** gebaut und
+weitergereicht, wie `fuseIndexBauen`. Und gezeichnet wird nur bei OFFENEM Reiter: `setBoxHtml`
+deckelt zwar das Schreiben, vergleicht aber erst NACH dem Bauen.
+
+### Die sechs seltenen Materialien hatten gar keine Beschreibung
+
+`RARE_ITEMS` trug als einzige der fünf Listen kein `desc` — die Ansicht hätte die Lücke nur
+SICHTBAR gemacht. Die sechs Texte sind ergänzt, und zwar aus den **gemessenen Senken** statt
+erfunden (`SPECIAL_UNIT_ITEMS`, die `unlockItem`-Felder, die `unlockItems` des Mondzerstörers).
+Derselbe Datenmangel hatte ein zweites Symptom: **`rareItemsBox` zeigte `${k}`, also den
+SCHLÜSSEL** — der Spieler las „antimateriekern", jede der sechs Zeilen trug dasselbe `ti-diamond`
+statt ihres eigenen Symbols, und darunter für alle denselben Satz. Die Definition stand die ganze
+Zeit in `RARE_ITEMS`; sie wurde dort nur nicht nachgeschlagen (die Zeile 40 Bildschirme weiter oben
+macht es seit jeher richtig).
+
+### Der Hilfetext nennt bewusst KEINE Gesamtzahl
+
+Reihenfolge gemessen, nicht geschätzt (Regel 38): Von den fünf Listen stehen nur `MODULE_DEFS` und
+`SHIP_MODULE_DEFS` **vor** `HELP_SECTIONS`; die anderen drei liegen dahinter und damit beim Laden
+in ihrer temporalen Todeszone. Eine eingetippte Zahl wäre zusätzlich die zweite Anzeigestelle neben
+der Liste und beim nächsten Eintrag still falsch (Regel 72) — die Ansicht zählt ohnehin selbst.
+
+### `test_herkunft` B war nicht gescopt — und die Behebung ist die eigentliche Lehre
+
+Der Wächter verbietet die FORM `for (… of ITEM_DEFS)`, weil ein Fundtopf, der roh iteriert, das
+Herkunfts-Schloss umgeht. Er meldete den neuen Katalog — zu Recht nach seinem Muster, zu Unrecht
+nach seinem Zweck: Eine **Anzeige**-Schleife MUSS alle Einträge sehen; der Katalog zeigt Abgrund-
+Beute, Boss-Teile und Unikate ja gerade deshalb, damit der Spieler ihren Fundort erfährt. Sie auf
+`fundPool` zu schicken wäre inhaltlich falsch.
+**Eine namentliche Ausnahmeliste wäre die schwächere Antwort gewesen** (Regel 40: die nächste
+Anzeige-Schleife hätte sie wieder gerissen). Unterschieden wird jetzt über die EIGENSCHAFT der
+Schleife: Wer ZIEHT, würfelt (`Math.random`), liest eine Fundchance (`.chance`) oder schreibt in
+einen Bestand (`state….=`). Wer nur ZEIGT, tut nichts davon. `B-vorab2` prüft die Unterscheidung
+selbst — sonst wäre sie ein Loch statt einer Regel. Und der Beleg, dass das keine Aufweichung ist:
+Der **Anlassfall** eingespeist (der Erkundungszweig zieht wieder roh) reißt `B` weiterhin, mit
+beiden Zeilennummern im Beleg.
+
+### Zwei Bestandstests hielten die Zahl 12 als Regel fest
+
+`test_reiterleiste` („alle zwölf Reiter gefunden", „ALLE zwölf sind sichtbar") und `test_nav`
+(„alle 12 Reiter haben eine Domäne", dazu die Reihenfolge als feste Zeichenkette) fielen auf
+völlig korrektem Code durch — Regel 3, eine Momentaufnahme statt der Eigenschaft. Beide sind
+mitgezogen und dabei **schärfer** geworden (Regel 43/68):
+
+- `test_reiterleiste` prüft „jeder vorhandene Reiter hat ein eigenes Symbol" und „ALLE sind
+  gleichzeitig sichtbar", mit `>= 12` als Untergrenze gegen ein vacuous grünes Ergebnis.
+- `test_nav` prüft jetzt drei Dinge statt zweier: jede Domäne ist eine der vier bekannten, die
+  Domänen stehen **zusammenhängend** (sonst passen die Trenner nicht mehr zu den Gruppen — das
+  fängt eine Umsortierung, die die alte Gleichheitsprüfung nur zufällig mitfing), und die
+  Reihenfolge der Bestands-Reiter ist als **Präfix** unverändert. Ein angehängter Reiter verletzt
+  die Muskelerinnerung nicht, ein umsortierter sehr wohl; dazu die Gegenrichtung als eigene Zeile
+  (kein Bestands-Reiter darf verschwinden).
+
+### Der Wächter
+
+`tests/test_gegenstandskatalog.js` (29 Prüfungen). Die erwartete Zahl der Einträge wird aus den
+FÜNF Quelllisten abgeleitet, nicht eingetippt; ebenso die Zahl der besessenen Typen aus der
+Fixture. Gegenprobe gegen `origin/main`: **27 von 29 rot bei identischer Prüfliste** (per `diff`
+über die reinen Prüfnamen verglichen, nicht gezählt — Regel 60). Die drei beidseitig grünen sind
+genau die richtigen: die fünf Quelllisten gab es vorher (das ist ja der Ausgangspunkt), und „keine
+Seitenfehler" **muss** in beide Richtungen grün sein.
+
+**Zwei Fehler am eigenen Wächter, beide von der Gegenprobe gefunden:**
+
+1. **Er starb am alten Stand beim Klick auf den fehlenden Reiter** — 14 statt 29 Prüfungen, und
+   der rote Exit-Code sah aus wie eine gelungene Gegenprobe (Regel 34). Jeder Browser-Schritt läuft
+   jetzt durch `versuche()` und meldet seinen Fehlschlag als eigene benannte Zeile; die Messungen
+   geben bei fehlender Fläche Vorgabewerte zurück, statt die Folgeprüfungen werfen zu lassen.
+2. **Vier Prüfungen waren aus dem falschen Grund grün.** Am Vergleichsstand gibt es weder
+   `GEGENSTAND_ARTEN` noch `HERKUNFT_TEXT` — `every` über eine leere Menge ist trivial wahr, und
+   `0 === 0` auch. Sie verlangen jetzt zuerst einen WERT, dann die Beziehung. Derselbe Befund wie
+   beim `/api/health`-Test: **Wer eine Prüfung über eine Menge formuliert, die es am
+   Vergleichsstand gar nicht gibt, prüft sonst nur, dass sie fehlt.**
+
+**Und eine Erwartung von mir war falsch, nicht der Code:** `3e` verlangte fünf besessene Typen, die
+Fixture hat sechs. Statt die Zahl zu korrigieren, wird sie jetzt aus der Fixture ABGELEITET — eine
+eingetippte Zahl wäre beim nächsten Fixture-Eintrag wieder still falsch (Regel 2).
+
+
 ## Die Hausstil-Wache war gegen ihre eigene Fehlerklasse blind (28.08.2026)
 
 Arbeitsregel 77 beschreibt seit dem 21.08.2026, dass ein `\uXXXX`-Escape die dateiweiten

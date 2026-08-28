@@ -27,14 +27,27 @@ await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOver
 const map=await page.evaluate(()=>{
   const o={}; document.querySelectorAll('.tab-btn').forEach(b=>{o[b.getAttribute('data-tab')]=b.getAttribute('data-tab-domain');});
   return o;});
-check('alle 12 Reiter haben eine Domaene', Object.keys(map).length===12 && Object.values(map).every(Boolean), map);
-const expect={basis:'kolonie',verteidigung:'kolonie',forschung:'kolonie',flotte:'kolonie',
- expedition:'erkundung',karte:'erkundung',galaxie:'erkundung',allianz:'gemeinschaft',offiziere:'gemeinschaft',
- markt:'meta',punkte:'meta',fortschritt:'meta'};
-check('Zuordnung entspricht den vorhandenen Trennern', JSON.stringify(map)===JSON.stringify(expect), map);
-// Reihenfolge unveraendert?
+// Geprueft wird die EIGENSCHAFT, nicht die Anzahl: "12" war eine Momentaufnahme und ist mit dem
+// dreizehnten Reiter (Sammlung, 28.08.2026) auf voellig korrektem Code durchgefallen (Hausregel 3).
+// Die vier Domaenen bleiben dagegen eine echte Regel - eine fuenfte muesste einen Trenner mitbringen.
+const DOMAENEN = ['kolonie','erkundung','gemeinschaft','meta'];
+check('jeder Reiter hat eine Domaene', Object.keys(map).length>0 && Object.values(map).every(Boolean), map);
+check('jede Domaene ist eine der vier bekannten',
+  Object.values(map).every(d => DOMAENEN.includes(d)), map);
+// Die Domaenen muessen zusammenhaengend stehen - sonst passen die Trenner nicht mehr zu den Gruppen.
 const order=await page.evaluate(()=>[...document.querySelectorAll('.tab-btn')].map(b=>b.getAttribute('data-tab')));
-check('Reihenfolge unveraendert', order.join(',')==='basis,verteidigung,forschung,flotte,expedition,karte,galaxie,allianz,offiziere,markt,punkte,fortschritt', order.join(','));
+const folge = order.map(t => map[t]);
+const bloecke = folge.filter((d,i) => d !== folge[i-1]);
+check('Zuordnung entspricht den vorhandenen Trennern',
+  new Set(bloecke).size === bloecke.length, { bloecke, map });
+// Die Reihenfolge der BESTANDS-Reiter ist Muskelerinnerung und darf sich nicht aendern; ein
+// ANGEHAENGTER Reiter verletzt das nicht, ein umsortierter sehr wohl. Deshalb Praefix statt
+// Gleichheit - und die Gegenrichtung mitgeprueft: der Bestand darf auch nicht schrumpfen.
+const BESTAND = 'basis,verteidigung,forschung,flotte,expedition,karte,galaxie,allianz,offiziere,markt,punkte,fortschritt'.split(',');
+check('Reihenfolge der Bestands-Reiter unveraendert',
+  BESTAND.every((t,i) => order[i] === t), order.join(','));
+check('kein Bestands-Reiter ist verschwunden',
+  BESTAND.every(t => order.includes(t)), BESTAND.filter(t => !order.includes(t)));
 // Aktiver Reiter je Domaene muss die Domaenenfarbe tragen
 const want={basis:'rgb(127, 119, 221)',karte:'rgb(92, 225, 255)',allianz:'rgb(250, 199, 117)',fortschritt:'rgb(93, 202, 165)'};
 for(const [tab,col] of Object.entries(want)){
