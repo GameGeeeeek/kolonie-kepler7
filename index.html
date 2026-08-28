@@ -3772,6 +3772,13 @@
             <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true"></i><div class="bname">Angriffe auf dich</div><div class="bmeta">Wenn dich ein Spieler angreift oder dir ein Schürfrecht im Asteroidengürtel streitig macht</div></div><div class="toggle-switch" data-notif-cat="attack"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-check" aria-hidden="true"></i><div class="bname">Fertige Aufträge</div><div class="bmeta">Wenn Forschung, Bau oder Expedition fertig wird, während du weg bist</div></div><div class="toggle-switch" data-notif-cat="completion"><div class="toggle-knob"></div></div></div>
+            <!-- 'neuspieler' feuert praktisch nur beim Betreiberkonto (der Server schickt die
+                 Meldung an 'gamegeeeeek'). Der Schalter steht trotzdem sichtbar hier, mit dem
+                 Zusatz, für wen er gilt - genau wie „Allianz-Bewerbungen" darüber, das ebenfalls
+                 nur eine Minderheit betrifft. Er ist die Notbremse für den Fall, dass jemand die
+                 Registrierung flutet: Das Postfach hält 30 Einträge ohne Bevorzugung, eine Flut
+                 verdrängte also die Feedback- und Meldungs-Einträge. -->
+            <div class="card-row"><div class="left"><i class="ti ti-user-circle" aria-hidden="true"></i><div><div class="bname">Neue Spieler</div><div class="bmeta">Wenn ein neu angemeldetes Konto die Kolonie zum ersten Mal öffnet. Nur relevant für den Spielbetreiber</div></div></div><div class="toggle-switch" data-notif-cat="neuspieler"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -33486,7 +33493,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -33588,6 +33595,11 @@
     'chat': { icon:'ti-message', color:'#8f86ea', text:(p)=>(p.authorName||'Jemand')+' hat im globalen Chat geschrieben - tippen öffnet den Chat.' },
     'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
+    // Der Server schickt nur Typ und Nutzlast ({username, gesamt}) - ohne diesen Eintrag stuende
+    // im Postfach eine leere Zeile (siehe 'chat' oben). Der Text sagt bewusst „geoeffnet" und
+    // nicht „spielt": Der erste Spielstand-Save feuert automatisch beim ersten Boot des Spiels,
+    // also Sekunden nach dem ersten Login - so steht es auch im Backend-Kommentar.
+    'neuer-spieler': { icon:'ti-user-circle', color:'#5dcaa5', text:(p)=>(p.username||'Ein neues Konto')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+fmt(p.gesamt)+' Spielstände insgesamt':'')+'.' },
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
     'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
