@@ -843,6 +843,26 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     (`applyOfflineProgress(luecke)` statt `luecke-1`) muss weiterhin mit ~107 % anschlagen,
     während `1c-vorab` grün bleibt.
 
+    **Nachtrag 28.08.2026 – dieselbe Flanke an einem ZWEITEN Test, und die Wache hat eine
+    benennbare Grenze.** `test_phantomsekunden` 2c hielt den Zuwachs seiner Auftau-Phase gegen
+    eine Rate, die 45 Sekunden vorher gemessen worden war, und meldete im Suite-Lauf 80,0 % –
+    exakt 5,99/7,49, also das Ende einer Happy Hour zwischen Phase A und Phase C. Behoben nach
+    demselben Muster (Rate vor UND nach dem Messfenster, `2c-vorab` prüft zuerst die Konstanz,
+    bei nachgewiesener Wanderung wird wiederholt); die Schranke von 2c blieb unangetastet.
+    **Der Anlassfall ist dabei deterministisch nachgestellt worden statt auf eine Fenstergrenze
+    zu warten:** eine Kopie der Spieldatei, deren `currentHappyHour()` nach 30 Sekunden Laufzeit
+    anspringt (`KEPLER_SPIELDATEI`). Am alten Stand fällt 2c mit 125,0 %, am neuen meldet Anlauf 1
+    genau diese 125,0 % und Anlauf 2 steht bei 100,0 %.
+    **Zwei Dinge daraus, die über den Einzelfall hinausgehen:** (a) Der erste Sabotage-Versuch gab
+    `type:'alle'` als ZEICHENKETTE zurück – `hh.type` ist aber ein Objekt aus `HAPPY_HOUR_TYPES`
+    mit `resources`/`pct`, und der Lauf starb an `.includes` auf `undefined` mit 0,0 % Anteil.
+    Eine Sabotage, die etwas ANDERES kaputtmacht als gedacht, belegt nichts – sie muss den
+    Anlassfall treffen, nicht bloß rot sein. (b) Die Wache kennt die Rate an ZWEI Punkten; ein
+    Sprung, der dazwischen liegt und wieder zurückgeht, entgeht ihr (an einer alle 20 Sekunden
+    flackernden Kopie gemessen: `2c-vorab` 1,3 %, während 2c mit 124,0 % fiel). Für die echte
+    Happy Hour ist das kein Fall – sie springt an Stundengrenzen –, aber die Grenze steht
+    namentlich im Test, statt sie durch eine dritte Schranke zu verdecken.
+
 57. **Eine EINMALZAHLUNG muss in den SPEICHER passen, nicht nur in den Zufluss — und der Speicher
     ist in beiden Stufen gedeckelt.** Vorfall 18.08.2026 beim Bau der Bastionsmarken: Die
     Kostentabelle war sauber nach der Messkonvention aus `docs/verteidigung-flotte-konzept.md`
