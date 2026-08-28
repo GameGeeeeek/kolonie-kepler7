@@ -5146,6 +5146,55 @@ Ursache in seiner eigenen Datei. Der Riegel steht dort, wo man ihn beim Lesen de
 bevor sie jemand benutzt hat — sie hätte die messbar schwächere Antwort neben der stärkeren stehen
 lassen, und ein unbenutzter Helfer wird beim nächsten Lesen für die Lösung gehalten.
 
+## Chat-Großetappe B/C: der Live-Chat lädt gebündelt und hält das Bild still (28.08.2026)
+
+Frontend-Hälfte zur Backend-Etappe A (kolonie-kepler7-backend #181: `GET /api/chat/global` und
+`GET /api/chat/allianz` liefern die Nachrichten als EIN Bündel statt als storage-LIST plus einen
+Einzel-GET je Nachricht). Auftrag Sascha, per Auswahl entschieden: „Großetappe: alles".
+
+**EIN Lader, EIN Zeichner für beide Kanäle** — `chatNachrichtenLaden(kanal)` und
+`chatKanalZeichnen(kanal)` (Z. ~43238/43307); der Galaxie-Chat und das Seiten-Panel gehen beide
+hindurch. Vorher hatte jeder Kanal seinen eigenen Ladeweg, und genau dort saß der
+Anfragen-Vervielfacher: je Nachricht ein `storage/<prefix>:msg:<ts>`-GET.
+
+**Sechs Entscheidungen, die man beim Anfassen kennen muss:**
+
+- **Der Bündel-Abruf hat einen RÜCKFALL, und der Rückfall hat einen RIEGEL.** Antwortet der
+  Server auf `/chat/global` mit 404 (Deploy hängt — siebenmal passiert), setzt der Lader
+  `chatBuendelFehlt = true` und lädt EINMAL über den alten Weg (storage-list + Einzel-GETs).
+  Der Riegel verhindert, dass der 6-Sekunden-Poll den alten Weg im Takt weiterfährt und das
+  240/min-Rate-Limit flutet — dieselbe Falle wie beim Markt-Sammelauftrag.
+  `test_chat_live` 2b misst genau das: nach dem Rückfall KEINE weiteren chat- und Einzel-GET-
+  Anfragen. (Die storage-LISTEN des Ungelesen-Zählers `checkChatUnread` laufen legitim weiter —
+  **die Kennzahl für den alten Ladeweg sind die EINZEL-GETs, nicht die Listen**; wer hier misst,
+  filtert auf `storage/<prefix>:msg:`.)
+- **Der Poll (6 s) hat vier Tore:** Panel offen, Tab sichtbar (`visibilityState`), Backend da,
+  `chatBuendelFehlt` nicht gesetzt. Geschlossenes Panel = null Anfragen (`test_chat_live` 1h).
+- **Drei-Fälle-Scroll statt „immer ans Ende".** Beim Neuzeichnen: (a) Liste wurde nach OBEN
+  erweitert („Ältere anzeigen") → Anker-Element merken und die Scroll-Differenz zurückrechnen,
+  damit die gelesene Nachricht unter dem Finger stehen bleibt; (b) der Leser stand unten → ans
+  neue Ende; (c) sonst → alte Scroll-Position halten. Ohne (c) risse jeder Poll dem Leser die
+  Historie aus der Hand — dieselbe Familie wie „Das Bild bleibt still" (`bildRuhigHalten`), nur
+  innerhalb einer Box.
+- **„Ältere anzeigen"** (`[data-chat-mehr]`, per `onclick` — die Box läuft über `setBoxHtml`):
+  `CHAT_TIEFE_START = 30, CHAT_TIEFE_SCHRITT = 100, CHAT_TIEFE_MAX = 300`. **Der Deckel ist die
+  Parität zu `CHAT_KEEP_PER_CHANNEL = 300` in `server.js`** — mehr anzufordern, als der Server je
+  aufhebt, wäre ein Knopf, der nichts nachlädt. `test_chat_live` 0a/0b liest beide Seiten.
+- **Tages-Trenner** (`chatTagesLabel`: Heute/Gestern/de-DE-Datum) als `— Label —`-Zeilen im
+  Verlauf; `chatVerlaufHtml` ist die eine Markup-Quelle für beide Kanäle.
+- **Kosmetik weiterhin über den `leaderboardCache`-Join per `authorId`** — nie aus der Nachricht
+  (die schreibt der Client selbst; eine mitgeschickte Farbe wäre in fünf Sekunden gefälscht).
+  Der Bündel-Abruf ändert daran nichts.
+
+**Wächter: `tests/test_chat_live.js` (22 Prüfungen).** Fixture mit 160 Nachrichten über zwei Tage
+(damit das 30er-Fenster beide Tage überspannt), Mock kann per Schalter das Bündel mit 404
+verweigern. Gemessen wird die WIRKUNG: genau 1 Bündel-Anfrage je Kanal und 0 Einzel-GETs (1a),
+Trenner-Zeilen tagesrobust (1b), Kosmetik gezählt statt behauptet (1c), Anker-Rechnung beim
+Nachladen (|Δ| ≤ 6 px, 1d/1e), Poll hält die Scroll-Position auch bei NEUER Nachricht (1f/1g),
+Rückfall + Riegel (2a/2b). Gegenprobe gegen v8.615.0 per `KEPLER_SPIELDATEI`: **15 rot bei
+identischen 22 Prüfnamen** (per `diff` über die reinen Prüfnamen verglichen, nicht gezählt —
+Regel 60).
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
