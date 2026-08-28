@@ -1058,6 +1058,38 @@ Sitzungsverlauf steht, ist mit dem Container weg; diese Datei ist das Gedächtni
     Umleitung setzt, prüft am Messergebnis, dass sie GRIFF (z. B. an verschobenen Anker-Indizes
     oder einem Wert, der nur in der Kopie steht) – eine still ignorierte Env-Variable sieht aus
     wie eine bestandene Gegenprobe.
+
+    **Nachtrag 28.08.2026 – ein Merge-VERSUCH ist ein Edit, auch wenn man ihn sofort abbricht.**
+    Während des vollen Laufs wurde ein als konfliktfrei erwarteter `git merge` gefahren (die
+    fremde Seite schien textgleich zur eigenen Basis). Er konfliktete doch, und git schreibt die
+    Konfliktmarker IN DEM MOMENT in die Arbeitsdatei, in dem der Konflikt entsteht – nicht erst
+    beim Auflösen. `git merge --abort` stellte die Datei byte-genau wieder her, aber im Fenster
+    dazwischen bootete `test_gegenstandskatalog` die vermarkerte Datei: totes JS, statische Reiter
+    noch antippbar, Panel leer, zwei rote Prüfungen plus Klick-Timeout – ein Fehlschlag, der wie
+    ein echter aussah und ein Messartefakt war. Verwirrend dabei: Die QUELLTEXT-Prüfungen
+    desselben Tests blieben grün, weil die Marker nur in fremden Hunks saßen.
+    **Vorgehen:** Während eines Laufs ist JEDER git-Befehl tabu, der den Arbeitsbaum schreiben
+    KANN (`merge`, `rebase`, `stash pop`, `checkout <ref> -- datei`, `pull`) – nicht nur Editoren;
+    `commit`, `fetch`, `log`, `diff` sind unbedenklich. Ein so entstandener Einzel-Fehlschlag wird
+    nach Suite-Ende durch einen EINZEL-Nachlauf des betroffenen Tests ersetzt und als Artefakt
+    dokumentiert, statt den 50-Minuten-Lauf wegzuwerfen – Tests davor und danach haben nachweislich
+    die korrekte Datei gelesen (Datei-mtime gegen die Log-Zeitachse gehalten).
+
+    **Zweite Hälfte desselben Vorfalls – die MERGE-BRÜCKE, wenn eine Parallelsitzung den
+    designierten Fernbranch mit alter Historie überschrieben hat.** Der Fernbranch stand auf der
+    VOR-Squash-Historie einer längst gemergten Etappe (Force-Push einer anderen Sitzung); ein
+    normaler Push war damit non-fast-forward, ein Force-Push von der Sicherheitsautomatik
+    gesperrt, und ein normaler Merge KONFLIKTETE (siehe oben) – schlimmer noch: Wo er NICHT
+    konfliktet, mischte er stillschweigend die ALTEN fremden Hunks ein, denn die fremde Seite
+    ist ja gegenüber der merge-base „neuer" als nichts. **Vorgehen, mit Freigabe von Sascha:**
+    (a) ERST messen, dass die Fernspitze keinen eigenen Inhalt trägt – der gerichtete Diff
+    `git diff origin/main <fernspitze>` darf als Plus-Zeilen nur ältere Fassungen bereits
+    gemergter Dateien zeigen; (b) dann die Brücke bauen, die den Baum GAR NICHT anfasst:
+    `git commit-tree HEAD^{tree} -p HEAD -p <fernspitze>` erzeugt einen Merge-Commit mit
+    byte-genau dem eigenen Baum und der Fernhistorie nur als zweitem Elternteil, danach
+    `git merge --ff-only <hash>`; (c) der Beleg ist `git diff <eigener-commit> HEAD` – MUSS
+    leer sein. Der Push ist danach ein gewöhnlicher Fast-Forward, nichts wird überschrieben,
+    und die fremde Historie bleibt erreichbar statt weggeworfen.
 15. **Auf das Suite-Ende über eine Marker-Zeile warten (`EXIT=` in der Log-Datei), nicht per
     `pgrep`** – das eigene Warte-Kommando enthält den Suchbegriff und meldet ewig „läuft".
     Kein `pkill` mit breitem Muster: es traf die eigenen Wartejobs und einmal die eigene Shell
@@ -5145,6 +5177,55 @@ Ursache in seiner eigenen Datei. Der Riegel steht dort, wo man ihn beim Lesen de
 `bannerStehtNoch`) war die ausgebaute Fassung der Klick-Reparatur und ist wieder entfernt worden,
 bevor sie jemand benutzt hat — sie hätte die messbar schwächere Antwort neben der stärkeren stehen
 lassen, und ein unbenutzter Helfer wird beim nächsten Lesen für die Lösung gehalten.
+
+## Chat-Großetappe B/C: der Live-Chat lädt gebündelt und hält das Bild still (28.08.2026)
+
+Frontend-Hälfte zur Backend-Etappe A (kolonie-kepler7-backend #181: `GET /api/chat/global` und
+`GET /api/chat/allianz` liefern die Nachrichten als EIN Bündel statt als storage-LIST plus einen
+Einzel-GET je Nachricht). Auftrag Sascha, per Auswahl entschieden: „Großetappe: alles".
+
+**EIN Lader, EIN Zeichner für beide Kanäle** — `chatNachrichtenLaden(kanal)` und
+`chatKanalZeichnen(kanal)` (Z. ~43238/43307); der Galaxie-Chat und das Seiten-Panel gehen beide
+hindurch. Vorher hatte jeder Kanal seinen eigenen Ladeweg, und genau dort saß der
+Anfragen-Vervielfacher: je Nachricht ein `storage/<prefix>:msg:<ts>`-GET.
+
+**Sechs Entscheidungen, die man beim Anfassen kennen muss:**
+
+- **Der Bündel-Abruf hat einen RÜCKFALL, und der Rückfall hat einen RIEGEL.** Antwortet der
+  Server auf `/chat/global` mit 404 (Deploy hängt — siebenmal passiert), setzt der Lader
+  `chatBuendelFehlt = true` und lädt EINMAL über den alten Weg (storage-list + Einzel-GETs).
+  Der Riegel verhindert, dass der 6-Sekunden-Poll den alten Weg im Takt weiterfährt und das
+  240/min-Rate-Limit flutet — dieselbe Falle wie beim Markt-Sammelauftrag.
+  `test_chat_live` 2b misst genau das: nach dem Rückfall KEINE weiteren chat- und Einzel-GET-
+  Anfragen. (Die storage-LISTEN des Ungelesen-Zählers `checkChatUnread` laufen legitim weiter —
+  **die Kennzahl für den alten Ladeweg sind die EINZEL-GETs, nicht die Listen**; wer hier misst,
+  filtert auf `storage/<prefix>:msg:`.)
+- **Der Poll (6 s) hat vier Tore:** Panel offen, Tab sichtbar (`visibilityState`), Backend da,
+  `chatBuendelFehlt` nicht gesetzt. Geschlossenes Panel = null Anfragen (`test_chat_live` 1h).
+- **Drei-Fälle-Scroll statt „immer ans Ende".** Beim Neuzeichnen: (a) Liste wurde nach OBEN
+  erweitert („Ältere anzeigen") → Anker-Element merken und die Scroll-Differenz zurückrechnen,
+  damit die gelesene Nachricht unter dem Finger stehen bleibt; (b) der Leser stand unten → ans
+  neue Ende; (c) sonst → alte Scroll-Position halten. Ohne (c) risse jeder Poll dem Leser die
+  Historie aus der Hand — dieselbe Familie wie „Das Bild bleibt still" (`bildRuhigHalten`), nur
+  innerhalb einer Box.
+- **„Ältere anzeigen"** (`[data-chat-mehr]`, per `onclick` — die Box läuft über `setBoxHtml`):
+  `CHAT_TIEFE_START = 30, CHAT_TIEFE_SCHRITT = 100, CHAT_TIEFE_MAX = 300`. **Der Deckel ist die
+  Parität zu `CHAT_KEEP_PER_CHANNEL = 300` in `server.js`** — mehr anzufordern, als der Server je
+  aufhebt, wäre ein Knopf, der nichts nachlädt. `test_chat_live` 0a/0b liest beide Seiten.
+- **Tages-Trenner** (`chatTagesLabel`: Heute/Gestern/de-DE-Datum) als `— Label —`-Zeilen im
+  Verlauf; `chatVerlaufHtml` ist die eine Markup-Quelle für beide Kanäle.
+- **Kosmetik weiterhin über den `leaderboardCache`-Join per `authorId`** — nie aus der Nachricht
+  (die schreibt der Client selbst; eine mitgeschickte Farbe wäre in fünf Sekunden gefälscht).
+  Der Bündel-Abruf ändert daran nichts.
+
+**Wächter: `tests/test_chat_live.js` (22 Prüfungen).** Fixture mit 160 Nachrichten über zwei Tage
+(damit das 30er-Fenster beide Tage überspannt), Mock kann per Schalter das Bündel mit 404
+verweigern. Gemessen wird die WIRKUNG: genau 1 Bündel-Anfrage je Kanal und 0 Einzel-GETs (1a),
+Trenner-Zeilen tagesrobust (1b), Kosmetik gezählt statt behauptet (1c), Anker-Rechnung beim
+Nachladen (|Δ| ≤ 6 px, 1d/1e), Poll hält die Scroll-Position auch bei NEUER Nachricht (1f/1g),
+Rückfall + Riegel (2a/2b). Gegenprobe gegen v8.615.0 per `KEPLER_SPIELDATEI`: **15 rot bei
+identischen 22 Prüfnamen** (per `diff` über die reinen Prüfnamen verglichen, nicht gezählt —
+Regel 60).
 
 ## Proaktive Vorschläge
 
