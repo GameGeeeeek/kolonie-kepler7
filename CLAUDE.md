@@ -5226,6 +5226,49 @@ Nachladen (|Δ| ≤ 6 px, 1d/1e), Poll hält die Scroll-Position auch bei NEUER 
 Rückfall + Riegel (2a/2b). Gegenprobe gegen v8.615.0 per `KEPLER_SPIELDATEI`: **15 rot bei
 identischen 22 Prüfnamen** (per `diff` über die reinen Prüfnamen verglichen, nicht gezählt —
 Regel 60).
+
+### Nachzug v8.620.0: der Riegel griff nur bei 404, und ein Poll konnte den Klick überholen
+
+Zwei Review-Bot-Befunde am Live-Stand v8.617.0, beide am Code verifiziert (Regel 10), beide
+behoben — und ein dritter Fund kam beim Testen dazu:
+
+- **Transiente Fehler fluteten den alten Weg.** `chatBuendelFehlt` wurde ausschließlich bei 404
+  gesetzt; jeder ANDERE Fehlschlag (429/500/502, Netzabbruch, ok-Antwort ohne `nachrichten`-Liste)
+  fiel je 6-Sekunden-Poll auf storage-list + Einzel-GETs durch — ~51 Anfragen je Durchlauf gegen
+  das 240/min-Limit, exakt die Kette des Markt-Sammelauftrag-Vorfalls. Seit v8.620.0 liefert der
+  Lader dort `null`: Der Zeichner lässt den Bestand stehen, der Poll versucht das **Bündel**
+  weiter (Selbstheilung), und der alte Weg bleibt dem echten 404 vorbehalten. Der Rückfall ist
+  damit, was er sein sollte: die Antwort auf einen ALTEN Server, nicht auf einen gestörten.
+- **Das Lade-Rennen.** `chatKanalZeichnen` konsumierte das `chatErweitert`-Flag NACH seinem
+  `await` — ein langsamer 30er-Poll konnte ein frisch geklicktes „Ältere anzeigen" (130)
+  überschreiben: Die Box sprang zurück auf 30, der Klick wirkte wie tot. Seit v8.620.0 trägt
+  jeder Lauf eine Laufnummer (`chatLadeLauf`), und wer nach seinem `await` nicht mehr der
+  jüngste ist, wirft sein Ergebnis weg. `test_chat_live` 4 stellt das Rennen DETERMINISTISCH
+  (30er-Antworten künstlich 1,5 s verzögert, 130er sofort) und belegt es am Antwort-Mitschnitt
+  (`4-vorab`) — sonst wäre die Prüfung auch ohne Rennen grün (Regel 28).
+- **Der dritte Fund, vom eigenen Wächter gefangen (3a2), nicht beim Lesen:** Die Chat-Box trägt
+  im STATISCHEN Markup einen `lädt…`-Platzhalter. Meine erste Fassung der Störungs-Erklärzeile
+  hing an `!box.childElementCount` — der Platzhalter ist aber ein Kind, die Zeile erschien nie,
+  und „lädt…" stünde bei einer Störung vor dem ersten Laden FÜR IMMER da: exakt der tote
+  Ladezustand aus Regel 35, den der Fix verhindern sollte. Die Erkennung läuft jetzt über
+  ZUSTAND statt Markup (`chatBoxGezeichnet`: hat dieser Kanal je einen gültigen Stand
+  gezeichnet?), mit `!box.childElementCount` nur noch als Wache gegen eine von außen geleerte
+  Box.
+
+**Und ein Mock, der vom Durchfallen lebte:** `test_kosmetik_flaechen` kannte die Bündel-Route
+nicht — sein Catch-all (`200` mit `[]`) fiel bis v8.617.0 still auf den storage-Weg durch, und
+genau davon lebte der Test. Mit dem abgedichteten Durchfallen zeigte er eine leere Box. Der Mock
+bedient die Route jetzt richtig. **Übertragbar: Ein Test-Mock, der eine Route dem Catch-all
+überlässt, ist eine Wette darauf, dass das Spiel mit der Falschantwort für immer gnädig umgeht —
+wer einen Fehlerpfad abdichtet, findet diese Mocks als Fehlschläge und behebt den MOCK, nicht die
+Abdichtung.**
+
+Wächter: `test_chat_live` ist auf **32 Prüfungen** gewachsen (Abschnitt 3: gestörter Server —
+kein Einzel-GET, Erklärzeile statt Altbestand, Poll pollt das Bündel weiter, Selbstheilung als
+Zusage der Erklärzeile; Abschnitt 4: das Rennen). Gegenprobe gegen v8.617.0 per
+`KEPLER_SPIELDATEI`: **genau 3a/3a2/3b/4a rot** bei identischen 32 Prüfnamen, mit dem Anlassfall
+wörtlich im Beleg (`4a: {"anzahl":30}`); grün bleiben MÜSSEN 3-vorab, 3c, 3z, 4-vorab0, 4-vorab
+und 4z (Regel 71).
 ## Vier neue Admin-Reiter (28.08.2026, Auftrag Sascha)
 
 **Wortlaut:** „mehr adminfähigkeiten in admin bereich hinzu mache vorschläge." Vorgelegt wurden

@@ -85,6 +85,16 @@ function backend(store){ return async r => {
   if (p === 'reports') return j({ reports: [] });
   if (p === 'pending-rewards/claim') return j({ reward: null });
   if (p === 'cosmetics') return j({ katalog: [], besitz: [], auswahl: GOLD, staub: 0 });
+  // Der Buendel-Weg der Chat-Etappe (Backend #181) - der Produktionsweg, ueber den der Chat seit
+  // v8.615.0 laedt. Bis v8.617.0 fiel der Lader beim Catch-all unten (200 mit []) STILL auf den
+  // alten storage-Weg durch und dieser Mock kam damit durch; seit v8.618.0 ist eine ok-Antwort
+  // ohne Nachrichtenliste bewusst eine voruebergehende Stoerung (kein Rueckfall - der wuerde das
+  // Rate-Limit fluten). Der Mock bedient die Route deshalb richtig, statt vom Durchfallen zu leben.
+  if (p === 'chat/global' || p === 'chat/allianz'){
+    const pref = p === 'chat/global' ? 'globalchat:msg:' : 'alliance:';
+    const liste = Object.keys(store).filter(k => k.startsWith(pref)).sort().map(k => JSON.parse(store[k]));
+    return j({ ok: true, nachrichten: liste, neuesteTs: liste.length ? liste[liste.length - 1].ts : 0 });
+  }
   if (p === 'storage-list'){
     const pref = decodeURIComponent((u.split('prefix=')[1] || '').split('&')[0]);
     return j({ keys: Object.keys(store).filter(k => k.startsWith(pref)) });
