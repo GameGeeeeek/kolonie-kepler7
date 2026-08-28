@@ -5152,6 +5152,29 @@ Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Op
 
 ## Deploy
 
+**STAND 28.08.2026: Die Serie von dreizehn Backend-Deploy-Ausfällen ist beendet.** Der Abschnitt
+unten beschreibt sie ausführlich – als Historie richtig, als Lagebeschreibung überholt. Was jetzt
+gilt, in vier Sätzen:
+
+- **Die Ursache war nie die Parallelität mehrerer Sitzungen**, sondern nodemon auf dem gepullten
+  Verzeichnis: `git pull` schrieb `server.js`, nodemon startete daraufhin neu und räumte den
+  laufenden git-Prozess mit ab, bevor er den Ref gesetzt hatte. Der Beleg ist die Asymmetrie, die
+  weiter unten mehrfach auftaucht und dort als Rätsel steht – **Frontend 0 Ausfälle, Backend 13,
+  bei demselben Webhook und denselben Pushes**. Der einzige Unterschied war der Beobachter.
+- **Der Backend-Container läuft seit dem 28.08.2026 ohne nodemon** und startet sich nach einem
+  erfolgreichen Pull selbst neu. Ein Code-Deploy kostet dabei rund 7 Sekunden 502 (gemessen); ein
+  Commit ohne `.js`/`.json`-Änderung startet gar nichts neu.
+- **Die 401/404-Routenmessung ist nicht mehr der erste Griff.** `GET /api/health` meldet vier
+  Felder – `commit` (womit der Prozess läuft), `checkout` (was auf Platte liegt), `blob` (welche
+  Datei er wirklich ausführt) und `selbstNeustart` (ob der Container umgebaut ist). Laufen
+  `commit` und `checkout` auseinander, ist das nur dann eine Störung, wenn der Commit Code
+  angefasst hat.
+- **Der Satz „der Frontend-Deploy beweist nichts über den Backend-Deploy" gilt weiter** – nur ist
+  die Prüfung jetzt ein `curl` statt einer Routenmessung mit zwei Kontrollen.
+
+Einzelheiten, Messungen und der Weg über Portainer stehen in der **Backend-CLAUDE.md** unter
+„nodemon fliegt aus dem Deploy-Pfad" und in der Box ganz oben in derselben Datei.
+
 **Ein Push nach `main` geht von selbst live** (verifiziert 05.08.2026 am Container-Log des Pi und am Quelltext). Bis dahin stand hier „live geht es erst, wenn Sascha manuell zieht" – das war überholt und hat zu falschen Auskünften geführt.
 
 Der Weg: GitHub ruft nach jedem Push den **Deploy-Webhook** des Backends auf (`POST /api/deploy-webhook`, `server.js:6297`, abgesichert per HMAC-SHA256 gegen `DEPLOY_WEBHOOK_SECRET`). Der Repo-**Name** aus dem Payload wählt einen von zwei **fest verdrahteten** Befehlen aus `DEPLOY_TARGETS` – nie etwas aus dem Request-Body, das schützt gegen Command-Injection:
