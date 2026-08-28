@@ -43234,12 +43234,30 @@
   const CHAT_TIEFE_START = 30, CHAT_TIEFE_SCHRITT = 100, CHAT_TIEFE_MAX = 300;
   const chatTiefe = { global: CHAT_TIEFE_START, allianz: CHAT_TIEFE_START };
   const chatErweitert = { global: false, allianz: false };
+  // Laufnummer je Kanal gegen ueberholende Ladeergebnisse: Der Zeichner merkt sich vor seinem
+  // await die Nummer und wirft sein Ergebnis weg, wenn inzwischen ein juengerer Lauf gestartet
+  // ist. Ohne den Riegel konnte ein langsamer 30er-Poll ein frisch geklicktes "Aeltere anzeigen"
+  // (130er-Lauf) UEBERSCHREIBEN und dabei das chatErweitert-Flag des Klicks konsumieren - die
+  // Box sprang zurueck auf 30 Nachrichten, und der Anker-Scroll blieb aus.
+  const chatLadeLauf = { global: 0, allianz: 0 };
+  // Hat dieser Kanal schon einmal einen GUELTIGEN Stand gezeichnet? Entscheidet bei einer
+  // Stoerung, ob der Bestand stehen bleibt oder die Erklaerzeile hin muss. Ein blosses
+  // box.childElementCount reicht dafuer NICHT: Die Box traegt im statischen Markup einen
+  // "laedt…"-Platzhalter (ein Kind!), und der stuende bei einer Stoerung vor dem ersten
+  // erfolgreichen Laden fuer immer da - genau der tote Ladezustand aus Regel 35. Gefunden von
+  // test_chat_live 3a2, nicht beim Lesen des Codes.
+  const chatBoxGezeichnet = { global: false, allianz: false };
   // Bündel-Abruf mit Rückfall: GET /api/chat/:kanal liefert den ganzen Kanal in EINER Antwort
   // (Backend #181) statt der alten ~1+50 Einzelanfragen gegen das 240/min-Limit. Ein älterer
   // Server antwortet 404 - dann läuft der alte Weg (storage-list + storageGet je Schlüssel)
   // weiter: "der Server darf hinterherhinken, das Frontend nicht". Der 404 wird je Sitzung
   // gemerkt, damit nicht jeder Poll erneut eine tote Route anfragt; nach einem Neuladen probiert
   // das Spiel den Bündel-Weg wieder (der Server kann inzwischen nachgezogen sein).
+  // Jeder ANDERE Fehlschlag (429/500/502, Netzabbruch, ok-Antwort ohne Nachrichtenliste) ist
+  // VORUEBERGEHEND und liefert null statt in den alten Weg zu fallen: Der alte Weg kostet
+  // ~1+Limit Anfragen, und ein 6-Sekunden-Poll haette das 240/min-Rate-Limit geflutet - genau
+  // die Kette, die beim Markt-Sammelauftrag einmal bis zur Abmeldung durchschlug. Der Zeichner
+  // laesst bei null den Bestand stehen; der naechste Poll versucht das Buendel erneut.
   let chatBuendelFehlt = false;
   async function chatNachrichtenLaden(kanal){
     const tag = kanal === 'allianz' ? myAllianceTag() : null;
@@ -43251,10 +43269,14 @@
         if (r.ok){
           const d = await r.json();
           if (d && Array.isArray(d.nachrichten)) return d.nachrichten;
-        } else if (r.status === 404){
-          chatBuendelFehlt = true;
+          return null; // ok-Antwort ohne Nachrichtenliste: voruebergehend, kein Rueckfall
         }
-      } catch(e){}
+        if (r.status === 404){
+          chatBuendelFehlt = true; // alter Server ohne Buendel-Route: einmalig auf den alten Weg
+        } else {
+          return null; // 429/500/502: voruebergehend - der alte Weg wuerde das Rate-Limit fluten
+        }
+      } catch(e){ return null; } // Netzabbruch: voruebergehend, naechster Poll probiert erneut
     }
     const prefix = kanal === 'allianz' ? 'alliance:'+tag+':msg:' : 'globalchat:msg:';
     const listRes = await storageList(prefix, true);
@@ -43315,11 +43337,23 @@
     const box = document.getElementById(boxId);
     if (!box) return;
     if (kanal === 'allianz' && !myAllianceTag()){ setBoxHtml(box, boxId, `<div class="bmeta">Keiner Allianz beigetreten.</div>`); return; }
+    const lauf = ++chatLadeLauf[kanal];
     try {
       const msgs = await chatNachrichtenLaden(kanal);
-      if (!msgs) return;
+      // Waehrend des await kann ein juengerer Lauf gestartet sein (Klick auf "Aeltere anzeigen",
+      // naechster Poll) - dann gehoert die Box ihm, und dieses Ergebnis wird verworfen. Damit
+      // konsumiert auch NUR der juengste Lauf das chatErweitert-Flag weiter unten.
+      if (lauf !== chatLadeLauf[kanal]) return;
+      if (!msgs){
+        // Voruebergehende Stoerung (Server nicht erreichbar, Rate-Limit): einen echten Bestand
+        // stehen lassen. Nur wer noch NIE gueltig gezeichnet wurde (der statische
+        // "laedt…"-Platzhalter) oder von aussen geleert ist, bekommt die Erklaerzeile - sonst
+        // stuende dort stumm ein Ladeversprechen, das nie einloest (Regel 35).
+        if (!chatBoxGezeichnet[kanal] || !box.childElementCount) setBoxHtml(box, boxId, `<div class="bmeta">Chat gerade nicht erreichbar – neuer Versuch läuft automatisch.</div>`);
+        return;
+      }
       msgs.sort((a,b) => (a.ts||0)-(b.ts||0));
-      if (!msgs.length){ setBoxHtml(box, boxId, `<div class="bmeta">Noch keine Nachrichten. Schreib die erste!</div>`); return; }
+      if (!msgs.length){ chatBoxGezeichnet[kanal] = true; setBoxHtml(box, boxId, `<div class="bmeta">Noch keine Nachrichten. Schreib die erste!</div>`); return; }
       const limit = Math.min(CHAT_TIEFE_MAX, chatTiefe[kanal] || CHAT_TIEFE_START);
       const mehrKnopf = msgs.length >= limit && limit < CHAT_TIEFE_MAX;
       const erweitert = chatErweitert[kanal]; chatErweitert[kanal] = false;
@@ -43334,6 +43368,7 @@
       const alteHoehe = box.scrollHeight, alterScroll = box.scrollTop;
       const warUnten = alterScroll + box.clientHeight >= alteHoehe - 40;
       const neu = setBoxHtml(box, boxId, chatVerlaufHtml(msgs.slice(-limit), { kanal, farbe: kanal==='allianz' ? '#c3bef5' : '#5dcaa5', mehrKnopf }));
+      chatBoxGezeichnet[kanal] = true;
       if (neu){
         if (erweitert) box.scrollTop = box.scrollHeight - alteHoehe + alterScroll;
         else if (warUnten) box.scrollTop = box.scrollHeight;

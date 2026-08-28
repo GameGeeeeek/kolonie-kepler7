@@ -38,6 +38,27 @@
 // 2a mit {"chat":0,"einzel":4} (der alte Weg lief - er WAR der Weg -, aber ohne Bündel-Versuch
 // davor). GRÜN bleiben MÜSSEN 0a, 1h und 2b - ohne Poll gibt es nichts, was gegen den alten
 // Server pollen könnte; eine dieser drei rot hieße WERKZEUGFEHLER, nicht Befund (Regel 71).
+//
+// ZWEI NACHGEZOGENE BEFUNDE (v8.618.0, verifizierte Bot-Meldungen am Live-Stand v8.617.0):
+//   * Abschnitt 3: Der Riegel gegen den teuren alten Weg griff NUR bei 404. Jeder andere
+//     Fehlschlag (429/500/502, Netzabbruch, ok-Antwort ohne Nachrichtenliste) fiel je 6-s-Poll
+//     auf storage-list + Einzel-GETs durch - ~51 Anfragen je Durchlauf gegen das 240/min-Limit,
+//     dieselbe Kette wie beim Markt-Sammelauftrag. Seit v8.618.0 liefert der Lader dort null,
+//     der Zeichner lässt den Bestand stehen (leere Box: Erklärzeile statt stummer Fläche,
+//     Regel 35), und der Poll versucht das Bündel weiter - die Selbstheilung (3c) ist die
+//     Zusage der Erklärzeile ("neuer Versuch läuft automatisch", Regel 11: Texte sind
+//     Versprechen).
+//   * Abschnitt 4: Der Zeichner konsumierte das chatErweitert-Flag NACH seinem await - ein
+//     langsamer 30er-Poll konnte ein frisch geklicktes "Ältere anzeigen" (130) überschreiben.
+//     Seit v8.618.0 trägt jeder Lauf eine Laufnummer (chatLadeLauf) und wirft sein Ergebnis
+//     weg, wenn inzwischen ein jüngerer gestartet ist. Das Rennen wird DETERMINISTISCH gestellt
+//     (limit=30-Antworten künstlich um 1,5 s verzögert, limit=130 sofort) und 4-vorab belegt am
+//     Antwort-Mitschnitt, dass es wirklich stattfand - sonst wäre 4a auch ohne Rennen grün
+//     (Regel 28).
+// Gegenprobe dazu gegen v8.617.0 per KEPLER_SPIELDATEI: es fallen GENAU 3a (Einzel-GETs liefen),
+// 3a2 (Altbestand statt Erklärzeile), 3b (der Poll fuhr den alten Weg im Takt weiter) und 4a
+// (die Box sprang zurück auf 30). GRÜN bleiben MÜSSEN 3-vorab, 3c, 3z, 4-vorab0, 4-vorab und 4z
+// - eine davon rot hieße WERKZEUGFEHLER, nicht Befund (Regel 71).
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SERVER_JS, pruefer, ruhigeUhren } = require('./lib/umgebung');
 const { SPIELDATEI } = require('./lib/spieldatei');
@@ -120,9 +141,16 @@ function backend(opts) {
     const j = (o, s = 200) => r.fulfill({ status: s, contentType: 'application/json', body: JSON.stringify(o) });
     if (p === 'chat/global' || p === 'chat/allianz') {
       if (opts.chat404) return j({ error: 'Cannot GET' }, 404);
+      // Abschnitt 3: ein VORUEBERGEHEND gestoerter Server (500/502/429) - bewusst kein 404,
+      // denn genau der Unterschied ist der Gegenstand.
+      if (opts.chatFehler) return j({ error: 'kaputt' }, opts.chatFehler);
+      // Abschnitt 4: limit=30-Antworten kuenstlich verzoegern, damit das Lade-Rennen
+      // deterministisch entsteht statt auf Wanduhr-Glueck zu warten (Regel 8/18-Familie).
+      if (opts.langsam30 && /limit=30$/.test(rest)) await new Promise(res => setTimeout(res, opts.langsam30));
       const limit = Math.max(1, parseInt((rest.split('limit=')[1] || '50'), 10) || 50);
       const liste = p === 'chat/global' ? opts.globalMsgs : opts.allianzMsgs;
       const teil = liste.slice(-limit);
+      if (opts.antworten) opts.antworten.push(rest); // Antwort-Reihenfolge fuer 4-vorab
       return j({ ok: true, nachrichten: teil, neuesteTs: teil.length ? teil[teil.length - 1].ts : 0 });
     }
     if (p === 'health') return j({ ok: true });
@@ -312,6 +340,87 @@ const einzelGets = a => a.filter(x => /^GET storage\/(globalchat|alliance:GG):ms
 
   check('2z: keine JS-Fehler im Rückfall-Lauf', l2.errs.length === 0, l2.errs.slice(0, 3));
   await l2.ctx.close();
+
+  // ============================================================ 3) Der VORÜBERGEHEND gestörte Server
+  // (500 statt 404). Der Store trägt bewusst Legacy-Altbestand: Am Stand v8.617.0 fiel der Lader
+  // hier auf den alten Weg durch und zeigte ihn - die Einzel-GETs und der Altbestand im DOM sind
+  // die MESSBARE Signatur des Fehlers, nicht bloß seine Beschriftung (Regel 61).
+  const stoerStore = Object.assign({ 'kepler7-save-v3': save() }, EINTRAEGE);
+  for (let i = 1; i <= 3; i++) stoerStore['globalchat:msg:' + (JETZT - (4 - i) * 60e3) + '-alt' + i] = JSON.stringify({ authorId: 'u-lume', authorName: 'Lumekx', authorAllianceTag: 'GG', text: 'Altbestand ' + i, ts: JETZT - (4 - i) * 60e3 });
+  const o3 = { anfragen: [], store: stoerStore, globalMsgs: globalNachrichten(), allianzMsgs: allianzNachrichten(), chat404: false, chatFehler: 500 };
+  const l3 = await booten(browser, o3);
+
+  o3.anfragen.length = 0;
+  await l3.page.evaluate(() => document.getElementById('chatEdgeTab').click());
+  await l3.page.waitForTimeout(2000);
+  await l3.page.evaluate(() => document.getElementById('chatPanelTabGlobal').click());
+  await l3.page.waitForTimeout(1200);
+  const stoer = await l3.page.evaluate(() => {
+    const t = document.getElementById('chatPanelGlobalBox').textContent || '';
+    return { nichtErreichbar: /Chat gerade nicht erreichbar/.test(t), altbestand: /Altbestand/.test(t),
+             leerFalsch: /Noch keine Nachrichten/.test(t) };
+  });
+  const a3 = { chat: chatAnfragen(o3.anfragen).length, einzel: einzelGets(o3.anfragen).length };
+  check('3-vorab: der Bündel-Versuch lief gegen den gestörten Server (sonst misst 3a nichts)',
+    a3.chat >= 1, a3);
+  check('3a: ein 500 fällt NICHT auf den alten Weg durch (kein einziger Einzel-GET)',
+    a3.einzel === 0, a3);
+  check('3a2: die leere Box erklärt die Störung, statt Altbestand oder "Noch keine Nachrichten" zu behaupten',
+    stoer.nichtErreichbar === true && stoer.altbestand === false && stoer.leerFalsch === false, stoer);
+
+  // Der Poll versucht das Bündel WEITER (der 404-Riegel darf hier nicht greifen - sonst gäbe es
+  // die Selbstheilung nicht), aber weiterhin ohne einen einzigen Einzel-GET.
+  o3.anfragen.length = 0;
+  await l3.page.waitForTimeout(8000);
+  const s3 = { chat: chatAnfragen(o3.anfragen).length, einzel: einzelGets(o3.anfragen).length };
+  check('3b: der Poll versucht das Bündel weiter und flutet dabei nicht den alten Weg',
+    s3.chat >= 1 && s3.einzel === 0, s3);
+
+  // Die Selbstheilung ist die Zusage der Erklärzeile ("neuer Versuch läuft automatisch") - sie
+  // MUSS an beiden Ständen grün sein; rot hieße, die Zeile lügt (Regel 11).
+  o3.chatFehler = 0;
+  let geheilt = false;
+  for (let i = 0; i < 20 && !geheilt; i++) {
+    await l3.page.waitForTimeout(500);
+    geheilt = await l3.page.evaluate(() => /Nachricht 160/.test(document.getElementById('chatPanelGlobalBox').textContent));
+  }
+  check('3c: sobald der Server wieder antwortet, heilt der nächste Poll die Box von selbst', geheilt === true, { geheilt });
+
+  check('3z: keine JS-Fehler im Störungs-Lauf', l3.errs.length === 0, l3.errs.slice(0, 3));
+  await l3.ctx.close();
+
+  // ============================================================ 4) Das Lade-Rennen (Poll gegen Klick)
+  const o4 = { anfragen: [], antworten: [], store: Object.assign({ 'kepler7-save-v3': save() }, EINTRAEGE), globalMsgs: globalNachrichten(), allianzMsgs: allianzNachrichten(), chat404: false, langsam30: 0 };
+  const l4 = await booten(browser, o4);
+  await l4.page.evaluate(() => document.getElementById('chatEdgeTab').click());
+  await l4.page.waitForTimeout(1800);
+  await l4.page.evaluate(() => document.getElementById('chatPanelTabGlobal').click());
+  await l4.page.waitForTimeout(900);
+  const start4 = await l4.page.evaluate(() => (document.getElementById('chatPanelGlobalBox').textContent.match(/Nachricht \d+/g) || []).length);
+  check('4-vorab0: das Startfenster steht (30 Nachrichten), bevor das Rennen gestellt wird', start4 === 30, { anzahl: start4 });
+
+  // Rennen stellen: Ab jetzt brauchen 30er-Antworten 1,5 s. Auf den NÄCHSTEN Poll-Start warten
+  // (die Anfrage steht im Mitschnitt, BEVOR die Verzögerung beginnt), dann sofort "Ältere
+  // anzeigen" klicken - dessen 130er-Antwort kommt zuerst, der langsame 30er-Poll danach.
+  o4.langsam30 = 1500;
+  o4.anfragen.length = 0; o4.antworten.length = 0;
+  let pollGestartet = false;
+  for (let i = 0; i < 150 && !pollGestartet; i++) {
+    await new Promise(res => setTimeout(res, 50));
+    pollGestartet = o4.anfragen.some(x => x.includes(' chat/global') && /limit=30$/.test(x));
+  }
+  await l4.page.evaluate(() => { const mk = document.querySelector('#chatPanelGlobalBox [data-chat-mehr="global"]'); if (mk) mk.click(); });
+  await l4.page.waitForTimeout(2500);
+  const idx130 = o4.antworten.findIndex(x => x.includes('chat/global') && /limit=130$/.test(x));
+  const idx30 = o4.antworten.findIndex(x => x.includes('chat/global') && /limit=30$/.test(x));
+  check('4-vorab: das Rennen fand wirklich statt (130er-Antwort VOR der langsamen 30er-Antwort)',
+    pollGestartet && idx130 >= 0 && idx30 >= 0 && idx130 < idx30, { pollGestartet, idx130, idx30, antworten: o4.antworten.slice(0, 6) });
+  const rennen = await l4.page.evaluate(() => (document.getElementById('chatPanelGlobalBox').textContent.match(/Nachricht \d+/g) || []).length);
+  check('4a: der überholte 30er-Poll überschreibt das frische Nachladen NICHT (Box bleibt bei 130)',
+    rennen === 130, { anzahl: rennen });
+
+  check('4z: keine JS-Fehler im Rennen-Lauf', l4.errs.length === 0, l4.errs.slice(0, 3));
+  await l4.ctx.close();
   await browser.close();
   return ende();
 })().catch(e => { console.error(e); process.exit(1); });
