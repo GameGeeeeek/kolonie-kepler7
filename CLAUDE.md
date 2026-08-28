@@ -2047,8 +2047,12 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     **Der Befund daraus ist am 21.08.2026 nachgemessen und behoben** – siehe den Abschnitt
     „Das Bild bleibt still" weiter unten. Er war größer als hier notiert: Es driftet nicht nur ein
     Sprungziel, sondern die Lesestelle JEDES Spielers, sobald ein Banner über ihm auftaucht oder
-    abläuft. Offen bleibt der zweite Halbsatz: **87 von 160** Tests, die das Spiel mit Spielstand
-    booten, pinnen `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort.
+    abläuft. **KORREKTUR 22.08.2026 zum zweiten Halbsatz** („87 von 160 Tests pinnen
+    `nextPlanetEventCheck` nicht – dieselbe Flanke wartet dort"): Das war eine Hochrechnung, keine
+    Messung, und sie ist falsch. Von 42 Fensterlage-Tests fällt gegen eine Kopie mit 90 % Spawn je
+    Tick **genau einer**; das Banner steht dort zwar (144 px gemessen), die Tests messen nur nichts,
+    was es verschiebt. Und *pinnen* hilft gegen das Banner ohnehin nicht – der Filter zählte die
+    falsche Eigenschaft. Einzelheiten im Abschnitt „Der Riegel gegen das Ereignis-Banner".
 
 63. **Die Tab-Hinweisleiste ist 166 px hoch, steht ÜBER dem Tab-Inhalt, und ihr Erscheinen ist ein
     RENNEN gegen die Test-Vorbereitung.** Vorfall 19.08.2026, drei Prüfläufe hintereinander mit je
@@ -2067,7 +2071,10 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     Sprungziel oben): Die Fixture muss die Möbel abschalten, die nur manchmal da sind –
     `seenTabHints` für alle Reiter, `nextPlanetEventCheck`/`nextTraderCheck` gepinnt. Gemessen sind
     **88 von 147** Tests, die das Spiel mit Spielstand booten und `nextPlanetEventCheck` nicht
-    pinnen; die Flanke wartet dort weiter.
+    pinnen. **KORREKTUR 22.08.2026:** Der Halbsatz „die Flanke wartet dort weiter" galt für die
+    Reiter-Hinweisleiste dieses Vorfalls – für das EREIGNIS-BANNER ist er nachgemessen und falsch
+    (41 von 42 Fensterlage-Tests bleiben auch bei 90 % Spawn grün). Und `nextPlanetEventCheck` ist
+    für das Banner ohnehin die falsche Größe; siehe „Der Riegel gegen das Ereignis-Banner".
     **Und die Lehre über die Fixture hinaus:** Ein Fehlschlag, der bei jedem Lauf ein anderes Opfer
     sucht, ist kein Wackeln von drei Tests, sondern EIN Zustand, der drei Tests trifft. Wer ihn je
     Test „stabilisiert", baut drei Pflaster über eine Ursache (genau das war hier zweimal passiert).
@@ -2123,9 +2130,16 @@ sobald jemand eine Stufe ändert – und der Spieler sieht eine Zahl, die die Mi
     verglichen, nicht gezählt – Regel 60). Und der Beleg, dass die Behebung wirklich gegriffen hat
     statt zufällig ruhig geblieben zu sein: `streuEreignisWeggeklickt` stand im grünen Lauf auf
     1/2/1, gegen die echte Spieldatei auf 0/0/0.
-    **Die Flanke ist nicht geschlossen, nur an dieser Stelle:** Jeder Test, der FENSTERLAGE misst,
-    ist ihr ausgesetzt, weil das Banner 138–164 px hoch ist und alles darunter verschiebt (Regel 63
-    zählt für die verwandte Reiterleisten-Flanke 88 von 147 betroffenen Tests).
+    **KORREKTUR 22.08.2026 – hier stand „jeder Test, der FENSTERLAGE misst, ist ihr ausgesetzt", und
+    das ist nachgemessen falsch.** Gegen eine Kopie mit 90 % Spawn je Tick fällt von 42
+    Fensterlage-Tests **genau einer**: dieser hier, und zwar an seiner eigenen Klick-Reparatur. Das
+    Banner steht in den anderen sehr wohl (144 px), sie messen nur INNERHALB von Containern oder
+    scrollen ihr Ziel vorher in den Blick. Ausgesetzt ist, wer eine ABSOLUTE Fensterlage ohne
+    Scrollen misst – hier, weil `.edge-tab` am VIEWPORT hängt. Seit dem 22.08.2026 ist die
+    Reparatur durch einen RIEGEL ersetzt (`ruhigeUhren()` setzt ein unsichtbares `activeEvent` und
+    trifft damit `if (state.activeEvent) return;` in der ersten Zeile derselben Funktion) – die
+    Reparatur war besiegbar, der Riegel nicht. Einzelheiten und beide Gegenproben im Abschnitt
+    „Der Riegel gegen das Ereignis-Banner".
 
 71. **Eine Gegenprobe per Env-Umleitung braucht eine Wache, die sagt, WAS fallen muss – sonst ist
     ihr Grün nicht von einem Werkzeugfehler zu unterscheiden.** Vorfall 19.08.2026 (Phase 4,
@@ -5030,11 +5044,136 @@ Das ist Regel 61 am eigenen Test; gefangen hat es die `WERKZEUGFEHLER`-Wache des
 (Regel 71). Prüfung `1e` schließt es, **gescopt auf den Rumpf** von `shipModuleBonusFor` – ein
 Aufruf irgendwo sonst in der Datei zählt nicht (Regel 39).
 
+## Der Riegel gegen das Ereignis-Banner — und die Flanke, die viel schmaler ist als behauptet (22.08.2026)
+
+Arbeitsregel 70 hielt fest, dass sich `maybeSpawnRandomEvent()` **nicht pinnen** lässt: keine Uhr,
+0,25 % je Tick, und `state.lastEventTime` wird zwar geschrieben, aber nirgends als Sperre gelesen.
+Die dortige Antwort war eine **Reparatur** — das Banner über den „Ignorieren"-Knopf wegklicken.
+Diese Etappe ersetzt sie durch eine **Verhinderung** und misst dabei nebenbei, wie groß die Flanke
+wirklich ist. Das Ergebnis widerlegt meine eigene Ausgangsannahme (Regel 26 in ihrer nützlichen
+Richtung: eine Gegenprobe, die nicht anschlägt, IST der Befund).
+
+### Die Sperre, die es doch gibt — sie stand in der ersten Zeile derselben Funktion
+
+`if (state.activeEvent) return;`. Ein Ereignis mit einem Schlüssel, den `RANDOM_EVENTS` **nicht**
+kennt, legt den Würfel damit still **und bleibt selbst unsichtbar**: Der Renderer findet keine
+Definition und fällt in seinen else-Zweig, der das Banner auf `display:none` setzt. Regel 70 hatte
+nach einer UHR gesucht und war deshalb daran vorbeigelaufen.
+
+`ruhigeUhren()` in `tests/lib/umgebung.js` liefert seither **alle drei** Störquellen auf einmal:
+`nextPlanetEventCheck`, `nextTraderCheck` und `activeEvent: { key: '__testruhe__' }`. Der
+Unterstrich-Rahmen macht den Schlüssel im Spielstand sofort als Test-Riegel erkennbar, das
+Ablaufdatum liegt weit in der Zukunft, damit der Tick ihn nicht per `resolveEvent('B')` auflöst.
+
+**Gemessen an einer Kopie der Spieldatei mit 90 % Spawn je Tick** (die Fixture-Form der
+Fensterlage-Tests, 390×844):
+
+| | Banner |
+|---|---|
+| ohne Riegel | **144 px, sichtbar** |
+| mit Riegel | **0 px, unsichtbar** |
+
+### Die Einbaustelle ist eine Entscheidung: der Spread steht VORNE
+
+`JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, … })` — damit gewinnt alles, was danach
+kommt. Wer ein ECHTES Ereignis messen will, setzt `activeEvent` dahinter und bekommt es.
+Andersherum (Spread am Ende, wie ihn der erste Nutzer `test_benachrichtigung_abgleich` hatte) hätte
+der Helfer ein bewusst gesetztes Ereignis **still überschrieben**, und der Test hätte gemessen,
+dass kein Banner steht, obwohl er eines wollte. `test_klappen_kollision` zeigt beide Hälften in
+einer Datei, gegen dieselbe 90-%-Kopie gemessen: **0 px** ohne Ereignis, **138 px** (390×844) bzw.
+**164 px** (360×740) mit gesetztem. Der Riegel verhindert den ZUFALL, nicht die Absicht.
+
+### Der EINE Test, bei dem sich ein Ergebnis ändert — und warum eine Reparatur dort verliert
+
+`test_klappen_kollision` hatte die Klick-Reparatur, und sie ist **besiegbar**: Gegen die 90-%-Kopie
+erschöpfte sie ihre drei Anläufe und maß danach ein Banner von **153 bzw. 207 px** — genau die
+Störung, gegen die sie klickt, nur mit einem schnelleren Würfel. **Eine Reparatur, die in einer
+Schleife gegen eine weiterlaufende Quelle anläuft, gewinnt nur, solange die Quelle langsam genug
+ist.** Mit dem Riegel: `EXIT=0`, Banner 0 px, bei identischen 16 Prüfnamen (per `diff` verglichen,
+nicht gezählt — Regel 60). Die Reparatur ist deshalb ersatzlos entfernt; der Beleg ist jetzt die
+`bannerHoehe` in der Vorab-Prüfung, die weiterhin 0 zeigen muss.
+
+### Der eigentliche Befund: 41 von 42 Tests sind der Flanke GAR NICHT ausgesetzt
+
+Die Regeln 62, 63 und 70 sagen übereinstimmend, die Flanke sei breit („87 von 160 Tests … dieselbe
+Flanke wartet dort", „jeder Test, der FENSTERLAGE misst, ist ihr ausgesetzt"). **Das war nie
+gemessen, und es stimmt nicht.** Gemessen am 22.08.2026, alle gegen dieselbe 90-%-Kopie:
+
+| Gruppe | Tests | rot |
+|---|---|---|
+| Fensterlage-Tests OHNE gepinnte Uhren | 18 | **0** |
+| Fensterlage-Tests MIT gepinnten Uhren (u. a. die vier aus Regel 63) | 23 | **0** |
+| `test_klappen_kollision` | 1 | **1** |
+
+**Das Banner steht in diesen Tests wirklich** (144 px, oben gemessen) — sie messen nur nichts, was
+es verschiebt. Der Mechanismus dahinter, benannt statt vermutet (Regel 20): Das Banner sitzt im
+Seitenfluss über dem Reiter-Inhalt. Wer INNERHALB eines Containers misst (Rechteck-Differenzen,
+SVG-viewBox, relative Geometrie) oder sein Ziel vorher in den Blick scrollt, merkt davon nichts.
+Ausgesetzt ist nur, wer eine ABSOLUTE Fensterlage ohne Scrollen misst — und das ist die
+Klappen/Reiterleisten-Kollision, weil `.edge-tab` am VIEWPORT hängt.
+
+**Und der Vorfall aus Regel 63 war eine andere Störquelle:** Dort ging es um die
+**Reiter-Hinweisleiste** (166 px), und die ist über `seenTabHints` längst abgeschaltet. Die zwei
+Fälle sind in Regel 70 zusammengezogen worden, obwohl nur einer das Banner betrifft.
+
+### Mein eigenes Auswahlkriterium war zuerst falsch — und zwar auf genau die Weise, vor der Regel 70 warnt
+
+Der erste Durchgang filterte „Tests, die `nextPlanetEventCheck` NICHT pinnen". **Pinnen hilft gegen
+das Banner aber gar nicht** — die 23 Tests, die pinnen, sind ihm genauso ausgesetzt wie die 18, die
+es nicht tun, und ausgerechnet die vier aus Regel 63 waren dadurch AUSGESCHLOSSEN. Wer nach der
+falschen Eigenschaft filtert, bekommt eine Liste, die sich vollständig LIEST und die eigentlich
+betroffenen Fälle nicht enthält (dieselbe Familie wie die Rundflug-Liste, Regel 40).
+
+### Was übernommen wurde — und was ausdrücklich nicht
+
+Übernommen haben den Riegel **20 Tests**: `test_klappen_kollision` (dort ändert er ein Ergebnis)
+und die 18 Fensterlage-Tests ohne gepinnte Uhren, dazu `test_benachrichtigung_abgleich`, das ihn
+schon hatte und nur auf die einheitliche Form gezogen wurde. Für die 18 ist er **prophylaktisch,
+und das steht hier, damit es niemand für eine Behebung hält**: Er greift nachweislich (144 → 0 px),
+ändert aber heute kein einziges Ergebnis. Sein Wert liegt darin, dass eine künftige Prüfung in
+einer dieser Dateien nicht still einem 144-px-Zufall ausgesetzt ist.
+
+**Die 23 Tests mit gepinnten Uhren sind NICHT angefasst** — gemessen 0 rot, und ein Ersetzer über
+weitere 23 Testdateien ist genau der Fall aus Regel 24. Wer sie später doch umstellt, hat mit
+diesem Abschnitt die Messung, gegen die er es begründen muss.
+
+**Kein automatischer Einbau in `starteBrowser`**, obwohl das eine Zeile statt zwanzig wäre: Ein
+Test, der das Zufallsereignis absichtlich messen will, wäre still sabotiert, und niemand fände die
+Ursache in seiner eigenen Datei. Der Riegel steht dort, wo man ihn beim Lesen des Tests sieht.
+
+**Ein Helfer, der es NICHT geworden ist:** `tests/lib/stoerungen.js` (`ereignisBannerWegraeumen`,
+`bannerStehtNoch`) war die ausgebaute Fassung der Klick-Reparatur und ist wieder entfernt worden,
+bevor sie jemand benutzt hat — sie hätte die messbar schwächere Antwort neben der stärkeren stehen
+lassen, und ein unbenutzter Helfer wird beim nächsten Lesen für die Lösung gehalten.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).
 
 ## Deploy
+
+**STAND 28.08.2026: Die Serie von dreizehn Backend-Deploy-Ausfällen ist beendet.** Der Abschnitt
+unten beschreibt sie ausführlich – als Historie richtig, als Lagebeschreibung überholt. Was jetzt
+gilt, in vier Sätzen:
+
+- **Die Ursache war nie die Parallelität mehrerer Sitzungen**, sondern nodemon auf dem gepullten
+  Verzeichnis: `git pull` schrieb `server.js`, nodemon startete daraufhin neu und räumte den
+  laufenden git-Prozess mit ab, bevor er den Ref gesetzt hatte. Der Beleg ist die Asymmetrie, die
+  weiter unten mehrfach auftaucht und dort als Rätsel steht – **Frontend 0 Ausfälle, Backend 13,
+  bei demselben Webhook und denselben Pushes**. Der einzige Unterschied war der Beobachter.
+- **Der Backend-Container läuft seit dem 28.08.2026 ohne nodemon** und startet sich nach einem
+  erfolgreichen Pull selbst neu. Ein Code-Deploy kostet dabei rund 7 Sekunden 502 (gemessen); ein
+  Commit ohne `.js`/`.json`-Änderung startet gar nichts neu.
+- **Die 401/404-Routenmessung ist nicht mehr der erste Griff.** `GET /api/health` meldet vier
+  Felder – `commit` (womit der Prozess läuft), `checkout` (was auf Platte liegt), `blob` (welche
+  Datei er wirklich ausführt) und `selbstNeustart` (ob der Container umgebaut ist). Laufen
+  `commit` und `checkout` auseinander, ist das nur dann eine Störung, wenn der Commit Code
+  angefasst hat.
+- **Der Satz „der Frontend-Deploy beweist nichts über den Backend-Deploy" gilt weiter** – nur ist
+  die Prüfung jetzt ein `curl` statt einer Routenmessung mit zwei Kontrollen.
+
+Einzelheiten, Messungen und der Weg über Portainer stehen in der **Backend-CLAUDE.md** unter
+„nodemon fliegt aus dem Deploy-Pfad" und in der Box ganz oben in derselben Datei.
 
 **Ein Push nach `main` geht von selbst live** (verifiziert 05.08.2026 am Container-Log des Pi und am Quelltext). Bis dahin stand hier „live geht es erst, wenn Sascha manuell zieht" – das war überholt und hat zu falschen Auskünften geführt.
 
@@ -5985,3 +6124,104 @@ war wirklich der 28.08., während meine Commits vom selben Sitzungsverlauf den 2
 EXTERNEN Uhr** (`curl -sI https://www.gamegeeeeek.de/ | grep -i '^date:'`), nicht am Gefühl für
 den Sitzungsverlauf — der kann beliebig lange Pausen enthalten, und ein falsch datierter Patchnote
 ist unveränderliche Historie.
+## Der Betreiber erfährt, wenn ein neuer Spieler anfängt (22.08.2026)
+
+Auftrag Sascha: „füge hinzu wenn sich neuer spieler anmeldet und spielt bekommt gamegeeeeek eine
+push nachricht." Über `AskUserQuestion` gewählt: **Auslöser ist das erste Öffnen des Spiels**
+(nicht die Registrierung) und **eine Meldung je Neuling, sofort** (keine Bündelung).
+
+Die serverseitige Hälfte samt Begründungen steht in der **Backend-CLAUDE.md**. Hier nur, was das
+Frontend angeht — und der Fund, der dabei herausfiel.
+
+### Vier Stellen, und die vierte ist die, die man übersieht
+
+`neuspieler` in `notifPrefsCache`, ein `NOTIF_EVENT_INFO`-Eintrag, eine Zeile im Markup der
+Benachrichtigungs-Box, und die **Sichtbarkeit** dieser Zeile. Die Kategorien-Aufzählung steht im
+Spiel an fünf Stellen (`getNotifPrefs` und `POST /api/notification-prefs` im Backend,
+`notifPrefsCache`, das `data-notif-cat`-Markup und `NOTIF_EVENT_INFO` hier) — wer eine davon
+vergisst, bekommt keinen Fehler, sondern eine stille Lücke.
+
+**Der `NOTIF_EVENT_INFO`-Eintrag ist Pflicht, nicht Zierde.** Ohne ihn zeichnet das Postfach die
+Zeile über den Rückfall am Ende: Glocke, graue Farbe und wörtlich das Wort **„Ereignis"** statt
+einer Auskunft. Gemessen, nicht vermutet — die Gegenprobe mit entferntem Eintrag zeigt genau das.
+
+**Der Schalter ist NUR für das Betreiberkonto sichtbar**, und das folgt aus Saschas zweiter Wahl:
+Ohne Bündelung bekommt das Postfach je Neuling einen Eintrag, und es hält 30. Ein Schalter, den
+jeder sieht, aber nur einer je auslöst, wäre eine tote Fläche mit einem Versprechen daran — genau
+die Sorte Falschaussage, gegen die Regel 35 geschrieben ist. Die Prüfung ist **bewusst keine
+Sicherheitsgrenze** und muss keine sein: Der Server schlägt die Kategorie ohnehin nur am
+Betreiberkonto nach; ein fremdes Konto kann sie setzen, gelesen wird sie dort nie.
+
+**Der Text sagt „geöffnet", nicht „spielt".** Der Auslöser ist der erste Spielstand-Save, und der
+feuert automatisch beim ersten Boot — die Meldung behauptet damit nur, was sie belegen kann.
+
+### Der Fund: der Kategorie-Wächter war seit dem 02.08.2026 blind
+
+`test_pushkategorien` prüfte den Postfach-Text nur für **einen** Typ — mit dem Kommentar „geprüft
+wird deshalb nur, dass der NEUE Typ einen hat". Der „neue Typ" war `alliance-raid` vom 02.08.2026;
+**jeder Typ danach war ungeprüft**. Belegt an einer Sabotage: Der Eintrag des neuen
+`neuer-spieler` ließ sich entfernen, und der Test blieb grün.
+
+Gemessen fehlt der Text bei **fünf** Bestandstypen (`alliance-application`, `feedback-received`,
+`message`, `player-reported`, `referral-milestone`) — alle fünf zeigen im Postfach „Ereignis". Sie
+stehen jetzt als **namentliche** Ausnahmeliste da, nicht mehr als „u. ä." im Kommentar: Ein
+sechster fällt damit auf, ohne dass jemand an ihn gedacht haben muss (Regel 40), und die Lücke
+bleibt sichtbar statt in einer Floskel zu verschwinden. Dazu die Gegenrichtung (`2c`, Regel 33):
+Wer einen der fünf Texte nachträgt, muss den Namen aus der Liste nehmen — sonst wächst eine Liste
+mit, die niemand mehr liest.
+
+**Die übertragbare Lehre steht unten als Arbeitsregel 79**, weil sie über diesen Test hinausgeht.
+
+### Zwei Fallen beim Bau des Frontend-Wächters
+
+- **`data-tab="einstellungen"` gibt es nicht.** Ein geratener Reiter-Name (Regel 4), und
+  `if (b) b.click()` verschluckt ihn still — der Test klickte nichts und maß trotzdem etwas. Der
+  Weg zu den Benachrichtigungs-Einstellungen läuft über `headerProfileBtn`; die Berichte-Box über
+  `headerReportsBtn`. **Die Vorlage, aus der ich kopiert hatte (`test_chatpush_schalter.js`),
+  trägt denselben Fehler und merkt ihn nie**, weil sie nur `className` liest. Seitdem stehen
+  `1-vorab` und `3-vorab` davor, die belegen, dass die Fläche überhaupt offen ist.
+- **Die Sichtbarkeit wird als PAAR gemessen** (Regel 61): Betreiberkonto sieht den Schalter,
+  ein anderes Konto nicht. Jede Hälfte allein wäre auch dann grün, wenn die Zeile ganz fehlt.
+
+Wächter: `tests/test_neuspieler_meldung.js` (17 Prüfungen — Sichtbarkeits-Paar, Schalterzustand,
+Postfach-Zeile) und `tests/test_pushkategorien.js` (erweitert). Die Backend-Hälfte prüft
+`tests/test_neuspieler_push_http.js` im Nachbar-Repo (30 Prüfungen, Port 3231).
+
+Gegenprobe gegen `origin/main` per `KEPLER_SPIELDATEI`: **9 rot bei identischen 17 Prüfnamen** (per
+`diff` verglichen, nicht gezählt — Regel 60). `3c` zeigt den Anlassfall wörtlich, statt ihn zu
+behaupten: `"Ereignis22.08., 19:07 · tippen zum Öffnen"` — genau die Zeile, die das Postfach ohne
+`NOTIF_EVENT_INFO`-Eintrag zeichnet.
+
+**Die zwei PRs gehören zusammen gemerged**, obwohl die Reihenfolge sonst gleichgültig wäre (ein
+Frontend ohne Server-Kategorie zeigt einen Schalter ohne Wirkung, ein Server ohne Frontend schickt
+eine Meldung, die das Postfach als „Ereignis" zeichnet — beides harmlos): `test_pushkategorien`
+hält Backend-Kategorien und Frontend-Schalter zusammen und fällt bei einer Seite allein.
+
+78. **Ein Test, der PERSISTENZ über einen Serverstopp misst, darf nicht SIGTERM benutzen — der
+    Graceful Shutdown schreibt genau den Eintrag mit, dessen Verlust gemessen werden soll.**
+    Vorfall 22.08.2026: Abschnitt 6 von `test_neuspieler_push_http` sollte belegen, dass die
+    Meldung einen Neustart überlebt. Sie tut das nur, weil `pushNotificationEvent` in `db.private`
+    schreibt und `saveDb()` folgt — die Prüfung wäre also die Absicherung gegen einen Umbau auf
+    reines RAM. Mit `SIGTERM` ist sie **wertlos**: Der Handler flusht die Datenbank auf Platte,
+    also auch einen Eintrag, der nur im Speicher stand. Ein Umbau auf RAM-only bliebe grün.
+    Verschärfend hatte ich in den Kommentar geschrieben, SIGKILL „misst etwas anderes" — das war
+    ungemessen und falsch herum. Gemeldet hat es allein die `WERKZEUGFEHLER`-Wache der Gegenprobe
+    (Regel 71): Die Sabotage „nur im RAM halten" ließ Abschnitt 6 grün.
+    **Vorgehen:** Wer Persistenz misst, beendet den Prozess so, wie er im Ernstfall stirbt —
+    `SIGKILL`, kein Aufräumen, kein Flush. Und die Gegenrichtung gehört dazu (`6a3`): Nach einem
+    SIGKILL muss der Eintrag da sein, weil er WIRKLICH auf Platte lag, nicht weil ihn der Stopp
+    noch hingeschrieben hat.
+
+79. **Ein Wächter, der nur „den NEUEN Fall" prüft, ist ab dem übernächsten Fall blind — und sein
+    eigener Kommentar tarnt das als Absicht.** Vorfall 22.08.2026: `test_pushkategorien` prüfte den
+    Postfach-Text für genau einen Typ, mit der Begründung „geprüft wird deshalb nur, dass der NEUE
+    Typ einen hat". Das war beim Schreiben (02.08.2026) richtig und ab dem nächsten Typ falsch;
+    gemessen fehlten fünf. Ein „u. ä." im Kommentar verschleiert dabei doppelt: Es behauptet
+    Vollständigkeit („und ähnliche"), ohne eine einzige Zahl zu nennen, und es macht die Lücke
+    unsichtbar für den, der später den Test liest.
+    **Vorgehen:** Ein Wächter prüft die MENGE, nicht das jüngste Mitglied. Bestandslücken werden
+    **namentlich** ausgenommen (nie als Sammelbegriff), mit dem Datum der Messung — dann fällt ein
+    neuer Fall auf, ohne dass jemand an ihn gedacht haben muss (Regel 40), und die Ausnahmeliste
+    braucht ihre Gegenrichtung (Regel 33): Ein Name, der längst behoben ist, gehört heraus.
+    Das ist die Familie von Regel 68, eine Ebene höher: Dort hält ein Test einen FEHLER als Regel
+    fest, hier hält er eine LÜCKE als Absicht fest.

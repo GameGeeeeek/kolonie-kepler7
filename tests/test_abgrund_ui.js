@@ -21,7 +21,7 @@
 //   8) Wochenlauf abrechenbar, Tiefensonde zeigt kommende Sektoren, Allianz-Beitrag unter eigenem Schluessel
 //   9) die Werkstatt ist ohne Zutun sichtbar, ein bewusstes Zuklappen ueberlebt
 // Konsolenfehler werden in jedem Abschnitt mitgeprueft.
-const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
 
 function backend(store){ return async r => {
   const req=r.request(); const p=req.url().split('/api/')[1].split('?')[0];
@@ -37,6 +37,7 @@ function backend(store){ return async r => {
 // misst Pruefung 5 bei jedem Lauf etwas anderes. Frachter, damit die Bergung nicht an leerem
 // Laderaum scheitert.
 const basisStand = zusatz => JSON.stringify(Object.assign({
+  ...ruhigeUhren(),
   tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:20,mine:18,lager:20,werft:12,labor:12},

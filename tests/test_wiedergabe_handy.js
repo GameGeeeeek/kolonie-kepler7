@@ -34,7 +34,7 @@
 // steht, aber von einer spaeteren Regel ueberschrieben wird, bestuende jede Textpruefung.
 // Genau das ist beim ersten Reparaturversuch passiert - der Medienblock lag vor den
 // Grundregeln, und `align-items:flex-start` gewann.
-const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -73,7 +73,7 @@ function backend(store, berichte){ return async r => {
   if(p.startsWith('storage/')){const k=decodeURIComponent(p.slice(8));if(req.method()==='PUT')return j({ok:true,version:2});if(store[k]!==undefined)return j({key:k,value:store[k],version:1});return j({e:1},404);}
   return j([]);
 };}
-const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const save = () => JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:9e4,forschungspunkte:3e4},
   buildings:Object.assign({solar:22,mine:20,labor:14,lager:30,werft:14}, ABWEHR),
   research:{rkampf:9}, fleet:Object.assign({missions:[]}, FLOTTE), colonies:{}, activeBasePlanet:'home',
