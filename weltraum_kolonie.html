@@ -3751,6 +3751,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-sword" aria-hidden="true"></i><div class="bname">Angriffe auf dich</div><div class="bmeta">Wenn dich ein Spieler angreift oder dir ein Schürfrecht im Asteroidengürtel streitig macht</div></div><div class="toggle-switch" data-notif-cat="attack"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-check" aria-hidden="true"></i><div class="bname">Fertige Aufträge</div><div class="bmeta">Wenn Forschung, Bau oder Expedition fertig wird, während du weg bist</div></div><div class="toggle-switch" data-notif-cat="completion"><div class="toggle-knob"></div></div></div>
+            <div class="card-row" id="notifNeuspielerRow" style="display:none"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Neue Spieler</div><div class="bmeta">Wenn ein neu angemeldetes Konto die Kolonie zum ersten Mal öffnet - erreicht nur das Betreiberkonto</div></div><div class="toggle-switch" data-notif-cat="neuspieler"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -7204,8 +7205,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.613.0';
+  const VERSION = '8.614.0';
   const PATCHNOTES = [
+    { version:'8.614.0', date:'28.08.2026', changes:[
+      '<strong>Der Betreiber erfährt, wenn ein neuer Spieler anfängt.</strong> Registriert sich jemand und öffnet das Spiel zum ersten Mal, bekommt das Betreiberkonto eine Push-Nachricht und einen Postfach-Eintrag – eine Meldung je Neuling, sofort beim ersten Spielstand. Der zugehörige Schalter steht in den Benachrichtigungs-Einstellungen und ist nur auf dem Betreiberkonto sichtbar: Für alle anderen wäre er eine Fläche mit einem Versprechen, das nie eintritt.',
+      '<strong>Nebenbei einen blinden Wächter geheilt:</strong> Die Prüfung der Push-Kategorien maß seit dem 02.08. nur den damals neuesten Typ – jeder danach war ungeprüft, und fünf Bestandstypen zeigen im Postfach bis heute nur das Wort „Ereignis" statt einer Auskunft. Sie stehen jetzt namentlich als bekannte Lücke im Test; ein sechster fällt ab sofort auf.',
+    ]},
     { version:'8.613.0', date:'28.08.2026', changes:[
       '<strong>Event-Schiffe transportieren jetzt Beute – und das Modul „Erzgreifer-Ausleger" wirkt endlich.</strong> Enterschiff, Phantomschiff und Riftwächter tragen ab sofort je 80 Frachtraum. Vier von ihnen ersetzen damit gut einen Kleinen Frachter; wer ernsthaft plündern will, nimmt weiterhin Frachter mit, aber ein reiner Event-Verband kommt nicht mehr mit völlig leeren Händen zurück.',
       '<strong>Der Grund für diese Änderung ist ein Modul, das seit seiner Einführung nichts getan hat.</strong> Der Erzgreifer-Ausleger aus dem Goldrausch verspricht „erhöht die Frachtkapazität aller Event-Schiffe deutlich" – nachgemessen war seine Wirkung exakt null. Der Frachtraum-Bonus wurde im ganzen Spiel nur für Frachter ausgelesen, und Event-Schiffe hatten überhaupt keinen Frachtraum, auf den ein Prozentsatz hätte wirken können. Jetzt wird der Bonus je Schiffsklasse gelesen: Das Frachter-Modul wirkt weiter auf Frachter, das Event-Modul auf Event-Schiffe.',
@@ -33460,7 +33465,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -33585,7 +33590,13 @@
     'alliance-muster': { icon:'ti-sword', color:'#e24b4a', text:(p)=>(p.byName||'Ein Kommandant')+' greift ['+(p.targetTag||'?')+'] an - Sammelphase '+Math.max(1,Math.round((p.gatherSeconds||0)/60))+' Min. Schließ deine Flotte im Allianz-Tab an!' },
     'alliance-base-attacked': { icon:'ti-building-castle', color:'#e24b4a', text:(p)=>p.destroyed?('['+(p.attackerTag||'?')+'] hat eure Allianzbasis ZERSTÖRT - alle Boni sind deaktiviert, bis die Reparatur bezahlt ist.'):('['+(p.attackerTag||'?')+'] hat eure Allianzbasis angegriffen - schickt Schiffe zur Verteidigung.') },
     'alliance-base-ready': { icon:'ti-building-castle', color:'#5dcaa5', text:(p)=>'Die Ressourcen für Allianzbasis-Stufe '+(p.level||'?')+' sind vollständig - die Bauzeit läuft jetzt.' },
-    'job-complete': { icon:'ti-check', color:'#5dcaa5', text:(p)=>{ const l={ research:'Deine Forschung ist abgeschlossen', construction:'Ein Bauauftrag ist fertiggestellt', expedition:'Eine Expedition ist zurückgekehrt', mission:'Eine Mission ist zurückgekehrt', terraform:'Ein Terraforming-Projekt ist fertig', exotic:'Eine exotische Forschung ist abgeschlossen', veteran:'Eine Veteranen-Ausbildung ist abgeschlossen' }; return (l[p.jobType]||'Etwas in deiner Kolonie ist fertig')+' - komm zurück und mach weiter!'; } }
+    'job-complete': { icon:'ti-check', color:'#5dcaa5', text:(p)=>{ const l={ research:'Deine Forschung ist abgeschlossen', construction:'Ein Bauauftrag ist fertiggestellt', expedition:'Eine Expedition ist zurückgekehrt', mission:'Eine Mission ist zurückgekehrt', terraform:'Ein Terraforming-Projekt ist fertig', exotic:'Eine exotische Forschung ist abgeschlossen', veteran:'Eine Veteranen-Ausbildung ist abgeschlossen' }; return (l[p.jobType]||'Etwas in deiner Kolonie ist fertig')+' - komm zurück und mach weiter!'; } },
+    // Betreiber-Meldung (22.08.2026): ein neu angelegtes Konto hat die Kolonie zum ersten Mal
+    // geöffnet. Der Eintrag ist Pflicht, nicht Zierde - ohne ihn zeichnet das Postfach die Zeile
+    // über den Rückfall unten mit einer Glocke und dem Wort "Ereignis". Der Text sagt bewusst
+    // "geöffnet" und nicht "spielt": Der auslösende erste Spielstand-Save feuert automatisch beim
+    // ersten Boot, die Meldung behauptet also nur, was sie belegen kann.
+    'neuer-spieler': { icon:'ti-user', color:'#5dcaa5', text:(p)=>(p.username||'Ein Kommandant')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+p.gesamt+'. Kommandant insgesamt':'')+'.' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -66137,11 +66148,19 @@
     }
     const cooldownNote = document.getElementById('nameChangeCooldownNote');
     const adminSectionRow = document.getElementById('adminSectionRow');
+    const istBetreiber = useBackend() && accountUsername && accountUsername.toLowerCase() === 'gamegeeeeek';
     if (adminSectionRow){
-      const isAdminAccount = useBackend() && accountUsername && accountUsername.toLowerCase() === 'gamegeeeeek';
-      adminSectionRow.style.display = isAdminAccount ? 'block' : 'none';
-      if (isAdminAccount) refreshAdminReportCount();
+      adminSectionRow.style.display = istBetreiber ? 'block' : 'none';
+      if (istBetreiber) refreshAdminReportCount();
     }
+    // Der Neue-Spieler-Schalter ist nur für das Betreiberkonto sichtbar. Ein Schalter, den jeder
+    // sieht, aber nur einer je auslöst, wäre eine tote Fläche mit einem Versprechen daran - und
+    // genau die Sorte Falschaussage, gegen die dieses Projekt sonst seine Ladezustände absichert.
+    // Die Prüfung ist bewusst KEINE Sicherheitsgrenze und muss keine sein: Der Server schlägt die
+    // Kategorie ohnehin nur am Betreiberkonto nach, ein fremdes Konto kann sie hier zwar setzen,
+    // aber sie wird bei ihm nie gelesen.
+    const neuspielerRow = document.getElementById('notifNeuspielerRow');
+    if (neuspielerRow) neuspielerRow.style.display = istBetreiber ? '' : 'none';
     if (cooldownNote){
       const remainMs = (state.lastNameChangeAt||0) + 30*86400000 - Date.now();
       if (remainMs > 0){

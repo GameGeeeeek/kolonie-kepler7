@@ -76,10 +76,31 @@ if (hatBackend){
   const ohneText = uniq.filter(t => !textFn.includes("'" + t + "'"));
   check('2: jeder Typ hat einen Push-Text', ohneText.length === 0, ohneText);
   const info = schnitt(src, 'const NOTIF_EVENT_INFO = {', '\n  };');
-  // job-complete/patchnotes u.ae. haben bewusst keinen Postfach-Eintrag - geprueft wird deshalb
-  // nur, dass der NEUE Typ einen hat, und dass die Liste ueberhaupt gelesen wurde.
   check('2: NOTIF_EVENT_INFO wurde gelesen', info.length > 500, info.length);
   check('2: der Raid-Aufruf hat einen Postfach-Eintrag', info.includes("'alliance-raid'"));
+
+  // Hier stand bis zum 22.08.2026: "job-complete/patchnotes u.ae. haben bewusst keinen
+  // Postfach-Eintrag - geprueft wird deshalb nur, dass der NEUE Typ einen hat". Der "neue Typ" war
+  // 'alliance-raid' vom 02.08.2026; jeder Typ danach war ungeprueft. GEMESSEN an einer Sabotage:
+  // Der Eintrag des neuen 'neuer-spieler' liess sich entfernen, und dieser Test blieb GRUEN -
+  // im Spiel haette das Postfach die Zeile mit Glocke und dem Wort "Ereignis" gezeichnet.
+  //
+  // Geprueft wird deshalb JEDER erzeugte Typ gegen die Liste, mit einer NAMENTLICHEN Ausnahme fuer
+  // den Bestand. Die fuenf sind kein "bewusst", sondern eine gemessene Luecke (22.08.2026) - sie
+  // stehen hier, damit ein SECHSTER auffaellt, ohne dass jemand an ihn gedacht haben muss
+  // (Regel 40), und damit die Luecke sichtbar bleibt statt in einem 'u.ae.' zu verschwinden.
+  const OHNE_POSTFACH_BESTAND = ['alliance-application', 'feedback-received', 'message', 'player-reported', 'referral-milestone'];
+  const ohnePostfach = uniq.filter(t => !info.includes("'" + t + "'"));
+  const neuOhnePostfach = ohnePostfach.filter(t => !OHNE_POSTFACH_BESTAND.includes(t));
+  check('2b: jeder Ereignistyp hat einen Postfach-Text (Bestandsluecken ausgenommen)',
+    neuOhnePostfach.length === 0, neuOhnePostfach);
+  // Gegenrichtung (Regel 33): Verschwindet ein Name aus der Ausnahmeliste - weil jemand den Text
+  // nachgetragen hat -, gehoert er hier raus. Sonst waechst eine Liste mit, die niemand mehr liest.
+  const behoben = OHNE_POSTFACH_BESTAND.filter(t => !ohnePostfach.includes(t));
+  check('2c: die Ausnahmeliste fuehrt keinen Typ, der laengst einen Text hat',
+    behoben.length === 0, behoben);
+  console.log('     INFO - Bestandsluecken ohne Postfach-Text (zeigen im Spiel "Ereignis"): '
+    + JSON.stringify(ohnePostfach.filter(t => OHNE_POSTFACH_BESTAND.includes(t))));
 }
 
 // ---------------------------------------------------------------- 3) Die neue Kategorie
