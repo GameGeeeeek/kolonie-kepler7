@@ -130,7 +130,38 @@ if (typeof bonus === 'function') {
   if (teile.every(Boolean)) {
     // SHIP_MODULE_DEFS leitet aus HERKUNFT_* ab - die Konstanten mitgeben, sonst laeuft der Block
     // nicht (derselbe Fall wie in test_schiffsmodul_paritaet).
-    const herkunft = (S.match(/\n  const HERKUNFT_[A-Z_]+ = [^\n]*/g) || []).join('\n');
+    // Die HERKUNFT_*-Konstanten werden ueber ihre KLAMMERTIEFE geschnitten, nicht ueber
+    // `[^\n]*`. Das alte Muster nahm an, jede von ihnen sei einzeilig - das galt fuer die vier
+    // Zeichenketten und brach am 28.08.2026 an HERKUNFT_TEXT, einem mehrzeiligen Objektliteral:
+    // Geschnitten wurde nur `const HERKUNFT_TEXT = {`, die offene Klammer verschluckte alles
+    // Folgende, und der Aufbau starb an "Unexpected identifier 'SHIP_MODULE_SET_DEFS'" - ein
+    // Fehler, der wie ein Fehler im Spiel aussieht statt im Messwerkzeug (Arbeitsregel 6).
+    // Dieselbe Familie wie `FESTUNG_[A-Z_]+` in test_protomaterie: ein Namenspraefix ist keine Form.
+    const herkunft = (() => {
+      const raus = [];
+      const re = /\n  const HERKUNFT_[A-Z_]+ = /g;
+      let m;
+      while ((m = re.exec(S))){
+        const ab = m.index + 1;
+        let i = ab, t = 0, inStr = null;
+        for (; i < S.length; i++){
+          const c = S[i];
+          if (inStr){ if (c === '\\') i++; else if (c === inStr) inStr = null; continue; }
+          if (c === "'" || c === '"' || c === '`'){ inStr = c; continue; }
+          if (c === '{' || c === '[') t++;
+          else if (c === '}' || c === ']') t--;
+          else if (c === ';' && t === 0){ i++; break; }
+        }
+        raus.push(S.slice(ab, i));
+      }
+      return raus.join('\n');
+    })();
+    // Der Schnitt gehoert selbst geprueft - sonst haengt der ganze Abschnitt an einer Annahme
+    // ueber die Schreibweise fremder Konstanten (Arbeitsregel 71).
+    check('2-bau-herkunft: jede HERKUNFT_-Konstante ist vollstaendig geschnitten',
+      (herkunft.match(/const HERKUNFT_/g) || []).length === (S.match(/\n  const HERKUNFT_[A-Z_]+ = /g) || []).length
+      && (() => { try { new Function(herkunft); return true; } catch (e){ return false; } })(),
+      herkunft.slice(0, 200));
     try {
       zeile = new Function(herkunft + '\n' + teile.join('\n') + '\nreturn shipModuleSetZeilenHtml;')();
     } catch (e) { f2 = e.message; }

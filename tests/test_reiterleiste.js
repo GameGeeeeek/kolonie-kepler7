@@ -151,7 +151,11 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
                  symbol: 'svg:' + [...svg.querySelectorAll('*')].map(e => e.getAttribute('d') || e.tagName).join('|').slice(0, 60) };
       });
     });
-    check('alle zwölf Reiter gefunden', symbole.length === 12, symbole.length);
+    // Nicht die ZAHL, sondern die Regel: jeder vorhandene Reiter hat ein eigenes Symbol. Die feste
+    // 12 war eine Momentaufnahme und ist mit dem dreizehnten Reiter (Sammlung, 28.08.2026) auf
+    // korrektem Code durchgefallen (Hausregel 3). Die Untergrenze bleibt, damit die Pruefung
+    // nicht ueber einer leeren Menge trivial gruen wird.
+    check('jeder Reiter hat ein Symbol', symbole.length >= 12, symbole.length);
     const zaehler = {};
     for (const s of symbole) (zaehler[s.symbol] = zaehler[s.symbol] || []).push(s.tab);
     const doppelt = Object.entries(zaehler).filter(([, tabs]) => tabs.length > 1)
@@ -214,7 +218,7 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
     m.verdeckt = m.verdeckt.filter(t => m1.verdeckt.includes(t));
     const p = g.name + ': ';
     check(p + 'die Leiste ist ein Raster, keine Wischleiste', m.anzeige === 'grid' && !m.wischbar, m);
-    check(p + 'ALLE zwölf Reiter sind gleichzeitig sichtbar', m.ganz === m.alle && m.alle === 12, { ganz: m.ganz, alle: m.alle });
+    check(p + 'ALLE Reiter sind gleichzeitig sichtbar', m.ganz === m.alle && m.alle >= 12, { ganz: m.ganz, alle: m.alle });
     check(p + 'keine Beschriftung wird abgeschnitten', m.abgeschnitten.length === 0, m.abgeschnitten);
     check(p + 'jeder Reiter bleibt ein treffbares Ziel (>=32px)', m.zuKlein.length === 0, m.zuKlein);
     check(p + 'die seitlichen Klappen verdecken keinen Reiter', m.verdeckt.length === 0, m.verdeckt);

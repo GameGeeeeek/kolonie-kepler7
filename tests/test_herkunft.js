@@ -174,12 +174,45 @@ const ZIEH_ARRAYS = ['ITEM_DEFS', 'EVENT_ITEM_DEFS', 'RARE_ITEMS'];
 const rohForm = new RegExp(
   'for\\s*\\(\\s*(?:const|let|var)\\s+\\w+\\s+of\\s+(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\)'
   + '|(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\[\\s*Math\\.floor');
+// Geprueft wird die FUNDSTELLE, nicht jede Schleife ueber eine Gegenstandsliste. Der Unterschied
+// ist nicht kosmetisch: Eine Anzeige-Schleife MUSS alle Eintraege sehen - der Gegenstands-Katalog
+// (Etappe D, 28.08.2026) zeigt Abgrund-Beute, Boss-Teile und Unikate ja gerade deshalb an, damit
+// der Spieler ihren Fundort erfaehrt. Sie auf fundPool zu schicken waere inhaltlich falsch.
+// Unterschieden wird deshalb ueber die EIGENSCHAFT der Schleife, nicht ueber ihren Namen (eine
+// Ausnahmeliste haette die naechste Anzeige-Schleife wieder gerissen, Regel 40): Wer ZIEHT,
+// wuerfelt (`Math.random`), liest eine Fundchance (`.chance`) oder schreibt in einen Bestand
+// (`state....=`). Wer nur ZEIGT, tut nichts davon.
+function schleifenRumpf(text, ab){
+  const auf = text.indexOf('{', ab);
+  if (auf < 0) return '';
+  let t = 0;
+  for (let j = auf; j < text.length; j++){
+    const c = text[j];
+    if (c === '{') t++;
+    else if (c === '}'){ t--; if (!t) return text.slice(auf, j + 1); }
+  }
+  return text.slice(auf);
+}
+function ziehtWirklich(rumpf){
+  return /Math\.random/.test(rumpf) || /\.chance\b/.test(rumpf) || /\bstate\.[A-Za-z.\[\]']+\s*=/.test(rumpf);
+}
 const roheZiehungen = zeilenVon(js)
   .map((z, i) => ({ z, nr: i + 1 }))
   .filter(x => !x.z.trim().startsWith('//') && rohForm.test(x.z))
+  .filter(x => {
+    // Index der Zeile in der Datei, dann ihren Rumpf schneiden.
+    const ab = zeilenVon(js).slice(0, x.nr - 1).reduce((n, z) => n + z.length + 1, 0);
+    return ziehtWirklich(schleifenRumpf(js, ab));
+  })
   .map(x => 'Zeile ' + x.nr + ': ' + x.z.trim().slice(0, 100));
 check('B: KEINE Fundstelle iteriert oder indiziert ein Gegenstands-Array roh',
   roheZiehungen.length === 0, roheZiehungen);
+// Die Unterscheidung selbst gehoert geprueft - sonst waere sie ein Loch statt einer Regel.
+check('B-vorab2: ziehende und zeigende Schleifen werden unterschieden',
+  ziehtWirklich('{ if (Math.random() < 0.1) x(); }')
+  && ziehtWirklich('{ if (r < item.chance) x(); }')
+  && ziehtWirklich('{ state.inventory[k] = 1; }')
+  && !ziehtWirklich('{ aus.push({ key:d.key, name:d.name }); }'));
 // Und die Gegenrichtung: Die Form muss ueberhaupt erkennbar sein. Ohne diese Zeile waere die
 // Pruefung darueber auch dann gruen, wenn der regulaere Ausdruck gar nichts mehr trifft
 // (Arbeitsregel 71 - eine Wache, die sagt, was sie findet, statt nur zu schweigen).

@@ -275,6 +275,6 @@ neben ihnen eine sechste zu führen. Sonst ist sie in drei Monaten die veraltete
 |---|---|---|---|
 | 1 | **A** — Schiffsmodul-Sets (+ die 36 Symbole) | Deckt den Auftrag zur Hälfte, kleinster Eingriff, keine neue Mechanik | **fertig** (v8.603.0) |
 | 2 | **C2** — zweite Abgrund-Reihe ab Tiefe 130 | ~~Reines Schreiben~~, löst zugleich den ältesten Endgame-Posten der Ideenliste | **fertig** (22.08.2026) |
-| 3 | **D** — Beschreibungs-Schicht + Sammlungs-Ansicht + `desc`-Prüfung | Ab hier hat jede weitere Etappe eine Anzeige, in der sie auftaucht | offen |
+| 3 | **D** — Beschreibungs-Schicht + Sammlungs-Ansicht + `desc`-Prüfung | Ab hier hat jede weitere Etappe eine Anzeige, in der sie auftaucht | **fertig** (28.08.2026, eigener 13. Hauptreiter) |
 | 4 | **B** — Boss-Sets aus der Allianz-Sperre lösen | Braucht die Sammlungs-Ansicht, damit der langsame Weg sichtbar ist | offen |
 | 5 | **C1** — Raid-Stufen mit eigenem Beutetisch | Größter Brocken, serverseitige Auflösung, eigener Balance-Durchgang | offen |
