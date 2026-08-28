@@ -7204,8 +7204,18 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.611.0';
+  const VERSION = '8.613.0';
   const PATCHNOTES = [
+    { version:'8.613.0', date:'28.08.2026', changes:[
+      '<strong>Event-Schiffe transportieren jetzt Beute – und das Modul „Erzgreifer-Ausleger" wirkt endlich.</strong> Enterschiff, Phantomschiff und Riftwächter tragen ab sofort je 80 Frachtraum. Vier von ihnen ersetzen damit gut einen Kleinen Frachter; wer ernsthaft plündern will, nimmt weiterhin Frachter mit, aber ein reiner Event-Verband kommt nicht mehr mit völlig leeren Händen zurück.',
+      '<strong>Der Grund für diese Änderung ist ein Modul, das seit seiner Einführung nichts getan hat.</strong> Der Erzgreifer-Ausleger aus dem Goldrausch verspricht „erhöht die Frachtkapazität aller Event-Schiffe deutlich" – nachgemessen war seine Wirkung exakt null. Der Frachtraum-Bonus wurde im ganzen Spiel nur für Frachter ausgelesen, und Event-Schiffe hatten überhaupt keinen Frachtraum, auf den ein Prozentsatz hätte wirken können. Jetzt wird der Bonus je Schiffsklasse gelesen: Das Frachter-Modul wirkt weiter auf Frachter, das Event-Modul auf Event-Schiffe.',
+      '<strong>Auch beim Asteroidenabbau.</strong> Das Schürfschiff ist ebenfalls ein Event-Schiff, und sein Laderaum ist der eigene Bunker – der Erzgreifer erhöht ihn jetzt mit. Das Gesandtenschiff bleibt außen vor: Es fliegt auf keiner Mission mit, ein Frachtraum wäre dort wirkungslos. Die Modulbeschreibung nennt die betroffenen Schiffe deshalb namentlich, statt weiter pauschal von „allen Event-Schiffen" zu sprechen, und die drei Werftkarten zeigen ihren Frachtraum an.',
+      '<strong>Behoben: Die automatische Verstärkung übersah den Urmaterie-Koloss.</strong> Sie verlegt bei einem erkannten Überfall die stärksten Kampfschiffe einer anderen Kolonie – übersprang dabei aber jedes Schiff mit Frachtraum, weil solche Schiffe bisher immer Frachter ohne Angriffswert waren. Der Urmaterie-Koloss ist der erste mit beidem, und er wurde deshalb seit seiner Einführung nie zur Verteidigung geschickt, obwohl er mit 250 Angriff eines der stärksten Schiffe des Spiels ist.',
+    ]},
+    { version:'8.612.0', date:'28.08.2026', changes:[
+      '<strong>Vier Textstellen im Spiel schlossen mit dem falschen Anführungszeichen.</strong> Betroffen waren zwei Meldungen der Modulschmiede und die Titelzeile des Teilen-Bildes: Sie öffnen korrekt mit dem tiefen Zeichen und schlossen mit einem typografischen statt mit dem geraden. Sichtbar ist das ein kleiner Unterschied – der Weg dorthin war der eigentliche Befund.',
+      'Die interne Prüfung, die genau solche Abweichungen vor jeder Auslieferung abfangen soll, konnte diese vier Stellen gar nicht sehen: Sie standen in einer Ersatzschreibweise, die zur Laufzeit dasselbe Zeichen ergibt, im Quelltext aber völlig anders aussieht. Die Prüfung kennt jetzt beide Schreibweisen und liegt an einer einzigen Stelle statt in zwei Kopien.',
+    ]},
     { version:'8.611.0', date:'22.08.2026', changes:[
       '<strong>Die Regionsnamen auf der Karte sind am Handy endlich lesbar.</strong> Sie standen in festen Zeichenmaßen, während die Karte je nach Bildschirmbreite unterschiedlich stark verkleinert wird – am PC kamen davon 11,8 Bildpunkte an, am Handy 4,7. Die Schrift richtet sich jetzt nach der tatsächlichen Darstellungsgröße: Der Regionsname wächst am Handy von 4,7 auf 9,0 Bildpunkte, die Zeile mit der Sektor-Eigenschaft von 3,1 auf 6,0. Am PC ändert sich nichts.',
       '<strong>Am Handy fällt die Zeile „N Systeme" weg.</strong> Drei Zeilen samt Konturstrich passten dort nicht nebeneinander – über alle acht Regionen überlappten sich acht Textpaare (auf schmalen Geräten vierzehn), jetzt sind es zwei bzw. drei. Die Zahl ist nicht verloren: Sie steht im Tooltip und in der Vorlesehilfe. Die Sektor-Eigenschaft bleibt sichtbar, sie ist eine Spielregel und kein Beiwerk.',
@@ -22518,7 +22528,25 @@
   /* Der Urmaterie-Koloss traegt Fracht UND kaempft (Etappe D). 2.000 liegen bewusst zwischen
      Grossfrachter (1.500) und Bergungsfrachter (3.000): Er soll den Bergungsfrachter nicht
      ersetzen - der ist billiger und blockiert keinen Kampfschiff-Platz. */
-  const CARGO_PER_SHIP = { frachter: 300, frachtergross: 1500, bergungsfrachter: 3000, urmateriekoloss: 2000 };
+  // Event-Schiffe (28.08.2026): Enterschiff, Phantomschiff und Riftwaechter tragen jetzt selbst
+  // Ladung. Der Anlass ist das Modul ev_erzgreifer, das seit v8.310.0 "erhoeht die Frachtkapazitaet
+  // aller Event-Schiffe deutlich" verspricht und nachweislich NICHTS bewirkt hat: Der cargo-Kanal
+  // wurde ausschliesslich fuer die Klasse 'frachter' gelesen, und alle drei Frachtschiffe gehoeren
+  // dorthin - Event-Schiffe hatten ueberhaupt keinen Frachtraum, auf den ein Prozentsatz haette
+  // wirken koennen. Genau die Fehlerklasse, vor der dieses Projekt bei Tabellenfeldern warnt: eine
+  // Zahl, die nur ein Text behauptet und keine Rechenstelle einloest.
+  // 80 je Schiff, gleich fuer alle drei: Vier davon ersetzen gut einen Kleinen Frachter (320 zu 300).
+  // Damit bleibt die Regel "wer Beute heimbringen will, nimmt Frachter mit" unangetastet - eine reine
+  // Event-Flotte geht aber nicht mehr mit voellig leeren Haenden zurueck. Die Zahl ist bewusst nicht
+  // nach Angriffswert gestaffelt: Frachtraum haengt am Rumpf, nicht an der Bewaffnung.
+  // NICHT dabei sind die zwei uebrigen Event-Schiffe, jedes aus einem eigenen gemessenen Grund:
+  // Das Schuerfschiff hat mit MINE_CARGO_JE_SCHIFF (400) laengst seinen eigenen Bunker - ein
+  // zweiter Eintrag hier wuerde in mineLaderaum() DOPPELT zaehlen; der Erzgreifer wirkt dort
+  // stattdessen auf den Bunker. Und das Gesandtenschiff fliegt ueberhaupt nicht mit (nicht in
+  // ATTACK_SHIP_KEYS, nicht in MINE_SHIP_KEYS, seine Wirkung ist passiv) - ein Frachtraum an ihm
+  // waere toter Code.
+  const CARGO_PER_SHIP = { frachter: 300, frachtergross: 1500, bergungsfrachter: 3000, urmateriekoloss: 2000,
+    enterschiff: 80, phantomschiff: 80, riftwaechter: 80 };
   const CARGO_SHIP_KEYS = Object.keys(CARGO_PER_SHIP);
   /* Passiver Lagerbeitrag je Schiff - eine ANDERE Tabelle, und sie ist absichtlich kuerzer:
      Der Bergungsfrachter steht bewusst NICHT darin. Sein Nachteil ist die halbe Geschwindigkeit,
@@ -23004,13 +23032,21 @@
   // Warum es das ueberhaupt braucht: Bis hierher war ein Frachter auf Mk X schneller und sparsamer,
   // aber trug keinen Kubikmeter mehr als auf Mk I - obwohl Laderaum das Einzige ist, wofuer er
   // existiert. Von den fuenf Markenzweigen waren fuer ihn zwei tot (Angriff, Schild).
+  // Je KLASSE statt fest 'frachter' (28.08.2026): Genau wie speed, fuel, hull und shield es an ihren
+  // vier Verbrauchsstellen laengst tun - cargo war der einzige Kanal, der seine Klasse fest
+  // verdrahtet hatte. Erst dadurch kann ein Event-Modul auf Event-Schiffe wirken.
+  // Der Rueckfall auf 'frachter' ist KEINE Bequemlichkeit, sondern verhindert eine stille
+  // Verschlechterung: Der Urmaterie-Koloss gehoert gemessen zu KEINER Modulklasse, bekam ueber die
+  // pauschale Zeile aber bisher den Frachter-Cargo-Bonus. Ohne den Rueckfall haette dieser Umbau ihm
+  // den weggenommen - eine unbestellte Zweitaenderung. Die Regel lautet also: Ein Schiff, das
+  // Frachtraum traegt und keiner Klasse angehoert, wird beim Frachtraum wie ein Frachter behandelt.
   function fleetCargoCapacity(fleet){
-    const cargoMult = 1 + shipModuleBonusFor('frachter', 'cargo');
+    const cargoMultVon = (k) => 1 + shipModuleBonusFor(shipClassKeyFor(k) || 'frachter', 'cargo');
     // Ganzzahlig: Der Markenzuschlag ist ein Bruch (0,04 je Stufe), und 10 Frachter auf Mk X ergaeben
     // sonst 4079,9999999999995 statt 4080 - eine Zahl, die in Frachtraum-Warnung und Beute-Kappung
     // auftaucht und dort niemand erklaeren koennte.
     return Math.round(CARGO_SHIP_KEYS.reduce((summe, k) =>
-      summe + (fleet[k]||0) * CARGO_PER_SHIP[k] * cargoMult * (1 + shipMarkBonus(k, 'cargo')), 0));
+      summe + (fleet[k]||0) * CARGO_PER_SHIP[k] * cargoMultVon(k) * (1 + shipMarkBonus(k, 'cargo')), 0));
   }
   // Kostenloser Basis-Frachtraum NUR für Expeditionsfunde (20.07.2026) - anders als reguläre
   // Angriffsmissionen (dort 0 Frachtraum ohne Frachter = Totalverlust der Beute, bewusst hart) sollen
@@ -23587,7 +23623,7 @@
       html += `<div class="bmeta" style="color:#f0b556;"><i class="ti ti-arrow-up" aria-hidden="true"></i> Werftmarken: ${Object.entries(L.marken).sort((x,y)=>y[1]-x[1]).map(([k,mk])=>shipDisplayName(k)+' Mk '+SHIP_MARK_ROMAN[mk-1]).join(', ')}${L.markAnteil>0?` (+${(Math.round(L.markAnteil*1000)/10).toString().replace('.',',')}% Angriffskraft, bereits eingerechnet)`:''}</div>`;
     html += npcEnterZeileHtml(L);
     html += `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(L.flug)} · Treibstoff ${fuelCostText(L.treibstoff)}${!canAfford(L.treibstoff)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}</div>`;
-    html += `<div class="bmeta" style="${L.fracht<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität ${fmt(L.fracht)}${L.fracht<=0?' \u2013 ohne Frachter geht die Beute verloren!':''}</div>`;
+    html += `<div class="bmeta" style="${L.fracht<=0?'color:#e24b4a;':''}"><i class="ti ti-box" aria-hidden="true"></i> Frachtkapazität ${fmt(L.fracht)}${L.fracht<=0?' \u2013 ohne Laderaum geht die Beute verloren!':''}</div>`;
     html += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute bei Sieg: ${rewardHtml(L.effLoot)}</div>`;
     return html;
   }
@@ -27749,7 +27785,7 @@
     { key:'ev_depeschenrelais',klasse:'eventflotte',    name:'Depeschen-Relais',       icon:'ti-message',     effect:'fuel',        base:0.12, eventKey:'fraktionskonflikt',
       desc:'Erbeutete Fraktions-Funkprotokolle erlauben effizientere Flugrouten: verringert den Treibstoffverbrauch aller Missionen mit Event-Schiffen. Exklusiv – nur während des Fraktionskonflikts auf Expeditionen zu finden.' },
     { key:'ev_erzgreifer',     klasse:'eventflotte',    name:'Erzgreifer-Ausleger',    icon:'ti-pick',        effect:'cargo',       base:0.25, eventKey:'goldrausch',
-      desc:'Schwere Bergebäume aus der Goldrausch-Ausrüstung: erhöht die Frachtkapazität aller Event-Schiffe deutlich – Missionen bringen mehr Beute zurück. Exklusiv – nur während des Goldrauschs auf Expeditionen zu finden.' },
+      desc:'Schwere Bergebäume aus der Goldrausch-Ausrüstung: erhöht die Frachtkapazität der Event-Schiffe – den Laderaum von Enterschiff, Phantomschiff und Riftwächter auf Missionen ebenso wie den Bunker des Schürfschiffs beim Asteroidenabbau, sodass mehr Beute heimkommt. Das Gesandtenschiff fliegt nicht mit und ist deshalb nicht betroffen. Exklusiv – nur während des Goldrauschs auf Expeditionen zu finden.' },
     // ===== Abgrund-Schiffsmodule (28.07.2026, v8.335.0, Roadmap Phase 2, zweite Haelfte) =====
     // Alle sechs wirken AUSSCHLIESSLICH im Abgrund und tragen deshalb eigene Effektnamen. Das ist
     // Absicht und die Grenze, die diese ganze Roadmap zieht: Die vier Standortmodule aus v8.334.0
@@ -28127,7 +28163,7 @@
      Kopie fuer Primordial haette dieselbe Wette noch einmal aufgemacht.
      Jetzt gibt es die Sperren genau einmal; jede neue Stufe erbt sie automatisch. */
   function craftForgedModule(isShip, defKey, plan){
-    if (!plan.freigeschaltet()){ log(plan.schmiede + ' benoetigt die Forschung \u201e' + plan.forschung + '\u201c.', 'ti-alert-triangle'); return; }
+    if (!plan.freigeschaltet()){ log(plan.schmiede + ' benoetigt die Forschung „' + plan.forschung + '".', 'ti-alert-triangle'); return; }
     const defs = isShip ? SHIP_MODULE_DEFS : MODULE_DEFS;
     const def = defs.find(d => d.key === defKey);
     if (!def || def.craftOnly) return;
@@ -28144,7 +28180,7 @@
     const inv = isShip ? state.shipModules : state.modules;
     inv[instKey] = (inv[instKey] || 0) + 1;
     plan.zaehlen();
-    log(MODULE_RARITY[plan.seltenheit].label + 'es \u201e' + def.name + '\u201c geschmiedet (' + bezahlterPreis + ') - liegt im '
+    log(MODULE_RARITY[plan.seltenheit].label + 'es „' + def.name + '" geschmiedet (' + bezahlterPreis + ') - liegt im '
       + (isShip ? 'Schiffsklassen-Modul-Inventar' : 'Standort-Modul-Inventar') + '.', def.icon);
     playSound('achieve'); checkAchievements(); render(); save();
   }
@@ -29208,7 +29244,13 @@
       // aber Angriffswert 0 - eine Verlegung, die nur aus ihnen bestuende, waere eine Verteidigung
       // aus lauter Nullen. Ueber CARGO_SHIP_KEYS statt zwei aufgezaehlter Schluessel, sonst haette
       // der Bergungsfrachter hier still als Kampfschiff gezaehlt.
-      for (const k of ATTACK_SHIP_KEYS){ if (CARGO_SHIP_KEYS.includes(k)) continue; const n = Math.max(0, (fleet[k]||0) - (away[k]||0)); avail[k] = n; if (n>0) anyPositive = true; }
+      // Datengetrieben wie KAMPF_SHIP_KEYS (28.08.2026): Die Regel, die hier gilt, ist "kein eigener
+      // Angriffswert" - CARGO_SHIP_KEYS war dafuer nur so lange deckungsgleich, wie jedes Schiff mit
+      // Frachtraum atk 0 hatte. Seit dem Urmaterie-Koloss (250 Angriff, 2.000 Frachtraum) stimmt das
+      // nicht mehr: Er wurde hier still uebersprungen und damit von der automatischen Verstaerkung
+      // ausgeschlossen - ausgerechnet eines der staerksten Schiffe des Spiels. Die drei Event-Schiffe
+      // mit Frachtraum waeren dieselbe Falle ein zweites Mal.
+      for (const k of ATTACK_SHIP_KEYS){ if (CARGO_SHIP_KEYS.includes(k) && !schiffTraegtAngriff(k)) continue; const n = Math.max(0, (fleet[k]||0) - (away[k]||0)); avail[k] = n; if (n>0) anyPositive = true; }
       if (!anyPositive) continue;
       const power = attackPower(avail);
       if (power > bestPower){ bestPower = power; best = { planet, fleet, avail }; }
@@ -55950,7 +55992,7 @@
       ctx.fillText(fmtShare(Math.floor(computeScore())), 470, 290);
       ctx.fillStyle = '#c3bef5'; ctx.font = '400 27px '+SHARE_FONT_MONO;
       ctx.fillText('Kommandanten-Level '+lvl+(badge?'  ·  '+badge:''), 470, 345);
-      if (titleDef){ ctx.fillStyle = '#fac775'; ctx.fillText('\u201E'+titleDef.title+'\u201C', 470, 388); }
+      if (titleDef){ ctx.fillStyle = '#fac775'; ctx.fillText('„'+titleDef.title+'"', 470, 388); }
       if (rankLine || tag){ ctx.fillStyle = '#9296ac'; ctx.fillText([rankLine, tag?'['+tag+']':null].filter(Boolean).join('  ·  '), 470, titleDef?431:388); }
       ctx.textAlign = 'center';
       drawShareFooter(ctx, W, H);
@@ -55970,7 +56012,7 @@
     if (titleDef){
       ctx.fillStyle = '#fac775';
       ctx.font = '400 26px '+SHARE_FONT_MONO;
-      ctx.fillText('\u201E'+titleDef.title+'\u201C', W/2, avCy+avR+140);
+      ctx.fillText('„'+titleDef.title+'"', W/2, avCy+avR+140);
       extraY = 36;
     }
     if (rankLine || tag){
@@ -59551,8 +59593,14 @@
   // Laderaum = eigener Bunker der Minenschiffe + der vorhandene Frachtraum. fleetCargoCapacity()
   // wiederverwendet statt nachgebaut: Cargo-Module und Werftmarken wirken dadurch automatisch mit -
   // genau die zwei Boni, die in der Vergangenheit zweimal an einer zweiten Rechenstelle vorbeiliefen.
+  // Der Bunker bekommt den cargo-Bonus der EVENTFLOTTE (28.08.2026): Das Schuerfschiff ist ein
+  // Event-Schiff, und sein Frachtraum IST dieser Bunker - es steht bewusst nicht in CARGO_PER_SHIP,
+  // weil es dort in genau dieser Summe ein zweites Mal zaehlen wuerde. Ohne diese Zeile waere der
+  // Erzgreifer-Ausleger ausgerechnet beim Bergbau wirkungslos geblieben, also dort, wo ein Modul
+  // aus dem GOLDRAUSCH-Event hingehoert.
   function mineLaderaum(flotte){
-    return Math.round((flotte.schuerfschiff||0) * MINE_CARGO_JE_SCHIFF * (1 + mineFoerderBonus()))
+    const bunkerMult = (1 + mineFoerderBonus()) * (1 + shipModuleBonusFor('eventflotte', 'cargo'));
+    return Math.round((flotte.schuerfschiff||0) * MINE_CARGO_JE_SCHIFF * bunkerMult)
          + fleetCargoCapacity(flotte);
   }
   // Flugzeit-Basis eines Systems aus den echten Erkundungsdauern seiner Planeten - damit erbt der
@@ -63555,9 +63603,9 @@
       else if (def.key==='hyperbomber') meta = `Angriffspunkte 130 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · <span style="color:#5dcaa5;">kein Trägerhangar nötig</span> (zählt direkt zum Kampf, anders als der normale Bomber) · Tier-2, Hyperraumantrieb${awayNote('hyperbomber')}`;
       else if (def.key==='leerenjaeger') meta = `Angriffspunkte 140 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Leere-Endgame-Klasse${awayNote('leerenjaeger')}`;
       else if (def.key==='kometenjaeger') meta = `Angriffspunkte 18 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · schnellster Kampfschiff-Typ (Geschwindigkeit ${def.speed}) · exklusives Event-Schiff "Meteoritensturm"${awayNote('kometenjaeger')}`;
-      else if (def.key==='enterschiff') meta = `Angriffspunkte 25 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · zäheste Angreiferklasse (hoher Schild) · exklusives Event-Schiff "Piratenüberfall"${awayNote('enterschiff')}`;
-      else if (def.key==='phantomschiff') meta = `Angriffspunkte 35 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Glaskanone (viel Angriff, wenig Schild) · exklusives Event-Schiff "Void-Anomalie"${awayNote('phantomschiff')}`;
-      else if (def.key==='riftwaechter') meta = `Angriffspunkte 20 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · nutzt dieselbe Schwachstelle wie der Leerenjäger gegen Leere-Gegner (+25% Angriffskraft) · exklusives Event-Schiff "Leerenriss-Welle"${awayNote('riftwaechter')}`;
+      else if (def.key==='enterschiff') meta = `Angriffspunkte 25 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · zäheste Angreiferklasse (hoher Schild) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.enterschiff*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('enterschiff','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.enterschiff}) · exklusives Event-Schiff "Piratenüberfall"${awayNote('enterschiff')}`;
+      else if (def.key==='phantomschiff') meta = `Angriffspunkte 35 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Glaskanone (viel Angriff, wenig Schild) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.phantomschiff*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('phantomschiff','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.phantomschiff}) · exklusives Event-Schiff "Void-Anomalie"${awayNote('phantomschiff')}`;
+      else if (def.key==='riftwaechter') meta = `Angriffspunkte 20 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · nutzt dieselbe Schwachstelle wie der Leerenjäger gegen Leere-Gegner (+25% Angriffskraft) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.riftwaechter*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('riftwaechter','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.riftwaechter}) · exklusives Event-Schiff "Leerenriss-Welle"${awayNote('riftwaechter')}`;
       else if (def.key==='gesandtenschiff') meta = `Kein Angriffswert - reines Utility-Schiff · +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange mind. eins in der Flotte steht · passiv, keine Missionen nötig · exklusives Event-Schiff "Fraktionskonflikt"`;
       else if (def.key==='schuerfschiff') meta = `Kein Angriffswert - reines Utility-Schiff · +3% Gesamtproduktion, solange mind. eins besessen wird · passiv, keine Missionen nötig · exklusives Event-Schiff "Goldrausch"`;
       else if (def.key==='frachter'){

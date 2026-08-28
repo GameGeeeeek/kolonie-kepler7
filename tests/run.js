@@ -108,17 +108,21 @@ try {
 //     deshalb in die Pflichtprüfungen, wo sie in ALLEN drei Modi läuft - auch in `--nummer`,
 //     also im letzten Moment vor dem Merge. Sie kostet einen Substring-Scan über eine ohnehin
 //     gelesene Datei.
+//
+//     NACHTRAG 22.08.2026: Der Satz oben („kommt NULL Mal vor") galt nur für die SCHREIBWEISE,
+//     nach der gesucht wurde. Gemessen an derselben Datei: 0 Literale, aber 8 `\u201c`-Escapes,
+//     vier davon in lebendem Spielertext. Ein Escape ist zur Laufzeit dasselbe Zeichen und für
+//     eine Literal-Suche unsichtbar - die Prüfung war gegen genau das blind, wofür sie gebaut
+//     wurde. Die Regel liegt seither in tests/lib/hausstil.js und kennt beide Schreibweisen;
+//     hier steht nur noch, WANN sie läuft.
 try {
+  const { hausstilVerstoesse } = require('./lib/hausstil');
   const html = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'), 'utf8');
-  // Öffnend „ (U+201E), schließend das GERADE " - so steht es im ganzen Spiel. Verboten ist damit
-  // U+201C, das im Deutschen als schließendes und im Englischen als öffnendes Zeichen auftritt.
-  const treffer = html.indexOf('“');
-  let wo = '';
-  if (treffer >= 0) {
-    const zeile = html.slice(0, treffer).split('\n').length;
-    wo = 'Zeile ' + zeile + ': …' + html.slice(Math.max(0, treffer - 45), treffer + 25).replace(/\s+/g, ' ') + '…';
-  }
-  melde('Anführungszeichen im Hausstil („…")', treffer < 0, wo);
+  const verstoesse = hausstilVerstoesse(html);
+  const wo = verstoesse.length
+    ? verstoesse.length + 'x, erster: ' + verstoesse[0].art + ' Zeile ' + verstoesse[0].zeile + ': ' + verstoesse[0].stelle
+    : '';
+  melde('Anführungszeichen im Hausstil („…")', verstoesse.length === 0, wo);
 } catch (e) {
   melde('Anführungszeichen im Hausstil („…")', false, String(e.message).slice(0, 80));
 }

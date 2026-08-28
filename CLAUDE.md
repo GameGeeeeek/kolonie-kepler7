@@ -3534,6 +3534,115 @@ Wächter: `tests/test_uebersicht_schrift.js` (14 Prüfungen). Gegenprobe gegen `
 **9 rot bei identischer Prüfliste** (per `diff` über die reinen Prüfnamen verglichen, nicht
 gezählt — Regel 60).
 
+## Event-Schiffe tragen Frachtraum — und der Erzgreifer wirkt endlich (28.08.2026)
+
+Entscheidung Sascha, aus zwei vorgelegten Wegen: **Event-Schiffen Frachtraum geben** (die Alternative
+wäre gewesen, das Modul umzuwidmen).
+
+**Der Befund stand seit dem 21.08.2026 als Nebenbefund im Klassen-Set-Abschnitt und war gemessen:**
+`ev_erzgreifer` („Erzgreifer-Ausleger", `cargo`, `base:0.25`, Klasse `eventflotte`) bewirkte
+**nichts**. Der `cargo`-Kanal wurde ausschließlich als `shipModuleBonusFor('frachter', 'cargo')`
+gelesen, und alle drei Frachtschiffe gehören zur Klasse `frachter` — Event-Schiffe hatten überhaupt
+keinen Frachtraum, auf den ein Prozentsatz hätte wirken können. Seine Beschreibung versprach
+ausdrücklich „erhöht die Frachtkapazität aller Event-Schiffe deutlich".
+
+### Vier Änderungen, jede aus einer Messung
+
+- **`CARGO_PER_SHIP` trägt drei Event-Schiffe** (Enterschiff, Phantomschiff, Riftwächter, je 80).
+  Die Zahl ist begründet, nicht gegriffen: **Vier davon ersetzen gut einen Kleinen Frachter**
+  (320 zu 300). Damit bleibt die dokumentierte Regel „wer Beute heimbringen will, nimmt Frachter
+  mit" unangetastet — eine reine Event-Flotte geht aber nicht mehr mit leeren Händen zurück.
+  Bewusst **nicht** nach Angriffswert gestaffelt: Frachtraum hängt am Rumpf, nicht an der Bewaffnung.
+- **`fleetCargoCapacity` liest den Bonus je KLASSE** statt fest über `'frachter'`. Das ist keine
+  Erfindung, sondern die Angleichung an das Hausmuster: `speed`, `fuel`, `hull` und `shield` tun
+  das an ihren vier Verbrauchsstellen längst (`cls ? shipModuleBonusFor(cls, …) : 0`), `cargo` war
+  der einzige Kanal mit fest verdrahteter Klasse.
+- **`mineLaderaum`: der Bunker des Schürfschiffs bekommt den `eventflotte`-Bonus.** Das Schürfschiff
+  IST ein Event-Schiff, und sein Frachtraum ist dieser Bunker (`MINE_CARGO_JE_SCHIFF` = 400).
+- **`maybeAutoReinforce` übergeht kein Kampfschiff mehr** — siehe der eigene Abschnitt darunter.
+
+### Zwei Schiffe bleiben bewusst außen vor, jedes aus einem gemessenen Grund
+
+- **Das Schürfschiff steht NICHT in `CARGO_PER_SHIP`.** `mineLaderaum()` addiert Bunker **und**
+  `fleetCargoCapacity(flotte)`; ein Eintrag dort zählte in genau dieser Summe ein zweites Mal.
+  Gemessen an einer Kopie mit Eintrag: **8.000 statt 4.000** für zehn Schürfschiffe.
+- **Das Gesandtenschiff bekommt keinen Frachtraum.** Es steht weder in `ATTACK_SHIP_KEYS` noch in
+  `MINE_SHIP_KEYS` — seine Wirkung ist passiv („+15% Ruf-Zuwachs, solange mind. eins in der Flotte
+  steht"). Ein Frachtraum an ihm wäre toter Code (Regel 59). Die Modulbeschreibung sagt das jetzt
+  ausdrücklich, statt weiter pauschal „aller Event-Schiffe" zu behaupten.
+
+### Der Rückfall in `fleetCargoCapacity` ist kein Schönheitsfehler
+
+`shipClassKeyFor(k) || 'frachter'` — der zweite Teil verhindert eine **stille Verschlechterung**:
+Der **Urmaterie-Koloss gehört gemessen zu KEINER Modulklasse**, bekam über die alte pauschale Zeile
+aber den Frachter-Cargo-Bonus. Ohne den Rückfall hätte dieser Umbau ihm den weggenommen — genau die
+unbestellte Zweitänderung aus dem Schiffskosten-Nachtrag. Die Regel lautet deshalb: *Ein Schiff, das
+Frachtraum trägt und keiner Klasse angehört, wird beim Frachtraum wie ein Frachter behandelt.*
+`test_eventfracht` 4-vorab misst die Klassenlosigkeit, bevor 4a die Wirkung prüft.
+
+### Der Bestandsfehler, der dabei herausfiel: die automatische Verstärkung übersprang den Koloss
+
+`maybeAutoReinforce()` verlegt bei einem erkannten Überfall die stärksten Kampfschiffe einer anderen
+Kolonie. Sie sprang über **jedes** Schiff in `CARGO_SHIP_KEYS` — mit der Begründung im Kommentar,
+Frachter hätten „Angriffswert 0". Das war deckungsgleich, solange jedes Schiff mit Frachtraum
+wirklich atk 0 hatte. **Seit dem Urmaterie-Koloss (21.08.2026, 250 Angriff bei 2.000 Frachtraum)
+stimmt es nicht mehr:** Eines der stärksten Schiffe des Spiels wurde von der automatischen
+Verteidigung stillschweigend ausgeschlossen.
+
+Die Zeile prüft jetzt dieselbe datengetriebene Form wie `KAMPF_SHIP_KEYS`
+(`CARGO_SHIP_KEYS.includes(k) && !schiffTraegtAngriff(k)`). **Die Lehre ist dieselbe wie bei
+`KAMPF_SHIP_KEYS` selbst, nur eine Anzeigestelle weiter:** Als der Koloss gebaut wurde, ist die eine
+Stelle mitgezogen worden und die zweite nicht — Punkt 6 der Checkliste, diesmal nicht an einem Text,
+sondern an einer zweiten Filterregel mit derselben Absicht.
+
+**Nachgemessen, weil es beim Bauen offen blieb: Er wirkt auch auf Expeditionen.**
+`EXPEDITION_SHIP_KEYS` ist `['forscher','spaeher'].concat(ATTACK_SHIP_KEYS)`, die drei Event-Schiffe
+sind dort also wählbar, und die Fundauflösung rechnet `EXPEDITION_BASE_CARGO +
+fleetCargoCapacity(escortFleet)`. Für ein Modul, das ausschließlich AUF Expeditionen zu finden ist,
+ist das die passende Wirkung — und es ist gemessen, nicht angenommen.
+
+### Wächter
+
+`tests/test_eventfracht.js` (26 Prüfungen, fünf Gegenproben). Er misst die **Wirkung** und fährt
+jede Aussage als **PAAR** — zwei Läufe, identisch bis auf einen Punkt:
+
+| | |
+|---|---|
+| **3a** | der Erzgreifer erhöht den Frachtraum (800 → 1.000) |
+| **3b/3c** | und er wirkt **nicht** auf Frachter, das Frachter-Modul **nicht** auf Event-Schiffe |
+| **4a** | der Koloss behält seinen Bonus (10.000 → 12.000) |
+| **5c/5d** | der Bunker steigt (4.000 → 5.000), ohne Doppelzählung |
+| **6b/6c** | das Gesandtenschiff fliegt wirklich nirgends mit — die drei anderen schon |
+
+Der Schneider ist **transitiv statt namensbasiert**: Was zur Laufzeit fehlt, wird aus derselben Datei
+nachgeschnitten, und der Nachlade-Versuch umschließt **Aufbau UND Aufruf** — eine geschnittene
+Funktion wirft oft erst beim Aufruf (die Lehre aus `4-bau3` in `test_schiffsmodul_paritaet`). Die
+Stücke werden dabei in der Reihenfolge der **Originaldatei** zusammengesetzt: `CARGO_SHIP_KEYS` ist
+`Object.keys(CARGO_PER_SHIP)` und wird beim Laden ausgewertet — stünde es davor, fände es seine
+Quelle in der temporalen Todeszone (Regel 38 im Kleinen).
+
+Gegenproben, alle mit 26 Prüfungen in beide Richtungen: Stand vor der Etappe → 11 rot; Rückfall
+entfernt → `4a`; `cargo` wieder pauschal → `3a`/`3c`; Schürfschiff in `CARGO_PER_SHIP` →
+`5-vorab`/`5a`/`5d`; Auto-Verstärkung zurück → `7a`.
+
+### Ein Bestandstest hielt die alte SCHREIBWEISE fest
+
+`test_flotte_v8375` 1 verlangte wörtlich `shipModuleBonusFor('frachter', 'cargo')` und fiel auf
+völlig korrektem Code durch — eine Momentaufnahme statt der Regel (Regel 3), und zwar zwei Zeilen
+unter einem Kommentar, der genau diese Lehre für die Zeile davor beschreibt. Geprüft wird jetzt die
+Eigenschaft („der Modul-Bonus steht neben dem Markenbonus"), **plus eine neue Zeile**, die den
+Zugewinn festhält: Er muss je Klasse gelesen werden. Eine Rückkehr zur festen Verdrahtung fällt
+damit auf — vorher wäre sie unbemerkt geblieben (Regel 43: stärker, nicht passend).
+
+**Zwei eigene Werkzeugfehler dabei, beide sofort gefangen:**
+- Mein erstes Muster `shipModuleBonusFor\([^)]*'cargo'\)` scheiterte am **inneren Funktionsaufruf**
+  im Argument: `[^)]*` bricht an dessen schließender Klammer ab. Gelesen wird jetzt zeilenweise —
+  ein Muster, das eine Schreibweise kodiert, war ja gerade der Anlass.
+- Der Test schneidet `fleetCargoCapacity` aus und **führt sie aus**; `shipClassKeyFor` fehlte in
+  seiner Bausteinliste, und der Lauf starb mittendrin statt eine benannte Prüfung zu melden. Die
+  Funktion wird jetzt mitgegeben (nicht durch etwas Ähnliches ersetzt, Regel 36), und `1-lauf`
+  fängt den Fehlschlag als eigene Prüfung ab (Regel 34).
+
 ## Nächstes Projekt: Beute, Sets und Instanzen (Auftrag 18.08.2026)
 
 Auftrag Sascha: „Findbare Module die zusammen set Bonus geben sowie Dungeons und raids mit
@@ -5784,3 +5893,72 @@ Erfolg braucht ein Symbol in `ACH_ICONS`). In `test_relikte` sind dabei vier fes
 SCHREIBWEISEN zu REGELN geworden (Regel 3): Die Wiederkehr wird nicht mehr gegen die feste Tiefe
 130 geprüft, sondern als Periode über alle Tiefen, und die Zahl der Reliquien im Hilfetext kommt
 aus einer Zahlwort-Zuordnung statt aus dem Wort „zwölf".
+
+
+## Die Hausstil-Wache war gegen ihre eigene Fehlerklasse blind (28.08.2026)
+
+Arbeitsregel 77 beschreibt seit dem 21.08.2026, dass ein `\uXXXX`-Escape die dateiweiten
+Zeichenprüfungen blind macht. Sie stand als Warnung da, gemessen war sie an einem BEINAHE-Fall
+(v8.599.0, vor dem Merge bemerkt). Beim Nachmessen der ausgelieferten Datei stellte sich heraus:
+Der Fall ist längst eingetreten.
+
+```
+U+201C als LITERAL (wonach die Pflichtprüfung suchte) : 0
+U+201C als ESCAPE  (was sie NICHT sah)                : 8
+```
+
+**Vier der acht standen in LEBENDEM Spielertext** — zwei `log()`-Meldungen der Modulschmiede
+(„benötigt die Forschung …", „…es X geschmiedet") und zweimal die Titelzeile des Teilen-Bildes
+(`ctx.fillText('\u201E'+titleDef.title+'\u201C', …)`). Die anderen vier liegen in PATCHNOTES
+(Versionen 8.526.0 und 8.587.0) und sind unveränderliche Historie.
+
+**Der Kommentar der Prüfung sagte ausdrücklich, das verbotene Zeichen komme „in 6,17 MB Datei und
+986 Patchnote-Einträgen NULL Mal vor".** Das stimmte — für die SCHREIBWEISE, nach der sie suchte.
+Genau die Sorte Satz, die beim nächsten Lesen als Beweis gelesen wird.
+
+### Die Regel liegt jetzt in EINER Datei, nicht in zwei Kopien
+
+`tests/lib/hausstil.js` ist die Implementierung; `tests/run.js` (Pflichtprüfung, läuft in allen
+drei Modi) und `test_forschungstexte.js` sind nur noch die zwei AUSFÜHRUNGSSTELLEN. Bis hierher
+stand an beiden ein eigenes `includes('“')` — solange die Regel eine Zeile war, ging das gut; mit
+der Escape-Behandlung wären die zwei Kopien beim nächsten Anfassen auseinandergelaufen. Der
+Kommentar in `run.js` benannte die Absicht schon vorher richtig („kein zweiter Maßstab, sondern ein
+früherer Zeitpunkt") — jetzt ist sie auch gebaut.
+
+**Die vier historischen Ausnahmen hängen an ihrer VERSION, nicht an einer Zeilennummer.** Eine
+Zeilennummer ist beim nächsten Patchnote falsch; die Version ändert sich nie. Und die Ausnahme gilt
+NUR für diese zwei Versionen, nicht für den ganzen PATCHNOTES-Block — ein NEUER Patchnote mit der
+Escape-Schreibweise fällt weiterhin auf. Das ist genau der Fall, der bei v8.599.0 nur deshalb nicht
+live ging, weil die Escapes zufällig als Stil-Abweichung auffielen.
+
+### Die Messung, die den Wert belegt
+
+| | alte Regel | neue Regel |
+|---|---|---|
+| Escape in lebendem Text (die Anlassfamilie) | **grün — sieht nichts** | rot, nennt Zeile 28130 |
+| Literal U+201C | rot | rot |
+
+Vier Gegenproben, alle beidseitig gefahren, 21 Prüfungen in jeder Richtung bei identischer
+Prüfliste, jede mit `WERKZEUGFEHLER`-Wache (Regel 71):
+
+| Sabotage | Ergebnis |
+|---|---|
+| Escape zurück in den Schmiede-Text | rot, `Escape \u201c Zeile 28130` |
+| Literal U+201C statt des geraden Zeichens | rot, `Literal U+201C Zeile 28130` |
+| NEUER Patchnote (9.999.0) mit Escape | rot — die Ausnahme gilt nicht für den Block |
+| `HISTORIE`-Liste geleert | rot mit den vier historischen Stellen — die Liste ist kein toter Code (Regel 59) |
+
+**Die dritte und die vierte Zeile gehören zusammen:** Ohne die dritte wäre die Ausnahme zu breit
+(jeder künftige Patchnote dürfte tarnen), ohne die vierte wäre sie womöglich wirkungslos und
+niemand hätte es gemerkt.
+
+### Ein Datums-Befund nebenbei, und er ist eine Messregel
+
+Die Pflichtprüfung meldete „Backend-Klon … geholt vor 129,2 Stunden", eine Stunde nachdem ich ihn
+gezogen hatte. Kein Fehler der Prüfung: Die **Containeruhr war um 5,3 Tage weitergesprungen** (die
+Sitzung lag dazwischen still). Nachgemessen an einer unabhängigen Uhr — dem `Date`-Kopf des Pi —
+war wirklich der 28.08., während meine Commits vom selben Sitzungsverlauf den 22.08. tragen.
+**Vorgehen: Wer ein Datum in einen Patchnote oder in diese Datei schreibt, misst es an einer
+EXTERNEN Uhr** (`curl -sI https://www.gamegeeeeek.de/ | grep -i '^date:'`), nicht am Gefühl für
+den Sitzungsverlauf — der kann beliebig lange Pausen enthalten, und ein falsch datierter Patchnote
+ist unveränderliche Historie.
