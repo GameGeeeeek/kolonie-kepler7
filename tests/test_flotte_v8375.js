@@ -54,14 +54,36 @@ function rollen(text, muster){
   // belegt sie ohnehin am Ergebnis.
   check('1: die Ladekapazitaet liest die Marke - und zwar je Klasse',
     /shipMarkBonus\(k, 'cargo'\)/.test(cap) && /CARGO_SHIP_KEYS/.test(cap), cap.replace(/\s+/g, ' ').slice(0, 200));
-  check('1: der Modul-Bonus bleibt daneben bestehen', /shipModuleBonusFor\('frachter', 'cargo'\)/.test(cap));
+  // Seit dem 28.08.2026 liest die Funktion den Modul-Bonus JE KLASSE (shipClassKeyFor(k)) statt fest
+  // ueber 'frachter' - erst dadurch kann ein Event-Modul auf Event-Schiffe wirken. Die hier gepruefte
+  // Eigenschaft ist unveraendert "der Modul-Bonus steht neben dem Markenbonus"; die alte Fassung
+  // nagelte dagegen die SCHREIBWEISE fest und fiel auf voellig korrektem Code durch (Arbeitsregel 3,
+  // dieselbe Lehre wie zwei Zeilen darueber). Die zweite Zeile ist der Zugewinn: Eine Rueckkehr zur
+  // festen Verdrahtung faellt jetzt auf - vorher waere sie unbemerkt geblieben.
+  // Zeilenweise statt mit einer Klammer-Regex: Das Argument enthaelt selbst einen Funktionsaufruf,
+  // an dessen schliessender Klammer jedes [^)]*-Muster abbricht - genau der Werkzeugfehler, den die
+  // Umstellung vermeiden sollte.
+  const cargoZeilen = cap.split('\n').filter(z => z.includes('shipModuleBonusFor') && z.includes("'cargo'"));
+  check('1: der Modul-Bonus bleibt daneben bestehen', cargoZeilen.length === 1, cargoZeilen.map(z => z.trim()));
+  check('1: und er wird je Klasse gelesen, nicht fest auf eine verdrahtet',
+    cargoZeilen.some(z => z.includes('shipClassKeyFor(k)')), cargoZeilen.map(z => z.trim()));
   // Und rechnen: die Formel wird ausgefuehrt, nicht nur gelesen.
+  // shipClassKeyFor wird MITGEGEBEN und nicht durch etwas Aehnliches ersetzt (Arbeitsregel 36) - die
+  // Funktion liest sie seit dem 28.08.2026, und ohne sie stirbt der Lauf mitten drin.
   const ctx = {};
-  new Function('ctx', 'shipModuleBonusFor', 'shipMarkBonus', 'CARGO_SHIP_KEYS', 'CARGO_PER_SHIP',
-    cap + ';ctx.f=fleetCargoCapacity;')
-    (ctx, () => 0, (k) => k === 'frachter' ? 0.36 : 0, ['frachter','frachtergross'], { frachter:300, frachtergross:1000 });
-  const nurKlein = ctx.f({ frachter: 10 });
-  const nurGross = ctx.f({ frachtergross: 10 });
+  let rechenFehler = null;
+  let nurKlein = null, nurGross = null;
+  try {
+    new Function('ctx', 'shipModuleBonusFor', 'shipMarkBonus', 'shipClassKeyFor', 'CARGO_SHIP_KEYS', 'CARGO_PER_SHIP',
+      cap + ';ctx.f=fleetCargoCapacity;')
+      (ctx, () => 0, (k) => k === 'frachter' ? 0.36 : 0, (k) => k === 'frachter' || k === 'frachtergross' ? 'frachter' : null,
+       ['frachter','frachtergross'], { frachter:300, frachtergross:1000 });
+    nurKlein = ctx.f({ frachter: 10 });
+    nurGross = ctx.f({ frachtergross: 10 });
+  } catch (e) { rechenFehler = e.message; }
+  // Eigene benannte Pruefung statt eines Absturzes: Sonst laufen die zwei Rechenzeilen darunter nie,
+  // und der rote Exit-Code sieht aus wie ein gefangener Fehler (Arbeitsregel 34).
+  check('1-lauf: die geschnittene Ladekapazitaet laesst sich ausfuehren', rechenFehler === null, rechenFehler);
   check('1: Mk X (+36%) hebt den kleinen Frachter von 3.000 auf 4.080', nurKlein === 4080, nurKlein);
   check('1: der unaufgeruestete Grossfrachter bleibt unveraendert', nurGross === 10000, nurGross);
   // Anzeige: nur dort bewerben, wo er wirkt.
