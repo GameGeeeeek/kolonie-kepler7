@@ -40,17 +40,20 @@ function schneideKonstante(src, name){
   return m ? m[0].trim() : null;
 }
 
-const TEILE = ['allianceRaidRankFactor', 'allianceRaidRankShare', 'allianceRaidRewardFor'];
+const TEILE = ['allianceRaidRankFactor', 'allianceRaidRankShare', 'allianceRaidRewardFor',
+               'allianceRaidMythischChance'];
+const KONSTANTEN = ['ALLIANCE_RAID_RANK_SPREAD', 'ALLIANCE_RAID_MYTHISCH_AB',
+                    'ALLIANCE_RAID_MYTHISCH_JE_STUFE', 'ALLIANCE_RAID_MYTHISCH_MAX'];
 
 function baue(src, wie){
-  const spread = schneideKonstante(src, 'ALLIANCE_RAID_RANK_SPREAD');
+  const konst = KONSTANTEN.map(n => schneideKonstante(src, n));
   const fns = TEILE.map(n => schneideFunktion(src, n));
-  const fehlt = TEILE.filter((n, i) => !fns[i]);
-  if (!spread) fehlt.push('ALLIANCE_RAID_RANK_SPREAD');
+  const fehlt = TEILE.filter((n, i) => !fns[i]).concat(KONSTANTEN.filter((n, i) => !konst[i]));
   if (fehlt.length) return { fehlt };
   try {
-    const f = new Function(spread + '\n' + fns.join('\n') + '\nreturn allianceRaidRewardFor;')();
-    return { f };
+    return new Function(konst.join('\n') + '\n' + fns.join('\n')
+      + '\nreturn { f: allianceRaidRewardFor, myth: allianceRaidMythischChance,'
+      + ' ab: ALLIANCE_RAID_MYTHISCH_AB, max: ALLIANCE_RAID_MYTHISCH_MAX };')();
   } catch (e) { return { fehler: String(e).split('\n')[0] }; }
 }
 
@@ -117,6 +120,47 @@ const erster = fe.f(5, 0.4, 1, 9, true, boss0);
 const letzter = fe.f(5, 0.4, 9, 9, true, boss0);
 check('4a: der erste Platz bringt mehr als der letzte', erster.credits > letzter.credits, { erster: erster.credits, letzter: letzter.credits });
 check('4b: auch der letzte Platz bekommt Antimaterie', letzter.resources.antimaterie >= 1, { letzter: letzter.resources.antimaterie });
+
+// --- 5. Etappe C1: die Mythisch-Chance ist eine zweite Kopie-Familie ---
+// Sie steht in beiden Repos (das Backend wuerfelt damit, das Frontend zeigt die Vorschau an) und
+// wird deshalb genauso AUSGEFUEHRT verglichen wie die Belohnungsformel darueber.
+//
+// 5a ist der Paritaetsvergleich, 5b/5c/5d messen die WIRKUNG. Ohne die drei waere 5a auch dann
+// gruen, wenn beide Seiten fuer JEDE Stufe 0 lieferten - ein Vergleich ueber einer konstanten
+// Groesse kann nicht fehlschlagen (Hausregel 28/62).
+const STUFEN_MYTH = [0, 1, 5, 9, 10, 11, 12, 15, 17, 18, 25, 60, 99];
+const mythAbw = [];
+for (const lvl of STUFEN_MYTH){
+  const a = fe.myth(lvl), b = be.myth(lvl);
+  if (a !== b) mythAbw.push({ lvl, front: a, back: b });
+}
+// Randfaelle ueber die Stufenliste hinaus: ein fehlendes oder unsinniges Argument darf auf beiden
+// Seiten nicht auseinanderlaufen (`Math.max(1, level | 0)` faengt sie ab).
+for (const roh of [undefined, null, NaN, -5, '12']){
+  const a = fe.myth(roh), b = be.myth(roh);
+  if (a !== b) mythAbw.push({ lvl: String(roh), front: a, back: b });
+}
+check('5a: die Mythisch-Chance ist in beiden Repos identisch', mythAbw.length === 0, mythAbw.slice(0, 3));
+
+const unterSchwelle = STUFEN_MYTH.filter(l => l < fe.ab).map(l => fe.myth(l));
+check('5b: unterhalb der Schwelle gibt es keine Mythisch-Chance',
+      unterSchwelle.length > 0 && unterSchwelle.every(v => v === 0),
+      { geprueft: unterSchwelle.length, werte: unterSchwelle });
+
+// Steigend UND wirklich groesser als null - sonst waere "monoton" ueber lauter Nullen erfuellt.
+const ueberSchwelle = STUFEN_MYTH.filter(l => l >= fe.ab);
+const werteUeber = ueberSchwelle.map(l => fe.myth(l));
+let steigt = true;
+for (let i = 1; i < werteUeber.length; i++) if (werteUeber[i] < werteUeber[i - 1]) steigt = false;
+check('5c: ab der Schwelle steigt sie mit der Bossstufe',
+      werteUeber.length > 1 && werteUeber[0] > 0 && steigt && werteUeber[werteUeber.length - 1] > werteUeber[0],
+      { stufen: ueberSchwelle, werte: werteUeber });
+
+// Der Deckel MUSS im geprueften Bereich wirklich greifen, sonst misst 5d eine Formel ohne Anschlag.
+const amDeckel = STUFEN_MYTH.filter(l => fe.myth(l) >= fe.max);
+check('5d: der Deckel greift und wird nie ueberschritten',
+      amDeckel.length > 0 && STUFEN_MYTH.every(l => fe.myth(l) <= fe.max) && fe.max === be.max,
+      { deckel: fe.max, amDeckelAb: amDeckel[0], hoechster: Math.max(...STUFEN_MYTH.map(l => fe.myth(l))) });
 
 console.log(fail ? 'FAIL - es gab rote Pruefungen.' : 'PASS');
 process.exit(fail ? 1 : 0);

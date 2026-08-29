@@ -6608,3 +6608,86 @@ Backend-Klon einen Commit hinter `origin/master` — nämlich hinter meinem eige
 #183. Der Klon stand auf dem inhaltsgleichen Branch-Commit vor dem Squash, deshalb waren die
 `server.js`-lesenden Tests schon vorher grün. Nachgezogen und die vier erneut gefahren, damit das
 gemessen ist statt angenommen.
+
+## Etappe C1: die Bossstufe entscheidet über die SPITZE des Beutetischs (28.08.2026)
+
+**Auftrag Sascha, über `AskUserQuestion` gewählt: „Mythisch ab Stufenschwelle".** Ab Bossstufe 10
+fällt ein erbeutetes Boss-Set-Teil mit stufenabhängiger Chance **mythisch** statt legendär. Damit
+ist die dritte der vier gemessenen Lücken aus `docs/beute-und-instanzen-konzept.md` erledigt.
+
+**Der Umfang war Teil der Wahl: eine Backend-Funktion, im Frontend nur ANZEIGE, dazu der
+Paritätstest.** Der Wurf liegt im Backend — Begründung, Kalibrierung und der Kommentar-Fund stehen
+dort (Backend-CLAUDE.md, gleicher Abschnittsname). Hier steht nur, was dieses Repo angeht.
+
+### Die Paritätskopie ist die zweite Kopie-Familie des Raids
+
+`allianceRaidMythischChance` samt ihren drei Konstanten steht jetzt in beiden Repos — dieselbe
+Entscheidung wie bei `allianceRaidRewardFor` einen Abschnitt weiter oben, und aus demselben Grund:
+Die Vorschau rechnet vorne, weil nach dem Abflug alle Eingaben feststehen. Sie darf deshalb nicht
+raten, wie hoch die Chance ist. Zusammengehalten wird das von einem **ausgeführten**
+Paritätstest, nicht von einem Textvergleich.
+
+**Zwei Anzeigestellen, und beide sind bewusst gewählt:**
+
+- Die **enroute-Vorschau** (unter der Beutetabelle) — dort steht die Belohnung ohnehin, und die
+  Mythisch-Chance ist eine Aussage über genau dieses Set-Teil.
+- Der **„kein Raid"-Zweig** mit dem Zusatz „Ab Stufe 10:". Wer eine Stufe wählt, soll die Folge
+  vorher sehen; ohne diese Stelle wäre die Schwelle eine Mechanik, die man erst nach dem Ausrufen
+  bemerkt (Regel 59).
+
+**Unter der Schwelle steht NICHTS** statt einer Null — dieselbe Entscheidung wie bei der
+Weltlage-Zeile und der Raid-Vorschau: Gibt es nichts zu sagen, wird nichts gesagt. Ein Server ohne
+C1 wird davon nicht berührt, weil die Zeile aus der lokalen Konstante rechnet; falsch wäre sie
+dort trotzdem, und **deshalb geht das Backend zuerst live** (Regel 60).
+
+### Die vier Hilfetexte tragen FESTE Zahlen — gemessen, nicht aus Bequemlichkeit
+
+Reihenfolge nachgemessen statt geschätzt (Regel 38): `HELP_SECTIONS` steht bei Zeichen
+**4.137.663**, `ALLIANCE_RAID_MYTHISCH_AB` bei **4.886.024**. Die Konstante liegt also 748.361
+Zeichen DAHINTER und damit beim Laden des Array-Literals in ihrer temporalen Todeszone — eine
+Ableitung ließe das Spiel gar nicht erst starten, und `node --check` sagte kein Wort dazu.
+
+Dort stehen deshalb die Ziffern 10 und 12 % **mit Kommentar an der Stelle**, der die Messung nennt
+und darauf verweist, dass beide Zahlen in derselben Datei noch einmal als Konstante stehen. Das ist
+die dokumentierte Ausnahme aus Regel 38 („dort gehört ein fester, korrekter Wert hin, mit Kommentar,
+warum nicht abgeleitet"), nicht ihr Bruch.
+
+### Zehn Punkt-6-Stellen, und die Suche danach war der eigentliche Aufwand
+
+Die Mechanik sind sechs Zeilen. Was Zeit kostet, ist die Frage, welche Stelle mit dem Satz
+„Mythisch gibt es nur aus Schmiede und Allianzmissionen" jetzt still falsch wird. Gefunden wurden
+zehn — vier Hilfetexte, drei Protokoll-/Kommentarzeilen der Modulschmiede, der `MODULE_RARITY`-
+Kommentar, der Fragment-Hinweis und der Kommentar an `bonusModuleTier`, der die Allianzmission
+wörtlich als „bislang die einzige erreichbare Quelle dafür" führte.
+
+**Der letzte ist der lehrreiche:** Er stand in einer Funktion, die mit dem Raid nichts zu tun hat,
+und wäre bei jeder namensbasierten Suche nach `raid` durchgefallen. Gefunden hat ihn erst die Suche
+nach der AUSSAGE (`einzige`, `nur.*Schmiede`, `Mythisch`), nicht nach dem Gegenstand — Regel 40 an
+einem Kommentar statt an einem Anzeigetext.
+
+**Bewusst NICHT angefasst, jedes einzeln geprüft:** die vier Stellen zu `SHIP_MODULE_DEFS`
+(Boss-Set-Teile sind Standort-Module, die Schiffsklassen-Module haben ihre eigene Seltenheitsleiter),
+die Verbrauchsgegenstände, und die drei PATCHNOTES-Fundstellen — unveränderliche Historie
+(Checkliste Punkt 4).
+
+### Der Wächter
+
+`tests/test_raid_belohnung_paritaet.js`, Abschnitt 5 (jetzt 14 Prüfungen). Er schneidet die
+Funktion samt Konstanten aus **beiden** Repos und führt sie über ein Stufenraster plus die
+Randfälle `undefined/null/NaN/-5/'12'`.
+
+**5a ist die Parität, 5b–5d messen die WIRKUNG — und die dritte Gegenprobe ist der Beleg dafür,
+dass das kein Beiwerk ist:** Setzt man `JE_STUFE` auf **BEIDEN** Seiten auf 0, bleibt `5a` grün
+(die Werte sind ja identisch) und nur `5c`/`5d` fallen. Ein Paritätsvergleich über einer konstanten
+Größe kann nicht fehlschlagen (Regel 28/62) — dieselbe Lücke, die im Schiffsmodul-Set-Test die
+Prüfung `1e` nötig gemacht hat.
+
+Alle drei Gegenproben beidseitig gefahren, je 14 Prüfungen, identische Prüfnamen per `diff`.
+
+**Und ein Werkzeugfehler im eigenen Mess-Skript, wörtlich Regel 60 plus der Nachtrag zu Regel 19:**
+Der Vergleich las die Prüfzeilen **samt Beleg** (`5a: … | {…}`) und zählte die Schlusszeile
+`FAIL - es gab rote Pruefungen.` als 15. Prüfung mit. Beide korrekten Sabotagen meldeten dadurch
+„PRUEFLISTE ABWEICHEND". Verglichen wird der reine Prüf-NAME
+(`sed -E 's/^(OK|FAIL) +- //; s/ \|.*$//'`), die Schlusszeile ausdrücklich herausgefiltert. Das ist
+in dieser Sitzung das dritte Mal derselbe Griff — die Regel steht seit dem 18.08.2026 da, und sie
+greift nur, wenn man sie beim Schreiben des Skripts anwendet statt beim Lesen des Ergebnisses.
