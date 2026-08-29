@@ -5376,6 +5376,96 @@ Ein Reiter, dessen Route mit 404 antwortet, wäre die tote Fläche aus Regel 35 
 und per `/api/health`-Blob belegt. Umgekehrt stellt das Backend Routen bereit, die niemand aufruft:
 folgenlos.
 
+## Die Aktivitäts-Uhr im Konto-Blatt (28.08.2026)
+
+Auftrag Sascha: „Da ist ein Spieler, der ist wirklich Tag und Nacht online. Kann man das irgendwie
+nachvollziehen, ob das wirklich ein Spieler ist oder irgendwie Bot oder KI oder whatever
+dahintersteckt?" Die Server-Hälfte samt Begründungen steht in der **Backend-CLAUDE.md**; hier nur,
+was dieses Repo angeht.
+
+### Der Befund, der zuerst gehört — und er entlastet den Spieler
+
+**„Immer online" ist in diesem Spiel kein Verdacht, sondern das rational richtige Verhalten.**
+`OFFLINE_BASE_SEC` ist 8 Stunden, mit vollem Autonomiekern höchstens 14 (`OFFLINE_BONUS_CAP_SEC`).
+Wer den Tab schließt und 24 h wegbleibt, verliert **zehn Stunden Produktion ersatzlos**; wer ihn
+offen lässt, verliert nichts — und `setInterval(save, 10000)` schreibt dabei alle zehn Sekunden.
+Ein `lastSeen` rund um die Uhr misst also nur, ob jemand einen Browser-Tab schließt.
+
+Wer das nächste Mal gefragt wird, ob ein Konto auffällig ist, rechnet **zuerst** hier nach, bevor
+irgendetwas gemessen wird.
+
+### Die Ausrichtung an Kalendertagen ist der Unterschied zwischen lesbar und unlesbar
+
+Der Server liefert 336 Zeichen (14 Tage × 24 Stunden), **ausgerichtet an UTC-Stunde 0**. Der erste
+Entwurf ließ die Reihe bei der *aktuellen* Stunde enden — damit ist sie gegen die Stundenachse
+verschoben, die Nacht liegt jeden Tag in einer anderen Spalte, und ein Schlafmuster wäre keine
+senkrechte Bahn mehr, sondern eine Diagonale. **Aufgefallen ist das erst beim Zeichnen**, nicht beim
+Bauen der Datenform.
+
+Drei Zeichen: `1` aktiv, `0` ruhig, `-` nicht beobachtet (vor der ersten Aufzeichnung oder noch in
+der Zukunft). Das dritte ist kein Schmuck — ohne es zählten die Stunden des heutigen Tages, die
+noch gar nicht stattgefunden haben, als Pause, und ein lückenloser Dauerläufer sähe am Abend wie ein
+schlafender Mensch aus.
+
+### Die Einordnung gehört dazu, nicht die nackte Zahl
+
+`aktivUhrEinordnung()` übersetzt die längste Pause in einen Satz, weil eine Zahl allein für den
+Leser nicht deutbar ist. Gemessen an vier nachgebauten Konten: Bot 0 h, ein Spieler mit nächtlichem
+Aufwachen 3 h, ein Vielspieler 5 h, ein Gelegenheitsspieler 14 h.
+
+**Im Verdachtsfall nennt der Text die zwei harmlosen Erklärungen mit** — ein geteiltes Konto und
+zwei Geräte in verschiedenen Zeitzonen. Ohne sie macht die Anzeige aus einem Hinweis einen Beweis,
+und am Ende steht eine Sperre auf einer Zahl. `test_aktivitaetsuhr_ui.js` 1b2 hält das fest.
+
+**Die Reaktionszeiten stehen als ganze Reihe da, nicht als Mittelwert:** Ein einzelner kurzer Wert
+ist Zufall (jemand hatte die Karte gerade offen), fünf sind ein Muster. Die Aussage liegt in der
+Wiederholung.
+
+### Der Wächter
+
+`tests/test_aktivitaetsuhr_ui.js` (17 Prüfungen). Er misst die **Wirkung**, nicht die Beschriftung:
+
+- **Die Kernmessung ist ein Paar aus drei Läufen** — Dauerläufer, Mensch, frisches Konto müssen
+  drei verschiedene Aussagen zeigen. Derselbe Text bei allen dreien wäre auch bei einer fest
+  verdrahteten Zeile grün (Regel 61).
+- **Gemessen wird die gezeichnete FARBE der Kästchen**, nicht das Markup: ein lückenloses Konto
+  zeichnet genau eine Farbe, ein Schlafmuster zwei, ein frisches Konto durchsichtige.
+- **4a ist die Gegenrichtung:** Ohne die Felder — also gegen einen Server, der noch nicht
+  ausgeliefert hat — fehlt der Block **ersatzlos**. Kein leerer Kasten, keine Überschrift ohne
+  Inhalt.
+
+Gegenprobe gegen `origin/main`: **10 rot bei identischer Prüfliste** (per `diff` über die reinen
+Prüfnamen verglichen). Die sieben grünen sind genau die richtigen — die „fehlt ersatzlos"-Zeilen
+müssen dort grün sein, sonst hätte man etwas kaputtgemacht.
+
+**Ein Fehler im Test, und er ist die bekannte Familie:** Die Suche lief zuerst mit einem einzigen
+Buchstaben, die Route verlangt aber zwei. Das Blatt zeigte „Bitte mindestens zwei Zeichen eingeben",
+und damit waren `4a` und `2c` — beides „fehlt ersatzlos"-Prüfungen — **über leerem Text trivial
+grün** (Regel 28). Gefangen haben es allein die `-vorab`-Zeilen.
+
+### Der Fehlschlag im vollen Lauf war ein Stilwächter, kein Fehler der Uhr
+
+`test_formensprache` fiel mit `["border:3px","border-radius:1px"]` — mein Raster zeichnete seine
+Kästchen mit `border-radius:1px` **inline**. Die Regel dahinter ist älter als diese Etappe: Das
+Spiel spricht seit dem Grafik-Audit HUD-Formensprache mit geschnittenen Ecken, und **in JS-Vorlagen
+gibt es keine px-Rundung** — eine Inline-Angabe kann von keiner CSS-Regel mehr korrigiert werden.
+
+Das ist wörtlich der Nachtrag, der im Abschnitt zur Raid-Vorschau schon steht: *Wer neues Markup mit
+INLINE-Stilen schreibt, ist von den dateiweiten Stilwächtern betroffen — auch wenn der eigene
+Bereich mit CSS nichts zu tun hat.* Bei 7-px-Kästchen war die Rundung ohnehin reine Zierde; sie ist
+ersatzlos raus, nicht durch eine zweite Schreibweise ersetzt.
+
+**Der Betroffenheits-Sweep (Regel 40/45) hätte das gefunden**, wenn er nicht nur nach den geänderten
+NAMEN gegrept hätte, sondern auch nach den CSS-Eigenschaften, die das neue Markup benutzt
+(`border-radius`, `border`, Farbliterale). Zwei Minuten `grep -c "border-radius" tests/*.js` gegen
+einen 50-Minuten-Lauf.
+
+### Auslieferungsreihenfolge: das Backend ZUERST
+
+Das Konto-Blatt liest `aktiv` und `reaktionen`; ohne sie zeichnet es den Block gar nicht (das ist
+4a). Der Frontend-Teil ist damit gegen einen alten Server harmlos — trotzdem gehört der
+Backend-PR vorher gemerged, sonst steht eine Fläche, die drei Tage lang nichts anzeigt.
+
 ## Proaktive Vorschläge
 
 Der Nutzer möchte am Ende einer Session bzw. auf Nachfrage aktiv auf weitere Optimierungs- und Verbesserungsmöglichkeiten hingewiesen werden – sowohl Code/Performance (z. B. weitere `render*Box()`-Kandidaten für das Signatur-Cache-Muster, weitere reine Anzeige-`setInterval`s für das Sichtbarkeits-Gate, doppelte/tote Funktionen) als auch Grafik/Spielinhalt. Nicht nur auf explizite Nachfrage warten, sondern von sich aus konkrete, im Code begründete Vorschläge einbringen (nicht spekulativ – vor dem Vorschlagen kurz grep/lesen, um zu bestätigen, dass es sich wirklich lohnt).

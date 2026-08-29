@@ -7271,8 +7271,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.621.0';
+  const VERSION = '8.622.0';
   const PATCHNOTES = [
+    { version:'8.622.0', date:'28.08.2026', changes:[
+      '<strong>Der Admin-Bereich kann jetzt beantworten, ob hinter einem Konto wirklich ein Mensch sitzt.</strong> Anlass war eine Beobachtung: Ein Spieler schien rund um die Uhr online. Nachgemessen ist das in diesem Spiel aber gar kein Verdacht – wer den Reiter schließt und einen Tag wegbleibt, verliert alles jenseits des Offline-Fensters von 8 bis 14 Stunden; den Reiter offen zu lassen ist also das <em>richtige</em> Verhalten, und der automatische Speicherpunkt alle zehn Sekunden lässt jeden so aussehen, als sei er ständig da. Gemessen wird deshalb jetzt etwas anderes.',
+      '<strong>Die Aktivitäts-Uhr zählt Handlungen, nicht Anwesenheit.</strong> Sie zeigt im Konto-Blatt 14 Tage als Raster: eine Zeile je Tag, ein Kästchen je Stunde, grün dort, wo der Server wirklich eine Aktion dieses Kontos ausgeführt hat – einen Angriff, einen Schlag gegen eine Festung, einen Handel. Ein Mensch schläft, und das sieht man sofort: eine senkrechte Bahn quer durch alle Tage. Die Uhr sagt ausdrücklich dazu, wenn ihre Aussage noch nicht trägt.',
+      '<strong>Die längste Ruhepause ist die Zahl, auf die es ankommt</strong> – nicht die Gesamtzahl der Stunden. An nachgebauten Konten gemessen: ein Vielspieler kommt auf fünf Stunden Nachtruhe, wer nachts kurz aufwacht auf drei. Erst eine Pause nahe null über viele Tage ist nicht mehr menschlich erklärbar – und selbst dann nennt die Anzeige die zwei harmlosen Möglichkeiten mit, ein geteiltes Konto und zwei Geräte in verschiedenen Zeitzonen. Ein Hinweis, kein Beweis.',
+      '<strong>Dazu die Reaktionszeit auf neue Ziele.</strong> Entsteht eine Asteroidenfestung oder ein Alien-Nest, wird festgehalten, wie lange es bis zum ersten Schlag eines Kontos dauert. Ein Mensch muss das Ziel erst bemerken und die Karte öffnen; wer wieder und wieder binnen Sekunden dort ist, fragt den Server im Takt ab. Die Aussage liegt in der Wiederholung, deshalb steht die ganze Reihe da und kein Mittelwert.',
+      '<strong>Für Spieler ändert sich nichts am Spiel.</strong> Es werden keine neuen Daten erhoben, die es nicht ohnehin gab – der Server hält lediglich fest, in welcher Stunde er eine Aktion ausgeführt hat, 14 Tage lang und ohne jedes Detail darüber, was es war. Die Anzeige sieht nur der Betreiber.'
+    ]},
     { version:'8.621.0', date:'28.08.2026', changes:[
       '<strong>Allianz-Raid: Ab Bossstufe 10 kann ein erbeutetes Boss-Set-Teil mythisch statt legendär ausfallen.</strong> Die Chance steigt mit jeder weiteren Stufe bis auf 12% und steht in der Belohnungsvorschau des laufenden Raids - vor dem Ausrufen nennt sie die Karte ebenfalls, damit die Stufenwahl eine sichtbare Folge hat. Mythische Boss-Set-Teile gibt es auf keinem anderen Weg: Die Mythische Modulschmiede fertigt zwar mythische Module, aber keine Set-Teile.',
       '<strong>Warum die Bossstufe und nicht die Fallchance.</strong> Die Wahrscheinlichkeit, dass ein Raid überhaupt ein Set-Teil abwirft, läuft schon ab Stufe 15 in ihre Obergrenze - ein Auftrieb darauf wäre wirkungslos gewesen. Die Seltenheit hatte dagegen keine Grenze nach oben und endete bislang bei Legendär.',
@@ -34634,6 +34641,74 @@
   }
 
   // --- 3. Konto-Blatt -------------------------------------------------------------------------
+  /* Die Aktivitaets-Uhr eines Kontos (28.08.2026, Auftrag Sascha: "kann man nachvollziehen, ob
+     da ein Bot dahintersteckt?").
+
+     WAS SIE ZEIGT - und was ausdruecklich nicht. Das Offline-Fenster ist 8 Stunden (mit vollem
+     Autonomiekern 14): Wer den Tab schliesst und 24 h wegbleibt, verliert zehn Stunden
+     Produktion; wer ihn offen laesst, verliert nichts. "Immer online" ist in diesem Spiel also
+     das rational richtige Verhalten und beweist nichts. Die Uhr zeigt deshalb HANDLUNGEN - die
+     Stunden, in denen der Server eine Aktion dieses Kontos ausgefuehrt hat.
+
+     Der Server liefert 14 Tage x 24 Stunden als Zeichenkette, ausgerichtet an KALENDERTAGEN:
+     Spalte 0 ist immer 00:00 UTC. Nur deshalb ist eine Schlafpause hier eine senkrechte Bahn und
+     keine Diagonale. Drei Zeichen: 1 = aktiv, 0 = ruhig, - = nicht beobachtet.
+
+     Die AUSSAGE steht in der laengsten Pause, nicht in der Gesamtzahl. Gemessen an vier
+     nachgebauten Konten: Bot 0 h, ein Spieler mit naechtlichem Aufwachen 3 h, ein Vielspieler
+     5 h, ein Gelegenheitsspieler 14 h. Die Einordnung darunter sagt das - eine nackte Zahl waere
+     fuer den Leser nicht deutbar, und die zwei harmlosen Erklaerungen (geteiltes Konto, zwei
+     Geraete in verschiedenen Zeitzonen) gehoeren dazu, damit niemand aus einem Hinweis einen
+     Beweis macht. */
+  function aktivUhrEinordnung(a){
+    if (!a || !a.belastbar) return { text:'Noch zu wenig aufgezeichnet – die Uhr braucht mindestens einen Tag.', farbe:'#8b93a7' };
+    const p = a.laengstePause;
+    if (p <= 2) return { text:'Keine Pause über ' + p + ' Stunden in ' + Math.round(a.beobachtet/24) + ' Tagen – das ist für einen Menschen ungewöhnlich. Bevor du daraus etwas schließt: Ein geteiltes Konto oder zwei Geräte in verschiedenen Zeitzonen sehen genauso aus.', farbe:'#f0997b' };
+    if (p <= 4) return { text:'Längste Ruhe ' + p + ' Stunden – knapp, aber möglich (kurze Nächte, mehrere Geräte).', farbe:'#fac775' };
+    return { text:'Längste Ruhe ' + p + ' Stunden – eine normale Nachtpause.', farbe:'#5dcaa5' };
+  }
+  function aktivUhrHtml(a){
+    if (!a || typeof a.reihe !== 'string' || a.reihe.length < 24) return '';
+    const tage = a.tage || 14;
+    const e = aktivUhrEinordnung(a);
+    // Eine Zeile je Tag, 24 Kaestchen. Die Stundenachse steht EINMAL darueber statt je Zeile -
+    // 14 Beschriftungen waeren auf dem Handy nicht mehr lesbar.
+    let raster = '';
+    for (let t = 0; t < tage; t++){
+      const zeile = a.reihe.slice(t*24, t*24+24);
+      raster += '<div style="display:grid; grid-template-columns:repeat(24,1fr); gap:1px;">'
+        + zeile.split('').map(c => '<div style="height:7px; background:'
+            + (c === '1' ? '#5dcaa5' : c === '0' ? '#2a3042' : 'transparent') + ';"></div>').join('')
+        + '</div>';
+    }
+    return `<div style="margin-top:6px;">
+      <div style="display:flex; justify-content:space-between;">
+        <span class="bmeta">Aktivität (${tage} Tage, UTC)</span>
+        <span class="bmeta">${adminZahl(a.aktiv)} von ${adminZahl(a.beobachtet)} Std.</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(24,1fr); gap:1px; margin:3px 0 2px;">
+        ${Array.from({length:24}, (_,h) => '<div class="bmeta" style="font-size:7px; text-align:center; opacity:' + (h%6===0?'0.8':'0') + ';">' + h + '</div>').join('')}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:1px;">${raster}</div>
+      <div class="bmeta" style="margin-top:4px; color:${e.farbe};">${escapeHtml(e.text)}</div>
+    </div>`;
+  }
+  /* Die Reaktionszeiten. Sie messen, was die Uhr nicht kann: wie lange nach dem ENTSTEHEN einer
+     Festung oder eines Nests der erste Schlag dieses Kontos kam. Ein Mensch muss das Ereignis
+     erst bemerken - er oeffnet die Karte; wer regelmaessig binnen Sekunden da ist, fragt den
+     Server im Takt ab. Die Aussage liegt in der WIEDERHOLUNG, deshalb steht hier die ganze Liste
+     und nicht nur ein Mittelwert - ein einzelner kurzer Wert ist Zufall, fuenf sind ein Muster. */
+  function reaktionenHtml(liste){
+    if (!Array.isArray(liste) || !liste.length) return '';
+    const kurz = liste.filter(r => r.sek < 120).length;
+    const fmtR = sek => sek < 120 ? sek + ' s' : sek < 7200 ? Math.round(sek/60) + ' Min.' : Math.round(sek/3600) + ' Std.';
+    return `<div style="margin-top:6px;">
+      <div class="bmeta">Erster Schlag nach dem Entstehen (${liste.length} gemessen)</div>
+      <div class="bmeta" style="margin-top:2px; color:#c8cfe0;">${liste.map(r =>
+        escapeHtml(r.art === 'nest' ? 'Nest' : 'Festung') + ' ' + fmtR(r.sek)).join(' · ')}</div>
+      ${kurz >= 3 ? `<div class="bmeta" style="margin-top:2px; color:#f0997b;">${kurz} davon unter zwei Minuten – so schnell bemerkt man ein neues Ziel nicht von Hand.</div>` : ''}
+    </div>`;
+  }
   async function loadAdminKonto(){
     const box = document.getElementById('adminKontoListe');
     const feld = document.getElementById('adminKontoSuche');
@@ -34664,6 +34739,8 @@
           ${zeile('Sternenstaub', adminZahl(k.sternenstaub) + ' · ' + adminZahl(k.abgewehrteAngriffe) + ' Angriffe abgewehrt')}
           ${zeile('Bonuscodes', adminZahl(k.bonusCodes) + ' eingelöst' + (k.bonusFehlversuche ? ' · ' + adminZahl(k.bonusFehlversuche) + ' Fehlversuche heute' : ''))}
           ${k.offeneBelohnungen ? zeile('Offene Belohnungen', adminZahl(k.offeneBelohnungen)) : ''}
+          ${aktivUhrHtml(k.aktiv)}
+          ${reaktionenHtml(k.reaktionen)}
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
             <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
             <button data-konto-sitzungen="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
