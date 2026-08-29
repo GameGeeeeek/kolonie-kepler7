@@ -26,18 +26,19 @@ const { check, ende } = pruefer();
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
+// Die HERKUNFT_*-Konstanten werden aus der Datei SELBST gezogen, nicht als feste Liste getippt
+// (Regel 40/43): eine getippte Liste veraltet, sobald eine weitere dazukommt - genau so ist
+// HERKUNFT_KONVOI (A2) hier durchgefallen (MODULE_DEFS wurde still zu null, "nicht geparst").
+// So ist jede kuenftige HERKUNFT-Konstante dabei.
+const herkunftDecls = (JS.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+
 function parseArray(name) {
   const von = JS.indexOf('const ' + name + ' = [');
   if (von < 0) return null;
   const bis = JS.indexOf('\n  ];', von);
   if (bis < 0) return null;
-  // HERKUNFT_*-Konstanten werden im Literal referenziert - als Parameter hereinreichen.
-  // HERKUNFT_UNIKAT nachgezogen (Arbeitsregel 9, v8.463.0): Fehlt eine Konstante, wirft das
-  // Literal einen ReferenceError, der hier still zu `null` wird - der Test meldete dann
-  // "MODULE_DEFS nicht geparst" statt der eigentlichen Ursache.
   try {
-    return new Function('HERKUNFT_NORMAL', 'HERKUNFT_ABGRUND', 'HERKUNFT_BOSS', 'HERKUNFT_UNIKAT',
-      'return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))('normal', 'abgrund', 'boss', 'unikat');
+    return new Function(herkunftDecls + '; return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))();
   } catch (e) { return null; }
 }
 function funktionsRumpf(name) {

@@ -44,7 +44,10 @@ function arrAus(name){
   return js.slice(s, k+1);
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
-const lade = n => new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus(n))();
+// Herkunfts-Konstanten aus der Datei ableiten, nicht eintippen (Regel 40/43): SHIP_MODULE_DEFS
+// enthaelt seit A2 quelle:HERKUNFT_KONVOI, eine feste Namensliste riesse hier den Literal-Parser.
+const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+const lade = n => new Function(herkunftDecls + "; return "+arrAus(n))();
 
 const SHIP_MODULE_DEFS = lade('SHIP_MODULE_DEFS');
 const SHIP_CLASS_DEFS  = lade('SHIP_CLASS_DEFS');

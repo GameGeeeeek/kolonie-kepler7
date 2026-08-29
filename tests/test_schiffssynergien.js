@@ -22,12 +22,17 @@ const { check, ende } = pruefer();
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
+// Die HERKUNFT_*-Konstanten werden aus der Datei SELBST gezogen, nicht als feste Liste getippt
+// (Regel 40/43): eine getippte Vier-Konstanten-Liste veraltet, sobald eine fuenfte dazukommt -
+// genau so ist HERKUNFT_KONVOI (A2) durchgefallen. So ist jede kuenftige HERKUNFT-Konstante dabei.
+const herkunftDecls = (JS.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+
 function arrAus(name){
   const i = JS.indexOf('const '+name+' = [');
   if (i < 0) return null;
   let d = 0, st = JS.indexOf('[', i), k = st;
   for (; k < JS.length; k++){ if (JS[k]==='[') d++; else if (JS[k]===']'){ d--; if(!d) break; } }
-  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+JS.slice(st, k+1)+';')(); }
+  try { return new Function(herkunftDecls + "; return "+JS.slice(st, k+1)+';')(); }
   catch(e){ return null; }
 }
 function fnAus(name){
