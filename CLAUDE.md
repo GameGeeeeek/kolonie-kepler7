@@ -6586,6 +6586,30 @@ hält Backend-Kategorien und Frontend-Schalter zusammen und fällt bei einer Sei
     Das ist die Familie von Regel 68, eine Ebene höher: Dort hält ein Test einen FEHLER als Regel
     fest, hier hält er eine LÜCKE als Absicht fest.
 
+80. **Ein Paritätstest, der die STRUKTUR des Nachbar-Repos festnagelt, fällt bei jedem Refactor
+    drüben durch — und wer ihn reißt, sieht ihn nicht.** Vorfall 29.08.2026: `test_bastionsmarken`
+    10c verlangte, `bastionMarkMultServer(save, k)` stehe **GENAU ZWEIMAL** im Rumpf von
+    `computeDefensePower` — die zwei Summierstellen für Heimat und Kolonien. Die Backend-Etappe
+    „PvP auf alle Standorte" hat die Funktion in `standortDefGebaeude(save, key)` zerlegt; die
+    Marke lebt seither an EINER Stelle, durch die beide Wege delegieren. Der Zähler fiel damit auf
+    völlig korrektem Code durch, in einem Repo, in dem gar nichts geändert worden war — und der
+    Autor der Backend-Änderung hat den Frontend-Test bei seinem Prüflauf nie gesehen.
+    **Vorgehen:** Ein Paritätstest verlangt die EIGENSCHAFT („die Marke wirkt an beiden
+    Summierwegen"), nie eine Aufrufzahl. Und die Behebung ist Regel 43, nicht eine gelockerte
+    Schranke: Aus dem Zähler wurden DREI Prüfungen — die Marke lebt **genau einmal** (eine zweite
+    Kopie kann wieder auseinanderlaufen, das ist ja der Grund für die Zusammenführung),
+    `computeDefensePower` delegiert **beide** Gebäude-Summierwege dorthin, und die neue
+    Zielwahl-Route `standortVerteidigung` erbt sie ebenfalls. Die dritte Zeile prüft eine
+    Eigenschaft, die es vorher gar nicht geben konnte — der Test fängt seither mehr als vorher,
+    nicht weniger. Beidseitig gegengeprüft: 50 Prüfungen in beiden Richtungen bei identischer
+    Prüfliste, am Eltern-Stand fallen genau 10c/10c2/10c3.
+    **Und die zweite Hälfte betrifft die ARBEITSTEILUNG:** Wer im Backend eine Funktion
+    zusammenführt, die ein Frontend-Test liest, kann das nicht bemerken — sein Prüflauf kennt die
+    Datei nicht. Ein solcher Refactor gehört deshalb im PR-Text benannt („bis der Frontend-Fix
+    gemerged ist, fällt `test_bastionsmarken` 10c"), damit der rote Test drüben als Etappe
+    erkennbar ist und nicht als Spielfehler gesucht wird — genau so ist es hier gelaufen, und
+    deshalb hat die Suche zwei Minuten statt eines halben Prüflaufs gekostet.
+
 ## Der Urmateriekern war unauffindbar — zwei Mechanismen, ein Komplettpaket (28.08.2026)
 
 **Spieler-Report Sascha: „Habe alle Systeme durchgeschaut kein einzigen urmaterie Asteroiden
@@ -6821,3 +6845,48 @@ Der Vergleich las die Prüfzeilen **samt Beleg** (`5a: … | {…}`) und zählte
 (`sed -E 's/^(OK|FAIL) +- //; s/ \|.*$//'`), die Schlusszeile ausdrücklich herausgefiltert. Das ist
 in dieser Sitzung das dritte Mal derselbe Griff — die Regel steht seit dem 18.08.2026 da, und sie
 greift nur, wenn man sie beim Schreiben des Skripts anwendet statt beim Lesen des Ergebnisses.
+
+## PvP auf alle Standorte (Auftrag 29.08.2026) — Etappe 1 Backend ist live
+
+**Auftrag Sascha (wörtlich): „prüfe man kann nur hauptlanet von spielern angreifen keine kolonien
+es sollen alle von spielern kolonisierten planeten angreifbar sein mehr pvp aktion!"** Über
+`AskUserQuestion` gewählt: **„Voller Standort-Kampf, 2 Etappen"**. Konzept mit allen Zahlen und den
+zwei Zusagen: **`docs/pvp-standorte-konzept.md`**.
+
+**Etappe 1 ist das BACKEND und ausgeliefert** (kolonie-kepler7-backend #187): `/api/attack` nimmt
+optional `targetPlanet` ('home' oder ein Kolonien-Schlüssel) und kämpft dann gegen die Verteidigung
+EINES Standorts; `GET /api/spieler-standorte?target=<id>` liefert die Zielwahl-Liste. **Ohne das
+Feld läuft byte-genau der bisherige Konto-Kampf** — das ist die Zusage, und sie ist gemessen, nicht
+behauptet. Die Zerlegung, die Beutefaktoren (heimat 1,0 / kolonie 0,5 / mond 0,35), der kontoweite
+Schutzschild und die Begründungen stehen in der **Backend-CLAUDE.md**.
+
+**Kein Schalter nötig** (anders als bei den Festungen, Regel 60): Ohne das neue Frontend sendet
+niemand `targetPlanet`, und der Altpfad ist byte-gleich. Es gibt keine Zahl, die ein Spieler ohne
+das Frontend anders sieht als vorher.
+
+### Der eine Nachzug im Frontend, den die Zerlegung erzwungen hat
+
+`bastionMarkMultServer(save, k)` stand vorher **zweimal** in `server.js` — an den zwei
+Summierstellen von `computeDefensePower`. Nach der Zerlegung lebt die Marke an EINER Stelle
+(`standortDefGebaeude`), durch die beide Wege delegieren. `test_bastionsmarken` 10c zählte die
+Aufrufstellen und fiel damit auf korrektem Code durch; er prüft seither die EIGENSCHAFT statt der
+Zahl und ist dabei stärker geworden (Einzelheiten und die übertragbare Lehre stehen als
+Arbeitsregel 80).
+
+### Was die Frontend-Etappe 1 noch bauen muss
+
+Die Zielwahl-UI. Das Konzept nennt die Einzelheiten; vier Dinge sind vorab gemessen und gehören
+beim Bauen berücksichtigt:
+
+- **`festungZiel` ist das Vorbild:** eine MODULVARIABLE, nichts im DOM. Der Flottendialog zeichnet
+  sich bei jeder Änderung neu, ein `<select>` darin verlöre seinen Wert (der Allianz-Raid ist
+  daran schon einmal still mit der Vorgabedauer gestartet).
+- **Die Standortliste braucht frische, unentdeckte `spyIntel`** — sonst nur Heimat plus Hinweis.
+  Der Honeypot verfälscht die Anzeige rein clientseitig; die Verfälschung gehört deshalb auch auf
+  die Standortliste, sonst ist sie über den neuen Weg umgehbar (Konzept §2.5).
+- **`m.targetPlanet` reist in der Mission mit**, und die Anzeigestellen ziehen nach: Missionskarte,
+  Flottenleiste, Bericht mit Standortnamen, und `pvp-fleet-loss` auf die Standortflotte, wenn der
+  Bericht ein `planetKey` trägt.
+- **Der Patchnote muss die Balance-Verschiebung benennen** (Konzept §2.7) — eine Kolonie ist ein
+  weicheres Ziel als die Heimat, und wer das verschweigt, liefert eine stille Verschlechterung für
+  jeden aus, der seine Verteidigung bisher nur zu Hause aufgestellt hat.
