@@ -5465,6 +5465,46 @@ einen 50-Minuten-Lauf.
 Das Konto-Blatt liest `aktiv` und `reaktionen`; ohne sie zeichnet es den Block gar nicht (das ist
 4a). Der Frontend-Teil ist damit gegen einen alten Server harmlos — trotzdem gehört der
 Backend-PR vorher gemerged, sonst steht eine Fläche, die drei Tage lang nichts anzeigt.
+## Die Meldungs-Salve: 13 Tests geprüft, EINER war betroffen (28.08.2026)
+
+Arbeitsregel 47 und ihr Nachtrag beschreiben zwei Fehlerfälle derselben Familie: Der Toast-Stapel
+hält nur drei Einträge, und `#log` hat gar keinen Stapel – es überschreibt sich per `innerHTML`
+mit jeder Meldung selbst. Ein Test, der eine Protokollzeile am ENDSTAND abliest, ist damit davon
+abhängig, dass zwischen Aktion und Ablesen keine andere Meldung kommt.
+
+Offen war, wie viele Tests das noch betrifft. **Gemessen statt geschätzt**, mit einer Kopie der
+Spieldatei, in der ab Sekunde 3 alle 300 ms eine Störmeldung durch `log()` läuft – also genau der
+Mechanismus, nicht bloß irgendeine Störung:
+
+| | |
+|---|---|
+| Browsertests, die `#log` oder Toasts lesen und keinen `ruhigeUhren`-Riegel haben | **13** |
+| davon gegen die Salve rot | **1** (`test_listen_cache`) |
+
+**Die Erwartung war eine andere, und das ist der Grund, warum die Messung vor der Arbeit steht.**
+`test_wachauf_nachholen` ist der Anlassfall von Regel 47 und blieb grün – seine Nachhol-Zeilen
+tragen seit der damaligen Behebung `toast-wichtig`, und `test_fundort_knopf` war schon auf den
+Mitschnitt umgestellt. Die Härtungen von damals haben also gehalten; eine pauschale Umstellung
+aller dreizehn wäre der Ersetzer-Fall aus Regel 24 gewesen (viel Änderung, ein echter Treffer).
+
+**Der eine Treffer:** `test_listen_cache` Prüfung 2 las `l.textContent` 1200 ms nach dem Klick.
+Der Kommentar daneben begründet ausdrücklich, warum am Meldungs-Log gemessen wird und nicht an der
+Bau-Warteschlange (die ist bei genug Rohstoffen sofort wieder leer) – die Entscheidung ist
+richtig, nur die Messform war die verwundbare. Er schneidet jetzt mit (`MutationObserver` per
+`addInitScript`, dasselbe Muster wie `test_fundort_knopf`) und gibt bei fehlendem Treffer die
+letzten Zeilen aus (Regel 37).
+
+Der Beleg aus dem Salven-Lauf zeigt den Mechanismus wörtlich – die Meldung ERSCHIEN, war beim
+Ablesen nur längst überschrieben:
+
+```
+["Zur Warteschlange hinzugefügt.", "Stoermeldung aus der Salve",
+ "Solarkraftwerk (Warteschlange) auf Level 23 ausgebaut.", "Stoermeldung aus der Salve"]
+```
+
+**Und die Gegenrichtung belegt, dass er dabei STÄRKER geworden ist** (Regel 26/43): Mit einer
+Kopie, in der der Einreihen-Knopf gar nicht erst verdrahtet wird, fallen `2` und `3` weiterhin –
+auch zusammen mit der Salve. Vier Läufe, 47 identische Prüfnamen in jedem.
 
 ## Proaktive Vorschläge
 
