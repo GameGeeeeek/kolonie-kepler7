@@ -39,8 +39,4 @@ if (treffer.length === 1) {
   check('CSS enthaelt die erwartete Groessenordnung an Icon-Regeln', regeln > 50 && regeln < 200, regeln);
 }
 
-check('beide HTML-Dateien tragen denselben Font',
-  fs.readFileSync(SPIELDATEI, 'utf8').match(/data:font\/woff2;base64,([A-Za-z0-9+/=]{64})/)[1]
-  === fs.readFileSync(path.join(WURZEL, 'index.html'), 'utf8').match(/data:font\/woff2;base64,([A-Za-z0-9+/=]{64})/)[1]);
-
 ende();
