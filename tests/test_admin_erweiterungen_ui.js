@@ -11,6 +11,14 @@
 //   4a/4b    der geschenk-Zweig bucht und speichert UND faellt nicht in den Bug-Report-Rueckfall
 //   5a/5b    der Betreiber sieht den Schalter UND ein anderes Konto nicht
 //
+// GEGENPROBE (per KEPLER_SPIELDATEI gegen den Stand v8.623.0 vor dieser Etappe, Prueflisten per
+// diff identisch): 33 von 39 fallen. Die sechs, die dort GRUEN bleiben, sind der Beleg statt eines
+// Mangels: 2d-vorab/2d (ein alter Server schickt die Felder nicht - das Blatt muss dann ohne die
+// Zeilen stehen, an BEIDEN Staenden), 1e2 (die Kontosuche laeuft unabhaengig von der Uebersicht)
+// und die drei -fehler-Zeilen (keine Seitenfehler, ebenfalls an beiden Staenden Pflicht). Die
+// erste Fassung dieser Gegenprobe STARB mitten drin an einem nackten page.fill mit 30-s-Timeout
+// (Regel 34) - seither sind alle Bedienschritte gefasst (fuellen/klicken/waehlen, 3 s).
+//
 // `state` lebt im Modulscope der Spieldatei (Regel 47) - gemessen wird der GESPEICHERTE Stand,
 // den der Zweig ueber save() schreibt. Das misst zugleich Regel 73: Der Server hat die
 // Belohnung beim Abholen bereits entfernt, ohne save() waere sie beim Schliessen des Reiters weg.
