@@ -87,6 +87,15 @@ Toasts, Logs und andere kurzlebige Meldungen nicht nur über einen späten DOM-E
 
 Fehlerausgaben sollen zeigen, was tatsächlich sichtbar war, nicht nur „nicht gefunden“.
 
+## Auf den ersten Schreibvorgang warten
+
+Wer misst, was ein Zweig über `save()` in den gespeicherten Spielstand schreibt, wartet auf den
+ERSTEN Schreibvorgang nach dem Boot – und vergleicht dabei gegen dieselbe Fixture-Zeichenkette,
+die im Mock-Speicher liegt. Ein frisch erzeugtes `save()` trägt ein anderes `lastTick`, ist nie
+gleich, und die Warteschleife greift dann einen späteren Autosave mit Produktion darin
+(gemessen 6.124 statt 6.000 Erz, `test_admin_erweiterungen_ui` 4a). Ressourcen im Fixture unter
+dem Lagerdeckel halten – sonst misst man den Deckel statt der Gutschrift.
+
 ## Merge-/Rebase-Konflikte in Tests
 
 Testdateien nie pauschal mit `ours` oder `theirs` ersetzen. Danach prüfen, dass keine Prüfungen aus einer Seite verloren gingen, z. B. durch Vergleich der Test-/Prüfnamen.
