@@ -158,6 +158,18 @@ Für Kepler ergibt sich Qualität aus:
 
 Ein stärkeres Cloud-Modell ohne diese Leitplanken kann schlechtere Änderungen liefern als ein kleineres lokales Modell mit sauberem Projektkontext und einem strengen Qualitätstor.
 
+## 16. Ein schwacher Hash über fortlaufende Schlüssel ist kein Zufall
+
+`hashStringToFloat` rechnet `h*31+Zeichen mod 10000`. Zwei Schlüssel, die sich nur in einer
+laufenden Nummer unterscheiden, liegen damit 31/10000 auseinander. Wer daraus Positionen ableitet,
+bekommt Muster statt Streuung – bei den Sternen der Systemansicht waren es „Perlenschnüre", die im
+Bild wie gestrichelte Striche aussahen, und aufgefallen ist es nur im gerenderten Bild, nicht im
+Quelltext.
+
+Für deterministische Streuung den Hash nur als Startwert nehmen und die Folge aus einem echten
+Generator ziehen (`sysZufall`, mulberry32). Und eine Zeichnung vor dem Merge einmal wirklich
+ansehen – ein Test, der Anker zählt, sieht so ein Muster nicht.
+
 ## Pflege dieser Datei
 
 Nur eine neue Regel aufnehmen, wenn sie:
