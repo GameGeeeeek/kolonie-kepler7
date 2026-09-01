@@ -294,4 +294,3 @@ sind unberührt. Nur falls später ein Server-relevanter Verbraucher dazukommt, 
 - [ ] Keine doppelten Funktions-/Key-Namen; kein doppeltes Komma in Arrays.
 - [ ] `node -e` Syntax-Check + `node check-icons.js` + JSDOM-Boot+Tab-Sweep.
 - [ ] VERSION erhöht, neuer PATCHNOTES-Eintrag, HELP_SECTIONS aktualisiert.
-- [ ] `cp weltraum_kolonie.html index.html` (beide Dateien identisch).

@@ -13,9 +13,8 @@ node naechste-version.js
 
 # VERSION + neuen deutschen PATCHNOTES-Eintrag setzen
 node build-patchnotes.js
-cp weltraum_kolonie.html index.html
 
-# Abschlussprüfung für Nummer/Patchnotes/Synchronität
+# Abschlussprüfung für Nummer/Patchnotes
 node tests/run.js --nummer
 ```
 

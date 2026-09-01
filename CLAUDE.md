@@ -6,7 +6,7 @@ Diese Datei ist absichtlich kurz. Sie enthält nur Startkontext und Regeln, die 
 
 - Browserbasiertes Weltraum-Kolonie-/Idle-Spiel.
 - Hauptcode: `weltraum_kolonie.html` – große Single-File-Anwendung mit HTML, CSS und Vanilla-JS; kein Framework und kein Build-Schritt für das Spiel selbst.
-- `index.html` und `weltraum_kolonie.html` müssen nach Änderungen identisch sein.
+- Es gibt **keine** `index.html`-Kopie mehr (seit 01.09.2026); nginx auf dem Pi liefert `weltraum_kolonie.html` direkt als Startseite (`index weltraum_kolonie.html;`). Eine neu angelegte Kopie lässt den Prüflauf fallen.
 - Deployment läuft auf dem Raspberry Pi über nginx, nicht über GitHub Pages.
 - Backend und weitere Dienste liegen in Nachbar-Repositories. Bei Änderungen über Repo-Grenzen hinweg immer beide Seiten prüfen.
 - Der lokale GameGeeeeek AI Hub/RAG kennt Frontend, Backend und Social Hub. Für Code-Suche zuerst RAG/grep verwenden statt die komplette Spieldatei in einen LLM-Kontext zu laden.
@@ -45,7 +45,6 @@ node naechste-version.js
 
 # 3. VERSION + neuen deutschen PATCHNOTES-Eintrag eintragen
 node build-patchnotes.js
-cp weltraum_kolonie.html index.html
 
 # 4. Nach der Nummernvergabe gezielte Abschlussprüfung
 node tests/run.js --nummer
@@ -69,15 +68,9 @@ Wichtig:
 
 Mehr: `docs/TESTING.md` und `tests/README.md`.
 
-## Zwei Dateien synchron halten
+## Eine Spieldatei, keine Kopie
 
-Der Pi-Deploy verwendet `weltraum_kolonie.html`. Nach jeder Änderung an der Spieldatei:
-
-```bash
-cp weltraum_kolonie.html index.html
-```
-
-Vor dem Commit muss die Identität beider Dateien durch den Prüflauf bestätigt sein.
+Der Pi-Deploy kopiert `*.html` ins Web-Verzeichnis und löscht dort nie; nginx nimmt `weltraum_kolonie.html` als Startseite. Eine `index.html` im Repo würde live ausgeliefert und beim nächsten Release still veralten, deshalb verbietet der Prüflauf sie.
 
 ## Patchnotes und Live-Dokumentation
 

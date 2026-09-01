@@ -4,7 +4,7 @@
  *
  *   node tests/run.js              alles
  *   node tests/run.js selects      nur Tests, deren Dateiname "selects" enthält
- *   node tests/run.js --nur-pflicht   nur Syntax + Icon-Whitelist + Dateigleichheit (Sekunden statt Minuten)
+ *   node tests/run.js --nur-pflicht   nur Syntax + Icon-Whitelist + Kopie-Verbot (Sekunden statt Minuten)
  *   node tests/run.js --nummer     Pflichtprüfungen + die vier Tests, die an VERSION/PATCHNOTES hängen
  *
  * --nummer ist fuer EINEN bestimmten Ablauf da (eingefuehrt 15.08.2026): Die Versionsnummer wird
@@ -68,15 +68,15 @@ try {
   melde('Icon-Whitelist (check-icons.js)', false, (e.stdout ? e.stdout.toString() : '').trim().split('\n').pop());
 }
 
-// 3. Die beiden HTML-Dateien müssen byte-gleich sein (der Pi-Deploy kopiert weltraum_kolonie.html,
-//    index.html ist die Kopie - laufen sie auseinander, sieht der Spieler etwas anderes als getestet)
-try {
-  const a = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'));
-  const b = fs.readFileSync(path.join(WURZEL, 'index.html'));
-  melde('weltraum_kolonie.html == index.html', a.equals(b),
-    a.equals(b) ? '' : 'cp weltraum_kolonie.html index.html');
-} catch (e) {
-  melde('weltraum_kolonie.html == index.html', false, String(e.message).slice(0, 80));
+// 3. Es darf KEINE index.html mehr geben. Bis zum 01.09.2026 lag hier eine byte-gleiche Kopie der
+//    Spieldatei, nur weil nginx standardmäßig index.html als Startseite erwartet; seit
+//    `index weltraum_kolonie.html;` in der nginx.conf des Pi ist sie überflüssig. Der Deploy kopiert
+//    aber pauschal *.html und löscht nie - eine aus Gewohnheit wieder angelegte Kopie würde live
+//    ausgeliefert und beim nächsten Release still veralten. Deshalb ist die Kopie jetzt ein Fehler.
+{
+  const kopie = fs.existsSync(path.join(WURZEL, 'index.html'));
+  melde('keine index.html-Kopie im Repo', !kopie,
+    kopie ? 'git rm index.html - nginx liefert weltraum_kolonie.html direkt aus' : '');
 }
 
 // 4. VERSION und der oberste PATCHNOTES-Eintrag müssen zusammenpassen - sonst wurde beim Commit

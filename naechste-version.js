@@ -19,7 +19,7 @@
  *   1 = KOLLISION: die lokale VERSION ist auf main bereits vergeben
  *
  * Damit ist der Ablauf: Änderung bauen → voller Prüflauf OHNE neue Nummer → dieses Skript →
- * Nummer + Patchnote eintragen → `node build-patchnotes.js` → `cp weltraum_kolonie.html index.html`
+ * Nummer + Patchnote eintragen → `node build-patchnotes.js`
  * → `node tests/run.js --nummer` (Sekunden) → committen und mergen.
  */
 const { spawnSync } = require('child_process');
