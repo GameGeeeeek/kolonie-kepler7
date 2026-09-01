@@ -63,7 +63,15 @@ for (const fid of ['kartell', 'void', 'legion', 'schatten']) {
 // misst das am gerenderten Knoten samt Kartenfarbe.
 check('terrGlow-Flächen sind entfernt (Besitz = Ring + Wappen in der Sektoransicht)',
   src.indexOf('terrGlow') < 0);
-check('die Sektoransicht kennt den Fraktions-Ring', src.indexOf('data-ring="fraktion"') >= 0);
+// Seit dem 29.08.2026 entsteht der Ringname in systemDominanz - der EINEN Quelle fuer alle
+// Kartenebenen. Geprueft wird deshalb die EIGENSCHAFT ("es gibt einen Fraktions-Ringnamen") statt
+// der frueheren Schreibweise data-ring="fraktion", die der Umbau legitim dynamisch gemacht hat
+// (Hausregel 3). Das ist zugleich SCHAERFER: Die zweite Zeile verlangt, dass es die Regel nur
+// EINMAL gibt - vorher stand sie in zwei Kartenstellen nebeneinander und konnte auseinanderlaufen.
+check('die Sektoransicht kennt den Fraktions-Ring', /ring:'fraktion'/.test(src));
+check('der Ringname kommt aus genau EINER Quelle',
+  (src.match(/ring:'fraktion'/g)||[]).length === 1 && (src.match(/function systemDominanz\(/g)||[]).length === 1,
+  { fraktionsRing: (src.match(/ring:'fraktion'/g)||[]).length, quelle: (src.match(/function systemDominanz\(/g)||[]).length });
 
 // ---- 4. Frontsegmente: seit KB-5b ENTFERNT ------------------------------------------------------
 // Sie waren fuer die Galaxie-Uebersicht gebaut; in der hineingezoomten Systemebene (seit KB-4 der

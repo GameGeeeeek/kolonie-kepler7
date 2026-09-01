@@ -450,3 +450,59 @@ mit 4 Bossen und der Sektorverteilung 12/3/1/1/1/0/0/0; die Verteidigungsreihe 3
 ohne Produkt-Boden; `npcMapMenu` mit einem Eintrag; `npcEmpireStrength` mit zwei Fundstellen;
 `activeWormhole` ausschließlich in Anzeigepfaden; `SEKTOR_DEFS[].desc` ohne Leser;
 `performSectorSearch` ohne Festungen/Nester/NPCs.
+
+## 6. Gebaut: Wem gehört ein System? Der Ring sagt es (01.09.2026)
+
+Auftrag Sascha: „anzeige welche macht ein system dominiert". Gewählt: **eine Rangfolge, eine
+Farbe** — der Knoten trägt das Zeichen genau der stärksten anwesenden Macht.
+
+**Der Befund war größer als „es fehlt eine Anzeige".** Beide Kartenstellen prüften die Eroberung
+nur gegen die EIGENE Spieler-ID. `galaxyCache.controlledSystems` ist aber die globale Karte
+`systemId -> userId` aller Spieler: Ein von einem **fremden** Spieler erobertes System sah aus wie
+ein unbeanspruchtes. Ebenso unsichtbar war die Kolonie-Herrschaft, obwohl
+`computeSystemControllers` sie vollständig führt. Alle vier Machtquellen waren vorhanden; die
+Etappe ist eine Verdrahtung plus Rangfolge — und beseitigt die Doppelung, dass die
+Ring-plus-Wappen-Regel zweimal stand (Nachbarpunkte der Systemebene und Sektoransicht).
+
+### Die Rangfolge (`systemDominanz`, die eine Quelle für alle Kartenebenen)
+
+| Rang | Art | warum dort |
+|---|---|---|
+| 1 | kollabiert | Zustand, kein Machtträger; in einem zerstörten System ist die Besitzfrage gegenstandslos. |
+| 2 | erobert | Die einzige Macht, die der Server exklusiv führt und die militärisch genommen wird. Schlägt das Territorium, weil man genau Fraktionssysteme erobert. |
+| 3 | Kolonie-Herrschaft | Alleinherrschaft über die besiedelten Planeten (nur bei EINER Identität, +5 % Produktion). |
+| 4 | Fraktions-Territorium | Politische Zuordnung ohne Präsenz — die weichste Aussage. Hängt wie bisher an der Ebene „fraktionen". |
+| 5 | Alien-Nest | Beansprucht nichts. Steht nur, wenn sonst niemand herrscht; sitzt ein Spieler drauf, bleibt das Nest Abzeichen (dieselbe Entdopplung wie 👽/👾). |
+
+Farben abgelesen, nicht erfunden: grün/rot aus der Chip-Zeile des offenen Systems, das Rosa
+fremder Kolonie-Herrschaft aus `renderTerritoryBox`, Fraktions- und Volksfarben aus ihren
+Tabellen. **Eigener Besitz ist gefüllt, Fremdes nur umrandet.** Die Betonung folgt der Rangstufe
+(`DOMINANZ_BETONUNG`) — am gerenderten Bild gemessen ging „von einem fremden Spieler erobert" mit
+den Bestandswerten des Fraktionsrings (Breite 1,2 / Deckkraft 0,55) unter; der Fraktionswert
+bleibt unverändert, alles darüber wird lauter.
+
+### Vier Anzeigestellen
+
+Sektoransicht (Ring, Statuszeile), Nachbarpunkte der offenen Systemebene (Ring, `meta`),
+Chip-Zeile im offenen System (Kolonie-Herrschaft dort neu — sonst widerspräche sie der Karte), und
+die **Systempunkte der Regionsübersicht**. Dort bewusst keine fünfte Textzeile und keine
+Regions-Aggregation: KB-21 hat gemessen, dass am Handy alle Beschriftungen bei 6–9 px liegen. Die
+Punkte kosten keinen Platz und sagen mehr als eine Summe — man sieht, WELCHE Systeme wem gehören.
+Auf Regionsebene ist das eine Zugabe, keine Karte.
+
+### Der Riegel gegen die quadratische Form
+
+`computeSystemControllers()` macht je besessenem Planeten ein lineares `PLANETS.find`.
+Ausgeführt gemessen (30 Spieler à 18 Planeten): 540 `find`-Aufrufe, 269.460 Vergleiche,
+**3,9 ms je Aufruf** — je Systemknoten gerufen wären das bei 81 Systemen **317 ms je
+Kartenaufbau**. `systemHerrscherCached()` (900 ms, Muster `storageCapCached`) verhindert das; die
+Bestandsaufrufer profitieren mit. Wer eine neue Machtquelle ergänzt, misst zuerst ihre Kosten je
+Knoten.
+
+Die Ringnamen `kontrolle` und `fraktion` sind Bestands-Anker (vier Tests greifen darauf) und
+bleiben; alles Neue trägt `data-ring="dominanz"` plus `data-dominanz="<art>"`.
+
+Wächter: `tests/test_systemdominanz.js` (28 Prüfungen, jede Kernmessung als PAAR; Gegenprobe
+gegen den Stand davor: 21 rot bei identischer Prüfliste). `test_fraktionsgebiet` prüft die
+Ring-Regel seither als Eigenschaft statt als Literal und verlangt zusätzlich, dass es sie nur
+EINMAL gibt.

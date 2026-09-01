@@ -57,6 +57,13 @@ Warnzeichen:
 
 Bei Refactorings auf eine gemeinsame Funktion müssen alle Einstiegspunkte weiterhin getestet werden.
 
+Beispiel Karte: `karteSystemBadges` (Abzeichen), `systemDominanz` (wem ein System gehört) und
+`kbMarkerFrei` (Markerplatz) sind je EINE Quelle für alle drei Kartenebenen. Wer dort etwas
+ergänzt, versorgt automatisch Regionsübersicht, Sektoransicht und offene Systemebene — und prüft
+vorher die Kosten je Knoten: eine Rechnung, die über alle Spieler oder Planeten läuft, gehört
+hinter einen kurzen Zwischenspeicher (`systemHerrscherCached`, `storageCapCached`), sonst wird
+sie mit der Zahl der Knoten quadratisch. Einzelheiten: `docs/sektorkarte-konzept.md`, Abschnitt 6.
+
 ## UI-Modi und versteckte Verantwortung
 
 Beim Entfernen oder Abschalten eines UI-Modus nicht nur die sichtbare Darstellung betrachten. Ein alter Zweig kann zusätzlich enthalten:
