@@ -15613,8 +15613,26 @@
     if (!daten || daten.fehler){
       /* Der Bau ist nicht zustande gekommen (belegt, Deckel, Heimat, Server weg): Die Baukosten
          kommen ZURUECK - sie sind fuer nichts bezahlt worden. gainResources klemmt am Lagerdeckel;
-         der Bericht nennt den Grund, denn beim Offline-Nachholen ist #log stumm. */
+         der Bericht nennt den Grund, denn beim Offline-Nachholen ist #log stumm.
+
+         ERST NACHSEHEN, DANN ERSTATTEN. Zwei Faelle sehen von hier aus gleich aus und sind es
+         nicht: Der Server hat den Bau abgelehnt (dann gehoert das Geld zurueck) - oder er hat
+         gebaut und nur die Antwort ging verloren (Verbindungsabbruch, oder der dokumentierte
+         Selbst-Neustart des Backends genau zwischen saveDb und res.json). Im zweiten Fall waere
+         die Erstattung eine Rohstoff-Verdopplung: Vorposten steht UND 125.000 zurueck. Der Client
+         kann das entscheiden, statt es zu raten - er fragt die Liste frisch ab und sieht nach, ob
+         in diesem System jetzt ein EIGENER Vorposten steht. Gefunden bei der gegnerischen Abnahme;
+         /api/vorposten/bauen ist der einzige der sechs Endpunkte ohne `abgerechnet`-Sperre. */
       const grund = (daten && daten.error) || (status === 404 ? 'Der Server kennt Vorposten noch nicht.' : 'Der Server war nicht erreichbar.');
+      await ladeVorposten();
+      const stehtSchon = (() => { const v = vorpostenAn(m.system); return !!(v && v.eigener); })();
+      if (stehtSchon){
+        log('Der Vorposten in ' + sysN + ' steht bereits – die Antwort des Servers ging nur verloren. Die Baukosten bleiben verbucht.', 'ti-building-community', 'wichtig');
+        pushReport({ type:'vorposten-bau', erfolg:true, fleetName:m.fleetName, system:m.system, systemName:sysN,
+          stufeName:(vorpostenAn(m.system) || {}).name || 'Feldlager', kosten:m.kosten||null,
+          grund:'Die Antwort des Servers ging verloren; nachgesehen: der Vorposten steht.' });
+        return;
+      }
       if (m.kosten) gainResources(m.kosten);
       log('Der Vorposten in ' + sysN + ' wurde nicht errichtet: ' + grund + ' Die Baukosten sind zurück im Lager.', 'ti-alert-triangle', 'warn');
       pushReport({ type:'vorposten-bau', keinKampf:true, erfolg:false, fleetName:m.fleetName, system:m.system, systemName:sysN, grund, kosten:m.kosten||null });
@@ -15960,6 +15978,26 @@
      Nest, Konvoi und Vorposten ueber ihre Abklingzeit - in beiden Faellen gibt es keinen zweiten
      Ertrag, sondern eine Abweisung. */
   function serverAufloesungStarten(aufloeser, m, planetKey, fleet){
+    /* DAUERHAFTE Marke, synchron VOR dem Start gesetzt: Der Aufloeser speichert als Erstes
+       (`await save()`), die Marke steht damit im Spielstand, bevor die Anfrage rausgeht.
+       WOZU: laufendeServerAufloesungen ist nur im Arbeitsspeicher. Bleibt das abschliessende
+       save() aus - Tab geschlossen, Reload, oder saveConflictDetected macht save() dauerhaft zum
+       No-Op -, steht die Mission beim naechsten Laden noch im Stand und wuerde ERNEUT eingereicht.
+       Der Server hat beim ersten Mal aber schon gebucht. Die Wiedereinreichung liefe dann in den
+       Fehlschlag-Zweig, und der ist kein neutraler Ausgang, sondern selbst ein Ertrag:
+         * vorposten-bau erstattet die kompletten Baukosten (60.000 Erz, 40.000 Kristalle,
+           25.000 Deuterium), obwohl der Vorposten steht - /api/vorposten/bauen ist der einzige
+           der sechs Endpunkte ganz ohne Doppel-Sperre, seine Abweisung IST die zweite Abrechnung.
+         * Bei den anderen fuenf bleibt `verluste` leer: Die Flotte kommt vollzaehlig heim, obwohl
+           der Schlag stattgefunden hat, und der Festungsschlag gibt zusaetzlich den
+           Belagerungsplan zurueck.
+       Gefunden bei der gegnerischen Abnahme dieses Aenderungssatzes. Vor dieser Behebung war der
+       Fall unerreichbar, weil der Server ausnahmslos mit 403 antwortete und nie etwas ausfuehrte -
+       die Behebung hat ihn also selbst erst geoeffnet.
+       Der Preis ist bewusst gewaehlt: Ging die Anfrage in Wirklichkeit gar nicht raus, verliert der
+       Spieler diesen einen Anflug (die Flotte kommt trotzdem vollzaehlig heim). Das ist die
+       harmlose Richtung - eine zweite Abrechnung waere es nicht. */
+    m.__gefragt = true;
     Promise.resolve()
       .then(() => aufloeser(m, planetKey, fleet))
       .catch(e => { console.error(e); })
@@ -15992,8 +16030,15 @@
          HIER FEHLT KEIN CODE: Die Schiffe stehen die ganze Mission ueber in `fleet`, ein leeres
          `verluste` ist also genau die vollzaehlige Rueckkehr (siehe pveVerlusteBuchen). */
       const zielName = asteroidName({sorte:m.sorte, groesse:m.groesse});
+      /* Den Grund nennt der SERVER (serverFehler), nicht der Statuscode - dieselbe
+         Vereinheitlichung, die die fuenf anderen Aufloeser am 02.09.2026 bekommen haben. Diese
+         Stelle hatte die alte Annahme behalten und die Variable zugewiesen, ohne sie je zu lesen.
+         Sichtbar wurde das erst durch die Behebung: Vorher antwortete der Endpunkt ausnahmslos mit
+         403 "keine Flotte im Spielstand", jetzt kommt z. B. 409 "bereits abgerechnet" - und dafuer
+         stand hier woertlich "der Server war nicht erreichbar". */
       const grund = 'Die Anfechtung kam nicht zustande'
-        + (status === 403 ? ' – Schutzfrist, Abklingzeit oder Allianz'
+        + (serverFehler ? ' – ' + serverFehler
+         : status === 403 ? ' – Schutzfrist, Abklingzeit oder Allianz'
          : status === 404 ? ' – der Server kennt Anfechtungen noch nicht'
          : ' – der Server war nicht erreichbar') + '.';
       log('Die Anfechtung bei '+zielName+' kam nicht zustande – die Flotte kehrt vollzählig zurück.',
@@ -34663,18 +34708,29 @@ async function claimPendingRewards(){
        gespeicherten Spielstand, die Zahl kann also um den Bruchteil abweichen, den eine seit dem
        letzten Speichern gebaute Werft ausmacht. Deshalb steht hier eine Naeherung ("~") und im
        BERICHT danach die Zahl des Servers. */
+    let unterMindesteinsatz = false;
     if (PVP_MINDESTEINSATZ_AKTIV){
       const anteil = pvpEinsatzAnteil(flotte);
       const pAnteil = Math.round(anteil*100), pNoetig = Math.round(PVP_MINDESTEINSATZ*100);
+      unterMindesteinsatz = anteil < PVP_MINDESTEINSATZ;
       html += anteil < PVP_MINDESTEINSATZ
         ? `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <strong>Unter dem Mindesteinsatz:</strong> Du schickst ~${pAnteil}% deiner Reichsflotte, nötig sind ${pNoetig}%. Der Kampf läuft mit der vollen Reichskraft, bringt aber nichts ein – keine Beute, keine Kampfpunkte, kein Schaden beim Ziel.</div>`
         : `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Einsatz ~${pAnteil}% deiner Reichsflotte – über dem Mindesteinsatz von ${pNoetig}%.</div>`;
     }
     const bf = (ziel && ziel.beuteFaktor) || 1;
     const frachtRaum = fleetCargoCapacity(flotte);
+    /* Unter dem Mindesteinsatz gibt es GAR KEINE Beute - ein "×1.00 (voller Satz)" zwei Zeilen
+       unter der roten Warnung waere der direkte Widerspruch, und der Frachter-Hinweis nennte eine
+       Ursache, die nicht die Ursache ist. Genau dieselbe Falle ist im Bericht und im Log schon
+       behoben; die Vorschau ist die Stelle, an der der Spieler die Entscheidung noch aendern
+       kann - sie darf ihn also am wenigsten in die Irre fuehren. */
+    if (unterMindesteinsatz){
+      html += `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-diamond" aria-hidden="true"></i> Beute: <strong>keine</strong> – unter dem Mindesteinsatz bringt auch ein gewonnener Angriff nichts ein. Schick mehr Schiffe, dann gilt wieder ×${bf.toFixed(2)}.</div>`;
+    } else {
     html += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute: <strong>×${bf.toFixed(2)}</strong> `
           + `${bf >= 1 ? '(voller Satz – die Heimat ist das fetteste Ziel)' : '(die Ressourcen liegen im gemeinsamen Konto des Ziels; an einer '+(standortArtVon(gewaehlt)==='mond'?'Mondkolonie':'Kolonie')+' ist weniger davon zu greifen)'}`
           + `${frachtRaum > 0 ? '' : ' – <span style="color:#e24b4a;">ohne Frachter kommt nichts davon an</span>'}.</div>`;
+    }
     const dur = missionDurationFor(pseudoDistanceSeconds(target.id), flotte, ATTACK_SHIP_KEYS);
     const fuel = missionFuelCostSplit(dur, flotte);
     html += `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(dur)} · Treibstoff ${fuelCostText(fuel)}`
@@ -44600,7 +44656,12 @@ async function claimPendingRewards(){
       } else if (r.type === 'player-attack'){
         title = (r.warTag?'⚔ ':'')+'Angriff auf Spieler '+escapeHtml(r.targetName);
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
-        if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
+        /* Im Sockel wurde WEDER der Kriegsbonus noch ein Kriegspunkt gebucht (siehe
+           resolvePlayerAttackMission: bpGained ist 0, addWarScore und warVictories laufen nicht).
+           Die alte Zeile stand direkt ueber der neuen Sockel-Zeile und behauptete das Gegenteil -
+           zwei Anzeigestellen derselben Groesse, eine davon mit der alten Annahme. */
+        if (r.warTag && r.ertragStufe !== 'sockel') body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
+        else if (r.warTag) body += '<br><span style="color:#e0a548;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – unter dem Mindesteinsatz zählt er allerdings <strong>nicht</strong> für den Kriegspunktestand.</span>';
         body += standortBerichtszeile(r, true);
         /* PvP-Mindesteinsatz - der wichtigste Satz des Berichts, wenn er greift. Ohne ihn stuende
            dort ein GEWONNENER Angriff ohne Beute, ohne Kampfpunkte und ohne Schaden, und nichts
@@ -44610,7 +44671,7 @@ async function claimPendingRewards(){
           body += '<br><span style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <strong>Unter dem Mindesteinsatz</strong> – '
                 + (typeof r.einsatzAnteil === 'number'
                     ? 'eingesetzt waren ' + Math.round(r.einsatzAnteil*100) + '% deiner Reichsflotte, nötig sind ' + Math.round(PVP_MINDESTEINSATZ*100) + '%. ' : '')
-                + 'Der Kampf lief mit der vollen Reichskraft, brachte aber nichts ein: keine Beute, keine Kampfpunkte, kein Schaden beim Ziel.</span>';
+                + 'Der Kampf lief mit der vollen Reichskraft, brachte aber nichts ein: keine Beute, keine Kampfpunkte, keine Kriegspunkte, keine Veteranen-Erfahrung, kein Schaden beim Ziel.</span>';
         }
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
         body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
@@ -56311,6 +56372,20 @@ async function claimPendingRewards(){
            das Auseinanderlaufen dieser Regel der Fehler war. */
         const serverAufloeser = serverAufloeserFuer(m.type);
         if (serverAufloeser){
+          /* Schon einmal eingereicht (siehe die Marke in serverAufloesungStarten): Der Server hat
+             das beim letzten Mal ausgewertet, nur das Aufraeumen ging verloren. Hier wird deshalb
+             NUR aufgeraeumt und der Spieler ehrlich informiert - ein zweites Einreichen waere
+             keine Wiederholung, sondern eine zweite Abrechnung. */
+          if (m.__gefragt){
+            const idx = fleet.missions.indexOf(m);
+            if (idx >= 0) fleet.missions.splice(idx, 1);
+            const wo = m.system ? ((STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name) : '';
+            if (showLog !== false) log('Dieser Anflug war beim Server bereits eingereicht' + (wo ? ' (' + wo + ')' : '') + ' – das Ergebnis konnte damals nicht mehr gespeichert werden. Er wird nicht erneut abgerechnet; die Flotte ist zurück.', 'ti-alert-triangle', 'warn');
+            angriffOhneKampf(m.type, wo || (m.targetName || ''),
+              'Der Anflug war beim Server bereits eingereicht – das Ergebnis ging beim Speichern verloren. Eine zweite Abrechnung findet nicht statt.',
+              { fleetName: m.fleetName, system: m.system || null, systemName: wo || null });
+            continue;
+          }
           serverAufloesungStarten(serverAufloeser, m, planetKey, fleet);
           continue;
         }

@@ -44,6 +44,21 @@
 //       betroffen); ein Test dafuer ist die Absicherung dieses Umbaus.
 //   z2: der PvP-Angriff bleibt unveraendert - er hatte kein `await save()` und war nie betroffen.
 //
+// ABSCHNITT 8 UND 9 - die zwei Regressionen, die DIESE Behebung selbst geoeffnet hat (gefunden bei
+// der gegnerischen Abnahme, 02.09.2026). Beide waren vorher unerreichbar, weil der Server
+// ausnahmslos mit 403 antwortete und nie etwas ausfuehrte:
+//   8: KEINE ZWEITE EINREICHUNG. Bleibt das abschliessende save() aus (Tab zu, Reload,
+//      saveConflictDetected), stand die Mission beim naechsten Laden noch im Spielstand und wurde
+//      ERNEUT eingereicht. Der Server hatte beim ersten Mal schon gebucht; die Wiedereinreichung
+//      lief in den Fehlschlag-Zweig, und der ist kein neutraler Ausgang, sondern selbst ein
+//      Ertrag (Flotte kommt vollzaehlig heim, Belagerungsplan zurueck, Baukosten erstattet).
+//      Die Marke m.__gefragt wird VOR der Anfrage gesetzt und mit dem save() des Aufloesers
+//      persistiert; eine markierte Mission wird nur noch aufgeraeumt.
+//   9: ERST NACHSEHEN, DANN ERSTATTEN. /api/vorposten/bauen ist der einzige der sechs Endpunkte
+//      ohne `abgerechnet`-Sperre. Bricht die Verbindung NACH dem Bau ab, sah der Client einen
+//      Fehler und erstattete die kompletten Baukosten - Vorposten steht UND Geld zurueck. Jetzt
+//      fragt er die Liste frisch ab und erstattet nur, wenn dort KEIN eigener Vorposten steht.
+//
 // GEGENPROBE (gefahren mit KEPLER_SPIELDATEI auf den Stand vor der Behebung):
 //   Es MUESSEN fallen: b und c jeder der sechs Missionsarten - 12 Pruefungen. Gemessen: genau
 //   diese 12 fallen.
@@ -254,6 +269,102 @@ async function lauf(browser, fall, verzoegerungMs) {
       gefragt === 1 && !!pv && pv.result === 'win', { gefragt, ergebnis: pv ? pv.result : null });
     await ctx.close();
   }
+
+  /* ---- 8: eine bereits eingereichte Mission wird nicht ein zweites Mal abgerechnet ---------- */
+  for (const fall of [FAELLE[0], FAELLE[4]]) {   // Anfechtung (mit abgerechnet-Sperre) und Vorposten-Bau (ohne)
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    const store = {}; const anfragen = []; const berichte = [];
+    const mission = Object.assign({
+      id: MID, type: fall.typ, fleetName: 'Prüfflotte', startTime: Date.now(), endTime: Date.now() + 4000,
+      composition: { jaeger: 5 },
+      // Genau der Zustand nach einem verlorenen Aufraeum-Speichern: die Marke steht, die Mission auch.
+      __gefragt: true
+    }, fall.mission);
+    store[SAVE_KEY] = grundstand(mission);
+    await page.route('**/api/**', async r => {
+      const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
+      const j = (o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
+      if (p === 'me') return j({ userId: 'u-ich', username: 'Ich', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
+      if (p.startsWith('storage/')) {
+        const k = decodeURIComponent(p.slice(8));
+        if (req.method() === 'PUT') { try { store[k] = JSON.parse(req.postData() || '{}').value; } catch (e) {} return j({ ok: true }); }
+        if (store[k] !== undefined) return j({ key: k, value: store[k], version: 1 });
+        return j({ e: 1 }, 404);
+      }
+      if (p === fall.pfad) { anfragen.push(1); return j(fall.antwort); }
+      if (p === 'reports') { if (req.method() === 'POST') { try { berichte.push(JSON.parse(req.postData() || '{}').report || {}); } catch (e) {} return j({ ok: true }); } return j({ reports: [] }); }
+      if (p === 'notifications') return req.method() === 'POST' ? j({ ok: true }) : j({ notifications: [] });
+      if (/leaderboard|messages|ranking|wars|halloffame|bounty|friends|pending/.test(p)) return j(p.includes('pending') ? { reward: null } : []);
+      if (/asteroid|festung|alien|konvoi|vorposten|galaxie/.test(p)) return j({ ok: true, felder: {}, liste: [], stufen: [] });
+      return j({});
+    });
+    await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+    await page.goto(SPIEL_URL);
+    await page.waitForTimeout(14000);
+    const b = berichte.filter(x => x.type === fall.typ);
+    check('8a ' + fall.typ + ': eine bereits eingereichte Mission wird NICHT erneut abgerechnet',
+      anfragen.length === 0, { anfragen: anfragen.length });
+    check('8b ' + fall.typ + ': sie verschwindet trotzdem aus dem Spielstand (keine Geistermission)',
+      missionImStand(store[SAVE_KEY] || '{}', MID) === false, { nochDrin: missionImStand(store[SAVE_KEY] || '{}', MID) });
+    check('8c ' + fall.typ + ': und der Spieler erfaehrt den Grund, statt still leer auszugehen',
+      b.length === 1 && b[0].keinKampf === true && /bereits eingereicht/.test(String(b[0].grund || '')),
+      b.length ? { keinKampf: b[0].keinKampf, grund: String(b[0].grund || '').slice(0, 60) } : 'kein Bericht');
+    await ctx.close();
+  }
+
+  /* ---- 9: die Vorposten-Erstattung wird gemessen, nicht angenommen ------------------------- */
+  async function vorpostenAbbruch(stehtSchon) {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    const store = {}; const berichte = [];
+    const mission = { id: MID, type: 'vorposten-bau', targetId: 'kepler', system: 'kepler',
+      fleetName: 'Baukolonne', startTime: Date.now(), endTime: Date.now() + 4000,
+      composition: { colonyShips: 1 }, kosten: { erz: 50000 } };
+    store[SAVE_KEY] = grundstand(mission);
+    const erzVor = (() => { try { return JSON.parse(store[SAVE_KEY]).resources.erz; } catch (e) { return null; } })();
+    await page.route('**/api/**', async r => {
+      const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
+      const j = (o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
+      if (p === 'me') return j({ userId: 'u-ich', username: 'Ich', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0 });
+      if (p.startsWith('storage/')) {
+        const k = decodeURIComponent(p.slice(8));
+        if (req.method() === 'PUT') { try { store[k] = JSON.parse(req.postData() || '{}').value; } catch (e) {} return j({ ok: true }); }
+        if (store[k] !== undefined) return j({ key: k, value: store[k], version: 1 });
+        return j({ e: 1 }, 404);
+      }
+      // DER MESSPUNKT: die Antwort auf den Bau geht verloren - genau der Fall, in dem der Server
+      // gebaut haben KANN. Ein abort() ist die ehrliche Nachbildung, kein Fehlerstatus.
+      if (p === 'vorposten/bauen') return r.abort();
+      if (p === 'vorposten') return j({ ok: true, aktiv: true, bauAktiv: true, maxJeKonto: 3, stufen: [{ stufe: 1, name: 'Feldlager' }],
+        liste: stehtSchon ? [{ sys: 'kepler', eigener: true, stufe: 1, name: 'Feldlager' }] : [] });
+      if (p === 'reports') { if (req.method() === 'POST') { try { berichte.push(JSON.parse(req.postData() || '{}').report || {}); } catch (e) {} return j({ ok: true }); } return j({ reports: [] }); }
+      if (p === 'notifications') return req.method() === 'POST' ? j({ ok: true }) : j({ notifications: [] });
+      if (/leaderboard|messages|ranking|wars|halloffame|bounty|friends|pending/.test(p)) return j(p.includes('pending') ? { reward: null } : []);
+      if (/asteroid|festung|alien|konvoi|galaxie/.test(p)) return j({ ok: true, felder: {} });
+      return j({});
+    });
+    await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+    await page.goto(SPIEL_URL);
+    await page.waitForTimeout(14000);
+    let erzNach = null; try { erzNach = JSON.parse(store[SAVE_KEY]).resources.erz; } catch (e) {}
+    const b = berichte.find(x => x.type === 'vorposten-bau');
+    await ctx.close();
+    return { erzVor, erzNach, zuwachs: (erzNach !== null && erzVor !== null) ? erzNach - erzVor : null, bericht: b || null };
+  }
+
+  const steht = await vorpostenAbbruch(true);
+  const weg = await vorpostenAbbruch(false);
+  check('9a: Verbindung weg UND der Vorposten steht -> KEINE Erstattung (sonst Rohstoff-Verdopplung)',
+    steht.bericht && steht.bericht.erfolg === true, steht.bericht ? { erfolg: steht.bericht.erfolg, grund: String(steht.bericht.grund || '').slice(0, 50) } : 'kein Bericht');
+  check('9b: Verbindung weg UND kein Vorposten da -> Erstattung wie bisher',
+    weg.bericht && weg.bericht.erfolg === false, weg.bericht ? { erfolg: weg.bericht.erfolg } : 'kein Bericht');
+  /* Gemessen wird der UNTERSCHIED der beiden Laeufe, nicht ein eingetippter Betrag: Die Produktion
+     laeuft in beiden Faellen gleich weiter und kuerzt sich damit heraus. Der Abstand muss deutlich
+     ueber dem Produktionsrauschen liegen - die Baukosten sind mit 50.000 bewusst gross gewaehlt. */
+  check('9c: und der Unterschied ist die Erstattung selbst, nicht Produktionsrauschen',
+    steht.zuwachs !== null && weg.zuwachs !== null && (weg.zuwachs - steht.zuwachs) > 1000,
+    { mitVorposten: steht.zuwachs, ohneVorposten: weg.zuwachs, abstand: (weg.zuwachs !== null && steht.zuwachs !== null) ? weg.zuwachs - steht.zuwachs : null });
 
   await browser.close();
   ende();
