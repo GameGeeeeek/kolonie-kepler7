@@ -683,3 +683,34 @@ Verteidigung, Garnison und die drei Nutzen-Kanäle nennt.
 Wächter: `tests/test_vorposten_zweig.js` (14; Quelltext plus zwei Browser-Stände – vor und nach der
 Wahl, inklusive dessen, was an den Server geht). Gegenprobe gegen v8.636.0: 12 rot, 2 grün,
 identische Prüflisten.
+
+## Etappe 2: die Raumstation, gezeichnet (02.09.2026)
+
+Bis Stufe 3 bleibt der Vorposten eine **Palisade mit Fahne** – ein Feldlager soll wie eines
+aussehen. Ab der Wahlstufe zeichnet `vorpostenSilhouette()` eine **Station im Orbit**, je Zweig
+eine eigene Form:
+
+- **Werft** – zwei Dockklammern, dazwischen ein Schiffsrumpf im Bau (spitzer Bug, Triebwerksglut am
+  Heck), Querstreben zwischen Klammer und Rumpf.
+- **Handelsknoten** – breiter Ring mit sechs angedockten Frachtcontainern, der sich langsam dreht.
+- **Festungsring** – gepanzerter Ring mit vier Geschütztürmen und einem gestrichelten Schildkreis.
+- **ohne Zweig** – neutraler Doppelring mit Nabe (ein Dokument aus der Zeit vor den Zweigen darf die
+  Zeichnung nicht zerbrechen).
+
+`vorpostenRadius()` wächst von 11 auf 17 – ein Ausbau, den man nicht sieht, ist kein Ausbau. Der
+Kollisionsschieber bekommt den gewachsenen Sichtradius, sonst schiebt eine Sternenfestung in die
+Planetenbahn. Die Rotation läuft über **eine** `transform`-Animation auf einer Gruppe, nicht über ein
+Dutzend Einzelpunkte (Bilder je Sekunde auf dem Telefon). Die Landmarke wechselt von ⛺ auf 🛰.
+
+Die vier Silhouetten wurden **im Bild angesehen**, nicht nur als Anker gezählt (PROJECT_MEMORY
+Nr. 16): Der erste Entwurf der Werft las sich als Gitter mit einem Ei – zwei Rechtecke mit
+durchlaufenden Streben. Erst Klammern plus spitzer Rumpf ergaben „Schiff im Dock".
+
+Wächter: `tests/test_vorposten_station.js` (15; die Zeichnung im echten Kartenaufbau, je Zweig die
+eigenen Formen und die Abwesenheit der fremden). Gegenprobe gegen v8.641.0: 8 rot, 7 grün,
+identische Prüflisten.
+
+**Eine Lehre aus dieser Gegenprobe:** Prüfung 3a („der Marker wächst mit der Stufe") maß zuerst die
+Bounding-Box – die enthält das `<text>` mit dem Namen, und „Sternenfestung" ist länger als
+„Stützpunkt". Sie war deshalb am alten Stand mit festem Radius **grün** und belegte nichts. Jetzt
+liest sie den Radius des pulsenden Hofs, die einzige Größe, die nur am Radius hängt.
