@@ -586,3 +586,49 @@ Eingearbeitete Kritik-Befunde (Blocker/wichtig aufgelöst, Hinweise abgewogen):
 - **[hinweis] fremde Vorposten bei B/C nicht behandelt (lupe:vollstaendigkeit):** §5 Schritt 7 ergänzt
   Rendering, Besitzer-Kennzeichnung, Anfechtungs-Menü und das Lesen des geteilten Zustands für die
   Bau-Bedingung.
+
+---
+
+## Stand der Umsetzung (02.09.2026)
+
+**Entschieden (Sascha, per Auswahl):** Option B – echtes PvP-Ziel in `db.shared` (Backend #194,
+`docs/vorposten.md` dort) – und **alle vier Nutzen-Kanäle**. Die PvP-Weiche des Flugzeit-Kanals ist
+nach Konzept-Empfehlung (i) gebaut: `vorpostenFlug(sysId, sek)` hängt NUR an den
+Nicht-PvP-Aufrufstellen (Erkundung, Kolonisierung, Abbau, Vorposten-Bau), nie in
+`missionDurationFor`; `tests/test_vorposten_paritaet.js` 5a–5c und `tests/test_vorposten_ui.js` 3c
+halten das (Anfechtungs-Hinflug mit und ohne Vorposten identisch).
+
+**Was das Frontend selbst festlegt** (der Server prüft keine Kosten, der Spielstand ist
+klientenautoritativ): `VORPOSTEN_BAUKOSTEN` 60.000 Erz / 40.000 Kristalle / 25.000 Deuterium,
+`VORPOSTEN_AUSBAU_KOSTEN` Stufe 2: 200k/130k/80k, Stufe 3: 600k/400k/250k. Regel 57: Stufe 1 ist
+für ein mittleres Konto bezahlbar, Stufe 3 ein Endspiel-Preis (rund drei Viertel des
+Endausbau-Lagerdeckels von 803.800); die Bremse dazwischen ist die 12-h-Ausbau-Abklingzeit des
+Servers – Zeit, nicht Material.
+
+**Die Bau-Mission** `vorposten-bau` (Form A) nutzt **ein Kolonieschiff als Baukolonne**, das
+zurückkehrt (Messfrage §12-3 entschieden: `colonyShips`, keine eigene Klasse). Baukosten werden beim
+Start bezahlt; kommt der Bau nicht zustande (belegt, Deckel, Server weg), gehen sie über
+`gainResources` zurück, und der Bericht `vorposten-bau` nennt den Grund.
+
+**Die Nutzen-Kanäle im Frontend:** `flug` (Anteil je Stufe, nur eigene Nicht-PvP-Missionen ins
+System), `prod` (Summe aller eigenen Vorposten, additiv in der Gruppe von Modul- und Sektorbonus,
+Deckel 10 %), `scan` (Entdeckungschance eigener Späher gegen Spieler mit Heimat im Vorposten-System
+× (1 − 0,25·Stufe); ab Stufe 2 gilt Aufklärung dort nie als veraltet), Garnison (rechnet der Server).
+Alle Zahlen kommen aus `GET /api/vorposten` – keine Tabelle im Frontend, kein Zahlen-Paritätstest.
+
+**Missionsfamilie:** `vorposten-defend` (einwegig, Schiffe bleiben bis zur Ankunft in `fleet`,
+der Server nimmt beim Stationieren an, was der gespeicherte Spielstand hat – der Client bucht genau
+`angenommen` ab) und `vorposten-rueckruf` (einwegig, `schiffe` wie `mining-recall`); beide in
+`EINWEGIG_ERLAUBT`. `vorposten-angriff` Form A. Berichte: `vorposten-bau`, `vorposten-garnison`,
+`vorposten-angriff`, `vorposten-verteidigung`; Belohnungszweige `vorposten` und `vorposten-verlust`.
+
+**Karte:** Knoten `data-map-vorposten` auf der inneren Bahn (`kbOrbitRx(1)·0,918`, wie NPC und Nest)
+bei 125°, durch `kbMarkerFrei` – bewusst NICHT `kbOrbitRx(kbMaxOrbit)` wie die Allianzbasis: `kbMaxOrbit`
+ist lokal in der Kartenfunktion, im Modulscope war das ein ReferenceError, der die ganze Systemebene
+leer ließ (erster Lauf von `test_vorposten_ui`: Chip da, Marker weg); ⛺-Landmarke; Detailtafel-Chip; Bau-Knopf im Basis-Schnellzugriff des
+aufgeklappten fremden Systems. Der Vorposten-Zustand ist Teil von `karteAuffangSignatur`.
+
+**Offen / nicht gebaut:** ein Allianz-Verband gegen Vorposten (der Server-Kern
+`vorpostenSchlagAusfuehren` nimmt `beteiligte` bereits gewichtet entgegen), Vorwarnung des
+Verteidigers vor der Ankunft (der Server hat keine `incomingmuster`-Entsprechung; der Besitzer sieht
+den Kampfvermerk im Dokument und den Fall im Belohnungsfach).
