@@ -103,6 +103,21 @@ if (hatBackend){
     + JSON.stringify(ohnePostfach.filter(t => OHNE_POSTFACH_BESTAND.includes(t))));
 }
 
+// ---------------------------------------------------------------- 2d) Kein Schluessel doppelt
+// GEMESSEN am 02.09.2026: 'vorposten-angegriffen' stand ZWEIMAL in NOTIF_EVENT_INFO - zwei
+// Nachtraege derselben Luecke, die sich beim Zusammenfuehren nicht in die Quere kamen, weil ein
+// Objektliteral doppelte Schluessel nicht meldet. Es gewinnt der SPAETERE; der fruehere ist
+// stiller toter Code, und wer ihn bearbeitet, sieht im Spiel keine Wirkung. Pruefungen 2 und 2b
+// koennen das nicht sehen: sie fragen nur, OB ein Schluessel vorkommt.
+{
+  const info = schnitt(src, 'const NOTIF_EVENT_INFO = {', '\n  };');
+  const keys = [...info.matchAll(/^    '([a-z-]+)':/gm)].map(m => m[1]);
+  check('2d: die Schluessel der Tabelle wurden gelesen', keys.length >= 15, keys.length);
+  const doppelt = keys.filter((k, i) => keys.indexOf(k) !== i);
+  check('2d: kein Ereignistyp steht zweimal in NOTIF_EVENT_INFO (der spaetere gewinnt still)',
+    doppelt.length === 0, [...new Set(doppelt)]);
+}
+
 // ---------------------------------------------------------------- 3) Die neue Kategorie
 if (hatBackend){
   for (const [was, text, muster] of [
