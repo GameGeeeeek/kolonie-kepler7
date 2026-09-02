@@ -444,10 +444,12 @@ check('VERSION und neuester Patchnotes-Eintrag stimmen ueberein',
 // test_abgrund_module2.js: Das Array waechst nach oben, das Fenster rutscht vorbei. Geprueft wird
 // der Einfuehrungs-Eintrag v8.350.0 selbst, nicht "irgendwo steht Werftmarke" (das erfuellt
 // inzwischen jeder spaetere Eintrag, der sie nur erwaehnt).
-const pn350 = src.indexOf("{ version:'8.350.0'");
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+const PN = require('./lib/patchnotes').patchnotesText(src);
+const pn350 = PN.indexOf("{ version:'8.350.0'");
 check('der Einfuehrungs-Eintrag v8.350.0 existiert noch', pn350 > 0);
 check('die Werftmarken sind in den Patchnotes dokumentiert',
-  pn350 > 0 && /Werftmarke/.test(src.slice(pn350, src.indexOf("{ version:'8.349.0'", pn350))));
+  pn350 > 0 && /Werftmarke/.test(PN.slice(pn350, PN.indexOf("{ version:'8.349.0'", pn350))));
 
 // ---------------------------------------------------------------- 10. Grafik
 // Seit dem 01.08.2026 nimmt der Maler eine Uebersteuerung entgegen: Im Profil eines FREMDEN

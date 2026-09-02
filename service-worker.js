@@ -39,6 +39,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Nie anfassen (01.09.2026): version.txt ist der Versions-Check des Spiels - aus dem cache-first-
+  // Zweig unten kaeme sonst bei jedem Abruf erst die ALTE Nummer, und ein Update fiele einen Takt
+  // spaeter auf. patchnotes-archiv.json wird nur auf Knopfdruck geholt und aendert sich je Release.
+  if (url.pathname === '/version.txt' || url.pathname === '/patchnotes-archiv.json') return;
+
     const STATIC_PASSTHROUGH = ['/robots.txt', '/sitemap.xml'];
     const isNavigation = !STATIC_PASSTHROUGH.includes(url.pathname) &&
           (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html'));
