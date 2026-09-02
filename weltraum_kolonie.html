@@ -1861,6 +1861,30 @@
       .lvl-pill { font-size:11px; }
       .bmeta { font-size:12px; }
       .header-btn-label { display:none; }
+      /* Trefferflaechen der Kopfzeile (02.09.2026, gemessen ueber alle 13 Reiter am 390x844-Handy).
+         Genau die Zeile darueber ist die Ursache: ohne Beschriftung bleibt vom Knopf nur das Icon
+         mit `padding:5px 9px`, und damit fallen alle sieben unter den 44-px-Richtwert:
+            headerCompactBtn 31x36, headerLogoutBtn 31x36, Feedback/Berichte/Hilfe/Profil 34x36,
+            Kofi 36x36 - je 6 px Abstand, Reihe von x=33 bis x=300.
+         Am PC stehen die Beschriftungen und die Knoepfe sind breit genug, deshalb steht die Regel
+         HIER und nicht global. Kein Ziel im Spiel liegt unter 24 px, WCAG 2.2 AA ist also erfuellt,
+         und ein Fehlgriff auf "Abmelden" ist durch dessen Rueckfrage abgesichert - das hier ist
+         Komfort, keine Behebung.
+         WARUM 44 hoch, aber nur 36 breit: Die Hoehe ist die Richtung, in der der Daumen am
+         ungenauesten trifft, und sie kostet keine Breite - sie kommt deshalb voll auf den
+         Richtwert. Die Breite ist gedeckelt, weil die Reihe sonst UMBRICHT und die Kopfzeile
+         hoeher wird, also alles darunter verschiebt (`.hero-actions` steht auf flex-wrap).
+         GEMESSEN, nicht geschaetzt - `.hero-actions` hat je Fenster so viel Platz:
+            360 px Fenster -> 294 px    390 px Fenster -> 316 px
+         Abzueglich der sechs Luecken (6*6 = 36 px) bleiben bei 360 px noch 258 px fuer sieben
+         Knoepfe, also 36,8 je Knopf. 40 px waeren bei 390 px auf den Pixel aufgegangen und bei
+         360 px umgebrochen - das ist keine Reserve. 7*36 + 36 = 288 px lassen auf beiden Groessen
+         Luft. Den Abstand von 6 px zu verkleinern waere der falsche Tausch: er ist es, der den
+         Fehlgriff auf den Nachbarknopf verhindert.
+         `display:inline-flex` zentriert das Icon in der groesseren Flaeche. Es hebelt den
+         Abmelden-Knopf nicht aus der Deckung: dessen `display:none` steht INLINE und gewinnt, bis
+         `wireLogout` ihn selbst auf inline-flex setzt. */
+      .hero-actions button { min-height:44px; min-width:36px; display:inline-flex; align-items:center; justify-content:center; }
     }
     .bcost { font-size:var(--fs-small); color:#7d8199; margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); }
     .bcost .costitem { display:flex; align-items:center; gap:3px; }
