@@ -100,7 +100,12 @@ function backend(store, z){
     if (p === 'admin/aktivitaet') return z.uebersichtStatus === 404 ? j({ error: 'nicht da' }, 404) : j(UEBERSICHT);
     if (p === 'admin/konto'){ z.kontoAnfragen.push(u.split('?')[1] || ''); return j({ konten: [z.konto], gefunden: 1 }); }
     if (p === 'admin/geschenke') return j(GESCHENKE);
-    if (p === 'admin/geschenk'){ let b = {}; try { b = JSON.parse(req.postData() || '{}'); } catch (e) {} z.geschenkPosts.push(b); return j({ ok: true, empfaenger: 9, gaben: b.gaben }); }
+    if (p === 'admin/geschenk'){
+      let b = {}; try { b = JSON.parse(req.postData() || '{}'); } catch (e) {} z.geschenkPosts.push(b);
+      if (z.geschenkVerzoegerung) await new Promise(r => setTimeout(r, z.geschenkVerzoegerung));
+      if (z.geschenkStatus === 500) return j({ error: 'kaputt' }, 500);
+      return j({ ok: true, empfaenger: 9, gaben: b.gaben });
+    }
     if (p === 'pending-rewards/claim'){ const n = (z.belohnungen || []).shift(); return j({ reward: n || null }); }
     if (p === 'notification-prefs') return j(Object.assign({}, z.prefs));
     if (p === 'notifications') return req.method() === 'POST' ? j({ ok: true }) : j({ notifications: z.postfach });
@@ -264,6 +269,37 @@ const rasterFarben = (page, name) => page.$$eval('[data-uebersicht-konto="' + na
   check('3d: ohne Gabe keine Rueckfrage und kein Versand', dialoge3c.length === 1 && z3c.geschenkPosts.length === 0, { dialoge: dialoge3c.length, posts: z3c.geschenkPosts.length });
   check('3-fehler: keine Seitenfehler', s3c.errs.length === 0, s3c.errs.slice(0, 3));
   await s3c.ctx.close();
+  // 3e: Doppelklick-Schutz (Codex-Hinweis auf #521). Der Server antwortet erst nach 1,5 s; ein
+  // zweiter Klick in dieser Zeit darf KEIN zweites POST ausloesen - sonst bekaeme jedes Konto
+  // das Geschenk doppelt. Der zweite Klick laeuft programmatisch (`el.click()`): Ein Playwright-
+  // Klick wartet auf einen bedienbaren Knopf und traefe erst NACH der Antwort - dann waere die
+  // Pruefung aus dem falschen Grund gruen.
+  const z3e = zustand({ geschenkVerzoegerung: 1500 });
+  const s3e = await seite(browser, z3e, { reiter: 'Geschenk' });
+  s3e.page.on('dialog', d => d.accept());
+  await fuellen(s3e.page, '[data-geschenk-gabe="credits"]', '100');
+  await klicken(s3e.page, '#adminGeschenkSendenBtn');
+  await s3e.page.waitForTimeout(300);
+  const gesperrt = await s3e.page.$eval('#adminGeschenkSendenBtn', el => el.disabled).catch(() => null);
+  await s3e.page.evaluate(() => { const b = document.getElementById('adminGeschenkSendenBtn'); if (b) b.click(); });
+  await s3e.page.waitForTimeout(2000);
+  const freiDanach = await s3e.page.$eval('#adminGeschenkSendenBtn', el => el.disabled).catch(() => null);
+  check('3e: waehrend die Anfrage laeuft, ist der Knopf gesperrt, und ein zweiter Klick schickt KEIN zweites POST',
+    gesperrt === true && z3e.geschenkPosts.length === 1, { gesperrt, posts: z3e.geschenkPosts.length });
+  check('3e2: nach der Antwort ist der Knopf wieder frei', freiDanach === false, { disabled: freiDanach });
+  await s3e.ctx.close();
+  // 3e3: auch nach einem FEHLSCHLAG wird der Knopf freigegeben - sonst waere der Versand nach
+  // einem 500 bis zum Neuladen tot.
+  const z3f = zustand({ geschenkStatus: 500 });
+  const s3f = await seite(browser, z3f, { reiter: 'Geschenk' });
+  s3f.page.on('dialog', d => d.accept());
+  await fuellen(s3f.page, '[data-geschenk-gabe="credits"]', '100');
+  await klicken(s3f.page, '#adminGeschenkSendenBtn');
+  await s3f.page.waitForTimeout(1000);
+  const freiNachFehler = await s3f.page.$eval('#adminGeschenkSendenBtn', el => el.disabled).catch(() => null);
+  check('3e3: nach einem Fehlschlag ist der Knopf wieder frei (wiederholbar)', freiNachFehler === false && z3f.geschenkPosts.length === 1,
+    { disabled: freiNachFehler, posts: z3f.geschenkPosts.length });
+  await s3f.ctx.close();
 
   // ---- 4) Das Belohnungsfach: der geschenk-Zweig -------------------------------------------------
   const z4 = zustand({ belohnungen: [{ id: 'g1', type: 'geschenk', credits: 500, erz: 1000, text: 'Danke euch allen', zeit: Date.now() }] });

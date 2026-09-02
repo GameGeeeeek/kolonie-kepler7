@@ -7306,8 +7306,11 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.626.0';
+  const VERSION = '8.627.0';
   const PATCHNOTES = [
+    { version:'8.627.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Der Geschenk-Knopf ist während des Versands gesperrt.</strong> Antwortet der Server langsam, konnte ein zweiter Klick nach der Rückfrage ein zweites Geschenk auslösen – jedes Konto hätte es doppelt bekommen, unwiderruflich. Der Knopf sperrt sich jetzt, bis die Antwort da ist, und gibt sich auch nach einem Fehlschlag wieder frei. Gefunden von der automatischen Codex-Durchsicht des vorigen Änderungssatzes.'
+    ]},
     { version:'8.626.0', date:'02.09.2026', changes:[
       '<strong>Admin-Bereich: Die Aktivitäts-Uhr hat jetzt eine Übersicht.</strong> Der Konto-Reiter zeigt beim Öffnen alle Konten mit Spielstand, die kürzeste Pause zuerst – je Zeile ein kleines 14-Tage-Raster, ein farbiger Punkt (grün unauffällig, orange auffällig, grau noch zu wenig aufgezeichnet) und die Zähler daneben. Bis hierher musste man jeden Namen einzeln suchen, um zu erfahren, ob überhaupt jemand auffällig ist. Tippen auf eine Zeile öffnet das Blatt.',
       '<strong>„Auffällig" ist eine feste Regel, keine Bauchentscheidung:</strong> über eine ganze Woche keine Pause über zwei Stunden. Trifft sie zu, bekommt der Betreiber einmal je Konto und Woche eine Meldung ins Postfach (abschaltbar unter Benachrichtigungen, nur für das Betreiberkonto sichtbar). Die Meldung nennt die zwei harmlosen Erklärungen mit – ein geteiltes Konto oder zwei Geräte in verschiedenen Zeitzonen sehen genauso aus. Ein Hinweis, kein Beweis.',
@@ -35146,6 +35149,15 @@ async function claimPendingRewards(){
     // Rueckfrage, weil es sich nicht zuruecknehmen laesst - dieselbe Abwaegung wie bei "alle
     // Sitzungen beenden": Was der Bediener nicht rueckgaengig machen kann, wird vorher benannt.
     if (!confirm('Jetzt ' + zusammenfassung + ' an ' + wieViele + ' verschenken?\n\nDas lässt sich nicht zurücknehmen.')) return;
+    // Den Knopf fuer die Dauer der Anfrage sperren (Codex-Hinweis auf #521, 02.09.2026): Der Pi
+    // antwortet auch mal langsam, und ein zweiter Klick nach der Rueckfrage schickte ein zweites
+    // POST - jedes Konto bekaeme das Geschenk doppelt, unwiderruflich. Gesperrt wird VOR dem
+    // ersten await (der zweite Klick sieht den Knopf dann schon gesperrt) und im finally wieder
+    // freigegeben, damit ein Fehlschlag wiederholbar bleibt - dasselbe Muster wie beim
+    // Rundschreiben-Knopf.
+    const btn = document.getElementById('adminGeschenkSendenBtn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
     try {
       const res = await backendFetch('/admin/geschenk', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ gaben, text: textEl ? textEl.value.trim() : '', nurAktiveTage }) });
@@ -35156,6 +35168,7 @@ async function claimPendingRewards(){
       if (textEl) textEl.value = '';
       loadAdminGeschenke();
     } catch(e){ log('Verschenken fehlgeschlagen – Server nicht erreichbar.', 'ti-alert-triangle'); }
+    finally { if (btn) btn.disabled = false; }
   }
   async function loadAdminKonto(){
     const box = document.getElementById('adminKontoListe');
