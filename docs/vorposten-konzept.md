@@ -604,7 +604,7 @@ also keine Kopie-Familie und keinen Paritätstest; alle Zahlen im Kartenmenü ko
   Antimaterie. Bezahlt wird der Ausbau erst nach dem Ja des Servers. Aufgeben erstattet nichts.
 - **Hilfe:** eigener Eintrag „Vorposten: deine Präsenz in einem fremden System".
 
-**Wächter:** `tests/test_vorposten_ui.js` (47 Prüfungen am gerenderten Spiel). Die Kernmessung
+**Wächter:** `tests/test_vorposten_ui.js` (51 Prüfungen am gerenderten Spiel). Die Kernmessung
 ist die **Flugzeit-Wirkung als Drei-Läufe-Messung** (Regel 61/62): dieselbe Fixture, derselbe
 Angriff – ohne eigenen Vorposten, mit einem Stufe-3-Vorposten in `abyss` (0,85 Sektor vom Ziel:
 Missionsdauer 85 %), mit einem in `zenith` (3,2 Sektor: unverändert). Dazu die geschnittene
