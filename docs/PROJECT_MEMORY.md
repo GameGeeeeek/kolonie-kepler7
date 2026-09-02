@@ -183,7 +183,18 @@ stattgefunden – „keinerlei Info" war die zutreffende Beschreibung, obwohl `l
 wurde. Transiente Meldungen messen sich als Ereignisverlauf (wann sichtbar, für wen), nicht als
 Aufruf im Protokoll. `pushToast` wartet deshalb auf freie Sicht (`TOAST_OVERLAYS`).
 
-## 18. Wer erst aufräumt und dann fragt, fragt nach etwas, das er gerade weggeräumt hat
+## 18. Ein `disabled`-Knopf ist auf dem Telefon eine stumme Sperre
+
+Der Vorposten-Bau-Knopf war `disabled`, sein Grund stand nur im `title`. Ein gesperrter Knopf feuert
+kein Klick-Ereignis, und am Telefon gibt es kein Hover – Tippen führte zu nichts. Für den Spieler
+sieht das wie ein kaputtes Spiel aus („ging aber anscheinend nicht"), obwohl die Prüfung korrekt war.
+
+Regel: Eine Bedingung, die etwas verhindert, muss **antippbar** erklärt werden. Knopf klickbar
+lassen (gedämpft, `aria-disabled`), Grund als `warn`-Toast. Und jede Sperre daraufhin prüfen, ob sie
+eine Sackgasse ist: Kosten oberhalb des Lagerdeckels lassen sich nie ansparen – dann gehört der
+Ausweg in den Text, nicht nur der Mangel.
+
+## 19. Wer erst aufräumt und dann fragt, fragt nach etwas, das er gerade weggeräumt hat
 
 Sechs Missionsarten – Anfechtung, Festungsschlag, Nest-Schlag, Wrackkonvoi, Vorposten-Bau und
 Vorposten-Angriff – haben ihren Kampf **nie** ausgefochten, jede seit ihrer eigenen Auslieferung.

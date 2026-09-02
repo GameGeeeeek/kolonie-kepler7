@@ -632,3 +632,26 @@ aufgeklappten fremden Systems. Der Vorposten-Zustand ist Teil von `karteAuffangS
 `vorpostenSchlagAusfuehren` nimmt `beteiligte` bereits gewichtet entgegen), Vorwarnung des
 Verteidigers vor der Ankunft (der Server hat keine `incomingmuster`-Entsprechung; der Besitzer sieht
 den Kampfvermerk im Dokument und den Fall im Belohnungsfach).
+
+## Der gesperrte Bau-Knopf sagt jetzt, warum (02.09.2026)
+
+Meldung Sascha: „habe versucht einen vorposten zu errichten ging aber anscheinend nicht." Im
+Browser bei 390×844 nachgestellt: Der Knopf „Vorposten errichten" stand da, war aber `disabled` –
+und ein gesperrter Knopf feuert **keinen** Klick. Der Grund lag ausschließlich im `title`; am
+Telefon gibt es kein Hover. Tippen führte zu nichts: kein Toast, keine Protokollzeile, keine
+Erklärung. Dieselbe Fehlerklasse wie beim Festungsschlag.
+
+Jetzt bleibt der Knopf klickbar (nur gedämpft, `aria-disabled`), und `vorpostenBauStarten()` nennt
+den Grund als wartenden Toast (`warn`, 9 s) – die Prüfung stand ohnehin schon dort.
+
+Zweiter Fund aus derselben Messung: **Die Baukosten können größer sein als das, was das Lager
+überhaupt fasst.** 60.000 Erz, 40.000 Kristalle, 25.000 Deuterium gegen 12.800 Lagerkapazität bei
+Lagerstufe 30 ohne Boni (`storageCap()` = 800 + Gebäude + Frachter, dann Multiplikatoren). „Nicht
+genug Rohstoffe" schickt den Spieler dann ins Warten auf etwas, das nie eintritt. Der Grund nennt
+in diesem Fall die Lagergröße und den Ausweg (Lager, Kryolager, Lagerforschung).
+
+Wächter: `tests/test_vorposten_bau_grund.js` (11; Quelltext + zwei Browser-Stände im Telefon-Format).
+Gegenprobe gegen v8.633.0: 8 rot, 3 grün, identische Prüflisten.
+
+**Übertragbar:** Ein `disabled`-Knopf, dessen Grund nur im `title` steht, ist auf einem Telefon eine
+stumme Sperre. Wer eine Bedingung zeigt, muss sie auch antippbar erklären.
