@@ -172,6 +172,17 @@ Für deterministische Streuung den Hash nur als Startwert nehmen und die Folge a
 Generator ziehen (`sysZufall`, mulberry32). Und eine Zeichnung vor dem Merge einmal wirklich
 ansehen – ein Test, der Anker zählt, sieht so ein Muster nicht.
 
+## 17. Ein Statuscode ist keine Diagnose, und ein verdeckter Toast keine Meldung
+
+Der Festungsschlag antwortete bei 403 mit „Abklingzeit", obwohl der Server drei verschiedene
+403-Gründe wörtlich mitschickt. Wer aus dem Code den Text rät, verwandelt eine Antwort in eine
+Vermutung; der Servertext gehört in Toast und Bericht, der geratene Text ist nur der Rückfall.
+
+Und eine Meldung, die abläuft, solange ein Overlay davorsteht, hat für den Spieler nie
+stattgefunden – „keinerlei Info" war die zutreffende Beschreibung, obwohl `log()` aufgerufen
+wurde. Transiente Meldungen messen sich als Ereignisverlauf (wann sichtbar, für wen), nicht als
+Aufruf im Protokoll. `pushToast` wartet deshalb auf freie Sicht (`TOAST_OVERLAYS`).
+
 ## Pflege dieser Datei
 
 Nur eine neue Regel aufnehmen, wenn sie:
