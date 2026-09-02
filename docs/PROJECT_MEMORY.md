@@ -66,6 +66,8 @@ Nach Eingriffen in Testdateien:
 
 Eine leichtere Suite kann grün werden, obwohl Schutz verloren ging.
 
+Ein Test-Parser, der Konstanten der Spieldatei als getippte Liste mitgibt (etwa die `HERKUNFT_*`-Werte vor einem `new Function`), stirbt beim nächsten Eintrag – oder liefert still `null`. Solche Preludes aus der Datei selbst ableiten (Regex über die Deklarationen); bei der fünften Herkunft (Konvoi) waren es acht Tests auf einmal.
+
 ## 6. UI-Zustände besitzen Aufbau und Abbau
 
 Beim Entfernen/Ersetzen eines UI-Modus nicht nur dessen sichtbaren Inhalt portieren. Alte Zweige können Cleanup enthalten:

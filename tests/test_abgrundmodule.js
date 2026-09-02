@@ -43,7 +43,11 @@ function arrAus(name){
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
 
-const MODULE_DEFS = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('MODULE_DEFS'))();
+// Die Herkunfts-Konstanten werden AUS DER DATEI abgeleitet, nicht eingetippt (Regel 40/43):
+// eine neue Herkunft (v8.463.0 HERKUNFT_UNIKAT, A2 HERKUNFT_KONVOI) fehlte einer festen
+// Namensliste sonst und riesse den Literal-Parser mit "... is not defined".
+const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+const MODULE_DEFS = new Function(herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
 const VIER = ['drucktank','echolotmast','splitterofen','nullfeldanker'];
 const defOf = k => MODULE_DEFS.find(d => d.key === k);
 

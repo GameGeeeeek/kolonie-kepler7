@@ -388,6 +388,9 @@ async function laufe(browser, store, viewport, mobil, systeme) {
     { was: 'fremde Spieler',     muster: /kbMarkerFrei\(homeSlotXY\(pl\.slot\)/ },
     { was: 'NPCs',               muster: /kbMarkerFrei\(npcMarkerXY\(\)/ },
     { was: 'Alien-Nester',       muster: /kbMarkerFrei\(nestMarkerXY\(/ },
+    /* A2-Wrackkonvois (28.08.2026): wandernde PvE-Beuteziele mit eigener Bahn konvoiMarkerXY(i),
+       ueber den Index aufgefaechert wie die Nester - laeuft durch denselben Schieber. */
+    { was: 'Wrackkonvois',       muster: /kbMarkerFrei\(konvoiMarkerXY\(/ },
     /* KB-20b (21.08.2026): Das Wurmloch-Portal sass bis dahin fest bei (665, 28) - einem Punkt aus
        dem alten, breiten Systemfeld. Mit dem engeren Ausschnitt lag es am PC gemessen 241 px hinter
        der Kastenkante, am Handy schon seit KB-12 133 px. Seitdem kommt seine Bahn aus kbOrbitRx()

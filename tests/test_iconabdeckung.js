@@ -256,9 +256,10 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   if (new Set(kerne).size !== liste.length) doppelt.push(klasse+' ('+liste.map(d=>d.k).join(', ')+')');
 }
 check('8: innerhalb jeder Schiffsklasse sind die Icons unterscheidbar', doppelt.length === 0, doppelt);
-// Und die Begründung der zwei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese vier
-// Module, die sich in ihrer Klasse doppelten. Faellt eine Wirkung weg, faellt auch diese Prüfung
-// auf - dann ist der Sonderkern womöglich gar nicht mehr nötig.
+// Und die Begründung der drei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese sechs
+// Module, die sich in ihrer Klasse doppelten (raffiniert:hull, jagdgeschwader:shield und - seit dem
+// A2-Wrackkonvoi, 28.08.2026 - schwerelinie:hull mit sl_kompositpanzer+kv_bergungspanzer). Faellt
+// eine Wirkung weg, faellt auch diese Prüfung auf - dann ist der Sonderkern womöglich nicht mehr nötig.
 const nachWirkung = [];
 for (const [klasse, liste] of Object.entries(proKlasse)){
   const zaehler = {};
@@ -266,8 +267,8 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   for (const [ef,n] of Object.entries(zaehler)) if (n > 1)
     nachWirkung.push(klasse+':'+ef+' ('+liste.filter(d=>d.effect===ef).map(d=>d.k).join('+')+')');
 }
-check('8: genau zwei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
-  nachWirkung.length === 2, nachWirkung);
+check('8: genau drei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
+  nachWirkung.length === 3, nachWirkung);
 
 // Die schmalen Fertigungs-Knöpfe bleiben bewusst flach (font-size:10px, ein 24px-SVG sprengt die
 // Zeile) - und zwar fuer BEIDE Modulfamilien gleich. Festgehalten, damit die Ausnahme eine Regel
