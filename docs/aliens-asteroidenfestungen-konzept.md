@@ -1593,3 +1593,25 @@ Wächter: `tests/test_festung_rueckmeldung.js` (16; Quelltext + Browser-Szenario
 Gegenprobe gegen v8.629.0: 12 rot, 4 grün, identische Prüflisten. Die Toast-Wartezeit wird als
 Ereignisverlauf gemessen (Overlay offen → kein Toast, Overlay zu → Toast mit Schaden), nicht als
 DOM-Endzustand.
+
+## Abklingzeit sichtbar, Start gesperrt – über alle Standorte (02.09.2026)
+
+Meldung Sascha: „Abklingzeit Wrackkonvois sollte angezeigt werden bzw. wenn Cooldown da, sollte
+man erst gar nicht angreifen können." Gemessen: Das Kartenmenü sperrte den Knopf zwar, aber nur
+gegen die Flotte des **aktiven** Standorts (`cf.missions`) – ein zweiter Verband von einer Kolonie
+flog los und lief bei der Ankunft in die 403-Abklingzeit des Servers. Die Startfunktionen prüften
+nichts, und die Restzeit stand nur als Knopfgrund.
+
+Jetzt, für Konvoi, Nest und Festung gleich:
+- `pveVerbandUnterwegs(typ, feld, wert)` prüft über `allFleetsWithPlanet()`; die drei Menüs nutzen sie.
+- `sendKonvoiMission`/`sendNestMission`/`sendFestungsMission` haben einen Torwächter (Abklingzeit
+  und unterwegs) – der Dialog kann länger offen stehen, als der Zustand gilt. Die Flottenwahl-Sperre
+  (`sperre`) nennt die Abklingzeit zusätzlich am Start-Knopf.
+- Marker-Tooltip („· dein nächster Schlag in …") und eine eigene Menüzeile (`pveAbklingZeile`,
+  `data-pve-abkling`) für Konvoi und Nest; die Festung hat `festungBeitragZeilen`.
+- `pveSchlagMerken(ziel)` setzt den eigenen Stempel sofort nach einem gewerteten Schlag – der
+  Server hat ihn gesetzt, `loadGalaxyState()` holt ihn aber erst asynchron.
+
+Wächter: `tests/test_pve_abklingsperre.js` (17; Quelltext + Browser mit drei Konvois: Abklingzeit,
+Kolonie-Verband unterwegs, Gegenrichtung). Gegenprobe gegen v8.631.0: 9 rot, 8 grün, identische
+Prüflisten.
