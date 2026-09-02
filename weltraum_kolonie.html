@@ -30105,7 +30105,15 @@ async function claimPendingRewards(){
        das Ergebnis per innerHTML, und dieser Eintrag ist der einzige mit FREITEXT - alle anderen
        tragen nur Benutzernamen, die der Server auf [a-zA-Z0-9_-aeoeueAeOeUess]{3,18} begrenzt. */
     'feedback-antwort': { icon:'ti-message', color:'#5dcaa5', text:(p)=>'Antwort auf dein Feedback'+(p.auszug?' („'+escapeHtml(String(p.auszug).slice(0,60))+'\u2026")':'')+': '+escapeHtml(String(p.text||'').slice(0,300)) },
-    'konto-verdacht': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>(p.username||'Ein Konto')+' hatte in '+(p.tage||7)+' Tagen keine Pause über '+(p.laengstePause||0)+' Std. - Bot, geteiltes Konto oder zwei Zeitzonen? Details im Admin-Bereich unter Konto.' }
+    'konto-verdacht': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>(p.username||'Ein Konto')+' hatte in '+(p.tage||7)+' Tagen keine Pause über '+(p.laengstePause||0)+' Std. - Bot, geteiltes Konto oder zwei Zeitzonen? Details im Admin-Bereich unter Konto.' },
+    /* Die beiden Meldungen aus Backend #208 (02.09.2026). Ohne diese Zeilen zeichnet das Postfach
+       die Glocke und das Wort "Ereignis" - der Beschenkte erfaehrt nicht, wofuer, und der Alarm
+       nennt weder Messwert noch Schwelle, also genau das, was ihn zum Alarm macht.
+       FREITEXT geht durch escapeHtml (Codex-Befund P2 an #532): renderNotificationEventsBox setzt
+       das Ergebnis per innerHTML. `grund` schreibt der Betreiber frei; `titel`/`text` kommen zwar
+       aus ALARM_SCHWELLEN bzw. der Messung, aber die Absicherung kostet hier nichts. */
+    'geschenk-konto': { icon:'ti-sparkles', color:'#fac775', text:(p)=>'Ein Geschenk vom Betreiber liegt in deinem Belohnungsfach'+(p.grund?' – „'+escapeHtml(String(p.grund).slice(0,160))+'\u201c':'')+'.' },
+    'admin-alarm': { icon:'ti-alert-triangle', color:'#e24b4a', text:(p)=>'Alarm: '+escapeHtml(String(p.titel||'Auffälligkeit'))+(p.text?' – '+escapeHtml(String(p.text).slice(0,200)):'')+' (gemessen '+escapeHtml(String(p.wert!==undefined?p.wert:'?'))+', Schwelle '+escapeHtml(String(p.schwelle!==undefined?p.schwelle:'?'))+')'+(p.konto?', Konto '+escapeHtml(String(p.konto)):'')+'.' }
   };
   /* Wartungsankuendigung (02.09.2026). Der Server haelt EINE Ankuendigung und liefert nach Ablauf
      null - der Client rechnet nur den Countdown, und zwar gegen die mitgelieferte Serverzeit
