@@ -655,6 +655,34 @@ Gegenprobe gegen v8.633.0: 8 rot, 3 grün, identische Prüflisten.
 **Übertragbar:** Ein `disabled`-Knopf, dessen Grund nur im `title` steht, ist auf einem Telefon eine
 stumme Sperre. Wer eine Bedingung zeigt, muss sie auch antippbar erklären.
 
+## Acht Stufen und drei Spezialisierungen – Frontend (02.09.2026)
+
+Auftrag Sascha: der Vorposten soll ein Highlight werden. Entscheidung: 8 Stufen, ab Stufe 4 eine
+einmalige Ausrichtung; Etappe 1 ist die Tiefe (Optik, Modul-Steckplätze, Projekte und Sprungtor
+folgen). Die Tabellen liegen im Backend (`docs/vorposten.md` dort), das Spiel liest sie.
+
+**Die Ausbaukosten sind aus dem Spiel verschwunden.** `VORPOSTEN_AUSBAU_KOSTEN` (zwei Einträge)
+ist gelöscht; die Kosten kommen als `v.naechsteStufe.kosten` vom Server. Mit acht Stufen wäre die
+lokale Tabelle eine Kopie-Familie geworden – die Fehlerklasse, die dieses Projekt dreimal erwischt
+hat. Bewusst **ohne Rückfall**: Ein Server ohne das Feld ist ein Server ohne die Stufen, dann gibt
+es auch nichts auszubauen.
+
+**Die Zweigwahl** fällt beim Sprung auf Stufe 4 in `vorpostenAusbauen()`. Die drei Varianten kommen
+fertig gerechnet vom Server (`naechsteStufe.varianten`), damit das Spiel die Multiplikatoren nicht
+ein zweites Mal kennt; gewählt wird über eine nummerierte Abfrage, die zu jeder Ausrichtung Kern,
+Verteidigung, Garnison und die drei Nutzen-Kanäle nennt.
+
+**Zwei Fallstricke, beide beim Bauen gemessen:**
+- `garnisonMax` kam aus der Stufentabelle – das ist die Leiter **ohne** Zweig-Multiplikatoren. Ein
+  Festungsring hätte 45 % zu wenig Platz angezeigt, und der Spieler hätte Schiffe geschickt, die
+  der Server ablehnt. Die Grenze kommt jetzt vom Objekt (`v.garnisonMax`).
+- Die Kopfzeile las die Stufenzahl aus `stufen.length` statt aus `maxStufe`. Im Betrieb identisch,
+  aber eine Antwort mit gekürzter Leiter hätte „Stufe 3 von 4" gezeigt.
+
+Wächter: `tests/test_vorposten_zweig.js` (14; Quelltext plus zwei Browser-Stände – vor und nach der
+Wahl, inklusive dessen, was an den Server geht). Gegenprobe gegen v8.636.0: 12 rot, 2 grün,
+identische Prüflisten.
+
 ## Der Allianz-Verband gegen einen Vorposten (02.09.2026)
 
 Eine Bastion hält 400.000 Kernpunkte und 60.000 Verteidigung. Für ein Einsteiger-Konto sind das rund
@@ -689,3 +717,4 @@ Dabei fiel ein stummer Punkt auf: `test_muster_nest_ui` 5c schnitt seine Scheibe
 `cblock.indexOf(zweigKopf)`. Ohne gefundenen Kopf ist das **0** – die Scheibe begann am Blockanfang
 und die Prüfung ging grün durch, genau in dem Fall, für den sie gebaut war. Ohne Kopf gibt es jetzt
 keine Scheibe.
+

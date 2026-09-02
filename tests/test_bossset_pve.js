@@ -85,18 +85,26 @@ const S_LEBEND = PN_BLOCK ? S.slice(0, PN_VON) + S.slice(PN_BIS) : S;
 // String 'const PATCHNOTES = [' - den gibt es in der Datei ein zweites Mal (der Bauer der
 // oeffentlichen Patchnotes-Seite liest ihn als Suchmarke), also Regel 39 im eigenen Test.
 //
-// Die Probe wird bei JEDEM Lauf frisch aus dem Block gelesen (02.09.2026). Vorher stand hier ein
-// fester historischer Wortlaut ('Boss-Set-Teile nur bei einer Allianz-Raid-Welle'). Seit der
-// Archiv-Rotation (v8.638.0) haelt der Block nur noch die neuesten Versionen; der Wortlaut ist
-// nach patchnotes-archiv.json gewandert und war in der Spieldatei gar nicht mehr da. Der Anker
-// verlor damit still seinen Gegenstand - genau daran ist dieser Test rot geworden, ohne dass sich
-// am Geprueften etwas geaendert hatte. Ein Stueck aus der MITTE des Blocks kann nicht heraus-
-// rotieren, solange es ueberhaupt Patchnotes gibt.
+// Beide Seiten dieses Merges haben denselben Ausfall vom 02.09.2026 behoben, aber verschieden.
+// Uebernommen ist von jeder das Bessere:
+//
+// - HISTORIE kommt aus tests/lib/patchnotes.js (origin/main). Das ist die EINE Stelle, die Spiel
+//   und patchnotes-archiv.json zusammensetzt; eine zweite eigene Pfadaufloesung waere genau die
+//   zweite Wahrheit, gegen die lib/spieldatei.js gebaut ist.
+//
+// - Die PROBE des Ankers wird bei jedem Lauf frisch aus dem Block gelesen. Ein fester Wortlaut
+//   taugt hier nicht mehr, auch nicht gegen die ganze Historie geprueft: Steht er im Archiv, ist
+//   `HISTORIE.includes(...)` immer wahr und `!S_LEBEND.includes(...)` trivial wahr (im Spiel gibt
+//   es ihn ja nicht mehr) - der Anker kann einen fehlgeschlagenen Schnitt dann nicht mehr
+//   bemerken. Gemessen an origin/main mit `S_LEBEND = S`: weggefallen 0, Anker meldet trotzdem
+//   OK. Mit der Probe aus dem Block faellt er in genau diesem Fall.
+const NUR_HISTORIE = 'Boss-Set-Teile nur bei einer Allianz-Raid-Welle';
+const HISTORIE = require('./lib/patchnotes').patchnotesText(S);
 const PROBE = PN_BLOCK.slice(Math.floor(PN_BLOCK.length / 2), Math.floor(PN_BLOCK.length / 2) + 120);
 check('0-anker: der PATCHNOTES-Block wurde wirklich herausgeschnitten',
   PN_BLOCK.length > 0 && PROBE.length === 120 && S.includes(PROBE) && !S_LEBEND.includes(PROBE),
   { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length,
-    probe: PROBE.slice(0, 40) });
+    probe: PROBE.slice(0, 40) })
 
 function block(t, anfang, endeMarke){
   const von = t.indexOf(anfang);
@@ -289,15 +297,11 @@ check('3d: alle drei Empfangsstellen rufen den EINEN Helfer', rufer.length === 3
 // "droppt nur bei <Boss>" war ab dieser Etappe eine Falschaussage. Geprueft im LEBENDEN Text.
 const droppt = (S_LEBEND.match(/droppt nur be[ie]/g) || []).length;
 check('5a: kein Modultext behauptet mehr "droppt nur bei"', droppt === 0, { treffer: droppt });
-// Die Historie liegt seit v8.638.0 in ZWEI Dateien: die neuesten Versionen im Spiel, alles
-// Aeltere in patchnotes-archiv.json. Wer nur die Spieldatei liest, misst "die Historie wurde
-// umgeschrieben", wo in Wahrheit nur rotiert wurde. Pfad wie in tests/test_patchnotes_archiv.js.
-const ARCHIV_TEXT = (() => {
-  try { return fs.readFileSync(path.join(WURZEL, 'patchnotes-archiv.json'), 'utf8'); } catch (e) { return ''; }
-})();
-const historie = (S + ARCHIV_TEXT).match(/Boss-Set-Teile nur bei einer Allianz-Raid[^'"]{0,40}/g) || [];
+// Die Historie steht seit v8.638.0 in ZWEI Dateien; HISTORIE oben setzt beide zusammen. Wer nur
+// die Spieldatei liest, misst "die Historie wurde umgeschrieben", wo in Wahrheit rotiert wurde.
+const historie = HISTORIE.match(/Boss-Set-Teile nur bei einer Allianz-Raid[^']{0,40}/g) || []
 check('5b: die PATCHNOTES tragen den alten Wortlaut weiter (Historie bleibt unangetastet)',
-  historie.length > 0, { gefunden: historie, archivGelesen: ARCHIV_TEXT.length > 0 });
+  historie.length > 0, { gefunden: historie, inHistorie: HISTORIE.includes(NUR_HISTORIE) });
 
 const herk = block(S, '  const HERKUNFT_TEXT = {', '\n  };');
 check('5c-anker: HERKUNFT_TEXT laesst sich schneiden', !!herk, { gefunden: !!herk });

@@ -53,6 +53,12 @@ Ein Test ist erst überzeugend, wenn gezeigt wurde, dass er den zu verhindernden
 
 Gegenprobe bevorzugt am echten alten Stand oder an einer gezielt sabotierten Kopie. Bleibt sie grün, ist das ein Diagnosebefund und kein Grund, nur den Erwartungswert umzuschreiben.
 
+Davon zu trennen ist die **Standardisierung**: ein Umbau, der eine lokale Kopie durch eine
+gemeinsame Quelle ersetzt, ohne das geprüfte Verhalten zu ändern. Dort ist eine grüne Gegenprobe
+das erwartete Ergebnis und kein Befund – belegt werden muss stattdessen, dass die Sabotage
+überhaupt gegriffen hat (sonst ist „beide grün" ein Werkzeugfehler). Ein solcher Umbau darf im
+Commit nicht als Behebung ausgegeben werden.
+
 ## 5. Testcode ist genauso kritisch wie Produktcode
 
 Breite Textersetzungen und Merge-Konflikte können Tests still schwächen.
