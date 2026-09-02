@@ -222,9 +222,11 @@ check('sie sagt, dass sich keins nachbauen laesst', /Keins der sechs lässt sich
 // und der Test wurde zwei Versionen spaeter rot, ohne dass sich an der geprueften Sache etwas
 // geaendert hatte. Ein Test, der am Kalender scheitert statt an der Sache, verliert genau dann sein
 // Vertrauen, wenn man es braucht. Jetzt wird der Eintrag namentlich gesucht.
-const pn356 = js.indexOf("{ version:'8.356.0'");
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+const PN = require('./lib/patchnotes').patchnotesText(js);
+const pn356 = PN.indexOf("{ version:'8.356.0'");
 check('der Patchnotes-Eintrag zu v8.356.0 existiert noch', pn356 > 0);
-const eintrag356 = pn356 > 0 ? js.slice(pn356, js.indexOf("{ version:'8.355.0'", pn356)) : '';
+const eintrag356 = pn356 > 0 ? PN.slice(pn356, PN.indexOf("{ version:'8.355.0'", pn356)) : '';
 check('die Patchnotes nennen beide Fehler',
   /nie gefallen/.test(eintrag356) && /Modulfragmenten nachbauen/.test(eintrag356));
 const version = (js.match(/const VERSION = '([\d.]+)'/) || [])[1];
