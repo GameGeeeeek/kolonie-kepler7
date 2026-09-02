@@ -2180,7 +2180,7 @@
       0% { r:8; opacity:0.9; stroke-width:3; }
       100% { r:26; opacity:0; stroke-width:0.5; }
     }
-    .planet-label { font-size:9.5px; fill:#c7cbe0; }
+    .planet-label { font-size:9.5px; fill:#c7cbe0; paint-order:stroke; stroke:#0a0d1a; stroke-width:2.4px; stroke-linejoin:round; }
 
     .missions-active { display:flex; flex-direction:column; gap:8px; margin-bottom:1rem; }
 
@@ -2753,6 +2753,9 @@
         <button id="adminTabSchalterBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:4px;"></i>Schalter</button>
         <button id="adminTabKontoBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:4px;"></i>Konto</button>
         <button id="adminTabSystemBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-adjustments" aria-hidden="true" style="margin-right:4px;"></i>System</button>
+        <button id="adminTabGeschenkBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Geschenk</button>
+        <button id="adminTabProtokollBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:4px;"></i>Protokoll</button>
+        <button id="adminTabAllianzenBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Allianzen</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2837,6 +2840,11 @@
           <button id="adminKontoSucheBtn" class="login-submit" style="width:auto; padding:8px 16px;"><i class="ti ti-user" aria-hidden="true" style="margin-right:5px;"></i>Suchen</button>
         </div>
         <div id="adminKontoListe" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <!-- Uebersicht nach Auffaelligkeit (01.09.2026). Die Uhr im Blatt beantwortet die Frage fuer
+             EIN Konto - wer wissen wollte, ob ueberhaupt jemand auffaellig ist, musste jeden Namen
+             einzeln suchen. Steht UNTER der Suche, damit das gesuchte Blatt oben bleibt. -->
+        <div class="section-title" style="font-size:12px; margin-top:12px;"><i class="ti ti-users" aria-hidden="true"></i>Alle Konten nach Auffälligkeit</div>
+        <div id="adminKontoUebersicht" style="display:flex; flex-direction:column; gap:4px;"></div>
       </div>
       <!-- Systemstand (28.08.2026). commit/checkout/blob standen nur in /api/health und brauchten
            ein curl von aussen; welche Konfiguration FEHLT, beantwortete bisher nur ein SSH-Zugang.
@@ -2844,6 +2852,40 @@
            im Klartext, und ein Screenshot dieser Flaeche darf sie nicht enthalten. -->
       <div id="adminSystemView" style="display:none; max-height:60vh; overflow-y:auto;">
         <div id="adminSystemInhalt" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+      <!-- Geschenk an alle (01.09.2026). Ein Bonuscode verlangt, dass der Spieler ihn findet und
+           eintippt; eine Entschaedigung nach einem Ausfall soll niemanden voraussetzen, der den
+           Discord liest. Gaben-Felder und Deckel kommen vom Server (GET /admin/geschenke) - dieselbe
+           Tabelle wie bei den Bonuscodes, keine zweite Kopie hier. -->
+      <div id="adminGeschenkView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Legt <strong>allen Konten mit Spielstand</strong> eine Belohnung ins Fach – etwa als Entschädigung nach einem Ausfall. Niemand muss einen Code finden; das Geschenk liegt beim nächsten Start bereit. Es gelten dieselben Obergrenzen wie bei den Bonuscodes.</div>
+        <div id="adminGeschenkEmpfaenger" class="bmeta" style="margin-bottom:8px;"></div>
+        <div class="bmeta" style="margin-bottom:4px;">Was verschenkt wird (leer = nichts davon):</div>
+        <div id="adminGeschenkGaben" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:6px; margin-bottom:8px;"></div>
+        <input id="adminGeschenkText" type="text" maxlength="200" placeholder="Nachricht dazu (optional, z.B. Entschuldigung für den Ausfall am Wochenende)" autocomplete="off" style="width:100%; font-size:13px; margin-bottom:8px;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+          <span class="bmeta">Empfänger:</span>
+          <select id="adminGeschenkFilter" style="flex:1; min-width:170px; font-size:12.5px;">
+            <option value="0">alle Konten mit Spielstand</option>
+            <option value="30">nur in den letzten 30 Tagen angemeldet</option>
+            <option value="7">nur in den letzten 7 Tagen angemeldet</option>
+          </select>
+        </div>
+        <button id="adminGeschenkSendenBtn" class="login-submit" style="width:100%; padding:8px 16px; margin-bottom:12px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:5px;"></i>Jetzt verschenken</button>
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bisherige Geschenke</div>
+        <div id="adminGeschenkVerlauf" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+      <!-- Protokoll (02.09.2026). Der Server haelt jede erfolgreiche Betreiber-Handlung beim Antworten
+           fest (eine Middleware ueber alle Admin-POSTs); hier nur die Sicht. -->
+      <div id="adminProtokollView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Jede Betreiber-Handlung mit Zeit, Ziel und Angaben – vom Server beim Antworten festgehalten, die letzten 300. Ein abgewiesener Versuch steht nicht darin.</div>
+        <div id="adminProtokollListe" style="display:flex; flex-direction:column; gap:4px;"></div>
+      </div>
+      <!-- Allianzen (02.09.2026). Alles liegt in db.shared unter alliance:<tag>:*; die Eingriffe gehen
+           denselben Weg wie das Aufloesen durch den Anfuehrer selbst. -->
+      <div id="adminAllianzenView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Alle Allianzen mit Mitgliedern, Basisstufe und offenen Bewerbungen. <strong>Anführer übertragen</strong> hilft, wenn der Anführer verschwunden ist; <strong>Auflösen</strong> tut genau das, was der Anführer selbst tun könnte – der Tag wird danach frei.</div>
+        <div id="adminAllianzenListe" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
   </div>
@@ -3813,6 +3855,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-check" aria-hidden="true"></i><div class="bname">Fertige Aufträge</div><div class="bmeta">Wenn Forschung, Bau oder Expedition fertig wird, während du weg bist</div></div><div class="toggle-switch" data-notif-cat="completion"><div class="toggle-knob"></div></div></div>
             <div class="card-row" id="notifNeuspielerRow" style="display:none"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Neue Spieler</div><div class="bmeta">Wenn ein neu angemeldetes Konto die Kolonie zum ersten Mal öffnet - erreicht nur das Betreiberkonto</div></div><div class="toggle-switch" data-notif-cat="neuspieler"><div class="toggle-knob"></div></div></div>
+            <div class="card-row" id="notifVerdachtRow" style="display:none"><div class="left"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="bname">Auffällige Konten</div><div class="bmeta">Wenn ein Konto über eine Woche keine Pause über zwei Stunden hatte - ein Hinweis, kein Beweis; erreicht nur das Betreiberkonto</div></div><div class="toggle-switch" data-notif-cat="verdacht"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -5703,6 +5746,9 @@
     mod_treibstoffdepot: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M50 8 L86 29 V71 L50 92 L14 71 V29 Z" fill="url(#gSteel)" opacity="0.85"/></g><path d="M50 26 Q68 48 68 58 A18 18 0 0 1 32 58 Q32 48 50 26 Z" fill="url(#gSky)"/><circle cx="43" cy="58" r="4" fill="#eaf3f8" opacity="0.6"/></svg>`,
     mod_expschutz: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M50 8 L86 29 V71 L50 92 L14 71 V29 Z" fill="url(#gSteel)" opacity="0.85"/></g><path d="M50 27 L68 34 V53 Q68 66 50 73 Q32 66 32 53 V34 Z" fill="url(#gCyan)" opacity="0.85"/><path d="M50 36 L58 52 H52 V62 H48 V52 H42 Z" fill="#eaf6ff"/></svg>`,
     mod_handelsleitstand: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M50 8 L86 29 V71 L50 92 L14 71 V29 Z" fill="url(#gSteel)" opacity="0.85"/></g><circle cx="50" cy="50" r="20" fill="none" stroke="url(#gGreen)" stroke-width="4"/><ellipse cx="50" cy="50" rx="9" ry="20" fill="none" stroke="url(#gGreen)" stroke-width="1.6" opacity="0.7"/><line x1="30" y1="50" x2="70" y2="50" stroke="#5dcaa5" stroke-width="1.6" opacity="0.7"/><circle cx="64" cy="38" r="4" fill="#c9ecd8"/></svg>`,
+    // Wrackkonvoi-Bergungsmodul (A2, 28.08.2026) - Standort-Modul aus geschleiften Konvois, effect:'prod'.
+    // Bergungs-/Recycling-Kreislauf in Bergungsgruen; gleiches Sechseck-Gehaeuse wie die uebrigen Standortmodule.
+    mod_kv_bergungslogik: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M50 8 L86 29 V71 L50 92 L14 71 V29 Z" fill="url(#gSteel)" opacity="0.85"/></g><path d="M30 52 Q30 30 52 30" fill="none" stroke="#8fd6a6" stroke-width="4" stroke-linecap="round"/><path d="M70 48 Q70 70 48 70" fill="none" stroke="#8fd6a6" stroke-width="4" stroke-linecap="round"/><path d="M57 30 L49 26 L49 34 Z" fill="#8fd6a6"/><path d="M43 70 L51 66 L51 74 Z" fill="#8fd6a6"/><circle cx="50" cy="50" r="4" fill="#d6f5e4"/></svg>`,
     // ===== Abgrund-Standortmodule (28.07.2026, v8.334.0) =====
     // Dasselbe Sechseck-Gehäuse wie die übrigen Standortmodule - sie sitzen auf einem Planeten und
     // gehören sichtbar in dieselbe Familie. Was sie unterscheidet, ist der Glyph in Abgrund-Mint
@@ -5977,6 +6023,9 @@
     sm_sl_schildgitter: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><path d="M50 18 L70 25 V42 Q70 56 50 64 Q30 56 30 42 V25 Z" fill="#7fd8e8"/><path d="M50 18 V64" stroke="#0d1224" stroke-width="1.6" opacity="0.4"/></svg>`,
     sm_sl_marschtriebwerk: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><g fill="none" stroke="#c3bef5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M34 40 L50 26 L66 40"/><path d="M34 53 L50 39 L66 53" opacity="0.72"/><path d="M34 66 L50 52 L66 66" opacity="0.42"/></g></svg>`,
     sm_sl_treibstoffzellen: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><path d="M50 20 Q66 40 66 50 A16 16 0 0 1 34 50 Q34 40 50 20 Z" fill="#5dcaa5"/><circle cx="44" cy="50" r="4" fill="#eafff7" opacity="0.55"/></svg>`,
+    // Wrackkonvoi-Schiffsmodul (A2, 28.08.2026) - Hüllenmodul der Schweren Linie aus geschleiften Konvois, effect:'hull'.
+    // Gleiches Schiffsmodul-Gehäuse wie die übrigen sm_-Icons; Bergungsanker in Bergungsbraun als Kern, kein Verlauf.
+    sm_kv_bergungspanzer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><circle cx="50" cy="24" r="5" fill="none" stroke="#d8a05a" stroke-width="4"/><line x1="50" y1="29" x2="50" y2="63" stroke="#d8a05a" stroke-width="4" stroke-linecap="round"/><line x1="37" y1="37" x2="63" y2="37" stroke="#d8a05a" stroke-width="4" stroke-linecap="round"/><path d="M31 51 Q34 65 50 65 Q66 65 69 51" fill="none" stroke="#d8a05a" stroke-width="4" stroke-linecap="round"/><path d="M31 51 L25 49 L33 45 Z" fill="#d8a05a"/><path d="M69 51 L75 49 L67 45 Z" fill="#d8a05a"/></svg>`,
     sm_t2_metamaterialpanzer: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><rect x="32" y="26" width="36" height="36" rx="3" fill="none" stroke="#9fe1cb" stroke-width="4"/><path d="M32 38 H68 M32 50 H68 M44 26 V62 M56 26 V62" stroke="#9fe1cb" stroke-width="1.6" opacity="0.8"/></svg>`,
     sm_t2_singularitaetsfokus: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="24" y="10" width="52" height="62" rx="4" fill="url(#gSteel)" opacity="0.82"/><rect x="33" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/><rect x="58" y="72" width="9" height="14" rx="2" fill="url(#gSteel)" opacity="0.62"/></g><path d="M50 17 L55 34 L67 23 L58 39 L74 42 L58 45 L66 61 L52 48 L50 65 L48 48 L34 61 L42 45 L26 42 L42 39 L33 23 L45 34 Z" fill="#e24b4a"/><circle cx="50" cy="42" r="4" fill="#ffe6e5"/></svg>`,
     // ===== Abgrund-Schiffsmodule (28.07.2026, v8.335.0) =====
@@ -7271,8 +7320,34 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.623.0';
+  const VERSION = '8.628.0';
   const PATCHNOTES = [
+    { version:'8.628.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Sperren mit Grund und Frist.</strong> Eine Sperre nennt jetzt einen Grund und läuft wahlweise nach 1, 3, 7 oder 30 Tagen von selbst ab; wer gesperrt ist, liest beim Anmelden Grund und Frist statt nur „gesperrt". Aus einer Meldung heraus wandert der Meldegrund automatisch in die Sperre. Als mildere Stufe gibt es die <strong>Stummschaltung</strong> für Stunden oder Tage: Globaler Chat, Allianz-Chat und Nachrichten sind dann gesperrt, spielen geht weiter – und wer stummgeschaltet ist, erfährt beim Senden Frist und Grund, statt dass seine Nachricht still verschwindet.',
+      '<strong>Spielstand-Blatt und Rücksicherung aus dem Backup.</strong> Der Betreiber sieht im Konto-Blatt eine Zusammenfassung des Spielstands (Ressourcen, Gebäude, Forschung, Flotte) und kann den Stand aus einer der Server-Sicherungen (alle 30 Minuten) daneben legen und zurückholen. Der bisherige Stand bleibt als Schatten erhalten und lässt sich wieder einsetzen; der betroffene Spieler wird dabei einmal abgemeldet. Bisher brauchte ein verlorener Spielstand Handarbeit direkt auf dem Server.',
+      '<strong>Zwei neue Reiter: Protokoll und Allianzen.</strong> Das Protokoll hält jede Betreiber-Handlung mit Zeit, Ziel und Angaben fest. Die Allianz-Übersicht zeigt Mitglieder, Basisstufe und offene Bewerbungen; ist ein Anführer verschwunden, lässt sich die Führung übertragen, und eine verwaiste Allianz kann aufgelöst werden – genau so, wie es der Anführer selbst könnte.',
+      '<strong>Für Spieler ändert sich am Spiel nichts.</strong> Wer nicht gesperrt oder stummgeschaltet ist, merkt von alledem nichts.'
+    ]},
+    { version:'8.627.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Der Geschenk-Knopf ist während des Versands gesperrt.</strong> Antwortet der Server langsam, konnte ein zweiter Klick nach der Rückfrage ein zweites Geschenk auslösen – jedes Konto hätte es doppelt bekommen, unwiderruflich. Der Knopf sperrt sich jetzt, bis die Antwort da ist, und gibt sich auch nach einem Fehlschlag wieder frei. Gefunden von der automatischen Codex-Durchsicht des vorigen Änderungssatzes.'
+    ]},
+    { version:'8.626.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Die Aktivitäts-Uhr hat jetzt eine Übersicht.</strong> Der Konto-Reiter zeigt beim Öffnen alle Konten mit Spielstand, die kürzeste Pause zuerst – je Zeile ein kleines 14-Tage-Raster, ein farbiger Punkt (grün unauffällig, orange auffällig, grau noch zu wenig aufgezeichnet) und die Zähler daneben. Bis hierher musste man jeden Namen einzeln suchen, um zu erfahren, ob überhaupt jemand auffällig ist. Tippen auf eine Zeile öffnet das Blatt.',
+      '<strong>„Auffällig" ist eine feste Regel, keine Bauchentscheidung:</strong> über eine ganze Woche keine Pause über zwei Stunden. Trifft sie zu, bekommt der Betreiber einmal je Konto und Woche eine Meldung ins Postfach (abschaltbar unter Benachrichtigungen, nur für das Betreiberkonto sichtbar). Die Meldung nennt die zwei harmlosen Erklärungen mit – ein geteiltes Konto oder zwei Geräte in verschiedenen Zeitzonen sehen genauso aus. Ein Hinweis, kein Beweis.',
+      '<strong>Zwei neue Zeilen im Konto-Blatt:</strong> Rate-Limit-Treffer (wie oft ein Konto heute und insgesamt in die Anfragebremse gelaufen ist, samt letztem Pfad) und abgelehnte Spielstände (wie oft der Server einen Stand als unplausibel verworfen hat, mit den letzten Gründen). Beides stand bis jetzt ausschließlich im Container-Log des Servers – ein abgelehnter Spielstand ist für den Spieler faktisch Speicherverlust, und niemand konnte es sehen, ohne per SSH auf den Pi zu gehen. Der Systemstand zählt beides zusätzlich mit.',
+      '<strong>Neuer Reiter „Geschenk":</strong> Der Betreiber kann allen Konten mit Spielstand eine Belohnung ins Fach legen – etwa als Entschädigung nach einem Ausfall –, wahlweise nur an Konten, die sich in den letzten 7 oder 30 Tagen angemeldet haben. Niemand muss einen Code finden; das Geschenk liegt beim nächsten Start bereit und wird wie ein Bonuscode gutgeschrieben, mit eigener Meldung und eigenem Bericht. Es gelten dieselben Obergrenzen wie bei den Bonuscodes, und vor dem Versand steht eine Rückfrage mit Betrag und Empfängerkreis.',
+      '<strong>Für Spieler ändert sich am Spiel nichts.</strong> Es werden keine neuen Daten erhoben – der Server hält nur fest, was er ohnehin protokolliert hat, jetzt am Konto statt in einer Logdatei, die niemand liest.'
+    ]},
+    { version:'8.625.0', date:'02.09.2026', changes:[
+      '<strong>Neu: Wrackkonvois – treibende Beute-Ziele.</strong> In der Galaxie tauchen vereinzelt Wrackkonvois auf: einzelne, angreifbare Ziele, die von System zu System weiterziehen und nach rund 18 Stunden ganz entkommen, wenn niemand zuschlägt. Auf der Karte stehen sie als eigener Knoten aus losen Rumpf-Scherben; das Kartenmenü zeigt den Rumpfzustand und die Abklingzeit und startet den Angriff.',
+      'Der Angriff ist ein Rundflug wie der Festungsschlag: hinfliegen, zuschlagen, zurückkehren. Je Konto gilt eine Abklingzeit von zwei Stunden je Konvoi, und jeder Ausgang – erlegt oder verpasst, weil der Konvoi entkommen oder schon von anderen aufgebracht war – schreibt einen eigenen Kampfbericht.',
+      '<strong>Die Beute gibt es nur hier.</strong> Wer am Fall beteiligt war, bekommt anteilig Sternenessenz, Kampfpunkte, Erfahrung und Credits – und mit etwas Glück eines von zwei exklusiven Modulen: die <strong>Bergungslogik</strong> (Standort, Produktion) oder den <strong>Bergungspanzer</strong> (Schwere Linie, Hülle). Beide fallen ausschließlich beim Erlegen eines Wrackkonvois – nicht schmiedbar, nicht handelbar.'
+    ] },
+    { version:'8.624.0', date:'02.09.2026', changes:[
+      '<strong>Die Systemansicht hat jetzt Licht und Schatten.</strong> Die Sonne trägt eine Korona mit zehn langsam wandernden Strahlen, jede Welt hat eine Tag- und eine Nachtseite (der Schatten liegt immer sonnenabgewandt), erforschte Welten bekommen einen Leuchtsaum in ihrer Typfarbe, unerforschte bleiben abgedunkelt. Hinter jedem Planeten liegt eine farbige Spur auf seiner Bahn, die Bahnen selbst sind durchgezogen statt gepunktet, und über allem liegt ein Nebelschleier in der Farbe der jeweiligen Sonne – der Himmel eines roten Zwergs sieht anders aus als der eines blauen Riesen.',
+      '<strong>Gasriesen tragen einen Ring, Monde sitzen auf einer sichtbaren Bahn.</strong> Der Ring läuft hinter der Kugel vorbei und vorne wieder hervor; die Mondbahn liegt exakt unter dem gewohnten Mond-Marker, der sich nicht bewegt hat. Beschriftungen bekommen einen dunklen Saum und bleiben so auch vor hellen Flächen lesbar. Wer am Gerät Bewegung reduziert hat, sieht dieselbe Zeichnung ohne die wandernden Strahlen.',
+      'Gebaut aus drei gerenderten Entwürfen (Licht und Schatten, Sternkarte, Nebelwelt) – gewählt wurde der erste, ergänzt um Ringe und Mondbahnen aus dem dritten. Bewusst ohne Weichzeichner-Filter: Jeder Verlauf ist ein Farbverlauf, damit die Karte am Handy flüssig bleibt (gemessen: unverändert 59,5 Bilder je Sekunde). Neuer Hilfe-Eintrag „Die Systemansicht lesen: Licht, Schatten, Ringe".'
+    ] },
     { version:'8.623.0', date:'01.09.2026', changes:[
       'Karte: Jedes System zeigt jetzt, wem es gehört. Der Ring am Systemknoten trägt die Farbe genau EINER Macht – der stärksten, die dort sitzt: erobert schlägt Kolonie-Herrschaft, die schlägt das Fraktions-Territorium, und ganz zuletzt steht ein Alien-Nest, das nichts beansprucht, sondern nur da sitzt. Was dir gehört, ist gefüllt und grün, alles Fremde nur umrandet; rot heißt: von einem fremden Spieler erobert.',
       'Bis hierher zeigte die Karte nur die EIGENE Eroberung und das Fraktions-Territorium. Ein von einem anderen Spieler erobertes System sah aus wie ein unbeanspruchtes, und die Kolonie-Herrschaft (jemand hält alle besiedelten Planeten eines Systems) war auf der Karte gar nicht zu sehen, obwohl die Territoriums-Box im Galaxie-Reiter sie längst führte. Beides steht jetzt auf allen drei Kartenebenen – in der Regionsübersicht tragen die Systempunkte dieselbe Farbe, im geöffneten System nennt die Chip-Zeile den Halter im Klartext.',
@@ -7352,43 +7427,11 @@
       '<strong>Die Belohnungsvorschau des Allianz-Raids erscheint jetzt wirklich.</strong> Seit v8.607.0 stand sie im Spiel, war aber bei jedem Verband unsichtbar: Sie suchte den eigenen Eintrag in der Rangliste unter einem Feldnamen, den der Server dort gar nicht ablegt – gefunden wurde damit nie jemand, und die ganze Tafel blieb leer. Nach dem Abflug siehst du wieder deinen Platz, deinen Anteil an der Angriffskraft und beide Spalten: was es bei einem Sieg gibt und was, wenn der Boss überlebt.',
       'Für die Zukunft abgesichert: Der Prüflauf hält jetzt jede angezeigte Zahl der Tafel gegen die Formel des Servers, statt nur zu prüfen, dass überhaupt etwas dasteht. Genau in dieser Lücke war der Fehler durchgekommen – die Rechnung stimmte, die Anzeige war da, nur zeigte sie nichts.'
     ] },
-    { version:'8.608.0', date:'22.08.2026', changes:[
-      '<strong>Die Abzeichenzeile einer Region ist jetzt antippbar.</strong> Sie sagte bisher nur im Tooltip, WELCHES System den Hinweis trägt – am Handy also gar nicht, denn dort gibt es kein Überfahren mit der Maus. Ein Tipp darauf öffnete stattdessen die Region. Jetzt bekommst du jedes betroffene System namentlich mit seinem Hinweis, und ein Tipp bringt dich direkt hin. Im Kepler-Kern stehen so 10 von 15 Systemen auf einen Blick da, statt sie einzeln aufzuklappen.',
-      '<strong>Dafür findet das Suchfeld über der Karte keine Landmarken mehr</strong> (Wunsch Sascha: „Die Suche soll nur Planeten zeigen keine Gegner das wäre zu einfach man soll schon bisschen suchen auf der Karte"). Festungen, Nester und Gegner waren seit v8.582.0 über Wörter wie <em>Festung</em> oder <em>Nest</em> auffindbar – gesucht wird jetzt wieder auf der Karte. Systeme und Planeten findet das Feld unverändert.',
-      'Nebenbei: Das Kartenmenü hat einen Höhendeckel bekommen und scrollt, statt bei vielen Einträgen unten aus dem Bild zu ragen.'
-    ] },
-  
-  
-    { version:'8.607.0', date:'22.08.2026', changes:[
-      '<strong>Der Allianz-Raid zeigt dir jetzt, was der Anflug dir bringt.</strong> Sobald der Verband abgeflogen ist, steht unter dem Countdown deine voraussichtliche Beute – Kredite, Kampfpunkte, Erfahrung, Erz, Kristalle, Deuterium, Antimaterie und Modulfragmente, jede Zeile mit ihrem Symbol. Daneben in Klammern der Fall, dass der Boss überlebt: Er kostet dich 40 Prozent, und Antimaterie wie Fragmente fallen dann ganz aus.',
-      'Die Zahlen sind exakt, keine Spanne. Nach dem Abflug steht alles fest, was sie bestimmt – dein Platz, dein Anteil an der Angriffskraft, die Zahl der Kommandanten und der Gegner. Offen ist nur noch, ob der Boss fällt, und genau das sind die zwei Werte. Wer nicht mitgeflogen ist, sieht nichts statt einer Null.',
-      '<strong>Weniger Text an derselben Stelle:</strong> Im Zustand ohne laufenden Raid stand der Name des nächsten Gegners dreimal gleichzeitig da – in der Kopfzeile, in der Regelzeile und im geschlossenen Auswahlfeld, das seine Wahl ohnehin anzeigt –, der Beutetext zweimal. Die Regelzeile trägt jetzt nur noch die Kampfregel; sie steht nirgends sonst, und genau sie muss die Allianz vor dem Ausrufen einplanen können.',
-      '<strong>Neu: Klassen-Sets für die Schiffsmodule.</strong> Jede der acht Schiffsklassen hat jetzt ein <strong>Set</strong> aus drei namentlich festgelegten Modulen. Sind zwei davon eingebaut, greift die erste Stufe; mit allen dreien kommt die zweite dazu – additiv zu den Modulen selbst. Das Panel im Offiziere-Tab zeigt dir bei jeder Klasse, wie viele Teile stecken und welches noch fehlt.',
-      '<strong>Das volle Set kostet alle drei Slots – und das ist die Entscheidung.</strong> Eine Klasse hat höchstens drei Plätze. Wer das Set komplettiert, verzichtet auf den freien Platz für ein Abgrund-Modul oder einen anderen Kanal; wer bei zwei Teilen bleibt, behält ihn. Ein Set ist deshalb keine reine Zugabe.',
-      '<strong>Behoben: Der Server rechnete deine Flottenverteidigung anders aus, als dein Spiel sie anzeigt.</strong> Gemessen an einer Flotte aus 200 Schlachtschiffen, 300 Kreuzern, 200 Zerstörern und 100 Metamaterial-Titanen schrieb er dir ohne Module <strong>47% zu viel</strong> gut und mit Modulen <strong>25% zu wenig</strong> – die beiden Fehler haben einander verdeckt. Vier Ursachen: eine erfundene Schild-Basis für die 34 Schiffstypen ohne eigenen Schildwert, fehlende Hüllen- und Schildmodule, fehlende Kampfforschung am Flottenanteil und Jäger, die ohne Trägerhangar mitzählten.',
-      '<strong>Was das für dich heißt:</strong> Verteidigung ist ab jetzt <em>modulabhängig</em>. Wer seine Klassen ausgerüstet hat, steht im Kampf spürbar besser da als bisher – wer keine Module eingebaut hat, schlechter. Anzeige und Kampf sagen dafür zum ersten Mal dasselbe.'
-    ] },
-    { version:'8.606.0', date:'22.08.2026', changes:[
-      '<strong>Wer einen Gegner über die Karte angreift, sieht endlich, worauf er sich einlässt.</strong> Bis jetzt trug das Kartenmenü einen einzigen Eintrag („Angreifen") und keine einzige Zahl; die Flottenwahl darunter nannte nur Flugzeit und Treibstoff. Im Galaxie-Reiter standen dieselben Gegner seit jeher mit Verteidigung, Erfolgschance, feindlicher Flotte, Schwachstelle, Enterphase, Frachtwarnung und Beute – wer über die Karte ging, flog blind.',
-      'Jetzt steht beides am selben Ort. Das Kartenmenü nennt Stufe, Verteidigung, die gegnerische Flotte, die Schwachstelle und die mögliche Beute. Die Flottenwahl darunter rechnet zusätzlich Erfolgschance, Konterwirkung, Enterphase, Treibstoff und Frachtraum live mit, während du deinen Verband zusammenstellst – samt der Warnung, wenn ohne Frachter die Beute verloren ginge.',
-      'Beide Wege ziehen ihre Zahlen aus derselben Rechenstelle wie der Kampf selbst. Karte und Galaxie-Reiter können damit nicht mehr auseinanderlaufen – vorher standen fünfzehn Zwischenwerte nur im Galaxie-Reiter, und eine zweite Vorschau daneben wäre beim nächsten Balance-Schritt still falsch geworden.'
-    ] },
-    { version:'8.605.0', date:'22.08.2026', changes:[
-      '<strong>Protomaterie hat endlich Abnehmer, die nicht nach einem Kauf verschwinden.</strong> Bisher war sie eine reine Einmalzahlungs-Währung: zwei Fabriken, die Mega-Ausbaustufen – wer die durch hatte, brauchte den Asteroidenbergbau nicht mehr. Neu sind eine achte Stufe der Orbitalstation (60 Protomaterie je Standort, einmalig) und der <strong>Urmaterie-Koloss</strong>, ein Schiff, das je Stück 30 Protomaterie kostet und damit laufend Nachschub verlangt.',
-      'Damit das überhaupt bezahlbar ist, wächst zuerst der Speicher: Die Aufbereitungsanlage trägt jetzt 150 statt 100 Protomaterie je Stufe bei, der Deckel steigt also von 2.500 auf 3.500. Der Anteil der Mega-Ausbaustufen zieht im Gleichschritt nach (400 → 600) – er bleibt damit bei denselben 17 Prozent deines Speichers, und die Stufen 26 bis 35 tragen weiter, statt auf einem festen Betrag stehenzubleiben.',
-      '<strong>Der Urmaterie-Koloss ist ein Hybrid</strong> – 250 Angriff und 2.000 Frachtraum in einem Rumpf, hinter der Kausalanker-Forschung. Er ist bewusst langsam und breit gebaut: ein Belagerungsschiff, das seine eigene Beute mitnimmt, kein Jäger. Bauzeit 30 Minuten, Kosten 30 Protomaterie, 8 Hohlraumgitter, 6 Kausalanker.',
-      '<strong>Behoben: Eine Abbaufuhre mit einem einzigen Schürfschiff brachte genauso viel Protomaterie wie eine mit fünfzig.</strong> Die Menge hing allein an der Größe des Vorkommens, nie an der Ladung – wer genug Flottenplätze hatte, konnte seine Schiffe in lauter Ein-Schiff-Pendelrouten zerlegen und die Ausbeute vervielfachen, ohne je eine Bergbauflotte zu bauen. Die volle Ausbeute gibt es jetzt ab zehn Schürfschiffen, darunter anteilig. Darüber ändert sich nichts: Eine Fuhre bleibt eine Fuhre.',
-      'Unter der Haube hat der Koloss außerdem acht Stellen gebraucht, an denen er vorher nicht existierte – er wäre baubar gewesen und hätte im Kampf auf beiden Seiten null Angriffskraft beigetragen. Gefunden hat das kein Nachdenken, sondern das Durchgehen jeder einzelnen Tabelle, die eine Schiffsklasse führt.'
-    ] },
-    { version:'8.604.0', date:'21.08.2026', changes:[
-      '<strong>Die Füllbalken im Kartenmenü sehen jetzt überall gleich aus.</strong> Zwei Auslieferungen zuvor hatten Alien-Nest und Asteroidenfestung schmale Balken mit Beschriftung bekommen – daneben, im selben Menü, zeichnet der Asteroiden-Vorrat seit Längerem einen breiten. Zwei Formen für dieselbe Sache. Es ist jetzt die breite, und der Prozentwert steht in der Zeile darüber, wo bei der Angriffs-Vorschau ohnehin schon einer stand.',
-      'Der Anlass war ein Blick auf den eigenen Bildschirm: Die Beschriftung lautete bei allen drei Festungsbalken „Rest" und unterschied sie damit überhaupt nicht – und genau das war der einzige Grund gewesen, die schmale Form zu wählen. Am Asteroiden ändert sich nichts Sichtbares; er zeichnet nur nicht mehr sein eigenes Markup, sondern benutzt dieselbe Stelle wie alle anderen.'
-    ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1027;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1032;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -8845,6 +8888,14 @@
      keine Wahrheitsfrage, und genau deshalb faellt sie sonst niemandem auf, bis sie auseinander
      laeuft. Reihenfolge vorher gemessen (Arbeitsregel 38): alle fuenf Leser stehen dahinter. */
   const FESTUNG_ABKLING_STD = 6;
+  /* Wrackkonvoi (A2): zwei display-relevante Zahlen aus server.js. KONVOI_ABKLING_STD spiegelt
+     A2_ABKLING_MS (2 h), KONVOI_LEBENSDAUER_STD die A2_LEBENSDAUER_MS (18 h) fuer die „entkommt in"-
+     Anzeige. Bewusst KEIN Paritaetstest wie bei der Festung: A2 ist einstufig, die Beute reist im
+     Zielobjekt mit, und der Server ist Autoritaet ueber die Sperre (er antwortet 403 mit
+     abklingzeit:true). Die Frontend-Zahl gatet nur die Anzeige - laeuft sie auseinander, sperrt oder
+     oeffnet das Kartenmenue hoechstens einen Schlag, den der Server dann korrekt entscheidet. */
+  const KONVOI_ABKLING_STD = 2;
+  const KONVOI_LEBENSDAUER_STD = 18;
   /* Der Belagerungsplan (21.08.2026, Auftrag Sascha: aus drei Optionen die UMWIDMUNG gewaehlt).
      Er senkt die EIGENEN Verluste des naechsten Festungsschlags - ausdruecklich NICHT das, was das
      Konzept vorsah (ein Extraschlag ausserhalb der Abklingzeit). Der Grund ist gemessen: Der Hort
@@ -8920,6 +8971,50 @@
   function nestAbklingBis(nest){
     const mein = (nest && nest.schlaege && state.player && nest.schlaege[state.player.id]) || 0;
     return mein ? mein + NEST_ABKLING_STD*3600*1000 : 0;
+  }
+  /* ---- A2: Wrackkonvoi (wandernde Beute-Ziele) -----------------------------------------------
+     Das Gegenstueck zum Nest, nur OHNE Volk und OHNE Schwaeche: ein flacher Wurf, kein Konterschiff.
+     Alles Angezeigte kommt aus galaxyCache.wrackKonvois (Feld heisst im Client bewusst so, nicht
+     nach dem Etappencode A2). Die Beute reist als flacher Deskriptor IM Zielobjekt mit - deshalb
+     KEINE Stufentabelle und KEIN Paritaetstest wie beim Nest. Nur lesend, wie nesterImSystem. */
+  function konvoiImSystem(sysId){
+    return (galaxyCache.wrackKonvois || []).filter(k => k && k.sys === sysId);
+  }
+  // Eigener Winkel (60 Grad), damit der Marker nicht auf Nest (340), NPC (200), Basis (205) oder
+  // Portal (325) faellt - zwei feste Winkel uebereinander traennt nur der Kollisionsschieber
+  // zufaellig (KB-13). Bahnmasse aus derselben Quelle wie alle Marker.
+  function konvoiMarkerXY(index){
+    const rx = kbOrbitRx(1) * 0.918;
+    const ry = rx * Math.max(0.60, kbOrbitMass().ry);
+    const rad = (60 + (index || 0) * 72) * Math.PI / 180;
+    return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
+  }
+  // Abklingzeit steht AM ZIEL (schlaege[uid]) und reist mit dem Galaxie-Zustand - ablesbar ohne
+  // Serverfrage, wie bei Nest und Festung. Der Server bleibt Autoritaet (403 mit abklingzeit:true).
+  function konvoiAbklingBis(k){
+    const mein = (k && k.schlaege && state.player && k.schlaege[state.player.id]) || 0;
+    return mein ? mein + KONVOI_ABKLING_STD*3600*1000 : 0;
+  }
+  // Wann entkommt der Konvoi (Lebensdauer)? Fuer die "entkommt in X"-Zeile im Kartenmenue.
+  function konvoiEntkommtBis(k){
+    return (k && k.seit) ? k.seit + KONVOI_LEBENSDAUER_STD*3600*1000 : 0;
+  }
+  /* Die Bergungszeile aus k.beute - dem flachen Deskriptor, den der Server im Zielobjekt mitschickt.
+     Wie nestBergungZeile, nur mit Sternenessenz vorn (die hat das Nest nicht) und dem Hinweis auf
+     das EXKLUSIVE Bergungsmodul (kv_bergungslogik/kv_bergungspanzer, quelle:'konvoi') - der einzige
+     Fundweg fuer diese zwei Module. Jede Zahl kommt aus dem Serverobjekt, keine ist erfunden. */
+  function konvoiBergungZeile(k){
+    const b = k && k.beute; if (!b) return '';
+    const teile = [];
+    if (b.essenz > 0)      teile.push(fmt(b.essenz) + ' Sternenessenz');
+    if (b.kampfpunkte > 0) teile.push(fmt(b.kampfpunkte) + ' Kampfpunkte');
+    if (b.xp > 0)          teile.push(fmt(b.xp) + ' Erfahrung');
+    if (b.credits > 0)     teile.push(fmt(b.credits) + ' Kredite');
+    if (!teile.length) return '';
+    let s = '<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Bergung: '
+      + escapeHtml(teile.join(' · ')) + ' – beim Fall nach Schadensanteil geteilt';
+    if (b.modulChance > 0) s += ', dazu die Chance auf ein <strong>Bergungsmodul</strong> (nur hier zu finden)';
+    return s + '.</div>';
   }
   /* Der Rollenanteil wird EXAKT wie im Backend gerechnet (rawFleetPower: Grundwert je Schiffsklasse
      mal diminishingShipCount), NICHT ueber attackPowerRaw. Das ist der Unterschied, auf den es
@@ -9983,6 +10078,67 @@
     log(fleetName+' fliegt zum '+stDef.name+' der '+v.name+' in '+(STAR_SYSTEMS.find(x=>x.id===nest.sys)||{name:nest.sys}).name+'. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
     render(); save();
   }
+  /* ---- A2: Wrackkonvoi-Angriff (Form A, wie Festung/Nest: endTime = jetzt + flug*1000) ----------
+     Die Vorschau ist die des Nestes OHNE Schwaeche/Koenigin/Wandert-Zeile - ein Wrackkonvoi hat kein
+     Konterschiff. Sie MISST trotzdem (Regel 61): LP-Anteil und Schiffszahl aendern sich mit Ziel und
+     Verband, und die Bergungszeile kommt aus dem Serverobjekt. Bewusst KEINE Schadens-Prozentzahl,
+     dieselbe Begruendung wie bei Nest und Festung. */
+  function konvoiVorschauHtml(flotte, konvoiId){
+    const k = (galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(konvoiId));
+    if (!k) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Diesen Wrackkonvoi gibt es nicht mehr.</div>';
+    const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
+    if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys);
+    const fuel = missionFuelCostSplit(flug, flotte);
+    const anteil = Math.max(0, Math.min(1, (k.lp||0) / Math.max(1, k.lpMax||1)));
+    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Beschuss · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
+    html += `<div class="bmeta"><i class="ti ti-recycle" aria-hidden="true" style="color:#8fd0ea;"></i> Wrackkonvoi – <strong>${fmt(Math.round(k.lp||0))}</strong> von ${fmt(k.lpMax||0)} (${Math.round(anteil*100)}%)</div>`;
+    html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> ${n} Schiffe im Verband. Was ankommt, zählt auf deinen Anteil an der Bergung – auch wenn andere den Konvoi aufbringen.</div>`;
+    html += konvoiBergungZeile(k);
+    // Der Verlustbereich ist gemessen: der Server würfelt die Quote als 0,08 + Zufall*0,06 = 8–14%.
+    html += `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Der Konvoi wehrt sich: rechne mit rund 8–14% Verlusten des Verbands.</div>`;
+    html += `<div class="bmeta"><i class="ti ti-droplet" aria-hidden="true"></i> Treibstoff ${fuelCostText(fuel)} · Danach ${KONVOI_ABKLING_STD} Stunden Abklingzeit an DIESEM Konvoi.</div>`;
+    return html;
+  }
+  function oeffneKonvoiAngriff(konvoiId){
+    const k = (galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(konvoiId));
+    if (!k){ log('Diesen Wrackkonvoi gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    oeffneFlottenwahl({
+      art: 'Konvoi',
+      titel: 'Wrackkonvoi angreifen',
+      keys: ATTACK_SHIP_KEYS,
+      vorschau: (flotte) => konvoiVorschauHtml(flotte, konvoiId),
+      startLabel: 'Angriff starten',
+      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      start: () => sendKonvoiMission(konvoiId)
+    });
+  }
+  function sendKonvoiMission(konvoiId){
+    const cf = currentFleet();
+    const k = (galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(konvoiId));
+    if (!k){ log('Diesen Wrackkonvoi gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    const flotte = buildAttackFleet(state.activeBasePlanet, cf);
+    const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
+    if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
+    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys);
+    const fuel = missionFuelCostSplit(flug, flotte);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(fuel);
+    const jetzt = Date.now();
+    const fleetName = resolveFleetName();
+    cf.missions.push({
+      id: nextMissionId(), type:'konvoi-angriff', targetId: k.sys,
+      // `zielId` bindet die Mission an DIESEN Konvoi - der Server sucht sie ueber m.zielId, nicht ueber
+      // targetId (anders als beim Nest). `system` ist das Startsystem: driftet der Konvoi weiter,
+      // erkennt der Server es am Vergleich und die Flotte kehrt unversehrt heim.
+      system: k.sys, zielId: String(k.id),
+      startTime: jetzt, endTime: jetzt + flug*1000,
+      fleetName, composition: flotte
+    });
+    log(fleetName+' fliegt zum Wrackkonvoi in '+(STAR_SYSTEMS.find(x=>x.id===k.sys)||{name:k.sys}).name+'. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
+    render(); save();
+  }
   function oeffneFestungsangriff(sysId){
     const feld = state.asteroidFeld && state.asteroidFeld[sysId];
     const fest = feld && feld.festung;
@@ -10224,6 +10380,63 @@
          Nestes. Die Funktion heisst loadGalaxyState, NICHT loadGalaxy - der erste Entwurf hatte
          den Namen geraten und ihn hinter einem typeof-Waechter versteckt, der den Fehler still
          gemacht haette (Arbeitsregel 4: Namen aus dem Code ablesen, nie raten). */
+      loadGalaxyState();
+      if (daten.gefallen) claimPendingRewards();
+    }
+    pveVerlusteBuchen(fleet, verluste);
+    render(); save();
+  }
+  /* Der Wrackkonvoi-Schlag bei der Rueckkehr (A2). Wortgleiches Muster wie nestAufloesen, mit
+     demselben `verpasst`-Ausgang: Der Server antwortet mit 200 und ohne Verluste, wenn das Ziel
+     aufgebracht, entkommen oder weitergedriftet ist - kein Fehler des Spielers, kostet ihn also
+     nichts, und der Grund gehoert ihm gesagt statt verschwiegen. Ein Konvoi hat kein Volk und keine
+     Stufe, der Bericht traegt sie also nicht. */
+  async function konvoiAufloesen(m, planetKey, fleet){
+    let daten = null, status = 0;
+    try {
+      await save();
+      const res = await backendFetch('/konvoi/angriff', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zielId: String(m.zielId||''), missionId: String(m.id) })
+      });
+      status = res.status;
+      daten = await res.json().catch(() => null);
+      if (!res.ok) daten = null;
+    } catch(e){ daten = null; }
+    const verluste = {};
+    const sysName = (STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system}).name;
+    if (!daten){
+      const grund = 'Der Angriff kam nicht zustande'
+        + (status === 403 ? ' – die Abklingzeit an diesem Wrackkonvoi lief noch'
+         : status === 404 ? ' – der Server kennt Wrackkonvois noch nicht'
+         : ' – der Server war nicht erreichbar') + '.';
+      log('Der Angriff auf den Wrackkonvoi bei '+sysName+' kam nicht zustande'
+        + (status === 403 ? ' – Abklingzeit' : status === 404 ? ' – der Server kennt Wrackkonvois noch nicht' : '')
+        + ' – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      angriffOhneKampf('konvoi-angriff', 'Wrackkonvoi bei '+sysName, grund,
+        { fleetName:m.fleetName, system:m.system, systemName:sysName });
+    } else if (daten.verpasst){
+      /* Vollzaehlig zurueck, keine Verluste, keine Abklingzeit - der Grund steht in der Meldung.
+         Leeres `verluste` heisst unversehrte Rueckkehr. */
+      log(daten.text || ('Der Wrackkonvoi bei '+sysName+' war nicht mehr da – dein Verband kehrt vollzählig zurück.'),
+        'ti-arrows-shuffle', 'wichtig');
+      angriffOhneKampf('konvoi-angriff', 'Wrackkonvoi bei '+sysName,
+        daten.text || 'Der Wrackkonvoi war bei der Ankunft nicht mehr da – aufgebracht, entkommen oder weitergedriftet.',
+        { fleetName:m.fleetName, system:m.system, systemName:sysName });
+    } else {
+      for (const [k, val] of Object.entries(m.composition||{})){
+        const weg = (daten.eigeneVerluste || {})[k] || 0;
+        if (weg > 0) verluste[k] = Math.min(val, weg);
+      }
+      pushReport({ type:'konvoi-angriff', fleetName:m.fleetName, system:m.system, systemName:sysName,
+        targetPlanet:planetKey,
+        schaden:daten.schaden||0, gefallen:!!daten.gefallen, lp:daten.lp||0, lpMax:daten.lpMax||0,
+        anteil:daten.anteil||0, teilnehmer:daten.teilnehmer||1, eigeneVerluste:daten.eigeneVerluste||{} });
+      log(daten.gefallen
+        ? 'Der Wrackkonvoi bei '+sysName+' ist aufgebracht! Dein Anteil an der Bergung: '+Math.round((daten.anteil||0)*100)+'%.'
+        : 'Wrackkonvoi bei '+sysName+' beschossen: '+fmt(daten.schaden||0)+' Schaden, noch '+fmt(daten.lp||0)+' übrig.',
+        daten.gefallen ? 'ti-trophy' : 'ti-sword',
+        daten.gefallen ? 'wichtig' : undefined);
       loadGalaxyState();
       if (daten.gefallen) claimPendingRewards();
     }
@@ -18270,7 +18483,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -21401,6 +21614,12 @@
   // Er steht nicht im Substat-Segment des Schluessels, wuerfelt also nie und uebersteht jede
   // Werkbank-Aktion. Bewusst nie 'atk'/'raidloss' (PvP-Paritaet, wie bei den Boss-Sets).
   const HERKUNFT_UNIKAT = 'unikat';
+  // Wrackkonvoi (A2, wandernde Beute-Ziele): Hält das Bergungs-Standortmodul (kv_bergungslogik) und
+  // das Bergungs-Schiffsmodul (kv_bergungspanzer) aus jedem regulären Fundtopf, jeder Schmiede und
+  // der Börse heraus. Vergeben werden sie ausschließlich über konvoiModulAusServerwurf(), sobald der
+  // Server beim Fall eines Wrackkonvois einen Modulwurf mitschickt. Dieselbe Schloss-Familie wie
+  // HERKUNFT_BOSS/HERKUNFT_UNIKAT.
+  const HERKUNFT_KONVOI = 'konvoi';
   const MODULE_DEFS = [
     { key:'panzerung', name:'Panzerungsmodul', icon:'ti-shield', effect:'def', base:0.05, desc:'Erhöht die Verteidigung dieses Standorts.' },
     { key:'waffen', name:'Waffenmodul', icon:'ti-sword', effect:'atk', base:0.05, desc:'Erhöht die Angriffskraft der hier stationierten Flotte.' },
@@ -21532,7 +21751,14 @@
       desc:'UNIKAT vom Ende der Piratenkette: Der Beutehort des letzten Kapitäns, umgearbeitet zum Leitstand – erhöht den Ertrag deiner Handelsrouten. Sein fester Unikat-Bonus von +3% Treibstoff-Ersparnis gilt imperiumsweit und würfelt nie. Fällt mit 15% Chance beim Sieg über den <strong>Piraten-Endboss</strong> (Stufe 10 der Kette), zusätzlich zu dessen garantiertem Modul. Immer Exotisch mit festem Spitzenwurf (110%).' },
     { key:'waechterauge', name:'Wächterauge', icon:'mod_waechterauge', effect:'def', base:0.05, quelle:HERKUNFT_UNIKAT,
       unikatSub:{ effect:'expedition', value:0.03 }, fundort:'Abgrund – Wächter',
-      desc:'UNIKAT aus den Zehnertiefen des Abgrunds: Das versteinerte Auge eines Wächters wacht weiter und erhöht die Verteidigung dieses Standorts. Sein fester Unikat-Bonus von +3% Expeditions-Ausbeute gilt imperiumsweit, würfelt nie und übersteht jede Werkbank-Aktion. Fällt ab Tiefe 40 mit 7% Chance bei jedem Wiederholungssieg über einen Wächter, zusätzlich zu dessen garantiertem Modul – der Erstsieg gehört weiter der Reliquie. Immer Exotisch mit festem Spitzenwurf (110%).' }
+      desc:'UNIKAT aus den Zehnertiefen des Abgrunds: Das versteinerte Auge eines Wächters wacht weiter und erhöht die Verteidigung dieses Standorts. Sein fester Unikat-Bonus von +3% Expeditions-Ausbeute gilt imperiumsweit, würfelt nie und übersteht jede Werkbank-Aktion. Fällt ab Tiefe 40 mit 7% Chance bei jedem Wiederholungssieg über einen Wächter, zusätzlich zu dessen garantiertem Modul – der Erstsieg gehört weiter der Reliquie. Immer Exotisch mit festem Spitzenwurf (110%).' },
+    // ===== Wrackkonvoi-Beutemodul (A2): exklusives Standort-Modul aus dem Herkunfts-Schloss =====
+    // Bewusst ein PRODUKTIONS-Kanal, kein Kampf-Kanal: Ein Standort-Modul ohne atk/hull/shield braucht
+    // keine Backend-Parität (der Server rechnet PvP nur aus Schiffs-Kampfwerten). Das eigentliche
+    // Kampf-Modul des Konvois ist kv_bergungspanzer in SHIP_MODULE_DEFS. Vergeben nur über
+    // konvoiModulAusServerwurf, wenn der Server beim Fall eines Wrackkonvois einen Modulwurf schickt.
+    { key:'kv_bergungslogik', name:'Bergungslogik', icon:'ti-recycle', effect:'prod', base:0.05, quelle:HERKUNFT_KONVOI,
+      desc:'Aus einem geschleiften <strong>Wrackkonvoi</strong> geborgene Förder- und Sortiersteuerung: erhöht die Ressourcenproduktion dieses Standorts. Exklusiv – fällt ausschließlich beim Erlegen eines Wrackkonvois, nie in einem regulären Fundtopf, einer Schmiede oder der Modulbörse.' },
   ];
   const MODULE_MAX_SLOT_LEVEL = 4; // Basis-Obergrenze Slots pro Planet
   // Slot-Obergrenze pro Standort - mit der Forschung "Slot-Miniaturisierung" (rmodulslots) +1 (Runde 4).
@@ -22058,6 +22284,26 @@
     state.modules[instKey] = (state.modules[instKey]||0) + 1;
     playSound('bossdrop');
     const info = moduleInstanceInfo(instKey);
+    return info ? (info.rar.label+' '+info.def.name) : def.name;
+  }
+
+  // Empfängt einen Server-Wurf für ein Wrackkonvoi-Beutemodul (A2) und legt es ins Inventar. Wie
+  // bosssetAusServerwurf ist das die REINE Empfangsstelle: Der Client würfelt NICHTS - Chance und
+  // Sorte entscheidet der Server -, er zieht nur das benannte Modul aus dem Herkunfts-Schloss.
+  // `mod.art` ('standort'/'schiff') entscheidet Topf, Substat-Wurf und Instanz-Info - dasselbe
+  // istSchiff-Muster wie in grantAbgrundModule.
+  function konvoiModulAusServerwurf(mod){
+    if (!mod || !mod.defKey) return null;
+    const istSchiff = mod.art === 'schiff';
+    const defs = istSchiff ? SHIP_MODULE_DEFS : MODULE_DEFS;
+    const def = defs.find(d => d.key === mod.defKey && d.quelle === HERKUNFT_KONVOI);
+    if (!def) return null;
+    const rarity = (mod.seltenheit && MODULE_RARITY[mod.seltenheit]) ? mod.seltenheit : 'episch';
+    const subs = rollModuleSubs(rarity, istSchiff, def.effect);
+    const instKey = def.key+':'+rarity+':1:'+mitWertWurf(subs);
+    const inv = istSchiff ? state.shipModules : state.modules;
+    inv[instKey] = (inv[instKey]||0) + 1;
+    const info = istSchiff ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
     return info ? (info.rar.label+' '+info.def.name) : def.name;
   }
 
@@ -22874,6 +23120,12 @@
     { key:'sl_schildgitter',   klasse:'schwerelinie',   name:'Schildgitter-Projektor', icon:'ti-shield-lock', effect:'shield',      base:0.08, desc:'Erhöht die Schildpunkte aller Schiffe der Schweren Linie und stärkt damit die Verteidigung ihres Standorts.' },
     { key:'sl_marschtriebwerk',klasse:'schwerelinie',   name:'Marschtriebwerke',       icon:'ti-rocket',      effect:'speed',       base:0.08, desc:'Erhöht die Geschwindigkeit aller Schiffe der Schweren Linie – die träge Kampflinie erreicht ihre Ziele spürbar schneller.' },
     { key:'sl_treibstoffzellen',klasse:'schwerelinie',  name:'Hochdruck-Treibstoffzellen', icon:'ti-droplet', effect:'fuel',        base:0.10, desc:'Verringert den Treibstoffverbrauch von Missionen mit Schiffen der Schweren Linie – gerade bei den durstigen schweren Rümpfen eine deutliche Ersparnis.' },
+    // ===== Wrackkonvoi-Kampfmodul (A2): exklusives Schiffsmodul aus dem Herkunfts-Schloss =====
+    // Trägt einen KAMPF-Kanal ('hull') und ist deshalb server-relevant: SHIP_MODULE_COMBAT_BASE im
+    // Backend führt kv_bergungspanzer mit denselben Werten (klasse/effect/base), test_schiffsmodul_paritaet.js
+    // hält beide zusammen. quelle:HERKUNFT_KONVOI sperrt es aus jedem Fundtopf; vergeben nur über
+    // konvoiModulAusServerwurf beim Fall eines Wrackkonvois.
+    { key:'kv_bergungspanzer', klasse:'schwerelinie',   name:'Bergungspanzerung',      icon:'ti-anchor',      effect:'hull',        base:0.12, quelle:HERKUNFT_KONVOI, desc:'Aus einem geschleiften <strong>Wrackkonvoi</strong> geborgene Rumpfplatten, an die schwere Kampflinie geschweißt: erhöht den Verteidigungsbeitrag aller Schiffe der Schweren Linie (Kreuzer, Zerstörer, Bomber, Hyperbomber). Exklusiv – fällt ausschließlich beim Erlegen eines Wrackkonvois, nie in einem regulären Fundtopf, einer Schmiede oder der Modulbörse.' },
     // Tier-2-Erweiterung "Synthese-Kette" (20.07.2026): zwei Apex-Module aus den neuen Ressourcen.
     { key:'t2_metamaterialpanzer', klasse:'raffiniert', name:'Metamaterial-Panzerplatte', icon:'ti-shield-lock', effect:'hull',      base:0.14, craftOnly:true, craftCost:{ metamaterial: 18 }, desc:'Erhöht den Verteidigungsbeitrag von Tier-2-Schiffen deutlich. Nur über die Tier-2-Modulfertigung erhältlich.' },
     { key:'t2_singularitaetsfokus', klasse:'raffiniert', name:'Singularitäts-Fokusarray', icon:'ti-bolt',       effect:'atk',         base:0.14, craftOnly:true, craftCost:{ singularitaetskern: 10 }, desc:'Erhöht die Angriffskraft von Tier-2-Schiffen deutlich. Nur über die Tier-2-Modulfertigung erhältlich.' },
@@ -24815,7 +25067,23 @@
   // eigenen Spielstand. Bewusst über den normalen, authentifizierten Speicherzyklus statt einer
   // direkten Server-seitigen Änderung des Spielstands - so gibt es keinen Konflikt mit einem
   // laufenden Auto-Save (siehe saveGameStateVersioned).
-  async function claimPendingRewards(){
+  /* Die Gaben eines Bonuscodes oder Geschenks buchen - EINE Stelle fuer beide Zweige (01.09.2026).
+   Vorher stand die Schleife im Bonuscode-Zweig; ein zweites Mal abgeschrieben waere sie die
+   uebliche zweite Wahrheit, die beim naechsten Feld auseinanderlaeuft. Jeder Wert wird einzeln
+   gefiltert, statt dem Server zu trauen - der Zweig darf nicht werfen (siehe Bonuscode). */
+function belohnungGabenBuchen(r){
+  const zahl = v => { const n = Math.floor(Number(v)); return (Number.isFinite(n) && n > 0) ? n : 0; };
+  const teile = [];
+  for (const k of ['erz','kristalle','deuterium','energie','antimaterie','forschungspunkte']){
+    const v = zahl(r[k]);
+    if (v){ state.resources[k] = (state.resources[k]||0) + v; teile.push('+'+fmt(v)+' '+resLabel(k)); }
+  }
+  const cr = zahl(r.credits);      if (cr){ state.credits = (state.credits||0) + cr; teile.push('+'+fmt(cr)+' Kredite'); }
+  const kp = zahl(r.kampfpunkte);  if (kp){ state.battlePoints = (state.battlePoints||0) + kp; teile.push('+'+fmt(kp)+' Kampfpunkte'); }
+  const xp = zahl(r.xp);           if (xp){ addXp(xp); teile.push('+'+fmt(xp)+' Erfahrung'); }
+  return teile;
+}
+async function claimPendingRewards(){
     if (!useBackend()) return;
     try {
       for (let i = 0; i < 10; i++){
@@ -24891,6 +25159,38 @@
             + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'),
             'ti-trophy', 'wichtig');
           save();   // siehe die Begruendung im Festungs-Zweig darueber - dasselbe gilt hier
+          continue;
+        }
+        if (r.type === 'wrackkonvoi'){
+          // A2: der Wrackkonvoi zahlt anteilig Sternenessenz (state.ascension.essence - die einzige
+          // Waehrung, die Prestige UND Aufstieg uebersteht) plus Kampfpunkte/Erfahrung/Kredite und
+          // dazu die Chance auf EINES der zwei Bergungsmodule (quelle:'konvoi', nur hier zu finden).
+          // Jeder Wert wird einzeln gefiltert - claimPendingRewards laeuft im stillen try/catch, und
+          // der Server hat den Eintrag beim Abholen schon geloescht; eine Ausnahme hier verloere ihn.
+          const teile = [];
+          const es = Math.max(0, Math.round(r.essenz||0));
+          if (es > 0){
+            if (!state.ascension) state.ascension = { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
+            state.ascension.essence = (state.ascension.essence||0) + es;
+            teile.push(es + ' Sternenessenz');
+          }
+          const kp = Math.max(0, Math.round(r.kampfpunkte||0));
+          if (kp > 0){ state.battlePoints = (state.battlePoints||0) + kp; teile.push(kp + ' Kampfpunkte'); }
+          const xp = Math.max(0, Math.round(r.xp||0));
+          if (xp > 0){ state.xp = (state.xp||0) + xp; teile.push(fmt(xp) + ' Erfahrung'); }
+          const cr = Math.max(0, Math.round(r.credits||0));
+          if (cr > 0){ state.credits = (state.credits||0) + cr; teile.push(fmt(cr) + ' Kredite'); }
+          // Zwei getrennte Modulwuerfe des Servers (modul = Standort, kampfmodul = Schiff), jeder
+          // ueber dieselbe Empfangsstelle; der Client wuerfelt NICHTS.
+          const mL = konvoiModulAusServerwurf(r.modul);
+          if (mL) teile.push('Bergungsmodul: ' + mL);
+          const mK = konvoiModulAusServerwurf(r.kampfmodul);
+          if (mK) teile.push('Bergungsmodul: ' + mK);
+          const sysName = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          log('Anteil an der Bergung des Wrackkonvois bei ' + sysName + ' ('
+            + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'),
+            'ti-recycle', 'wichtig');
+          save();   // Regel 73: der Server hat die Belohnung beim Abholen schon geloescht
           continue;
         }
         if (r.type === 'weekly-league'){
@@ -25015,21 +25315,25 @@
            Roh addiert wie der 'festung'-Zweig darüber, also ohne Lagerdeckel – ein Geschenk, das am
            vollen Lager verpufft, wäre die unfreundlichere Auslegung, und die Beträge sind klein. */
         if (r.type === 'bonuscode'){
-          const zahl = v => { const n = Math.floor(Number(v)); return (Number.isFinite(n) && n > 0) ? n : 0; };
-          const teile = [];
-          for (const k of ['erz','kristalle','deuterium','energie','antimaterie','forschungspunkte']){
-            const v = zahl(r[k]);
-            if (v){ state.resources[k] = (state.resources[k]||0) + v; teile.push('+'+fmt(v)+' '+resLabel(k)); }
-          }
-          const cr = zahl(r.credits);      if (cr){ state.credits = (state.credits||0) + cr; teile.push('+'+fmt(cr)+' Kredite'); }
-          const kp = zahl(r.kampfpunkte);  if (kp){ state.battlePoints = (state.battlePoints||0) + kp; teile.push('+'+fmt(kp)+' Kampfpunkte'); }
-          const xp = zahl(r.xp);           if (xp){ addXp(xp); teile.push('+'+fmt(xp)+' Erfahrung'); }
+          const teile = belohnungGabenBuchen(r);
           const codeText = String(r.code || '').slice(0, 40);
           log('Bonuscode eingelöst'+(codeText ? ' ('+codeText+')' : '')+': '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-award', 'ok');
           playSound('achieve');
           // Der Bericht ist die BLEIBENDE Auskunft - `log()` überschreibt sich mit der nächsten
           // Meldung selbst, und beim Offline-Nachholen erscheint es gar nicht.
           pushReport({ type:'bonuscode', code: codeText, gaben: teile });
+          save();
+          continue;
+        }
+        /* Geschenk an alle (01.09.2026): dieselbe Gabenform wie der Bonuscode, deshalb derselbe
+           Buchungs-Helfer. Ein EIGENER Zweig ist Pflicht - ein unbekannter Typ faellt unten in den
+           Rueckfall und meldet woertlich "+500 Kredite fuer deinen Bug-Report". */
+        if (r.type === 'geschenk'){
+          const teile = belohnungGabenBuchen(r);
+          const text = String(r.text || '').slice(0, 200);
+          log('Geschenk vom Team'+(text ? ' („'+text+'")' : '')+': '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-sparkles', 'ok');
+          playSound('achieve');
+          pushReport({ type:'geschenk', text, gaben: teile });
           save();
           continue;
         }
@@ -28576,7 +28880,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true, verdacht:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -28707,7 +29011,10 @@
     // über den Rückfall unten mit einer Glocke und dem Wort "Ereignis". Der Text sagt bewusst
     // "geöffnet" und nicht "spielt": Der auslösende erste Spielstand-Save feuert automatisch beim
     // ersten Boot, die Meldung behauptet also nur, was sie belegen kann.
-    'neuer-spieler': { icon:'ti-user', color:'#5dcaa5', text:(p)=>(p.username||'Ein Kommandant')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+p.gesamt+'. Kommandant insgesamt':'')+'.' }
+    'neuer-spieler': { icon:'ti-user', color:'#5dcaa5', text:(p)=>(p.username||'Ein Kommandant')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+p.gesamt+'. Kommandant insgesamt':'')+'.' },
+    // Betreiber-Meldung (01.09.2026): ein Konto ist nach der Verdachtsregel der Aktivitäts-Uhr
+    // auffällig. Der Text nennt die harmlosen Erklärungen mit - ein Hinweis, kein Beweis.
+    'konto-verdacht': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>(p.username||'Ein Konto')+' hatte in '+(p.tage||7)+' Tagen keine Pause über '+(p.laengstePause||0)+' Std. - Bot, geteiltes Konto oder zwei Zeitzonen? Details im Admin-Bereich unter Konto.' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -28879,7 +29186,7 @@
     try {
       const res = await backendFetch('/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toUserId: messageComposeTargetId, text }) });
       if (res.ok){ log('Nachricht gesendet.', 'ti-mail'); closeMessageCompose(); }
-      else { log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+      else { let d = {}; try { d = await res.json(); } catch(e){} log(d.error || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
     finally { if (sendBtn) sendBtn.disabled = false; }
   }
@@ -29310,8 +29617,11 @@
     { tab:'codes',     btn:'adminTabCodesBtn',     view:'adminCodesView',     anzeige:'block', sub:'Bonuscodes',               laden:() => loadAdminBonusCodes() },
     { tab:'feedback',  btn:'adminTabFeedbackBtn',  view:'adminFeedbackView',  anzeige:'block', sub:'Feedback der Spieler',     laden:() => loadAdminFeedback() },
     { tab:'schalter',  btn:'adminTabSchalterBtn',  view:'adminSchalterView',  anzeige:'block', sub:'Notabschaltung',           laden:() => loadAdminSchalter() },
-    { tab:'konto',     btn:'adminTabKontoBtn',     view:'adminKontoView',     anzeige:'block', sub:'Konto nachschlagen',       laden:null },
-    { tab:'system',    btn:'adminTabSystemBtn',    view:'adminSystemView',    anzeige:'block', sub:'Systemstand',              laden:() => loadAdminSystemstand() }
+    { tab:'konto',     btn:'adminTabKontoBtn',     view:'adminKontoView',     anzeige:'block', sub:'Konto nachschlagen',       laden:() => loadAdminAktivitaet() },
+    { tab:'system',    btn:'adminTabSystemBtn',    view:'adminSystemView',    anzeige:'block', sub:'Systemstand',              laden:() => loadAdminSystemstand() },
+    { tab:'geschenk',  btn:'adminTabGeschenkBtn',  view:'adminGeschenkView',  anzeige:'block', sub:'Geschenk an alle Spieler',  laden:() => loadAdminGeschenke() },
+    { tab:'protokoll', btn:'adminTabProtokollBtn', view:'adminProtokollView', anzeige:'block', sub:'Protokoll der Betreiber-Handlungen', laden:() => loadAdminProtokoll() },
+    { tab:'allianzen', btn:'adminTabAllianzenBtn', view:'adminAllianzenView', anzeige:'block', sub:'Allianzen',                   laden:() => loadAdminAllianzen() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -29694,6 +30004,332 @@
       ${kurz >= 3 ? `<div class="bmeta" style="margin-top:2px; color:#f0997b;">${kurz} davon unter zwei Minuten – so schnell bemerkt man ein neues Ziel nicht von Hand.</div>` : ''}
     </div>`;
   }
+  /* ===== Uebersicht nach Auffaelligkeit und Geschenk an alle (01.09.2026, Auftrag Sascha
+     "Funktionen weiter ausbauen") - die Server-Haelfte samt Verdachtsregel steht in der
+     Backend-CLAUDE.md. Hier nur die Anzeige. ============================================== */
+  // Das Miniraster je Uebersichtszeile: 14 Zeilen x 24 Kaestchen von 3 px - dieselben drei Farben
+  // wie die grosse Uhr im Blatt (aktiv / ruhig / nicht beobachtet), nur ohne Achse.
+  function aktivMiniRasterHtml(reihe, tage){
+    if (typeof reihe !== 'string' || reihe.length < 24) return '';
+    const t = tage || Math.floor(reihe.length / 24);
+    let zeilen = '';
+    for (let d = 0; d < t; d++){
+      zeilen += '<div style="display:grid; grid-template-columns:repeat(24,3px); gap:1px;">'
+        + reihe.slice(d*24, d*24+24).split('').map(c => '<div style="height:2px; background:'
+            + (c === '1' ? '#5dcaa5' : c === '0' ? '#2a3042' : 'transparent') + ';"></div>').join('') + '</div>';
+    }
+    return '<div data-mini-raster style="display:flex; flex-direction:column; gap:1px; flex-shrink:0;" aria-hidden="true">' + zeilen + '</div>';
+  }
+  async function loadAdminAktivitaet(){
+    const box = document.getElementById('adminKontoUebersicht');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Übersicht wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/aktivitaet');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Übersicht nach Auffälligkeit'); return; }
+      const d = await res.json();
+      const konten = d.konten || [];
+      if (!konten.length){ box.innerHTML = `<div class="bmeta">Noch kein Konto mit Spielstand.</div>`; return; }
+      const regel = d.regel || { pauseMaxStd: 2, minStunden: 168 };
+      const pauseText = k => !k.belastbar ? 'zu wenig aufgezeichnet' : (adminZahl(k.laengstePause) + ' h längste Pause');
+      const punkt = f => '<span style="display:inline-block; width:8px; height:8px; background:' + f + '; margin-right:6px; flex-shrink:0;" aria-hidden="true"></span>';
+      box.innerHTML = `<div class="bmeta" style="line-height:1.5; margin-bottom:4px;">${adminZahl(d.gesamt)} Konten mit Spielstand, die kürzeste Pause zuerst. <strong>Auffällig</strong> heißt: über ${Math.round(regel.minStunden/24)} Tage keine Pause über ${regel.pauseMaxStd} Stunden – ein Hinweis, kein Beweis (geteiltes Konto, zwei Zeitzonen). Tippen öffnet das Blatt.</div>`
+        + konten.map(k => `<div class="card-row" data-uebersicht-konto="${escapeHtml(k.username)}" data-uebersicht-verdacht="${k.verdacht ? '1' : '0'}" role="button" tabindex="0" style="padding:0.4rem 0.7rem; gap:10px; cursor:pointer;">
+          ${aktivMiniRasterHtml(k.reihe, d.tage)}
+          <div class="left" style="min-width:0; flex:1;"><div style="min-width:0;">
+            <div class="bname" style="display:flex; align-items:center;">${punkt(k.verdacht ? '#f0997b' : k.belastbar ? '#5dcaa5' : '#4a5068')}${escapeHtml(k.username)}${k.gesperrt ? ' <span class="bmeta" style="color:#f0997b; margin-left:6px;">gesperrt</span>' : ''}${k.verdacht ? ' <span class="bmeta" style="color:#f0997b; margin-left:6px;">auffällig</span>' : ''}</div>
+            <div class="bmeta">${pauseText(k)} · ${adminZahl(k.aktiv)} von ${adminZahl(k.beobachtet)} Std. aktiv${k.schnelleReaktionen ? ' · ' + adminZahl(k.schnelleReaktionen) + '× unter 2 Min. am Ziel' : ''}${k.rateLimitHeute ? ' · ' + adminZahl(k.rateLimitHeute) + '× Rate-Limit heute' : ''}${k.spielstandAbgelehnt ? ' · ' + adminZahl(k.spielstandAbgelehnt) + ' Spielstände abgelehnt' : ''}</div>
+          </div></div>
+        </div>`).join('');
+      box.querySelectorAll('[data-uebersicht-konto]').forEach(el => {
+        const oeffnen = () => {
+          const f = document.getElementById('adminKontoSuche');
+          if (f) f.value = el.getAttribute('data-uebersicht-konto');
+          loadAdminKonto();
+          const liste = document.getElementById('adminKontoListe');
+          if (liste && liste.scrollIntoView) liste.scrollIntoView({ block:'start' });
+        };
+        el.onclick = oeffnen;
+        el.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); oeffnen(); } };
+      });
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Übersicht nach Auffälligkeit'); }
+  }
+  // Die zwei neuen Blatt-Zeilen. Beide fehlen ERSATZLOS, wenn der Server die Felder nicht schickt
+  // (ein Stand vor dem 01.09.2026) - kein "0", das etwas behauptet, was niemand gemessen hat.
+  function rateLimitZeileHtml(zeile, r){
+    if (!r || typeof r !== 'object') return '';
+    const farbe = r.heute ? '#f0997b' : (r.gesamt ? '#fac775' : '#5dcaa5');
+    const text = adminZahl(r.heute) + ' heute · ' + adminZahl(r.gesamt) + ' gesamt'
+      + (r.letzterPfad ? ' · zuletzt ' + escapeHtml(r.letzterPfad) + ' (' + adminZeit(r.letzteZeit) + ')' : '');
+    return zeile('Rate-Limit-Treffer', '<span style="color:' + farbe + ';">' + text + '</span>');
+  }
+  function spielstandAbgelehntHtml(zeile, a){
+    if (!a || typeof a !== 'object') return '';
+    if (!a.n) return zeile('Abgelehnte Spielstände', 'keine');
+    const letzte = Array.isArray(a.letzte) && a.letzte.length ? a.letzte : [{ zeit: a.letzteZeit, grund: a.letzterGrund }];
+    return zeile('Abgelehnte Spielstände', '<span style="color:#f0997b;">' + adminZahl(a.n) + ' · zuletzt ' + adminZeit(a.letzteZeit) + '</span>')
+      + '<div class="bmeta" style="color:#f0997b; line-height:1.5;">' + letzte.map(x => adminZeit(x.zeit) + ': ' + escapeHtml(x.grund || '')).join('<br>')
+      + '<br><span style="color:#c9d4e8;">Ein abgelehnter Spielstand wird NICHT gespeichert – der Spieler sieht bei jedem Neuladen den letzten angenommenen Stand.</span></div>';
+  }
+  let adminGeschenkEmpfaengerZahlen = { alle: 0, aktiv30: 0 };
+  async function loadAdminGeschenke(){
+    const box = document.getElementById('adminGeschenkVerlauf');
+    const gabenBox = document.getElementById('adminGeschenkGaben');
+    const info = document.getElementById('adminGeschenkEmpfaenger');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/geschenke');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Geschenke'); if (info) info.textContent = ''; return; }
+      const d = await res.json();
+      adminGeschenkEmpfaengerZahlen = { alle: d.empfaengerGesamt || 0, aktiv30: d.empfaenger30Tage || 0 };
+      // Gaben-Felder aus der Server-Tabelle, wie bei den Bonuscodes: Der Deckel steht als max am
+      // Feld, und der Server prueft trotzdem.
+      if (gabenBox && !gabenBox.childElementCount){
+        gabenBox.innerHTML = Object.keys(d.gaben || {}).map(k => {
+          const g = d.gaben[k];
+          return `<label style="display:flex; flex-direction:column; gap:2px;"><span class="bmeta">${escapeHtml(g.name)} (max ${fmt(g.max)})</span>`
+               + `<input type="number" min="1" max="${g.max}" data-geschenk-gabe="${escapeHtml(k)}" placeholder="0" style="font-size:12.5px;"></label>`;
+        }).join('');
+      }
+      const textEl = document.getElementById('adminGeschenkText');
+      if (textEl && d.textMax) textEl.maxLength = d.textMax;
+      if (info) info.textContent = 'Empfänger: ' + adminZahl(d.empfaengerGesamt) + ' Konten mit Spielstand, davon ' + adminZahl(d.empfaenger30Tage) + ' in den letzten 30 Tagen angemeldet.';
+      const liste = d.geschenke || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Noch nichts verschenkt.</div>`; return; }
+      box.innerHTML = liste.map(g => `<div class="card-row" style="padding:0.5rem 0.85rem;"><div class="left"><div style="min-width:0;">
+          <div class="bname">${adminZeit(g.zeit)} · an ${adminZahl(g.empfaenger)} Konten${g.nurAktiveTage ? ' (angemeldet binnen ' + adminZahl(g.nurAktiveTage) + ' Tagen)' : ''}</div>
+          <div class="bmeta">${escapeHtml(Object.keys(g.gaben || {}).map(k => fmt(g.gaben[k]) + ' ' + resLabel(k)).join(', '))}${g.text ? ' · „' + escapeHtml(g.text) + '"' : ''}</div>
+        </div></div></div>`).join('');
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Geschenke'); }
+  }
+  async function adminGeschenkSenden(){
+    const gaben = {};
+    document.querySelectorAll('[data-geschenk-gabe]').forEach(el => {
+      const n = Math.floor(Number(el.value));
+      if (Number.isFinite(n) && n > 0) gaben[el.getAttribute('data-geschenk-gabe')] = n;
+    });
+    if (!Object.keys(gaben).length){ log('Das Geschenk enthält nichts – bitte mindestens eine Gabe eintragen.', 'ti-alert-triangle'); return; }
+    const textEl = document.getElementById('adminGeschenkText');
+    const filterEl = document.getElementById('adminGeschenkFilter');
+    const nurAktiveTage = filterEl ? Math.max(0, parseInt(filterEl.value, 10) || 0) : 0;
+    const zusammenfassung = Object.keys(gaben).map(k => fmt(gaben[k]) + ' ' + resLabel(k)).join(', ');
+    const wieViele = nurAktiveTage ? 'alle Konten, die sich in den letzten ' + nurAktiveTage + ' Tagen angemeldet haben'
+                                   : 'ALLE ' + adminZahl(adminGeschenkEmpfaengerZahlen.alle) + ' Konten mit Spielstand';
+    // Rueckfrage, weil es sich nicht zuruecknehmen laesst - dieselbe Abwaegung wie bei "alle
+    // Sitzungen beenden": Was der Bediener nicht rueckgaengig machen kann, wird vorher benannt.
+    if (!confirm('Jetzt ' + zusammenfassung + ' an ' + wieViele + ' verschenken?\n\nDas lässt sich nicht zurücknehmen.')) return;
+    // Den Knopf fuer die Dauer der Anfrage sperren (Codex-Hinweis auf #521, 02.09.2026): Der Pi
+    // antwortet auch mal langsam, und ein zweiter Klick nach der Rueckfrage schickte ein zweites
+    // POST - jedes Konto bekaeme das Geschenk doppelt, unwiderruflich. Gesperrt wird VOR dem
+    // ersten await (der zweite Klick sieht den Knopf dann schon gesperrt) und im finally wieder
+    // freigegeben, damit ein Fehlschlag wiederholbar bleibt - dasselbe Muster wie beim
+    // Rundschreiben-Knopf.
+    const btn = document.getElementById('adminGeschenkSendenBtn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    try {
+      const res = await backendFetch('/admin/geschenk', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ gaben, text: textEl ? textEl.value.trim() : '', nurAktiveTage }) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok){ log(data.error || ('Verschenken fehlgeschlagen ('+res.status+').'), 'ti-alert-triangle'); return; }
+      log('Geschenk an ' + adminZahl(data.empfaenger) + ' Konten verschickt – es liegt beim nächsten Start im Belohnungsfach.', 'ti-sparkles', 'ok');
+      document.querySelectorAll('[data-geschenk-gabe]').forEach(el => { el.value = ''; });
+      if (textEl) textEl.value = '';
+      loadAdminGeschenke();
+    } catch(e){ log('Verschenken fehlgeschlagen – Server nicht erreichbar.', 'ti-alert-triangle'); }
+    finally { if (btn) btn.disabled = false; }
+  }
+  /* ===== Spielstand-Blatt, Backups, Protokoll, Allianzen (02.09.2026, Auftrag Sascha "Ideen fuer
+     noch mehr admin Funktionen jeglicher Art") - die Server-Haelfte samt Begruendungen steht in der
+     Backend-Doku docs/admin.md. ======================================================================
+     Das Spielstand-Blatt zeigt eine ZUSAMMENFASSUNG, nie den rohen Stand. Die Ruecksicherung ist der
+     einzige Schreibzugriff auf einen fremden Spielstand: Der Server bewahrt den bisherigen Stand als
+     Schatten und entwertet die Sitzungen des Spielers - das sagt die Rueckfrage, bevor sie es tut. */
+  function spielstandTabelleHtml(z, titel){
+    if (!z) return `<div class="bmeta">${escapeHtml(titel)}: kein Spielstand.</div>`;
+    if (z.fehler) return `<div class="bmeta" style="color:#f0997b;">${escapeHtml(titel)}: ${escapeHtml(z.fehler)}</div>`;
+    const zeile = (k, w) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:#c9d4e8; text-align:right;">${w}</span></div>`;
+    const liste = (obj, max) => { const e = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]); return e.length ? escapeHtml(e.slice(0, max).map(([k, v]) => k + ' ' + adminZahl(v)).join(', ')) + (e.length > max ? ' …' : '') : '–'; };
+    return `<div style="display:flex; flex-direction:column; gap:3px;">
+      <div class="bname" style="font-size:12px;">${escapeHtml(titel)}</div>
+      ${zeile('Stand', adminZeit(z.lastTick) + ' · ' + adminZahl(Math.round((z.groesse || 0) / 1024)) + ' kB')}
+      ${zeile('Kredite / Erfahrung', adminZahl(z.credits) + ' / ' + adminZahl(z.xp) + (z.prestige ? ' · Prestige ' + adminZahl(z.prestige) : ''))}
+      ${zeile('Kampfpunkte', adminZahl(z.kampfpunkte))}
+      ${zeile('Ressourcen', escapeHtml(Object.entries(z.ressourcen || {}).map(([k, v]) => resLabel(k) + ' ' + adminZahl(v)).join(', ')))}
+      ${zeile('Gebäude', liste(z.gebaeude, 8))}
+      ${zeile('Forschung', liste(z.forschung, 8))}
+      ${zeile('Flotte', liste(z.flotte, 8))}
+      ${zeile('Kolonien / Missionen / Bauaufträge', adminZahl(z.kolonien) + ' / ' + adminZahl(z.missionen) + ' / ' + adminZahl(z.bauauftraege))}
+      ${z.allianz ? zeile('Allianz', escapeHtml(z.allianz)) : ''}
+    </div>`;
+  }
+  async function adminSpielstandAnzeigen(name){
+    const box = document.querySelector('[data-konto-spielstand-box="' + CSS.escape(name) + '"]');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Spielstand wird geladen…</div>`;
+    try {
+      const [res, resB] = await Promise.all([backendFetch('/admin/spielstand?name=' + encodeURIComponent(name)), backendFetch('/admin/backups')]);
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'das Spielstand-Blatt'); return; }
+      const d = await res.json();
+      const backups = resB.ok ? ((await resB.json()).backups || []) : [];
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:6px;">
+        ${spielstandTabelleHtml(d.vorhanden ? d.zusammenfassung : null, 'Aktueller Spielstand' + (d.version !== null ? ' (Version ' + adminZahl(d.version) + ')' : ''))}
+        ${d.schatten ? `<div style="margin-top:4px;">${spielstandTabelleHtml(d.schatten.zusammenfassung, 'Schatten vom ' + adminZeit(d.schatten.zeit) + ' – ' + (d.schatten.quelle || ''))}
+          <button data-schatten-zurueck="${escapeHtml(name)}" style="width:100%; font-size:11px; margin-top:4px;">Schatten wieder einsetzen (Rücksicherung rückgängig)</button></div>` : ''}
+        <div class="bmeta" style="margin-top:4px;">Stand aus einem Server-Backup ansehen (${adminZahl(backups.length)} Sicherungen, alle 30 Minuten):</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <select data-backup-datei="${escapeHtml(name)}" style="flex:2 1 170px; font-size:11.5px;">${backups.map(b => `<option value="${escapeHtml(b.datei)}">${adminZeit(b.zeit)} · ${adminZahl(Math.round(b.groesse / 1024))} kB</option>`).join('')}</select>
+          <button data-backup-ansehen="${escapeHtml(name)}" style="flex:1 1 120px; font-size:11px;" ${backups.length ? '' : 'disabled'}>Aus Backup ansehen</button>
+        </div>
+        <div data-backup-box="${escapeHtml(name)}"></div>
+      </div>`;
+      const sel = box.querySelector('[data-backup-datei]');
+      const bb = box.querySelector('[data-backup-ansehen]');
+      if (bb) bb.onclick = () => adminBackupSpielstandAnzeigen(name, sel ? sel.value : '');
+      const sz = box.querySelector('[data-schatten-zurueck]');
+      if (sz) sz.onclick = () => adminSchattenZurueck(name);
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'das Spielstand-Blatt'); }
+  }
+  async function adminBackupSpielstandAnzeigen(name, datei){
+    const box = document.querySelector('[data-backup-box="' + CSS.escape(name) + '"]');
+    if (!box || !datei) return;
+    box.innerHTML = `<div class="bmeta">Backup wird gelesen…</div>`;
+    try {
+      const res = await backendFetch('/admin/backup-spielstand?name=' + encodeURIComponent(name) + '&datei=' + encodeURIComponent(datei));
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ box.innerHTML = `<div class="bmeta" style="color:#f0997b;">${escapeHtml(d.error || 'Backup nicht lesbar.')}</div>`; return; }
+      box.innerHTML = `<div style="margin-top:4px;">${spielstandTabelleHtml(d.vorhanden ? d.zusammenfassung : null, 'Im Backup vom ' + adminZeit(d.zeit))}
+        ${d.vorhanden ? `<button data-backup-zurueckholen="${escapeHtml(name)}" data-datei="${escapeHtml(datei)}" style="width:100%; font-size:11px; margin-top:6px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Diesen Stand zurückholen</button>` : ''}
+      </div>`;
+      const zb = box.querySelector('[data-backup-zurueckholen]');
+      if (zb) zb.onclick = () => adminSpielstandZurueckholen(name, datei);
+    } catch(e){ box.innerHTML = `<div class="bmeta">Keine Verbindung.</div>`; }
+  }
+  async function adminSpielstandZurueckholen(name, datei){
+    // Die Rueckfrage nennt die zwei Folgen, die der Bediener nicht rueckgaengig machen kann, ohne
+    // den Schatten zu kennen: Der Spieler wird abgemeldet, sein jetziger Stand wird zum Schatten.
+    if (!confirm('Den Spielstand von „' + name + '" aus dem Backup zurückholen?\n\nDer jetzige Stand bleibt als Schatten erhalten und lässt sich wieder einsetzen. Der Spieler wird auf allen Geräten abgemeldet und lädt nach der nächsten Anmeldung den zurückgeholten Stand – sonst würde sein laufendes Spiel den alten Stand sofort zurückschreiben.')) return;
+    try {
+      const res = await backendFetch('/admin/spielstand-zurueckholen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: name, datei }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Zurückholen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Spielstand von ' + name + ' zurückgeholt (Version ' + adminZahl(d.version) + ') – der Spieler muss sich neu anmelden.', 'ti-check', 'ok');
+      loadAdminKonto();
+    } catch(e){ log('Keine Verbindung – nichts zurückgeholt.', 'ti-alert-triangle'); }
+  }
+  async function adminSchattenZurueck(name){
+    if (!confirm('Den Schatten von „' + name + '" wieder einsetzen? Der jetzige Stand wird dabei zum neuen Schatten, der Spieler wird abgemeldet.')) return;
+    try {
+      const res = await backendFetch('/admin/spielstand-schatten-zurueck', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: name }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Rückgängig fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Schatten von ' + name + ' wieder eingesetzt (Version ' + adminZahl(d.version) + ').', 'ti-check', 'ok');
+      loadAdminKonto();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
+  // Backups im Systemstand: Anzahl, juengste Sicherung, "Backup jetzt". Fehlt die Route (alter
+  // Server), fehlt die Kachel ersatzlos.
+  async function adminBackupsKachel(box){
+    let d = null;
+    try { const res = await backendFetch('/admin/backups'); if (res.ok) d = await res.json(); } catch(e){}
+    if (!d || !Array.isArray(d.backups)) return;
+    const neu = d.backups[0];
+    const zeile = (k, w) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:#c9d4e8; text-align:right;">${w}</span></div>`;
+    const kachel = document.createElement('div');
+    kachel.className = 'card-row';
+    kachel.style.cssText = 'flex-direction:column; align-items:stretch; gap:5px;';
+    kachel.innerHTML = `<div class="bname"><i class="ti ti-shield" aria-hidden="true" style="margin-right:5px;"></i>Backups</div>
+      ${zeile('Sicherungen', adminZahl(d.backups.length) + ' von höchstens ' + adminZahl(d.behalt) + ' · alle ' + adminZahl(d.taktMinuten) + ' Minuten')}
+      ${zeile('Jüngste', neu ? adminZeit(neu.zeit) + ' · ' + adminZahl(Math.round(neu.groesse / 1024)) + ' kB' : 'keine')}
+      <button id="adminBackupJetztBtn" style="width:100%; font-size:11px; margin-top:4px;">Backup jetzt anlegen</button>
+      <div class="bmeta" style="line-height:1.5;">Ein Backup ist eine Kopie der ganzen Datenbank. Einzelne Spielstände holst du im Konto-Blatt daraus zurück.</div>`;
+    box.appendChild(kachel);
+    const btn = kachel.querySelector('#adminBackupJetztBtn');
+    if (btn) btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const res = await backendFetch('/admin/backup-jetzt', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+        const r = await res.json().catch(() => ({}));
+        if (!res.ok){ log(r.error || 'Backup fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        log('Backup angelegt: ' + (r.neuestes ? adminZeit(r.neuestes.zeit) : '') + ' (' + adminZahl(r.anzahl) + ' Sicherungen).', 'ti-check', 'ok');
+        loadAdminSystemstand();
+      } catch(e){ log('Keine Verbindung – kein Backup.', 'ti-alert-triangle'); }
+      finally { btn.disabled = false; }
+    };
+  }
+  async function loadAdminProtokoll(){
+    const box = document.getElementById('adminProtokollListe');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/protokoll');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'das Protokoll'); return; }
+      const d = await res.json();
+      const liste = d.eintraege || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Noch keine Handlung festgehalten.</div>`; return; }
+      box.innerHTML = liste.map(e => {
+        const details = Object.entries(e.details || {}).filter(([k]) => k !== 'targetUsername' && k !== 'tag').map(([k, v]) => k + '=' + String(v)).join(' · ');
+        return `<div class="card-row" style="padding:0.4rem 0.7rem;"><div class="left"><div style="min-width:0;">
+          <div class="bname" style="font-size:12px;">${adminZeit(e.zeit)} · ${escapeHtml(e.art)}${e.ziel ? ' → ' + escapeHtml(e.ziel) : ''}</div>
+          <div class="bmeta">${e.von ? 'von ' + escapeHtml(e.von) : ''}${details ? (e.von ? ' · ' : '') + escapeHtml(details) : ''}</div>
+        </div></div></div>`;
+      }).join('');
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'das Protokoll'); }
+  }
+  async function loadAdminAllianzen(){
+    const box = document.getElementById('adminAllianzenListe');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/allianzen');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Allianzen'); return; }
+      const d = await res.json();
+      const liste = d.allianzen || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Es gibt noch keine Allianz.</div>`; return; }
+      const rolleText = r => r === 'admin' ? 'Anführer' : r === 'officer' ? 'Offizier' : 'Mitglied';
+      box.innerHTML = liste.map(a => `<div class="card-row" data-allianz="${escapeHtml(a.tag)}" style="flex-direction:column; align-items:stretch; gap:5px; ${a.aufgeloest ? 'opacity:0.6;' : ''}">
+          <div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline;">
+            <span class="bname">[${escapeHtml(a.tag)}]${a.name ? ' ' + escapeHtml(a.name) : ''}</span>
+            <span class="bmeta" style="color:${a.aufgeloest ? '#7d8199' : '#5dcaa5'};">${a.aufgeloest ? 'aufgelöst ' + adminZeit(a.aufgeloestAm) : adminZahl(a.mitglieder.length) + ' von ' + adminZahl(a.mitgliederMax) + ' Mitgliedern'}</span>
+          </div>
+          <div class="bmeta">gegründet ${adminZeit(a.gegruendet)}${a.gruender ? ' von ' + escapeHtml(a.gruender) : ''} · Beitritt ${a.beitritt === 'application' ? 'auf Bewerbung' : 'offen'}${a.basisStufe !== null ? ' · Basis Stufe ' + adminZahl(a.basisStufe) : ''}${a.bewerbungen ? ' · ' + adminZahl(a.bewerbungen) + ' offene Bewerbung' + (a.bewerbungen === 1 ? '' : 'en') : ''}</div>
+          ${a.mitglieder.length ? `<div class="bmeta" style="color:#c9d4e8; line-height:1.6;">${a.mitglieder.map(m => escapeHtml(m.name) + ' <span class="bmeta">(' + rolleText(m.rolle) + (m.letzteSitzung ? ', zuletzt ' + adminZeit(m.letzteSitzung) : '') + (m.kontoDa ? '' : ', Konto fehlt') + ')</span>').join(' · ')}</div>` : ''}
+          ${a.aufgeloest ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:2px;">
+            <select data-allianz-mitglied="${escapeHtml(a.tag)}" style="flex:2 1 150px; font-size:11.5px;">${a.mitglieder.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)} (${rolleText(m.rolle)})</option>`).join('')}</select>
+            <button data-allianz-anfuehrer="${escapeHtml(a.tag)}" style="flex:1 1 130px; font-size:11px;">Zum Anführer machen</button>
+            <button data-allianz-aufloesen="${escapeHtml(a.tag)}" style="flex:1 1 100px; font-size:11px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Auflösen</button>
+          </div>`}
+        </div>`).join('');
+      box.querySelectorAll('[data-allianz-anfuehrer]').forEach(b => b.onclick = () => {
+        const tag = b.getAttribute('data-allianz-anfuehrer');
+        const sel = box.querySelector('[data-allianz-mitglied="' + CSS.escape(tag) + '"]');
+        adminAllianzAnfuehrer(tag, sel ? sel.value : '');
+      });
+      box.querySelectorAll('[data-allianz-aufloesen]').forEach(b => b.onclick = () => adminAllianzAufloesen(b.getAttribute('data-allianz-aufloesen')));
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Allianzen'); }
+  }
+  async function adminAllianzAnfuehrer(tag, name){
+    if (!name) return;
+    if (!confirm('„' + name + '" zum Anführer von [' + tag + '] machen? Der bisherige Anführer wird Offizier.')) return;
+    try {
+      const res = await backendFetch('/admin/allianz/anfuehrer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, targetUsername: name }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Übertragen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log(name + ' führt jetzt [' + tag + '].', 'ti-check', 'ok');
+      loadAdminAllianzen();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
+  async function adminAllianzAufloesen(tag){
+    if (!confirm('Allianz [' + tag + '] auflösen? Alle Mitglieder werden entfernt, der Tag wird für eine Neugründung frei. Das lässt sich nicht zurücknehmen.')) return;
+    try {
+      const res = await backendFetch('/admin/allianz/aufloesen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Auflösen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('[' + tag + '] aufgelöst – ' + adminZahl(d.entfernt) + ' Mitglieder entfernt.', 'ti-check', 'ok');
+      loadAdminAllianzen();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
   async function loadAdminKonto(){
     const box = document.getElementById('adminKontoListe');
     const feld = document.getElementById('adminKontoSuche');
@@ -29724,17 +30360,50 @@
           ${zeile('Sternenstaub', adminZahl(k.sternenstaub) + ' · ' + adminZahl(k.abgewehrteAngriffe) + ' Angriffe abgewehrt')}
           ${zeile('Bonuscodes', adminZahl(k.bonusCodes) + ' eingelöst' + (k.bonusFehlversuche ? ' · ' + adminZahl(k.bonusFehlversuche) + ' Fehlversuche heute' : ''))}
           ${k.offeneBelohnungen ? zeile('Offene Belohnungen', adminZahl(k.offeneBelohnungen)) : ''}
+          ${rateLimitZeileHtml(zeile, k.rateLimitTreffer)}
+          ${spielstandAbgelehntHtml(zeile, k.spielstandAbgelehnt)}
           ${aktivUhrHtml(k.aktiv)}
+          ${k.aktiv && k.aktiv.verdachtGemeldet ? zeile('Verdachtsmeldung', 'an dich geschickt am ' + adminZeit(k.aktiv.verdachtGemeldet)) : ''}
           ${reaktionenHtml(k.reaktionen)}
+          ${k.sperre ? zeile('Sperre', '<span style="color:#f0997b;">' + (k.sperre.grund ? escapeHtml(k.sperre.grund) : 'ohne Grund') + ' · ' + (k.sperre.bis ? 'bis ' + adminZeit(k.sperre.bis) : 'unbefristet') + (k.sperre.seit ? ' · seit ' + adminZeit(k.sperre.seit) : '') + '</span>') : ''}
+          ${k.stumm ? zeile('Stummgeschaltet', '<span style="color:#fac775;">bis ' + adminZeit(k.stumm.bis) + (k.stumm.grund ? ' · ' + escapeHtml(k.stumm.grund) : '') + '</span>') : ''}
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
-            <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
-            <button data-konto-sitzungen="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
+            <input type="text" maxlength="200" data-konto-grund="${escapeHtml(k.username)}" placeholder="Grund (für Sperre oder Stummschaltung, optional)" autocomplete="off" style="flex:2 1 170px; font-size:11.5px;">
+            <select data-konto-tage="${escapeHtml(k.username)}" aria-label="Dauer der Sperre" style="flex:1 1 110px; font-size:11.5px;">
+              <option value="0">Sperre: unbefristet</option><option value="1">Sperre: 1 Tag</option><option value="3">Sperre: 3 Tage</option><option value="7">Sperre: 7 Tage</option><option value="30">Sperre: 30 Tage</option>
+            </select>
+            <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1 1 90px; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
           </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <select data-konto-stumm-stunden="${escapeHtml(k.username)}" aria-label="Dauer der Stummschaltung" style="flex:1 1 110px; font-size:11.5px;">
+              <option value="1">Stumm: 1 Stunde</option><option value="6">Stumm: 6 Stunden</option><option value="24" selected>Stumm: 24 Stunden</option><option value="72">Stumm: 3 Tage</option><option value="168">Stumm: 7 Tage</option>
+            </select>
+            <button data-konto-stumm="${escapeHtml(k.username)}" style="flex:1 1 90px; font-size:11px;">Stummschalten</button>
+            ${k.stumm ? `<button data-konto-stumm-auf="${escapeHtml(k.username)}" style="flex:1 1 90px; font-size:11px;">Stummschaltung aufheben</button>` : ''}
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button data-konto-sitzungen="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
+            <button data-konto-spielstand="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Spielstand ansehen${k.schattenDa ? ' (Schatten da)' : ''}</button>
+          </div>
+          <div data-konto-spielstand-box="${escapeHtml(k.username)}"></div>
         </div>`).join('');
       box.querySelectorAll('[data-konto-sperre]').forEach(b => b.onclick = async () => {
-        await adminToggleBan(b.getAttribute('data-konto-sperre'), b.getAttribute('data-konto-gesperrt') === '1');
+        const name = b.getAttribute('data-konto-sperre');
+        const grundEl = box.querySelector('[data-konto-grund="' + CSS.escape(name) + '"]');
+        const tageEl = box.querySelector('[data-konto-tage="' + CSS.escape(name) + '"]');
+        await adminToggleBan(name, b.getAttribute('data-konto-gesperrt') === '1',
+          { grund: grundEl ? grundEl.value.trim() : '', tage: tageEl ? parseInt(tageEl.value, 10) || 0 : 0 });
         loadAdminKonto();
       });
+      box.querySelectorAll('[data-konto-stumm]').forEach(b => b.onclick = async () => {
+        const name = b.getAttribute('data-konto-stumm');
+        const grundEl = box.querySelector('[data-konto-grund="' + CSS.escape(name) + '"]');
+        const stdEl = box.querySelector('[data-konto-stumm-stunden="' + CSS.escape(name) + '"]');
+        await adminStumm(name, stdEl ? parseInt(stdEl.value, 10) || 24 : 24, grundEl ? grundEl.value.trim() : '');
+        loadAdminKonto();
+      });
+      box.querySelectorAll('[data-konto-stumm-auf]').forEach(b => b.onclick = async () => { await adminStumm(b.getAttribute('data-konto-stumm-auf'), 0, ''); loadAdminKonto(); });
+      box.querySelectorAll('[data-konto-spielstand]').forEach(b => b.onclick = () => adminSpielstandAnzeigen(b.getAttribute('data-konto-spielstand')));
       box.querySelectorAll('[data-konto-sitzungen]').forEach(b => b.onclick = () =>
         adminSitzungenBeenden(b.getAttribute('data-konto-sitzungen')));
     } catch(e){ box.innerHTML = adminListenFehler(null, 'die Kontosuche'); }
@@ -29791,6 +30460,8 @@
           ${zeile('Offenes Feedback', adminZahl(best.offenesFeedback||0), best.offenesFeedback ? '#fac775' : '#5dcaa5')}
           ${zeile('Offene Meldungen', adminZahl(best.offeneMeldungen||0), best.offeneMeldungen ? '#fac775' : '#5dcaa5')}
           ${zeile('Nicht zugeordnete Spenden', adminZahl(best.offeneKofiZuordnungen||0), best.offeneKofiZuordnungen ? '#fac775' : '#5dcaa5')}
+          ${typeof best.abgelehnteSpielstaende7Tage === 'number' ? zeile('Abgelehnte Spielstände (7 Tage)', adminZahl(best.abgelehnteSpielstaende7Tage), best.abgelehnteSpielstaende7Tage ? '#f0997b' : '#5dcaa5') : ''}
+          ${typeof best.verdachtKonten === 'number' ? zeile('Auffällige Konten', adminZahl(best.verdachtKonten), best.verdachtKonten ? '#fac775' : '#5dcaa5') : ''}
         </div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px;">
           <div class="bname"><i class="ti ti-key" aria-hidden="true" style="margin-right:5px;"></i>Konfiguration</div>
@@ -29802,6 +30473,7 @@
           ${zeile('Push-Schlüssel', lauf.pushSchluesselDa ? 'vorhanden' : 'FEHLEN', lauf.pushSchluesselDa ? '#5dcaa5' : '#f0997b')}
           ${zeile('Deploy-Selbstheilung', lauf.selbstheilungDa ? 'vorhanden' : 'fehlt', lauf.selbstheilungDa ? '#5dcaa5' : '#fac775')}
         </div>`;
+      await adminBackupsKachel(box);
     } catch(e){ box.innerHTML = adminListenFehler(null, 'den Systemstand'); }
   }
   function adminListenFehler(res, was){
@@ -30184,23 +30856,43 @@
           <div class="bmeta" style="margin-bottom:6px;">Gemeldet von ${escapeHtml(r.reporterName)} · ${formatRelativeTime(r.time)}</div>
           <div style="font-size:12.5px; color:#c7cbe0; margin-bottom:8px;">${escapeHtml(r.reason)}</div>
           <div style="display:flex; gap:6px;">
-            <button data-admin-ban="${escapeHtml(r.targetName)}" data-currently-banned="${r.targetBanned?'1':'0'}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
+            <button data-admin-ban="${escapeHtml(r.targetName)}" data-currently-banned="${r.targetBanned?'1':'0'}" data-admin-reason="${escapeHtml(String(r.reason||'').slice(0,160))}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
             <button data-admin-dismiss="${r.id}" style="flex:1; font-size:11px;">Meldung entfernen</button>
           </div>
         </div>`).join('');
-      listEl.querySelectorAll('[data-admin-ban]').forEach(btn => btn.onclick = () => adminToggleBan(btn.getAttribute('data-admin-ban'), btn.getAttribute('data-currently-banned')==='1'));
+      // Der Grund der Meldung wandert in die Sperre - der Gesperrte liest ihn beim Anmelden.
+      listEl.querySelectorAll('[data-admin-ban]').forEach(btn => btn.onclick = () => adminToggleBan(btn.getAttribute('data-admin-ban'), btn.getAttribute('data-currently-banned')==='1',
+        { grund: btn.getAttribute('data-admin-reason') ? 'Meldung: ' + btn.getAttribute('data-admin-reason') : '', tage: 0 }));
       listEl.querySelectorAll('[data-admin-dismiss]').forEach(btn => btn.onclick = () => adminDismissReport(btn.getAttribute('data-admin-dismiss')));
     } catch(e){ listEl.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; }
   }
-  async function adminToggleBan(username, currentlyBanned){
+  /* Sperre mit Grund und Frist (02.09.2026). `opt.grund` steht im Anmeldetext des Gesperrten,
+     `opt.tage` 0 heisst unbefristet; eine abgelaufene Frist hebt der Server beim naechsten Kontakt
+     selbst auf. Der Meldungen-Reiter gibt den Grund der Meldung mit, das Konto-Blatt sein Formular. */
+  async function adminToggleBan(username, currentlyBanned, opt){
+    opt = opt || {};
     const wantBan = !currentlyBanned;
-    if (wantBan && !confirm(username+' wirklich sperren? Das Konto kann sich danach nicht mehr anmelden, bis du es wieder entsperrst.')) return;
+    const tage = Math.max(0, parseInt(opt.tage, 10) || 0);
+    const frist = tage ? 'für ' + tage + ' Tag' + (tage === 1 ? '' : 'e') : 'unbefristet';
+    if (wantBan && !confirm(username+' wirklich sperren ('+frist+')? Das Konto kann sich danach nicht mehr anmelden'+(tage ? ', bis die Frist abläuft oder du es entsperrst.' : ', bis du es wieder entsperrst.')+(opt.grund ? '\n\nGrund, den der Spieler sieht: '+opt.grund : ''))) return;
     try {
-      const res = await backendFetch('/admin/set-banned', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: username, banned: wantBan }) });
+      const res = await backendFetch('/admin/set-banned', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: username, banned: wantBan, grund: opt.grund || '', tage }) });
       const data = await res.json();
       if (!res.ok){ log(data.error||'Aktion fehlgeschlagen.', 'ti-alert-triangle'); return; }
-      log(username+(wantBan?' gesperrt.':' entsperrt.'), 'ti-check');
+      log(username+(wantBan ? ' gesperrt ('+frist+').' : ' entsperrt.'), 'ti-check');
       await loadAdminReports();
+    } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+  }
+  async function adminStumm(username, stunden, grund){
+    const h = Math.max(0, parseInt(stunden, 10) || 0);
+    if (h && !confirm(username+' für '+h+' Stunden stummschalten? Globaler Chat, Allianz-Chat und Nachrichten sind dann gesperrt, spielen geht weiter.')) return;
+    try {
+      const res = await backendFetch('/admin/stumm', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: username, stunden: h, grund: grund || '' }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok){ log(data.error||'Stummschalten fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log(h ? username+' ist bis '+adminZeit(data.stummBis)+' stummgeschaltet.' : 'Stummschaltung von '+username+' aufgehoben.', 'ti-check');
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
   async function adminDismissReport(reportId){
@@ -36137,6 +36829,7 @@
             + 'Alle Boni fließen <strong>additiv</strong> in dieselben gedeckelten Gruppen wie Forschung, Module und Doktrinen – sie stapeln sich also nicht multiplikativ auf. Auf der Karte steht die Eigenschaft an jeder Region (Übersicht) und in der Kopfzeile der Sektoransicht; der Tooltip nennt sie ausführlich.';
         })() },
       { title:'Landmarken: was in einem System steht', body:'Die Karte zeigt an jedem System, was dort los ist - auf allen drei Ebenen. Ein <strong>🛡</strong> steht für eine <strong>Asteroidenfestung</strong> und nennt ihren Kernstand und die Abbau-Drosselung, ein <strong>👾</strong> für ein <strong>Alien-Nest</strong> mit Volk, Stufe und Schwäche - stehen mehrere im selben System, trägt das Abzeichen die Zahl und nennt die stärkste Stufe. Aus dem 👾 wird ein <strong>👑</strong>, sobald dort die Königin sitzt. Das <strong>🎯</strong> markiert <strong>Gegner</strong> mit ihrem Namen und ihrer Stufe. Auf der Regionsübersicht werden diese Abzeichen zusammengefasst: Ein 🛡 an einer Region heißt, dass irgendwo darin eine Festung steht. <strong>Tippe die Abzeichenzeile an</strong>, und du bekommst jedes betroffene System namentlich mit seinem Hinweis - ein Tipp darauf bringt dich direkt hin. Am PC nennt sie der Tooltip zusätzlich beim Überfahren. Bis dahin musste man jedes der 67 Systeme einzeln aufklappen, um eine Festung überhaupt zu finden. Alle drei sind an die Ebene <strong>Ereignisse</strong> gekoppelt und lassen sich dort abschalten. <strong>Über das Suchfeld findest du sie bewusst nicht</strong> - es sucht Systeme und Planeten. Wo etwas los ist, verraten dir die Abzeichen auf der Karte. Das <strong>👽</strong> für ein gesichtetes Volk bleibt daneben stehen, schweigt aber in Systemen mit einem eigenen Nest-Abzeichen - dort wäre es dieselbe Aussage zweimal.' },
+       { title:'Die Systemansicht lesen: Licht, Schatten, Ringe', body:'Im geöffneten System zeichnet die Karte, was du sonst nur aus Listen wüsstest. <strong>Jede Welt hat eine Tag- und eine Nachtseite</strong>: Der Schatten liegt immer auf der sonnenabgewandten Seite, die Sonne selbst trägt eine Korona mit langsam wandernden Strahlen. <strong>Die farbige Spur auf der Bahn</strong> hinter jedem Planeten nennt seinen Typ (grün erdähnlich, blau Wasserwelt, orange Gasriese, violett Kristallwelt, grau Asteroid) – auch bei noch unerforschten Welten, dort blasser. <strong>Ein Leuchtsaum in der Typfarbe</strong> bekommen nur erforschte Welten; unerforschte bleiben abgedunkelt mit gestricheltem Rand. <strong>Gasriesen tragen einen Ring</strong>, Monde sitzen auf einer feinen Bahn um ihren Planeten. Wer am Gerät Bewegung reduziert hat, sieht dieselbe Zeichnung ohne die wandernden Strahlen.' },
       { title:'Wem gehört ein System? Der Ring sagt es', body:'Jeder Systemknoten trägt den Ring genau <strong>einer</strong> Macht – der stärksten, die dort sitzt. Die Reihenfolge geht von der härtesten zur weichsten Aussage: <strong>erobert</strong> (militärisch genommen, der Server führt je System genau einen Eroberer) schlägt <strong>Kolonie-Herrschaft</strong> (jemand hält <em>alle</em> besiedelten Planeten und bekommt dafür +5 % Produktion), diese schlägt das <strong>Fraktions-Territorium</strong> (politische Zuordnung ohne eigene Präsenz), und ganz zuletzt steht ein <strong>Alien-Nest</strong> – es beansprucht nichts, es sitzt nur da. Ein Nest färbt den Ring deshalb nur, wenn sonst niemand herrscht; sitzt ein Spieler drauf, gilt der, und das Nest bleibt als 👾 sichtbar.<br><br><strong>Was dir gehört, ist gefüllt</strong> und grün gezeichnet, alles Fremde nur umrandet – so musst du keine Farben auseinanderhalten, um deinen Besitz zu finden. Rot heißt: von einem fremden Spieler erobert. In der <strong>Regionsübersicht</strong> trägt jeder Systempunkt dieselbe Farbe, du siehst also schon von oben, wie eine Gegend aufgeteilt ist. Und im geöffneten System nennt die Chip-Zeile alles im Klartext.<br><br>Die politische Landkarte (Fraktions-Territorien) lässt sich über die Ebene „Fraktionen" ausblenden; Eroberungen und Kolonie-Herrschaft bleiben immer sichtbar – das sind Tatsachen über Besitz, keine Zuordnung.' },
       { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. In der <strong>Sektoransicht</strong> trägt jedes System mit Aufklärung ein 🔎-Abzeichen samt der <strong>stärksten bekannten Verteidigung</strong> (🛡, Farbe = Verlässlichkeit wie am Marker), und schon die Übersicht zeigt das 🔎 an der Region - so siehst du auf jeder Ebene, wo du bereits Aufklärung hast.' },
       { title:'Störmanöver (Sabotage)', body:'Mit einem <strong>Spionagekreuzer</strong> kannst du im Spielerprofil (Menü "···" → Störmanöver) eine verdeckte Sabotage gegen einen anderen Spieler ausführen. Es wird <strong>nichts gestohlen</strong> - stattdessen richtet ein erfolgreiches Störmanöver <strong>echten Schaden</strong> beim Ziel an: zufällig entweder wird ein <strong>Produktionsgebäude für 30 Minuten um 50% gedrosselt</strong> oder die <strong>Verteidigung des Ziels ist 30 Minuten lang um 30% geschwächt</strong> (leichter angreifbar). <strong>Ohne Flottenkampf und ohne Flottenrisiko</strong>, aber pro Ziel gilt eine <strong>2-Stunden-Abklingzeit</strong>. Die Erfolgschance sinkt mit der <strong>Spionageabwehr-Forschung des Ziels</strong> (von 85% bis herunter auf 25%) - wer viel in Spionageabwehr investiert, ist also nicht nur gegen Ausspähen, sondern auch gegen Sabotage geschützt. Das Ziel wird benachrichtigt und kann die Sabotage aussitzen oder sofort beheben (Automatische Reparatur bzw. Metamaterial-Reparaturschwarm). Serverseitig aufgelöst und gehärtet.' },
@@ -36584,7 +37277,7 @@
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','konvoi-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
@@ -36603,7 +37296,7 @@
      Spiels; sie trug rote Pille, roten Streifen und ein Warndreieck ueber 38k angekommenem Erz und
      stand im Filter unter "Nur Rueckschlaege". */
   const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout',
-                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode'];
+                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
   const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
@@ -36638,6 +37331,8 @@
        hat. Er gilt deshalb als neutral-positiv: nichts ist schiefgegangen. */
     if (r.keinKampf) return true;
     if (r.type === 'nest-angriff') return true;
+    // Wrackkonvoi-Schlag (A2): wie Nest/Festung ein Fortschritt (Lebenspunkte sinken, Anteil waechst).
+    if (r.type === 'konvoi-angriff') return true;
     // 'destroyed' (zerstoerte gegnerische Basis - der beste Ausgang) galt hier bis v8.430.0 als
     // negativ: rote Karte, "Verloren"-Pille. battleCardData hatte den Fall laengst richtig, diese
     // Stelle war die zweite Anzeigestelle mit der alten Annahme (CLAUDE.md Pflicht 6).
@@ -37197,6 +37892,21 @@
               + ' übrig. Nächster Schlag an DIESEM Nest in ' + NEST_ABKLING_STD + ' Stunden – Mitstreiter können in der Zwischenzeit weitermachen.');
         const nvs = eskorteSchiffssumme(r.eigeneVerluste);
         body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (nvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
+      } else if (r.type === 'konvoi-angriff'){
+        /* Wie beim Nest-/Festungsbericht nennt er, was ANGEKOMMEN ist (`schaden`) - der Server
+           zaehlt genau das auf den Bergungsanteil. Ein Konvoi hat kein Volk und keine Stufe. */
+        title = r.gefallen ? 'Wrackkonvoi aufgebracht' : 'Wrackkonvoi beschossen';
+        body = '<i class="ti ti-recycle" aria-hidden="true" style="color:' + (r.gefallen ? '#5dcaa5' : '#8fd0ea') + ';"></i> '
+             + escapeHtml(r.systemName || r.system || '')
+             + ' · Schaden <strong>' + fmt(r.schaden||0) + '</strong>';
+        body += '<br>' + (r.gefallen
+          ? 'Der Wrackkonvoi ist aufgebracht. Dein Anteil an der Bergung: <strong>' + Math.round((r.anteil||0)*100) + '%</strong>'
+            + ((r.teilnehmer||1) > 1 ? ' (von ' + r.teilnehmer + ' Beitragenden)' : '')
+            + ' – er liegt unter den Belohnungen.'
+          : 'Noch <strong>' + fmt(r.lp||0) + '</strong>' + (r.lpMax ? ' von ' + fmt(r.lpMax) : '')
+            + ' übrig. Nächster Schlag an DIESEM Konvoi in ' + KONVOI_ABKLING_STD + ' Stunden – Mitstreiter können in der Zwischenzeit weitermachen.');
+        const kvs = eskorteSchiffssumme(r.eigeneVerluste);
+        body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (kvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
       } else if (r.type === 'festung-angriff'){
         /* Der Festungsbericht nennt ausdruecklich, was ANGEKOMMEN ist (`schaden`) - nicht, was
            gewuerfelt wurde. Der Server zaehlt genau das auf den Hortanteil, und ein Bericht, der
@@ -37239,6 +37949,12 @@
         body = '<i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
              + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
              + '<br>Bonuscodes gibt es gelegentlich auf den Kanälen des Spiels – jeder gilt nur eine Weile und nur einmal je Konto.';
+      } else if (r.type === 'geschenk'){
+        title = 'Geschenk vom Team';
+        body = '<i class="ti ti-sparkles" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
+             + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
+             + (r.text ? '<br>„' + escapeHtml(r.text) + '"' : '')
+             + '<br><span class="bmeta">Ein Geschenk an alle Kommandanten – zum Beispiel als Entschädigung nach einem Ausfall.</span>';
       } else if (r.type === 'item-found'){
         title = (r.rare?'Seltener Fund: ':'Item gefunden: ')+r.itemName;
         body = 'Gefunden bei: <strong>'+(r.foundAt||'unbekannt')+'</strong>'+(r.rare?'':' · liegt im Inventar (Fortschritt-Tab) bereit');
@@ -37460,6 +38176,7 @@
         : r.type==='debris-cleared' ? 'ti-recycle'
         : (r.type==='deckelausgleich' || r.type==='deckelkappung') ? 'ti-pick'
         : r.type==='bonuscode' ? 'ti-award'
+        : r.type==='geschenk' ? 'ti-sparkles'
         /* `positive`, NICHT `won` (v8.597.0): `won` prueft nur `result` gegen 'win'/'destroyed'
            und ist damit eine ZWEITE Wahrheit ueber "Erfolg". Die KI-Abfangautomatik trug deshalb
            ein WARNDREIECK ueber vertriebenen Piraten - derselbe Spieler-Report, andere Stelle.
@@ -38804,9 +39521,12 @@
     if (!tag || !text || !text.trim()) return;
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     try {
-      await storageSet('alliance:'+tag+':msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', text: text.trim().slice(0,300), ts: Date.now() }), true);
+      // Strikt mit Server (02.09.2026): storageSet() faellt bei einem 403 still auf den lokalen
+      // Speicher zurueck - ein Stummgeschalteter saehe seine Nachricht dann bei sich, sonst nirgends,
+      // und erfuehre den Grund nie. Ohne Server bleibt der bisherige Weg.
+      await (useBackend() ? storageSetStrict : storageSet)('alliance:'+tag+':msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', text: text.trim().slice(0,300), ts: Date.now() }), true);
       loadAllianceMessages();
-    } catch(e){ log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+    } catch(e){ log((e && e.message) || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
   }
   // Globaler Chat: von allen Spielern lesbar, unabhängig von der Allianz – seit der Großetappe
   // derselbe Lader und Renderer wie der Allianz-Chat (chatKanalZeichnen), nur ohne Tag-Präfix.
@@ -38815,9 +39535,9 @@
     if (!text || !text.trim()) return;
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     try {
-      await storageSet('globalchat:msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', authorAllianceTag: myAllianceTag()||null, text: text.trim().slice(0,300), ts: Date.now() }), true);
+      await (useBackend() ? storageSetStrict : storageSet)('globalchat:msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', authorAllianceTag: myAllianceTag()||null, text: text.trim().slice(0,300), ts: Date.now() }), true);
       loadGlobalChat();
-    } catch(e){ log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+    } catch(e){ log((e && e.message) || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
   }
   // ===== Ungelesen-Erkennung für den Chat-Reiter =====
   // Die Nachrichten-Keys enthalten bereits den Zeitstempel als Präfix (Date.now()+'-'+random) - eine
@@ -47389,7 +48109,8 @@
     normal:  'Fällt regulär - Expeditionen, Sonden, Händler, Schmiede.',
     abgrund: 'Fällt ausschließlich bei Tauchgängen in den Abgrund - nicht schmiedbar, nicht handelbar.',
     boss:    'Fällt bei einer Allianz-Raid-Welle und an schweren PvE-Zielen – Asteroidenfestung, Alien-Nest, Weltboss.',
-    unikat:  'Fällt ausschließlich bei seiner eigenen Jagd (Weltboss bzw. Wächter) - immer mit Spitzenwurf.'
+    unikat:  'Fällt ausschließlich bei seiner eigenen Jagd (Weltboss bzw. Wächter) - immer mit Spitzenwurf.',
+    konvoi:  'Fällt ausschließlich beim Erlegen eines Wrackkonvois - nicht schmiedbar, nicht handelbar.'
   };
   // Lazy, nicht beim Laden: Zwei der fuenf Listen stehen weiter unten in der Datei, und ein
   // Aufruf waehrend der Modulauswertung traefe sie in ihrer temporalen Todeszone (Arbeitsregel 38).
@@ -48911,6 +49632,11 @@
         // Nest-Schlag angekommen - derselbe Weg wie die Festung darueber.
         if (m.type === 'nest-angriff'){
           nestAufloesen(m, planetKey, fleet);
+          continue;
+        }
+        // Wrackkonvoi-Schlag angekommen (A2) - derselbe Weg wie das Nest darueber.
+        if (m.type === 'konvoi-angriff'){
+          konvoiAufloesen(m, planetKey, fleet);
           continue;
         }
         /* Rueckruf angekommen: Die Schiffe treten wieder in die Flotte ein. m.schiffe statt
@@ -52278,6 +53004,10 @@
          Tick-Unruhe, gegen die der Zwischenspeicher gebaut ist. Auf Tausender gerundet reicht:
          ein Schlag aendert die LP um ein Vielfaches davon. */
       (galaxyCache.alienNester||[]).map(n => n.id + ':' + n.stufe + ':' + Math.round((n.lp||0)/1000)).join(','),
+      // Wrackkonvois (A2): dieselbe schlanke Signatur wie die Nester - ein gefallener oder
+      // weitergedrifteter Konvoi verschwindet damit sofort von der Karte, statt bis zum Vollbau
+      // stehen zu bleiben; die auf Tausender gerundeten LP vermeiden die Tick-Unruhe.
+      (galaxyCache.wrackKonvois||[]).map(k => k.id + ':' + Math.round((k.lp||0)/1000)).join(','),
       (karteSektorOffen || '')
     ].join('§');
   }
@@ -53090,6 +53820,18 @@
           title: volk.name + ' – ' + (sd ? sd.name : 'Nest')
             + (nester.length > 1 ? ' und ' + (nester.length-1) + ' weitere' + (nester.length === 2 ? 's Nest' : ' Nester') : '')
             + (volk.schwaeche ? ' · Schwäche: ' + nestSchwaecheName(volk.schwaeche) : '') });
+      }
+      /* ♻️ Wrackkonvoi - ein wanderndes Beute-Ziel, kein Nest und keine Festung. Der Rumpf-Anteil
+         sagt, ob sich der Weg lohnt; der Zusatz "driftet weiter" erklaert, warum man nicht zu lange
+         zoegern sollte. Mehrere im selben System bekommen EIN Abzeichen mit Zahl, wie beim Nest. */
+      const konvois = konvoiImSystem(sysId);
+      if (konvois.length){
+        const kv = konvois[0];
+        const antKv = Math.round(100 * Math.max(0, Math.min(1, (kv.lp||0) / Math.max(1, kv.lpMax||1))));
+        badges.push({ icon:'♻️',
+          title: 'Wrackkonvoi – ' + antKv + '% Rumpf'
+            + (konvois.length > 1 ? ' und ' + (konvois.length-1) + ' weiterer' : '')
+            + ' · driftet weiter, wenn niemand ihn stellt' });
       }
       /* 🎯 statt ⚔️ - das Schwerter-Zeichen ist an den Fraktionskrieg vergeben (siehe oben), und
          zwei Bedeutungen fuer dasselbe Symbol sind die zweite Anzeigestelle in Reinform. */
@@ -54166,7 +54908,8 @@
     'colonize-moon': { hin:'#af9ce6', rueck:null,      rundflug:false, was:'Mondlandung' },
     relocate:        { hin:'#fac775', rueck:null,      rundflug:false, was:'Verlegung' },
     'nest-angriff':  { hin:'#8fd694', rueck:'#5dcaa5', rundflug:true,  was:'Nest-Angriff' },
-    'festung-angriff': { hin:'#e0a548', rueck:'#5dcaa5', rundflug:true,  was:'Festungsschlag' }
+    'festung-angriff': { hin:'#e0a548', rueck:'#5dcaa5', rundflug:true,  was:'Festungsschlag' },
+    'konvoi-angriff': { hin:'#8fd0ea', rueck:'#5dcaa5', rundflug:true,  was:'Wrackkonvoi' }
   };
   // Zielposition einer Mission im aktuell gezeigten System. Gibt zusätzlich zurück, ob das Ziel
   // ueberhaupt im Blick liegt - liegt es das nicht, nutzt der Zeichner die Sonne als Platzhalter
@@ -54190,6 +54933,13 @@
       const fest = feld && feld.festung;
       if (!fest) return null;
       return { system: m.system, pos: asteroidPlatzXY(fest.platz) };
+    }
+    /* Ein Wrackkonvoi ist KEIN Planet - wie das Nest ueber Index und konvoiMarkerXY, damit die
+       Linie am Marker endet statt daneben. */
+    if (m.type === 'konvoi-angriff'){
+      const liste = konvoiImSystem(m.system);
+      const i = liste.findIndex(x => String(x.id) === String(m.zielId));
+      return { system: m.system, pos: konvoiMarkerXY(i >= 0 ? i : 0) };
     }
     // Alle uebrigen Arten zielen auf einen Planeten. Ein Mond liegt auf der Karte beim
     // uebergeordneten Planeten (siehe planetSystemOf) - deshalb der Umweg ueber moonParentKey.
@@ -54422,6 +55172,53 @@
   // ein Countdown, ist das Markup jede Sekunde ein anderes und die Ebene wird geschrieben; läuft
   // keiner, steht sie still. Voraussetzung waren die deterministischen Sterne (siehe oben).
   let lastSystemLayerMarkup = null;
+  /* Gestaltung der offenen Systemansicht ("Licht und Schatten", 01.09.2026, Auftrag "optisch ein
+     Meisterwerk"; gewählt aus drei gerenderten Varianten: A als Basis plus Gasriesen-Ringe und
+     sichtbare Mondbahnen aus C). Vier Helfer, damit Heimat und Planeten dieselbe Zeichnung teilen
+     statt zweier Kopien. BEWUSST OHNE SVG-FILTER: Ein feGaussianBlur wird bei jeder Neuzeichnung
+     gerastert, und die Ebene trägt Dauer-Animationen (Pulse, Strahlen) - jeder Farbverlauf hier ist
+     ein radialGradient, der kostet beim Zeichnen nichts. Alles ist deterministisch (kein
+     Math.random), sonst griffe der Markup-Vergleich an der Schreibstelle von buildMap nie. */
+  // Tag-/Nachtseite: der Schatten liegt auf der sonnenabgewandten Seite. Der Verlauf hat seinen
+  // Mittelpunkt auf der SONNENSEITE der Scheibe (halber Radius Richtung Sonne) und wird zum Rand
+  // hin dunkel - so bleibt die beleuchtete Seite frei und die abgewandte fällt in den Schatten.
+  function sysSchatten(id, x, y, r, staerke){
+    const dx = SUN_X - x, dy = SUN_Y - y, l = Math.hypot(dx, dy) || 1;
+    const lx = x + dx/l*r*0.5, ly = y + dy/l*r*0.5;
+    return `<radialGradient id="sysSchatten-${id}" gradientUnits="userSpaceOnUse" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="${(r*1.75).toFixed(1)}"><stop offset="0" stop-color="#020612" stop-opacity="0"/><stop offset="0.5" stop-color="#020612" stop-opacity="0"/><stop offset="1" stop-color="#020612" stop-opacity="${staerke}"/></radialGradient><circle data-sys-schatten="${id}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="url(#sysSchatten-${id})"/>`;
+  }
+  // Atmosphären-Halo in der Typfarbe, nur für ERFORSCHTE Welten (zwei Ringe statt eines Weichzeichners).
+  function sysHalo(x, y, r, farbe){
+    return `<circle data-sys-halo="1" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+1.3).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.4" stroke-opacity="0.55"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+2.8).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.6" stroke-opacity="0.18"/>`;
+  }
+  // Gasriesen-Ring in zwei Hälften: die hintere VOR der Scheibe gezeichnet, die vordere DANACH
+  // (untere Hälfte im gekippten Koordinatensystem, per clipPath) - sonst läge der Ring flach auf
+  // der Kugel statt um sie herum. Die clipPath liegt bewusst in derselben gedrehten Gruppe wie
+  // die Ellipse, damit das Rechteck im selben gekippten Raum schneidet.
+  function sysGasring(id, x, y, r, vorne){
+    const cx = x.toFixed(1), cy = y.toFixed(1), rx = (r*2.1).toFixed(1), ry = (r*0.5).toFixed(1);
+    if (!vorne) return `<g data-sys-ring="${id}" transform="rotate(-18 ${cx} ${cy})"><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#e8c9a0" stroke-width="2.2" stroke-opacity="0.5"/><ellipse cx="${cx}" cy="${cy}" rx="${(r*1.7).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="#d9975a" stroke-width="1.1" stroke-opacity="0.65"/></g>`;
+    return `<g transform="rotate(-18 ${cx} ${cy})"><clipPath id="sysRingClip-${id}"><rect x="${(x-r*2.3).toFixed(1)}" y="${cy}" width="${(r*4.6).toFixed(1)}" height="${(r*1.2).toFixed(1)}"/></clipPath><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#e8c9a0" stroke-width="2.2" stroke-opacity="0.9" clip-path="url(#sysRingClip-${id})"/></g>`;
+  }
+  // Mondbahn: ein feiner Kreis, auf dem der Mond-Marker liegt. Der Marker sitzt seit jeher bei
+  // (x+versatz, y+versatz), also im Abstand versatz·√2 - die Bahn übernimmt exakt diesen Radius,
+  // statt den Marker zu verschieben (an dem hängen Klick-Handler und Kartenmenü-Tests). Der
+  // Versatz ist bei Planeten r+2, bei der Heimat 13 - deshalb wird er übergeben und nicht aus
+  // dem Radius geraten (der erste Entwurf tat das: die Heimatbahn lag 1,4 Einheiten neben ihrem
+  // Mond, gemessen von test_systemansicht_optik 1f2).
+  // Deterministischer Zufall für den Sternhimmel eines Systems (mulberry32). hashStringToFloat ist
+  // dafür ungeeignet, und das ist GEMESSEN: Es rechnet h*31+Zeichen und nimmt mod 10000 - zwei
+  // Schlüssel, die sich nur in der Sternnummer unterscheiden, liegen damit 31/10000 auseinander,
+  // also 1,4 Einheiten auf der Karte. 48 Sterne ergaben so zwei "Perlenschnüre" aus je acht bis
+  // zehn Sternen, die im Bild wie gestrichelte Striche aussahen. Der Hash liefert nur noch den
+  // Startwert, die Folge kommt aus dem Generator.
+  function sysZufall(schluessel){
+    let a = Math.floor(hashStringToFloat(schluessel) * 4294967295) >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function sysMondbahn(x, y, versatz){
+    return `<circle data-sys-mondbahn="1" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(versatz*Math.SQRT2).toFixed(1)}" fill="none" stroke="#dfe6ff" stroke-opacity="0.22" stroke-width="0.6"/>`;
+  }
   function buildMap(){
     renderMapBaseLinks();
     // Ziel ist seit v8.349.0 die Gruppe INNERHALB der Galaxiekarte, nicht mehr ein eigenes SVG in
@@ -54596,21 +55393,51 @@
         <stop offset="45%" stop-color="${activeSunType.glow}" stop-opacity="0.55"/>
         <stop offset="100%" stop-color="${activeSunType.glow}" stop-opacity="0"/>
       </radialGradient>
+      <radialGradient id="sysKorona" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="${activeSunType.core}" stop-opacity="0.5"/>
+        <stop offset="0.3" stop-color="${activeSunType.glow}" stop-opacity="0.2"/>
+        <stop offset="1" stop-color="${activeSunType.glow}" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="sysStrahl" gradientUnits="userSpaceOnUse" cx="${SUN_X}" cy="${SUN_Y}" r="${(72*activeSunType.r).toFixed(1)}">
+        <stop offset="0.3" stop-color="#ffffff" stop-opacity="0.22"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="sysNebelBlau" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#2b3a7a" stop-opacity="0.28"/><stop offset="1" stop-color="#2b3a7a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="sysNebelSonne" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="${activeSunType.glow}" stop-opacity="0.11"/><stop offset="1" stop-color="${activeSunType.glow}" stop-opacity="0"/></radialGradient>
+      <radialGradient id="sysNebelViolett" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#4a3f8a" stop-opacity="0.16"/><stop offset="1" stop-color="#4a3f8a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="sysHeimatHalo" cx="50%" cy="50%" r="50%"><stop offset="0.45" stop-color="#7f77dd" stop-opacity="0.45"/><stop offset="1" stop-color="#7f77dd" stop-opacity="0"/></radialGradient>
     </defs>`;
+    // Nebelschleier: drei weiche Flächen, eine davon in der Farbe der Sonne dieses Systems - der
+    // Himmel eines roten Zwergs sieht damit anders aus als der eines blauen Riesen. Ohne Filter,
+    // nur Verläufe (siehe Kopfkommentar der sys*-Helfer).
+    inner += `<ellipse data-sys-nebel="1" cx="${SUN_X-60}" cy="${SUN_Y-70}" rx="240" ry="130" fill="url(#sysNebelBlau)"/><ellipse cx="${SUN_X+110}" cy="${SUN_Y+95}" rx="200" ry="100" fill="url(#sysNebelSonne)"/><ellipse cx="${SUN_X-150}" cy="${SUN_Y+120}" rx="130" ry="75" fill="url(#sysNebelViolett)"/>`;
     // Aus hashStringToFloat statt Math.random (v8.498.0): mit Zufallswerten war das erzeugte Markup
     // bei jedem Aufbau ein anderes - die Sterne sprangen im Sekundentakt, und der Markup-Vergleich
     // an der Schreibstelle unten könnte nie greifen (dieselbe Behebung wie bei den Galaxie-Sternen
     // am 26.07.2026). Der Systemname im Schlüssel gibt jedem System seinen eigenen Himmel.
-    for (let i=0;i<30;i++){
-      const sx = hashStringToFloat(activeSystem+':sysstern'+i+'x')*700, sy = hashStringToFloat(activeSystem+':sysstern'+i+'y')*230;
-      const sr = hashStringToFloat(activeSystem+':sysstern'+i+'r')*1+0.3, so = hashStringToFloat(activeSystem+':sysstern'+i+'o')*0.4+0.15;
+    // 48 Sterne über das ganze sichtbare Feld (die Ebene ist seit KB-20 höher als die 230 Einheiten
+    // der alten Streifen-Geometrie); die hellsten tragen ein feines Kreuz als Glanz.
+    const sternZufall = sysZufall(activeSystem+':sysstern');
+    for (let i=0;i<48;i++){
+      const sx = sternZufall()*440+130, sy = sternZufall()*360-65;
+      const sr = sternZufall()*1.1+0.3, so = sternZufall()*0.45+0.15;
       inner += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${sr.toFixed(1)}" fill="#fff" opacity="${so.toFixed(2)}"/>`;
+      if (sr > 1.15) inner += `<line x1="${(sx-3.5).toFixed(1)}" y1="${sy.toFixed(1)}" x2="${(sx+3.5).toFixed(1)}" y2="${sy.toFixed(1)}" stroke="#fff" stroke-width="0.35" opacity="${(so*0.7).toFixed(2)}"/><line x1="${sx.toFixed(1)}" y1="${(sy-3.5).toFixed(1)}" x2="${sx.toFixed(1)}" y2="${(sy+3.5).toFixed(1)}" stroke="#fff" stroke-width="0.35" opacity="${(so*0.7).toFixed(2)}"/>`;
     }
 
     // Orbit-Ringe
     for (const orbit of orbitsPresent){
       const rx = kbOrbitRx(orbit), ry = rx*kbOrbitMass().ry;
-      inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-dasharray="2,5"/>`;
+      inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#dfe6ff" stroke-opacity="0.10" stroke-width="0.6"/>`;
+    }
+    // Bahnspur: ein kurzer Bogen in der Typfarbe, der hinter jedem Planeten auf seiner Bahn liegt -
+    // dieselbe Ellipsen-Formel wie planetOrbitXY, damit der Bogen exakt an der Scheibe endet.
+    for (const p of sysPlanets){
+      const orbit = p.orbit || 3, rx = kbOrbitRx(orbit), ry = rx*kbOrbitMass().ry;
+      const a1 = ORBIT_ANGLES[(orbit-1) % ORBIT_ANGLES.length]*Math.PI/180, a0 = a1 - 0.55;
+      const spurTyp = effectivePlanetType(p.id) || p.type;
+      const spurFarbe = (PLANET_TYPE_INFO[spurTyp] && PLANET_TYPE_INFO[spurTyp].color) || p.color;
+      inner += `<path data-sys-spur="${p.id}" d="M ${(SUN_X + rx*Math.cos(a0)).toFixed(1)} ${(SUN_Y + ry*Math.sin(a0)).toFixed(1)} A ${rx} ${ry.toFixed(1)} 0 0 1 ${(SUN_X + rx*Math.cos(a1)).toFixed(1)} ${(SUN_Y + ry*Math.sin(a1)).toFixed(1)}" fill="none" stroke="${spurFarbe}" stroke-opacity="${state.discovered[p.id] ? 0.5 : 0.28}" stroke-width="1.1" stroke-linecap="round"/>`;
     }
     // Asteroidenguertel (v8.478.0). Nur in den ~20 Guertelsystemen; die Bahn selbst wird immer
     // gezeichnet, damit ein leergefoerdertes System als solches erkennbar bleibt statt einfach
@@ -54748,6 +55575,40 @@
           </g>`;
       });
     }
+    /* ===== Wrackkonvoi (A2, wandernde Beute) ==================================================
+       Anders als die Festung (steht) und das Nest (waechst) DRIFTET der Konvoi. Gezeichnet als
+       lose Truemmerkette mit einem gestrichelten, sich drehenden Peilring - bewusst in Cyan und
+       mit Rumpf-Scherben statt einer geschlossenen Form, damit man ihn auf der Karte nicht mit der
+       gezackten Bastion oder der organischen Nestzelle verwechselt. Der Marker laeuft durch
+       kbMarkerFrei() wie jeder andere (Regel 52/53); der sichtbare Radius ist der Peilring. */
+    if (karteEbeneAn('ereignisse')){
+      konvoiImSystem(activeSystem).forEach((k, i) => {
+        const r = 12;
+        const sichtR = r * 1.6;
+        const coord = kbMarkerFrei(konvoiMarkerXY(i), sysPlanets, activeSunType.r, sichtR, platzierteMarker);
+        platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
+        const anteil = Math.max(0, Math.min(1, (k.lp||0) / Math.max(1, k.lpMax||1)));
+        const b = r * 1.15;
+        // Drei angewinkelte Rumpf-Scherben auf leicht versetzten Bahnen - lose Truemmer, kein Zahnrad.
+        const scherben = [30, 150, 270].map((g, j) => {
+          const rad = g * Math.PI/180, rr = r * (0.5 + 0.12 * j);
+          const cx = coord.x + rr*Math.cos(rad), cy = coord.y + rr*Math.sin(rad), s = r * 0.32;
+          return `<polygon points="${(cx-s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy-s*0.8).toFixed(1)} ${(cx+s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+s*0.8).toFixed(1)}" fill="#8fd0ea" fill-opacity="0.85" stroke="#0a0d1a" stroke-width="0.6"/>`;
+        }).join('');
+        inner += `
+          <g class="planet-node" data-map-konvoi="${escapeHtml(String(k.id))}" style="cursor:pointer;">
+            <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}% (antippen für das Menü)</title>
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4">
+              <animateTransform attributeName="transform" type="rotate" from="0 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" to="360 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" dur="9s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.75).toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="#8fd0ea" stroke-width="1.2"/>
+            ${scherben}
+            <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
+            <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2*anteil).toFixed(1)}" height="2.6" fill="#8fd0ea"/>
+            <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y - r - 6).toFixed(1)}" text-anchor="middle" style="fill:#8fd0ea;">Wrackkonvoi</text>
+          </g>`;
+      });
+    }
     // Schuerfpeilungen (v8.481.0). Eigene, weiter aussen liegende Bahn und ein gestrichelter Ring -
     // sie sind privat und gehoeren sichtbar NICHT zum Guertel. Koennen in JEDEM bekannten System
     // liegen, deshalb ausserhalb des istGuertelSystem-Zweigs.
@@ -54848,11 +55709,19 @@
       inner += `<text class="planet-label" x="${whX.toFixed(1)}" y="${(whY+22).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#c3bef5;">Wurmloch</text>`;
     }
     // Sonne (Größe/Farbe/Sonderform folgen dem Sonnentyp dieses Systems, siehe activeSunType oben)
+    // Korona (großer weicher Verlauf) und zehn Strahlen, die - sofern Bewegung nicht abbestellt
+    // ist - in 150 s einmal um die Sonne wandern. Größe folgt dem Sonnentyp wie der Glow.
+    inner += `<circle data-sys-korona="1" cx="${SUN_X}" cy="${SUN_Y}" r="${(95*activeSunType.r).toFixed(1)}" fill="url(#sysKorona)"/>`;
+    { let strahlen = '';
+      const ri = (22*activeSunType.r).toFixed(1), ro = (72*activeSunType.r).toFixed(1);
+      for (let i=0;i<10;i++) strahlen += `<polygon points="${SUN_X-0.9},${SUN_Y-ri} ${SUN_X+0.9},${SUN_Y-ri} ${SUN_X},${SUN_Y-ro}" fill="url(#sysStrahl)" transform="rotate(${i*36} ${SUN_X} ${SUN_Y})"/>`;
+      inner += `<g data-sys-strahlen="1">${strahlen}${kbBewegungAus() ? '' : `<animateTransform attributeName="transform" type="rotate" from="0 ${SUN_X} ${SUN_Y}" to="360 ${SUN_X} ${SUN_Y}" dur="150s" repeatCount="indefinite"/>`}</g>`;
+    }
     inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(34*activeSunType.r).toFixed(1)}" fill="url(#sunGlow)"/>`;
     if (activeSunType.pulsar){
       inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(24*activeSunType.r).toFixed(1)}" fill="none" stroke="${activeSunType.glow}" stroke-width="1.4" stroke-dasharray="3 7" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${SUN_X} ${SUN_Y}" to="360 ${SUN_X} ${SUN_Y}" dur="2.6s" repeatCount="indefinite"/></circle>`;
     }
-    inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/>`;
+    inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/><circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r+1.2).toFixed(1)}" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="0.8"/>`;
     if (activeSunType.binary){
       inner += `<circle cx="${(SUN_X+9*activeSunType.r).toFixed(1)}" cy="${(SUN_Y-7*activeSunType.r).toFixed(1)}" r="${(6*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}" opacity="0.85"/>`;
     }
@@ -54906,12 +55775,16 @@
         <g class="planet-node" data-planet="__home__" style="cursor:default;">
           ${highlightActive && colonyHighlight.key==='__home__' ? `<circle class="find-highlight pulse" cx="${hcx}" cy="${hcy}" r="8"/>` : ''}
           ${homeOrbitalRingSvg}
-          ${(() => { const homeEffType = effectivePlanetType('home'); const durl = getPlanetTextureDataUrl(homeEffType); return durl
+          <circle cx="${hcx}" cy="${hcy}" r="17" fill="url(#sysHeimatHalo)"/>
+          ${(() => { const homeEffType = effectivePlanetType('home'); const durl = getPlanetTextureDataUrl(homeEffType);
+            const ringHinten = homeEffType === 'gasriese' ? sysGasring('home', hc.x, hc.y, 10, false) : '';
+            const ringVorne = homeEffType === 'gasriese' ? sysGasring('home', hc.x, hc.y, 10, true) : '';
+            return ringHinten + (durl
             ? `<clipPath id="pclip-home"><circle cx="${hcx}" cy="${hcy}" r="10"/></clipPath><image href="${durl}" x="${(hc.x-10).toFixed(1)}" y="${(hc.y-10).toFixed(1)}" width="20" height="20" clip-path="url(#pclip-home)"/>`
-            : `<circle cx="${hcx}" cy="${hcy}" r="10" fill="rgba(126,119,221,0.3)"/>`; })()}
+            : `<circle cx="${hcx}" cy="${hcy}" r="10" fill="rgba(126,119,221,0.3)"/>`) + sysSchatten('home', hc.x, hc.y, 10, 0.72) + ringVorne; })()}
           <circle cx="${hcx}" cy="${hcy}" r="10" fill="none" stroke="#7f77dd" stroke-width="1.5"/>
           ${homeTfInProgress ? `<circle cx="${hcx}" cy="${hcy}" r="12" fill="none" stroke="${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${homeTfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).label||''}</title></circle>` : ''}
-          ${homeHasMoon ? `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
+          ${homeHasMoon ? sysMondbahn(hc.x, hc.y, 13) + `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_home' ? `<circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(hc.x+11.5).toFixed(1)}" cy="${(hc.y+12).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
           </g>` : ''}
@@ -54965,14 +55838,19 @@
           ${orbitalRingSvg}
           ${p.type==='super' ? `<circle cx="${px}" cy="${py}" r="${r+5}" fill="none" stroke="#f3aec6" stroke-opacity="0.5"><animate attributeName="r" values="${r+4};${r+8};${r+4}" dur="2.4s" repeatCount="indefinite"/></circle>` : ''}
           ${isMine ? `<circle cx="${px}" cy="${py}" r="${r+4}" fill="none" stroke="#5dcaa5" stroke-width="2"/><circle cx="${px}" cy="${py}" r="${r+4}" fill="none" stroke="#5dcaa5" stroke-opacity="0.4"><animate attributeName="r" values="${r+3};${r+7};${r+3}" dur="2.6s" repeatCount="indefinite"/></circle>` : ''}
+          ${disc ? sysHalo(pos.x, pos.y, r, bodyColor) : ''}
+          ${effType === 'gasriese' ? sysGasring(p.id, pos.x, pos.y, r, false) : ''}
           ${(() => { const durl = getPlanetTextureDataUrl(effType); return durl
-            ? `<clipPath id="pclip-${p.id}"><circle cx="${px}" cy="${py}" r="${r}"/></clipPath><image href="${durl}" x="${(pos.x-r).toFixed(1)}" y="${(pos.y-r).toFixed(1)}" width="${r*2}" height="${r*2}" clip-path="url(#pclip-${p.id})" opacity="${disc?1:0.55}"/>`
-            : `<circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${bodyColor}" opacity="${disc?1:0.55}"/>`; })()}
+            ? `<clipPath id="pclip-${p.id}"><circle cx="${px}" cy="${py}" r="${r}"/></clipPath><image href="${durl}" x="${(pos.x-r).toFixed(1)}" y="${(pos.y-r).toFixed(1)}" width="${r*2}" height="${r*2}" clip-path="url(#pclip-${p.id})" opacity="${disc?1:0.7}"/>`
+            : `<circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${bodyColor}" opacity="${disc?1:0.7}"/>`; })()}
+          ${sysSchatten(p.id, pos.x, pos.y, r, disc ? 0.78 : 0.5)}
+          ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="#0a0d1a" opacity="0.32"/>`}
+          ${effType === 'gasriese' ? sysGasring(p.id, pos.x, pos.y, r, true) : ''}
           ${tfInProgress ? `<circle cx="${px}" cy="${py}" r="${r+2}" fill="none" stroke="${(PLANET_TYPE_INFO[tfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${tfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[tfState.targetType]||{}).label||''}</title></circle>` : ''}
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
           ${hasDebris ? `<g data-map-debris="${p.id}"><circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>` : ''}
-          ${hasMoon ? `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
+          ${hasMoon ? sysMondbahn(pos.x, pos.y, r+2) + `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_'+p.id ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
           </g>` : ''}
@@ -55185,6 +56063,13 @@
         e.stopPropagation();
         if (galaxyMapDidDrag) return;
         nestMapMenu(e, node.getAttribute('data-map-nest'));
+      });
+    });
+    svg.querySelectorAll('[data-map-konvoi]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (galaxyMapDidDrag) return;
+        konvoiMapMenu(e, node.getAttribute('data-map-konvoi'));
       });
     });
     svg.querySelectorAll('[data-map-moon]').forEach(node => {
@@ -55925,6 +56810,42 @@
       + (v.art ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> ${escapeHtml(v.art.charAt(0).toUpperCase() + v.art.slice(1))}.</div>` : '')
       + reifText
       + (v.wandert ? '<div class="bmeta"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Dieses Nest <strong>wandert</strong> – ein Verband, der zu spät kommt, findet nichts mehr vor und kehrt unversehrt zurück.</div>' : ''));
+  }
+  /* Das Konvoi-Kartenmenue - das Gegenstueck zu nestMapMenu, nur schlanker: OHNE Volk, OHNE
+     Schwaeche/Konterschiff, OHNE Reife-Zeile. Die Abklingzeit steht am ZIEL (schlaege[uid]), die
+     Mission bindet ueber zielId (nicht nestId/system), und die "driftet weiter"-Zeile ersetzt die
+     Reife-Zeile: Ein Konvoi waechst nicht, er wandert und entkommt. */
+  function konvoiMapMenu(ev, konvoiId){
+    const k = (galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(konvoiId));
+    if (!k) return;
+    const cf = currentFleet();
+    const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n,key) => n + (cf[key]||0), 0);
+    const schonUnterwegs = cf.missions.some(m => m.type === 'konvoi-angriff' && String(m.zielId) === String(k.id));
+    const abklingBis = konvoiAbklingBis(k);
+    const wartet = abklingBis > Date.now();
+
+    let grund = 'Öffnet die Flottenwahl.';
+    let gesperrt = false;
+    if (!useBackend()){ grund = 'Wrackkonvois gibt es nur mit Serververbindung.'; gesperrt = true; }
+    else if (schonUnterwegs){ grund = 'Ein Verband ist bereits zu diesem Konvoi unterwegs.'; gesperrt = true; }
+    else if (!kampfschiffe){ grund = 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.'; gesperrt = true; }
+    else if (wartet){ grund = 'Deine Verbände sammeln sich neu – nächster Schlag in ' + fmtDuration((abklingBis - Date.now())/1000) + '.'; gesperrt = true; }
+
+    const eintraege = [
+      { icon:'ti-sword', label:'Konvoi angreifen', grund, disabled: gesperrt,
+        fn: () => oeffneKonvoiAngriff(String(k.id)) }
+    ];
+    const entkommtBis = konvoiEntkommtBis(k);
+    const driftText = (entkommtBis && entkommtBis > Date.now())
+      ? '<div class="bmeta"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Zieht in etwa ' + fmtDuration((entkommtBis - Date.now())/1000) + ' weiter – wer zu spät kommt, findet nichts mehr vor.</div>'
+      : '';
+    openKarteMenu(ev, 'Wrackkonvoi', 'Wandernde Beute',
+      eintraege,
+      `<div class="bmeta"><i class="ti ti-recycle" aria-hidden="true" style="color:#8fd0ea;"></i> Lebenspunkte <strong>${fmt(Math.round(k.lp||0))}</strong> von ${fmt(k.lpMax||0)} (${Math.round(((k.lp||0)/Math.max(1,k.lpMax||0))*100)}%)</div>`
+      + kartenFuellBalken(k.lp||0, k.lpMax||0, '#8fd0ea',
+          'Wie viel vom Konvoi noch steht - nicht ein Vergleich mit anderen Zielen.')
+      + konvoiBergungZeile(k)
+      + driftText);
   }
   function festungMapMenu(ev, sysId){
     const feld = state.asteroidFeld && state.asteroidFeld[sysId];
@@ -59291,6 +60212,23 @@
             </div>
           `;
         }
+        if (m.type === 'konvoi-angriff'){
+          // Eigener Zweig wie beim Nest darueber - sonst stuende der Wrackkonvoi als "Erkundungsziel".
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const sysName = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system || '?' }).name;
+          const phase = remaining > (totalDur*1000)/2 ? 'Anflug' : 'Rückflug';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Unterwegs: ${fleetBreakdownHtml(m.composition||{})}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-recycle" aria-hidden="true" style="color:#8fd0ea;"></i>${m.fleetName?escapeHtml(m.fleetName)+' → ':''}Wrackkonvoi (${escapeHtml(sysName)})</div>
+                <div class="bmeta">${phase} · ${fmtDuration(remaining/1000)}</div>
+              </div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         if (m.type === 'festung-angriff'){
           // Wortgleich zur Anfechtung darunter aufgebaut. Der Countdown nennt "Rückflug", sobald
           // die halbe Strecke um ist - sonst wechselte die Bedeutung des Balkens still, ohne dass
@@ -59476,7 +60414,7 @@
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -61487,6 +62425,11 @@
             icon = 'ti-alien'; color = v.farbe;
             label = 'Nest-Angriff → ' + v.name + ' (' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name) + ')';
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + ' – ' + (m.stufeName || 'Nest') + '.';
+          } else if (m.type === 'konvoi-angriff'){
+            // Eigener Zweig wie beim Nest darueber - sonst "Erkundungsziel".
+            icon = 'ti-recycle'; color = '#8fd0ea';
+            label = 'Wrackkonvoi → ' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name);
+            shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + '.';
           } else if (m.type === 'festung-angriff'){
             // Eigener Zweig aus demselben Grund wie bei 'mining' darunter: Ohne ihn faellt die
             // Mission in den generischen Zweig und stuende dort als "Erkundungsziel" - er sucht
@@ -62141,6 +63084,9 @@
     // aber sie wird bei ihm nie gelesen.
     const neuspielerRow = document.getElementById('notifNeuspielerRow');
     if (neuspielerRow) neuspielerRow.style.display = istBetreiber ? '' : 'none';
+    // Dieselbe Regel fuer die Verdachtsmeldung der Aktivitaets-Uhr (01.09.2026).
+    const verdachtRow = document.getElementById('notifVerdachtRow');
+    if (verdachtRow) verdachtRow.style.display = istBetreiber ? '' : 'none';
     if (cooldownNote){
       const remainMs = (state.lastNameChangeAt||0) + 30*86400000 - Date.now();
       if (remainMs > 0){
@@ -63467,6 +64413,8 @@
     document.querySelectorAll('[data-grant-tier]').forEach(b => b.onclick = () => { adminGrantTier = b.getAttribute('data-grant-tier'); renderAdminGrantAuswahl(); });
     const adminCodeCreateBtn = document.getElementById('adminCodeCreateBtn');
     if (adminCodeCreateBtn) adminCodeCreateBtn.onclick = adminBonusCodeAnlegen;
+    const adminGeschenkSendenBtn = document.getElementById('adminGeschenkSendenBtn');
+    if (adminGeschenkSendenBtn) adminGeschenkSendenBtn.onclick = adminGeschenkSenden;
     const bonusCodeBtn = document.getElementById('bonusCodeBtn');
     if (bonusCodeBtn) bonusCodeBtn.onclick = bonusCodeEinloesen;
     const bonusCodeInput = document.getElementById('bonusCodeInput');

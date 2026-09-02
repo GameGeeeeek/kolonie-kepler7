@@ -69,8 +69,11 @@ check('1c: moduleWertOf liest den Wurf, klemmt Ausreisser und gibt Altbestand 10
 // ---- 3) Fundpfade wuerfeln, Fertigung nicht
 // Gezaehlt werden die AUFRUFE im Schluesselbau (":1:'+mitWertWurf") - die blosse
 // Funktionsdefinition matcht dasselbe Kurzmuster und verfaelschte die Zaehlung (erster Lauf).
-check('3a: alle fuenf Fundpfade haengen den Wurf an (mitWertWurf)',
-  (JS.match(/:1:'\+mitWertWurf\(subs\)/g) || []).length === 5);
+// Sechster Pfad seit A2 (28.08.2026): konvoiModulAusServerwurf legt kv_bergungslogik/kv_bergungspanzer
+// aus dem Server-Belohnungsfach ins Inventar und wuerfelt dabei denselben Wert-Token wie jeder Fund -
+// ein Boss-Set-Teil-artiges Herkunfts-Schloss (quelle:'konvoi'), aber im Schluessel ein regulaerer Wurf.
+check('3a: alle sechs Fundpfade haengen den Wurf an (mitWertWurf)',
+  (JS.match(/:1:'\+mitWertWurf\(subs\)/g) || []).length === 6);
 check('3b: die Fragment-Fertigung bleibt bei 100% (kein Token im gefertigten Schluessel)',
   JS.includes("const instKey = defKey+':'+rarity;"));
 

@@ -506,3 +506,65 @@ Wächter: `tests/test_systemdominanz.js` (28 Prüfungen, jede Kernmessung als PA
 gegen den Stand davor: 21 rot bei identischer Prüfliste). `test_fraktionsgebiet` prüft die
 Ring-Regel seither als Eigenschaft statt als Literal und verlangt zusätzlich, dass es sie nur
 EINMAL gibt.
+
+## 7. Gebaut: Die Systemansicht bekommt Licht und Schatten (01.09.2026)
+
+Auftrag Sascha: „generell die systemansicht ausbauen das es optisch ein meisterwerk werden könnte".
+Vorgelegt wurden drei gerenderte Varianten auf denselben Daten (Sonne, Bahnen, echte
+Planetentexturen aus dem Markup des Heimatsystems): A „Licht und Schatten", B „Sternkarte",
+C „Nebelwelt". Gewählt: **A als Basis, plus Gasriesen-Ringe und sichtbare Mondbahnen aus C.** Die
+Mockups samt Generator liegen nicht im Repo (Sitzungs-Scratchpad); die Entscheidung steht hier.
+
+### Was die offene Systemansicht jetzt zeichnet
+
+| Element | Regel |
+|---|---|
+| Nebelschleier | drei weiche Flächen hinter allem, eine davon in der Farbe der Sonne dieses Systems |
+| Sterne | 48 statt 30, über das ganze sichtbare Feld; die hellsten mit Glanzkreuz |
+| Bahnen | durchgezogen (0,6 breit, 10 % Deckkraft) statt gepunktet |
+| Bahnspur | kurzer Bogen in der Typfarbe **hinter** jedem Planeten, endet exakt an der Scheibe; unerforscht blasser |
+| Sonne | Korona (radialer Verlauf, Radius 95·Sonnentyp) und zehn Strahlen, die in 150 s einmal wandern; Randlicht am Kern |
+| Tag-/Nachtseite | je Scheibe ein Verlauf mit Mittelpunkt auf der **Sonnenseite** (halber Radius Richtung Sonne), dunkel zum abgewandten Rand |
+| Atmosphären-Halo | zwei Ringe in der Typfarbe, **nur erforschte** Welten |
+| Unerforscht | Scheibe 0,7 plus dunkle Deckung 0,32, gestrichelter Rand bleibt |
+| Gasriesen-Ring | hintere Hälfte vor, vordere Hälfte nach der Scheibe (clipPath im gekippten Raum) |
+| Mondbahn | feiner Kreis mit Radius Versatz·√2 – der bestehende Mond-Marker liegt darauf, er wurde nicht bewegt |
+| Beschriftung | dunkler Saum (`paint-order: stroke`, 2,4 px) für alle `.planet-label` |
+
+### Drei Entscheidungen
+
+1. **Kein SVG-Filter.** Die Mockups A und C nutzten `feGaussianBlur`. Im Spiel wird jeder Filter bei
+   jeder Neuzeichnung gerastert, und die Ebene trägt Dauer-Animationen (Pulse, Strahlen). Jeder
+   Verlauf ist deshalb ein `radialGradient`; die Halos sind zwei Ringe statt eines Weichzeichners.
+   `test_systemansicht_optik` 0b hält das fest.
+2. **Die Sterne kommen aus einem Generator, nicht aus `hashStringToFloat` je Stern.** Gemessen: Der
+   Hash rechnet `h*31+Zeichen mod 10000`; zwei Schlüssel, die sich nur in der Sternnummer
+   unterscheiden, liegen 31/10000 auseinander, also 1,4 Karteneinheiten. 48 Sterne ergaben zwei
+   „Perlenschnüre" aus je acht bis zehn Sternen, die im Bild wie gestrichelte Striche aussahen.
+   `sysZufall` (mulberry32) nimmt den Hash nur als Startwert.
+3. **Der Mond-Marker bleibt, wo er ist.** An ihm hängen Klick-Handler und `test_kartenmenue`. Die
+   Bahn übernimmt seinen Abstand: Planeten `r+2`, Heimat 13. Der erste Entwurf riet den Versatz aus
+   dem Radius und legte die Heimatbahn 1,4 Einheiten neben ihren Mond (1f2 hat es gemeldet).
+
+### Kosten, gemessen (Heimatsystem, 1280×900, alt gegen neu)
+
+| | alt | neu |
+|---|---|---|
+| Markup der Ebene | 56.158 Zeichen | 69.475 Zeichen |
+| Elemente | 106 | 244 |
+| Verläufe / Filter | 1 / 0 | 15 / 0 |
+| Dauer-Animationen | 1 | 2 |
+| Neuaufbau bis zum nächsten Frame (5 Messungen) | 30–42 ms | 32–56 ms |
+| Frames je Sekunde bei ruhender Karte | 59,5 | 59,5 |
+
+### Wächter
+
+`tests/test_systemansicht_optik.js` – 28 Prüfungen. Die Kernmessungen sind Regeln, keine
+Momentaufnahmen: Spur endet an der Bildmitte, Schatten-Verlauf liegt näher an der Sonne als die
+Scheibe, Mondbahn-Radius gleich Markerabstand; Halo und Abdunklung als Paar erforscht/unerforscht;
+Determinismus über einen echten Systemwechsel (Vega und zurück, zeichengleiches Markup). Gegenprobe
+gegen `origin/main`: 18 rot, 10 grün, identische Prüflisten. Drei Werkzeugfehler beim Bau: Der
+Anker „`let inner = \`<defs>`" traf zuerst die Galaxie-Ebene (zwei Vorkommen); ein Schnitt „von den
+Sternen bis zur Sonne" umfasste 36 kB samt Wurmloch-Filter und ließ 0b aus dem falschen Grund
+fallen; und weder Warten noch Fenstergröße noch Tab-Wechsel lösen einen Neuaufbau aus
+(`__karteAufbauten` blieb dreimal bei 6) – erst der Systemwechsel tut es.

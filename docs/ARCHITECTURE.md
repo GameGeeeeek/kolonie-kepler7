@@ -56,6 +56,12 @@ vorher die Kosten je Knoten: eine Rechnung, die über alle Spieler oder Planeten
 hinter einen kurzen Zwischenspeicher (`systemHerrscherCached`, `storageCapCached`), sonst wird
 sie mit der Zahl der Knoten quadratisch. Einzelheiten: `docs/sektorkarte-konzept.md`, Abschnitt 6.
 
+Die Zeichnung der offenen Systemansicht (Korona, Tag-/Nachtseite, Halos, Ringe, Mondbahnen) lebt in
+vier `sys*`-Helfern vor `buildMap` und kommt bewusst ohne SVG-Filter aus: Filter werden bei jeder
+Neuzeichnung gerastert, die Ebene trägt Dauer-Animationen. Jeder Verlauf ist ein `radialGradient`,
+alles ist deterministisch, sonst greift der Markup-Vergleich an der Schreibstelle nie.
+Entscheidungen und Messwerte: `docs/sektorkarte-konzept.md` §7.
+
 ## UI-Modi und versteckte Verantwortung
 
 Beim Entfernen oder Abschalten eines UI-Modus nicht nur die sichtbare Darstellung betrachten. Ein alter Zweig kann zusätzlich enthalten:

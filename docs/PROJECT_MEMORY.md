@@ -66,6 +66,8 @@ Nach Eingriffen in Testdateien:
 
 Eine leichtere Suite kann grün werden, obwohl Schutz verloren ging.
 
+Ein Test-Parser, der Konstanten der Spieldatei als getippte Liste mitgibt (etwa die `HERKUNFT_*`-Werte vor einem `new Function`), stirbt beim nächsten Eintrag – oder liefert still `null`. Solche Preludes aus der Datei selbst ableiten (Regex über die Deklarationen); bei der fünften Herkunft (Konvoi) waren es acht Tests auf einmal.
+
 ## 6. UI-Zustände besitzen Aufbau und Abbau
 
 Beim Entfernen/Ersetzen eines UI-Modus nicht nur dessen sichtbaren Inhalt portieren. Alte Zweige können Cleanup enthalten:
@@ -157,6 +159,18 @@ Für Kepler ergibt sich Qualität aus:
 - Eskalation bei Fehlschlägen.
 
 Ein stärkeres Cloud-Modell ohne diese Leitplanken kann schlechtere Änderungen liefern als ein kleineres lokales Modell mit sauberem Projektkontext und einem strengen Qualitätstor.
+
+## 16. Ein schwacher Hash über fortlaufende Schlüssel ist kein Zufall
+
+`hashStringToFloat` rechnet `h*31+Zeichen mod 10000`. Zwei Schlüssel, die sich nur in einer
+laufenden Nummer unterscheiden, liegen damit 31/10000 auseinander. Wer daraus Positionen ableitet,
+bekommt Muster statt Streuung – bei den Sternen der Systemansicht waren es „Perlenschnüre", die im
+Bild wie gestrichelte Striche aussahen, und aufgefallen ist es nur im gerenderten Bild, nicht im
+Quelltext.
+
+Für deterministische Streuung den Hash nur als Startwert nehmen und die Folge aus einem echten
+Generator ziehen (`sysZufall`, mulberry32). Und eine Zeichnung vor dem Merge einmal wirklich
+ansehen – ein Test, der Anker zählt, sieht so ein Muster nicht.
 
 ## Pflege dieser Datei
 
