@@ -150,9 +150,26 @@ check('Gegenprobe: die alte Form wuerde erkannt',
 // daneben, das sei "gleiche Formel wie die tatsaechliche Kampfaufloesung". Seit v8.295.0 laeuft der
 // Kampf in drei Phasen - der Bericht widersprach damit der Vorschau im Profil fuer dasselbe Ziel.
 const spyBlock = schnitt("} else if (r.type === 'spy-report'){", 'if (r.spyShielded)');
-check('Spionagebericht nutzt battleWinChance', spyBlock.includes('battleWinChance('));
-check('Spionagebericht nutzt die PvP-Phasengrenzen', spyBlock.includes('PVP_PHASE_MIN') && spyBlock.includes('PVP_PHASE_MAX'));
-check('Spionagebericht rechnet die Konterwirkung ein', spyBlock.includes('counterMultiplier('));
+/* Seit dem 02.09.2026 rechnet der Bericht nicht mehr selbst: Die Siegchance stand ZWEIMAL im
+   Code (hier und in der Angriffs-Vorschau), und die Kopie hier hatte beide alten Annahmen behalten
+   - nur der aktive Standort statt der Reichsflotte, und die kontoweite Verteidigung, obwohl ein
+   Angriff seit der Standort-Etappe EINEN Ort trifft. Beides laeuft jetzt durch pvpSiegchance().
+   Die drei Pruefungen folgen deshalb der Delegation, statt die Wortform am alten Ort zu suchen -
+   und werden dabei staerker: Sie halten die gemeinsame Stelle fest UND dass der Bericht sie
+   wirklich benutzt. Wer die zweite Rechnung wieder einbaut, faellt an der ersten Zeile. */
+check('Spionagebericht delegiert an die gemeinsame Siegchance-Rechnung', spyBlock.includes('pvpSiegchance('));
+const chanceBlock = schnitt('function pvpSiegchance(', '\n  }');
+check('Die gemeinsame Rechnung nutzt battleWinChance', chanceBlock.includes('battleWinChance('));
+check('Die gemeinsame Rechnung nutzt die PvP-Phasengrenzen',
+  chanceBlock.includes('PVP_PHASE_MIN') && chanceBlock.includes('PVP_PHASE_MAX'));
+/* Die Konterwirkung steckt seitdem im VERHAELTNIS zweier pvpReichskraft-Aufrufe - genauso leitet
+   der Server sie ab (zwei computeAttackPower-Aufrufe, mit und ohne Gegnerflotte). Geprueft wird
+   die ganze Kette, nicht nur ein Aufruf: das Verhaeltnis hier, counterMultiplier dort. */
+check('Die gemeinsame Rechnung leitet den Konter als Verhaeltnis ab',
+  /pvpReichskraft\(zielFlotte\)\s*\/\s*roh/.test(chanceBlock), { laenge: chanceBlock.length });
+const reichBlock = schnitt('function pvpReichskraft(', '\n  }');
+check('Und die Reichskraft wendet dabei counterMultiplier an',
+  reichBlock.includes('counterMultiplier('), { laenge: reichBlock.length });
 check('Kein einzelner Wurf mehr im Spionagebericht', !/Math\.max\(0\.1,\s*Math\.min\(0\.9/.test(spyBlock));
 check('Spionagebericht nutzt die gemeinsame Schaetzung', spyBlock.includes('estimateEnemyFleetAtk('));
 

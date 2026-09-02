@@ -165,6 +165,72 @@ vorher — seine Kolonien sind es nicht mehr.
   den bestehenden `test_kartenmarker`-Datengetrieben-Sweep — neue Markerart erbt 1b/1c
   automatisch).
 
+## 4b. Stand der Umsetzung
+
+| Teil | Stand |
+|---|---|
+| Backend Etappe 1 (`targetPlanet`, `/api/spieler-standorte`, `standortVerteidigung`) | **fertig und live** (401 auf dem Pi gemessen) |
+| Frontend Etappe 1 (Zielwahl, Vorschau, Berichte, Wächter) | **fertig**, 01.09.2026 |
+| Etappe 2 (fremde Kolonien als Karten-Marker) | offen |
+
+### Was beim Umsetzen der Frontend-Etappe 1 ANDERS entschieden wurde als hier
+
+Jede dieser Abweichungen hat einen Grund; wer sie für ein Versehen hält und „repariert", baut den
+jeweiligen Fehler wieder ein.
+
+- **Die Zielwahl führt ZWEI Variablen** (`pvpZiel` + `pvpZielFuer`), nicht eine wie `festungZiel`.
+  Kolonieschlüssel sind GLOBALE Planeten-IDs — Spieler A und Spieler B können beide auf Vesna
+  siedeln. Die Prüfung „steht der Schlüssel in der Liste?" nach dem Festungs-Muster greift dann
+  NICHT, und eine bei A getroffene, abgebrochene Wahl wirkte bei B still weiter.
+- **Der Standortname reist als TEXT in der Mission mit**, nicht nur als Schlüssel.
+  `planetDisplayName` löst zuerst über `state.colonyNames` auf, also über die EIGENEN
+  Umbenennungen: Wer seine Vesna-Kolonie „Erzhafen" genannt hat, sähe im Bericht über einen
+  Angriff auf die FREMDE Vesna-Kolonie seinen eigenen Namen. Dafür gibt es `fremdStandortName()`;
+  für eigene Standorte (`attack-received`, `pvp-fleet-loss`) bleibt `planetDisplayName` richtig.
+- **Das Ziel wird im `start`-Callback eingefroren**, nicht in `sendPlayerAttackMission` aus der
+  Modulvariable gelesen. Dort liegt ein `await loadPlayerEntry` zwischen Auswahl und
+  `missions.push`, und das Overlay ist zu diesem Zeitpunkt schon geschlossen — der Spieler kann in
+  dem Netzfenster längst ein neues Ziel markiert haben.
+- **`pvpKampfDetails` musste erweitert werden.** Die Funktion ist eine WHITELIST; was sie nicht
+  kennt, erreicht keinen Bericht. Ohne die drei neuen Felder wäre die halbe Etappe unsichtbar
+  gewesen, ohne dass irgendein Test angeschlagen hätte.
+- **Die Vorschau nennt drei Einschränkungen ausdrücklich**, statt eine glatte Zahl zu behaupten:
+  Der Konter wird gegen die bekannte GESAMTflotte gerechnet (der Server rechnet ihn gegen die
+  Flotte DIESES Standorts, die keine Aufklärung liefert); die Verteidigung ist die Serverzahl, aber
+  Aufstellung und Gefechtsvorrat kommen im Kampf noch obendrauf; die Flugzeit hängt am Spieler und
+  nicht am Ort (`pseudoDistanceSeconds` hasht die Spieler-ID).
+
+### Ein ausgelieferter Fehler, der dabei gemessen und mitbehoben wurde
+
+Die PvP-Vorschau rechnete ihre Angriffskraft über `buildAttackFleet(state.activeBasePlanet, …)` —
+also über die Auswahl am aktiven Standort. Der Server rechnet sie in `computeAttackPower()` über
+`allFleetsOf(save)`, also über Heimatflotte **plus jede Kolonieflotte**; der Request trägt gar keine
+Flottenangabe. Die angezeigte Siegchance war damit für jeden mit Kolonieflotten zu pessimistisch,
+und zwar seit jeher. Entschieden am 01.09.2026 (Sascha): mitbeheben. Die Vorschau rechnet seither
+über `pvpReichskraft()`, das die Server-Schleife spiegelt (rohe Kraft und Vielfalt je
+Standortflotte, Konter je Flotte, danach die kontoweiten Faktoren genau einmal).
+
+**Offen daraus als eigene Aufgabe:** Kampfkraft und Risiko sind entkoppelt. Die Verluste zieht
+`applyCombatLosses` aus `m.composition`, also aus der Auswahl — ein Angriff mit einem einzigen
+Jäger kämpft mit voller Reichskraft und riskiert diesen einen Jäger. Beute gibt es dabei keine (der
+Client deckelt sie am Frachtraum), wohl aber 25 Kampfpunkte und Gebäudezerstörung beim Ziel. Das
+ist eine PvP-Balance-Entscheidung und braucht eine eigene Backend-Etappe.
+
+### Drei Lehren aus dem Bau des Wächters
+
+- **Eine Gegenprobe braucht eine Liste der Prüfungen, die fallen MÜSSEN.** Zwei von vier
+  Gegenproben blieben grün — ohne die Liste hätte ich daraus „der Test belegt nichts" gelesen und
+  den Code verdächtigt. Tatsächlich waren es Fehler im Test: Die Honeypot-Probe umging den
+  Ladepfad (die Fixture berechnete vor), und die Zielbindungs-Probe traf nur eine von zwei
+  Schranken — die andere fing ab.
+- **Eine Gegenprobe kann einen blinden Fleck melden statt ihn zu bestätigen.** Die Sabotage
+  „targetPlanet nicht in den Request" ließ keine Prüfung fallen. Grund: Alle vier Prüfungen maßen
+  die MISSION, und die trägt den Standort auch dann, wenn er den Server nie erreicht. Die Zeile,
+  ohne die die ganze Etappe wirkungslos ist, war ungeprüft.
+- **Die Fixture maß zuerst den unteren Anschlag.** Mit 800 Angriffskraft lagen Heimat *und*
+  Kolonie bei 10 % Siegchance — der Test hätte den Deckel gemessen statt der Wirkung. Mit 8.000
+  zeigt er 10 % / 72 % / 90 %.
+
 ## 5. Offene Entscheidungen (beim Bauen messen, nicht raten)
 
 - Die konkreten Beutefaktoren (Kolonie ~0,5 / Mond ~0,35) gegen echte Bestände rechnen.
