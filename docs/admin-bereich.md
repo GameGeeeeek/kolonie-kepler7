@@ -196,3 +196,44 @@ Löschen-Knopf ist dann weg, damit die Frist nicht versehentlich neu gesetzt wir
 **Wächter** `tests/test_admin_konto2_ui.js` (33 Prüfungen) mit den Paaren 1a/1b, 2a/2b, 3a/3b,
 3c/3d, 4a/4b und 5a/5b. Gegenprobe gegen origin/main v8.636.0: 28 von 33 fallen, Prüflisten
 identisch; die fünf verbleibenden sind im Kopf der Testdatei einzeln begründet.
+
+## Wächter, Galaxie-Reiter, Geschenk je Konto, Chat-Moderation (02.09.2026)
+
+Sechste Runde (Auftrag „Weitere Ideen für Admin Funktionen", alle vier gewählt). Backend #208
+zuerst live, dann dieser Stand.
+
+**Wächter als fünfte Karte der Lage.** `loadAdminAlarm()` hängt an `loadAdminLage()` und zeigt je
+Schwelle den aktuellen Messwert („18 von 15", orange wenn überschritten, sonst grün), den Zeitpunkt
+der letzten Prüfung, die Ruhefrist, die offenen Funde und die letzten Meldungen. Kennt der Server
+die Route nicht, fällt die Karte **ersatzlos** weg — die vier vorhandenen Lage-Karten bleiben
+stehen, statt dass eine 404-Meldung sie verdrängt. Das ist die eine Stelle, an der `adminListenFehler`
+bewusst nicht benutzt wird: Der Wächter ist eine Ergänzung, kein Reiterinhalt.
+
+**Vierzehnter Reiter „Galaxie".** Fünf Karten: Weltboss (Lebenspunkte setzen, entfernen — steht
+keiner, sagt die Karte das und bietet **kein** Erschaffen an, weil die `bossId` klientenseitig
+entsteht), Alien-Nester und Wrackkonvois (Liste mit Entfernen-Knopf je Eintrag, dazu Auswahl für
+Volk und System zum Setzen), Marktereignis beenden, Kopfgeld auf einen Namen setzen. Jede Handlung
+fragt nach und nennt die Folge — keine davon hat einen Rückgängig-Knopf, und ein gesetztes Nest
+steht sofort auf der Karte aller Spieler.
+
+**Geschenk an ein Konto** im Konto-Blatt: Auswahl der Gabe, Menge, Grund (Pflicht). Die Rückfrage
+nennt Menge, Gabe und Grund; nach dem Versand sind Menge und Grund leer, und die Meldung sagt, dass
+der Grund im Postfach des Beschenkten steht.
+
+**Chat-Moderation** im Konto-Blatt: „Chat-Nachrichten ansehen" lädt die letzten 20 Zeilen dieses
+Kontos aus beiden Kanälen, jede mit Entfernen-Knopf. Zwei Rückfragen nacheinander: erst „entfernen?"
+(verschwindet für alle), dann „zusätzlich 24 Stunden stummschalten?" — **Abbrechen bei der zweiten
+heißt: nur löschen**, Abbrechen bei der ersten heißt gar nichts. Wer eine Zeile entfernt, will den
+Verfasser meistens auch bremsen; zwei getrennte Handgriffe daraus zu machen hieße, dass der zweite
+vergessen wird.
+
+**Postfach.** `admin-alarm` (nur der Betreiber bekommt ihn) nennt Konto, Messwert und Schwelle;
+`geschenk-konto` nennt den Grund. Beide Einträge müssen da sein, sonst zeichnet das Postfach die
+Zeile mit Glocke und dem blanken Wort „Ereignis" — `test_pushkategorien` 2b fällt darauf. Das
+Geschenk-Icon ist `ti-sparkles`, **nicht** `ti-gift`: Letzteres fehlt im 69er-Whitelist-Font und ist
+genau der Bug, wegen dem `check-icons.js` existiert.
+
+**Wächter** `tests/test_admin_runde6_ui.js` (33 Prüfungen) mit den Paaren 1a/1b, 2a/2b, 2e/2f,
+3a/3b und 4a/4b. Gegenprobe gegen origin/main v8.641.0: 28 von 34 fallen, Prüflisten identisch.
+Der erste Entwurf starb dabei mitten im Lauf an einem Zugriff auf ein leeres Listenelement, statt
+rot zu werden (Arbeitsregel 34) — jeder solche Zugriff trägt seither eine Existenzprüfung.

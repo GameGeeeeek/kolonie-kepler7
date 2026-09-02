@@ -43,9 +43,15 @@ const LINK = 'https://gamegeeeeek.de/?reset=0123456789abcdef0123456789abcdef0123
 {
   const i = JS.indexOf('const ADMIN_REITER = [');
   const literal = i >= 0 ? JS.slice(i, JS.indexOf('];', i)) : '';
-  check('0a: der Reiter Lage steht in ADMIN_REITER mit Ladefunktion, und es sind dreizehn Reiter',
-    /tab:'lage'[^\n]*laden:\(\) => loadAdminLage\(\)/.test(literal) && (literal.match(/tab:'/g) || []).length === 13,
-    { reiter: (literal.match(/tab:'/g) || []).length });
+  // GEZAEHLT WIRD HIER NICHT MEHR. Diese Pruefung stand auf "dreizehn" und fiel, sobald eine
+  // spaetere Runde den vierzehnten Reiter baute - eine Zahl ist eine Momentaufnahme, kein Verhalten.
+  // Die REGEL lautet: Der Lage-Reiter ist eingetragen, und JEDER Eintrag hat Knopf, Ansicht und
+  // entweder eine Ladefunktion oder ausdruecklich keine. Die haelt auch beim fuenfzehnten.
+  const eintraege = literal.split(/\n\s*\{ tab:/).slice(1);
+  check('0a: der Reiter Lage steht in ADMIN_REITER mit Ladefunktion, und jeder Eintrag ist vollstaendig',
+    /tab:'lage'[^\n]*laden:\(\) => loadAdminLage\(\)/.test(literal)
+    && eintraege.length >= 13 && eintraege.every(e => /btn:'/.test(e) && /view:'/.test(e) && /laden:/.test(e)),
+    { reiter: eintraege.length, unvollstaendig: eintraege.filter(e => !(/btn:'/.test(e) && /view:'/.test(e) && /laden:/.test(e))).length });
   // 0b ist seit dem Merge von v8.634.0 eine FREMDE Anzeigestelle: Eine parallele Sitzung hat den
   // Postfach-Eintrag zur Backend-Meldung schon gebaut (mit Deckeln auf Auszug und Text). Die Pruefung
   // bleibt, weil die Meldung dieses Auftrags ohne sie als blankes "Ereignis" ankaeme - dass sie am
