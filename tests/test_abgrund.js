@@ -417,8 +417,9 @@ check('8: die gewaehlte Tauchtiefe liegt im Spielstand, nicht nur im DOM',
   check('8: der alte Sammelabsatz unter "Grundlagen" ist verschwunden',
     (js.match(/title:'Der Abgrund – endlos neue Sektoren'/g) || []).length === 0);
 }
-check('8: der oberste Patchnotes-Eintrag beschreibt den Abgrund',
-  /version:'8\.320\.0'[\s\S]{0,4000}Abgrund/.test(js));
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+check('8: der Patchnotes-Eintrag zu v8.320.0 beschreibt den Abgrund',
+  /version:'8\.320\.0'[\s\S]{0,4000}Abgrund/.test(require('./lib/patchnotes').patchnotesText(js)));
 
 // ---- 9) Bestenlisten-Verdrahtung (v8.321.0) ----
 // Der Determinismus aus Abschnitt 1 hat nur dann einen Zweck, wenn die Tiefe auch irgendwo

@@ -131,8 +131,9 @@ check('die Hilfe erklaert, warum Angreifen nicht beim Planeten steht',
 // Patchnotes-Array waechst nach OBEN, ein Byte-Fenster rutscht mit jeder neuen Version am gesuchten
 // Eintrag vorbei und der Test wird rot, ohne dass sich an der Sache etwas geaendert hat. Genau das
 // ist am 01.08.2026 bei test_abgrund_module2.js passiert.
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
 check('das Kartenmenue steht in den Patchnotes',
-  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(src));
+  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(require('./lib/patchnotes').patchnotesText(src)));
 
 // ---------------------------------------------------------------- 8. Im Browser
 // Der statische Teil oben prueft, dass der Code so AUSSIEHT, wie er soll. Dass das Menue auch

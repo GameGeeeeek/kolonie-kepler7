@@ -385,7 +385,8 @@ const FRONT_KEY = 'kartell|schatten';
   // verlangt, dass EINER von ihnen alle drei Zahlen zusammen nennt (nicht ueber mehrere verteilt).
   // Die Zusage bleibt damit dieselbe: Aendern sich die Zahlen im Code, findet sich kein Eintrag
   // mehr, der die neuen nennt - es muss also eine neue Patchnote geschrieben werden.
-  const eintraege = fe.match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,4000}?\n    \]\},/g) || [];
+  // Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+  const eintraege = require('./lib/patchnotes').patchnotesText(fe).match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,4000}?\n    \]\},/g) || [];
   const nennt = (t) => t.includes(String(api.RK_BOLLWERK_ERFOLG)) && t.includes(String(api.RK_BOLLWERK_FEHLSCHLAG));
   check('G3: eine Patchnote nennt dieselben Gewichte',
     eintraege.some(nennt), { eintraege: eintraege.length });
