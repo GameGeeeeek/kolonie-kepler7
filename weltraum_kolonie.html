@@ -35097,6 +35097,18 @@ async function claimPendingRewards(){
         ? (p.angreiferName||'Ein Kommandant')+' hat dir das Schürfrecht am '+wo+' abgenommen. Deine überlebende Eskorte kehrt zurück - der Vorrat selbst blieb unangetastet.'
         : 'Deine Eskorte hat '+(p.angreiferName||'einen Angreifer')+' am '+wo+' zurückgeschlagen. Das Schürfrecht bleibt deins - sieh nach, was von der Wache übrig ist.';
     } },
+    /* Der Vorposten unter Beschuss (B2, 02.09.2026). Derselbe Grund wie beim Schuerfrecht darueber:
+       Der Server schreibt keinen fremden Spielstand, der Besitzer erfaehrt den Angriff also nur
+       hier - und zwar bei JEDEM Schlag, nicht erst beim Fall. Genau darauf beruht die
+       Verteidigungs-Zusage: Er soll die Garnison verstaerken koennen, solange der Vorposten steht.
+       Der Kernstand steht im Text, weil er die Dringlichkeit traegt; ohne ihn wuesste der Besitzer
+       nur DASS, nicht WIE DRINGEND. */
+    'vorposten-angegriffen': { icon:'ti-building-community', color:'#e24b4a', text:(p)=>{
+      const wo = (p.name||'Vorposten') + (p.system ? ' bei ' + ((STAR_SYSTEMS.find(x=>x.id===p.system)||{}).name || p.system) : '');
+      return p.gefallen
+        ? (p.angreiferName||'Ein Kommandant')+' hat deinen '+wo+' geschleift - die Garnison ist mit ihm verloren. Dein Anteil an dem, was blieb, liegt im Belohnungsfach.'
+        : (p.angreiferName||'Ein Kommandant')+' beschießt deinen '+wo+' - der Kern steht noch bei '+(p.kernProzent||0)+'%. Verstärke die Garnison, solange er hält.';
+    } },
     'sabotaged': { icon:'ti-alert-triangle', color:'#e24b4a', text:(p)=> p.kind==='defense' ? ((p.fromName||'Ein Spieler')+' hat deine Verteidigung um 30% geschwächt ('+(p.durationMin||30)+' Min). Repariere oder rüste auf!') : ((p.fromName||'Ein Spieler')+' hat eine deiner Produktionen lahmgelegt (-50% für '+(p.durationMin||30)+' Min). Repariere im Verteidigungs-Tab.') },
     'leaderboard-overtaken': { icon:'ti-trophy', color:'#fac775', text:(p)=>(p.aheadName||'Ein Spieler')+' ist an dir vorbeigezogen - du bist jetzt auf Platz '+(p.rank||'?')+'. Zeit, zurückzuschlagen!' },
     // Der Aufruf zum Allianz-Raid (02.08.2026). Text nennt die Sammelphase, weil genau die den
