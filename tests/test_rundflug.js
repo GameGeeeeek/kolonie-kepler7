@@ -103,7 +103,10 @@ const EINWEGIG_ERLAUBT = {
   'defend-base-return': 'IST der Rueckweg von der Allianzbasis',
   'relocate':           'Verlegung zwischen eigenen Standorten - die Schiffe bleiben dort',
   'colonize':           'das Kolonieschiff wird zur Kolonie',
-  'colonize-moon':      'dito, Mondlandung'
+  'colonize-moon':      'dito, Mondlandung',
+  // Vorposten (B2, 02.09.2026): dieselbe zweiteilige Familie wie die Eskorte am Vorkommen.
+  'vorposten-defend':   'Garnison bleibt am Vorposten stationiert (Rueckweg: vorposten-rueckruf)',
+  'vorposten-rueckruf': 'IST der Rueckweg der Garnison'
 };
 const missionsBloecke = [];
 for (const m of OHNE_HISTORIE.matchAll(/missions\.push\(\{/g)){
