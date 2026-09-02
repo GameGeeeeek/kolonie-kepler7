@@ -128,10 +128,13 @@ bzw. „Wartung läuft (noch ca. N Min.): Text" und blendet nach `ab + dauer` vo
 Ankündigungs-Karte im Schalter-Reiter (`adminAnkuendigungText/Ab/Dauer`) setzt und hebt auf; beides
 ruft danach sofort `ladeAnkuendigung()`, der Admin sieht also das Banner, ohne die Minute abzuwarten.
 Der neue Notaus „angriffe" erscheint in der Schalterliste wie die anderen (nur AB-schaltbar); das
-Backend antwortet mit 503 und Grund. Der PvP-Pfad zeigt `data.error` des Servers ohnehin, Festung,
-Nest und Konvoi seit #530 ebenfalls (`serverFehler`) – die Pause steht damit im Bericht und in der
-Meldung. Nur der Vorposten-Pfad (#531) nennt den Grund nach Status; dort steht ein 503-Zweig
-„Angriffe sind gerade pausiert (Wartung)" (Wächter 0d).
+Backend antwortet mit 503 und Grund. Der PvP-Pfad zeigt `data.error` des Servers ohnehin; Festung,
+Nest und Konvoi (#530) sowie der Vorposten (#533) lesen ihn als `serverFehler` und nennen ihn in
+Bericht und Meldung. Der Wortlaut der Pause kommt damit überall vom Server, nicht aus dem
+Statuscode – Wächter 0d misst genau das (vier Pfade, acht Anzeigestellen). Der eigene 503-Zweig aus
+dem ersten Entwurf ist damit entfallen; er wäre eine zweite Fassung derselben Aussage gewesen. 0d ist
+deshalb die einzige Prüfung dieses Wächters, die am alten Stand grün bleibt: Sie misst eine fremde
+Anzeigestelle, an der der Notaus hängt, und hat als Gegenprobe eine Sabotage statt des alten Standes.
 
 **Support-Werkzeuge im Konto-Blatt.** Drei Zeilen unter der Sperre: E-Mail setzen
 (`[data-konto-email]`, gilt als bestätigt, die Meldung nennt die verkürzte Form), Umbenennen

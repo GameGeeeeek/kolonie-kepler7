@@ -15,11 +15,13 @@
 // Alle Bedienschritte sind gefasst (fuellen/klicken/waehlen mit 3 s), damit die Gegenprobe am
 // alten Stand ROT wird statt mitten drin zu sterben (Arbeitsregel 34).
 //
-// GEGENPROBE (Regel 1), gemessen am 02.09.2026 gegen origin/main (v8.629.0, aafcdf9) per
-// KEPLER_SPIELDATEI: 36 von 42 fallen, Prueflisten identisch (kein Abbruch). Gruen bleiben am alten
-// Stand NUR 1-vorab (der Feedback-Reiter gab es schon), 2b (die generische Meldung), und die vier
-// "keine Seitenfehler" (1e, 4e, 5i, 6f). Auch die Nicht-Wirkungen 1b/1d/4d/5c/5e/5g fallen dort, weil
-// jede von ihnen zusaetzlich die Meldung bzw. die Rueckfrage misst, die es ohne die Flaeche nicht gibt.
+// GEGENPROBE (Regel 1), gemessen am 02.09.2026 gegen origin/main (v8.633.0, e926bfa) per
+// KEPLER_SPIELDATEI: 35 von 42 fallen, Prueflisten identisch (kein Abbruch). Gruen bleiben am alten
+// Stand NUR 1-vorab (den Feedback-Reiter gab es schon), 2b (die generische Meldung), die vier
+// "keine Seitenfehler" (1e, 4e, 5i, 6f) und 0d - Letzteres mit Absicht und mit eigener Sabotage-
+// Gegenprobe, siehe die Begruendung an der Pruefung selbst. Auch die Nicht-Wirkungen 1b/1d/4d/5c/5e/5g
+// fallen dort, weil jede von ihnen zusaetzlich die Meldung bzw. die Rueckfrage misst, die es ohne die
+// Flaeche nicht gibt.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, ruhigeUhren, logMitschnitt, logZeilen } = require('./lib/umgebung');
 
@@ -44,13 +46,20 @@ const LINK = 'https://gamegeeeeek.de/?reset=0123456789abcdef0123456789abcdef0123
   check('0c: das Banner steht im DOM, und die Ankuendigung wird beim Start und jede Minute geholt',
     /id="wartungBanner" role="status"/.test(HTML) && /setInterval\(\(\) => \{ try \{ ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 60000\)/.test(JS)
     && /loadNotificationEvents\(\); ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 2500\)/.test(JS));
-  // Der PvP-Pfad zeigt data.error des Servers. Festung, Nest und Konvoi zeigen seit #530 ebenfalls den
-  // Servertext (serverFehler, je zweimal: Bericht und Meldung) - der nennt die Angriffspause von selbst.
-  // Der Vorposten-Pfad (#531) wirft den Antworttext bei !ok weg und nennt den Grund nach Status; dort
-  // steht der 503-Zweig. Vor #530 sagten alle vier nur "kam nicht zustande".
-  check('0d: Festung, Nest, Konvoi zeigen den Servertext und der Vorposten-Pfad nennt bei 503 die Angriffspause',
-    (JS.match(/\(serverFehler \|\| \(status === /g) || []).length >= 6
-    && (JS.match(/status === 503 \? ' – Angriffe sind gerade pausiert \(Wartung\)'/g) || []).length === 1);
+  // Der 503-Text der Angriffspause muss beim Spieler ankommen. Der PvP-Pfad zeigt data.error immer;
+  // Festung, Nest, Konvoi (#530) und Vorposten (#533) lesen den Servertext in `serverFehler` und nennen
+  // ihn in Bericht UND Meldung - vier Pfade, je zweimal. Faellt einer davon je auf den blossen
+  // Statuscode zurueck, sagt er bei einer Wartung wieder nur "kam nicht zustande".
+  //
+  // 0d ist die EINZIGE Pruefung hier, die am alten Stand GRUEN bleibt, und das mit Absicht: Diese acht
+  // Anzeigestellen hat nicht dieser Aenderungssatz gebaut, sondern #530/#533 - der erste Entwurf setzte
+  // hier noch eigene 503-Zweige daneben und hat sie beim Merge zugunsten der fremden Fassung aufgegeben.
+  // Geprueft wird sie trotzdem, weil der Notaus `angriffe` an ihr haengt: ohne sie kommt der Grund der
+  // Wartungspause beim Spieler nicht an. Ihre Gegenprobe ist deshalb eine SABOTAGE statt des alten
+  // Standes - gemessen 02.09.2026: ein entfernter serverFehler-Zweig im Vorposten-Pfad laesst sie fallen.
+  check('0d: alle vier Angriffspfade lesen den Servertext (serverFehler), der die Angriffspause nennt',
+    (JS.match(/let daten = null, status = 0, serverFehler = ''/g) || []).length >= 4
+    && (JS.match(/\(serverFehler \|\| \(status === /g) || []).length === 8);
 }
 
 function konto(extra){
