@@ -192,6 +192,58 @@ const gespeichert = (store) => { try { return JSON.parse(store['kepler7-save-v3'
     await ctx.close();
   }
 
+  /* ---------------------------------------------- 5) Der planetKey-Zweig, AUSGEFUEHRT
+     Bis zum 02.09.2026 war die neue Regel nur als Zeichenkette geprueft (Abschnitt A) - und die
+     Regexe haengen am Parameternamen `x`, nicht am Verhalten. Vergliche die Zeile das falsche
+     Feld (der Server sendet `planetKey`, die Client-Eintraege tragen `planet`), verloere der
+     Verteidiger bei einem Standort-Angriff GAR KEINE Schiffe, und der ganze Prueflauf bliebe
+     gruen. Umgekehrt machte ein blosses Umbenennen von `x` den Test rot, obwohl das Verhalten
+     stimmt. Teil B fuhr den Zweig nie: alle Belohnungen dort tragen kein planetKey, und die
+     Fixture hat `colonies:{}` - also nur einen einzigen Standort.
+     Dieser Abschnitt gibt dem Verteidiger eine Kolonie MIT Flotte und misst beide Richtungen. */
+  const MIT_KOLONIE = { colonies: { vesna: { buildings:{turm:4}, fleet:{ jaeger:400, cruisers:80 } } } };
+  {
+    const { page, ctx, store } = await lauf(browser,
+      [{ id:'r5', type:'pvp-fleet-loss', pct:0.50, attackerName:'Nyx-Kollektiv', at:Date.now(), planetKey:'vesna' }],
+      MIT_KOLONIE);
+    await page.waitForTimeout(2500);
+    const st = gespeichert(store);
+    const kol = st && st.colonies && st.colonies.vesna && st.colonies.vesna.fleet;
+    check('5-bau: der Spielstand traegt Heimat- UND Kolonieflotte', !!(st && st.fleet && kol),
+      { heimat: st && st.fleet, kolonie: kol });
+    check('5a: mit planetKey verliert NUR der getroffene Standort Schiffe',
+      !!kol && kol.jaeger < 400 && kol.cruisers < 80, kol);
+    check('5b: und die Heimatflotte bleibt unangetastet',
+      !!st && st.fleet.jaeger === 1000 && st.fleet.cruisers === 200, st && st.fleet);
+    await ctx.close();
+  }
+  {
+    const { page, ctx, store } = await lauf(browser,
+      [{ id:'r6', type:'pvp-fleet-loss', pct:0.50, attackerName:'Nyx-Kollektiv', at:Date.now(), planetKey:'home' }],
+      MIT_KOLONIE);
+    await page.waitForTimeout(2500);
+    const st = gespeichert(store);
+    const kol = st && st.colonies && st.colonies.vesna && st.colonies.vesna.fleet;
+    check('5c: planetKey "home" trifft die Heimat',
+      !!st && st.fleet.jaeger < 1000 && st.fleet.cruisers < 200, st && st.fleet);
+    check('5d: und laesst die Kolonieflotte in Ruhe',
+      !!kol && kol.jaeger === 400 && kol.cruisers === 80, kol);
+    await ctx.close();
+  }
+  {
+    // Der Rueckfall, ebenfalls ausgefuehrt: OHNE planetKey trifft es weiterhin beide Standorte.
+    const { page, ctx, store } = await lauf(browser,
+      [{ id:'r7', type:'pvp-fleet-loss', pct:0.50, attackerName:'Nyx-Kollektiv', at:Date.now() }],
+      MIT_KOLONIE);
+    await page.waitForTimeout(2500);
+    const st = gespeichert(store);
+    const kol = st && st.colonies && st.colonies.vesna && st.colonies.vesna.fleet;
+    check('5e: ohne planetKey verlieren BEIDE Standorte (der Rueckfall, ausgefuehrt)',
+      !!st && !!kol && st.fleet.jaeger < 1000 && kol.jaeger < 400,
+      { heimat: st && st.fleet, kolonie: kol });
+    await ctx.close();
+  }
+
   await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
   process.exit(fail ? 1 : 0);

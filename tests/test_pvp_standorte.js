@@ -31,7 +31,11 @@
 //     pvpZielFuerTarget): 5a faellt. Nur eine von beiden zu entfernen genuegt nicht, die andere
 //     faengt ab - das hat die erste Fassung dieser Gegenprobe als WERKZEUGFEHLER gemeldet.
 //   * ladeZielStandorte ohne den Honigfaktor: 1f faellt.
-//   * planetDisplayName statt fremdStandortName in standortBerichtszeile: 7b faellt.
+//   * planetDisplayName statt fremdStandortName in standortBerichtszeile: 7e faellt.
+//     NICHT 7b - dessen Bericht traegt standortName, das `||` schliesst kurz und der
+//     Rueckfall laeuft gar nicht. Gemessen am 02.09.2026: mit dieser Sabotage blieb 7b
+//     gruen. 7e spielt deshalb einen Bericht mit der Feldmenge des SERVERS ein (ohne
+//     standortName) - das ist der einzige Weg, auf dem der Rueckfall live entsteht.
 //   * targetPlanet nicht in den Request: 4e faellt. (4a-4d messen die MISSION und blieben gruen -
 //     genau daran ist die Luecke aufgefallen.)
 const fs = require('fs');
@@ -319,6 +323,37 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
       const bf = txt.match(/Beute:\s*×([\d.,]+)/);
       werte[key] = { chance: ch ? Number(ch[1]) : null, beute: bf ? bf[1] : null, txt };
     }
+    /* 3c2 - DIE ZAHL SELBST, nicht nur ihre Wirkung (02.09.2026). 3d-3f messen Siegchancen, und
+       zwei der drei sitzen bauartbedingt auf einem Anschlag: home (900000 gegen 8000) liegt auf
+       dem Boden von 10 %, moon_vesna (900) auf der Decke von 90 % - beide ergeben sich aus
+       PVP_PHASE_MIN/MAX und der Zwei-von-drei-Formel, nicht aus der Verteidigungszahl. Gemessen:
+       Multipliziert man die Heimat-Verteidigung in der Vorschau mit 1000, bleiben 3d, 3e und 3f
+       GRUEN. Belegt war damit nur "vesna weicht vom Boden ab", nicht "jede Wahl liefert die
+       Verteidigung IHRES Standorts".
+       Diese Pruefung liest deshalb die Zahl am Knopf und vergleicht sie mit der Standortliste -
+       unabhaengig von jedem Deckel. fmt() wird IM Spiel aufgerufen, damit die Erwartung nicht
+       eine zweite Formatier-Wahrheit im Test wird. */
+    const schildTexte = await t.page.evaluate((liste) => liste.map(st => {
+      const b = document.querySelector('#fwahlOverlay [data-pvp-ziel="' + st.key + '"]');
+      return { key: st.key, text: b ? b.innerText : null };
+    }), STANDORTE_A);
+    // fmt() lebt im Modulrumpf und ist von aussen nicht aufrufbar - die abgekuerzte Zahl wird
+    // deshalb hier zurueckgerechnet. 1 % Spielraum deckt genau die Rundung der Abkuerzung ab
+    // ("900.0k"), nicht mehr: eine um Faktor 1000 falsche Zahl faellt sofort auf.
+    const zahlAus = t => {
+      const m = String(t||'').match(/🛡\s*([\d.,]+)\s*([kMG])?/);
+      if (!m) return null;
+      const n = Number(m[1].replace(/\./g, m[2] ? '.' : '').replace(',', '.'));
+      const f = { k:1e3, M:1e6, G:1e9 }[m[2]] || 1;
+      return n * f;
+    };
+    const schilde = STANDORTE_A.map((st, i) => ({
+      key: st.key, text: schildTexte[i].text,
+      gelesen: zahlAus(schildTexte[i].text), erwartet: st.verteidigung }));
+    const falscheZahl = schilde.filter(x => x.gelesen === null
+      || Math.abs(x.gelesen - x.erwartet) > x.erwartet * 0.01);
+    check('3c2: jeder Zielknopf nennt die Verteidigung SEINES Standorts', falscheZahl.length === 0, schilde);
+
     check('3d: jeder Standort liefert eine Siegchance',
       ['home','vesna','moon_vesna'].every(k => werte[k].chance !== null),
       Object.fromEntries(Object.entries(werte).map(([k,v])=>[k,v.chance])));
@@ -326,6 +361,15 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
       werte.home.chance !== werte.vesna.chance, { home: werte.home.chance, vesna: werte.vesna.chance });
     check('3f: die schwaechere Kolonie ist die bessere Chance',
       werte.vesna.chance > werte.home.chance, { home: werte.home.chance, vesna: werte.vesna.chance });
+    /* 3f2 - die Fixture spannt bewusst die ganze Breite auf (900000 / 4000 / 900), deshalb sitzen
+       home auf dem Boden (10 %) und moon_vesna auf der Decke (90 %). Beide Werte folgen aus
+       PVP_PHASE_MIN/MAX, nicht aus der Verteidigungszahl - ein Test, der nur sie liest, misst den
+       Deckel. Diese Pruefung haelt fest, dass MINDESTENS EIN Wert wirklich gerechnet ist; die
+       Zahlen selbst bewacht 3c2 am Zielknopf. */
+    check('3f2: die mittlere Kolonie liefert einen ECHTEN Wert, keinen Anschlag',
+      werte.vesna.chance > 10 && werte.vesna.chance < 90,
+      { home: werte.home.chance, vesna: werte.vesna.chance, moon: werte.moon_vesna.chance });
+
     check('3g: der Beutefaktor unterscheidet sich ebenfalls',
       werte.home.beute !== werte.vesna.beute, { home: werte.home.beute, vesna: werte.vesna.beute });
     check('3h: die Vorschau sagt, dass die Flugzeit am Spieler haengt, nicht am Standort',
@@ -498,6 +542,44 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
       /Vesna/.test(bericht) && !/MEIN ERZHAFEN/i.test(bericht), { auszug: bericht.slice(0,500) });
     check('7c: und er benennt die Standortart', /Kolonie/i.test(bericht), { auszug: bericht.slice(0,500) });
     check('7d: der geminderte Beutefaktor steht dabei', /0[.,]50/.test(bericht), { auszug: bericht.slice(0,500) });
+    await t.ctx.close();
+  }
+
+  /* 7e/7f - DER LIVE-FALL, und bis zum 02.09.2026 ungeprueft. Der Messgegenstand ist
+     `const name = fremd ? (r.standortName || fremdStandortName(key)) : planetDisplayName(key);`
+     Der Bericht oben traegt standortName, das `||` schliesst also kurz und fremdStandortName()
+     wird NIE aufgerufen - 7b belegte den Rueckfall damit gar nicht. Gemessen: Eine Kopie der
+     Spieldatei mit planetDisplayName im fremd-Zweig lief mit 7b GRUEN durch.
+     SERVERSEITIG geschriebene Berichte tragen aber genau KEIN standortName: server.js haengt
+     `...standortFelder` an, und das sind nur targetPlanet, standortArt und beuteFaktor. Der
+     Rueckfall ist also der einzige Weg, auf dem der Standortname eines Server-Berichts entsteht.
+     Dieser Block spielt deshalb einen Bericht mit exakt der Feldmenge des Servers ein. */
+  {
+    const SERVERBERICHT = {
+      id:'r-server', type:'player-attack', result:'win', time: Date.now()-1000,
+      targetName:'Anna', targetId: ZIEL_A,
+      targetPlanet:'vesna', standortArt:'kolonie', beuteFaktor:0.5,   // KEIN standortName - wie vom Server
+      attackPower: 8000, defensePower: 4000, loot:{ erz: 1000 },
+      cargoCapacity: 6000, fromPlanet:'Heimatbasis', fleet:{ cruisers: 400 }
+    };
+    const t = await tab(browser, fixture({ aufklaerung:true, eigeneKolonieVesna:true }), { berichte:[SERVERBERICHT] });
+    let bericht = '', aufbauFehler = null;
+    try {
+      await t.page.waitForTimeout(1200);
+      bericht = await t.page.evaluate(() => {
+        const titel = Array.from(document.querySelectorAll('*'))
+          .filter(e => /Angriff auf Spieler Anna/i.test(e.textContent||'') && e.children.length === 0)[0];
+        if (!titel) return '';
+        const karte = titel.closest('.card-row') || titel.closest('[class*=report]') || titel.parentElement.parentElement;
+        return karte ? karte.innerText : titel.innerText;
+      });
+    } catch(e){ aufbauFehler = String(e).slice(0,200); }
+    check('7e-bau: der Server-Bericht (ohne standortName) liess sich rendern',
+      !aufbauFehler && bericht.length > 40, aufbauFehler || { laenge: bericht.length });
+    check('7e: ohne standortName loest der Bericht ueber fremdStandortName auf, NICHT ueber die eigenen Kolonienamen',
+      /Vesna/.test(bericht) && !/MEIN ERZHAFEN/i.test(bericht), { auszug: bericht.slice(0,500) });
+    check('7f: und der Standort steht ueberhaupt drin',
+      /Angegriffener Standort/i.test(bericht), { auszug: bericht.slice(0,500) });
     await t.ctx.close();
   }
 
