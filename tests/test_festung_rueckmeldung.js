@@ -38,13 +38,12 @@ const ICH = 'u-ich';
 
 // ---- 0) Quelltext ------------------------------------------------------------------------------------
 {
-  // Je Funktion gemessen (nicht ueber die ganze Datei gezaehlt): Eine spaeter dazugekommene
-  // Aufloesung (vorpostenAngriffAufloesen aus v8.630.0 hatte noch das alte Muster) darf diese
-  // Pruefung nicht kippen - sie bekommt ihre eigene Zeile, sobald sie umgestellt ist.
-  const AUFLOESUNGEN = ['anfechtungAufloesen', 'nestAufloesen', 'konvoiAufloesen', 'festungAufloesen'];
+  // Je Funktion gemessen (nicht ueber die ganze Datei gezaehlt) - und die Vorposten-Aufloesung aus
+  // v8.630.0 ist seit v8.632.0 dabei: Sie hatte das alte Muster ("Bauschutz oder Abklingzeit" aus 403 geraten).
+  const AUFLOESUNGEN = ['anfechtungAufloesen', 'nestAufloesen', 'konvoiAufloesen', 'festungAufloesen', 'vorpostenAngriffAufloesen'];
   const fn = name => { const a = src.indexOf('  async function ' + name + '('); const b = a < 0 ? -1 : src.indexOf('\n  }\n', a); return (a >= 0 && b > a) ? src.slice(a, b) : ''; };
   const lage = AUFLOESUNGEN.map(n => { const s = fn(n); return { n, da: !!s, behaelt: /if \(!res\.ok\)\{ serverFehler = \(daten && typeof daten\.error === 'string'\)/.test(s), verwirft: /if \(!res\.ok\) daten = null;/.test(s) }; });
-  check('0a: alle vier Aufloesungen (Anfechtung, Nest, Konvoi, Festung) behalten den Servertext', lage.every(x => x.da && x.behaelt && !x.verwirft), lage.filter(x => !(x.da && x.behaelt && !x.verwirft)));
+  check('0a: alle fuenf Aufloesungen (Anfechtung, Nest, Konvoi, Festung, Vorposten) behalten den Servertext', lage.every(x => x.da && x.behaelt && !x.verwirft), lage.filter(x => !(x.da && x.behaelt && !x.verwirft)));
   check('0b: der Grund im Festungs-, Nest- und Konvoi-Zweig nennt den Servertext vor dem Statuscode',
     /const festGrund = 'Der Angriff kam nicht zustande – '\s*\+ \(serverFehler \|\|/.test(src)
     && (src.match(/\+ ' – ' \+ \(serverFehler \|\| \(status === 403/g) || []).length === 2);
