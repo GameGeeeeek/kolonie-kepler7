@@ -24,7 +24,8 @@
 // GEGENPROBE per KEPLER_SPIELDATEI gegen origin/main (v8.628.0) - Pflichtliste am Ende des Kopfes.
 //
 // PFLICHTLISTE (gemessen am 02.09.2026, Prueflisten beider Laeufe per diff identisch):
-// am alten Stand fallen 0a 0b 0c 0d 1a 1b 1d 1e 1f 2a 2b 2c; gruen bleiben MUESSEN 1-vorab, 2-vorab
+// Gegenprobe gemessen 02.09.2026 gegen origin/main (v8.629.0, KEPLER_SPIELDATEI): rot 0a 0b 0c 0d 1a 1b 1d 1e 1f 2a 2b 2c (12),
+// gruen bleiben 1-vorab 1g 1c 2-vorab (4); Prueflisten beider Laeufe per diff identisch (16 Namen).
 // (Boot ohne Skriptfehler), 1c (der Bericht kommt auch alt an - genau deshalb steht er nie allein)
 // und 1g (der Willkommen-Toast erscheint auch alt bei offenem Overlay: er hat kein Gewicht).
 const fs = require('fs');
