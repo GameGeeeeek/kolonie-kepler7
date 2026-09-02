@@ -62,6 +62,12 @@ Neuzeichnung gerastert, die Ebene trägt Dauer-Animationen. Jeder Verlauf ist ei
 alles ist deterministisch, sonst greift der Markup-Vergleich an der Schreibstelle nie.
 Entscheidungen und Messwerte: `docs/sektorkarte-konzept.md` §7.
 
+Die Galaxie hat drei Schichten im selben Array: 69 Basissysteme, 30 Startschub-Systeme (feste
+Tabelle in beiden Repos) und die Wochensysteme (Formel aus dem Wochen-Index, Deckel 178). Basiszahlen
+und Erfolge zählen nur die Basis; der Wochenring rechnet nur mit der Basis, sonst wanderten erzeugte
+Systeme samt Kolonien. Die Auswahl der 20 Gürtelsysteme ist eingefroren und eine Kopie der
+Backend-Formel; die Liste des Servers hat Vorrang. Warum: `docs/galaxie-wachstum.md`.
+
 ## UI-Modi und versteckte Verantwortung
 
 Beim Entfernen oder Abschalten eines UI-Modus nicht nur die sichtbare Darstellung betrachten. Ein alter Zweig kann zusätzlich enthalten:

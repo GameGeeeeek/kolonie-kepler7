@@ -1567,3 +1567,29 @@ einer Zeichnung, die zwischen dem 16. und 18.08.2026 fünfzehn Etappen (KB-1 bis
 hat und deren letzte drei Etappen ausschließlich Kollisions- und Bedienbarkeits-Nachwehen waren
 (Regeln 49–53). Wer hier arbeitet, misst mit `elementFromPoint` und auf **beiden** Formfaktoren –
 ein Sichtbarkeits-Test findet genau die Fehler nicht, die dort auftreten.
+
+## Sichtbare Rückmeldung nach jedem Schlag (02.09.2026)
+
+Meldung Sascha: „Asteroidenfestung muss man anscheinend mehrmals angreifen, aber man bekommt
+keinerlei Info, was der Angriff bewirkt hat, ob Cooldown ist oder ein Bericht." Im Browser
+nachgestellt, zwei Ursachen, beide nicht in der Kampfrechnung:
+
+1. **Der Toast kam, solange niemand hinsah.** Die Auflösung läuft beim Laden, während das
+   Willkommen-zurück-Overlay noch offen ist; der Treffer-Toast lief seine 4,2 s hinter dem
+   Overlay ab. `pushToast` hält Meldungen jetzt zurück, solange eines der Fenster aus
+   `TOAST_OVERLAYS` offen ist (Warteschlange, 1-s-Takt, Deckel 10 min), und zeigt `wichtig`/`warn`
+   neun Sekunden. Jeder Festungs-, Nest- und Konvoischlag meldet sich als `wichtig`.
+2. **Der Statuscode wurde zur Diagnose erklärt.** Bei 403 schrieb das Spiel „Abklingzeit" in
+   Bericht und Toast, obwohl der Server drei verschiedene 403-Gründe wörtlich mitschickt
+   (Abklingzeit bis wann, kein Spielstand, keine Flotte im Spielstand). Die vier Auflösungen
+   (Anfechtung, Nest, Konvoi, Festung) behalten `daten.error` (`serverFehler`) und nennen ihn vor
+   dem geratenen Text.
+
+Dazu nennen Festungsmenü und Marker-Tooltip den eigenen Beitrag, den Hortanteil aus
+`fest.beitraege` (`festungBeitragDaten`), den letzten und den nächsten möglichen Schlag; ohne
+eigenen Schlag sagt das Menü das ausdrücklich, und jede Zeile verweist auf Berichte › Kämpfe.
+
+Wächter: `tests/test_festung_rueckmeldung.js` (16; Quelltext + Browser-Szenario Treffer und 403).
+Gegenprobe gegen v8.629.0: 12 rot, 4 grün, identische Prüflisten. Die Toast-Wartezeit wird als
+Ereignisverlauf gemessen (Overlay offen → kein Toast, Overlay zu → Toast mit Schaden), nicht als
+DOM-Endzustand.
