@@ -256,12 +256,9 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   if (new Set(kerne).size !== liste.length) doppelt.push(klasse+' ('+liste.map(d=>d.k).join(', ')+')');
 }
 check('8: innerhalb jeder Schiffsklasse sind die Icons unterscheidbar', doppelt.length === 0, doppelt);
-// Und die Begründung der Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese Module,
-// die sich in ihrer Klasse doppelten. Faellt eine Wirkung weg, faellt auch diese Prüfung
+// Und die Begründung der zwei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese vier
+// Module, die sich in ihrer Klasse doppelten. Faellt eine Wirkung weg, faellt auch diese Prüfung
 // auf - dann ist der Sonderkern womöglich gar nicht mehr nötig.
-// Seit 02.09.2026 sind es DREI Paare: kv_bergungspanzer trifft in der Schweren Linie auf
-// sl_kompositpanzer. Das Paar ist nicht waehlbar - Klasse und Kanal des Moduls stehen im Backend
-// (SHIP_MODULE_COMBAT_BASE: schwerelinie/hull) und die Paritaetspruefung vergleicht beide.
 const nachWirkung = [];
 for (const [klasse, liste] of Object.entries(proKlasse)){
   const zaehler = {};
@@ -269,8 +266,8 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   for (const [ef,n] of Object.entries(zaehler)) if (n > 1)
     nachWirkung.push(klasse+':'+ef+' ('+liste.filter(d=>d.effect===ef).map(d=>d.k).join('+')+')');
 }
-check('8: genau drei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
-  nachWirkung.length === 3, nachWirkung);
+check('8: genau zwei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
+  nachWirkung.length === 2, nachWirkung);
 
 // Die schmalen Fertigungs-Knöpfe bleiben bewusst flach (font-size:10px, ein 24px-SVG sprengt die
 // Zeile) - und zwar fuer BEIDE Modulfamilien gleich. Festgehalten, damit die Ausnahme eine Regel

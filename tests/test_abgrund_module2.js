@@ -33,7 +33,7 @@ function arrAus(name){
   if (i < 0) throw new Error('Array nicht gefunden: '+name);
   let d = 0, s = js.indexOf('[', i), k = s;
   for (; k < js.length; k++){ if (js[k]==='[') d++; else if (js[k]===']'){ d--; if(!d) break; } }
-  return new Function("const HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat', HERKUNFT_KONVOI='konvoi'; return "+js.slice(s, k+1)+';')();
+  return new Function("const HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+js.slice(s, k+1)+';')();
 }
 const MODULE_DEFS = arrAus('MODULE_DEFS');
 const SHIP_MODULE_DEFS = arrAus('SHIP_MODULE_DEFS');
