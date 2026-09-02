@@ -248,10 +248,13 @@ const MD = (() => {
   let d=0, s=js.indexOf('[', i), k=s;
   for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
   // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
-  // sobald die beiden Herkunfts-Konstanten definiert sind.
-  // HERKUNFT_UNIKAT dazu (Arbeitsregel 9, v8.463.0): Die Unikat-Defs nutzen die vierte
-  // Herkunfts-Konstante - ohne sie bricht das Literal-Parsen mit ReferenceError ab.
-  return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+js.slice(s,k+1))();
+  // sobald die Herkunfts-Konstanten definiert sind.
+  // ALLE HERKUNFT_*-Konstanten werden AUS DER DATEI abgeleitet, nicht eingetippt (Hausregel 43):
+  // Fuer jede neue Herkunft (v8.463.0 HERKUNFT_UNIKAT, A2 HERKUNFT_KONVOI fuer die Wrackkonvois)
+  // steht sonst frueher oder spaeter ein ReferenceError beim Literal-Parsen - eine Namensliste
+  // waere blind gegen genau die Erweiterung, die diesen Test spaeter reisst.
+  const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+  return new Function(herkunftDecls + '; return ' + js.slice(s,k+1))();
 })();
 const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
 check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);
