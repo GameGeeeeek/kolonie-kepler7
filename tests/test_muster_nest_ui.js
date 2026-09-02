@@ -149,8 +149,12 @@ async function messen(browser, galaxy, extraStore, waehleNest) {
   const cbis = JS.indexOf('async function refreshAllianceMusterAttack(');
   check('5a-anker: der claim-Block ist auffindbar', cvon > 0 && cbis > cvon);
   const cblock = (cvon > 0 && cbis > cvon) ? JS.slice(cvon, cbis) : '';
-  const nestZweig = cblock.slice(cblock.indexOf('if (data.nest){'), cblock.indexOf('const lostParts'));
-  check('5b: es gibt einen Nest-Zweig', cblock.indexOf('if (data.nest){') > 0);
+  /* Seit dem Verband gegen Festungen (01.09.2026) ist der Zweig fuer BEIDE PvE-Ziele da -
+     `if (data.nest || data.festung){`. Gesucht wird der Kopf, der `data.nest` prueft; ein Zweig,
+     der nur die Festung kennt, waere hier zu Recht rot. */
+  const zweigKopf = cblock.indexOf('if (data.nest || data.festung){') > 0 ? 'if (data.nest || data.festung){' : 'if (data.nest){';
+  const nestZweig = cblock.slice(cblock.indexOf(zweigKopf), cblock.indexOf('const lostParts'));
+  check('5b: es gibt einen Nest-Zweig', cblock.indexOf(zweigKopf) > 0, { kopf: zweigKopf });
   check('5c: und er fasst die Waehrungsfelder NICHT an',
     !!nestZweig && !/state\.credits\s*=/.test(nestZweig) && !/newForschungspunkte/.test(nestZweig),
     { hinweis: 'der Server schickt sie bei einem Nest nicht - uebernommen waere das undefined im Spielstand' });
