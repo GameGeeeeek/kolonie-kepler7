@@ -7328,6 +7328,7 @@
       '<strong>Der Preis für ein leichtes Ziel ist die Beute.</strong> Die Ressourcen deines Gegners liegen in <em>einem</em> gemeinsamen Konto, nicht je Planet. Damit ein schwach verteidigter Außenposten nicht zum Hintereingang zum ganzen Vermögen wird, hängt am Standort ein fester Faktor: Heimatbasis voller Satz, Kolonie die Hälfte, Mond gut ein Drittel. Die Heimat bleibt also das fetteste Ziel und ist zugleich am besten verteidigt; eine schwache Kolonie ist der leichte Weg mit halbem Ertrag. Genau diese Abwägung ist der Sinn der Sache.',
       '<strong>Die Standorte musst du erst finden.</strong> Zur Wahl steht nur, was eine Aufklärung aufgedeckt hat – ohne sie kennst du bloß die Heimatbasis. Der Späh-Bericht listet jeden Standort mit seiner Verteidigung und seinem Beutefaktor auf; die Angaben altern mit der Aufklärung und werden nach sechs Stunden nicht mehr angeboten. Wurde dein Späher dabei entdeckt, sind auch diese Zahlen aufgebläht – die Spionageabwehr des Ziels verfälscht sie genauso wie die Gesamtverteidigung.',
       '<strong>Behoben: Die angezeigte Siegchance war zu pessimistisch.</strong> Die Vorschau rechnete mit der Flotte, die du am aktiven Standort ausgewählt hattest – der Server kämpft aber mit deiner gesamten Reichsflotte, also samt aller Schiffe auf deinen Kolonien. Wer Flotten verteilt stehen hatte, sah dadurch eine deutlich schlechtere Chance, als er wirklich hatte. Beide rechnen jetzt dieselbe Größe.',
+      '<strong>Behoben: Drei Stellen urteilten noch über das ganze Reich.</strong> Der Spionagebericht rechnete seine „geschätzte Gewinnchance\u0022 aus deiner Flotte am <em>aktiven</em> Standort gegen die <em>kontoweite</em> Verteidigung – beides überholt. Profil-Vorschau und Bedrohungs-Banner taten dasselbe mit dem Verteidigungswert aus der Bestenliste. Alle drei rechnen jetzt dieselbe Größe wie die Zielwahl und der Server: deine Reichsflotte gegen die Verteidigung des Ortes, der wirklich getroffen wird. Ohne Aufklärung bleibt der grobe Reichswert stehen – und die Anzeige sagt dann ausdrücklich dazu, dass es eine Schätzung übers ganze Reich ist.',
       'Kontoweit bleiben: der Angriffs-Schutzschild (du kannst die Standorte eines Spielers also nicht nacheinander abklappern), der Anti-Farming-Abschlag und die Sperre gegen viel schwächere Ziele. Die Flugzeit hängt weiterhin am Spieler, nicht am Ort – ein Mond ist genauso weit weg wie seine Heimat, und die Vorschau sagt das ausdrücklich dazu. Neuer Hilfe-Eintrag „Angriffsziel wählen: Heimat, Kolonie oder Mond".'
     ]},
     { version:'8.628.0', date:'02.09.2026', changes:[
@@ -33773,6 +33774,34 @@ async function claimPendingRewards(){
          Gefechtsvorrat des Verteidigers kommen im Kampf noch obendrauf.
      (c) Die FLUGZEIT haengt am Spieler, nicht am Standort (pseudoDistanceSeconds hasht die
          Spieler-ID). Ein Mond ist genauso weit weg wie die Heimat. */
+  /* Die eine Siegchance-Rechnung fuer PvP. Sie stand bis zum 02.09.2026 ZWEIMAL im Code: einmal
+     in der Angriffs-Vorschau (pvpVorschauHtml) und einmal im Spionagebericht - und die zweite
+     Kopie hatte beide alten Annahmen behalten: `attackPower(currentFleet())` (nur der AKTIVE
+     Standort, waehrend der Server ueber die ganze Reichsflotte rechnet) und die kontoweite
+     Verteidigung aus dem Bericht, obwohl ein Angriff jetzt EINEN Ort trifft. Der Kommentar an der
+     Stelle warnte woertlich vor "zwei Anzeigestellen derselben Groesse, von denen eine die alte
+     Annahme behalten hatte" - genau das war sie geworden.
+     Struktur wie im Backend: rohe Reichskraft, Konter als VERHAELTNIS der beiden Aufrufe (der
+     Server leitet ihn genauso ab), dann battleWinChance mit den PvP-Phasengrenzen. */
+  function pvpSiegchance(zielId, zielFlotte, verteidigung){
+    const roh = pvpReichskraft(null);
+    const konter = (roh > 0 && zielFlotte && Object.keys(zielFlotte).length)
+      ? pvpReichskraft(zielFlotte) / roh : 1;
+    const kraft = Math.round(roh * (1 + (zielId ? spyIntelEdge(zielId) : 0)) * gefechtsvorratVorschau('angriff').mult);
+    const pct = (verteidigung === null || verteidigung === undefined || !(kraft > 0)) ? null
+      : Math.round(battleWinChance(kraft, verteidigung, konter, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100);
+    return { kraft, konter, pct };
+  }
+  /* Die Verteidigung EINES Standorts aus der letzten Aufklaerung - dieselbe Quelle, aus der die
+     Zielwahl ihre Zahlen nimmt (/api/spieler-standorte, also standortVerteidigung im Server).
+     Ohne aufgedeckte Liste gibt es null; der Aufrufer entscheidet dann, was er zeigt. */
+  function pvpStandortVerteidigung(zielId, key){
+    const it = (state.spyIntel || {})[zielId];
+    const liste = it && Array.isArray(it.standorte) ? it.standorte : null;
+    if (!liste) return null;
+    const e = liste.find(x => x.key === (key || 'home'));
+    return e && typeof e.verteidigung === 'number' ? e.verteidigung : null;
+  }
   function pvpVorschauHtml(flotte, target){
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
     if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
@@ -33798,17 +33827,14 @@ async function claimPendingRewards(){
     }
     // Struktur exakt wie im Backend: rohe Reichskraft, Konter als Verhaeltnis der beiden Aufrufe,
     // dann battleWinChance mit den PvP-Phasen.
-    const spyEdge = spyIntelEdge(target.id);
-    const vorrat = gefechtsvorratVorschau('angriff');
     const it = (state.spyIntel||{})[target.id];
     const zielFlotte = {};
     if (it && it.entry) for (const k of Object.keys(SHIP_SCORE_WEIGHTS)) if ((it.entry[k]||0) > 0) zielFlotte[k] = it.entry[k];
-    const roh = pvpReichskraft(null);
-    const konter = roh > 0 && Object.keys(zielFlotte).length ? pvpReichskraft(zielFlotte) / roh : 1;
-    const kraft = Math.round(roh * (1 + spyEdge) * vorrat.mult);
-    const def = ziel && ziel.verteidigung !== null ? ziel.verteidigung : null;
-    if (def !== null && kraft > 0){
-      const pct = Math.round(battleWinChance(kraft, def, konter, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100);
+    const def = ziel && ziel.verteidigung !== null && ziel.verteidigung !== undefined ? ziel.verteidigung : null;
+    const rech = pvpSiegchance(target.id, zielFlotte, def);
+    const kraft = rech.kraft, konter = rech.konter;
+    if (rech.pct !== null){
+      const pct = rech.pct;
       const farbe = pct >= 60 ? '#5dcaa5' : (pct >= 30 ? '#e0a548' : '#e24b4a');
       html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Siegchance gegen <strong>${escapeHtml(fremdStandortName(gewaehlt))}</strong>: `
             + `<strong style="color:${farbe};">~${pct}%</strong> (deine Reichsflotte ${fmt(kraft)} gegen ${fmt(def)} Verteidigung dort).</div>`;
@@ -33883,9 +33909,25 @@ async function claimPendingRewards(){
     /* Der Standort wird als ERSTES festgehalten - vor jeder Sperrpruefung und vor dem `await`
        weiter unten. Er kommt als Argument herein und nicht aus der Modulvariable `pvpZiel`, damit
        ein zwischenzeitlich gewaehltes anderes Ziel diese Mission nicht mehr erreichen kann.
-       'home' und null bedeuten dasselbe wie bisher: der Request laesst das Feld dann weg und der
-       Server laeuft seinen unveraenderten Altpfad (Konto-Kampf gegen die Heimat). */
-    const zielKey = (zielStandort && zielStandort !== 'home') ? String(zielStandort) : null;
+
+       AUCH 'home' REIST MIT (Behebung 02.09.2026). Bis hierher liess der Request das Feld bei
+       'home' weg, und der Server lief dann seinen Altpfad: computeDefensePower, also die SUMME
+       ueber alle Standorte. Die Vorschau daneben zeigte aber die Heimat-Verteidigung aus
+       /api/spieler-standorte, und die kommt aus standortVerteidigung('home') - nur Heimat-Gebaeude
+       und Heimat-Flotte. Fuer jeden Verteidiger MIT Kolonien standen da also zwei verschiedene
+       Zahlen, und die angezeigte Siegchance war zu OPTIMISTISCH. Patchnote und Hilfe versprechen
+       ausdruecklich das Gegenteil ("Ein Angriff ohne Zielwahl trifft die Heimat mit deren eigener
+       Verteidigung"); mit dem Feld rechnet der Server dieselbe Funktion, aus der die Vorschau ihre
+       Zahl bezieht.
+
+       Zweite Wirkung derselben Ursache: Der Server schickt `planetKey` im Flottenverlust NUR im
+       Standort-Fall mit. Ohne ihn verlor der Verteidiger bei einem Heimat-Angriff Schiffe an
+       JEDEM Standort - haerter als der alte Konto-Angriff, obwohl nur ein Ort getroffen wurde.
+
+       Der Altpfad bleibt erreichbar und wird gebraucht: Eine Mission, die beim Update schon flog,
+       traegt kein `targetPlanet` im Missionsobjekt und schickt deshalb weiterhin keines - sie
+       bekommt genau das Ergebnis, mit dem sie losgeschickt wurde. */
+    const zielKey = String(zielStandort || 'home');
     const pactAtk = activePactWith(playerId);
     if (pactAtk){ log('Nichtangriffspakt mit '+name+' aktiv - Angriffe sind blockiert (läuft noch '+fmtDuration(Math.max(0,((pactAtk.cancelEffectiveAt||pactAtk.expiresAt)-Date.now()))/1000)+').', 'ti-shield'); return; }
     const cf = currentFleet();
@@ -34684,7 +34726,17 @@ async function claimPendingRewards(){
     const winRate = totalBattles>0 ? Math.round((entry.battleWins||0)/totalBattles*100) : null;
     // Angriffskraft der eigenen Flotte vorab berechnen - für Bedrohungs-Banner + Angriffs-Vorschau.
     let previewPower = null;
-    const defVal = (entry.defensePower!==undefined ? entry.defensePower : null);
+    /* Seit dem 02.09.2026 zaehlt fuer PvP der STANDORT, nicht das Reich: Ein Angriff ohne eigene
+       Zielwahl trifft die Heimatbasis mit DEREN Verteidigung. `entry.defensePower` aus der
+       Bestenliste ist aber die Konto-Summe - Banner und Vorschau haetten sonst ein Urteil ueber
+       etwas gefaellt, das so gar nicht mehr gekaempft wird (bei einem Ziel mit Kolonien zu
+       pessimistisch). Bevorzugt wird deshalb die Heimat-Zeile der aufgedeckten Standortliste -
+       dieselbe Quelle, aus der Zielwahl und Spionagebericht ihre Zahlen nehmen. Ohne Aufklaerung
+       bleibt der Kontowert als grobe Naeherung stehen; `defAusAufklaerung` sagt den Anzeigestellen,
+       welcher der beiden Faelle vorliegt, damit keine von beiden mehr behauptet als sie weiss. */
+    const defHeimat = entry.id ? pvpStandortVerteidigung(entry.id, 'home') : null;
+    const defAusAufklaerung = defHeimat !== null;
+    const defVal = defAusAufklaerung ? defHeimat : (entry.defensePower!==undefined ? entry.defensePower : null);
     // Aufklärungsvorteil (01.08.2026): frische, unentdeckte Spionage gegen GENAU dieses Ziel. Er
     // steht hier und nicht in attackPower(), weil er zielabhängig ist - attackPower() kennt nur die
     // eigene Flotte. Der Server wendet ihn in resolveAttack an derselben Stelle an (auf die rohe
@@ -34800,10 +34852,13 @@ async function claimPendingRewards(){
         // Schwellen (1,3× / 0,8× Kräfteverhältnis) und konnte der Vorschau direkt widersprechen.
         let cls, mark, verdict, detail;
         const ch = previewChance;
+        // Worueber das Urteil gefaellt wird, steht dabei - ohne Aufklaerung ist es das ganze Reich
+        // und damit nur eine Naeherung fuer den Angriff, der wirklich stattfindet.
+        const wogegen = defAusAufklaerung ? ' gegen die Heimatbasis' : ' (Schätzung übers ganze Reich)';
         if (ch === null){ cls='pt-even'; mark='⚠'; verdict='KEINE EINSCHÄTZUNG'; detail='Angriffskraft oder Verteidigung unbekannt'; }
-        else if (ch >= 65){ cls='pt-weak'; mark='✓'; verdict='LOHNENDES ZIEL'; detail='Siegchance ~'+ch+'%'; }
-        else if (ch >= 35){ cls='pt-even'; mark='⚠'; verdict='KNAPPES DUELL'; detail='Siegchance ~'+ch+'%'; }
-        else { cls='pt-danger'; mark='⚠'; verdict='ÜBERMÄCHTIGES ZIEL'; detail='Siegchance ~'+ch+'%'; }
+        else if (ch >= 65){ cls='pt-weak'; mark='✓'; verdict='LOHNENDES ZIEL'; detail='Siegchance ~'+ch+'%'+wogegen; }
+        else if (ch >= 35){ cls='pt-even'; mark='⚠'; verdict='KNAPPES DUELL'; detail='Siegchance ~'+ch+'%'+wogegen; }
+        else { cls='pt-danger'; mark='⚠'; verdict='ÜBERMÄCHTIGES ZIEL'; detail='Siegchance ~'+ch+'%'+wogegen; }
         threatEl.className = 'profile-threat '+cls;
         threatEl.style.display = 'flex';
         threatEl.innerHTML = `<span style="font-size:15px;">${mark}</span><span class="pt-verdict">${verdict}</span><span class="pt-detail">${detail}</span>`;
@@ -43486,15 +43541,29 @@ async function claimPendingRewards(){
           // ist, gilt der Zuschlag, und er muss hier stehen, weil die Vorschau im Profil ihn auch
           // nennt. Zwei Anzeigestellen derselben Größe, von denen eine ihn vergisst, wären wieder
           // genau der wiederkehrende Fehler dieses Projekts.
+          /* Seit dem 02.09.2026 dieselbe Funktion wie die Angriffs-Vorschau (pvpSiegchance) -
+             vorher stand hier eine zweite Rechnung mit ZWEI alten Annahmen:
+               * `attackPower(currentFleet())` mass nur den AKTIVEN Standort, waehrend der Server
+                 ueber die ganze Reichsflotte rechnet (computeAttackPower ueber allFleetsOf). Wer
+                 Flotten auf Kolonien stehen hatte, las hier eine zu pessimistische Zahl.
+               * `r.defensePower` ist die KONTOWEITE Verteidigung aus dem Bericht - ein Angriff
+                 trifft aber jetzt EINEN Ort. Gegen die Heimatbasis ist die Zahl damit zu hoch.
+             Bevorzugt wird deshalb die Heimat-Verteidigung aus der aufgedeckten Standortliste
+             (dieselbe Quelle, aus der die Zielwahl ihre Zahlen nimmt). Fehlt sie - alter Bericht
+             ohne Standortliste -, bleibt der Kontowert stehen, und der Text sagt das dann auch. */
           const berichtEdge = r.targetId ? spyIntelEdge(r.targetId) : 0;
-          const myFullAttack = Math.round(attackPower(currentFleet()) * (1 + berichtEdge));
-          // Konterwirkung aus der ausgespähten Flottenaufstellung - dieselbe Quelle und dieselbe
-          // Funktion, die auch die Angriffs-Vorschau im Spielerprofil nutzt. Ohne sie nennt der
-          // Bericht eine andere Zahl als die Vorschau für exakt dasselbe Ziel.
-          const spyKonter = (r.ships && Object.keys(r.ships).length)
-            ? counterMultiplier(buildAttackFleet(state.activeBasePlanet, currentFleet()), r.ships) : 1;
-          const winChance = Math.round(battleWinChance(myFullAttack, r.defensePower, spyKonter, PVP_PHASE_MIN, PVP_PHASE_MAX)*100);
-          body += '<br><i class="ti ti-star" aria-hidden="true" style="color:#fac775;"></i> Deine volle Angriffskraft von '+planetDisplayName(state.activeBasePlanet)+': '+fmt(myFullAttack)+' → geschätzte Gewinnchance: <strong>'+winChance+'%</strong>';
+          const heimatDef = r.targetId ? pvpStandortVerteidigung(r.targetId, 'home') : null;
+          const defWert = heimatDef !== null ? heimatDef : r.defensePower;
+          const spyFlotte = (r.ships && Object.keys(r.ships).length) ? r.ships : null;
+          const rechB = pvpSiegchance(r.targetId || null, spyFlotte, defWert);
+          const myFullAttack = rechB.kraft;
+          const winChance = rechB.pct;
+          body += '<br><i class="ti ti-star" aria-hidden="true" style="color:#fac775;"></i> Deine Reichsflotte: '+fmt(myFullAttack)
+                + ' → geschätzte Gewinnchance gegen '+(heimatDef !== null ? 'die <strong>Heimatbasis</strong>' : 'das <em>gesamte Reich</em>')
+                + ': <strong>'+winChance+'%</strong>'
+                + (heimatDef !== null
+                    ? '<br><span style="opacity:.8;">Andere Standorte haben eigene Werte – die Zielwahl im Flottenfeld nennt sie.</span>'
+                    : '<br><span style="color:#e0a548;">Diese Aufklärung ist älter als die Standort-Zielwahl – spähe erneut, um die Werte je Standort zu sehen.</span>');
           if (berichtEdge > 0) body += '<br><span style="color:#5dcaa5;"><i class="ti ti-target" aria-hidden="true"></i> Aufklärungsvorteil aktiv: +'+Math.round(berichtEdge*100)+'% Angriffskraft gegen dieses Ziel, solange die Aufklärung keine 30 Minuten alt ist. Danach fällt der Zuschlag weg.</span>';
         }
         if (r.spyShielded) body += '<br><span style="color:#e0a548;"><i class="ti ti-shield-lock" aria-hidden="true"></i> Ziel betreibt Spionageabwehr – Werte können ungenau sein.</span>';

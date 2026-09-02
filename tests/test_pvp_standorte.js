@@ -357,8 +357,18 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
     await t.page.evaluate(() => { const b = document.querySelector('#fwahlOverlay [data-fwahl-start]'); if (b) b.click(); });
     await t.page.waitForTimeout(900);
     const miss = (t.stand().fleet && t.stand().fleet.missions || []).filter(m => m.type === 'attack-player');
-    check('4d: ohne Zielwahl traegt die Mission KEIN Standortfeld - der Server laeuft seinen Altpfad',
-      miss.length === 1 && miss[0].targetPlanet === undefined, miss.map(m=>m.targetPlanet));
+    /* Bis zum 02.09.2026 stand hier "ohne Zielwahl traegt die Mission KEIN Standortfeld - der
+       Server laeuft seinen Altpfad". Diese Pruefung war GRUEN und hat trotzdem einen Fehler
+       zementiert: Der Altpfad rechnet computeDefensePower, also die SUMME ueber alle Standorte -
+       waehrend die Vorschau daneben die Heimat-Verteidigung aus /api/spieler-standorte zeigte
+       (standortVerteidigung('home'), nur Heimat). Fuer einen Verteidiger MIT Kolonien waren das
+       zwei verschiedene Zahlen, und die angezeigte Siegchance war zu optimistisch.
+       Geprueft wird jetzt die RICHTIGE Eigenschaft: Auch ohne eigene Wahl reist 'home' mit, damit
+       der Server dieselbe Funktion rechnet, aus der die Vorschau ihre Zahl bezieht. Der Altpfad
+       bleibt fuer Altmissionen erreichbar - das misst 4f am Missionsobjekt ohne targetPlanet. */
+    check('4d: ohne eigene Wahl reist der Standort home mit (Vorschau und Kampf rechnen dieselbe Verteidigung)',
+      miss.length === 1 && miss[0].targetPlanet === 'home' && miss[0].standortArt === 'heimat',
+      miss.map(m=>({ standort:m.targetPlanet, art:m.standortArt })));
     await t.ctx.close();
   }
 
@@ -369,21 +379,38 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
      „targetPlanet nicht in den Request" aufgelaufen und hat den blinden Fleck gemeldet.
      Gemessen ohne Klickweg: Eine fertige, FAELLIGE Mission steht im Startstand, der erste Tick
      loest sie auf, und der Mock schreibt den Request-Rumpf mit. */
-  for (const [name, standort, erwartet] of [['mit Zielwahl','moon_vesna','moon_vesna'], ['ohne Zielwahl', null, undefined]]){
+  /* Der dritte Fall ist seit dem 02.09.2026 der wichtigste: 'home'. Bis dahin liess der Request
+     das Feld dort weg und der Server rechnete die Konto-Summe, waehrend die Vorschau die
+     Heimat-Verteidigung zeigte. Der Fall 'Altmission' bleibt daneben stehen und misst etwas
+     anderes: ein Missionsobjekt OHNE targetPlanet - so sehen Missionen aus, die beim Update schon
+     flogen. Sie sollen weiterhin kein Feld schicken und genau das Ergebnis bekommen, mit dem sie
+     losgeschickt wurden. */
+  for (const [id, name, standort, erwartet] of [
+        ['4e', 'Mond gewaehlt', 'moon_vesna', 'moon_vesna'],
+        ['4f', 'Altmission ohne Standortfeld', null, undefined],
+        ['4g', 'Heimat gewaehlt', 'home', 'home']]){
+    /* ZWEI KETTENGLIEDER, ZWEI WAECHTER - gemessen, nicht angenommen: Dieser Block spielt eine
+       FERTIG GEBAUTE Mission ein und misst deshalb nur das zweite Glied (Missionsobjekt ->
+       Request). Bei einer Sabotage von sendPlayerAttackMission (erstes Glied, Klick -> Mission)
+       bleibt 4g gruen - das ist richtig so und kein blinder Fleck: Das erste Glied haelt 4d fest
+       (gemessen am 02.09.2026: unter genau dieser Sabotage fallen 4d und 5a, 4g nicht). Wer eines
+       der beiden Glieder bricht, bekommt also einen roten Test - aber nicht denselben. */
     const st = JSON.parse(fixture({ aufklaerung:true }));
     st.fleet.missions = [{
       id: 999, type:'attack-player', targetId: ZIEL_A, targetName:'Anna',
       startTime: Date.now()-600000, endTime: Date.now()-2000,
       fleetName:'Testverband', composition:{ cruisers: 400 }, cargoCapacity: 6000,
-      ...(standort ? { targetPlanet: standort, standortArt:'mond', standortName:'Mond von Vesna' } : {})
+      ...(standort ? { targetPlanet: standort,
+                       standortArt: standort === 'home' ? 'heimat' : 'mond',
+                       standortName: standort === 'home' ? 'Heimatbasis' : 'Mond von Vesna' } : {})
     }];
     const t = await tab(browser, JSON.stringify(st));
     await t.page.waitForTimeout(2500);
     const a = t.store.__angriffe || [];
-    check('4e-bau ('+name+'): der Angriff wurde beim Server abgesetzt', a.length >= 1, a);
-    check('4'+(standort?'e':'f')+' ('+name+'): der Request traegt '+(standort?'den Standort':'KEIN Standortfeld'),
+    check(id+'-bau ('+name+'): der Angriff wurde beim Server abgesetzt', a.length >= 1, a);
+    check(id+' ('+name+'): der Request traegt '+(standort ? 'den Standort '+standort : 'KEIN Standortfeld'),
       a.length >= 1 && a[0].targetPlanet === erwartet, a[0]);
-    check('4'+(standort?'e':'f')+'2 ('+name+'): die Ziel-ID steht in jedem Fall drin',
+    check(id+'2 ('+name+'): die Ziel-ID steht in jedem Fall drin',
       a.length >= 1 && a[0].targetUserId === ZIEL_A, a[0]);
     await t.ctx.close();
   }
@@ -407,8 +434,13 @@ const zielKnoepfe = page => page.evaluate(() => Array.from(
     await t.page.evaluate(() => { const b = document.querySelector('#fwahlOverlay [data-fwahl-start]'); if (b) b.click(); });
     await t.page.waitForTimeout(900);
     const miss = (t.stand().fleet && t.stand().fleet.missions || []).filter(m => m.type === 'attack-player');
+    /* Die gepruefte Eigenschaft ist unveraendert - Annas Wahl darf Ben nicht erreichen. Gemessen
+       wird sie seit dem 02.09.2026 SCHAERFER: nicht mehr "kein Standort" (das waere jetzt auch bei
+       einem kaputten Rueckfall wahr), sondern GENAU der Vorgabewert 'home'. Annas Wahl war
+       'moon_vesna', und Ben fuehrt denselben Schluessel (5-vorab2) - ein Durchschlagen waere also
+       sichtbar und wird nicht von der Listenpruefung abgefangen. */
     check('5a: die bei Anna getroffene Wahl wirkt bei Ben NICHT weiter',
-      miss.length === 1 && miss[0].targetId === ZIEL_B && miss[0].targetPlanet === undefined,
+      miss.length === 1 && miss[0].targetId === ZIEL_B && miss[0].targetPlanet === 'home',
       miss.map(m=>({ ziel:m.targetId, standort:m.targetPlanet })));
     await t.ctx.close();
   }
