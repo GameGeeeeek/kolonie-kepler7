@@ -85,9 +85,15 @@ const S_LEBEND = (() => {
 // 'const PATCHNOTES = [' - den gibt es in der Datei ein zweites Mal (Zeile ~21530, der Bauer der
 // oeffentlichen Patchnotes-Seite liest ihn als Suchmarke), also Regel 39 im eigenen Test.
 const NUR_HISTORIE = 'Boss-Set-Teile nur bei einer Allianz-Raid-Welle';
+/* Die Historie liegt seit dem 01.09.2026 an ZWEI Stellen (Spiel + patchnotes-archiv.json);
+   tests/lib/patchnotes.js setzt sie zusammen. Dieser Anker fiel am 02.09.2026, als der gesuchte
+   Eintrag beim naechsten Release aus dem Spiel ins Archiv rotierte - der Wortlaut war nicht weg,
+   nur umgezogen. Gesucht wird deshalb in der GANZEN Historie, verneint wird weiter im lebenden
+   Text der Spieldatei (dort ist das Archiv ohnehin unsichtbar, es liegt in einer anderen Datei). */
+const HISTORIE = require('./lib/patchnotes').patchnotesText(S);
 check('0-anker: der PATCHNOTES-Block wurde wirklich herausgeschnitten',
-  S_LEBEND.length > 0 && S.includes(NUR_HISTORIE) && !S_LEBEND.includes(NUR_HISTORIE),
-  { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length });
+  S_LEBEND.length > 0 && HISTORIE.includes(NUR_HISTORIE) && !S_LEBEND.includes(NUR_HISTORIE),
+  { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length, inHistorie: HISTORIE.includes(NUR_HISTORIE) });
 
 function block(t, anfang, endeMarke){
   const von = t.indexOf(anfang);
@@ -280,7 +286,7 @@ check('3d: alle drei Empfangsstellen rufen den EINEN Helfer', rufer.length === 3
 // "droppt nur bei <Boss>" war ab dieser Etappe eine Falschaussage. Geprueft im LEBENDEN Text.
 const droppt = (S_LEBEND.match(/droppt nur be[ie]/g) || []).length;
 check('5a: kein Modultext behauptet mehr "droppt nur bei"', droppt === 0, { treffer: droppt });
-const historie = S.match(/Boss-Set-Teile nur bei einer Allianz-Raid[^']{0,40}/g) || [];
+const historie = HISTORIE.match(/Boss-Set-Teile nur bei einer Allianz-Raid[^']{0,40}/g) || [];
 check('5b: die PATCHNOTES tragen den alten Wortlaut weiter (Historie bleibt unangetastet)',
   historie.length > 0, { gefunden: historie });
 
