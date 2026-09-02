@@ -714,3 +714,28 @@ identische Prüflisten.
 Bounding-Box – die enthält das `<text>` mit dem Namen, und „Sternenfestung" ist länger als
 „Stützpunkt". Sie war deshalb am alten Stand mit festem Radius **grün** und belegte nichts. Jetzt
 liest sie den Radius des pulsenden Hofs, die einzige Größe, die nur am Radius hängt.
+
+## Etappe 3: Stationsmodule im Spiel (02.09.2026)
+
+Die Tabellen liegen im Backend (`docs/vorposten.md` dort) — das Spiel hält **keine eigene
+Moduldefinition**. Katalog, Seltenheiten, Bestand, Ausbaukosten und die Bau-Abklingzeit kommen mit
+`GET /api/vorposten`; gerechnet wird auf dem Server, angezeigt hier.
+
+- Das **Kartenmenü** des eigenen Vorpostens nennt die Belegung („Steckplätze: 1 von 2 – Selten
+  Geschützbank") und öffnet mit einem Eintrag das Steckplatz-Fenster. Vor der Wahlstufe steht dort
+  der Grund, statt nur ausgegraut zu sein (Lehre vom Bau-Knopf).
+- Das **Fenster** (dasselbe Overlay-Muster wie die Flottenwahl, kein zweites Gerüst) zeigt belegte
+  und freie Plätze, den Bestand mit Anzahl und Wirkung in Worten, und die Schmiede.
+- **Wirkung in Worten**: `vpModulWirkungText()` rechnet `basis × mult` nur zur **Anzeige** nach. Der
+  Horchposten ist eine **Stufe**, kein Anteil — „+1 Aufklärungsstufe", nicht „+100 %".
+- Der **Ausbau** gleicht Kredite und Spielstand-Version an, die der Server zurückmeldet (wie
+  `/api/worldboss/resolve`) — ohne das liefe der nächste Speicherversuch in einen Versionskonflikt.
+
+Wächter: `tests/test_vorposten_module_ui.js` (17). Gegenprobe gegen v8.642.0: 15 rot, 2 grün,
+identische Prüflisten.
+
+**Eine Lehre daraus:** Der erste Entwurf des Tests **brach** am alten Stand nach der sechsten
+Prüfung ab (`fenster.raus[0].label` auf einem leeren Array). Die Prüflisten waren dadurch
+verschieden, und für die zehn Prüfungen dahinter belegte die Gegenprobe nichts. Ein Test, der am
+kaputten Stand abstürzt statt zu fallen, misst dort gar nichts — jede Auswertung eines erwarteten
+Elements gehört null-sicher geschrieben.
