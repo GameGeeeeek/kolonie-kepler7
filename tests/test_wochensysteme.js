@@ -55,12 +55,21 @@ function neueGalaxie(){
     starSrc + '\n' + planetSrc + '\n' + typeSrc + '\n' + genSrc + '\n' +
     'return { STAR_SYSTEMS, PLANETS, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_COUNT, WEEKLY_SYSTEMS_PER_WEEK,' +
     ' WEEKLY_SYSTEM_EPOCH, WEEKLY_SYSTEM_MAX, WEEKLY_ORBIT_POS, WEEKLY_PLANET_TYPES, WEEK_MS,' +
-    ' weeklySystemCount, nextWeeklySystemTs, extendWeeklySystems, buildWeeklySystem, baseStarSystems };'
+    ' weeklySystemCount, nextWeeklySystemTs, extendWeeklySystems, buildWeeklySystem, baseStarSystems,' +
+    ' SCHUB_SYSTEMS, SCHUB_SYSTEM_COUNT, extendSchubSystems, generierePlaneten };'
   )();
 }
 
 const g = neueGalaxie();
 const EPOCH = g.WEEKLY_SYSTEM_EPOCH, WOCHE = g.WEEK_MS;
+// Seit dem Startschub (02.09.2026) stehen im Array hinter den 69 Basissystemen erst die 30 fest
+// verorteten Schub-Systeme (beim Auswerten des Blocks schon angehängt), dann die Wochensysteme.
+// "Neu" im Sinne dieses Tests sind die WOCHENsysteme - deshalb ab BASIS + SCHUB geschnitten und
+// die Planeten an ihrer Marke (weekly) erkannt. Den Schub selbst prüft test_startschub.js.
+const SCHUB = g.SCHUB_SYSTEM_COUNT;
+check('0: der Startschub ist beim Auswerten des Blocks angehängt (30 Systeme)', SCHUB === 30 && g.STAR_SYSTEMS.length === g.BASE_STAR_SYSTEM_COUNT + 30, { SCHUB, laenge: g.STAR_SYSTEMS.length });
+const wochenSysteme = (x) => x.STAR_SYSTEMS.slice(x.BASE_STAR_SYSTEM_COUNT + x.SCHUB_SYSTEM_COUNT);
+const wochenPlaneten = (x) => x.PLANETS.filter(p => p.weekly);
 check('die Epoche ist ein Montag 00:00 UTC', new Date(EPOCH).getUTCDay() === 1 && new Date(EPOCH).getUTCHours() === 0,
   new Date(EPOCH).toISOString());
 
@@ -81,7 +90,8 @@ for (let w = 0; w <= 12; w++){
 // Systeme mit ~7.800 Planeten, die an knapp 50 Stellen linear durchsucht werden.
 check('1: der Deckel greift', g.weeklySystemCount(EPOCH + 5000*WOCHE) === g.WEEKLY_SYSTEM_MAX, g.WEEKLY_SYSTEM_MAX);
 check('1: der Deckel ist eine gerade Zahl (volle Wochen)', g.WEEKLY_SYSTEM_MAX % 2 === 0);
-check('1: der Deckel liegt bei 208 (104 Wochen)', g.WEEKLY_SYSTEM_MAX === 208, g.WEEKLY_SYSTEM_MAX);
+// 178 statt 208 seit dem Startschub: 69 Basis + 30 Schub + 178 Wochen = 277 Plätze des Spiralfelds.
+check('1: der Deckel liegt bei 178 (89 Wochen)', g.WEEKLY_SYSTEM_MAX === 178, g.WEEKLY_SYSTEM_MAX);
 // Countdown-Anzeige
 check('1: der nächste Termin ist der kommende Montag',
   g.nextWeeklySystemTs(EPOCH + 3*WOCHE + 5000) === EPOCH + 4*WOCHE);
@@ -92,14 +102,14 @@ check('1: am Deckel gibt es keinen nächsten Termin mehr', g.nextWeeklySystemTs(
 {
   const a = neueGalaxie(); a.extendWeeklySystems(EPOCH + 20*WOCHE); // 42 Systeme
   const b = neueGalaxie(); b.extendWeeklySystems(EPOCH + 3*WOCHE);  // 8 Systeme
-  const aNeu = a.STAR_SYSTEMS.slice(a.BASE_STAR_SYSTEM_COUNT);
-  const bNeu = b.STAR_SYSTEMS.slice(b.BASE_STAR_SYSTEM_COUNT);
+  const aNeu = wochenSysteme(a);
+  const bNeu = wochenSysteme(b);
   check('2: Lauf A hat 42 neue Systeme', aNeu.length === 42, aNeu.length);
   check('2: Lauf B hat 8 neue Systeme', bNeu.length === 8, bNeu.length);
   check('2: die ersten 8 Systeme sind in beiden Läufen identisch',
     JSON.stringify(aNeu.slice(0,8)) === JSON.stringify(bNeu), { a: aNeu[0], b: bNeu[0] });
-  const aP = a.PLANETS.slice(a.BASE_PLANET_COUNT).filter(p => bNeu.some(s => s.id === p.system));
-  const bP = b.PLANETS.slice(b.BASE_PLANET_COUNT);
+  const aP = wochenPlaneten(a).filter(p => bNeu.some(s => s.id === p.system));
+  const bP = wochenPlaneten(b);
   check('2: auch alle Planeten dieser 8 Systeme sind identisch',
     JSON.stringify(aP) === JSON.stringify(bP), { anzahl: [aP.length, bP.length] });
 }
@@ -107,31 +117,36 @@ check('1: am Deckel gibt es keinen nächsten Termin mehr', g.nextWeeklySystemTs(
 // ---------------------------------------------------------------- 3: nur anhängen (B)
 {
   const c = neueGalaxie();
+  // "Fest eingetragen" heisst hier: Basis UND Schub - beide stehen vor dem ersten Wochen-Aufruf da.
+  const festSysteme = c.BASE_STAR_SYSTEM_COUNT + c.SCHUB_SYSTEM_COUNT;
+  const festPlaneten = c.PLANETS.length;
   const sysVorher = JSON.stringify(c.STAR_SYSTEMS);
   const plVorher = JSON.stringify(c.PLANETS);
-  check('3: vor dem ersten Aufruf ist nichts angehängt',
-    c.STAR_SYSTEMS.length === c.BASE_STAR_SYSTEM_COUNT && c.PLANETS.length === c.BASE_PLANET_COUNT);
+  const schubPlaneten = c.PLANETS.filter(p => p.schub).length;
+  check('3: vor dem ersten Aufruf ist kein Wochensystem angehängt (nur Basis und Schub)',
+    c.STAR_SYSTEMS.length === c.BASE_STAR_SYSTEM_COUNT + c.SCHUB_SYSTEM_COUNT && c.PLANETS.length === c.BASE_PLANET_COUNT + schubPlaneten
+    && wochenSysteme(c).length === 0, { systeme: c.STAR_SYSTEMS.length, planeten: c.PLANETS.length, schubPlaneten });
   c.extendWeeklySystems(EPOCH);
-  const nach2 = JSON.stringify(c.STAR_SYSTEMS.slice(0, c.BASE_STAR_SYSTEM_COUNT + 2));
-  check('3: die fest eingetragene Galaxie bleibt unangetastet',
-    JSON.stringify(c.STAR_SYSTEMS.slice(0, c.BASE_STAR_SYSTEM_COUNT)) === sysVorher);
+  const nach2 = JSON.stringify(wochenSysteme(c).slice(0, 2));
+  check('3: die fest eingetragene Galaxie (Basis und Schub) bleibt unangetastet',
+    JSON.stringify(c.STAR_SYSTEMS.slice(0, festSysteme)) === sysVorher);
   check('3: auch die fest eingetragenen Planeten bleiben unangetastet',
-    JSON.stringify(c.PLANETS.slice(0, c.BASE_PLANET_COUNT)) === plVorher);
+    JSON.stringify(c.PLANETS.slice(0, festPlaneten)) === plVorher);
   const zuwachs1 = c.extendWeeklySystems(EPOCH + 4*WOCHE);
   check('3: ein späterer Aufruf hängt genau die fehlenden an', zuwachs1 === 8, zuwachs1);
   check('3: und lässt die zuvor erzeugten unverändert',
-    JSON.stringify(c.STAR_SYSTEMS.slice(0, c.BASE_STAR_SYSTEM_COUNT + 2)) === nach2);
+    JSON.stringify(wochenSysteme(c).slice(0, 2)) === nach2);
   check('3: ein Aufruf ohne Zuwachs ändert nichts', c.extendWeeklySystems(EPOCH + 4*WOCHE) === 0);
   check('3: ein Aufruf mit ÄLTEREM Zeitpunkt entfernt nichts',
-    c.extendWeeklySystems(EPOCH) === 0 && c.STAR_SYSTEMS.length === c.BASE_STAR_SYSTEM_COUNT + 10,
-    c.STAR_SYSTEMS.length - c.BASE_STAR_SYSTEM_COUNT);
+    c.extendWeeklySystems(EPOCH) === 0 && wochenSysteme(c).length === 10,
+    wochenSysteme(c).length);
 }
 
 // ---------------------------------------------------------------- 4: Planetenrotation (C)
 const voll = neueGalaxie();
 voll.extendWeeklySystems(EPOCH + 5000*WOCHE); // alles bis zum Deckel, damit auch Randfälle drankommen
-const neueSysteme = voll.STAR_SYSTEMS.slice(voll.BASE_STAR_SYSTEM_COUNT);
-const neuePlaneten = voll.PLANETS.slice(voll.BASE_PLANET_COUNT);
+const neueSysteme = wochenSysteme(voll);
+const neuePlaneten = wochenPlaneten(voll);
 check('4: der Deckel erzeugt genau '+voll.WEEKLY_SYSTEM_MAX+' Systeme', neueSysteme.length === voll.WEEKLY_SYSTEM_MAX, neueSysteme.length);
 
 {

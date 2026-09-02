@@ -18,6 +18,8 @@
 //   4. Die drei Nachhol-/Rueckkehr-Meldungen tragen die Markierung wirklich (sonst schuetzt der
 //      Mechanismus niemanden).
 //
+// Nachtrag 02.09.2026 (wartender Toast): Pruefung 5a faellt am Stand v8.629.0 (kein Warteblock), 5b/5c bleiben
+// dort gruen - gemessen mit KEPLER_SPIELDATEI, Prueflisten identisch.
 // GEGENPROBE (Arbeitsregel 1, beide Richtungen): Am alten Stand fliegt die wichtige Meldung raus
 // (Pruefung 1 faellt) und keine der drei Zeilen traegt 'wichtig' (Pruefung 4 faellt).
 const fs = require('fs');
@@ -35,6 +37,16 @@ function schneideFunktion(name){
 }
 const pushToastCode = schneideFunktion('pushToast');
 const escapeHtmlCode = schneideFunktion('escapeHtml');
+// Seit dem 02.09.2026 wartet pushToast auf freie Sicht (TOAST_OVERLAYS, toastOverlayOffen,
+// toastWarteschlange, toastWarteschlangeStarten - der Block direkt VOR pushToast). Er wird mit
+// ausgeschnitten und mit ausgefuehrt, kein Platzhalter (Arbeitsregel 36). Am alten Stand fehlt er;
+// dann bleibt der Ausschnitt leer und nur Pruefung 5 faellt.
+function schneideToastWarteBlock(){
+  const von = JS.indexOf('  const TOAST_OVERLAYS = [');
+  const bis = von < 0 ? -1 : JS.indexOf('  function pushToast(', von);
+  return (von >= 0 && bis > von) ? JS.slice(von, bis) : '';
+}
+const warteBlockCode = schneideToastWarteBlock();
 check('0a: pushToast steht in der Spieldatei', !!pushToastCode, pushToastCode ? pushToastCode.length : -1);
 check('0b: escapeHtml steht in der Spieldatei (die echte Abhaengigkeit, kein Platzhalter)',
   !!escapeHtmlCode, escapeHtmlCode ? escapeHtmlCode.length : -1);
@@ -49,7 +61,7 @@ function fakeElement(){
   };
   return el;
 }
-function macheUmgebung(){
+function macheUmgebung(overlayOffen){
   const kinder = [];
   const container = {
     children: kinder,
@@ -57,25 +69,31 @@ function macheUmgebung(){
     appendChild(el){ kinder.push(el); el.parentNode = container; },
     removeChild(el){ const i = kinder.indexOf(el); if (i >= 0) kinder.splice(i, 1); el.parentNode = null; return el; }
   };
+  // Ein "offenes" Overlay ist ein Element, dessen getComputedStyle nicht display:none meldet -
+  // genau das fragt toastOverlayOffen. Ohne offenes Overlay gibt es zu den Overlay-IDs kein Element.
   const dokument = {
     hidden: false,
-    getElementById: id => id === 'toastContainer' ? container : { innerHTML:'' },
+    getElementById: id => id === 'toastContainer' ? container : (overlayOffen && id === 'welcomeBackOverlay' ? { innerHTML:'', overlay:true } : null),
     createElement: () => fakeElement()
   };
-  return { container, dokument };
+  const getComputedStyle = el => ({ display: el && el.overlay ? 'flex' : 'none' });
+  return { container, dokument, getComputedStyle };
 }
 let bau = null, bauFehler = null;
 try {
   // setTimeout wird geschluckt (kein Auto-Entfernen im Test), requestAnimationFrame ebenso.
-  bau = new Function('document', 'state', 'requestAnimationFrame', 'setTimeout',
-    escapeHtmlCode + '\n' + pushToastCode + '\nreturn pushToast;');
+  // setInterval wird ebenso geschluckt (die Warteschlange wird hier nur synchron gemessen);
+  // die Warteschlange selbst kommt als `toastWarteschlange` mit heraus.
+  bau = new Function('document', 'state', 'requestAnimationFrame', 'setTimeout', 'setInterval', 'clearInterval', 'getComputedStyle',
+    escapeHtmlCode + '\n' + warteBlockCode + '\n' + pushToastCode
+    + '\nreturn { pushToast, warteschlange: (typeof toastWarteschlange !== "undefined") ? toastWarteschlange : null };');
 } catch (e){ bauFehler = e.message; }
 check('0c: der Block laesst sich ausfuehren (Arbeitsregel 34)', !!bau, bauFehler);
 if (!bau) return ende();
-function frisch(){
-  const u = macheUmgebung();
-  const pushToast = bau(u.dokument, { notifOn:false }, ()=>{}, ()=>0);
-  return { pushToast, kinder: u.container.children };
+function frisch(overlayOffen){
+  const u = macheUmgebung(!!overlayOffen);
+  const b = bau(u.dokument, { notifOn:false }, ()=>{}, ()=>0, ()=>0, ()=>{}, u.getComputedStyle);
+  return { pushToast: b.pushToast, warteschlange: b.warteschlange, kinder: u.container.children };
 }
 const texte = kinder => kinder.map(k => (k.innerHTML.match(/<span>(.*)<\/span>/)||[])[1] || '');
 
@@ -105,6 +123,23 @@ const texte = kinder => kinder.map(k => (k.innerHTML.match(/<span>(.*)<\/span>/)
   check('3: auch ein Stapel aus lauter wichtigen bleibt bei drei (Rueckfall auf die aelteste)',
     kinder.length === 3 && JSON.stringify(texte(kinder)) === JSON.stringify(['Wichtig 3','Wichtig 4','Wichtig 5']),
     { anzahl: kinder.length, texte: texte(kinder) });
+}
+
+// ---- 5) Verdeckte Sicht (02.09.2026): eine wichtige Meldung wartet, statt hinter dem Overlay
+//         abzulaufen; eine banale laeuft weiter sofort (sie hat keinen Anspruch auf Aufmerksamkeit).
+//         Spieler-Report Sascha: Der Festungs-Treffer erschien hinter dem Willkommen-Overlay.
+{
+  const { pushToast, warteschlange, kinder } = frisch(true);
+  pushToast('Festung beschossen: 7.400 Schaden', 'ti-sword', 'wichtig');
+  pushToast('Banal', 'ti-info');
+  check('5a: bei offenem Overlay landet die wichtige Meldung in der Warteschlange, nicht im Stapel',
+    !!warteschlange && warteschlange.length === 1 && /7\.400/.test(warteschlange[0][0]) && !texte(kinder).some(t => /7\.400/.test(t)),
+    { warteschlange: warteschlange && warteschlange.map(w => w[0]), stapel: texte(kinder) });
+  check('5b: die banale Meldung erscheint weiterhin sofort', texte(kinder).includes('Banal'), texte(kinder));
+  const zu = frisch(false);
+  zu.pushToast('Festung beschossen: 7.400 Schaden', 'ti-sword', 'wichtig');
+  check('5c: ohne Overlay erscheint die wichtige Meldung sofort (Gegenrichtung)',
+    texte(zu.kinder).some(t => /7\.400/.test(t)) && (zu.warteschlange || []).length === 0, { stapel: texte(zu.kinder), warteschlange: (zu.warteschlange || []).length });
 }
 
 // ---- 4) Die Nachhol-/Rueckkehr-Meldungen tragen die Markierung wirklich -------------------

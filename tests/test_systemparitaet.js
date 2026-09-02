@@ -190,5 +190,66 @@ if (beKoord && beRing) {
 check('Backend-Kommentar verweist auf diesen Test',
   beSrc.includes('test_systemparitaet.js'));
 
+// ---- Startschub-Tabelle beidseitig (02.09.2026) --------------------------------------------------
+// Die 30 fest verorteten Systeme stehen als SCHUB_SYSTEMS (Frontend, mit Namen) und SCHUB_COORDS
+// (Backend, nur Koordinaten). Der Server kennt sie für Angriffe, Spawns und Fraktionen - eine
+// Abweichung hiesse: ein System, das der Client zeigt, lehnt der Server als unbekannt ab.
+const feSchub = [];
+{
+  const von = feSrc.indexOf('  const SCHUB_SYSTEMS = ['), bis = feSrc.indexOf('\n  ];', von);
+  if (von >= 0 && bis > von)
+    for (const m of feSrc.slice(von, bis).matchAll(/id:'(syss_\d+)',\s*name:'[^']*',\s*gx:([-\d.]+),\s*gy:([-\d.]+)/g)) feSchub.push({ id: m[1], gx: +m[2], gy: +m[3] });
+}
+const beSchub = [];
+{
+  const von = beSrc.indexOf('const SCHUB_COORDS = ['), bis = beSrc.indexOf('\n];', von);
+  if (von >= 0 && bis > von)
+    for (const m of beSrc.slice(von, bis).matchAll(/id: '(syss_\d+)', gx: ([-\d.]+), gy: ([-\d.]+)/g)) beSchub.push({ id: m[1], gx: +m[2], gy: +m[3] });
+}
+check('Startschub: 30 Einträge beidseitig', feSchub.length === 30 && beSchub.length === 30, { frontend: feSchub.length, backend: beSchub.length });
+check('Startschub: gleiche IDs in gleicher Reihenfolge', feSchub.length === beSchub.length && feSchub.every((s, i) => beSchub[i].id === s.id),
+  feSchub.map((s, i) => beSchub[i] && beSchub[i].id === s.id ? null : `${i}: FE ${s.id} vs BE ${beSchub[i] ? beSchub[i].id : '(fehlt)'}`).filter(Boolean).slice(0, 4));
+check('Startschub: alle gx/gy zahlengleich', feSchub.length === beSchub.length && feSchub.every((s, i) => beSchub[i].gx === s.gx && beSchub[i].gy === s.gy),
+  feSchub.filter((s, i) => beSchub[i] && (beSchub[i].gx !== s.gx || beSchub[i].gy !== s.gy)).map(s => s.id).slice(0, 4));
+
+// ---- Gürtelauswahl: beide Fassungen rechnen denselben Satz ---------------------------------------
+// Bis zum 02.09.2026 rechneten Frontend (hashStringToFloat, 'kepler7-guertel-v1') und Backend
+// (astHash, 'kepler7-asteroiden-v1') verschiedene Sätze - gemessen stimmten 10 von 20 überein, und
+// asteroidenImSystem verlangt beides, also waren zehn Gürtel im Spiel unsichtbar. Seitdem ist die
+// Frontend-Formel eine Kopie der Backend-Formel; hier laufen beide über dieselbe Systemliste
+// (69 Basis + 30 Schub + 20 Wochensysteme) und müssen dieselben 20 nennen.
+{
+  const holFe = (name) => { const m = feSrc.match(new RegExp('  function ' + name + '\\([\\s\\S]*?\\n  \\}\\n')); return m ? m[0] : ''; };
+  const holBe = (name) => { const m = beSrc.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n\\}\\n')); return m ? m[0] : ''; };
+  const feTeile = [holFe('guertelHash'), holFe('guertelKandidat'), holFe('guertelSysteme')];
+  const beTeile = [holBe('astHash'), holBe('astGuertelKandidat'), holBe('astGuertelSysteme')];
+  check('Gürtel: alle drei Frontend-Funktionen gefunden', feTeile.every(Boolean), feTeile.map(x => x.length));
+  check('Gürtel: alle drei Backend-Funktionen gefunden', beTeile.every(Boolean), beTeile.map(x => x.length));
+  const feK = { seed: konstante(feSrc, 'GUERTEL_AUSWAHL_SEED'), stand: konstante(feSrc, 'GUERTEL_WOCHEN_STAND'), zahl: konstante(feSrc, 'GUERTEL_SYSTEM_ZAHL') };
+  const beK = { seed: konstante(beSrc, 'AST_SEED'), stand: konstante(beSrc, 'AST_GUERTEL_WOCHEN_STAND'), zahl: konstante(beSrc, 'AST_GUERTEL_ZAHL') };
+  check('Gürtel: Seed, Wochenstand und Zahl beidseitig gleich',
+    !!feK.seed && feK.seed === beK.seed && !!feK.stand && feK.stand === beK.stand && !!feK.zahl && feK.zahl === beK.zahl, { frontend: feK, backend: beK });
+  const GUERTEL_ABHAENGIG = ['Gürtel: beide Fassungen laufen über dieselbe Liste', 'Gürtel: beide nennen dieselben 20 Systeme',
+    'Gürtel: kein Schub-System und kein Wochensystem ab sysw_14 darunter'];
+  if (!(feTeile.every(Boolean) && beTeile.every(Boolean) && feK.seed && beK.seed)) {
+    // Rot mit Grund statt stiller Auslassung: Die Prueflisten beider Laeufe muessen per diff vergleichbar bleiben.
+    for (const n of GUERTEL_ABHAENGIG) check(n, false, { nichtGeprueft: 'Funktionen oder Konstanten fehlen auf einer Seite' });
+  } else {
+    const liste = feSys.map(s => ({ id: s.id, gx: s.gx, gy: s.gy }))
+      .concat(feSchub.map(s => ({ id: s.id, gx: s.gx, gy: s.gy, schub: true })))
+      .concat(Array.from({ length: 20 }, (_, i) => Object.assign(feKoord(i, feRing), { weekly: true })));
+    let feSatz = null, beSatz = null, fehler = null;
+    try {
+      feSatz = new Function('STAR_SYSTEMS', `const GUERTEL_AUSWAHL_SEED = ${feK.seed}; const GUERTEL_WOCHEN_STAND = ${feK.stand}; const GUERTEL_SYSTEM_ZAHL = ${feK.zahl}; let _guertelCache = null;\n` + feTeile.join('\n') + '\nreturn guertelSysteme();')(liste);
+      beSatz = new Function('SYSTEM_COORDS', 'SCHUB_COORDS', `const AST_SEED = ${beK.seed}; const AST_GUERTEL_WOCHEN_STAND = ${beK.stand}; const AST_GUERTEL_ZAHL = ${beK.zahl}; const SCHUB_IDS = new Set(SCHUB_COORDS.map(s => s.id)); let _astGuertelCache = null;\n` + beTeile.join('\n') + '\nreturn astGuertelSysteme();')(liste, beSchub);
+    } catch (e) { fehler = String(e); }
+    check('Gürtel: beide Fassungen laufen über dieselbe Liste', !fehler && Array.isArray(feSatz) && Array.isArray(beSatz), fehler);
+    check('Gürtel: beide nennen dieselben 20 Systeme', !!feSatz && !!beSatz && feSatz.length === 20 && JSON.stringify(feSatz) === JSON.stringify(beSatz),
+      feSatz && beSatz ? { nurFE: feSatz.filter(x => !beSatz.includes(x)), nurBE: beSatz.filter(x => !feSatz.includes(x)) } : undefined);
+    check('Gürtel: kein Schub-System und kein Wochensystem ab sysw_14 darunter',
+      !!beSatz && !beSatz.some(x => /^syss_/.test(x) || (/^sysw_/.test(x) && Number(x.slice(5)) >= 14)), beSatz && beSatz.filter(x => /^syss_/.test(x)));
+  }
+}
+
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles in Ordnung');
 process.exit(fail ? 1 : 0);
