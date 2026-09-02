@@ -108,3 +108,53 @@ weg, Bestätigen sperrt UND Abbrechen nicht, Kachel mit Route UND ohne sie weg, 
 Bestätigung UND nicht nach Abbruch, Stummgeschalteter liest den Grund UND ein freier Spieler
 sieht nichts. Der erste Entwurf von 7c ließ `/api/me` auch ohne Token angemeldet antworten – die
 Landeseite mit dem Anmeldeformular erschien nie, und die Prüfung maß über leerem Text.
+
+## Feedback beantworten, Wartungsbanner, Support-Werkzeuge, Lage (02.09.2026)
+
+Vierte Runde (Auftrag „Weitere Ideen für Admin Funktionen vorschlagen", alle vier gewählt). Backend
+#201 zuerst live (`/api/health` blob geprüft), dann dieser Stand.
+
+**Feedback beantworten.** Jeder Eintrag im Feedback-Reiter hat ein Antwortfeld (500 Zeichen) und
+„Antworten" (`[data-fb-antwort-text]`/`[data-fb-antwort]`); eine vorhandene Antwort steht mit Zeit
+am Eintrag („Deine Antwort (…)"). Ein leeres Feld schickt nichts und sagt es. Der Einsender findet
+die Antwort in seinem Postfach als Meldung `feedback-antwort` (`NOTIF_EVENT_INFO`) mit dem Auszug
+seines eigenen Textes – die Push dazu bekommt nur, wer Nachrichten-Push erlaubt hat. Diesen
+Postfach-Eintrag hat eine parallele Sitzung mit v8.634.0 selbst gebaut; beim Merge blieb ihre
+Fassung stehen (sie deckelt Auszug und Text), meine wurde verworfen.
+
+**Wartungsbanner.** `#wartungBanner` liegt direkt hinter `<body>`, für alle Spieler. Beim Start
+(2,5 s) und jede Minute holt `ladeAnkuendigung()` `GET /api/ankuendigung`; die Serverzeit `jetzt`
+aus der Antwort wird als `wartungZeitversatz` gemerkt, damit der Countdown nicht an der Uhr des
+Geräts hängt. `zeichneWartungBanner()` (alle 30 s) schreibt „Wartung in N Min. (ca. D Min.): Text"
+bzw. „Wartung läuft (noch ca. N Min.): Text" und blendet nach `ab + dauer` von selbst aus. Die
+Ankündigungs-Karte im Schalter-Reiter (`adminAnkuendigungText/Ab/Dauer`) setzt und hebt auf; beides
+ruft danach sofort `ladeAnkuendigung()`, der Admin sieht also das Banner, ohne die Minute abzuwarten.
+Der neue Notaus „angriffe" erscheint in der Schalterliste wie die anderen (nur AB-schaltbar); das
+Backend antwortet mit 503 und Grund. Der PvP-Pfad zeigt `data.error` des Servers ohnehin; Festung,
+Nest und Konvoi (#530) sowie der Vorposten (#533) lesen ihn als `serverFehler` und nennen ihn in
+Bericht und Meldung. Der Wortlaut der Pause kommt damit überall vom Server, nicht aus dem
+Statuscode – Wächter 0d misst genau das (vier Pfade, acht Anzeigestellen). Der eigene 503-Zweig aus
+dem ersten Entwurf ist damit entfallen; er wäre eine zweite Fassung derselben Aussage gewesen. 0d ist
+deshalb die einzige Prüfung dieses Wächters, die am alten Stand grün bleibt: Sie misst eine fremde
+Anzeigestelle, an der der Notaus hängt, und hat als Gegenprobe eine Sabotage statt des alten Standes.
+
+**Support-Werkzeuge im Konto-Blatt.** Drei Zeilen unter der Sperre: E-Mail setzen
+(`[data-konto-email]`, gilt als bestätigt, die Meldung nennt die verkürzte Form), Umbenennen
+(`[data-konto-neuername]`, Rückfrage nennt Abmeldung und alle Namensstellen; danach springt die
+Suche auf den neuen Namen) und „Passwort-Reset-Link erzeugen" (`[data-konto-resetlink]`, Rückfrage;
+der Link landet NUR im schreibgeschützten Feld daneben, vorselektiert – die Meldung nennt die Frist,
+nie den Link, damit der Token nicht im Protokoll steht).
+
+**Lage (dreizehnter Reiter).** Vier Karten aus `GET /api/admin/lage`: Wirtschaft (Konten mit
+Spielstand und Aktive in 7 Tagen, Kredite gesamt mit Median und Top-Liste, Kampfpunkte, Ressourcen
+in Umlauf), Markt (Preis je Rohstoff mit Basis und Abweichung in Prozent; über 40 % orange;
+Ereignis), PvE-Ziele (Weltboss, Nester, Festungen, Wrackkonvois, Vorposten mit Besitzer) und
+Betrieb (gesetzte Notaus-Schalter, Ankündigung). Ohne die Route steht die 404-Meldung
+(`adminListenFehler`), keine Karte. Icon der Wirtschafts-Karte ist `ti-award`: `ti-coin` liegt
+nicht im 69er-Whitelist-Font, `check-icons.js` fiel an dieser einen Stelle.
+
+**Wächter** `tests/test_admin_support_ui.js` (42 Prüfungen) mit Paaren: Antwort da UND ersatzlos
+weg, Antworten schickt UND leer schickt nichts, Banner zählt herunter UND ist ohne Ankündigung
+unsichtbar und leer, Setzen zeigt das Banner sofort UND Aufheben nimmt es sofort weg, Umbenennen
+und Reset-Link nach Bestätigung UND nicht nach Abbruch, vier Lage-Karten UND ohne Route nur die
+404-Meldung. Gegenprobe gegen origin/main (v8.629.0): 36 von 42 fallen, Prüflisten identisch.
