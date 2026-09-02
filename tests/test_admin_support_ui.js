@@ -22,6 +22,10 @@
 // Gegenprobe, siehe die Begruendung an der Pruefung selbst. Auch die Nicht-Wirkungen 1b/1d/4d/5c/5e/5g
 // fallen dort, weil jede von ihnen zusaetzlich die Meldung bzw. die Rueckfrage misst, die es ohne die
 // Flaeche nicht gibt.
+// NACHTRAG zum Merge von v8.634.0: Dort ist der Postfach-Eintrag 'feedback-antwort' aus einer
+// PARALLELEN Sitzung schon enthalten - 0b und 2a messen seither ebenfalls fremden Code und faerben
+// sich am alten Stand gruen bzw. bleiben es. Die Zahlen oben sind gegen v8.633.0 gemessen und werden
+// hier NICHT nachgerechnet: Sie sind der Beleg, den dieser Aenderungssatz gefuehrt hat.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, ruhigeUhren, logMitschnitt, logZeilen } = require('./lib/umgebung');
 
@@ -42,6 +46,10 @@ const LINK = 'https://gamegeeeeek.de/?reset=0123456789abcdef0123456789abcdef0123
   check('0a: der Reiter Lage steht in ADMIN_REITER mit Ladefunktion, und es sind dreizehn Reiter',
     /tab:'lage'[^\n]*laden:\(\) => loadAdminLage\(\)/.test(literal) && (literal.match(/tab:'/g) || []).length === 13,
     { reiter: (literal.match(/tab:'/g) || []).length });
+  // 0b ist seit dem Merge von v8.634.0 eine FREMDE Anzeigestelle: Eine parallele Sitzung hat den
+  // Postfach-Eintrag zur Backend-Meldung schon gebaut (mit Deckeln auf Auszug und Text). Die Pruefung
+  // bleibt, weil die Meldung dieses Auftrags ohne sie als blankes "Ereignis" ankaeme - dass sie am
+  // alten Stand gruen ist, steht im Kopf dieser Datei.
   check('0b: das Postfach kennt die Meldungsart feedback-antwort', /'feedback-antwort': \{ icon:'ti-message'/.test(JS));
   check('0c: das Banner steht im DOM, und die Ankuendigung wird beim Start und jede Minute geholt',
     /id="wartungBanner" role="status"/.test(HTML) && /setInterval\(\(\) => \{ try \{ ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 60000\)/.test(JS)

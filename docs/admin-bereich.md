@@ -118,7 +118,9 @@ Vierte Runde (Auftrag „Weitere Ideen für Admin Funktionen vorschlagen", alle 
 „Antworten" (`[data-fb-antwort-text]`/`[data-fb-antwort]`); eine vorhandene Antwort steht mit Zeit
 am Eintrag („Deine Antwort (…)"). Ein leeres Feld schickt nichts und sagt es. Der Einsender findet
 die Antwort in seinem Postfach als Meldung `feedback-antwort` (`NOTIF_EVENT_INFO`) mit dem Auszug
-seines eigenen Textes – die Push dazu bekommt nur, wer Nachrichten-Push erlaubt hat.
+seines eigenen Textes – die Push dazu bekommt nur, wer Nachrichten-Push erlaubt hat. Diesen
+Postfach-Eintrag hat eine parallele Sitzung mit v8.634.0 selbst gebaut; beim Merge blieb ihre
+Fassung stehen (sie deckelt Auszug und Text), meine wurde verworfen.
 
 **Wartungsbanner.** `#wartungBanner` liegt direkt hinter `<body>`, für alle Spieler. Beim Start
 (2,5 s) und jede Minute holt `ladeAnkuendigung()` `GET /api/ankuendigung`; die Serverzeit `jetzt`
