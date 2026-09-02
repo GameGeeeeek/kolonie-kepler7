@@ -7347,8 +7347,11 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.635.0';
+  const VERSION = '8.636.0';
   const PATCHNOTES = [
+    { version:'8.636.0', date:'02.09.2026', changes:[
+      '<strong>Wenn sich ein Vorposten nicht errichten lässt, sagt das Spiel jetzt warum.</strong> Der Knopf „Vorposten errichten" war gesperrt und schwieg dazu: Ein gesperrter Knopf reagiert nicht auf Tippen, und der Grund stand nur im Tooltip – den es am Telefon gar nicht gibt. Jetzt ist der Knopf antippbar und nennt den Grund für neun Sekunden: fehlende Baukolonne, Rohstoffe, ein bereits vorhandener Vorposten oder der Deckel von drei Stück. Fasst dein Lager die Baukosten überhaupt nicht (60.000 Erz, 40.000 Kristalle, 25.000 Deuterium), steht das ausdrücklich da – zusammen mit dem Ausweg: Lager oder Kryolager ausbauen, oder Lagertechnik erforschen. Danke an Sascha für die Meldung.'
+    ] },
     { version:'8.635.0', date:'02.09.2026', changes:[
       '<strong>Wartungsbanner für alle:</strong> Kündigt der Betreiber eine Wartung an, erscheint bei jedem Spieler oben ein Band mit Countdown („Wartung in 15 Min. (ca. 30 Min.): …"), während der Wartung mit der Restdauer – und es verschwindet danach von selbst. Der Countdown rechnet mit der Uhr des Servers, nicht mit der deines Geräts. Solange die Angriffspause dazu gesetzt ist, antworten PvP-, Festungs-, Nest-, Konvoi- und Vorposten-Angriffe mit einer klaren Meldung („Angriffe sind gerade pausiert") statt mit einem Fehler – niemand verliert eine Flotte an einen Neustart.',
       '<strong>Antworten auf dein Feedback landen im Postfach.</strong> Beantwortet der Betreiber eine Fehlermeldung oder Idee, findest du die Antwort im Postfach, mit dem Anfang deines eigenen Textes davor; wer Nachrichten-Push erlaubt hat, bekommt sie auch aufs Handy.',
@@ -15556,19 +15559,28 @@
     const unterwegs = cf.missions.filter(m => m.type === 'vorposten-bau').length;
     if ((cf.colonyShips||0) - unterwegs < 1) return 'Kein freies Kolonieschiff als Baukolonne auf ' + planetDisplayName(state.activeBasePlanet) + '.';
     if (allFleetsWithPlanet().some(x => x.fleet.missions.some(m => m.type === 'vorposten-bau' && m.targetId === sysId))) return 'Eine Baukolonne ist bereits unterwegs.';
-    if (!canAfford(VORPOSTEN_BAUKOSTEN)) return 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – nicht genug Rohstoffe.';
+    /* Ein Lager, das die Baukosten NIE fasst, ist eine Sackgasse - "nicht genug Rohstoffe" schickt
+       den Spieler dann ins Warten auf etwas, das nie eintritt. Gemessen: Lagerstufe 30 ohne Boni
+       fasst 12.800, der Vorposten kostet 60.000 Erz. Deshalb nennt der Grund in diesem Fall den
+       Ausweg (Lager/Kryolager/Lagerforschung), nicht nur den Mangel. */
+    if (!canAfford(VORPOSTEN_BAUKOSTEN)){
+      const cap = storageCapCached();
+      const zuKlein = Object.values(VORPOSTEN_BAUKOSTEN).some(a => a > cap);
+      if (zuKlein) return 'Dein Lager fasst nur ' + fmt(Math.floor(cap)) + ' je Rohstoff, gebraucht werden ' + kostenText(VORPOSTEN_BAUKOSTEN) + '. Bau Lager oder Kryolager aus (oder forsche Lagertechnik), sonst lässt sich das nie ansparen.';
+      return 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – nicht genug Rohstoffe.';
+    }
     return null;
   }
   function vorpostenBauStarten(sysId){
     const grund = vorpostenBauGrund(sysId);
-    if (grund){ log(grund, 'ti-alert-triangle'); return; }
+    if (grund){ log(grund, 'ti-alert-triangle', 'warn'); return; }   // 'warn': 9 s und wartet auf freie Sicht
     const cf = currentFleet();
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
     const flug = vorpostenFlug(sysId, missionDurationFor(asteroidFlugBasis(sysId), { colonyShips: 1 }, ['colonyShips'], sysId));
     const fuel = missionFuelCostSplit(flug, { colonyShips: 1 });
     const gesamt = Object.assign({}, VORPOSTEN_BAUKOSTEN);
     for (const [fr, fa] of Object.entries(fuel)) gesamt[fr] = (gesamt[fr]||0) + fa;
-    if (!canAfford(gesamt)){ log('Nicht genug Rohstoffe: Baukosten ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' plus Treibstoff ' + fuelCostText(fuel) + '.', 'ti-alert-triangle'); return; }
+    if (!canAfford(gesamt)){ log('Nicht genug Rohstoffe: Baukosten ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' plus Treibstoff ' + fuelCostText(fuel) + '.', 'ti-alert-triangle', 'warn'); return; }
     if (!confirm('Vorposten in ' + sysN + ' errichten?\n\nKosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' + Treibstoff ' + fuelCostText(fuel) + '.\nDie Baukolonne (1 Kolonieschiff) fliegt hin und zurück (' + fmtDuration(flug) + '). Ein Vorposten ist eine verbindliche Ortswahl: Aufgeben erstattet nichts.')) return;
     if (fleetLimitBlocks()) return;
     pay(gesamt);
@@ -61638,7 +61650,14 @@ async function claimPendingRewards(){
       if (vpHier) html += `<button class="planet-pill" data-vorposten-menu="1" style="border-color:${vpHier.eigener ? 'rgba(93,202,165,0.5)' : 'rgba(224,102,122,0.5)'};"><i class="ti ti-building-community" aria-hidden="true" style="color:${vpHier.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD};"></i>${escapeHtml(vpHier.eigener ? 'Dein ' + (vpHier.name||'Vorposten') : (vpHier.name||'Vorposten') + ' [' + (vpHier.besitzerName||'?') + ']')}</button>`;
       else if (activeSystem !== myHomeSystem){
         const grundB = vorpostenBauGrund(activeSystem);
-        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'disabled' : ''} title="${escapeHtml(grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.')}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
+        /* NICHT `disabled` (02.09.2026, Spieler-Report Sascha "habe versucht einen vorposten zu
+           errichten ging aber anscheinend nicht"): Ein gesperrter Knopf feuert KEINEN Klick, und der
+           Grund stand nur im `title` - am Telefon gibt es kein Hover, also war die Sperre stumm.
+           Gemessen bei 390x844: Klick -> nichts, kein Toast, keine Protokollzeile. Jetzt bleibt der
+           Knopf klickbar und gedaempft; vorpostenBauStarten() nennt den Grund als wartenden Toast
+           (`warn`, 9 s). Dieselbe Lehre wie beim Festungsschlag: Eine Sperre, die ihren Grund nicht
+           sagt, sieht fuer den Spieler wie ein kaputtes Spiel aus. */
+        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.')}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
       }
     }
     box.innerHTML = html;
