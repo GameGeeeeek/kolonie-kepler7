@@ -31,7 +31,8 @@
 //
 // GEGENPROBE (in beide Richtungen): gegen `origin/main` per KEPLER_SPIELDATEI/KEPLER_BACKEND_SERVER.
 const fs = require('fs');
-const { SPIELDATEI, SERVER_JS } = require('./lib/spieldatei');
+const path = require('path');
+const { WURZEL, SPIELDATEI, SERVER_JS } = require('./lib/spieldatei');
 const { pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -75,25 +76,35 @@ function ohneKommentare(t){
 }
 // Regel 46: verneinende Pruefungen schneiden den PATCHNOTES-Block heraus, sonst findet die Suche
 // ihren eigenen Behebungs-Eintrag wieder.
-const S_LEBEND = (() => {
-  const v = S.indexOf('  const PATCHNOTES = [');
-  const b = v < 0 ? -1 : S.indexOf('\n  ];', v);
-  return (v >= 0 && b > v) ? S.slice(0, v) + S.slice(b) : S;
-})();
-// Der Anker misst die EIGENSCHAFT, nicht den Marker: Ein Wortlaut, der nachweislich NUR in der
-// Historie steht, muss im lebenden Text fehlen. Der erste Entwurf suchte stattdessen den String
-// 'const PATCHNOTES = [' - den gibt es in der Datei ein zweites Mal (Zeile ~21530, der Bauer der
+const PN_VON = S.indexOf('  const PATCHNOTES = [');
+const PN_BIS = PN_VON < 0 ? -1 : S.indexOf('\n  ];', PN_VON);
+const PN_BLOCK = (PN_VON >= 0 && PN_BIS > PN_VON) ? S.slice(PN_VON, PN_BIS) : '';
+const S_LEBEND = PN_BLOCK ? S.slice(0, PN_VON) + S.slice(PN_BIS) : S;
+// Der Anker misst die EIGENSCHAFT, nicht den Marker: Ein Wortlaut, der nachweislich NUR im
+// PATCHNOTES-Block steht, muss im lebenden Text fehlen. Der erste Entwurf suchte stattdessen den
+// String 'const PATCHNOTES = [' - den gibt es in der Datei ein zweites Mal (der Bauer der
 // oeffentlichen Patchnotes-Seite liest ihn als Suchmarke), also Regel 39 im eigenen Test.
+//
+// Beide Seiten dieses Merges haben denselben Ausfall vom 02.09.2026 behoben, aber verschieden.
+// Uebernommen ist von jeder das Bessere:
+//
+// - HISTORIE kommt aus tests/lib/patchnotes.js (origin/main). Das ist die EINE Stelle, die Spiel
+//   und patchnotes-archiv.json zusammensetzt; eine zweite eigene Pfadaufloesung waere genau die
+//   zweite Wahrheit, gegen die lib/spieldatei.js gebaut ist.
+//
+// - Die PROBE des Ankers wird bei jedem Lauf frisch aus dem Block gelesen. Ein fester Wortlaut
+//   taugt hier nicht mehr, auch nicht gegen die ganze Historie geprueft: Steht er im Archiv, ist
+//   `HISTORIE.includes(...)` immer wahr und `!S_LEBEND.includes(...)` trivial wahr (im Spiel gibt
+//   es ihn ja nicht mehr) - der Anker kann einen fehlgeschlagenen Schnitt dann nicht mehr
+//   bemerken. Gemessen an origin/main mit `S_LEBEND = S`: weggefallen 0, Anker meldet trotzdem
+//   OK. Mit der Probe aus dem Block faellt er in genau diesem Fall.
 const NUR_HISTORIE = 'Boss-Set-Teile nur bei einer Allianz-Raid-Welle';
-/* Die Historie liegt seit dem 01.09.2026 an ZWEI Stellen (Spiel + patchnotes-archiv.json);
-   tests/lib/patchnotes.js setzt sie zusammen. Dieser Anker fiel am 02.09.2026, als der gesuchte
-   Eintrag beim naechsten Release aus dem Spiel ins Archiv rotierte - der Wortlaut war nicht weg,
-   nur umgezogen. Gesucht wird deshalb in der GANZEN Historie, verneint wird weiter im lebenden
-   Text der Spieldatei (dort ist das Archiv ohnehin unsichtbar, es liegt in einer anderen Datei). */
 const HISTORIE = require('./lib/patchnotes').patchnotesText(S);
+const PROBE = PN_BLOCK.slice(Math.floor(PN_BLOCK.length / 2), Math.floor(PN_BLOCK.length / 2) + 120);
 check('0-anker: der PATCHNOTES-Block wurde wirklich herausgeschnitten',
-  S_LEBEND.length > 0 && HISTORIE.includes(NUR_HISTORIE) && !S_LEBEND.includes(NUR_HISTORIE),
-  { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length, inHistorie: HISTORIE.includes(NUR_HISTORIE) });
+  PN_BLOCK.length > 0 && PROBE.length === 120 && S.includes(PROBE) && !S_LEBEND.includes(PROBE),
+  { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length,
+    probe: PROBE.slice(0, 40) })
 
 function block(t, anfang, endeMarke){
   const von = t.indexOf(anfang);
@@ -286,9 +297,11 @@ check('3d: alle drei Empfangsstellen rufen den EINEN Helfer', rufer.length === 3
 // "droppt nur bei <Boss>" war ab dieser Etappe eine Falschaussage. Geprueft im LEBENDEN Text.
 const droppt = (S_LEBEND.match(/droppt nur be[ie]/g) || []).length;
 check('5a: kein Modultext behauptet mehr "droppt nur bei"', droppt === 0, { treffer: droppt });
-const historie = HISTORIE.match(/Boss-Set-Teile nur bei einer Allianz-Raid[^']{0,40}/g) || [];
+// Die Historie steht seit v8.638.0 in ZWEI Dateien; HISTORIE oben setzt beide zusammen. Wer nur
+// die Spieldatei liest, misst "die Historie wurde umgeschrieben", wo in Wahrheit rotiert wurde.
+const historie = HISTORIE.match(/Boss-Set-Teile nur bei einer Allianz-Raid[^']{0,40}/g) || []
 check('5b: die PATCHNOTES tragen den alten Wortlaut weiter (Historie bleibt unangetastet)',
-  historie.length > 0, { gefunden: historie });
+  historie.length > 0, { gefunden: historie, inHistorie: HISTORIE.includes(NUR_HISTORIE) });
 
 const herk = block(S, '  const HERKUNFT_TEXT = {', '\n  };');
 check('5c-anker: HERKUNFT_TEXT laesst sich schneiden', !!herk, { gefunden: !!herk });

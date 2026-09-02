@@ -202,3 +202,39 @@ Ein KI-Agent darf eine Änderung nicht allein deshalb als fertig betrachten, wei
 6. erst bei grünem Qualitätstor Version/Patchnotes vergeben
 
 Damit bleibt die Ergebnisqualität unabhängig davon, ob der Code von Claude, einem lokalen Modell oder einem anderen Coding-Agenten erzeugt wurde.
+
+## Ein Anker darf nicht auf Patchnote-Wortlaut stehen (02.09.2026)
+
+Seit der Archiv-Rotation (v8.638.0) hält der `PATCHNOTES`-Block im Spiel nur noch die neuesten
+Versionen; alles Ältere wandert nach `patchnotes-archiv.json`. Damit ist **jeder feste
+Patchnote-Wortlaut in einem Test ein Ablaufdatum**.
+
+`test_bossset_pve.js` hatte genau das: einen Anker, der beweisen sollte, dass der PATCHNOTES-Block
+wirklich herausgeschnitten wurde, und der dafür einen bestimmten historischen Satz voraussetzte.
+Der Satz rotierte ins Archiv, der Anker verlor still seinen Gegenstand, und der Test wurde rot,
+ohne dass sich am Geprüften etwas geändert hatte — auf `main`, also am ausgelieferten Stand.
+
+Regeln daraus:
+
+- **Positive Anker lesen ihre Probe aus dem Block selbst**, bei jedem Lauf frisch (z. B. ein Stück
+  aus dessen Mitte). Ein Stück aus dem Block kann nicht herausrotieren, solange es Patchnotes gibt.
+- **Wer „die Historie ist unangetastet" prüft, liest beide Dateien** — Spieldatei *und*
+  `patchnotes-archiv.json`. Wer nur die Spieldatei liest, misst „umgeschrieben", wo rotiert wurde.
+- **Negative Prüfungen** („dieser Text steht nicht mehr im lebenden Code") sind von der Rotation
+  nicht betroffen; der Historien-Schnitt schützt sie dort nur vor falschem Rot. Sie brauchen keine
+  Änderung.
+
+Die Fehlerklasse lässt sich messen statt raten: Zeichenketten aus `tests/*.js` suchen, die im
+Archiv stehen, aber nicht mehr in `weltraum_kolonie.html`. Am 02.09.2026 traf das neun Dateien —
+acht davon nur in Kommentaren, eine (`test_bossset_pve.js`) in einer echten Voraussetzung.
+
+## Eine Scheibe ohne gefundenen Anfang beginnt bei 0
+
+`cblock.slice(cblock.indexOf(kopf), …)` liefert bei fehlendem `kopf` **nicht** nichts, sondern die
+Scheibe ab Index 0 — `indexOf` gibt `-1`, und `slice` zählt das vom Ende her, bzw. bei einem leeren
+Suchstring 0. `test_muster_nest_ui.js` prüfte darauf, dass ein bestimmter Zweig die Währungsfelder
+nicht anfasst; fehlte der Zweig ganz, maß die Prüfung den Blockanfang und ging grün durch — genau
+in dem Fall, für den sie gebaut war.
+
+Wer eine Scheibe an einem gesuchten Anker aufhängt, gibt bei nicht gefundenem Anker **leer**
+zurück und lässt die Prüfung daran scheitern.

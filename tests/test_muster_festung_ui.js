@@ -140,9 +140,18 @@ async function messen(browser, opt, extraStore, waehleFestung){
   const cvon = JS.indexOf('async function claimMusterAttackOutcome(');
   const cbis = JS.indexOf('async function refreshAllianceMusterAttack(');
   const cblock = (cvon > 0 && cbis > cvon) ? JS.slice(cvon, cbis) : '';
-  check('1b: der claim-Zweig gilt fuer Nest UND Festung', /if \(data\.nest \|\| data\.festung\)\{/.test(cblock));
+  /* Der Zweig deckt inzwischen mehrere Ziele ohne Allianz ab (Nest, Festung, Vorposten).
+     Geprueft wird die Regel, nicht die Zahl der Glieder: `data.nest` steht vorn, `data.festung`
+     ist dabei. Faellt eines von beiden weg, ist diese Pruefung zu Recht rot. */
+  check('1b: der claim-Zweig gilt fuer Nest UND Festung',
+    /if \(data\.nest(?: \|\| data\.\w+)* \|\| data\.festung(?: \|\| data\.\w+)*\)\{/.test(cblock),
+    { kopf: (cblock.match(/if \(data\.nest[^)]*\)\{/) || ['-'])[0] });
   check('1c: der Bericht hat einen Festungs-Zweig', /istFestungBericht = r\.zielArt === 'festung'/.test(JS));
-  check('1d: die Hilfe nennt die Festung als Verbandsziel', /Ziel kann eine fremde Allianzbasis, ein Alien-Nest oder eine Asteroidenfestung sein/.test(JS));
+  /* Der Satz in HELP_SECTIONS zaehlt inzwischen mehr Zielarten auf. Geprueft wird, dass die
+     Asteroidenfestung IN diesem Satz steht - nicht die genaue Reihenfolge der Aufzaehlung. */
+  const hilfeSatz = (JS.match(/Ziel kann eine fremde Allianzbasis[^.<]{0,200}sein/) || [''])[0];
+  check('1d: die Hilfe nennt die Festung als Verbandsziel',
+    /Asteroidenfestung/.test(hilfeSatz), { satz: hilfeSatz });
 
   const browser = await starteBrowser();
   try {
