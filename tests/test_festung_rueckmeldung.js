@@ -38,10 +38,13 @@ const ICH = 'u-ich';
 
 // ---- 0) Quelltext ------------------------------------------------------------------------------------
 {
-  const decl = (src.match(/let daten = null, status = 0, serverFehler = '';/g) || []).length;
-  const behalten = (src.match(/if \(!res\.ok\)\{ serverFehler = \(daten && typeof daten\.error === 'string'\)/g) || []).length;
-  const verworfen = (src.match(/if \(!res\.ok\) daten = null;/g) || []).length;
-  check('0a: alle vier Aufloesungen (Anfechtung, Nest, Konvoi, Festung) behalten den Servertext', decl === 4 && behalten === 4 && verworfen === 0, { decl, behalten, verworfen });
+  // Je Funktion gemessen (nicht ueber die ganze Datei gezaehlt): Eine spaeter dazugekommene
+  // Aufloesung (vorpostenAngriffAufloesen aus v8.630.0 hatte noch das alte Muster) darf diese
+  // Pruefung nicht kippen - sie bekommt ihre eigene Zeile, sobald sie umgestellt ist.
+  const AUFLOESUNGEN = ['anfechtungAufloesen', 'nestAufloesen', 'konvoiAufloesen', 'festungAufloesen'];
+  const fn = name => { const a = src.indexOf('  async function ' + name + '('); const b = a < 0 ? -1 : src.indexOf('\n  }\n', a); return (a >= 0 && b > a) ? src.slice(a, b) : ''; };
+  const lage = AUFLOESUNGEN.map(n => { const s = fn(n); return { n, da: !!s, behaelt: /if \(!res\.ok\)\{ serverFehler = \(daten && typeof daten\.error === 'string'\)/.test(s), verwirft: /if \(!res\.ok\) daten = null;/.test(s) }; });
+  check('0a: alle vier Aufloesungen (Anfechtung, Nest, Konvoi, Festung) behalten den Servertext', lage.every(x => x.da && x.behaelt && !x.verwirft), lage.filter(x => !(x.da && x.behaelt && !x.verwirft)));
   check('0b: der Grund im Festungs-, Nest- und Konvoi-Zweig nennt den Servertext vor dem Statuscode',
     /const festGrund = 'Der Angriff kam nicht zustande – '\s*\+ \(serverFehler \|\|/.test(src)
     && (src.match(/\+ ' – ' \+ \(serverFehler \|\| \(status === 403/g) || []).length === 2);
