@@ -44,10 +44,11 @@ const LINK = 'https://gamegeeeeek.de/?reset=0123456789abcdef0123456789abcdef0123
   check('0c: das Banner steht im DOM, und die Ankuendigung wird beim Start und jede Minute geholt',
     /id="wartungBanner" role="status"/.test(HTML) && /setInterval\(\(\) => \{ try \{ ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 60000\)/.test(JS)
     && /loadNotificationEvents\(\); ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 2500\)/.test(JS));
-  // Der PvP-Pfad zeigt data.error des Servers; die drei PvE-Pfade (Festung, Nest, Konvoi) werfen den
-  // Antworttext bei !ok weg und nennen den Grund nach Status - der 503 der Angriffspause gehoert dazu.
-  check('0d: Festung, Nest und Konvoi nennen bei 503 die Angriffspause statt nur "kam nicht zustande"',
-    (JS.match(/status === 503 \? ' – Angriffe sind gerade pausiert \(Wartung\)'/g) || []).length === 3);
+  // Der PvP-Pfad zeigt data.error des Servers; die vier PvE-/Vorposten-Pfade (Festung, Nest, Konvoi,
+  // Vorposten seit #531) werfen den Antworttext bei !ok weg und nennen den Grund nach Status - der 503
+  // der Angriffspause gehoert dazu.
+  check('0d: Festung, Nest, Konvoi und Vorposten nennen bei 503 die Angriffspause statt nur "kam nicht zustande"',
+    (JS.match(/status === 503 \? ' – Angriffe sind gerade pausiert \(Wartung\)'/g) || []).length === 4);
 }
 
 function konto(extra){

@@ -128,9 +128,10 @@ bzw. „Wartung läuft (noch ca. N Min.): Text" und blendet nach `ab + dauer` vo
 Ankündigungs-Karte im Schalter-Reiter (`adminAnkuendigungText/Ab/Dauer`) setzt und hebt auf; beides
 ruft danach sofort `ladeAnkuendigung()`, der Admin sieht also das Banner, ohne die Minute abzuwarten.
 Der neue Notaus „angriffe" erscheint in der Schalterliste wie die anderen (nur AB-schaltbar); das
-Backend antwortet mit 503 und Grund. Der PvP-Pfad zeigt `data.error` des Servers ohnehin; die drei
-PvE-Pfade (Festung, Nest, Konvoi) werfen den Antworttext bei `!res.ok` weg und nennen den Grund nach
-Status – dort steht jetzt ein 503-Zweig „Angriffe sind gerade pausiert (Wartung)" (Wächter 0d).
+Backend antwortet mit 503 und Grund. Der PvP-Pfad zeigt `data.error` des Servers ohnehin; die vier
+Pfade Festung, Nest, Konvoi und Vorposten (seit #531) werfen den Antworttext bei `!res.ok` weg und
+nennen den Grund nach Status – dort steht jetzt ein 503-Zweig „Angriffe sind gerade pausiert
+(Wartung)" (Wächter 0d).
 
 **Support-Werkzeuge im Konto-Blatt.** Drei Zeilen unter der Sperre: E-Mail setzen
 (`[data-konto-email]`, gilt als bestätigt, die Meldung nennt die verkürzte Form), Umbenennen
