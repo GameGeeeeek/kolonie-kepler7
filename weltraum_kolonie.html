@@ -15476,19 +15476,28 @@
     const unterwegs = cf.missions.filter(m => m.type === 'vorposten-bau').length;
     if ((cf.colonyShips||0) - unterwegs < 1) return 'Kein freies Kolonieschiff als Baukolonne auf ' + planetDisplayName(state.activeBasePlanet) + '.';
     if (allFleetsWithPlanet().some(x => x.fleet.missions.some(m => m.type === 'vorposten-bau' && m.targetId === sysId))) return 'Eine Baukolonne ist bereits unterwegs.';
-    if (!canAfford(VORPOSTEN_BAUKOSTEN)) return 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – nicht genug Rohstoffe.';
+    /* Ein Lager, das die Baukosten NIE fasst, ist eine Sackgasse - "nicht genug Rohstoffe" schickt
+       den Spieler dann ins Warten auf etwas, das nie eintritt. Gemessen: Lagerstufe 30 ohne Boni
+       fasst 12.800, der Vorposten kostet 60.000 Erz. Deshalb nennt der Grund in diesem Fall den
+       Ausweg (Lager/Kryolager/Lagerforschung), nicht nur den Mangel. */
+    if (!canAfford(VORPOSTEN_BAUKOSTEN)){
+      const cap = storageCapCached();
+      const zuKlein = Object.values(VORPOSTEN_BAUKOSTEN).some(a => a > cap);
+      if (zuKlein) return 'Dein Lager fasst nur ' + fmt(Math.floor(cap)) + ' je Rohstoff, gebraucht werden ' + kostenText(VORPOSTEN_BAUKOSTEN) + '. Bau Lager oder Kryolager aus (oder forsche Lagertechnik), sonst lässt sich das nie ansparen.';
+      return 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – nicht genug Rohstoffe.';
+    }
     return null;
   }
   function vorpostenBauStarten(sysId){
     const grund = vorpostenBauGrund(sysId);
-    if (grund){ log(grund, 'ti-alert-triangle'); return; }
+    if (grund){ log(grund, 'ti-alert-triangle', 'warn'); return; }   // 'warn': 9 s und wartet auf freie Sicht
     const cf = currentFleet();
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
     const flug = vorpostenFlug(sysId, missionDurationFor(asteroidFlugBasis(sysId), { colonyShips: 1 }, ['colonyShips'], sysId));
     const fuel = missionFuelCostSplit(flug, { colonyShips: 1 });
     const gesamt = Object.assign({}, VORPOSTEN_BAUKOSTEN);
     for (const [fr, fa] of Object.entries(fuel)) gesamt[fr] = (gesamt[fr]||0) + fa;
-    if (!canAfford(gesamt)){ log('Nicht genug Rohstoffe: Baukosten ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' plus Treibstoff ' + fuelCostText(fuel) + '.', 'ti-alert-triangle'); return; }
+    if (!canAfford(gesamt)){ log('Nicht genug Rohstoffe: Baukosten ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' plus Treibstoff ' + fuelCostText(fuel) + '.', 'ti-alert-triangle', 'warn'); return; }
     if (!confirm('Vorposten in ' + sysN + ' errichten?\n\nKosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' + Treibstoff ' + fuelCostText(fuel) + '.\nDie Baukolonne (1 Kolonieschiff) fliegt hin und zurück (' + fmtDuration(flug) + '). Ein Vorposten ist eine verbindliche Ortswahl: Aufgeben erstattet nichts.')) return;
     if (fleetLimitBlocks()) return;
     pay(gesamt);
@@ -61002,7 +61011,14 @@ async function claimPendingRewards(){
       if (vpHier) html += `<button class="planet-pill" data-vorposten-menu="1" style="border-color:${vpHier.eigener ? 'rgba(93,202,165,0.5)' : 'rgba(224,102,122,0.5)'};"><i class="ti ti-building-community" aria-hidden="true" style="color:${vpHier.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD};"></i>${escapeHtml(vpHier.eigener ? 'Dein ' + (vpHier.name||'Vorposten') : (vpHier.name||'Vorposten') + ' [' + (vpHier.besitzerName||'?') + ']')}</button>`;
       else if (activeSystem !== myHomeSystem){
         const grundB = vorpostenBauGrund(activeSystem);
-        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'disabled' : ''} title="${escapeHtml(grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.')}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
+        /* NICHT `disabled` (02.09.2026, Spieler-Report Sascha "habe versucht einen vorposten zu
+           errichten ging aber anscheinend nicht"): Ein gesperrter Knopf feuert KEINEN Klick, und der
+           Grund stand nur im `title` - am Telefon gibt es kein Hover, also war die Sperre stumm.
+           Gemessen bei 390x844: Klick -> nichts, kein Toast, keine Protokollzeile. Jetzt bleibt der
+           Knopf klickbar und gedaempft; vorpostenBauStarten() nennt den Grund als wartenden Toast
+           (`warn`, 9 s). Dieselbe Lehre wie beim Festungsschlag: Eine Sperre, die ihren Grund nicht
+           sagt, sieht fuer den Spieler wie ein kaputtes Spiel aus. */
+        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.')}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
       }
     }
     box.innerHTML = html;
