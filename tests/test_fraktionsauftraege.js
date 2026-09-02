@@ -222,9 +222,13 @@ check('7: zwei neue Erfolge auf die Aufträge',
 check('7: mit Kategorie und Icon eingetragen',
   /fquestgold5:'handel'/.test(src) && /fquestgold5:'ti-trophy'/.test(src) &&
   /fquest50:'handel'/.test(src) && /fquest50:'ti-medal'/.test(src));
+// Gemessen am 01.09.2026: Das fruehere Muster (klein geschriebenes "jede Fraktion zieht …") traf
+// NUR den Patchnote, nie die Hilfe - dort steht der Satz gross geschrieben und mit der Anzahl als
+// Ausdruck ('+(()=>{…})()+') mittendrin. Die Pruefung war grün, weil die Historie den Satz zitierte.
+// Seit die Historie im Archiv liegt, misst sie den LEBENDEN Hilfetext, und zwar ohne den Block.
 check('7: die Hilfe erklärt die fraktionseigenen Pools und die drei Stufen',
-  /jede Fraktion zieht aus ihrem eigenen Pool|eigenen Pool von sieben Auftragsarten/.test(src) &&
-  /<strong>Bronze<\/strong>/.test(src) && /<strong>Gold<\/strong>/.test(src));
+  /Jede Fraktion zieht aus ihrem eigenen Pool von /.test(SRC_OHNE_HISTORIE) &&
+  /<strong>Bronze<\/strong>/.test(SRC_OHNE_HISTORIE) && /<strong>Gold<\/strong>/.test(SRC_OHNE_HISTORIE));
 check('7: und den Unterschied zwischen Lieferung und Standprüfung',
   /die werden beim Abschließen abgebucht/.test(src) && /kosten dich nichts/.test(src));
 check('7: die alte Hilfe-Beschreibung ist weg',

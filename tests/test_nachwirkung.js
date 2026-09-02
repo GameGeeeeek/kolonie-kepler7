@@ -116,9 +116,11 @@ const proz = x => Math.round(x * 100);
 const deckelVon = k => DEFS.defs.find(d => d.kind === k).deckel;
 check('4a: die Hilfe nennt die Deckel der Konstanten',
   JS.includes('+' + proz(deckelVon('prod_all')) + '% Produktion, +' + proz(deckelVon('atk')) + '% Angriff, +' + proz(deckelVon('def')) + '% Verteidigung'));
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+const PN = require('./lib/patchnotes').patchnotesText(JS);
 check('4b: die Patchnote nennt dieselben Deckel (unveraenderliche Historie stimmt zum Startstand)',
-  JS.includes('gedeckelt +' + proz(deckelVon('prod_all')) + '%') &&
-  JS.includes('gedeckelt +' + proz(deckelVon('atk')) + '%'));
+  PN.includes('gedeckelt +' + proz(deckelVon('prod_all')) + '%') &&
+  PN.includes('gedeckelt +' + proz(deckelVon('atk')) + '%'));
 check('4c: die Dauer der Texte ist die Dauer der Konstante',
   DEFS.dauer === 10 * 60 * 1000, DEFS.dauer);
 

@@ -21,7 +21,9 @@ Spielern steht. Vor jedem Commit an `weltraum_kolonie.html`, in dieser Reihenfol
 4. **VERSION-Konstante erhöhen + neuer PATCHNOTES-Eintrag** (deutsch, nie rückwirkend editieren).
    Erst **unmittelbar vor** dem Commit vergeben, `main` in diesem Moment nochmal ansehen — bei
    parallelen PRs kollidieren Versionsnummern sonst mehrfach. **`node build-patchnotes.js`**
-   danach ausführen (erzeugt `patchnotes.html` neu, nie von Hand editieren).
+   danach ausführen: Es rotiert die ältesten Einträge aus dem Spiel nach `patchnotes-archiv.json`,
+   schreibt `patchnotes.html`, `version.txt` und den Zähler im Spiel. Alle geänderten Dateien
+   gehören in denselben Commit; keine davon von Hand editieren.
 5. Bei Mechanik-/Balance-Änderungen: siehe Skill `anzeigestellen` (HELP_SECTIONS, TUTORIAL_STEPS,
    alle Anzeigestellen derselben Größe).
 
