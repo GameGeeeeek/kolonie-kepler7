@@ -123,6 +123,13 @@ Bei Mechanikänderungen deshalb neben dem Code auch prüfen:
 
 `patchnotes.html` wird aus dem Patchnotes-Array erzeugt und nicht von Hand gepflegt.
 
+### Patchnotes-Archiv und version.txt (01.09.2026)
+
+- Der `PATCHNOTES`-Block im Spiel hält nur die neuesten 20 Versionen (`PATCHNOTES_IM_SPIEL` in `build-patchnotes.js`); das Spiel zeichnet davon 15 sofort. Die Historie liegt in `patchnotes-archiv.json` (eine Zeile je Version) und wird erst geladen, wenn jemand im Update-Tab auf „ältere Versionen" tippt. Vorher waren es 1,14 MB Literal in der Spieldatei, 18 % des JavaScripts, bei jedem Start mitgeparst.
+- `build-patchnotes.js` rotiert die ältesten Einträge textuell (Wortlaut unverändert) ins Archiv, pflegt `PATCHNOTES_ARCHIV_ANZAHL` im Spiel (Restzahl für den Knopf, ohne das Archiv zu laden) und schreibt `version.txt`. Es bricht ab, statt Doppelte zu erzeugen. Wächter: `tests/test_patchnotes_archiv.js` (Bestand, Rotation an einer Kopie, Gegenprobe, Idempotenz).
+- Der Versions-Check des Clients (Auto-Reload alle 5 Minuten, Update-Overlay bei Tab-Wechsel) liest `version.txt` (20 Byte) statt der ganzen Spieldatei; die Spieldatei wird nur noch bei einer wirklich neueren Version einmal geholt, für die Patchnotes im Overlay. Da nginx für unbekannte Pfade die Spieldatei selbst liefert (200, text/html), wird die Antwort auf das Versionsmuster geprüft; fehlt `version.txt`, greift höchstens alle 30 Minuten der alte Vollabruf. Wächter: `tests/test_versionscheck.js`.
+- Tests, die den `PATCHNOTES`-Block als Historie ausschneiden, funktionieren unverändert; das Archiv wird von ihnen nicht durchsucht.
+
 ## Refactoring-Regel
 
 Ein Refactoring ist erst abgeschlossen, wenn:

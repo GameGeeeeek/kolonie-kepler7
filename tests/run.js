@@ -34,7 +34,9 @@ const nurPflicht = argumente.includes('--nur-pflicht');
 // Die vier Tests, die WIRKLICH am Patchnotes-Block oder an VERSION haengen - ermittelt per
 // `grep -l "PATCHNOTES\|const VERSION" tests/*.js` und danach einzeln nachgesehen, welche den
 // Inhalt auch benutzen statt ihn nur zu erwaehnen. Zusammen rund 14 Sekunden.
-const NUMMER_TESTS = ['test_patchnotesseite.js', 'test_patchnotes_lazy.js', 'test_zaehlangaben.js', 'test_seo.js'];
+// Dazu seit dem 01.09.2026 die beiden Tests am Patchnotes-Archiv und an version.txt - beide lesen
+// VERSION und den Block und fallen, wenn build-patchnotes.js nach der Nummernvergabe nicht lief.
+const NUMMER_TESTS = ['test_patchnotesseite.js', 'test_patchnotes_lazy.js', 'test_zaehlangaben.js', 'test_seo.js', 'test_patchnotes_archiv.js', 'test_versionscheck.js'];
 const nurNummer = argumente.includes('--nummer');
 const filter = argumente.filter(a => !a.startsWith('--'));
 
@@ -89,6 +91,21 @@ try {
     v === erster ? v : 'VERSION=' + v + ' / Patchnotes=' + erster);
 } catch (e) {
   melde('VERSION passt zum obersten Patchnotes-Eintrag', false, String(e.message).slice(0, 80));
+}
+
+// 4a. version.txt muss zur VERSION passen. Der Client liest seit dem 01.09.2026 diese Datei statt
+//     der ganzen Spieldatei, um ein Update zu bemerken - eine veraltete version.txt hiesse, dass KEIN
+//     Spieler das naechste Update angezeigt bekommt, und nichts sonst wuerde das melden.
+//     build-patchnotes.js schreibt sie; hier faellt auf, wenn der Lauf nach der Nummernvergabe fehlte.
+try {
+  const html = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'), 'utf8');
+  const v = (html.match(/const VERSION = '([^']+)'/) || [])[1];
+  const pfad = path.join(WURZEL, 'version.txt');
+  const txt = fs.existsSync(pfad) ? fs.readFileSync(pfad, 'utf8').trim() : null;
+  melde('version.txt passt zur VERSION', !!v && txt === v,
+    txt === v ? v : (txt === null ? 'version.txt fehlt - node build-patchnotes.js' : 'VERSION=' + v + ' / version.txt=' + txt));
+} catch (e) {
+  melde('version.txt passt zur VERSION', false, String(e.message).slice(0, 80));
 }
 
 // 4b. Hausstil der Anführungszeichen. Die REGEL selbst gehört tests/test_forschungstexte.js
