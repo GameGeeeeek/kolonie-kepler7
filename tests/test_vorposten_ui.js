@@ -391,8 +391,11 @@ if (flugFn){
   check('6c: der Start legt die Bau-Mission an (Baukolonne = 1 Kolonieschiff, System chronos)',
     !!mBau && mBau.system === SYS && (mBau.composition||{}).colonyShips === 1 && (mBau.endTime - mBau.startTime) > 0,
     { typen: ((nachher.fleet||{}).missions||[]).map(m => m.type), m: mBau && { system: mBau.system, composition: mBau.composition } });
-  check('6d: das Kolonieschiff verlaesst die Flotte, die Baukosten sind bezahlt (Erz −20.000, Kristalle −12.000)',
-    (vorher.fleet.colonyShips - (nachher.fleet.colonyShips||0)) === 1
+  /* Rundflug-Muster (test_flotte_rueckkehr): Das Kolonieschiff bleibt bis zur Rueckkehr der Kolonne in
+     der Flotte gezaehlt (computeAwayByType sperrt es als unterwegs) und wird erst beim erfolgreichen
+     Bau abgebucht - beim Start darf sich der Bestand also NICHT aendern, nur die Kosten. */
+  check('6d: das Kolonieschiff bleibt bis zur Rückkehr gezählt (Rundflug), die Baukosten sind bezahlt (Erz −20.000, Kristalle −12.000)',
+    (nachher.fleet.colonyShips||0) === vorher.fleet.colonyShips && (mBau && (mBau.composition||{}).colonyShips === 1)
       && (vorher.resources.erz - nachher.resources.erz) >= 20000 && (vorher.resources.kristalle - nachher.resources.kristalle) >= 12000,
     { kolonieschiffe: [vorher.fleet.colonyShips, nachher.fleet.colonyShips], erz: vorher.resources.erz - nachher.resources.erz, kristalle: vorher.resources.kristalle - nachher.resources.kristalle });
   check('6e: keine Seitenfehler beim Bau', tB.errs.length === 0, tB.errs.slice(0, 3));
@@ -452,6 +455,13 @@ if (flugFn){
   check('9c: die Boni-Bilanz nennt die Vorposten als Quelle', /Schürfschiffe, Doktrin, Vorposten/.test(JS));
   check('9d: die Spionage-Entdeckung liest die Aufklaerungsstufe des Ziel-Systems', /vorpostenScanStufe\(entry\.homeSystem\)/.test(JS));
   check('9e: die Hilfe traegt den Vorposten-Eintrag', /title:'Vorposten: deine Präsenz in einem fremden System'/.test(JS));
+  // Beide Stellen, die "unterwegs" zaehlen (computeAwayByType und die Flottenansicht) - sonst liesse
+  // sich das Kolonieschiff der Baukolonne waehrend des Flugs ein zweites Mal verplanen.
+  check('9f: die Baukolonne zaehlt an beiden Unterwegs-Stellen als unterwegs', JS.split("m.type==='vorposten-bau'").length - 1 === 2,
+    { stellen: JS.split("m.type==='vorposten-bau'").length - 1 });
+  check('9g: Bau und Angriff loesen ueber den EINEN Verlust-Helfer auf, die Garnisons-Ankunft heisst bewusst nicht Aufloesen',
+    /async function vorpostenBauAufloesen\(m, planetKey, fleet\)/.test(JS) && /async function vorpostenAngriffAufloesen\(m, planetKey, fleet\)/.test(JS)
+      && /async function vorpostenGarnisonAnkunft\(m, planetKey, fleet\)/.test(JS) && !/vorpostenDefendAufloesen/.test(JS));
 
   await browser.close();
   ende();

@@ -15471,7 +15471,7 @@
     if (!vorpostenCache.bauAktiv) return { sichtbar:true, ok:false, grund:'Der Bau neuer Vorposten ist derzeit angehalten.' };
     const cf = currentFleet();
     if (cf.missions.some(m => m.type === 'vorposten-bau')) return { sichtbar:true, ok:false, grund:'Eine Baukolonne ist bereits unterwegs.' };
-    if ((cf.colonyShips || 0) < 1) return { sichtbar:true, ok:false, grund:'Die Baukolonne braucht ein Kolonieschiff auf ' + planetDisplayName(state.activeBasePlanet) + '.' };
+    if (((cf.colonyShips || 0) - (computeAwayByType(cf).colonyShips || 0)) < 1) return { sichtbar:true, ok:false, grund:'Die Baukolonne braucht ein freies Kolonieschiff auf ' + planetDisplayName(state.activeBasePlanet) + '.' };
     if (!canAfford(VORPOSTEN_BAUKOSTEN)) return { sichtbar:true, ok:false, grund:'Baukosten fehlen: ' + fuelCostText(VORPOSTEN_BAUKOSTEN) + '.' };
     return { sichtbar:true, ok:true, grund:'' };
   }
@@ -15628,9 +15628,9 @@
     if (!canAfford(kosten)){ log('Nicht genug für Baukosten und Treibstoff: benötigt '+fuelCostText(kosten)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
     pay(kosten);
-    // Das Kolonieschiff verlaesst die Flotte sofort (es wird verbaut); schlaegt der Bau fehl, kommt es
-    // mit der Kolonne zurueck (vorpostenBauAufloesen).
-    cf.colonyShips = Math.max(0, (cf.colonyShips||0) - 1);
+    // Rundflug-Muster wie jede PvE-Aufloesung (test_flotte_rueckkehr): Das Kolonieschiff bleibt in der
+    // Flotte gezaehlt und ist ueber computeAwayByType als unterwegs gesperrt; verbraucht wird es erst
+    // beim erfolgreichen Bau (vorpostenBauAufloesen bucht es ueber pveVerlusteBuchen ab).
     const jetzt = Date.now();
     const fleetName = resolveFleetName();
     cf.missions.push({
@@ -15638,7 +15638,7 @@
       startTime: jetzt, endTime: jetzt + flug*1000,   // Rundflug (Form A), NIE /2
       fleetName, composition: flotte
     });
-    log('Baukolonne '+fleetName+' fliegt nach '+vorpostenSysName(sysId)+'. Der Vorposten steht in '+fmtDuration(flug/2)+', die Kolonne ist in '+fmtDuration(flug)+' zurück.', 'ti-building-lighthouse');
+    log('Baukolonne '+fleetName+' fliegt nach '+vorpostenSysName(sysId)+' und ist in '+fmtDuration(flug)+' zurück – dann steht der Vorposten.', 'ti-building-lighthouse');
     render(); save();
   }
   function oeffneVorpostenStationierung(sysId){
@@ -15685,8 +15685,8 @@
     log('Garnison zum Vorposten bei '+vorpostenSysName(sysId)+' entsandt (~'+fmtDuration(dur)+' Flug).', 'ti-shield');
     render(); save();
   }
-  function vorpostenRueckflugAnlegen(sysId, schiffe, was){
-    const cf = currentFleet();
+  function vorpostenRueckflugAnlegen(sysId, schiffe, was, zielFleet){
+    const cf = zielFleet || currentFleet();   // bei der Ankunft: die Flotte des Startplaneten
     const n = Object.values(schiffe || {}).reduce((a, v) => a + (typeof v === 'number' && v > 0 ? v : 0), 0);
     if (!n) return 0;
     const dur = missionDurationFor(asteroidFlugBasis(sysId), schiffe, ATTACK_SHIP_KEYS, sysId, 'vorposten-defend-return') / 2;
@@ -15756,12 +15756,14 @@
         stufe: daten.vorposten.stufe || 1, name: daten.vorposten.name || 'Feldlager', kernLp: (daten.vorposten.kern||{}).lpMax || 0,
         schutzBis: daten.vorposten.schutzBis || 0 });
       log('Vorposten bei ' + sysName + ' errichtet: ' + (daten.vorposten.name || 'Feldlager') + '. Bauschutz ' + fmtDuration((vorpostenCache.schutzMs||0)/1000) + ' – stationiere eine Garnison, bevor er abläuft.', 'ti-building-lighthouse', 'wichtig');
+      // Das Kolonieschiff ist verbaut - abgebucht ueber den EINEN Helfer (test_flotte_rueckkehr).
+      pveVerlusteBuchen(fleet, { colonyShips: 1 });
       loadVorposten();
     } else {
-      // Fehlgeschlagen (schon belegt, Deckel, Server weg): das Kolonieschiff kommt mit der Kolonne zurueck.
-      fleet.colonyShips = (fleet.colonyShips||0) + 1;
+      // Fehlgeschlagen (schon belegt, Deckel, Server weg): nichts verbraucht, das Kolonieschiff bleibt.
+      pveVerlusteBuchen(fleet, {});
       const grund = (daten && daten.error) || (status ? 'Der Server hat den Bau abgelehnt (' + status + ').' : 'Der Server war nicht erreichbar.');
-      log('Bau bei ' + sysName + ' nicht möglich: ' + grund + ' Das Kolonieschiff ist zurück.', 'ti-alert-triangle', 'wichtig');
+      log('Bau bei ' + sysName + ' nicht möglich: ' + grund + ' Das Kolonieschiff bleibt dir erhalten.', 'ti-alert-triangle', 'wichtig');
       angriffOhneKampf('vorposten-bau', 'Vorposten bei ' + sysName, grund, { fleetName:m.fleetName, system:m.system, systemName:sysName, targetPlanet:planetKey, fehlgeschlagen:true });
     }
     render(); save();
@@ -15812,8 +15814,11 @@
   }
   /* Ankunft der Garnison: Der Server nimmt an, was er annehmen kann (Bestand, freier Platz, nur
      Kampfschiffe). Was er NICHT annimmt, kehrt sofort um - die Schiffe haben die Flotte beim Start
-     verlassen und muessen ueber eine Rueckflug-Mission wieder hinein (Muster defend-base-return). */
-  async function vorpostenDefendAufloesen(m, planetKey, fleet){
+     verlassen und muessen ueber eine Rueckflug-Mission wieder hinein (Muster defend-base-return).
+     Bewusst KEINE "...Aufloesen"-Funktion im Sinne von test_flotte_rueckkehr: Dort bleibt der Verband
+     waehrend der Mission in der Flotte gezaehlt und Verluste werden abgebucht. Hier ist es umgekehrt -
+     eine einwegige Verlegung wie defend-base, deren Ankunft nichts abbucht und nichts addiert. */
+  async function vorpostenGarnisonAnkunft(m, planetKey, fleet){
     let daten = null;
     try {
       await save();
@@ -15837,7 +15842,7 @@
     } else {
       log('Stationierung bei ' + sysName + ' nicht möglich: ' + ((daten && daten.fehler) || 'Der Server hat nichts angenommen.') + ' Die Schiffe kehren zurück.', 'ti-alert-triangle', 'wichtig');
     }
-    vorpostenRueckflugAnlegen(m.system, rest, 'kehren vom Vorposten zurück (nicht stationiert)');
+    vorpostenRueckflugAnlegen(m.system, rest, 'kehren vom Vorposten zurück (nicht stationiert)', fleet);
     render(); save();
   }
   function pveVerlusteBuchen(fleet, verluste){
@@ -24033,7 +24038,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='vorposten-bau' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -43496,7 +43501,7 @@ async function claimPendingRewards(){
         title = r.keinKampf ? 'Vorposten-Bau nicht möglich' : 'Vorposten errichtet: ' + (r.name || 'Feldlager');
         body = '<i class="ti ti-building-lighthouse" aria-hidden="true" style="color:' + (r.keinKampf ? '#e0a548' : '#5dcaa5') + ';"></i> ' + escapeHtml(r.systemName || r.system || '');
         body += '<br>' + (r.keinKampf
-          ? escapeHtml(r.grund || 'Der Bau war nicht möglich.') + ' Das Kolonieschiff ist zurück.'
+          ? escapeHtml(r.grund || 'Der Bau war nicht möglich.') + ' Das Kolonieschiff bleibt dir erhalten.'
           : 'Stufe ' + (r.stufe || 1) + ' · Kern <strong>' + fmt(r.kernLp || 0) + '</strong>. Bauschutz bis ' + (r.schutzBis ? new Date(r.schutzBis).toLocaleString('de-DE') : '–') + ' – stationiere eine Garnison, bevor er abläuft.');
       } else if (r.type === 'vorposten-angriff'){
         /* Wie Festung/Nest/Konvoi nennt der Bericht, was ANGEKOMMEN ist (`schaden`) - der Server zaehlt
@@ -55334,7 +55339,7 @@ async function claimPendingRewards(){
           continue;
         }
         if (m.type === 'vorposten-defend'){
-          vorpostenDefendAufloesen(m, planetKey, fleet);
+          vorpostenGarnisonAnkunft(m, planetKey, fleet);
           continue;
         }
         if (m.type === 'vorposten-defend-return'){
@@ -66188,7 +66193,7 @@ async function claimPendingRewards(){
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='vorposten-bau' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }

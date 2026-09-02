@@ -582,7 +582,10 @@ also keine Kopie-Familie und keinen Paritätstest; alle Zahlen im Kartenmenü ko
   Schiffe verlassen die Flotte beim Start, der Rückweg ist eine eigene Mission) und stehen in
   `EINWEGIG_ERLAUBT` von `tests/test_rundflug.js`. Dabei hat sich der dortige Detektor als blind
   für eine dritte Einweg-Form erwiesen (Dauer VOR dem push halbiert, `endTime: jetzt + dur*1000`) –
-  er erkennt sie jetzt und belegt an den zwei Garnisons-Missionen, dass er sie findet.
+  er erkennt sie jetzt und belegt an den zwei Garnisons-Missionen, dass er sie findet. Bau und
+  Angriff lösen als `…Aufloesen(m, planetKey, fleet)` auf und buchen über `pveVerlusteBuchen`
+  (`test_flotte_rueckkehr`); die Ankunft der Garnison heißt bewusst `vorpostenGarnisonAnkunft` –
+  ihre Schiffe haben die Flotte beim Start verlassen, dort wird nichts abgebucht und nichts addiert.
 - **Berichte (§6):** `vorposten-bau` (auch der ERFOLG, plus Fehlschlag mit Grund),
   `vorposten-angriff` (Schaden = das Angekommene, Durchschlag, Garnisonsverluste, Beuteanteil beim
   Fall) und `vorposten-verlust` (der eigene ist gefallen – ein Rückschlag ohne Ergebnisbegriff,
@@ -595,8 +598,9 @@ also keine Kopie-Familie und keinen Paritätstest; alle Zahlen im Kartenmenü ko
   senkt die Entdeckungschance der Spionage um 15 % je Stufe im Umkreis; Stationierung über die
   Garnison (Kampfschiffe, Deckel je Stufe, Überzählige kehren sofort um).
 - **Baukosten (§6, Regel 57):** 20.000 Erz, 12.000 Kristalle, 6.000 Deuterium plus **ein
-  Kolonieschiff**, das verbaut wird – jeder Posten liegt unter dem Lagerdeckel eines mittleren
-  Kontos; Ausbau Stufe 2: 20.000 / 15.000 / 9.000, Stufe 3: 20.000 / 20.000 / 12.000 + 40
+  Kolonieschiff**, das beim erfolgreichen Bau verbraucht wird (bis zur Rückkehr der Kolonne zählt es
+  als unterwegs, Rundflug-Muster von `test_flotte_rueckkehr`) – jeder Posten liegt unter dem
+  Lagerdeckel eines mittleren Kontos; Ausbau Stufe 2: 20.000 / 15.000 / 9.000, Stufe 3: 20.000 / 20.000 / 12.000 + 40
   Antimaterie. Bezahlt wird der Ausbau erst nach dem Ja des Servers. Aufgeben erstattet nichts.
 - **Hilfe:** eigener Eintrag „Vorposten: deine Präsenz in einem fremden System".
 
