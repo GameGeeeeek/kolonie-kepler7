@@ -137,8 +137,11 @@ async function oeffne(browser, reiter, opt){
   // ---- 1. Die neun Reiter sind BEDIENBAR ------------------------------------------------------
   {
     const { ctx, page } = await oeffne(browser, null, {});
+    // Die Reiter-Liste kommt aus ADMIN_REITER der Spieldatei, nicht aus einer Namensliste hier:
+    // Ein zehnter Reiter (Geschenk, 01.09.2026) waere sonst still ungemessen geblieben - eine
+    // Namensliste findet nur, woran man beim Schreiben gedacht hat (Arbeitsregel 40).
     const mess = await page.evaluate(() => {
-      const ids = ['Reports','Analytics','Broadcast','Supporter','Codes','Feedback','Schalter','Konto','System'];
+      const ids = Array.from(document.querySelectorAll('[id^="adminTab"][id$="Btn"]')).map(b => b.id.replace(/^adminTab/, '').replace(/Btn$/, ''));
       return ids.map(id => {
         const b = document.getElementById('adminTab' + id + 'Btn');
         if (!b) return { id, da:false };
@@ -151,7 +154,7 @@ async function oeffne(browser, reiter, opt){
                  text: (b.textContent || '').trim() };
       });
     });
-    check('1a: alle neun Reiter sind vorhanden', mess.every(m => m.da), mess.filter(m => !m.da).map(m => m.id));
+    check('1a: alle Reiter sind vorhanden - mindestens die neun vom 28.08.2026', mess.length >= 9 && mess.every(m => m.da), { anzahl: mess.length, fehlend: mess.filter(m => !m.da).map(m => m.id) });
     check('1b: jeder Reiter ist an seiner Mitte anklickbar', mess.every(m => m.trifft),
       mess.filter(m => !m.trifft).map(m => m.id));
     // Die Beschriftung darf nicht abgeschnitten sein - bei neun Knoepfen in einer 560px-Karte war

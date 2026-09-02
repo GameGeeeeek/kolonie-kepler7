@@ -2753,6 +2753,7 @@
         <button id="adminTabSchalterBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:4px;"></i>Schalter</button>
         <button id="adminTabKontoBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:4px;"></i>Konto</button>
         <button id="adminTabSystemBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-adjustments" aria-hidden="true" style="margin-right:4px;"></i>System</button>
+        <button id="adminTabGeschenkBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Geschenk</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2837,6 +2838,11 @@
           <button id="adminKontoSucheBtn" class="login-submit" style="width:auto; padding:8px 16px;"><i class="ti ti-user" aria-hidden="true" style="margin-right:5px;"></i>Suchen</button>
         </div>
         <div id="adminKontoListe" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <!-- Uebersicht nach Auffaelligkeit (01.09.2026). Die Uhr im Blatt beantwortet die Frage fuer
+             EIN Konto - wer wissen wollte, ob ueberhaupt jemand auffaellig ist, musste jeden Namen
+             einzeln suchen. Steht UNTER der Suche, damit das gesuchte Blatt oben bleibt. -->
+        <div class="section-title" style="font-size:12px; margin-top:12px;"><i class="ti ti-users" aria-hidden="true"></i>Alle Konten nach Auffälligkeit</div>
+        <div id="adminKontoUebersicht" style="display:flex; flex-direction:column; gap:4px;"></div>
       </div>
       <!-- Systemstand (28.08.2026). commit/checkout/blob standen nur in /api/health und brauchten
            ein curl von aussen; welche Konfiguration FEHLT, beantwortete bisher nur ein SSH-Zugang.
@@ -2844,6 +2850,28 @@
            im Klartext, und ein Screenshot dieser Flaeche darf sie nicht enthalten. -->
       <div id="adminSystemView" style="display:none; max-height:60vh; overflow-y:auto;">
         <div id="adminSystemInhalt" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+      <!-- Geschenk an alle (01.09.2026). Ein Bonuscode verlangt, dass der Spieler ihn findet und
+           eintippt; eine Entschaedigung nach einem Ausfall soll niemanden voraussetzen, der den
+           Discord liest. Gaben-Felder und Deckel kommen vom Server (GET /admin/geschenke) - dieselbe
+           Tabelle wie bei den Bonuscodes, keine zweite Kopie hier. -->
+      <div id="adminGeschenkView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Legt <strong>allen Konten mit Spielstand</strong> eine Belohnung ins Fach – etwa als Entschädigung nach einem Ausfall. Niemand muss einen Code finden; das Geschenk liegt beim nächsten Start bereit. Es gelten dieselben Obergrenzen wie bei den Bonuscodes.</div>
+        <div id="adminGeschenkEmpfaenger" class="bmeta" style="margin-bottom:8px;"></div>
+        <div class="bmeta" style="margin-bottom:4px;">Was verschenkt wird (leer = nichts davon):</div>
+        <div id="adminGeschenkGaben" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:6px; margin-bottom:8px;"></div>
+        <input id="adminGeschenkText" type="text" maxlength="200" placeholder="Nachricht dazu (optional, z.B. Entschuldigung für den Ausfall am Wochenende)" autocomplete="off" style="width:100%; font-size:13px; margin-bottom:8px;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+          <span class="bmeta">Empfänger:</span>
+          <select id="adminGeschenkFilter" style="flex:1; min-width:170px; font-size:12.5px;">
+            <option value="0">alle Konten mit Spielstand</option>
+            <option value="30">nur in den letzten 30 Tagen angemeldet</option>
+            <option value="7">nur in den letzten 7 Tagen angemeldet</option>
+          </select>
+        </div>
+        <button id="adminGeschenkSendenBtn" class="login-submit" style="width:100%; padding:8px 16px; margin-bottom:12px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:5px;"></i>Jetzt verschenken</button>
+        <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bisherige Geschenke</div>
+        <div id="adminGeschenkVerlauf" style="display:flex; flex-direction:column; gap:6px;"></div>
       </div>
     </div>
   </div>
@@ -3813,6 +3841,7 @@
             <div class="card-row"><div class="left"><i class="ti ti-trophy" aria-hidden="true"></i><div class="bname">Bestenlisten-Überholung</div><div class="bmeta">Wenn dich jemand in der Rangliste überholt</div></div><div class="toggle-switch" data-notif-cat="leaderboard"><div class="toggle-knob"></div></div></div>
             <div class="card-row"><div class="left"><i class="ti ti-check" aria-hidden="true"></i><div class="bname">Fertige Aufträge</div><div class="bmeta">Wenn Forschung, Bau oder Expedition fertig wird, während du weg bist</div></div><div class="toggle-switch" data-notif-cat="completion"><div class="toggle-knob"></div></div></div>
             <div class="card-row" id="notifNeuspielerRow" style="display:none"><div class="left"><i class="ti ti-user" aria-hidden="true"></i><div class="bname">Neue Spieler</div><div class="bmeta">Wenn ein neu angemeldetes Konto die Kolonie zum ersten Mal öffnet - erreicht nur das Betreiberkonto</div></div><div class="toggle-switch" data-notif-cat="neuspieler"><div class="toggle-knob"></div></div></div>
+            <div class="card-row" id="notifVerdachtRow" style="display:none"><div class="left"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div class="bname">Auffällige Konten</div><div class="bmeta">Wenn ein Konto über eine Woche keine Pause über zwei Stunden hatte - ein Hinweis, kein Beweis; erreicht nur das Betreiberkonto</div></div><div class="toggle-switch" data-notif-cat="verdacht"><div class="toggle-knob"></div></div></div>
           </div>
         </div>
           </div>
@@ -7277,8 +7306,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.625.0';
+  const VERSION = '8.626.0';
   const PATCHNOTES = [
+    { version:'8.626.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Die Aktivitäts-Uhr hat jetzt eine Übersicht.</strong> Der Konto-Reiter zeigt beim Öffnen alle Konten mit Spielstand, die kürzeste Pause zuerst – je Zeile ein kleines 14-Tage-Raster, ein farbiger Punkt (grün unauffällig, orange auffällig, grau noch zu wenig aufgezeichnet) und die Zähler daneben. Bis hierher musste man jeden Namen einzeln suchen, um zu erfahren, ob überhaupt jemand auffällig ist. Tippen auf eine Zeile öffnet das Blatt.',
+      '<strong>„Auffällig" ist eine feste Regel, keine Bauchentscheidung:</strong> über eine ganze Woche keine Pause über zwei Stunden. Trifft sie zu, bekommt der Betreiber einmal je Konto und Woche eine Meldung ins Postfach (abschaltbar unter Benachrichtigungen, nur für das Betreiberkonto sichtbar). Die Meldung nennt die zwei harmlosen Erklärungen mit – ein geteiltes Konto oder zwei Geräte in verschiedenen Zeitzonen sehen genauso aus. Ein Hinweis, kein Beweis.',
+      '<strong>Zwei neue Zeilen im Konto-Blatt:</strong> Rate-Limit-Treffer (wie oft ein Konto heute und insgesamt in die Anfragebremse gelaufen ist, samt letztem Pfad) und abgelehnte Spielstände (wie oft der Server einen Stand als unplausibel verworfen hat, mit den letzten Gründen). Beides stand bis jetzt ausschließlich im Container-Log des Servers – ein abgelehnter Spielstand ist für den Spieler faktisch Speicherverlust, und niemand konnte es sehen, ohne per SSH auf den Pi zu gehen. Der Systemstand zählt beides zusätzlich mit.',
+      '<strong>Neuer Reiter „Geschenk":</strong> Der Betreiber kann allen Konten mit Spielstand eine Belohnung ins Fach legen – etwa als Entschädigung nach einem Ausfall –, wahlweise nur an Konten, die sich in den letzten 7 oder 30 Tagen angemeldet haben. Niemand muss einen Code finden; das Geschenk liegt beim nächsten Start bereit und wird wie ein Bonuscode gutgeschrieben, mit eigener Meldung und eigenem Bericht. Es gelten dieselben Obergrenzen wie bei den Bonuscodes, und vor dem Versand steht eine Rückfrage mit Betrag und Empfängerkreis.',
+      '<strong>Für Spieler ändert sich am Spiel nichts.</strong> Es werden keine neuen Daten erhoben – der Server hält nur fest, was er ohnehin protokolliert hat, jetzt am Konto statt in einer Logdatei, die niemand liest.'
+    ]},
     { version:'8.625.0', date:'02.09.2026', changes:[
       '<strong>Neu: Wrackkonvois – treibende Beute-Ziele.</strong> In der Galaxie tauchen vereinzelt Wrackkonvois auf: einzelne, angreifbare Ziele, die von System zu System weiterziehen und nach rund 18 Stunden ganz entkommen, wenn niemand zuschlägt. Auf der Karte stehen sie als eigener Knoten aus losen Rumpf-Scherben; das Kartenmenü zeigt den Rumpfzustand und die Abklingzeit und startet den Angriff.',
       'Der Angriff ist ein Rundflug wie der Festungsschlag: hinfliegen, zuschlagen, zurückkehren. Je Konto gilt eine Abklingzeit von zwei Stunden je Konvoi, und jeder Ausgang – erlegt oder verpasst, weil der Konvoi entkommen oder schon von anderen aufgebracht war – schreibt einen eigenen Kampfbericht.',
@@ -30060,7 +30096,23 @@
   // eigenen Spielstand. Bewusst über den normalen, authentifizierten Speicherzyklus statt einer
   // direkten Server-seitigen Änderung des Spielstands - so gibt es keinen Konflikt mit einem
   // laufenden Auto-Save (siehe saveGameStateVersioned).
-  async function claimPendingRewards(){
+  /* Die Gaben eines Bonuscodes oder Geschenks buchen - EINE Stelle fuer beide Zweige (01.09.2026).
+   Vorher stand die Schleife im Bonuscode-Zweig; ein zweites Mal abgeschrieben waere sie die
+   uebliche zweite Wahrheit, die beim naechsten Feld auseinanderlaeuft. Jeder Wert wird einzeln
+   gefiltert, statt dem Server zu trauen - der Zweig darf nicht werfen (siehe Bonuscode). */
+function belohnungGabenBuchen(r){
+  const zahl = v => { const n = Math.floor(Number(v)); return (Number.isFinite(n) && n > 0) ? n : 0; };
+  const teile = [];
+  for (const k of ['erz','kristalle','deuterium','energie','antimaterie','forschungspunkte']){
+    const v = zahl(r[k]);
+    if (v){ state.resources[k] = (state.resources[k]||0) + v; teile.push('+'+fmt(v)+' '+resLabel(k)); }
+  }
+  const cr = zahl(r.credits);      if (cr){ state.credits = (state.credits||0) + cr; teile.push('+'+fmt(cr)+' Kredite'); }
+  const kp = zahl(r.kampfpunkte);  if (kp){ state.battlePoints = (state.battlePoints||0) + kp; teile.push('+'+fmt(kp)+' Kampfpunkte'); }
+  const xp = zahl(r.xp);           if (xp){ addXp(xp); teile.push('+'+fmt(xp)+' Erfahrung'); }
+  return teile;
+}
+async function claimPendingRewards(){
     if (!useBackend()) return;
     try {
       for (let i = 0; i < 10; i++){
@@ -30292,21 +30344,25 @@
            Roh addiert wie der 'festung'-Zweig darüber, also ohne Lagerdeckel – ein Geschenk, das am
            vollen Lager verpufft, wäre die unfreundlichere Auslegung, und die Beträge sind klein. */
         if (r.type === 'bonuscode'){
-          const zahl = v => { const n = Math.floor(Number(v)); return (Number.isFinite(n) && n > 0) ? n : 0; };
-          const teile = [];
-          for (const k of ['erz','kristalle','deuterium','energie','antimaterie','forschungspunkte']){
-            const v = zahl(r[k]);
-            if (v){ state.resources[k] = (state.resources[k]||0) + v; teile.push('+'+fmt(v)+' '+resLabel(k)); }
-          }
-          const cr = zahl(r.credits);      if (cr){ state.credits = (state.credits||0) + cr; teile.push('+'+fmt(cr)+' Kredite'); }
-          const kp = zahl(r.kampfpunkte);  if (kp){ state.battlePoints = (state.battlePoints||0) + kp; teile.push('+'+fmt(kp)+' Kampfpunkte'); }
-          const xp = zahl(r.xp);           if (xp){ addXp(xp); teile.push('+'+fmt(xp)+' Erfahrung'); }
+          const teile = belohnungGabenBuchen(r);
           const codeText = String(r.code || '').slice(0, 40);
           log('Bonuscode eingelöst'+(codeText ? ' ('+codeText+')' : '')+': '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-award', 'ok');
           playSound('achieve');
           // Der Bericht ist die BLEIBENDE Auskunft - `log()` überschreibt sich mit der nächsten
           // Meldung selbst, und beim Offline-Nachholen erscheint es gar nicht.
           pushReport({ type:'bonuscode', code: codeText, gaben: teile });
+          save();
+          continue;
+        }
+        /* Geschenk an alle (01.09.2026): dieselbe Gabenform wie der Bonuscode, deshalb derselbe
+           Buchungs-Helfer. Ein EIGENER Zweig ist Pflicht - ein unbekannter Typ faellt unten in den
+           Rueckfall und meldet woertlich "+500 Kredite fuer deinen Bug-Report". */
+        if (r.type === 'geschenk'){
+          const teile = belohnungGabenBuchen(r);
+          const text = String(r.text || '').slice(0, 200);
+          log('Geschenk vom Team'+(text ? ' („'+text+'")' : '')+': '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-sparkles', 'ok');
+          playSound('achieve');
+          pushReport({ type:'geschenk', text, gaben: teile });
           save();
           continue;
         }
@@ -33853,7 +33909,7 @@
   }
   let messagesCache = [];
   // ===== Server-Ereignis-Benachrichtigungen (Vorstufe für Push) =====
-  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true };
+  let notifPrefsCache = { enabled:true, messages:true, pact:true, weltboss:true, raid:true, allianceraid:true, alliancebase:true, chat:true, patchnotes:true, application:true, spy:true, attack:true, leaderboard:true, completion:true, neuspieler:true, verdacht:true };
   let notificationEventsCache = [];
   async function loadNotificationPrefs(){
     if (!useBackend()) return;
@@ -33984,7 +34040,10 @@
     // über den Rückfall unten mit einer Glocke und dem Wort "Ereignis". Der Text sagt bewusst
     // "geöffnet" und nicht "spielt": Der auslösende erste Spielstand-Save feuert automatisch beim
     // ersten Boot, die Meldung behauptet also nur, was sie belegen kann.
-    'neuer-spieler': { icon:'ti-user', color:'#5dcaa5', text:(p)=>(p.username||'Ein Kommandant')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+p.gesamt+'. Kommandant insgesamt':'')+'.' }
+    'neuer-spieler': { icon:'ti-user', color:'#5dcaa5', text:(p)=>(p.username||'Ein Kommandant')+' hat die Kolonie zum ersten Mal geöffnet'+(p.gesamt?' - '+p.gesamt+'. Kommandant insgesamt':'')+'.' },
+    // Betreiber-Meldung (01.09.2026): ein Konto ist nach der Verdachtsregel der Aktivitäts-Uhr
+    // auffällig. Der Text nennt die harmlosen Erklärungen mit - ein Hinweis, kein Beweis.
+    'konto-verdacht': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>(p.username||'Ein Konto')+' hatte in '+(p.tage||7)+' Tagen keine Pause über '+(p.laengstePause||0)+' Std. - Bot, geteiltes Konto oder zwei Zeitzonen? Details im Admin-Bereich unter Konto.' }
   };
   async function loadNotificationEvents(){
     if (!useBackend()) return;
@@ -34587,8 +34646,9 @@
     { tab:'codes',     btn:'adminTabCodesBtn',     view:'adminCodesView',     anzeige:'block', sub:'Bonuscodes',               laden:() => loadAdminBonusCodes() },
     { tab:'feedback',  btn:'adminTabFeedbackBtn',  view:'adminFeedbackView',  anzeige:'block', sub:'Feedback der Spieler',     laden:() => loadAdminFeedback() },
     { tab:'schalter',  btn:'adminTabSchalterBtn',  view:'adminSchalterView',  anzeige:'block', sub:'Notabschaltung',           laden:() => loadAdminSchalter() },
-    { tab:'konto',     btn:'adminTabKontoBtn',     view:'adminKontoView',     anzeige:'block', sub:'Konto nachschlagen',       laden:null },
-    { tab:'system',    btn:'adminTabSystemBtn',    view:'adminSystemView',    anzeige:'block', sub:'Systemstand',              laden:() => loadAdminSystemstand() }
+    { tab:'konto',     btn:'adminTabKontoBtn',     view:'adminKontoView',     anzeige:'block', sub:'Konto nachschlagen',       laden:() => loadAdminAktivitaet() },
+    { tab:'system',    btn:'adminTabSystemBtn',    view:'adminSystemView',    anzeige:'block', sub:'Systemstand',              laden:() => loadAdminSystemstand() },
+    { tab:'geschenk',  btn:'adminTabGeschenkBtn',  view:'adminGeschenkView',  anzeige:'block', sub:'Geschenk an alle Spieler',  laden:() => loadAdminGeschenke() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -34971,6 +35031,132 @@
       ${kurz >= 3 ? `<div class="bmeta" style="margin-top:2px; color:#f0997b;">${kurz} davon unter zwei Minuten – so schnell bemerkt man ein neues Ziel nicht von Hand.</div>` : ''}
     </div>`;
   }
+  /* ===== Uebersicht nach Auffaelligkeit und Geschenk an alle (01.09.2026, Auftrag Sascha
+     "Funktionen weiter ausbauen") - die Server-Haelfte samt Verdachtsregel steht in der
+     Backend-CLAUDE.md. Hier nur die Anzeige. ============================================== */
+  // Das Miniraster je Uebersichtszeile: 14 Zeilen x 24 Kaestchen von 3 px - dieselben drei Farben
+  // wie die grosse Uhr im Blatt (aktiv / ruhig / nicht beobachtet), nur ohne Achse.
+  function aktivMiniRasterHtml(reihe, tage){
+    if (typeof reihe !== 'string' || reihe.length < 24) return '';
+    const t = tage || Math.floor(reihe.length / 24);
+    let zeilen = '';
+    for (let d = 0; d < t; d++){
+      zeilen += '<div style="display:grid; grid-template-columns:repeat(24,3px); gap:1px;">'
+        + reihe.slice(d*24, d*24+24).split('').map(c => '<div style="height:2px; background:'
+            + (c === '1' ? '#5dcaa5' : c === '0' ? '#2a3042' : 'transparent') + ';"></div>').join('') + '</div>';
+    }
+    return '<div data-mini-raster style="display:flex; flex-direction:column; gap:1px; flex-shrink:0;" aria-hidden="true">' + zeilen + '</div>';
+  }
+  async function loadAdminAktivitaet(){
+    const box = document.getElementById('adminKontoUebersicht');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Übersicht wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/aktivitaet');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Übersicht nach Auffälligkeit'); return; }
+      const d = await res.json();
+      const konten = d.konten || [];
+      if (!konten.length){ box.innerHTML = `<div class="bmeta">Noch kein Konto mit Spielstand.</div>`; return; }
+      const regel = d.regel || { pauseMaxStd: 2, minStunden: 168 };
+      const pauseText = k => !k.belastbar ? 'zu wenig aufgezeichnet' : (adminZahl(k.laengstePause) + ' h längste Pause');
+      const punkt = f => '<span style="display:inline-block; width:8px; height:8px; background:' + f + '; margin-right:6px; flex-shrink:0;" aria-hidden="true"></span>';
+      box.innerHTML = `<div class="bmeta" style="line-height:1.5; margin-bottom:4px;">${adminZahl(d.gesamt)} Konten mit Spielstand, die kürzeste Pause zuerst. <strong>Auffällig</strong> heißt: über ${Math.round(regel.minStunden/24)} Tage keine Pause über ${regel.pauseMaxStd} Stunden – ein Hinweis, kein Beweis (geteiltes Konto, zwei Zeitzonen). Tippen öffnet das Blatt.</div>`
+        + konten.map(k => `<div class="card-row" data-uebersicht-konto="${escapeHtml(k.username)}" data-uebersicht-verdacht="${k.verdacht ? '1' : '0'}" role="button" tabindex="0" style="padding:0.4rem 0.7rem; gap:10px; cursor:pointer;">
+          ${aktivMiniRasterHtml(k.reihe, d.tage)}
+          <div class="left" style="min-width:0; flex:1;"><div style="min-width:0;">
+            <div class="bname" style="display:flex; align-items:center;">${punkt(k.verdacht ? '#f0997b' : k.belastbar ? '#5dcaa5' : '#4a5068')}${escapeHtml(k.username)}${k.gesperrt ? ' <span class="bmeta" style="color:#f0997b; margin-left:6px;">gesperrt</span>' : ''}${k.verdacht ? ' <span class="bmeta" style="color:#f0997b; margin-left:6px;">auffällig</span>' : ''}</div>
+            <div class="bmeta">${pauseText(k)} · ${adminZahl(k.aktiv)} von ${adminZahl(k.beobachtet)} Std. aktiv${k.schnelleReaktionen ? ' · ' + adminZahl(k.schnelleReaktionen) + '× unter 2 Min. am Ziel' : ''}${k.rateLimitHeute ? ' · ' + adminZahl(k.rateLimitHeute) + '× Rate-Limit heute' : ''}${k.spielstandAbgelehnt ? ' · ' + adminZahl(k.spielstandAbgelehnt) + ' Spielstände abgelehnt' : ''}</div>
+          </div></div>
+        </div>`).join('');
+      box.querySelectorAll('[data-uebersicht-konto]').forEach(el => {
+        const oeffnen = () => {
+          const f = document.getElementById('adminKontoSuche');
+          if (f) f.value = el.getAttribute('data-uebersicht-konto');
+          loadAdminKonto();
+          const liste = document.getElementById('adminKontoListe');
+          if (liste && liste.scrollIntoView) liste.scrollIntoView({ block:'start' });
+        };
+        el.onclick = oeffnen;
+        el.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); oeffnen(); } };
+      });
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Übersicht nach Auffälligkeit'); }
+  }
+  // Die zwei neuen Blatt-Zeilen. Beide fehlen ERSATZLOS, wenn der Server die Felder nicht schickt
+  // (ein Stand vor dem 01.09.2026) - kein "0", das etwas behauptet, was niemand gemessen hat.
+  function rateLimitZeileHtml(zeile, r){
+    if (!r || typeof r !== 'object') return '';
+    const farbe = r.heute ? '#f0997b' : (r.gesamt ? '#fac775' : '#5dcaa5');
+    const text = adminZahl(r.heute) + ' heute · ' + adminZahl(r.gesamt) + ' gesamt'
+      + (r.letzterPfad ? ' · zuletzt ' + escapeHtml(r.letzterPfad) + ' (' + adminZeit(r.letzteZeit) + ')' : '');
+    return zeile('Rate-Limit-Treffer', '<span style="color:' + farbe + ';">' + text + '</span>');
+  }
+  function spielstandAbgelehntHtml(zeile, a){
+    if (!a || typeof a !== 'object') return '';
+    if (!a.n) return zeile('Abgelehnte Spielstände', 'keine');
+    const letzte = Array.isArray(a.letzte) && a.letzte.length ? a.letzte : [{ zeit: a.letzteZeit, grund: a.letzterGrund }];
+    return zeile('Abgelehnte Spielstände', '<span style="color:#f0997b;">' + adminZahl(a.n) + ' · zuletzt ' + adminZeit(a.letzteZeit) + '</span>')
+      + '<div class="bmeta" style="color:#f0997b; line-height:1.5;">' + letzte.map(x => adminZeit(x.zeit) + ': ' + escapeHtml(x.grund || '')).join('<br>')
+      + '<br><span style="color:#c9d4e8;">Ein abgelehnter Spielstand wird NICHT gespeichert – der Spieler sieht bei jedem Neuladen den letzten angenommenen Stand.</span></div>';
+  }
+  let adminGeschenkEmpfaengerZahlen = { alle: 0, aktiv30: 0 };
+  async function loadAdminGeschenke(){
+    const box = document.getElementById('adminGeschenkVerlauf');
+    const gabenBox = document.getElementById('adminGeschenkGaben');
+    const info = document.getElementById('adminGeschenkEmpfaenger');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/geschenke');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Geschenke'); if (info) info.textContent = ''; return; }
+      const d = await res.json();
+      adminGeschenkEmpfaengerZahlen = { alle: d.empfaengerGesamt || 0, aktiv30: d.empfaenger30Tage || 0 };
+      // Gaben-Felder aus der Server-Tabelle, wie bei den Bonuscodes: Der Deckel steht als max am
+      // Feld, und der Server prueft trotzdem.
+      if (gabenBox && !gabenBox.childElementCount){
+        gabenBox.innerHTML = Object.keys(d.gaben || {}).map(k => {
+          const g = d.gaben[k];
+          return `<label style="display:flex; flex-direction:column; gap:2px;"><span class="bmeta">${escapeHtml(g.name)} (max ${fmt(g.max)})</span>`
+               + `<input type="number" min="1" max="${g.max}" data-geschenk-gabe="${escapeHtml(k)}" placeholder="0" style="font-size:12.5px;"></label>`;
+        }).join('');
+      }
+      const textEl = document.getElementById('adminGeschenkText');
+      if (textEl && d.textMax) textEl.maxLength = d.textMax;
+      if (info) info.textContent = 'Empfänger: ' + adminZahl(d.empfaengerGesamt) + ' Konten mit Spielstand, davon ' + adminZahl(d.empfaenger30Tage) + ' in den letzten 30 Tagen angemeldet.';
+      const liste = d.geschenke || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Noch nichts verschenkt.</div>`; return; }
+      box.innerHTML = liste.map(g => `<div class="card-row" style="padding:0.5rem 0.85rem;"><div class="left"><div style="min-width:0;">
+          <div class="bname">${adminZeit(g.zeit)} · an ${adminZahl(g.empfaenger)} Konten${g.nurAktiveTage ? ' (angemeldet binnen ' + adminZahl(g.nurAktiveTage) + ' Tagen)' : ''}</div>
+          <div class="bmeta">${escapeHtml(Object.keys(g.gaben || {}).map(k => fmt(g.gaben[k]) + ' ' + resLabel(k)).join(', '))}${g.text ? ' · „' + escapeHtml(g.text) + '"' : ''}</div>
+        </div></div></div>`).join('');
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Geschenke'); }
+  }
+  async function adminGeschenkSenden(){
+    const gaben = {};
+    document.querySelectorAll('[data-geschenk-gabe]').forEach(el => {
+      const n = Math.floor(Number(el.value));
+      if (Number.isFinite(n) && n > 0) gaben[el.getAttribute('data-geschenk-gabe')] = n;
+    });
+    if (!Object.keys(gaben).length){ log('Das Geschenk enthält nichts – bitte mindestens eine Gabe eintragen.', 'ti-alert-triangle'); return; }
+    const textEl = document.getElementById('adminGeschenkText');
+    const filterEl = document.getElementById('adminGeschenkFilter');
+    const nurAktiveTage = filterEl ? Math.max(0, parseInt(filterEl.value, 10) || 0) : 0;
+    const zusammenfassung = Object.keys(gaben).map(k => fmt(gaben[k]) + ' ' + resLabel(k)).join(', ');
+    const wieViele = nurAktiveTage ? 'alle Konten, die sich in den letzten ' + nurAktiveTage + ' Tagen angemeldet haben'
+                                   : 'ALLE ' + adminZahl(adminGeschenkEmpfaengerZahlen.alle) + ' Konten mit Spielstand';
+    // Rueckfrage, weil es sich nicht zuruecknehmen laesst - dieselbe Abwaegung wie bei "alle
+    // Sitzungen beenden": Was der Bediener nicht rueckgaengig machen kann, wird vorher benannt.
+    if (!confirm('Jetzt ' + zusammenfassung + ' an ' + wieViele + ' verschenken?\n\nDas lässt sich nicht zurücknehmen.')) return;
+    try {
+      const res = await backendFetch('/admin/geschenk', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ gaben, text: textEl ? textEl.value.trim() : '', nurAktiveTage }) });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok){ log(data.error || ('Verschenken fehlgeschlagen ('+res.status+').'), 'ti-alert-triangle'); return; }
+      log('Geschenk an ' + adminZahl(data.empfaenger) + ' Konten verschickt – es liegt beim nächsten Start im Belohnungsfach.', 'ti-sparkles', 'ok');
+      document.querySelectorAll('[data-geschenk-gabe]').forEach(el => { el.value = ''; });
+      if (textEl) textEl.value = '';
+      loadAdminGeschenke();
+    } catch(e){ log('Verschenken fehlgeschlagen – Server nicht erreichbar.', 'ti-alert-triangle'); }
+  }
   async function loadAdminKonto(){
     const box = document.getElementById('adminKontoListe');
     const feld = document.getElementById('adminKontoSuche');
@@ -35001,7 +35187,10 @@
           ${zeile('Sternenstaub', adminZahl(k.sternenstaub) + ' · ' + adminZahl(k.abgewehrteAngriffe) + ' Angriffe abgewehrt')}
           ${zeile('Bonuscodes', adminZahl(k.bonusCodes) + ' eingelöst' + (k.bonusFehlversuche ? ' · ' + adminZahl(k.bonusFehlversuche) + ' Fehlversuche heute' : ''))}
           ${k.offeneBelohnungen ? zeile('Offene Belohnungen', adminZahl(k.offeneBelohnungen)) : ''}
+          ${rateLimitZeileHtml(zeile, k.rateLimitTreffer)}
+          ${spielstandAbgelehntHtml(zeile, k.spielstandAbgelehnt)}
           ${aktivUhrHtml(k.aktiv)}
+          ${k.aktiv && k.aktiv.verdachtGemeldet ? zeile('Verdachtsmeldung', 'an dich geschickt am ' + adminZeit(k.aktiv.verdachtGemeldet)) : ''}
           ${reaktionenHtml(k.reaktionen)}
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
             <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
@@ -35068,6 +35257,8 @@
           ${zeile('Offenes Feedback', adminZahl(best.offenesFeedback||0), best.offenesFeedback ? '#fac775' : '#5dcaa5')}
           ${zeile('Offene Meldungen', adminZahl(best.offeneMeldungen||0), best.offeneMeldungen ? '#fac775' : '#5dcaa5')}
           ${zeile('Nicht zugeordnete Spenden', adminZahl(best.offeneKofiZuordnungen||0), best.offeneKofiZuordnungen ? '#fac775' : '#5dcaa5')}
+          ${typeof best.abgelehnteSpielstaende7Tage === 'number' ? zeile('Abgelehnte Spielstände (7 Tage)', adminZahl(best.abgelehnteSpielstaende7Tage), best.abgelehnteSpielstaende7Tage ? '#f0997b' : '#5dcaa5') : ''}
+          ${typeof best.verdachtKonten === 'number' ? zeile('Auffällige Konten', adminZahl(best.verdachtKonten), best.verdachtKonten ? '#fac775' : '#5dcaa5') : ''}
         </div>
         <div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px;">
           <div class="bname"><i class="ti ti-key" aria-hidden="true" style="margin-right:5px;"></i>Konfiguration</div>
@@ -41881,7 +42072,7 @@
      Spiels; sie trug rote Pille, roten Streifen und ein Warndreieck ueber 38k angekommenem Erz und
      stand im Filter unter "Nur Rueckschlaege". */
   const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout',
-                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode'];
+                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
   const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
@@ -42534,6 +42725,12 @@
         body = '<i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
              + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
              + '<br>Bonuscodes gibt es gelegentlich auf den Kanälen des Spiels – jeder gilt nur eine Weile und nur einmal je Konto.';
+      } else if (r.type === 'geschenk'){
+        title = 'Geschenk vom Team';
+        body = '<i class="ti ti-sparkles" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
+             + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
+             + (r.text ? '<br>„' + escapeHtml(r.text) + '"' : '')
+             + '<br><span class="bmeta">Ein Geschenk an alle Kommandanten – zum Beispiel als Entschädigung nach einem Ausfall.</span>';
       } else if (r.type === 'item-found'){
         title = (r.rare?'Seltener Fund: ':'Item gefunden: ')+r.itemName;
         body = 'Gefunden bei: <strong>'+(r.foundAt||'unbekannt')+'</strong>'+(r.rare?'':' · liegt im Inventar (Fortschritt-Tab) bereit');
@@ -42755,6 +42952,7 @@
         : r.type==='debris-cleared' ? 'ti-recycle'
         : (r.type==='deckelausgleich' || r.type==='deckelkappung') ? 'ti-pick'
         : r.type==='bonuscode' ? 'ti-award'
+        : r.type==='geschenk' ? 'ti-sparkles'
         /* `positive`, NICHT `won` (v8.597.0): `won` prueft nur `result` gegen 'win'/'destroyed'
            und ist damit eine ZWEITE Wahrheit ueber "Erfolg". Die KI-Abfangautomatik trug deshalb
            ein WARNDREIECK ueber vertriebenen Piraten - derselbe Spieler-Report, andere Stelle.
@@ -67659,6 +67857,9 @@
     // aber sie wird bei ihm nie gelesen.
     const neuspielerRow = document.getElementById('notifNeuspielerRow');
     if (neuspielerRow) neuspielerRow.style.display = istBetreiber ? '' : 'none';
+    // Dieselbe Regel fuer die Verdachtsmeldung der Aktivitaets-Uhr (01.09.2026).
+    const verdachtRow = document.getElementById('notifVerdachtRow');
+    if (verdachtRow) verdachtRow.style.display = istBetreiber ? '' : 'none';
     if (cooldownNote){
       const remainMs = (state.lastNameChangeAt||0) + 30*86400000 - Date.now();
       if (remainMs > 0){
@@ -68985,6 +69186,8 @@
     document.querySelectorAll('[data-grant-tier]').forEach(b => b.onclick = () => { adminGrantTier = b.getAttribute('data-grant-tier'); renderAdminGrantAuswahl(); });
     const adminCodeCreateBtn = document.getElementById('adminCodeCreateBtn');
     if (adminCodeCreateBtn) adminCodeCreateBtn.onclick = adminBonusCodeAnlegen;
+    const adminGeschenkSendenBtn = document.getElementById('adminGeschenkSendenBtn');
+    if (adminGeschenkSendenBtn) adminGeschenkSendenBtn.onclick = adminGeschenkSenden;
     const bonusCodeBtn = document.getElementById('bonusCodeBtn');
     if (bonusCodeBtn) bonusCodeBtn.onclick = bonusCodeEinloesen;
     const bonusCodeInput = document.getElementById('bonusCodeInput');
