@@ -69,6 +69,18 @@ Vor `slice`, `indexOf` oder `lastIndexOf` sicherstellen, dass der gesuchte Anker
 
 Kommentare und historische Patchnotes können dieselben Zeichenketten wie der produktive Code enthalten. Negative Prüfungen wie „alter Text existiert nicht mehr“ deshalb auf den Live-Bereich begrenzen bzw. `PATCHNOTES` aus der Suchmenge ausschließen.
 
+## Fixtures wie der echte Erzeuger bauen
+
+Steht im Code ein Rückfall hinter `||`, `??` oder einem `if`, prüft eine Fixture, die den ersten
+Zweig füllt, den Rückfall **nie** – und der Rückfall ist oft genau der Live-Pfad. Gemessen am
+02.09.2026: Eine Prüfung auf `r.standortName || fremdStandortName(key)` setzte `standortName` in der
+Fixture; die Gegenprobe „falsche Namensauflösung" blieb deshalb grün, obwohl serverseitig erzeugte
+Berichte dieses Feld gar nicht tragen.
+
+Die Frage lautet nicht „welche Felder brauche ich?", sondern **„welche Felder schickt der echte
+Erzeuger?"** – und wenn es mehrere gibt (Client-Weg und Server-Weg), braucht jeder seinen eigenen
+Fall.
+
 ## Betroffenheits-Sweep vor langem Volltest
 
 Nach Änderungen nicht nur nach dem geänderten Funktionsnamen suchen. Tests können ein Feature über DOM-Merkmale oder fachliche Texte bedienen.
@@ -121,6 +133,12 @@ Darum unterscheiden zwischen:
 - lokal = tatsächlicher aktueller Remote-Stand
 
 Checks, die auf gecachten Remote-Referenzen beruhen, sollen deren Alter sichtbar machen.
+
+**Die Warnung ist einseitig, der Fehler nicht.** Der Prüflauf meldet einen veralteten *Nachbar*-Klon;
+für das *eigene* Repository gibt es keine solche Meldung. Genau dort entsteht der teure Fall: Ein
+Paritätstest, gemessen gegen ein veraltetes eigenes `main`, sieht wie eine echte Lücke aus – man
+„behebt" dann etwas, das stromaufwärts längst geschlossen ist. Vor jeder Paritätsaussage deshalb
+**beide** Seiten auffrischen, nicht nur die, die der Prüflauf namentlich erwähnt.
 
 ## Qualitätstor für KI-Agenten
 
