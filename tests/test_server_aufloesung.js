@@ -320,9 +320,16 @@ async function lauf(browser, fall, verzoegerungMs) {
     const store = {}; const berichte = [];
     const mission = { id: MID, type: 'vorposten-bau', targetId: 'kepler', system: 'kepler',
       fleetName: 'Baukolonne', startTime: Date.now(), endTime: Date.now() + 4000,
-      composition: { colonyShips: 1 }, kosten: { erz: 50000 } };
+      /* KOSTEN IN KREDITEN, und das ist keine Bequemlichkeit. Der erste Anlauf nahm 50.000 Erz und
+         mass damit den LAGERDECKEL statt der Erstattung: gainResources klemmt bei storageCap(),
+         und der liegt in einem nackten Pruefspielstand bei rund 800 - beide Laeufe landeten dort,
+         der Abstand war zwangslaeufig 0 (gemessen: -4200 in beiden). Kredite sind die einzige
+         Groesse, die gainResources ohne Deckel durchreicht (`if (r === 'credits')`), und sie
+         unterliegen keiner Produktion. Damit misst die Pruefung genau das, worum es geht: ob
+         gainResources(m.kosten) ueberhaupt gelaufen ist. */
+      composition: { colonyShips: 1 }, kosten: { credits: 5000 } };
     store[SAVE_KEY] = grundstand(mission);
-    const erzVor = (() => { try { return JSON.parse(store[SAVE_KEY]).resources.erz; } catch (e) { return null; } })();
+    const erzVor = (() => { try { return JSON.parse(store[SAVE_KEY]).credits || 0; } catch (e) { return null; } })();
     await page.route('**/api/**', async r => {
       const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
       const j = (o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
@@ -347,7 +354,7 @@ async function lauf(browser, fall, verzoegerungMs) {
     await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
     await page.goto(SPIEL_URL);
     await page.waitForTimeout(14000);
-    let erzNach = null; try { erzNach = JSON.parse(store[SAVE_KEY]).resources.erz; } catch (e) {}
+    let erzNach = null; try { erzNach = JSON.parse(store[SAVE_KEY]).credits || 0; } catch (e) {}
     const b = berichte.find(x => x.type === 'vorposten-bau');
     await ctx.close();
     return { erzVor, erzNach, zuwachs: (erzNach !== null && erzVor !== null) ? erzNach - erzVor : null, bericht: b || null };
@@ -359,12 +366,12 @@ async function lauf(browser, fall, verzoegerungMs) {
     steht.bericht && steht.bericht.erfolg === true, steht.bericht ? { erfolg: steht.bericht.erfolg, grund: String(steht.bericht.grund || '').slice(0, 50) } : 'kein Bericht');
   check('9b: Verbindung weg UND kein Vorposten da -> Erstattung wie bisher',
     weg.bericht && weg.bericht.erfolg === false, weg.bericht ? { erfolg: weg.bericht.erfolg } : 'kein Bericht');
-  /* Gemessen wird der UNTERSCHIED der beiden Laeufe, nicht ein eingetippter Betrag: Die Produktion
-     laeuft in beiden Faellen gleich weiter und kuerzt sich damit heraus. Der Abstand muss deutlich
-     ueber dem Produktionsrauschen liegen - die Baukosten sind mit 50.000 bewusst gross gewaehlt. */
-  check('9c: und der Unterschied ist die Erstattung selbst, nicht Produktionsrauschen',
-    steht.zuwachs !== null && weg.zuwachs !== null && (weg.zuwachs - steht.zuwachs) > 1000,
-    { mitVorposten: steht.zuwachs, ohneVorposten: weg.zuwachs, abstand: (weg.zuwachs !== null && steht.zuwachs !== null) ? weg.zuwachs - steht.zuwachs : null });
+  /* Gemessen wird der UNTERSCHIED der beiden Laeufe, nicht ein eingetippter Betrag - und in
+     Krediten, damit weder Lagerdeckel noch Produktion dazwischenfunken (siehe Kommentar oben).
+     Erwartung: ohne stehenden Vorposten kommen genau die 5000 zurueck, mit stehendem gar nichts. */
+  check('9c: und die Erstattung selbst ist messbar - genau im einen Fall, nicht im anderen',
+    steht.zuwachs === 0 && weg.zuwachs === 5000,
+    { mitVorposten: steht.zuwachs, ohneVorposten: weg.zuwachs });
 
   await browser.close();
   ende();
