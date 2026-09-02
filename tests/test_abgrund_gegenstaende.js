@@ -82,8 +82,8 @@ const IAM = new Function('MODULE_DEFS, SHIP_MODULE_DEFS, HERKUNFT_ABGRUND',
   fnAus('istAbgrundModul')+'; return istAbgrundModul;');
 // HERKUNFT_UNIKAT in beiden Literal-Parsern (Arbeitsregel 9, v8.463.0): die Unikat-Defs
 // nutzen die vierte Herkunfts-Konstante - ohne sie ReferenceError beim Array-Parsen.
-const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('MODULE_DEFS'))();
-const SMD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('SHIP_MODULE_DEFS'))();
+const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat', HERKUNFT_KONVOI='konvoi'; return "+arrAus('MODULE_DEFS'))();
+const SMD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat', HERKUNFT_KONVOI='konvoi'; return "+arrAus('SHIP_MODULE_DEFS'))();
 const istAbgrund = IAM(MD, SMD, 'abgrund');
 const abgrundStandort = MD.filter(d=>d.quelle==='abgrund').map(d=>d.key);
 const abgrundSchiff   = SMD.filter(d=>d.quelle==='abgrund').map(d=>d.key);

@@ -27,8 +27,11 @@ function arrAus(name){
   if (i < 0) return null;
   let d = 0, st = JS.indexOf('[', i), k = st;
   for (; k < JS.length; k++){ if (JS[k]==='[') d++; else if (JS[k]===']'){ d--; if(!d) break; } }
-  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+JS.slice(st, k+1)+';')(); }
-  catch(e){ return null; }
+  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat', HERKUNFT_KONVOI='konvoi'; return "+JS.slice(st, k+1)+';')(); }
+  // Den Grund NICHT verschlucken: Fehlt dem Praeambel-Text eine Herkunfts-Konstante, ist das
+  // ein ReferenceError - und ohne diese Zeile meldete 1a nur "mods:null", was nach einem
+  // kaputten Anker aussieht statt nach einer fehlenden Konstante (gemessen 02.09.2026).
+  catch(e){ parseFehler.push(name + ': ' + e.message); return null; }
 }
 function fnAus(name){
   const von = JS.indexOf('function '+name+'(');
@@ -37,11 +40,12 @@ function fnAus(name){
   return bis > von ? JS.slice(von, bis + 4) : '';
 }
 
+const parseFehler = [];
 const SYN = arrAus('SHIP_SYNERGY_DEFS');
 const MODS = arrAus('SHIP_MODULE_DEFS');
 const KLASSEN = arrAus('SHIP_CLASS_DEFS');
 check('1a: SHIP_SYNERGY_DEFS, SHIP_MODULE_DEFS und SHIP_CLASS_DEFS geparst',
-  !!(SYN && MODS && KLASSEN), { syn: SYN && SYN.length, mods: MODS && MODS.length });
+  !!(SYN && MODS && KLASSEN), { syn: SYN && SYN.length, mods: MODS && MODS.length, parseFehler });
 if (!SYN || !MODS || !KLASSEN) return ende();
 
 // ---- 1) Vollstaendigkeit
