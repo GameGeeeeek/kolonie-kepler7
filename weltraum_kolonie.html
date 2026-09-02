@@ -14113,8 +14113,12 @@
                Heimatsystem den Vorposten traegt, und haelt dortige Aufklaerung ab Stufe 2 frisch.
        Garnison - stationierte Kampfschiffe verteidigen den Vorposten (rechnet der Server). */
   const VORPOSTEN_BAUKOSTEN = { erz: 60000, kristalle: 40000, deuterium: 25000 };
-  const VORPOSTEN_AUSBAU_KOSTEN = { 2: { erz: 200000, kristalle: 130000, deuterium: 80000 }, 3: { erz: 600000, kristalle: 400000, deuterium: 250000 } };
-  const VORPOSTEN_PROD_DECKEL = 0.10;
+  /* Deckel des Vorposten-Produktionsbonus ueber ALLE eigenen Vorposten. Von 0,10 auf 0,25 angehoben
+     (02.09.2026, mit der Stufenleiter auf 8): Ein Handelsknoten der Stufe 8 traegt allein 0,234 -
+     beim alten Deckel waere jeder Ausbau ab Stufe 3 wirkungslos gewesen und die Stufenleiter haette
+     etwas versprochen, das nie ankommt. Drei ausgebaute Handelsknoten erreichen den Deckel jetzt
+     gemeinsam, ein einzelner nicht ganz. */
+  const VORPOSTEN_PROD_DECKEL = 0.25;
   const VORPOSTEN_FARBE_EIGEN = '#5dcaa5', VORPOSTEN_FARBE_FREMD = '#e0667a';
   let vorpostenCache = { aktiv: false, bauAktiv: false, liste: [], stufen: [], maxJeKonto: 3, eigene: 0, geladen: 0 };
   async function ladeVorposten(){
@@ -14165,7 +14169,15 @@
     return (v && v.eigener && v.nutzen && v.nutzen.scan) || 0;
   }
   function vorpostenScanMult(sysId){ return Math.max(0.25, 1 - 0.25 * vorpostenScanStufe(sysId)); }
-  function vorpostenAusbauKosten(v){ return VORPOSTEN_AUSBAU_KOSTEN[(v.stufe || 1) + 1] || null; }
+  /* Die Ausbaukosten kommen seit dem 02.09.2026 vom SERVER (v.naechsteStufe.kosten, aus
+     VORPOSTEN_STUFEN). Vorher stand hier eine eigene Tabelle mit zwei Eintraegen - mit acht Stufen
+     waere daraus eine Kopie-Familie geworden, und die ist in diesem Projekt schon dreimal
+     auseinandergelaufen. Kein Rueckfall auf eine lokale Tabelle: Ein Server ohne das Feld ist ein
+     Server ohne die Stufen, dann gibt es auch nichts auszubauen. */
+  function vorpostenAusbauKosten(v){ return (v && v.naechsteStufe && v.naechsteStufe.kosten) || null; }
+  function vorpostenZweigWahlSteht(v){ return !!(v && v.naechsteStufe && v.naechsteStufe.zweigWahl); }
+  function vorpostenVarianten(v){ return (v && v.naechsteStufe && v.naechsteStufe.varianten) || []; }
+  function vorpostenZweigDef(key){ return (vorpostenCache.zweige || []).find(z => z && z.key === key) || null; }
   function kostenText(k){ return Object.entries(k || {}).map(([r, a]) => fmt(a) + ' ' + resDefFor(r).label).join(', '); }
   /* Der Belagerungsplan (21.08.2026, Auftrag Sascha: aus drei Optionen die UMWIDMUNG gewaehlt).
      Er senkt die EIGENEN Verluste des naechsten Festungsschlags - ausdruecklich NICHT das, was das
@@ -15623,15 +15635,18 @@
   function vorpostenGarnisonSenden(sysId){
     const v = vorpostenAn(sysId);
     if (!v || !v.eigener){ log('Dort steht kein eigener Vorposten.', 'ti-alert-triangle'); return; }
+    /* garnisonMax vom OBJEKT, nicht aus der Stufentabelle: die Tabelle ist die Leiter ohne
+       Zweig-Multiplikatoren (ein Festungsring haette 45 % zu wenig gezeigt, 02.09.2026). */
     const st = vorpostenStufeDef(v.stufe) || {};
-    const frei = Math.max(0, (st.garnisonMax || 0) - (v.garnisonAnzahl || 0));
+    const grenze = v.garnisonMax || st.garnisonMax || 0;
+    const frei = Math.max(0, grenze - (v.garnisonAnzahl || 0));
     oeffneFlottenwahl({
       art: 'Vorposten', titel: 'Garnison nach ' + (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name,
       keys: ATTACK_SHIP_KEYS,
       vorschau: (flotte) => {
         const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
         const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
-        return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Garnison: ${v.garnisonAnzahl||0} von ${st.garnisonMax||0} Plätzen belegt – <strong>${frei}</strong> frei. Mehr als das nimmt der Vorposten nicht an; der Rest bleibt zu Hause.</div>`
+        return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Garnison: ${v.garnisonAnzahl||0} von ${grenze} Plätzen belegt – <strong>${frei}</strong> frei. Mehr als das nimmt der Vorposten nicht an; der Rest bleibt zu Hause.</div>`
           + `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} – die Schiffe bleiben dort, bis du sie zurückrufst. Sie verteidigen den Vorposten und verlieren dabei; fällt er, sind sie verloren.</div>`
           + (n > frei ? `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${n - frei} Schiff(e) mehr als Platz – sie kämen unverrichtet zurück.</div>` : '');
       },
@@ -15714,13 +15729,35 @@
     const kosten = vorpostenAusbauKosten(v);
     if (!kosten){ log('Dieser Vorposten ist voll ausgebaut.', 'ti-info-circle'); return; }
     if (!canAfford(kosten)){ log('Ausbau kostet ' + kostenText(kosten) + ' – nicht genug Rohstoffe.', 'ti-alert-triangle'); return; }
-    const naechste = vorpostenStufeDef((v.stufe||1) + 1) || {};
-    if (!confirm('Vorposten zur Stufe „' + (naechste.name || 'nächste') + '" ausbauen?\n\nKosten: ' + kostenText(kosten) + '. Ein Ausbau heilt nicht: angerichteter Schaden bleibt.')) return;
+    /* Steht die einmalige Ausrichtung an (Sprung auf vorpostenCache.zweigAb), wird sie HIER
+       gewaehlt - der Server verlangt sie und lehnt den Ausbau sonst mit `zweigNoetig` ab. Die
+       Varianten kommen fertig gerechnet vom Server (v.naechsteStufe.varianten), damit das Spiel
+       die Multiplikatoren nicht ein zweites Mal kennt. */
+    let zweig = v.zweig || '';
+    if (vorpostenZweigWahlSteht(v)){
+      const varianten = vorpostenVarianten(v);
+      if (!varianten.length){ log('Der Server nennt keine Ausrichtungen – lade das Spiel neu.', 'ti-alert-triangle', 'warn'); return; }
+      const zeilen = varianten.map((va, i) => {
+        const def = vorpostenZweigDef(va.zweig) || {};
+        return (i+1) + ') ' + (def.name || va.zweig) + ' – ' + (va.name || '') + '\n'
+          + '   ' + (def.kurz || '') + '\n'
+          + '   Kern ' + fmt(va.kernLp) + ', Verteidigung ' + fmt(va.verteidigung) + ', Garnison ' + fmt(va.garnisonMax)
+          + ', Flugzeit −' + Math.round((va.nutzen.flug||0)*100) + '%, Produktion +' + (Math.round((va.nutzen.prod||0)*1000)/10) + '%, Aufklärung ' + va.nutzen.scan;
+      }).join('\n\n');
+      const wahl = prompt('Ab dieser Stufe bekommt der Vorposten eine Ausrichtung – die Entscheidung gilt für immer.\n\n'
+        + zeilen + '\n\nGib die Nummer ein (1–' + varianten.length + '):', '1');
+      if (wahl === null) return;
+      const idx = parseInt(String(wahl).trim(), 10) - 1;
+      if (!(idx >= 0 && idx < varianten.length)){ log('Keine gültige Ausrichtung gewählt – der Ausbau wurde nicht gestartet.', 'ti-alert-triangle', 'warn'); return; }
+      zweig = varianten[idx].zweig;
+    }
+    const zielName = (vorpostenVarianten(v).find(x => !zweig || x.zweig === zweig) || {}).name || 'nächste Stufe';
+    if (!confirm('Vorposten zur Stufe ' + ((v.stufe||1)+1) + " („" + zielName + '") ausbauen?\n\nKosten: ' + kostenText(kosten) + '. Ein Ausbau heilt nicht: angerichteter Schaden bleibt.')) return;
     let daten = null;
     try {
-      const res = await backendFetch('/vorposten/ausbauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) });
+      const res = await backendFetch('/vorposten/ausbauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId, zweig }) });
       daten = await res.json().catch(() => null);
-      if (!res.ok){ log((daten && daten.error) || 'Der Server hat den Ausbau abgelehnt.', 'ti-alert-triangle'); return; }
+      if (!res.ok){ log((daten && daten.error) || 'Der Server hat den Ausbau abgelehnt.', 'ti-alert-triangle', 'warn'); return; }
     } catch(e){ log('Der Server war nicht erreichbar.', 'ti-alert-triangle'); return; }
     pay(kosten);
     log('Vorposten ausgebaut: ' + ((daten.vorposten && daten.vorposten.name) || 'neue Stufe') + '.', 'ti-building-community', 'wichtig');
@@ -63469,17 +63506,23 @@ async function claimPendingRewards(){
     const jetzt = Date.now();
     const kern = v.kern || {};
     const farbe = v.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD;
+    /* Die Garnisonsgrenze kommt vom OBJEKT (zweig-korrekt), nicht aus der Stufentabelle - und sie
+       steht HIER, nicht im Besitzer-Zweig: die Info-Zeile unten nennt sie fuer jeden Vorposten. */
+    const grenze = v.garnisonMax || st.garnisonMax || 0;
     const eintraege = [];
     if (v.eigener){
       const kosten = vorpostenAusbauKosten(v);
       const ausbauWartet = (v.ausbauAb||0) > jetzt;
-      eintraege.push({ icon:'ti-arrow-up', label: kosten ? 'Ausbauen zur Stufe ' + ((v.stufe||1)+1) : 'Voll ausgebaut',
+      const wahlSteht = vorpostenZweigWahlSteht(v);
+      eintraege.push({ icon:'ti-arrow-up', label: !kosten ? 'Voll ausgebaut'
+          : wahlSteht ? 'Ausbauen zur Stufe ' + ((v.stufe||1)+1) + ' – Ausrichtung wählen'
+          : 'Ausbauen zur Stufe ' + ((v.stufe||1)+1) + ((vorpostenVarianten(v)[0] || {}).name ? ' („' + vorpostenVarianten(v)[0].name + '")' : ''),
         grund: !kosten ? 'Höchste Stufe erreicht.' : ausbauWartet ? 'Nächster Ausbau in ' + fmtDuration((v.ausbauAb - jetzt)/1000) + '.' : 'Kosten: ' + kostenText(kosten) + (canAfford(kosten) ? '' : ' – nicht genug Rohstoffe.'),
         disabled: !kosten || ausbauWartet || !canAfford(kosten), fn: () => vorpostenAusbauen(sysId) });
-      const frei = Math.max(0, (st.garnisonMax||0) - (v.garnisonAnzahl||0));
+      const frei = Math.max(0, grenze - (v.garnisonAnzahl||0));
       const garnUnterwegs = cf.missions.some(m => m.type === 'vorposten-defend' && m.targetId === sysId);
       eintraege.push({ icon:'ti-shield', label:'Garnison entsenden',
-        grund: garnUnterwegs ? 'Eine Garnison ist bereits unterwegs.' : !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.' : frei < 1 ? 'Die Garnison ist voll (' + (st.garnisonMax||0) + ').' : frei + ' von ' + (st.garnisonMax||0) + ' Plätzen frei – Kampfschiffe verteidigen den Vorposten.',
+        grund: garnUnterwegs ? 'Eine Garnison ist bereits unterwegs.' : !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.' : frei < 1 ? 'Die Garnison ist voll (' + grenze + ').' : frei + ' von ' + grenze + ' Plätzen frei – Kampfschiffe verteidigen den Vorposten.',
         disabled: garnUnterwegs || !kampfschiffe || frei < 1, fn: () => vorpostenGarnisonSenden(sysId) });
       eintraege.push({ icon:'ti-refresh', label:'Garnison zurückrufen', grund: (v.garnisonAnzahl||0) ? 'Holt alle ' + v.garnisonAnzahl + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '.' : 'Dort steht keine Garnison.',
         disabled: !(v.garnisonAnzahl||0), fn: () => vorpostenRueckruf(sysId, 'rueckruf') });
@@ -63498,10 +63541,19 @@ async function claimPendingRewards(){
       eintraege.push({ icon:'ti-sword', label:'Vorposten angreifen', grund, disabled: gesperrt, fn: () => oeffneVorpostenAngriff(sysId) });
     }
     const nutzen = v.nutzen || {};
-    let info = `<div class="bmeta"><i class="ti ti-building-community" aria-hidden="true" style="color:${farbe};"></i> ${escapeHtml(v.eigener ? 'Dein Vorposten' : 'Besitzer: ' + (v.besitzerName||'?'))} · Stufe ${v.stufe||1} von ${(vorpostenCache.stufen||[]).length||3}</div>`
+    /* Ausrichtung und Stufe von N (02.09.2026): Der Vorposten hat acht Stufen und ab der vierten
+       eine Spezialisierung - beides muss am Objekt ablesbar sein, sonst weiss niemand, wie weit er
+       noch kommt oder was er vor sich hat. Beide Zahlen kommen vom Server. */
+    const zweigZeile = v.zweigName
+      ? `<div class="bmeta" data-vp-zweig="1"><i class="ti ti-git-branch" aria-hidden="true" style="color:${farbe};"></i> Ausrichtung: <strong>${escapeHtml(v.zweigName)}</strong>${(vorpostenZweigDef(v.zweig)||{}).kurz ? ' – ' + escapeHtml(vorpostenZweigDef(v.zweig).kurz) : ''}</div>`
+      : (v.eigener && vorpostenZweigWahlSteht(v)
+        ? `<div class="bmeta" data-vp-zweig="0"><i class="ti ti-git-branch" aria-hidden="true"></i> Noch ohne Ausrichtung – beim nächsten Ausbau wählst du sie <strong>einmalig</strong>.</div>`
+        : '');
+    let info = `<div class="bmeta"><i class="ti ti-building-community" aria-hidden="true" style="color:${farbe};"></i> ${escapeHtml(v.eigener ? 'Dein Vorposten' : 'Besitzer: ' + (v.besitzerName||'?'))} · Stufe ${v.stufe||1} von ${v.maxStufe || vorpostenCache.maxStufe || (vorpostenCache.stufen||[]).length || 3}</div>`
       + `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(kern.lp||0))}</strong> von ${fmt(kern.lpMax||0)} (${Math.round(100*Math.max(0,Math.min(1,(kern.lp||0)/Math.max(1,kern.lpMax||1))))}%)</div>`
       + kartenFuellBalken(kern.lp||0, kern.lpMax||0, farbe, 'Wie viel vom Kern noch steht - faellt er, faellt der Vorposten.')
-      + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Verteidigung <strong>${fmt(v.verteidigung||0)}</strong> · Garnison ${v.garnisonAnzahl||0} von ${st.garnisonMax||0}${v.eigener && v.garnison ? ' – ' + fleetBreakdownHtml(v.garnison) : ''}</div>`
+      + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Verteidigung <strong>${fmt(v.verteidigung||0)}</strong> · Garnison ${v.garnisonAnzahl||0} von ${grenze}${v.eigener && v.garnison ? ' – ' + fleetBreakdownHtml(v.garnison) : ''}</div>`
+      + zweigZeile
       + `<div class="bmeta"><i class="ti ti-sparkles" aria-hidden="true"></i> Nutzen: −${Math.round((nutzen.flug||0)*100)}% Flugzeit für eigene Nicht-PvP-Missionen hierher · +${Math.round((nutzen.prod||0)*1000)/10}% Produktion aller Standorte · Aufklärung Stufe ${nutzen.scan||0}</div>`;
     if ((v.schutzBis||0) > jetzt) info += `<div class="bmeta"><i class="ti ti-shield-lock" aria-hidden="true"></i> Bauschutz noch ${fmtDuration((v.schutzBis - jetzt)/1000)}</div>`;
     if (v.letzterKampf) info += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Letzter Angriff: ${escapeHtml(v.letzterKampf.angreiferName||'?')} – ${fmt(v.letzterKampf.schaden||0)} Schaden${v.letzterKampf.gefallen ? ', geschleift' : ''} (${fmtDuration((jetzt - (v.letzterKampf.zeit||jetzt))/1000)} her)</div>`;
