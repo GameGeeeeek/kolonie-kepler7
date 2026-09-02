@@ -628,10 +628,9 @@ ist lokal in der Kartenfunktion, im Modulscope war das ein ReferenceError, der d
 leer ließ (erster Lauf von `test_vorposten_ui`: Chip da, Marker weg); ⛺-Landmarke; Detailtafel-Chip; Bau-Knopf im Basis-Schnellzugriff des
 aufgeklappten fremden Systems. Der Vorposten-Zustand ist Teil von `karteAuffangSignatur`.
 
-**Offen / nicht gebaut:** ein Allianz-Verband gegen Vorposten (der Server-Kern
-`vorpostenSchlagAusfuehren` nimmt `beteiligte` bereits gewichtet entgegen), Vorwarnung des
-Verteidigers vor der Ankunft (der Server hat keine `incomingmuster`-Entsprechung; der Besitzer sieht
-den Kampfvermerk im Dokument und den Fall im Belohnungsfach).
+**Offen / nicht gebaut:** Vorwarnung des Verteidigers vor der Ankunft (der Server hat keine
+`incomingmuster`-Entsprechung; der Besitzer sieht den Kampfvermerk im Dokument, die Meldung beim
+ersten Schlag und den Fall im Belohnungsfach).
 
 ## Der gesperrte Bau-Knopf sagt jetzt, warum (02.09.2026)
 
@@ -714,3 +713,39 @@ identische Prüflisten.
 Bounding-Box – die enthält das `<text>` mit dem Namen, und „Sternenfestung" ist länger als
 „Stützpunkt". Sie war deshalb am alten Stand mit festem Radius **grün** und belegte nichts. Jetzt
 liest sie den Radius des pulsenden Hofs, die einzige Größe, die nur am Radius hängt.
+
+## Der Allianz-Verband gegen einen Vorposten (02.09.2026)
+
+Eine Bastion hält 400.000 Kernpunkte und 60.000 Verteidigung. Für ein Einsteiger-Konto sind das rund
+53 Einzelschläge bei vier Stunden Abklingzeit – solo ist sie nicht zu schleifen. Damit ist der
+Vorposten die vierte Zielart des koordinierten Angriffs, neben fremder Allianzbasis, Alien-Nest und
+Asteroidenfestung. Der Server-Kern `vorpostenSchlagAusfuehren` nahm `beteiligte` schon gewichtet
+entgegen; gebaut wurde die Zielwahl, der Auflösungszweig und der Bericht.
+
+**Zielwahl (`renderAllianceMusterBox`).** `musterVorposten` filtert die geladenen Vorposten auf
+**fremd** und **ohne Bauschutz** – dieselben zwei Bedingungen, die der Server beim `create` prüft.
+Ein Eintrag, den der Server abweisen würde, gehört nicht in die Liste; das Paar in Abschnitt 4 von
+`tests/test_muster_vorposten_ui.js` misst genau das: der fremde, ungeschützte steht zur Wahl, der
+eigene und der geschützte nicht. Steht kein wählbarer Vorposten da, erscheint die Option nicht –
+eine leere Wahl wäre ein Versprechen ohne Gegenstand (dieselbe Regel wie bei Nest und Festung).
+
+**Der Bauschutz wird zweimal geprüft.** Beim Ausrufen und noch einmal **bei der Ankunft**
+(Backend, Grund `schutz`). Ohne die zweite Prüfung wäre der Verband der Weg, den Bauschutz zu
+umgehen: Man ruft gegen einen ungeschützten Vorposten aus, der Besitzer baut während der
+Sammelphase neu – und der frisch gebaute stünde ungeschützt da. Der Verband kehrt stattdessen
+unverrichtet und vollzählig zurück.
+
+**Wortlaut-Tests sind an dieser Stelle teuer.** Der Umbau der Zielart-Wahl auf vier Optionen riss
+zwei fremde Tests, die den alten Satz wörtlich festhielten: `test_muster_festung_ui` 1b/1d und
+`test_muster_nest_ui` 5b/5c. Beide prüften eine Momentaufnahme (`if (data.nest || data.festung){`,
+„… oder eine Asteroidenfestung sein") statt der Regel. Sie prüfen jetzt die Regel: der claim-Zweig
+muss `data.nest` zuerst und `data.festung` irgendwo führen, die Zahl der weiteren Glieder ist offen;
+der Hilfesatz muss die Asteroidenfestung nennen, die Reihenfolge der Aufzählung ist offen. Eine
+fünfte Zielart bricht diese Tests nicht mehr, ein Wegfall der bewachten Zielart weiterhin schon
+(gemessen: Festung raus → 1b; Nest raus → 1b, 5b, 5c; Festung aus der Hilfe → 1d).
+
+Dabei fiel ein stummer Punkt auf: `test_muster_nest_ui` 5c schnitt seine Scheibe ab
+`cblock.indexOf(zweigKopf)`. Ohne gefundenen Kopf ist das **0** – die Scheibe begann am Blockanfang
+und die Prüfung ging grün durch, genau in dem Fall, für den sie gebaut war. Ohne Kopf gibt es jetzt
+keine Scheibe.
+
