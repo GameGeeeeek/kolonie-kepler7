@@ -70,3 +70,41 @@ Ohne `NOTIF_EVENT_INFO`-Eintrag zeichnet das Postfach das Wort „Ereignis".
 
 Alle Gegenproben laufen per `KEPLER_SPIELDATEI` gegen den Stand vor der jeweiligen Etappe; die
 Prüflisten werden per `diff` über die reinen Prüfnamen verglichen, nicht gezählt.
+
+## Vier weitere Fähigkeiten: Sperre mit Frist, Spielstand-Rücksicherung, Protokoll, Allianzen (02.09.2026)
+
+Auftrag Sascha: „Ideen für noch mehr admin Funktionen jeglicher Art?" – alle vier Vorschläge gewählt.
+Server-Hälfte samt Begründungen: Backend `docs/admin.md` (kolonie-kepler7-backend#196).
+
+**Konto-Blatt, Moderation.** Sperre und Stummschaltung teilen sich ein Grund-Feld; die Sperre hat
+eine Dauer-Auswahl (unbefristet, 1/3/7/30 Tage), die Stummschaltung eine Stunden-Auswahl. Beide
+Zeilen (`Sperre`, `Stummgeschaltet`) fehlen **ersatzlos**, wenn der Server die Felder nicht schickt.
+Der Meldungen-Reiter gibt beim Sperren den Grund der Meldung als „Meldung: …" mit – der Gesperrte
+liest ihn beim Anmelden. `adminToggleBan(name, gesperrt, { grund, tage })` ist die eine Stelle für
+beide Reiter.
+
+**Spielstand-Blatt.** „Spielstand ansehen" lädt eine Zusammenfassung (nie den rohen Stand), den
+Schatten einer früheren Rücksicherung mit „wieder einsetzen", und die Backup-Auswahl. „Aus Backup
+ansehen" zeigt den Stand aus der gewählten Sicherung **neben** dem heutigen, erst dann gibt es
+„Diesen Stand zurückholen" – mit einer Rückfrage, die die zwei Folgen nennt: Der Spieler wird auf
+allen Geräten abgemeldet (sonst schriebe sein laufendes Spiel den alten Stand per 409-Wiederholung
+zurück), der jetzige Stand wird zum Schatten. Im Systemstand hängt eine Backups-Kachel mit „Backup
+jetzt anlegen"; ohne die Route fehlt sie ersatzlos (`adminBackupsKachel`).
+
+**Protokoll- und Allianz-Reiter** (elfter und zwölfter Reiter). Das Protokoll zeigt Zeit, Art, Ziel,
+Wer und die gekürzten Angaben je Handlung; `targetUsername`/`tag` erscheinen als Ziel, nicht ein
+zweites Mal in den Angaben. Die Allianz-Karte zeigt Mitglieder (Anführer zuerst, mit letzter Sitzung
+und „Konto fehlt"), Limit, Basisstufe, Bewerbungen; „Zum Anführer machen" nimmt das gewählte
+Mitglied, „Auflösen" fragt nach. Eine aufgelöste Allianz hat keine Knöpfe.
+
+**Die Spielerseite.** Chat-Senden läuft mit Server über `storageSetStrict` – `storageSet()` fiel
+bei einem 403 still auf den lokalen Speicher zurück, ein Stummgeschalteter hätte seine Nachricht
+bei sich gesehen und sonst nirgends, ohne je den Grund zu erfahren. Ohne Server bleibt der
+bisherige Weg. Direktnachrichten zeigen den Fehlertext des Servers; der Anmeldetext eines
+Gesperrten kommt unverändert vom Server (Grund und Frist).
+
+**Wächter** `tests/test_admin_verwaltung_ui.js` (35 Prüfungen) mit Paaren: Zeilen da UND ersatzlos
+weg, Bestätigen sperrt UND Abbrechen nicht, Kachel mit Route UND ohne sie weg, Auflösen nach
+Bestätigung UND nicht nach Abbruch, Stummgeschalteter liest den Grund UND ein freier Spieler
+sieht nichts. Der erste Entwurf von 7c ließ `/api/me` auch ohne Token angemeldet antworten – die
+Landeseite mit dem Anmeldeformular erschien nie, und die Prüfung maß über leerem Text.

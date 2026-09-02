@@ -2754,6 +2754,8 @@
         <button id="adminTabKontoBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-user-circle" aria-hidden="true" style="margin-right:4px;"></i>Konto</button>
         <button id="adminTabSystemBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-adjustments" aria-hidden="true" style="margin-right:4px;"></i>System</button>
         <button id="adminTabGeschenkBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Geschenk</button>
+        <button id="adminTabProtokollBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:4px;"></i>Protokoll</button>
+        <button id="adminTabAllianzenBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Allianzen</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2872,6 +2874,18 @@
         <button id="adminGeschenkSendenBtn" class="login-submit" style="width:100%; padding:8px 16px; margin-bottom:12px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:5px;"></i>Jetzt verschenken</button>
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bisherige Geschenke</div>
         <div id="adminGeschenkVerlauf" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+      <!-- Protokoll (02.09.2026). Der Server haelt jede erfolgreiche Betreiber-Handlung beim Antworten
+           fest (eine Middleware ueber alle Admin-POSTs); hier nur die Sicht. -->
+      <div id="adminProtokollView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Jede Betreiber-Handlung mit Zeit, Ziel und Angaben – vom Server beim Antworten festgehalten, die letzten 300. Ein abgewiesener Versuch steht nicht darin.</div>
+        <div id="adminProtokollListe" style="display:flex; flex-direction:column; gap:4px;"></div>
+      </div>
+      <!-- Allianzen (02.09.2026). Alles liegt in db.shared unter alliance:<tag>:*; die Eingriffe gehen
+           denselben Weg wie das Aufloesen durch den Anfuehrer selbst. -->
+      <div id="adminAllianzenView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Alle Allianzen mit Mitgliedern, Basisstufe und offenen Bewerbungen. <strong>Anführer übertragen</strong> hilft, wenn der Anführer verschwunden ist; <strong>Auflösen</strong> tut genau das, was der Anführer selbst tun könnte – der Tag wird danach frei.</div>
+        <div id="adminAllianzenListe" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
   </div>
@@ -7306,8 +7320,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.627.0';
+  const VERSION = '8.628.0';
   const PATCHNOTES = [
+    { version:'8.628.0', date:'02.09.2026', changes:[
+      '<strong>Admin-Bereich: Sperren mit Grund und Frist.</strong> Eine Sperre nennt jetzt einen Grund und läuft wahlweise nach 1, 3, 7 oder 30 Tagen von selbst ab; wer gesperrt ist, liest beim Anmelden Grund und Frist statt nur „gesperrt". Aus einer Meldung heraus wandert der Meldegrund automatisch in die Sperre. Als mildere Stufe gibt es die <strong>Stummschaltung</strong> für Stunden oder Tage: Globaler Chat, Allianz-Chat und Nachrichten sind dann gesperrt, spielen geht weiter – und wer stummgeschaltet ist, erfährt beim Senden Frist und Grund, statt dass seine Nachricht still verschwindet.',
+      '<strong>Spielstand-Blatt und Rücksicherung aus dem Backup.</strong> Der Betreiber sieht im Konto-Blatt eine Zusammenfassung des Spielstands (Ressourcen, Gebäude, Forschung, Flotte) und kann den Stand aus einer der Server-Sicherungen (alle 30 Minuten) daneben legen und zurückholen. Der bisherige Stand bleibt als Schatten erhalten und lässt sich wieder einsetzen; der betroffene Spieler wird dabei einmal abgemeldet. Bisher brauchte ein verlorener Spielstand Handarbeit direkt auf dem Server.',
+      '<strong>Zwei neue Reiter: Protokoll und Allianzen.</strong> Das Protokoll hält jede Betreiber-Handlung mit Zeit, Ziel und Angaben fest. Die Allianz-Übersicht zeigt Mitglieder, Basisstufe und offene Bewerbungen; ist ein Anführer verschwunden, lässt sich die Führung übertragen, und eine verwaiste Allianz kann aufgelöst werden – genau so, wie es der Anführer selbst könnte.',
+      '<strong>Für Spieler ändert sich am Spiel nichts.</strong> Wer nicht gesperrt oder stummgeschaltet ist, merkt von alledem nichts.'
+    ]},
     { version:'8.627.0', date:'02.09.2026', changes:[
       '<strong>Admin-Bereich: Der Geschenk-Knopf ist während des Versands gesperrt.</strong> Antwortet der Server langsam, konnte ein zweiter Klick nach der Rückfrage ein zweites Geschenk auslösen – jedes Konto hätte es doppelt bekommen, unwiderruflich. Der Knopf sperrt sich jetzt, bis die Antwort da ist, und gibt sich auch nach einem Fehlschlag wieder frei. Gefunden von der automatischen Codex-Durchsicht des vorigen Änderungssatzes.'
     ]},
@@ -34218,7 +34238,7 @@ async function claimPendingRewards(){
     try {
       const res = await backendFetch('/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ toUserId: messageComposeTargetId, text }) });
       if (res.ok){ log('Nachricht gesendet.', 'ti-mail'); closeMessageCompose(); }
-      else { log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+      else { let d = {}; try { d = await res.json(); } catch(e){} log(d.error || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
     finally { if (sendBtn) sendBtn.disabled = false; }
   }
@@ -34651,7 +34671,9 @@ async function claimPendingRewards(){
     { tab:'schalter',  btn:'adminTabSchalterBtn',  view:'adminSchalterView',  anzeige:'block', sub:'Notabschaltung',           laden:() => loadAdminSchalter() },
     { tab:'konto',     btn:'adminTabKontoBtn',     view:'adminKontoView',     anzeige:'block', sub:'Konto nachschlagen',       laden:() => loadAdminAktivitaet() },
     { tab:'system',    btn:'adminTabSystemBtn',    view:'adminSystemView',    anzeige:'block', sub:'Systemstand',              laden:() => loadAdminSystemstand() },
-    { tab:'geschenk',  btn:'adminTabGeschenkBtn',  view:'adminGeschenkView',  anzeige:'block', sub:'Geschenk an alle Spieler',  laden:() => loadAdminGeschenke() }
+    { tab:'geschenk',  btn:'adminTabGeschenkBtn',  view:'adminGeschenkView',  anzeige:'block', sub:'Geschenk an alle Spieler',  laden:() => loadAdminGeschenke() },
+    { tab:'protokoll', btn:'adminTabProtokollBtn', view:'adminProtokollView', anzeige:'block', sub:'Protokoll der Betreiber-Handlungen', laden:() => loadAdminProtokoll() },
+    { tab:'allianzen', btn:'adminTabAllianzenBtn', view:'adminAllianzenView', anzeige:'block', sub:'Allianzen',                   laden:() => loadAdminAllianzen() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -35170,6 +35192,196 @@ async function claimPendingRewards(){
     } catch(e){ log('Verschenken fehlgeschlagen – Server nicht erreichbar.', 'ti-alert-triangle'); }
     finally { if (btn) btn.disabled = false; }
   }
+  /* ===== Spielstand-Blatt, Backups, Protokoll, Allianzen (02.09.2026, Auftrag Sascha "Ideen fuer
+     noch mehr admin Funktionen jeglicher Art") - die Server-Haelfte samt Begruendungen steht in der
+     Backend-Doku docs/admin.md. ======================================================================
+     Das Spielstand-Blatt zeigt eine ZUSAMMENFASSUNG, nie den rohen Stand. Die Ruecksicherung ist der
+     einzige Schreibzugriff auf einen fremden Spielstand: Der Server bewahrt den bisherigen Stand als
+     Schatten und entwertet die Sitzungen des Spielers - das sagt die Rueckfrage, bevor sie es tut. */
+  function spielstandTabelleHtml(z, titel){
+    if (!z) return `<div class="bmeta">${escapeHtml(titel)}: kein Spielstand.</div>`;
+    if (z.fehler) return `<div class="bmeta" style="color:#f0997b;">${escapeHtml(titel)}: ${escapeHtml(z.fehler)}</div>`;
+    const zeile = (k, w) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:#c9d4e8; text-align:right;">${w}</span></div>`;
+    const liste = (obj, max) => { const e = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]); return e.length ? escapeHtml(e.slice(0, max).map(([k, v]) => k + ' ' + adminZahl(v)).join(', ')) + (e.length > max ? ' …' : '') : '–'; };
+    return `<div style="display:flex; flex-direction:column; gap:3px;">
+      <div class="bname" style="font-size:12px;">${escapeHtml(titel)}</div>
+      ${zeile('Stand', adminZeit(z.lastTick) + ' · ' + adminZahl(Math.round((z.groesse || 0) / 1024)) + ' kB')}
+      ${zeile('Kredite / Erfahrung', adminZahl(z.credits) + ' / ' + adminZahl(z.xp) + (z.prestige ? ' · Prestige ' + adminZahl(z.prestige) : ''))}
+      ${zeile('Kampfpunkte', adminZahl(z.kampfpunkte))}
+      ${zeile('Ressourcen', escapeHtml(Object.entries(z.ressourcen || {}).map(([k, v]) => resLabel(k) + ' ' + adminZahl(v)).join(', ')))}
+      ${zeile('Gebäude', liste(z.gebaeude, 8))}
+      ${zeile('Forschung', liste(z.forschung, 8))}
+      ${zeile('Flotte', liste(z.flotte, 8))}
+      ${zeile('Kolonien / Missionen / Bauaufträge', adminZahl(z.kolonien) + ' / ' + adminZahl(z.missionen) + ' / ' + adminZahl(z.bauauftraege))}
+      ${z.allianz ? zeile('Allianz', escapeHtml(z.allianz)) : ''}
+    </div>`;
+  }
+  async function adminSpielstandAnzeigen(name){
+    const box = document.querySelector('[data-konto-spielstand-box="' + CSS.escape(name) + '"]');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Spielstand wird geladen…</div>`;
+    try {
+      const [res, resB] = await Promise.all([backendFetch('/admin/spielstand?name=' + encodeURIComponent(name)), backendFetch('/admin/backups')]);
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'das Spielstand-Blatt'); return; }
+      const d = await res.json();
+      const backups = resB.ok ? ((await resB.json()).backups || []) : [];
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:6px;">
+        ${spielstandTabelleHtml(d.vorhanden ? d.zusammenfassung : null, 'Aktueller Spielstand' + (d.version !== null ? ' (Version ' + adminZahl(d.version) + ')' : ''))}
+        ${d.schatten ? `<div style="margin-top:4px;">${spielstandTabelleHtml(d.schatten.zusammenfassung, 'Schatten vom ' + adminZeit(d.schatten.zeit) + ' – ' + (d.schatten.quelle || ''))}
+          <button data-schatten-zurueck="${escapeHtml(name)}" style="width:100%; font-size:11px; margin-top:4px;">Schatten wieder einsetzen (Rücksicherung rückgängig)</button></div>` : ''}
+        <div class="bmeta" style="margin-top:4px;">Stand aus einem Server-Backup ansehen (${adminZahl(backups.length)} Sicherungen, alle 30 Minuten):</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <select data-backup-datei="${escapeHtml(name)}" style="flex:2 1 170px; font-size:11.5px;">${backups.map(b => `<option value="${escapeHtml(b.datei)}">${adminZeit(b.zeit)} · ${adminZahl(Math.round(b.groesse / 1024))} kB</option>`).join('')}</select>
+          <button data-backup-ansehen="${escapeHtml(name)}" style="flex:1 1 120px; font-size:11px;" ${backups.length ? '' : 'disabled'}>Aus Backup ansehen</button>
+        </div>
+        <div data-backup-box="${escapeHtml(name)}"></div>
+      </div>`;
+      const sel = box.querySelector('[data-backup-datei]');
+      const bb = box.querySelector('[data-backup-ansehen]');
+      if (bb) bb.onclick = () => adminBackupSpielstandAnzeigen(name, sel ? sel.value : '');
+      const sz = box.querySelector('[data-schatten-zurueck]');
+      if (sz) sz.onclick = () => adminSchattenZurueck(name);
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'das Spielstand-Blatt'); }
+  }
+  async function adminBackupSpielstandAnzeigen(name, datei){
+    const box = document.querySelector('[data-backup-box="' + CSS.escape(name) + '"]');
+    if (!box || !datei) return;
+    box.innerHTML = `<div class="bmeta">Backup wird gelesen…</div>`;
+    try {
+      const res = await backendFetch('/admin/backup-spielstand?name=' + encodeURIComponent(name) + '&datei=' + encodeURIComponent(datei));
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ box.innerHTML = `<div class="bmeta" style="color:#f0997b;">${escapeHtml(d.error || 'Backup nicht lesbar.')}</div>`; return; }
+      box.innerHTML = `<div style="margin-top:4px;">${spielstandTabelleHtml(d.vorhanden ? d.zusammenfassung : null, 'Im Backup vom ' + adminZeit(d.zeit))}
+        ${d.vorhanden ? `<button data-backup-zurueckholen="${escapeHtml(name)}" data-datei="${escapeHtml(datei)}" style="width:100%; font-size:11px; margin-top:6px;"><i class="ti ti-shield" aria-hidden="true" style="margin-right:4px;"></i>Diesen Stand zurückholen</button>` : ''}
+      </div>`;
+      const zb = box.querySelector('[data-backup-zurueckholen]');
+      if (zb) zb.onclick = () => adminSpielstandZurueckholen(name, datei);
+    } catch(e){ box.innerHTML = `<div class="bmeta">Keine Verbindung.</div>`; }
+  }
+  async function adminSpielstandZurueckholen(name, datei){
+    // Die Rueckfrage nennt die zwei Folgen, die der Bediener nicht rueckgaengig machen kann, ohne
+    // den Schatten zu kennen: Der Spieler wird abgemeldet, sein jetziger Stand wird zum Schatten.
+    if (!confirm('Den Spielstand von „' + name + '" aus dem Backup zurückholen?\n\nDer jetzige Stand bleibt als Schatten erhalten und lässt sich wieder einsetzen. Der Spieler wird auf allen Geräten abgemeldet und lädt nach der nächsten Anmeldung den zurückgeholten Stand – sonst würde sein laufendes Spiel den alten Stand sofort zurückschreiben.')) return;
+    try {
+      const res = await backendFetch('/admin/spielstand-zurueckholen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: name, datei }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Zurückholen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Spielstand von ' + name + ' zurückgeholt (Version ' + adminZahl(d.version) + ') – der Spieler muss sich neu anmelden.', 'ti-check', 'ok');
+      loadAdminKonto();
+    } catch(e){ log('Keine Verbindung – nichts zurückgeholt.', 'ti-alert-triangle'); }
+  }
+  async function adminSchattenZurueck(name){
+    if (!confirm('Den Schatten von „' + name + '" wieder einsetzen? Der jetzige Stand wird dabei zum neuen Schatten, der Spieler wird abgemeldet.')) return;
+    try {
+      const res = await backendFetch('/admin/spielstand-schatten-zurueck', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: name }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Rückgängig fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Schatten von ' + name + ' wieder eingesetzt (Version ' + adminZahl(d.version) + ').', 'ti-check', 'ok');
+      loadAdminKonto();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
+  // Backups im Systemstand: Anzahl, juengste Sicherung, "Backup jetzt". Fehlt die Route (alter
+  // Server), fehlt die Kachel ersatzlos.
+  async function adminBackupsKachel(box){
+    let d = null;
+    try { const res = await backendFetch('/admin/backups'); if (res.ok) d = await res.json(); } catch(e){}
+    if (!d || !Array.isArray(d.backups)) return;
+    const neu = d.backups[0];
+    const zeile = (k, w) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:#c9d4e8; text-align:right;">${w}</span></div>`;
+    const kachel = document.createElement('div');
+    kachel.className = 'card-row';
+    kachel.style.cssText = 'flex-direction:column; align-items:stretch; gap:5px;';
+    kachel.innerHTML = `<div class="bname"><i class="ti ti-shield" aria-hidden="true" style="margin-right:5px;"></i>Backups</div>
+      ${zeile('Sicherungen', adminZahl(d.backups.length) + ' von höchstens ' + adminZahl(d.behalt) + ' · alle ' + adminZahl(d.taktMinuten) + ' Minuten')}
+      ${zeile('Jüngste', neu ? adminZeit(neu.zeit) + ' · ' + adminZahl(Math.round(neu.groesse / 1024)) + ' kB' : 'keine')}
+      <button id="adminBackupJetztBtn" style="width:100%; font-size:11px; margin-top:4px;">Backup jetzt anlegen</button>
+      <div class="bmeta" style="line-height:1.5;">Ein Backup ist eine Kopie der ganzen Datenbank. Einzelne Spielstände holst du im Konto-Blatt daraus zurück.</div>`;
+    box.appendChild(kachel);
+    const btn = kachel.querySelector('#adminBackupJetztBtn');
+    if (btn) btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const res = await backendFetch('/admin/backup-jetzt', { method:'POST', headers:{'Content-Type':'application/json'}, body: '{}' });
+        const r = await res.json().catch(() => ({}));
+        if (!res.ok){ log(r.error || 'Backup fehlgeschlagen.', 'ti-alert-triangle'); return; }
+        log('Backup angelegt: ' + (r.neuestes ? adminZeit(r.neuestes.zeit) : '') + ' (' + adminZahl(r.anzahl) + ' Sicherungen).', 'ti-check', 'ok');
+        loadAdminSystemstand();
+      } catch(e){ log('Keine Verbindung – kein Backup.', 'ti-alert-triangle'); }
+      finally { btn.disabled = false; }
+    };
+  }
+  async function loadAdminProtokoll(){
+    const box = document.getElementById('adminProtokollListe');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/protokoll');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'das Protokoll'); return; }
+      const d = await res.json();
+      const liste = d.eintraege || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Noch keine Handlung festgehalten.</div>`; return; }
+      box.innerHTML = liste.map(e => {
+        const details = Object.entries(e.details || {}).filter(([k]) => k !== 'targetUsername' && k !== 'tag').map(([k, v]) => k + '=' + String(v)).join(' · ');
+        return `<div class="card-row" style="padding:0.4rem 0.7rem;"><div class="left"><div style="min-width:0;">
+          <div class="bname" style="font-size:12px;">${adminZeit(e.zeit)} · ${escapeHtml(e.art)}${e.ziel ? ' → ' + escapeHtml(e.ziel) : ''}</div>
+          <div class="bmeta">${e.von ? 'von ' + escapeHtml(e.von) : ''}${details ? (e.von ? ' · ' : '') + escapeHtml(details) : ''}</div>
+        </div></div></div>`;
+      }).join('');
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'das Protokoll'); }
+  }
+  async function loadAdminAllianzen(){
+    const box = document.getElementById('adminAllianzenListe');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/allianzen');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Allianzen'); return; }
+      const d = await res.json();
+      const liste = d.allianzen || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta">Es gibt noch keine Allianz.</div>`; return; }
+      const rolleText = r => r === 'admin' ? 'Anführer' : r === 'officer' ? 'Offizier' : 'Mitglied';
+      box.innerHTML = liste.map(a => `<div class="card-row" data-allianz="${escapeHtml(a.tag)}" style="flex-direction:column; align-items:stretch; gap:5px; ${a.aufgeloest ? 'opacity:0.6;' : ''}">
+          <div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline;">
+            <span class="bname">[${escapeHtml(a.tag)}]${a.name ? ' ' + escapeHtml(a.name) : ''}</span>
+            <span class="bmeta" style="color:${a.aufgeloest ? '#7d8199' : '#5dcaa5'};">${a.aufgeloest ? 'aufgelöst ' + adminZeit(a.aufgeloestAm) : adminZahl(a.mitglieder.length) + ' von ' + adminZahl(a.mitgliederMax) + ' Mitgliedern'}</span>
+          </div>
+          <div class="bmeta">gegründet ${adminZeit(a.gegruendet)}${a.gruender ? ' von ' + escapeHtml(a.gruender) : ''} · Beitritt ${a.beitritt === 'application' ? 'auf Bewerbung' : 'offen'}${a.basisStufe !== null ? ' · Basis Stufe ' + adminZahl(a.basisStufe) : ''}${a.bewerbungen ? ' · ' + adminZahl(a.bewerbungen) + ' offene Bewerbung' + (a.bewerbungen === 1 ? '' : 'en') : ''}</div>
+          ${a.mitglieder.length ? `<div class="bmeta" style="color:#c9d4e8; line-height:1.6;">${a.mitglieder.map(m => escapeHtml(m.name) + ' <span class="bmeta">(' + rolleText(m.rolle) + (m.letzteSitzung ? ', zuletzt ' + adminZeit(m.letzteSitzung) : '') + (m.kontoDa ? '' : ', Konto fehlt') + ')</span>').join(' · ')}</div>` : ''}
+          ${a.aufgeloest ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:2px;">
+            <select data-allianz-mitglied="${escapeHtml(a.tag)}" style="flex:2 1 150px; font-size:11.5px;">${a.mitglieder.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)} (${rolleText(m.rolle)})</option>`).join('')}</select>
+            <button data-allianz-anfuehrer="${escapeHtml(a.tag)}" style="flex:1 1 130px; font-size:11px;">Zum Anführer machen</button>
+            <button data-allianz-aufloesen="${escapeHtml(a.tag)}" style="flex:1 1 100px; font-size:11px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Auflösen</button>
+          </div>`}
+        </div>`).join('');
+      box.querySelectorAll('[data-allianz-anfuehrer]').forEach(b => b.onclick = () => {
+        const tag = b.getAttribute('data-allianz-anfuehrer');
+        const sel = box.querySelector('[data-allianz-mitglied="' + CSS.escape(tag) + '"]');
+        adminAllianzAnfuehrer(tag, sel ? sel.value : '');
+      });
+      box.querySelectorAll('[data-allianz-aufloesen]').forEach(b => b.onclick = () => adminAllianzAufloesen(b.getAttribute('data-allianz-aufloesen')));
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Allianzen'); }
+  }
+  async function adminAllianzAnfuehrer(tag, name){
+    if (!name) return;
+    if (!confirm('„' + name + '" zum Anführer von [' + tag + '] machen? Der bisherige Anführer wird Offizier.')) return;
+    try {
+      const res = await backendFetch('/admin/allianz/anfuehrer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, targetUsername: name }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Übertragen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log(name + ' führt jetzt [' + tag + '].', 'ti-check', 'ok');
+      loadAdminAllianzen();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
+  async function adminAllianzAufloesen(tag){
+    if (!confirm('Allianz [' + tag + '] auflösen? Alle Mitglieder werden entfernt, der Tag wird für eine Neugründung frei. Das lässt sich nicht zurücknehmen.')) return;
+    try {
+      const res = await backendFetch('/admin/allianz/aufloesen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Auflösen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('[' + tag + '] aufgelöst – ' + adminZahl(d.entfernt) + ' Mitglieder entfernt.', 'ti-check', 'ok');
+      loadAdminAllianzen();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
   async function loadAdminKonto(){
     const box = document.getElementById('adminKontoListe');
     const feld = document.getElementById('adminKontoSuche');
@@ -35205,15 +35417,45 @@ async function claimPendingRewards(){
           ${aktivUhrHtml(k.aktiv)}
           ${k.aktiv && k.aktiv.verdachtGemeldet ? zeile('Verdachtsmeldung', 'an dich geschickt am ' + adminZeit(k.aktiv.verdachtGemeldet)) : ''}
           ${reaktionenHtml(k.reaktionen)}
+          ${k.sperre ? zeile('Sperre', '<span style="color:#f0997b;">' + (k.sperre.grund ? escapeHtml(k.sperre.grund) : 'ohne Grund') + ' · ' + (k.sperre.bis ? 'bis ' + adminZeit(k.sperre.bis) : 'unbefristet') + (k.sperre.seit ? ' · seit ' + adminZeit(k.sperre.seit) : '') + '</span>') : ''}
+          ${k.stumm ? zeile('Stummgeschaltet', '<span style="color:#fac775;">bis ' + adminZeit(k.stumm.bis) + (k.stumm.grund ? ' · ' + escapeHtml(k.stumm.grund) : '') + '</span>') : ''}
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
-            <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
-            <button data-konto-sitzungen="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
+            <input type="text" maxlength="200" data-konto-grund="${escapeHtml(k.username)}" placeholder="Grund (für Sperre oder Stummschaltung, optional)" autocomplete="off" style="flex:2 1 170px; font-size:11.5px;">
+            <select data-konto-tage="${escapeHtml(k.username)}" aria-label="Dauer der Sperre" style="flex:1 1 110px; font-size:11.5px;">
+              <option value="0">Sperre: unbefristet</option><option value="1">Sperre: 1 Tag</option><option value="3">Sperre: 3 Tage</option><option value="7">Sperre: 7 Tage</option><option value="30">Sperre: 30 Tage</option>
+            </select>
+            <button data-konto-sperre="${escapeHtml(k.username)}" data-konto-gesperrt="${k.gesperrt ? '1' : '0'}" style="flex:1 1 90px; font-size:11px;">${k.gesperrt ? 'Entsperren' : 'Sperren'}</button>
           </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <select data-konto-stumm-stunden="${escapeHtml(k.username)}" aria-label="Dauer der Stummschaltung" style="flex:1 1 110px; font-size:11.5px;">
+              <option value="1">Stumm: 1 Stunde</option><option value="6">Stumm: 6 Stunden</option><option value="24" selected>Stumm: 24 Stunden</option><option value="72">Stumm: 3 Tage</option><option value="168">Stumm: 7 Tage</option>
+            </select>
+            <button data-konto-stumm="${escapeHtml(k.username)}" style="flex:1 1 90px; font-size:11px;">Stummschalten</button>
+            ${k.stumm ? `<button data-konto-stumm-auf="${escapeHtml(k.username)}" style="flex:1 1 90px; font-size:11px;">Stummschaltung aufheben</button>` : ''}
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button data-konto-sitzungen="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-logout" aria-hidden="true" style="margin-right:4px;"></i>Alle Sitzungen beenden</button>
+            <button data-konto-spielstand="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Spielstand ansehen${k.schattenDa ? ' (Schatten da)' : ''}</button>
+          </div>
+          <div data-konto-spielstand-box="${escapeHtml(k.username)}"></div>
         </div>`).join('');
       box.querySelectorAll('[data-konto-sperre]').forEach(b => b.onclick = async () => {
-        await adminToggleBan(b.getAttribute('data-konto-sperre'), b.getAttribute('data-konto-gesperrt') === '1');
+        const name = b.getAttribute('data-konto-sperre');
+        const grundEl = box.querySelector('[data-konto-grund="' + CSS.escape(name) + '"]');
+        const tageEl = box.querySelector('[data-konto-tage="' + CSS.escape(name) + '"]');
+        await adminToggleBan(name, b.getAttribute('data-konto-gesperrt') === '1',
+          { grund: grundEl ? grundEl.value.trim() : '', tage: tageEl ? parseInt(tageEl.value, 10) || 0 : 0 });
         loadAdminKonto();
       });
+      box.querySelectorAll('[data-konto-stumm]').forEach(b => b.onclick = async () => {
+        const name = b.getAttribute('data-konto-stumm');
+        const grundEl = box.querySelector('[data-konto-grund="' + CSS.escape(name) + '"]');
+        const stdEl = box.querySelector('[data-konto-stumm-stunden="' + CSS.escape(name) + '"]');
+        await adminStumm(name, stdEl ? parseInt(stdEl.value, 10) || 24 : 24, grundEl ? grundEl.value.trim() : '');
+        loadAdminKonto();
+      });
+      box.querySelectorAll('[data-konto-stumm-auf]').forEach(b => b.onclick = async () => { await adminStumm(b.getAttribute('data-konto-stumm-auf'), 0, ''); loadAdminKonto(); });
+      box.querySelectorAll('[data-konto-spielstand]').forEach(b => b.onclick = () => adminSpielstandAnzeigen(b.getAttribute('data-konto-spielstand')));
       box.querySelectorAll('[data-konto-sitzungen]').forEach(b => b.onclick = () =>
         adminSitzungenBeenden(b.getAttribute('data-konto-sitzungen')));
     } catch(e){ box.innerHTML = adminListenFehler(null, 'die Kontosuche'); }
@@ -35283,6 +35525,7 @@ async function claimPendingRewards(){
           ${zeile('Push-Schlüssel', lauf.pushSchluesselDa ? 'vorhanden' : 'FEHLEN', lauf.pushSchluesselDa ? '#5dcaa5' : '#f0997b')}
           ${zeile('Deploy-Selbstheilung', lauf.selbstheilungDa ? 'vorhanden' : 'fehlt', lauf.selbstheilungDa ? '#5dcaa5' : '#fac775')}
         </div>`;
+      await adminBackupsKachel(box);
     } catch(e){ box.innerHTML = adminListenFehler(null, 'den Systemstand'); }
   }
   function adminListenFehler(res, was){
@@ -35665,23 +35908,43 @@ async function claimPendingRewards(){
           <div class="bmeta" style="margin-bottom:6px;">Gemeldet von ${escapeHtml(r.reporterName)} · ${formatRelativeTime(r.time)}</div>
           <div style="font-size:12.5px; color:#c7cbe0; margin-bottom:8px;">${escapeHtml(r.reason)}</div>
           <div style="display:flex; gap:6px;">
-            <button data-admin-ban="${escapeHtml(r.targetName)}" data-currently-banned="${r.targetBanned?'1':'0'}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
+            <button data-admin-ban="${escapeHtml(r.targetName)}" data-currently-banned="${r.targetBanned?'1':'0'}" data-admin-reason="${escapeHtml(String(r.reason||'').slice(0,160))}" style="flex:1; font-size:11px;">${r.targetBanned ? 'Entsperren' : 'Sperren'}</button>
             <button data-admin-dismiss="${r.id}" style="flex:1; font-size:11px;">Meldung entfernen</button>
           </div>
         </div>`).join('');
-      listEl.querySelectorAll('[data-admin-ban]').forEach(btn => btn.onclick = () => adminToggleBan(btn.getAttribute('data-admin-ban'), btn.getAttribute('data-currently-banned')==='1'));
+      // Der Grund der Meldung wandert in die Sperre - der Gesperrte liest ihn beim Anmelden.
+      listEl.querySelectorAll('[data-admin-ban]').forEach(btn => btn.onclick = () => adminToggleBan(btn.getAttribute('data-admin-ban'), btn.getAttribute('data-currently-banned')==='1',
+        { grund: btn.getAttribute('data-admin-reason') ? 'Meldung: ' + btn.getAttribute('data-admin-reason') : '', tage: 0 }));
       listEl.querySelectorAll('[data-admin-dismiss]').forEach(btn => btn.onclick = () => adminDismissReport(btn.getAttribute('data-admin-dismiss')));
     } catch(e){ listEl.innerHTML = '<div class="bmeta">Server nicht erreichbar.</div>'; }
   }
-  async function adminToggleBan(username, currentlyBanned){
+  /* Sperre mit Grund und Frist (02.09.2026). `opt.grund` steht im Anmeldetext des Gesperrten,
+     `opt.tage` 0 heisst unbefristet; eine abgelaufene Frist hebt der Server beim naechsten Kontakt
+     selbst auf. Der Meldungen-Reiter gibt den Grund der Meldung mit, das Konto-Blatt sein Formular. */
+  async function adminToggleBan(username, currentlyBanned, opt){
+    opt = opt || {};
     const wantBan = !currentlyBanned;
-    if (wantBan && !confirm(username+' wirklich sperren? Das Konto kann sich danach nicht mehr anmelden, bis du es wieder entsperrst.')) return;
+    const tage = Math.max(0, parseInt(opt.tage, 10) || 0);
+    const frist = tage ? 'für ' + tage + ' Tag' + (tage === 1 ? '' : 'e') : 'unbefristet';
+    if (wantBan && !confirm(username+' wirklich sperren ('+frist+')? Das Konto kann sich danach nicht mehr anmelden'+(tage ? ', bis die Frist abläuft oder du es entsperrst.' : ', bis du es wieder entsperrst.')+(opt.grund ? '\n\nGrund, den der Spieler sieht: '+opt.grund : ''))) return;
     try {
-      const res = await backendFetch('/admin/set-banned', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUsername: username, banned: wantBan }) });
+      const res = await backendFetch('/admin/set-banned', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: username, banned: wantBan, grund: opt.grund || '', tage }) });
       const data = await res.json();
       if (!res.ok){ log(data.error||'Aktion fehlgeschlagen.', 'ti-alert-triangle'); return; }
-      log(username+(wantBan?' gesperrt.':' entsperrt.'), 'ti-check');
+      log(username+(wantBan ? ' gesperrt ('+frist+').' : ' entsperrt.'), 'ti-check');
       await loadAdminReports();
+    } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
+  }
+  async function adminStumm(username, stunden, grund){
+    const h = Math.max(0, parseInt(stunden, 10) || 0);
+    if (h && !confirm(username+' für '+h+' Stunden stummschalten? Globaler Chat, Allianz-Chat und Nachrichten sind dann gesperrt, spielen geht weiter.')) return;
+    try {
+      const res = await backendFetch('/admin/stumm', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: username, stunden: h, grund: grund || '' }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok){ log(data.error||'Stummschalten fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log(h ? username+' ist bis '+adminZeit(data.stummBis)+' stummgeschaltet.' : 'Stummschaltung von '+username+' aufgehoben.', 'ti-check');
     } catch(e){ log('Server nicht erreichbar.', 'ti-alert-triangle'); }
   }
   async function adminDismissReport(reportId){
@@ -44310,9 +44573,12 @@ async function claimPendingRewards(){
     if (!tag || !text || !text.trim()) return;
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     try {
-      await storageSet('alliance:'+tag+':msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', text: text.trim().slice(0,300), ts: Date.now() }), true);
+      // Strikt mit Server (02.09.2026): storageSet() faellt bei einem 403 still auf den lokalen
+      // Speicher zurueck - ein Stummgeschalteter saehe seine Nachricht dann bei sich, sonst nirgends,
+      // und erfuehre den Grund nie. Ohne Server bleibt der bisherige Weg.
+      await (useBackend() ? storageSetStrict : storageSet)('alliance:'+tag+':msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', text: text.trim().slice(0,300), ts: Date.now() }), true);
       loadAllianceMessages();
-    } catch(e){ log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+    } catch(e){ log((e && e.message) || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
   }
   // Globaler Chat: von allen Spielern lesbar, unabhängig von der Allianz – seit der Großetappe
   // derselbe Lader und Renderer wie der Allianz-Chat (chatKanalZeichnen), nur ohne Tag-Präfix.
@@ -44321,9 +44587,9 @@ async function claimPendingRewards(){
     if (!text || !text.trim()) return;
     const id = Date.now()+'-'+Math.random().toString(36).slice(2,8);
     try {
-      await storageSet('globalchat:msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', authorAllianceTag: myAllianceTag()||null, text: text.trim().slice(0,300), ts: Date.now() }), true);
+      await (useBackend() ? storageSetStrict : storageSet)('globalchat:msg:'+id, JSON.stringify({ authorId: state.player.id, authorName: state.player.name||'Kommandant', authorAllianceTag: myAllianceTag()||null, text: text.trim().slice(0,300), ts: Date.now() }), true);
       loadGlobalChat();
-    } catch(e){ log('Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
+    } catch(e){ log((e && e.message) || 'Nachricht konnte nicht gesendet werden.', 'ti-alert-triangle'); }
   }
   // ===== Ungelesen-Erkennung für den Chat-Reiter =====
   // Die Nachrichten-Keys enthalten bereits den Zeitstempel als Präfix (Date.now()+'-'+random) - eine
