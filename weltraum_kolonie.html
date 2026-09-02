@@ -2760,6 +2760,7 @@
         <button id="adminTabProtokollBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:4px;"></i>Protokoll</button>
         <button id="adminTabAllianzenBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Allianzen</button>
         <button id="adminTabLageBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Lage</button>
+        <button id="adminTabGalaxieBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-world" aria-hidden="true" style="margin-right:4px;"></i>Galaxie</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2922,6 +2923,12 @@
         <div id="adminAllianzenListe" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
       <!-- Lage (02.09.2026): Wirtschaft ueber alle Spielstaende, Markt, lebende PvE-Ziele - nur lesen. -->
+      <!-- Galaxie-Eingriff (02.09.2026). db.galaxy ist fuer Clients bauartbedingt unerreichbar;
+           dieser Reiter ist der einzige Weg dorthin, der nicht ueber die db.json auf dem Pi geht. -->
+      <div id="adminGalaxieView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Greift direkt in die Galaxie ein: Weltboss, Alien-Nester, Wrackkonvois, Marktereignis und Kopfgeld. Gesetzt wird über dieselben Erzeuger, die auch der Weltentakt benutzt – ein von Hand gebautes Ziel hätte fehlende Felder.</div>
+        <div id="adminGalaxieInhalt"></div>
+      </div>
       <div id="adminLageView" style="display:none; max-height:60vh; overflow-y:auto;">
         <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Kredite und Ressourcen in Umlauf über alle Spielstände, Marktpreise gegen ihre Basis und die lebenden PvE-Ziele – nur lesen, nichts davon wird hier verändert.</div>
         <div id="adminLageInhalt" style="display:flex; flex-direction:column; gap:10px;"></div>
@@ -30052,6 +30059,17 @@ async function claimPendingRewards(){
     'vorposten-angegriffen': { icon:'ti-building-fortress', color:'#f0997b', text:(p)=>p.gefallen
       ? (p.angreiferName||'Ein Kommandant')+' hat deinen '+(p.name||'Vorposten')+' bei '+(p.system||'?')+' geschleift – die Garnison ist mit ihm verloren.'
       : (p.angreiferName||'Ein Kommandant')+' beschießt deinen '+(p.name||'Vorposten')+' bei '+(p.system||'?')+' – Kern noch '+(p.kernProzent||0)+' %. Verstärke die Garnison, solange er steht.' },
+    /* Alarm an den Betreiber (Backend #208). Nur der Admin bekommt ihn - der Eintrag muss trotzdem
+       hier stehen, sonst zeichnet das Postfach die Zeile mit Glocke und dem blanken Wort
+       "Ereignis" (test_pushkategorien 2b faellt darauf). Messwert und Schwelle stehen im Text,
+       weil ein "irgendwas ist auffaellig" zum Nachsehen zwingt und damit kein Alarm ist. */
+    'admin-alarm': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>(p.titel||'Auffälligkeit')
+      + (p.konto ? ' bei ' + p.konto : '') + ': ' + (p.text||'')
+      + ' (gemessen ' + (p.wert !== undefined ? p.wert : '?') + ', Schwelle ' + (p.schwelle !== undefined ? p.schwelle : '?') + ')' },
+    // Geschenk an ein einzelnes Konto (Backend #208). Der Grund IST die Nachricht - ohne ihn
+    // wuesste der Beschenkte nicht, wofuer er etwas bekommt.
+    'geschenk-konto': { icon:'ti-sparkles', color:'#5dcaa5', text:(p)=>'Ein Geschenk vom Betreiber: '
+      + (p.grund || 'ohne Angabe') + ' – hol es dir im Spiel ab.' },
     'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
     // Die Anfechtung eines Schürfrechts (Phase 5). Der Verteidiger bekommt vom Server KEINEN
     // Bericht - der Server schreibt grundsätzlich keinen fremden Spielstand -, er erfährt den
@@ -30765,7 +30783,8 @@ async function claimPendingRewards(){
     { tab:'geschenk',  btn:'adminTabGeschenkBtn',  view:'adminGeschenkView',  anzeige:'block', sub:'Geschenk an alle Spieler',  laden:() => loadAdminGeschenke() },
     { tab:'protokoll', btn:'adminTabProtokollBtn', view:'adminProtokollView', anzeige:'block', sub:'Protokoll der Betreiber-Handlungen', laden:() => loadAdminProtokoll() },
     { tab:'allianzen', btn:'adminTabAllianzenBtn', view:'adminAllianzenView', anzeige:'block', sub:'Allianzen',                   laden:() => loadAdminAllianzen() },
-    { tab:'lage',      btn:'adminTabLageBtn',      view:'adminLageView',      anzeige:'block', sub:'Wirtschaft und Galaxie',      laden:() => loadAdminLage() }
+    { tab:'lage',      btn:'adminTabLageBtn',      view:'adminLageView',      anzeige:'block', sub:'Wirtschaft und Galaxie',      laden:() => loadAdminLage() },
+    { tab:'galaxie',   btn:'adminTabGalaxieBtn',   view:'adminGalaxieView',   anzeige:'block', sub:'Eingriffe in die Welt',       laden:() => loadAdminGalaxie() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -31496,8 +31515,121 @@ async function claimPendingRewards(){
         + zeile('Vorposten', (p.vorposten || []).length ? escapeHtml((p.vorposten || []).map(v => v.sys + ' von ' + v.besitzerName + ' St. ' + v.stufe + ' (' + adminZahl(v.kern) + '/' + adminZahl(v.kernMax) + ')').join(' · ')) : 'keine');
       const stand = zeile('Notaus gesetzt', (d.notAus || []).length ? escapeHtml(d.notAus.join(', ')) : 'keiner', (d.notAus || []).length ? '#f0997b' : '#5dcaa5')
         + zeile('Wartungsankündigung', d.ankuendigung ? escapeHtml(d.ankuendigung.text) + ' (' + adminZeit(d.ankuendigung.ab) + ')' : 'keine');
-      box.innerHTML = karte('Wirtschaft', 'ti-award', wirtschaft) + karte('Markt', 'ti-truck', markt) + karte('PvE-Ziele', 'ti-target', pve) + karte('Betrieb', 'ti-adjustments', stand);
+      box.innerHTML = karte('Wirtschaft', 'ti-award', wirtschaft) + karte('Markt', 'ti-truck', markt) + karte('PvE-Ziele', 'ti-target', pve) + karte('Betrieb', 'ti-adjustments', stand)
+        + `<div id="adminAlarmKarte"></div>`;
+      loadAdminAlarm();
     } catch(e){ box.innerHTML = adminListenFehler(null, 'die Lage'); }
+  }
+  /* Der Wächter (Backend #208) als fünfte Karte der Lage. Er zeigt die aktuellen Messwerte AUCH
+     dann, wenn nichts ausgelöst hat: Ein schweigender Wächter und ein toter sehen sonst gleich aus.
+     Die Karte fehlt ersatzlos, wenn der Server die Route nicht kennt - der Rest der Lage bleibt
+     stehen, statt dass eine 404-Meldung die vier vorhandenen Karten verdrängt. */
+  /* Galaxie-Eingriff (Backend #208). Jede Handlung fragt nach, weil keine davon einen Rueckgaengig-
+     Knopf hat: Ein entferntes Nest ist weg, ein gesetztes steht sofort auf der Karte aller Spieler. */
+  let galaxieDaten = null;
+  async function loadAdminGalaxie(){
+    const box = document.getElementById('adminGalaxieInhalt');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/galaxie');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Galaxie'); return; }
+      const d = galaxieDaten = await res.json();
+      const karte = (titel, icon, inhalt) => `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px;"><div class="bname"><i class="ti ${icon}" aria-hidden="true" style="margin-right:5px;"></i>${titel}</div>${inhalt}</div>`;
+      const sysOptionen = (d.systeme || []).map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+      const b = d.weltboss;
+      const boss = b
+        ? `<div class="bmeta">Stufe ${adminZahl(b.level)} · ${adminZahl(b.hp)} / ${adminZahl(b.maxHp)} LP · ${adminZahl(b.beteiligte)} beteiligt${b.besiegt ? ' · <span style="color:#7d8199;">besiegt</span>' : ''}</div>
+           <div style="display:flex; gap:6px; flex-wrap:wrap;">
+             <input type="number" id="galaxieBossHp" min="0" max="${b.maxHp}" placeholder="Lebenspunkte (0–${b.maxHp})" style="flex:2 1 150px; font-size:11.5px;">
+             <button id="galaxieBossHpBtn" style="flex:1 1 110px; font-size:11px;">Lebenspunkte setzen</button>
+             <button id="galaxieBossWegBtn" style="flex:1 1 110px; font-size:11px; color:#f0997b;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Weltboss entfernen</button>
+           </div>`
+        : `<div class="bmeta">Gerade steht kein Weltboss. Er entsteht im Spiel, nicht hier – deshalb gibt es kein „Erschaffen".</div>`;
+      const liste = (eintraege, art, text) => (eintraege || []).length
+        ? (eintraege || []).map(e => `<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline;">
+             <span class="bmeta">${escapeHtml(text(e))}</span>
+             <button data-galaxie-weg="${art}" data-galaxie-id="${escapeHtml(e.id)}" style="font-size:10.5px; padding:3px 8px;">Entfernen</button>
+           </div>`).join('')
+        : `<div class="bmeta">keine</div>`;
+      box.innerHTML = karte('Weltboss', 'ti-skull', boss)
+        + karte('Alien-Nester', 'ti-alien', liste(d.nester, 'nest', n => n.volk + ' bei ' + n.sys + ' · Stufe ' + n.stufe + ' · ' + adminZahl(n.lp) + '/' + adminZahl(n.lpMax))
+            + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                 <select id="galaxieNestVolk" aria-label="Volk" style="flex:1 1 120px; font-size:11.5px;">${(d.voelker || []).map(v => `<option value="${escapeHtml(v.schluessel)}">${escapeHtml(v.name)}</option>`).join('')}</select>
+                 <select id="galaxieNestSys" aria-label="System" style="flex:1 1 130px; font-size:11.5px;">${sysOptionen}</select>
+                 <button id="galaxieNestBtn" style="flex:1 1 100px; font-size:11px;">Nest setzen</button>
+               </div>`)
+        + karte('Wrackkonvois', 'ti-recycle', liste(d.konvois, 'konvoi', k => 'bei ' + k.sys + ' · ' + adminZahl(k.lp) + '/' + adminZahl(k.lpMax))
+            + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                 <select id="galaxieKonvoiSys" aria-label="System" style="flex:2 1 150px; font-size:11.5px;">${sysOptionen}</select>
+                 <button id="galaxieKonvoiBtn" style="flex:1 1 100px; font-size:11px;">Konvoi setzen</button>
+               </div>`)
+        + karte('Marktereignis', 'ti-truck', d.marktEreignis
+            ? `<div class="bmeta" style="color:#fac775;">${escapeHtml(d.marktEreignis.label || '')} · Faktor ${d.marktEreignis.mult} · bis ${adminZeit(d.marktEreignis.endsAt)}</div>
+               <button id="galaxieMarktBtn" style="width:100%; font-size:11px;">Ereignis beenden</button>`
+            : `<div class="bmeta">Kein Ereignis aktiv.</div>`)
+        + karte('Kopfgeld', 'ti-target', (d.kopfgeld
+            ? `<div class="bmeta">Auf <strong>${escapeHtml(d.kopfgeld.targetName || '?')}</strong> · ${adminZahl(d.kopfgeld.reward)} Kredite · ${d.kopfgeld.claimed ? 'kassiert' : 'offen'}${d.kopfgeld.durchAdmin ? ' · von dir gesetzt' : ''}</div>`
+            : `<div class="bmeta">Kein Kopfgeld gesetzt.</div>`)
+            + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                 <input type="text" id="galaxieKopfgeldName" maxlength="18" placeholder="Benutzername" autocomplete="off" style="flex:2 1 150px; font-size:11.5px;">
+                 <button id="galaxieKopfgeldBtn" style="flex:1 1 100px; font-size:11px;">Kopfgeld setzen</button>
+               </div>`);
+      const an = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+      an('galaxieBossHpBtn', () => { const el = document.getElementById('galaxieBossHp'); galaxieHandlung({ bereich:'weltboss', aktion:'hp', hp: parseInt(el ? el.value : '', 10) },
+        'Lebenspunkte des Weltbosses auf ' + (el ? el.value : '?') + ' setzen?' + (String(el && el.value) === '0' ? '\n\nMit null gilt er als besiegt.' : '')); });
+      an('galaxieBossWegBtn', () => galaxieHandlung({ bereich:'weltboss', aktion:'entfernen' },
+        'Den Weltboss entfernen?\n\nLaufende Angriffsflüge darauf kommen ins Leere und kehren zurück.'));
+      an('galaxieNestBtn', () => { const v = document.getElementById('galaxieNestVolk'), sy = document.getElementById('galaxieNestSys');
+        galaxieHandlung({ bereich:'nest', aktion:'setzen', volk: v ? v.value : '', sys: sy ? sy.value : '' }, 'Ein Nest bei ' + (sy ? sy.value : '?') + ' setzen? Es steht sofort auf der Karte aller Spieler.'); });
+      an('galaxieKonvoiBtn', () => { const sy = document.getElementById('galaxieKonvoiSys');
+        galaxieHandlung({ bereich:'konvoi', aktion:'setzen', sys: sy ? sy.value : '' }, 'Einen Wrackkonvoi bei ' + (sy ? sy.value : '?') + ' setzen?'); });
+      an('galaxieMarktBtn', () => galaxieHandlung({ bereich:'marktereignis', aktion:'beenden' }, 'Das laufende Marktereignis beenden? Die Preise kehren zum Normalwert zurück.'));
+      an('galaxieKopfgeldBtn', () => { const el = document.getElementById('galaxieKopfgeldName');
+        const name = el ? el.value.trim() : '';
+        if (!name){ log('Bitte einen Namen eingeben.', 'ti-alert-triangle'); return; }
+        galaxieHandlung({ bereich:'kopfgeld', aktion:'setzen', targetUsername: name }, 'Das Kopfgeld dieser Woche auf „' + name + '" setzen? Das überschreibt das Kopfgeld auf den Bestenlisten-Ersten.'); });
+      box.querySelectorAll('[data-galaxie-weg]').forEach(btn => btn.onclick = () =>
+        galaxieHandlung({ bereich: btn.getAttribute('data-galaxie-weg'), aktion:'entfernen', id: btn.getAttribute('data-galaxie-id') },
+          'Dieses Ziel entfernen? Angriffsflüge darauf kommen ins Leere.'));
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Galaxie'); }
+  }
+  async function galaxieHandlung(body, frage){
+    if (frage && !confirm(frage)) return false;
+    try {
+      const res = await backendFetch('/admin/galaxie', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Der Eingriff ging nicht.', 'ti-alert-triangle'); return false; }
+      log('Galaxie: ' + body.bereich + ' ' + body.aktion + ' erledigt.', 'ti-check', 'ok');
+      loadAdminGalaxie();
+      return true;
+    } catch(e){ log('Keine Verbindung – nichts geändert.', 'ti-alert-triangle'); return false; }
+  }
+  async function loadAdminAlarm(){
+    const box = document.getElementById('adminAlarmKarte');
+    if (!box) return;
+    try {
+      const res = await backendFetch('/admin/alarm');
+      if (!res.ok){ box.innerHTML = ''; return; }
+      const d = await res.json();
+      const zeile = (k, v, farbe) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:${farbe || '#c9d4e8'}; text-align:right;">${v}</span></div>`;
+      const sch = d.schwellen || {}, st = d.stand || {};
+      const messwert = (art) => {
+        const wert = st[art] || 0, grenze = (sch[art] || {}).schwelle || 0;
+        return zeile((sch[art] || {}).name || art, adminZahl(wert) + ' von ' + adminZahl(grenze), wert >= grenze ? '#f0997b' : '#5dcaa5');
+      };
+      const alter = Math.round((d.jetzt - (d.letzterLauf || 0)) / 1000);
+      const offen = (d.offen || []);
+      const verlauf = (d.verlauf || []).slice(0, 6);
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px;">
+          <div class="bname"><i class="ti ti-bell" aria-hidden="true" style="margin-right:5px;"></i>Wächter</div>
+          ${zeile('Letzte Prüfung', d.letzterLauf ? (alter < 90 ? 'vor ' + adminZahl(alter) + ' Sekunden' : adminZeit(d.letzterLauf)) : '<span style="color:#f0997b;">noch nie gelaufen</span>')}
+          ${Object.keys(sch).map(messwert).join('')}
+          ${zeile('Ruhefrist je Meldung', adminZahl(d.ruheStunden) + ' Stunden')}
+          ${offen.length ? `<div class="bmeta" style="color:#f0997b; line-height:1.5; margin-top:2px;">Offen: ${escapeHtml(offen.map(f => f.art + (f.konto ? ' (' + f.konto + ')' : '') + ' ' + f.wert).join(' · '))}</div>` : `<div class="bmeta" style="color:#5dcaa5; margin-top:2px;">Nichts über der Schwelle.</div>`}
+          ${verlauf.length ? `<div class="bmeta" style="line-height:1.6; margin-top:2px;">Zuletzt gemeldet: ${escapeHtml(verlauf.map(v => adminZeit(v.zeit) + ' ' + v.art + (v.konto ? ' (' + v.konto + ')' : '') + ' ' + v.wert).join(' · '))}</div>` : ''}
+        </div>`;
+    } catch(e){ box.innerHTML = ''; }
   }
   async function loadAdminProtokoll(){
     const box = document.getElementById('adminProtokollListe');
@@ -31641,6 +31773,13 @@ async function claimPendingRewards(){
             <button data-konto-verlauf="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Kampfverlauf ansehen${k.kampfVerlauf ? ' (' + adminZahl(k.kampfVerlauf) + ')' : ''}</button>
           </div>
           <div data-konto-verlauf-box="${escapeHtml(k.username)}"></div>
+          <!-- Chat-Moderation (02.09.2026): die letzten Zeilen dieses Kontos, jede einzeln
+               entfernbar. Bis hierher gab es nur die Stummschaltung - der Verfasser schwieg danach,
+               seine Zeile stand aber weiter fuer alle da. -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button data-konto-chat="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-message" aria-hidden="true" style="margin-right:4px;"></i>Chat-Nachrichten ansehen</button>
+          </div>
+          <div data-konto-chat-box="${escapeHtml(k.username)}"></div>
           <div class="bmeta" style="margin-top:6px;">Support: E-Mail setzen, umbenennen, Reset-Link erzeugen – alles landet im Protokoll.</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <input type="email" data-konto-email="${escapeHtml(k.username)}" placeholder="Neue E-Mail-Adresse (gilt als bestätigt)" autocomplete="off" style="flex:2 1 180px; font-size:11.5px;">
@@ -31660,6 +31799,18 @@ async function claimPendingRewards(){
             <button data-konto-mail="${escapeHtml(k.username)}" style="flex:1 1 110px; font-size:11px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>E-Mail senden</button>
           </div>
           <textarea maxlength="2000" data-konto-mailtext="${escapeHtml(k.username)}" placeholder="Text der E-Mail – Absätze bleiben erhalten." style="width:100%; min-height:60px; resize:vertical; font-size:12px;"></textarea>
+          <!-- Geschenk an genau dieses Konto (02.09.2026). Die vorhandene Geschenk-Flaeche schickt
+               an alle - fuer die Entschaedigung nach einem Fehler gab es bis hierher gar nichts. -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <select data-konto-gabe="${escapeHtml(k.username)}" aria-label="Art der Gabe" style="flex:1 1 120px; font-size:11.5px;">
+              <option value="credits">Kredite</option><option value="erz">Erz</option><option value="kristalle">Kristalle</option>
+              <option value="deuterium">Deuterium</option><option value="antimaterie">Antimaterie</option>
+              <option value="forschungspunkte">Forschungspunkte</option><option value="kampfpunkte">Kampfpunkte</option><option value="xp">Erfahrung</option>
+            </select>
+            <input type="number" min="1" data-konto-gabemenge="${escapeHtml(k.username)}" placeholder="Menge" style="flex:1 1 90px; font-size:11.5px;">
+            <button data-konto-geschenk="${escapeHtml(k.username)}" style="flex:1 1 110px; font-size:11px;"><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Geschenk senden</button>
+          </div>
+          <input type="text" maxlength="200" data-konto-geschenkgrund="${escapeHtml(k.username)}" placeholder="Grund des Geschenks (Pflicht – der Spieler liest ihn)" autocomplete="off" style="width:100%; font-size:11.5px;">
           <!-- Loeschung mit Frist (02.09.2026): der einzige Eingriff, der sich nicht zuruecknehmen
                laesst - deshalb sieben Tage Vorlauf und bis dahin ein Abbrechen-Knopf an dieser Stelle. -->
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -31707,6 +31858,17 @@ async function claimPendingRewards(){
         adminSitzungenBeenden(b.getAttribute('data-konto-sitzungen')));
       box.querySelectorAll('[data-konto-verlauf]').forEach(b => b.onclick = () =>
         adminKontoVerlauf(b.getAttribute('data-konto-verlauf')));
+      box.querySelectorAll('[data-konto-chat]').forEach(b => b.onclick = () =>
+        adminKontoChat(b.getAttribute('data-konto-chat')));
+      box.querySelectorAll('[data-konto-geschenk]').forEach(b => b.onclick = async () => {
+        const name = b.getAttribute('data-konto-geschenk');
+        const art = box.querySelector('[data-konto-gabe="' + CSS.escape(name) + '"]');
+        const menge = box.querySelector('[data-konto-gabemenge="' + CSS.escape(name) + '"]');
+        const grund = box.querySelector('[data-konto-geschenkgrund="' + CSS.escape(name) + '"]');
+        if (await adminKontoGeschenk(name, art ? art.value : '', menge ? menge.value : '', grund ? grund.value.trim() : '', b)){
+          if (menge) menge.value = ''; if (grund) grund.value = '';
+        }
+      });
       box.querySelectorAll('[data-konto-mail]').forEach(b => b.onclick = async () => {
         const name = b.getAttribute('data-konto-mail');
         const bet = box.querySelector('[data-konto-mailbetreff="' + CSS.escape(name) + '"]');
@@ -31779,6 +31941,61 @@ async function claimPendingRewards(){
       if (betEl) betEl.value = ''; if (txtEl) txtEl.value = '';
     } catch(e){ if (stand) stand.textContent = ''; log('Keine Verbindung – nichts verschickt.', 'ti-alert-triangle'); }
     finally { if (btn) btn.disabled = false; }
+  }
+  /* Chat-Moderation und Geschenk je Konto (Backend #208). Beides sitzt im Konto-Blatt, weil beides
+     eine Handlung AN EINEM SPIELER ist - man moderiert eine Person, nicht einen Kanal. */
+  async function adminKontoChat(name){
+    const box = document.querySelector('[data-konto-chat-box="' + CSS.escape(name) + '"]');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Nachrichten werden geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/chat?name=' + encodeURIComponent(name) + '&limit=20');
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'die Chat-Nachrichten'); return; }
+      const d = await res.json();
+      const liste = d.nachrichten || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta" style="margin-top:4px;">Von diesem Konto steht keine Nachricht mehr im Chat. Ältere werden von selbst aufgeräumt.</div>`; return; }
+      box.innerHTML = `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:5px; margin-top:4px;">`
+        + liste.map(n => `<div style="display:flex; gap:6px; align-items:baseline; justify-content:space-between;">
+            <span class="bmeta" style="flex:1; min-width:0;">${adminZeit(n.zeit)} · ${escapeHtml(n.kanal === 'global' ? 'Global' : 'Allianz ' + n.kanal)}: <span style="color:#c9d4e8;">${escapeHtml(n.text)}</span></span>
+            <button data-chat-loeschen="${escapeHtml(n.key)}" data-chat-autor="${escapeHtml(n.autor || '')}" style="font-size:10.5px; padding:3px 8px;">Entfernen</button>
+          </div>`).join('') + `</div>`;
+      box.querySelectorAll('[data-chat-loeschen]').forEach(b => b.onclick = () =>
+        adminChatLoeschen(b.getAttribute('data-chat-loeschen'), b.getAttribute('data-chat-autor'), name));
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'die Chat-Nachrichten'); }
+  }
+  async function adminChatLoeschen(key, autor, kontoName){
+    // Die Rueckfrage bietet die Stummschaltung gleich mit an: Wer eine Zeile entfernt, will den
+    // Verfasser meistens auch bremsen - zwei Handgriffe daraus zu machen heisst, dass der zweite
+    // vergessen wird. Nein heisst nur loeschen, Abbrechen heisst gar nichts.
+    if (!confirm('Diese Nachricht entfernen?\n\nSie verschwindet für alle Spieler.')) return false;
+    const stumm = confirm('Soll „' + (autor || 'der Verfasser') + '" zusätzlich für 24 Stunden stummgeschaltet werden?\n\nAbbrechen heißt: nur die Nachricht entfernen.');
+    try {
+      const res = await backendFetch('/admin/chat/loeschen', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key, stummStunden: stumm ? 24 : 0, grund: stumm ? 'Entfernte Chat-Nachricht' : '' }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Die Nachricht konnte nicht entfernt werden.', 'ti-alert-triangle'); return false; }
+      log('Nachricht entfernt' + (d.stummKonto ? ' – ' + d.stummKonto + ' ist bis ' + adminZeit(d.stummBis) + ' stummgeschaltet.' : '.'), 'ti-check', 'ok');
+      adminKontoChat(kontoName);
+      if (d.stummKonto) loadAdminKonto();
+      return true;
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); return false; }
+  }
+  async function adminKontoGeschenk(name, art, menge, grund, knopf){
+    const n = Math.floor(Number(menge));
+    if (!art || !Number.isFinite(n) || n <= 0){ log('Bitte Gabe und eine Menge größer als 0 angeben.', 'ti-alert-triangle'); return false; }
+    if (!grund){ log('Bitte kurz begründen, wofür das Geschenk ist – der Spieler liest den Grund.', 'ti-alert-triangle'); return false; }
+    if (!confirm('„' + name + '" ' + adminZahl(n) + ' ' + art + ' schenken?\n\nGrund: ' + grund)) return false;
+    if (knopf) knopf.disabled = true;
+    try {
+      const gaben = {}; gaben[art] = n;
+      const res = await backendFetch('/admin/geschenk-konto', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name, gaben, grund }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Das Geschenk ging nicht raus.', 'ti-alert-triangle'); return false; }
+      log(name + ' bekommt ' + adminZahl(n) + ' ' + art + ' – der Grund steht in seinem Postfach.', 'ti-check', 'ok');
+      return true;
+    } catch(e){ log('Keine Verbindung – nichts verschenkt.', 'ti-alert-triangle'); return false; }
+    finally { if (knopf) knopf.disabled = false; }
   }
   async function adminKontoVerlauf(name){
     const box = document.querySelector('[data-konto-verlauf-box="' + CSS.escape(name) + '"]');
