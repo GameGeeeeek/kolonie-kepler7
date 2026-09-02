@@ -37,4 +37,15 @@ const SERVER_JS = ersterVorhandener([
   '/workspace/kolonie-kepler7-backend/server.js'
 ].filter(Boolean));
 
-module.exports = { WURZEL, SPIELDATEI, SPIEL_URL, SERVER_JS, ersterVorhandener };
+// Seit den KI-Kampfberichten (E1a, 28.08.2026) gibt es eine dritte Quelle: das Messwerkzeug in
+// gamegeeeeek-ai-core. Prompt und Sperren liegen dort UND im Backend - dort gemessen, hier
+// entscheidend -, und der Paritaetstest haelt sie zusammen. Dieselbe Behandlung wie SERVER_JS:
+// per Env umleitbar (sonst waere jede Gegenprobe still wirkungslos) und ueberspringbar, wenn das
+// Nachbar-Repo nicht daneben liegt.
+const AI_CORE_MESSLAUF = ersterVorhandener([
+  process.env.KEPLER_AI_CORE_MESSLAUF,
+  path.join(WURZEL, '..', 'gamegeeeeek-ai-core', 'tools', 'kampftext_messlauf.py'),
+  '/workspace/gamegeeeeek-ai-core/tools/kampftext_messlauf.py'
+].filter(Boolean));
+
+module.exports = { WURZEL, SPIELDATEI, SPIEL_URL, SERVER_JS, AI_CORE_MESSLAUF, ersterVorhandener };

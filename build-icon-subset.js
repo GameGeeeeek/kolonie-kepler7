@@ -91,12 +91,10 @@ const altBytes = Buffer.from(alt.split(',')[1], 'base64').length;
 
 const neuesHtml = html.replace(alt, 'data:font/woff2;base64,' + b64);
 fs.writeFileSync(SPIEL, neuesHtml);
-// CLAUDE.md: weltraum_kolonie.html und index.html müssen identisch bleiben.
-fs.writeFileSync(path.join(__dirname, 'index.html'), neuesHtml);
 
 const kb = n => (n / 1024).toFixed(1) + ' KB';
 console.log('Font vorher : ' + kb(altBytes));
 console.log('Font nachher: ' + kb(neu.length));
 console.log('HTML        : ' + kb(Buffer.byteLength(html)) + ' -> ' + kb(Buffer.byteLength(neuesHtml)));
-console.log('\nweltraum_kolonie.html und index.html aktualisiert.');
+console.log('\nweltraum_kolonie.html aktualisiert.');
 console.log('Bitte noch pruefen: node check-icons.js');

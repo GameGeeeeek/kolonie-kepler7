@@ -134,10 +134,18 @@ geprüft hält.
   ausgelöst. **Offen bleibt die Wiederholungsmessung:** Der Zuschnitt ist an den vier echten
   Durchläufern gegengeprüft, nicht an einem neuen Lauf am M715q – „fast fehlersicher" gilt erst,
   wenn DIESELBE Messung wiederholt wurde (Regel 48).
-- **E1 – Pilot: eine Kampfart.** Vorschlag **`npc-attack`** (häufigste Kampfart, reichste
-  Daten, kein PvP-Risiko, kein zweiter Spieler betroffen). Backend-Endpunkte + Warteschlange +
-  Wahrheits-Sperre, Client-Sektion im Bericht, Schalter `KAMPFTEXT_AKTIV` (Backend) – derselbe
-  Auslieferungs-Schutz wie `FESTUNG_SPAWN_AKTIV`.
+- **E1 – Pilot: eine Kampfart** (`npc-attack`: häufigste Kampfart, reichste Daten, kein
+  PvP-Risiko, kein zweiter Spieler betroffen). In zwei Hälften geteilt, weil das Backend zuerst
+  live gehen muss (Frontend-Regel 60):
+  - **E1a – Backend: FERTIG am 28.08.2026** (kolonie-kepler7-backend#191). `POST
+    /api/kampfbericht/text` (202 + `auftragId`), `GET /api/kampfbericht/text/:id`, Warteschlange
+    (ein Auftrag gleichzeitig Richtung M715q), Tagesdeckel je Konto und gesamt, Prompt-Schablone
+    und die drei Wahrheits-Sperren, alles hinter `KAMPFTEXT_AKTIV = false`. Einzelheiten und die
+    sieben Entscheidungen: `kolonie-kepler7-backend/docs/ki-kampfberichte.md`.
+  - **E1b – Frontend: offen.** Client-Sektion im Bericht, 30-s-Poll, und das Umlegen des
+    Schalters. **Drei Vorbedingungen, alle am Pi:** `AI_CORE_URL` und `AI_CORE_API_KEY` als
+    Container-Env (verlangt ein Neuerzeugen des Containers), und eine erste Messung, ob der Pi
+    den M715q überhaupt erreicht — das ist bis heute nicht geprüft.
 - **E2 – die großen Momente:** Weltboss, Festungs-Fall, Königin, PvP-Angriff (dort beide
   Perspektiven: Der Verteidiger bekommt denselben Kampf aus seiner Sicht erzählt – zwei Texte
   aus einem Datensatz).

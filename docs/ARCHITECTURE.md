@@ -7,17 +7,9 @@ Diese Datei enthält dauerhafte Architekturregeln, die zu detailliert für `CLAU
 Kepler 7 ist derzeit im Kern eine große Single-File-Anwendung:
 
 - `weltraum_kolonie.html` enthält HTML, CSS und Vanilla-JavaScript.
-- `index.html` ist eine synchron zu haltende Kopie.
 - Es gibt keinen klassischen Frontend-Build mit Framework-Komponenten.
-- Der Pi-Deploy verwendet `weltraum_kolonie.html`; deshalb ist die Dateiparität kritisch.
-
-Nach Änderungen an der Spieldatei:
-
-```bash
-cp weltraum_kolonie.html index.html
-```
-
-Die Test-Suite prüft die Parität zusätzlich.
+- Der Pi-Deploy kopiert `*.html` ins Web-Verzeichnis; nginx liefert `weltraum_kolonie.html` direkt als Startseite (`index weltraum_kolonie.html;`, seit 01.09.2026).
+- Eine `index.html`-Kopie gibt es nicht mehr; der Prüflauf lehnt sie ab, weil der Deploy nie löscht und eine Kopie live still veralten würde.
 
 ## Große Datei: gezielt statt vollständig arbeiten
 
