@@ -6,7 +6,7 @@
 //
 // Der Test erzwingt die Ablehnung, indem das Backend fuer den pact:-Schluessel 500 liefert, und
 // vergleicht Erfolgs- und Fehlerlauf.
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, ruhigeUhren, logMitschnitt, logZeilen } = require('./lib/umgebung');
 
 const FILE = SPIEL_URL;
 let fail = false;
@@ -50,6 +50,11 @@ function backend(store, schreibfehler){ return async r => {
 };}
 
 const SPIELSTAND = JSON.stringify({
+  // Der Spread steht VORNE, damit alles Folgende gewinnt (die Einbau-Regel aus lib/umgebung):
+  // Planeten-Ereignis, Haendler UND der Zufallsereignis-Riegel. Dieser Test hat den Vorfall im
+  // Kommentar unten seit dem 04.08.2026 beschrieben und trotzdem nie gepinnt - er hat sich
+  // stattdessen einen eigenen Mitschnitt gebaut, also die Folge behandelt statt der Ursache.
+  ...ruhigeUhren(),
   tutorialSeen: true, newbieWelcomeSeen: true,
   // seenTabHints gesetzt, damit die Ersthinweis-Leiste (v8.298.3) hier nichts verdeckt.
   seenTabHints: { galaxie: true },
@@ -70,6 +75,11 @@ async function lauf(browser, schreibfehler){
   const store = { 'kepler7-save-v3': SPIELSTAND, [PAKT_KEY]: JSON.stringify(PAKT) };
   await page.route('**/api/**', backend(store, schreibfehler));
   await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  // Der Mitschnitt haengt am DOKUMENT und laeuft ueber addInitScript VOR dem ersten Tick - der
+  // eigene Beobachter dieses Tests sass am #log-KNOTEN und wurde erst nach dem Boot gesetzt
+  // (Falle (b) im Kommentar von lib/umgebung): Wird der Container spaeter noch einmal ersetzt,
+  // sammelt er am verwaisten Original weiter.
+  await logMitschnitt(page);
   await page.goto(FILE); await page.waitForTimeout(2600);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
 
@@ -79,20 +89,6 @@ async function lauf(browser, schreibfehler){
   await page.evaluate(() => { const b = document.querySelector('[data-galaxy-subtab="diplo"]'); if (b) b.click(); });
   await page.waitForTimeout(1600);
 
-  // Das Protokoll MITSCHREIBEN statt am Ende einmal hineinzusehen (04.08.2026): #log haelt
-  // nur die letzten Eintraege. Feuert zwischen Klick und Ablesen ein Zufallsereignis
-  // („Neues Ereignis: Reiche Kristalladern entdeckt ..."), verdraengt es die Meldung, auf die
-  // dieser Test wartet - der Lauf wird rot, obwohl das Geschenk sich richtig verhalten hat.
-  // Genau so ist es im Sammellauf vom 04.08.2026 passiert, und beim Einzelstart mit
-  // demselben Stand lief er sofort wieder gruen.
-  await page.evaluate(() => {
-    window.__protokoll = '';
-    const el = document.getElementById('log');
-    if (!el) return;
-    window.__protokoll = el.textContent || '';
-    new MutationObserver(() => { window.__protokoll += '\n' + (el.textContent || ''); })
-      .observe(el, { childList: true, subtree: true, characterData: true });
-  });
 
   const knopf = await page.locator('#diplomacyBox [data-pact-gift-send]').count();
   if (!knopf) console.log('   [Debug] diplomacyBox:', await page.evaluate(() => { const b = document.getElementById('diplomacyBox'); return b ? b.innerText.slice(0, 250) : 'FEHLT'; }));
@@ -106,7 +102,7 @@ async function lauf(browser, schreibfehler){
   }) : false;
   await page.waitForTimeout(1800);
 
-  const log = await page.evaluate(() => window.__protokoll || (document.getElementById('log') || {}).textContent || '');
+  const log = (await logZeilen(page)).join('\n');
   let erzNachher = null, gespeicherterPakt = null;
   try { erzNachher = JSON.parse(store['kepler7-save-v3']).resources.erz; } catch (e) {}
   try { gespeicherterPakt = JSON.parse(store[PAKT_KEY]); } catch (e) {}
