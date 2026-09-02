@@ -80,9 +80,14 @@ function layoutPruefen(){
   const ids = [...src.slice(src.indexOf('const STAR_SYSTEMS = ['), src.indexOf('const TERRAFORM_TARGET_TYPES')).matchAll(/\bid:\s*'([^']+)'/g)].map(m=>m[1]);
   const BASE = ids.length;
   const WEEKLY = +(src.match(/const WEEKLY_SYSTEM_MAX = (\d+);/)||[])[1];
+  // Startschub (02.09.2026): 30 fest verortete Systeme zwischen Basis und Wochensystemen; das
+  // Spiralfeld hält 69 + 30 + 178 = 277 Plätze vor.
+  const schubLiteral = src.slice(src.indexOf('const SCHUB_SYSTEMS = ['), src.indexOf('\n  ];', src.indexOf('const SCHUB_SYSTEMS = [')));
+  const SCHUB = (schubLiteral.match(/\bid:\s*'syss_/g) || []).length;
   const umgebung = {
     BASE_STAR_SYSTEM_COUNT: BASE,
-    GALAXY_SPIRAL_SLOTS: BASE + WEEKLY,
+    SCHUB_SYSTEM_COUNT: SCHUB,
+    GALAXY_SPIRAL_SLOTS: BASE + SCHUB + WEEKLY,
     GALAXY_SPIRAL_RMAX: +(src.match(/const GALAXY_SPIRAL_RMAX = (\d+);/)||[])[1],
     GALAXY_GOLDEN_ANGLE: +(src.match(/const GALAXY_GOLDEN_ANGLE = ([\d.]+);/)||[])[1],
     GALAXY_MIN_NODE_DIST: +(src.match(/const GALAXY_MIN_NODE_DIST = (\d+);/)||[])[1],
