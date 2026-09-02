@@ -39,6 +39,27 @@ Nach Möglichkeit immer beidseitig belegen:
 
 Bleibt ein Test am alten Stand grün, zuerst untersuchen, warum er die Regel nicht misst. Nicht nur Erwartungswerte so lange verändern, bis er zufällig rot wird.
 
+### Die laute Kopie (`KEPLER_SPIELDATEI`)
+
+Zufällige Störungen lassen sich nicht abwarten, sondern werden hochgedreht: eine Kopie der
+Spieldatei unter einem anderen Pfad, dort die Wahrscheinlichkeit verstellt, und die Tests über
+`KEPLER_SPIELDATEI` dagegen gefahren. Die echte Spieldatei bleibt dabei unangetastet, ein
+gleichzeitig laufender Prüflauf also gültig.
+
+Zwei Belege gehören dazu, sonst ist „grün" ein Werkzeugbefund:
+
+- **Die Umleitung kam an.** Einmal gegen eine absichtlich kaputte Datei fahren – der Test muss
+  fallen. Eine still ignorierte Umgebungsvariable sieht sonst aus wie eine bestandene Probe.
+- **Die Sabotage hat gegriffen.** Eine Sonde in eine *Kopie* des Tests unter `tests/` setzen
+  (nicht aus `/tmp`, dort löst `require('./lib/umgebung')` nicht auf) und die Störung im Lauf
+  wirklich messen, nicht aus der Wahrscheinlichkeit erschließen.
+
+Gemessen am 02.09.2026 mit `Math.random() > 0.9` statt `0.0025` in `maybeSpawnRandomEvent`: Alle
+24 Tests, die Fensterlage messen und keinen Ereignis-Riegel führen, bleiben grün, obwohl das
+Banner in ihren Läufen nachweislich stand (152 px bzw. 98 px). Das Spiel weicht dieser
+Verschiebung selbst aus – ausweichende Klappe seit dem 18.08.2026, Bildruhe seit dem 21.08.2026.
+Ein flächiger Einbau von `ruhigeUhren()` in diese Tests wäre also Arbeit ohne Beleg gewesen.
+
 ## Fachliche Regel statt Momentaufnahme prüfen
 
 - Erwartungen aus gemessenen Ausgangsdaten ableiten, wenn feste Zahlen nicht selbst Teil der Regel sind.
