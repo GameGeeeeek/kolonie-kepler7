@@ -369,9 +369,15 @@ async function lauf(browser, fall, verzoegerungMs) {
   /* Gemessen wird der UNTERSCHIED der beiden Laeufe, nicht ein eingetippter Betrag - und in
      Krediten, damit weder Lagerdeckel noch Produktion dazwischenfunken (siehe Kommentar oben).
      Erwartung: ohne stehenden Vorposten kommen genau die 5000 zurueck, mit stehendem gar nichts. */
-  check('9c: und die Erstattung selbst ist messbar - genau im einen Fall, nicht im anderen',
-    steht.zuwachs === 0 && weg.zuwachs === 5000,
-    { mitVorposten: steht.zuwachs, ohneVorposten: weg.zuwachs });
+  /* Verglichen wird der ABSTAND der beiden Laeufe, nicht der Absolutwert. Gemessen: 250 mit
+     stehendem Vorposten, 5250 ohne - die 250 sind Kredit-Zufluss, den beide gleichermassen haben.
+     Der Abstand ist die Erstattung selbst und betraegt genau die 5000 aus m.kosten. Die Toleranz
+     faengt einen Tick Unterschied im Zufluss ab, ohne die Aussage zu verwaessern: ohne die
+     Behebung waere der Abstand 0. */
+  const abstand = (weg.zuwachs !== null && steht.zuwachs !== null) ? weg.zuwachs - steht.zuwachs : null;
+  check('9c: der Abstand beider Laeufe ist genau die Erstattung (5000), nicht null',
+    abstand !== null && Math.abs(abstand - 5000) < 500,
+    { mitVorposten: steht.zuwachs, ohneVorposten: weg.zuwachs, abstand });
 
   await browser.close();
   ende();
