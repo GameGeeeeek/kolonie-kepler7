@@ -211,6 +211,28 @@ hängt (hier der Radius des Hof-Kreises). Und: Gefunden hat den Fehler die Gegen
 grüne Lauf — eine Prüfung, die am alten Stand grün bleibt, obwohl sie fallen müsste, ist der
 eigentliche Ertrag der Gegenprobe.
 
+## 20. Wer erst aufräumt und dann fragt, fragt nach etwas, das er gerade weggeräumt hat
+
+Sechs Missionsarten – Anfechtung, Festungsschlag, Nest-Schlag, Wrackkonvoi, Vorposten-Bau und
+Vorposten-Angriff – haben ihren Kampf **nie** ausgefochten, jede seit ihrer eigenen Auslieferung.
+`checkMissions` entfernte die fertige Mission synchron aus `fleet.missions`, der Auflöser
+speicherte diesen Stand mit `await save()` und fragte erst danach den Server – und der sucht die
+Mission über ihre Kennung im gespeicherten Spielstand. Antwort: immer 403, Flotte kehrt unversehrt
+heim, kein Kampf. Der PvP-Angriff war als einziger heil, und zwar aus Versehen: Er hat kein
+`await save()` vor dem Aufruf.
+
+Die übertragbare Regel: **Wenn der Server einen Zustand aus dem gespeicherten Spielstand liest,
+darf der Client diesen Zustand nicht vorher entfernen – „erst speichern, dann fragen" genügt
+nicht, wenn zwischen Entfernen und Speichern nichts mehr liegt.** Der Kommentar an der Stelle sagte
+sogar wörtlich „Erst speichern (er liest die Mission aus dem GESPEICHERTEN Stand), dann fragen" –
+die Absicht war richtig, nur war die Mission zu diesem Zeitpunkt schon weg. Ein Kommentar, der die
+Absicht beschreibt, belegt nicht, dass sie zutrifft.
+
+Zweitens: **Fünf gleichartige Zweige nebeneinander laufen auseinander, sobald einer angefasst
+wird.** Die sechs Auflöser waren wortgleich gebaut und teilten damit auch den Fehler sechsfach.
+Sie laufen jetzt über einen gemeinsamen Starter, der die Mission erst nach der Antwort entfernt –
+im `finally`, damit eine geworfene Ausnahme keine Mission für immer stehen lässt.
+
 ## Pflege dieser Datei
 
 Nur eine neue Regel aufnehmen, wenn sie:

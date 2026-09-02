@@ -238,3 +238,90 @@ ist eine PvP-Balance-Entscheidung und braucht eine eigene Backend-Etappe.
 - Ob die Wochenliga/Kampf-Bilanz Standort-Siege anders gewichtet (vorerst: nein, ein Sieg ist
   ein Sieg).
 - Regionsabzeichen für fremde Kolonien (Etappe 2, Frage an Sascha).
+
+## 6. Mindesteinsatz: Ertrag nur ab echtem Einsatz (Aufgabe #20, 02.09.2026)
+
+### Der Befund
+
+Kampfkraft und Risiko waren entkoppelt. `computeAttackPower` rechnet serverseitig über
+`allFleetsOf` — die **ganze Reichsflotte** —, während die Verluste im Client nur aus der
+geschickten `m.composition` gezogen werden. Ein Angriff mit **einem** Jäger kämpfte also mit
+voller Reichskraft und riskierte diesen einen Jäger.
+
+Zwei Dinge kamen beim Nachmessen dazu und verschärfen die Lage erheblich:
+
+- **`awayShipTotalsServer` kennt `attack-player` nicht** (nur `relocate`, `defend-base`,
+  `defend-base-return`, `attack-alliance-base`). Angriffsmissionen ziehen ihre Schiffe nirgends
+  ab — der volle Bestand bleibt stehen, während sie fliegen.
+- **`cargoCapacity` kommt in `server.js` null Mal vor.** Der Server zog dem Ziel **immer** den
+  vollen Satz ab (12–25 %) und schrieb ihn dem Angreifer gut; der Frachtdeckel sitzt allein im
+  Client, der den Angreifer-Spielstand danach überschreibt. Ein Ein-Jäger-Angriff plünderte also
+  ein Viertel des Ressourcenkontos — und der größte Teil wurde **vernichtet**, weil ihn niemand
+  tragen konnte. Für den Angreifer sah es nach „keine Beute" aus, für das Opfer nicht. Das war die
+  teuerste Zahl der ganzen Lücke und in der Aufgabenbeschreibung nicht erfasst.
+
+### Die Regel (Balance-Entscheidung Sascha: „Mindesteinsatz als Ertragsschwelle")
+
+Ein Angriff unter `PVP_MINDESTEINSATZ` wird **nicht abgelehnt, sondern ertraglos**: keine Beute,
+keine Kampfpunkte, keine Kriegspunkte, keine Veteranen-Erfahrung, kein Anlagenschaden, kein
+Flottenverlust beim Ziel. Der Kampf läuft normal, die Siegchance bleibt die Reichsflotte — die
+Zusage aus v8.634.0 bleibt damit wörtlich wahr. Die **eigenen** Verluste fallen weiter an; ein
+Nadelstich ist also nicht gratis, aber auch nicht mehr lohnend.
+
+Ablehnen wäre die schlechtere Bauform: Beim Eintreffen hat der Angreifer Treibstoff und Flugzeit
+längst bezahlt, und seine Flotte kann seit dem Start gewachsen sein.
+
+### Wer was durchsetzt
+
+| Größe | Wo | Warum dort |
+|---|---|---|
+| Beute, Anlagenschaden, Flottenverlust beim Ziel, `battlePoints` am Nutzerobjekt | Server | PvP-relevant, gehört nicht in die Hand des Angreifers |
+| `state.battlePoints`, `state.commandPoints`, `state.veteranXp` | Client | liegen im klientenautoritativen Spielstand, der Server kann sie nicht weglassen |
+
+Beide Seiten lesen dieselbe `ertragStufe` aus der Antwort. Läuft der Client gegen ein Backend ohne
+diese Etappe, fehlt das Feld — dann bleibt alles beim Altpfad.
+
+### `missionId` statt Flotte im Request
+
+Der Spielstand ist klientenautoritativ; eine Flottenangabe im Body wäre eine PvP-relevante Größe
+aus der Hand des Angreifers. Der Server liest die Zusammensetzung deshalb aus dem **gespeicherten**
+Spielstand. Ehrlich bleibt: Wer sich den Request baut, kann eine große Mission in seinen Spielstand
+schreiben. Der Missbrauch wandert damit aus „drei Klicks in der offiziellen Oberfläche" in die
+Klasse „Spielstand fälschen" — eine **Spielregel, kein Sicherheitsschloss**.
+
+**Warum das hier ohne `await save()` funktioniert:** `checkMissions` entfernt die Mission zwar
+synchron, aber `fetch()` geht im selben synchronen Durchlauf raus — vor dem Speichern des Ticks.
+Gemessen (Playwright-Sonde, dreimal): `save+ save+ save+ >>attack<< save-`. Kommt das Speichern
+doch einmal zuerst an, fällt der Server auf `voll` zurück, also in die für den Spieler harmlose
+Richtung. Für die sechs PvE-Auflöser reichte genau das nicht — siehe `docs/PROJECT_MEMORY.md`,
+Punkt 20.
+
+### Die Kopie-Familie
+
+`PVP_MINDESTEINSATZ` und `PVP_MINDESTEINSATZ_AKTIV` stehen in `weltraum_kolonie.html` **und** in
+`server.js`. Sie werden in **einem Zug** auf beiden Seiten umgelegt: Stünde der Schalter vorne an
+und hinten aus, warnte die Vorschau vor einer Regel, die es nicht gibt. `tests/test_pvp_mindesteinsatz.js`
+prüft Wert und Schalterstand gegen `server.js`.
+
+Auch der **Hilfeabschnitt** hängt am Schalter (`...(PVP_MINDESTEINSATZ_AKTIV ? [{…}] : [])`) — ein
+Text, der einen Mindesteinsatz beschreibt, während der Server ihn nicht anwendet, wäre eine
+Falschauskunft.
+
+### Die Anzeigestellen
+
+- **Vorschau** (`pvpVorschauHtml`): nennt den Einsatzanteil, **bevor** die Flotte startet. Das ist
+  der eigentliche Sinn der Etappe — eine Regel, die dem Spieler erst im Bericht begegnet, bestraft
+  ihn für etwas, das er beim Zusammenstellen nicht sehen konnte. Bewusst als Näherung („~"): Die
+  Vorschau rechnet mit dem laufenden Zustand, der Server mit dem gespeicherten.
+- **Log** (Sieg- und Verlustzweig): nennt Schwelle und tatsächlichen Anteil aus der **Antwort**.
+- **Bericht**: eigene Zeile, wenn `ertragStufe === 'sockel'`.
+- **Beutetext**: „nichts (Ziel hatte keine Ressourcen)" wäre im Sockel wörtlich falsch — dort steht
+  jetzt nur „nichts", und der Grund folgt im nächsten Satz.
+- **Hilfe**: eigener Abschnitt unter „Flotte & Schiffe", am Schalter hängend.
+
+### Die Schwelle ist noch geraten
+
+25 % ist ein Startwert. Vor dem Umlegen des Schalters misst
+`kolonie-kepler7-backend/pvp_einsatz_messen.js` über `db.private`, welchen Anteil der stärkste
+Standort eines Kontos üblicherweise hält — sonst trifft die Regel ehrliche Spieler mit verteilter
+Flotte. Ein Konto mit sechs gleich starken Standorten kommt rechnerisch nie über 16,7 %.
