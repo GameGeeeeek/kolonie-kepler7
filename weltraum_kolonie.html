@@ -15573,7 +15573,7 @@
       pushReport({ type:'vorposten-bau', erfolg:true, fleetName:m.fleetName, system:m.system, systemName:sysN, stufeName:(daten.vorposten && daten.vorposten.name) || 'Feldlager', kosten:m.kosten||null });
       ladeVorposten();
     }
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   function vorpostenGarnisonSenden(sysId){
     const v = vorpostenAn(sysId);
@@ -15857,6 +15857,63 @@
   function pveVerlusteBuchen(fleet, verluste){
     for (const [k, weg] of Object.entries(verluste || {})) if (weg > 0) fleet[k] = Math.max(0, (fleet[k]||0) - weg);
   }
+  /* ===== Missionen, deren Ausgang der SERVER entscheidet =====================================
+     Sie MUESSEN im gespeicherten Spielstand stehen bleiben, bis er geantwortet hat: Jeder dieser
+     sechs Endpunkte sucht die Mission ueber ihre Kennung in db.private (astFindeAngriffsmission,
+     festungFindeMission, nestFindeMission, A2FindeMission, vorpostenFindeMission) und weist den
+     Anflug mit 403 ab, wenn er sie nicht findet.
+
+     GENAU DAS PASSIERTE BISHER BEI ALLEN SECHS. checkMissions entfernte die fertige Mission
+     synchron aus fleet.missions, und der Aufloeser speicherte diesen Stand danach mit `await
+     save()` - also OHNE die Mission -, bevor er fragte. Gemessen mit einer Playwright-Sonde, deren
+     Attrappe sich wie der echte Server verhaelt: Der Spieler bekam jedes Mal "Zu diesem Angriff
+     ist keine Flotte im gespeicherten Spielstand unterwegs", die Flotte kam unversehrt heim, es
+     gab NIE einen Kampf - seit Auslieferung der jeweiligen Mechanik.
+     Kein Test konnte das fangen, weil jede Test-Attrappe unbedingt mit Erfolg antwortet; sie
+     faelschte also ausgerechnet das, was in Wirklichkeit fehlschlug.
+
+     Der PvP-Angriff war NICHT betroffen - er hat kein `await save()` vor dem Aufruf, und die
+     Anfrage geht deshalb raus, bevor der Tick den Stand ohne Mission speichert. An diesem
+     Unterschied ist der Fehler ueberhaupt aufgefallen. */
+  const laufendeServerAufloesungen = new Set();
+  function serverMissionLaeuft(m){ return !!m && laufendeServerAufloesungen.has(m.id); }
+  /* Bewusst eine Funktion mit switch und nicht eine Tabelle aus Funktionsverweisen: Ein
+     Objektliteral auf oberster Ebene wird beim Laden ausgewertet und braeuchte die Aufloeser
+     dort bereits - dieselbe Falle, die im Backend als temporale Todeszone dokumentiert ist. */
+  function serverAufloeserFuer(typ){
+    switch (typ){
+      case 'asteroid-contest':  return anfechtungAufloesen;
+      case 'festung-angriff':   return festungAufloesen;
+      case 'nest-angriff':      return nestAufloesen;
+      case 'konvoi-angriff':    return konvoiAufloesen;
+      case 'vorposten-bau':     return vorpostenBauAnkunft;
+      case 'vorposten-angriff': return vorpostenAngriffAufloesen;
+      // 'vorposten-defend' steht bewusst NICHT hier: /vorposten/stationieren bekommt die Flotte
+      // im Body und sucht gar keine Mission - der Zweig war deshalb nie betroffen.
+      default: return null;
+    }
+  }
+  /* Startet die serverseitige Aufloesung und raeumt danach IMMER auf - auch wenn der Aufloeser
+     wirft. Ohne das `finally` bliebe die Mission fuer immer in der Flotte stehen und wuerde einen
+     Kampfschiff-Slot blockieren; das waere schlimmer als der Fehler, der hier behoben wird.
+     Die Mission wird ueber ihre Kennung aus der AKTUELLEN Liste geholt, nie ueber einen beim Start
+     gemerkten Index: checkMissions setzt fleet.missions in jedem Tick neu.
+     Bleibt das abschliessende Speichern aus (Tab geschlossen zwischen Antwort und Aufraeumen),
+     steht die Mission beim naechsten Laden noch im Spielstand und wird erneut eingereicht. Das ist
+     der bewusst in Kauf genommene Rest: Festung und Anfechtung fangen ihn ueber `abgerechnet` ab,
+     Nest, Konvoi und Vorposten ueber ihre Abklingzeit - in beiden Faellen gibt es keinen zweiten
+     Ertrag, sondern eine Abweisung. */
+  function serverAufloesungStarten(aufloeser, m, planetKey, fleet){
+    Promise.resolve()
+      .then(() => aufloeser(m, planetKey, fleet))
+      .catch(e => { console.error(e); })
+      .finally(() => {
+        laufendeServerAufloesungen.delete(m.id);
+        const i = (fleet.missions || []).findIndex(x => x.id === m.id);
+        if (i >= 0) fleet.missions.splice(i, 1);
+        render(); save();
+      });
+  }
   // Bei Ankunft: Der Server entscheidet. Erst speichern (er liest die Mission aus dem GESPEICHERTEN
   // Stand), dann fragen, dann die eigenen Verluste buchen - der Server fasst den Spielstand nie an.
   async function anfechtungAufloesen(m, planetKey, fleet){
@@ -15907,7 +15964,7 @@
       ladeAsteroidfeld(true);
     }
     pveVerlusteBuchen(fleet, verluste);
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   /* Der Festungsschlag kommt heim (Phase 1, 18.08.2026). Wortgleiches Muster wie
      anfechtungAufloesen darueber - inklusive der wichtigsten Eigenschaft: Antwortet der Server
@@ -15985,7 +16042,7 @@
       if (daten.gefallen) claimPendingRewards();
     }
     pveVerlusteBuchen(fleet, verluste);
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   /* Der Wrackkonvoi-Schlag bei der Rueckkehr (A2). Wortgleiches Muster wie nestAufloesen, mit
      demselben `verpasst`-Ausgang: Der Server antwortet mit 200 und ohne Verluste, wenn das Ziel
@@ -16043,7 +16100,7 @@
       if (daten.gefallen) claimPendingRewards();
     }
     pveVerlusteBuchen(fleet, verluste);
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   /* Der Vorposten-Schlag bei der Rueckkehr (B2) - wortgleich zum Nest aufgebaut: kein Kampf heisst
      leeres `verluste` (vollzaehlige Rueckkehr), `verpasst` (weg/ersetzt) kostet nichts und nennt den
@@ -16093,7 +16150,7 @@
       if (daten.gefallen) claimPendingRewards();
     }
     pveVerlusteBuchen(fleet, verluste);
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   async function festungAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
@@ -16185,7 +16242,7 @@
       if (daten.gefallen) claimPendingRewards();
     }
     pveVerlusteBuchen(fleet, verluste);
-    render(); save();
+    // Mission entfernen, render und save macht serverAufloesungStarten - auch wenn hier etwas wirft.
   }
   function asteroidResListe(a, menge){
     const s = asteroidSorte(a.sorte);
@@ -29649,6 +29706,30 @@
     power *= t2OffenseAuraMult(gesamt);
     return Math.round(power);
   }
+  /* ===== PvP-Mindesteinsatz ===================================================================
+     KOPIE-FAMILIE mit server.js (PVP_MINDESTEINSATZ_AKTIV / PVP_MINDESTEINSATZ). Beide Seiten
+     muessen denselben Wert UND denselben Schalterstand tragen; tests/test_pvp_mindesteinsatz.js
+     vergleicht sie gegen server.js.
+     Der Schalter steht hier NUR, damit die Vorschau warnen kann, BEVOR die Flotte losfliegt -
+     entschieden wird die Sache serverseitig. Steht er dort aus und hier an, waere die Warnung eine
+     Luege; deshalb wird er in EINEM Zug auf beiden Seiten umgelegt. */
+  const PVP_MINDESTEINSATZ_AKTIV = false;
+  const PVP_MINDESTEINSATZ = 0.25;
+  /* Der Anteil der geschickten Flotte an der Reichs-Rohkraft - dieselbe Form wie pvpEinsatzAnteil
+     in server.js: nur der flottenabhaengige Teil (attackPowerRaw x fleetDiversityMult je
+     Standort). Alles danach - Doktrin, Haltung, Bonusgruppe, Buffs, Aura - ist KONTOWEIT und
+     kuerzt sich im Quotienten heraus. Deshalb steht hier bewusst nicht pvpReichskraft(): Dessen
+     kontoweite Faktoren wuerden am Anteil nichts aendern, aber jede kuenftige Aenderung an ihnen
+     koennte die beiden Seiten stillschweigend auseinanderlaufen lassen. */
+  function pvpEinsatzAnteil(composition){
+    const roh = f => attackPowerRaw(f) * fleetDiversityMult(f);
+    let gesamt = 0;
+    for (const e of allFleetsWithPlanet()) if (e.fleet) gesamt += roh(e.fleet);
+    // Kein Reich, keine Schwelle - wie im Backend, damit niemand durch eine Division durch null
+    // aus dem PvP faellt.
+    if (!(gesamt > 0)) return 1;
+    return Math.min(1, roh(composition) / gesamt);
+  }
   function buildingSetFor(planetKey){
     if (planetKey === 'home') return state.buildings;
     const col = state.colonies[planetKey];
@@ -34698,10 +34779,24 @@ async function claimPendingRewards(){
       if (typeof data.targetPlanet === 'string') d.targetPlanet = data.targetPlanet;
       if (typeof data.standortArt === 'string') d.standortArt = data.standortArt;
       if (typeof data.beuteFaktor === 'number') d.beuteFaktor = data.beuteFaktor;
+      /* PvP-Mindesteinsatz. Diese beiden MUESSEN hier stehen: Diese Funktion ist eine Whitelist,
+         und was sie nicht kennt, erreicht keinen Bericht - der Spieler saehe einen GEWONNENEN
+         Angriff ohne Beute und ohne Kampfpunkte und bekaeme nirgends gesagt, warum. Ihr Fehlen
+         ist zugleich der Erkennungsweg fuer einen Server ohne diese Etappe. */
+      if (typeof data.ertragStufe === 'string') d.ertragStufe = data.ertragStufe;
+      if (typeof data.einsatzAnteil === 'number') d.einsatzAnteil = data.einsatzAnteil;
       return d;
     }
-    const applyWinLoss = () => { addVeteranXp(planetKey, 20); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {}; };
-    const applyDefeatLoss = () => { addVeteranXp(planetKey, 5); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.3+Math.random()*0.3).pct, planetKey, m.composition) : {}; };
+    /* Ertragsstufe des Servers (PvP-Mindesteinsatz). Sie wird weiter unten aus der Antwort
+       gesetzt und steht hier oben, weil die beiden Verlustfunktionen sie brauchen - die
+       Pfeilfunktionen lesen sie erst beim AUFRUF, also nach der Antwort.
+       Veteranen-XP faellt unter denselben Sockel wie Kampfpunkte und Beute: Sie ist ein Ertrag,
+       und ein Nadelstich soll keinen erwirtschaften. Der Server kann sie nicht selbst weglassen -
+       state.veteranXp liegt im klientenautoritativen Spielstand -, deshalb steht die Regel hier.
+       Im simulierten Modus (kein Server) bleibt sie false; dort gibt es die Regel nicht. */
+    let ertragSockel = false;
+    const applyWinLoss = () => { addVeteranXp(planetKey, ertragSockel ? 0 : 20); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {}; };
+    const applyDefeatLoss = () => { addVeteranXp(planetKey, ertragSockel ? 0 : 5); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, applyRetreatDampening(0.3+Math.random()*0.3).pct, planetKey, m.composition) : {}; };
     if (useBackend()){
       // Bug behoben (13.07.2026): der Kampf wurde bisher SOFORT beim Losschicken berechnet - das Opfer
       // verlor Ressourcen, bevor die angreifende Flotte überhaupt eingetroffen war. Der eigentliche
@@ -34711,7 +34806,17 @@ async function claimPendingRewards(){
         /* `targetPlanet` reist NUR mit, wenn die Mission eines traegt. Fehlt das Feld, laeuft im
            Backend byte-gleich der bisherige Konto-Kampf - eine beim Update schon fliegende
            Altmission bekommt also weiterhin genau das Ergebnis, mit dem sie losgeschickt wurde. */
-        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId, ...(m.targetPlanet ? { targetPlanet: m.targetPlanet } : {}) }) });
+        /* `missionId` reist mit, damit der Server die EINGESETZTE Flotte im gespeicherten
+           Spielstand nachschlagen kann (PvP-Mindesteinsatz). Bewusst nur die Kennung und nicht
+           die Flotte selbst: Der Spielstand ist klientenautoritativ, eine Flottenangabe im Body
+           waere eine PvP-relevante Groesse aus der Hand des Angreifers.
+           Dass der Server sie findet, haengt an der Reihenfolge: checkMissions entfernt die
+           Mission zwar synchron, aber fetch() geht im selben synchronen Durchlauf raus - VOR dem
+           Speichern des Ticks. Gemessen (Playwright-Sonde, dreimal): save+ save+ save+ >>attack<<
+           save-. Kommt das Speichern doch einmal zuerst an, faellt der Server auf 'voll' zurueck,
+           also in die fuer den Spieler harmlose Richtung. Fuer die sechs PvE-Aufloeser reichte
+           genau das nicht - die haben ein `await save()` davor, siehe serverAufloesungStarten. */
+        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId, ...(m.id !== undefined ? { missionId: String(m.id) } : {}), ...(m.targetPlanet ? { targetPlanet: m.targetPlanet } : {}) }) });
         myAttackShieldUntil = 0; // eigener Angriff hebt den eigenen Schutzschild auf (Server tut dasselbe)
         data = await res.json();
         if (res.status === 403 && data && data.shieldMs > 0){
@@ -34740,6 +34845,13 @@ async function claimPendingRewards(){
       }
       // Siehe Kommentar bei doMarketTrade: Server erhöht die Spielstand-Versionsnummer mit.
       if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
+      /* 'sockel' heisst: Der Kampf lief ganz normal, aber er hat nichts eingebracht. Der Server
+         hat Beute, Anlagenschaden und den Flottenverlust beim Ziel bereits weggelassen; hier
+         fallen die clientseitigen Ertraege dazu weg. Ohne diesen Zweig bekaeme der Spieler fuer
+         einen Nadelstich weiterhin 25 Kampfpunkte samt Kommandopunkten, und sein Spielstand liefe
+         dauerhaft gegen die Buchung des Servers.
+         Ein Server ohne diese Etappe schickt das Feld gar nicht - dann bleibt es beim Altpfad. */
+      ertragSockel = data.ertragStufe === 'sockel';
       if (data.success){
         const rawStolen = data.stolen || {};
         const rawTotal = Object.values(rawStolen).reduce((a,b)=>a+b,0);
@@ -34756,10 +34868,13 @@ async function claimPendingRewards(){
           carried[res] = state.resources[res]-before;
         }
         const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ') || 'nichts (Ziel hatte keine Ressourcen)';
-        const bpGained = warTag ? Math.round(25*1.5) : 25;
-        awardBattlePoints(bpGained);
-        logScoreChange(bpGained*3, 'Angriff auf '+name+' gewonnen (+'+bpGained+' Kampfpunkte)'+(warTag?' [Krieg]':''), 'ti-sword');
-        if (warTag){ addWarScore(warTag, 1); state.warVictories = (state.warVictories||0)+1; }
+        const bpGained = ertragSockel ? 0 : (warTag ? Math.round(25*1.5) : 25);
+        if (bpGained > 0){
+          awardBattlePoints(bpGained);
+          logScoreChange(bpGained*3, 'Angriff auf '+name+' gewonnen (+'+bpGained+' Kampfpunkte)'+(warTag?' [Krieg]':''), 'ti-sword');
+        }
+        // Kriegspunkte sind ebenfalls ein Ertrag - ein Nadelstich soll keinen Krieg entscheiden.
+        if (warTag && !ertragSockel){ addWarScore(warTag, 1); state.warVictories = (state.warVictories||0)+1; }
         const cargoNote = (m.cargoCapacity||0)<=0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale<1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
         const ownLostWinBackend = applyWinLoss();
         const ownLossTxt = lostCountsToText(ownLostWinBackend);
@@ -34771,8 +34886,12 @@ async function claimPendingRewards(){
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       } else {
-        awardBattlePoints(3);
-        logScoreChange(3*3, 'Angriff auf '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
+        // Auch der Trostpreis faellt unter den Sockel - genau wie im Backend, wo derselbe Zweig
+        // die 3 Kampfpunkte nur ausserhalb des Sockels bucht.
+        if (!ertragSockel){
+          awardBattlePoints(3);
+          logScoreChange(3*3, 'Angriff auf '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
+        }
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
@@ -55825,10 +55944,16 @@ async function claimPendingRewards(){
         any = true;
         ankunftsKampf(m, planetKey, fleet, showLog);
       }
-      const done = fleet.missions.filter(m => now >= m.endTime);
+      /* Eine Mission, deren Ausgang gerade beim Server liegt, ist NICHT fertig - sonst schickte
+         der naechste Tick denselben Anflug ein zweites Mal los. */
+      const done = fleet.missions.filter(m => now >= m.endTime && !serverMissionLaeuft(m));
       if (!done.length) continue;
       any = true;
-      fleet.missions = fleet.missions.filter(m => now < m.endTime);
+      /* Erst markieren, dann filtern - der Filter darunter laesst genau die markierten stehen.
+         Sie muessen im Spielstand bleiben, bis der Server geantwortet hat (siehe
+         serverAufloesungStarten); entfernt werden sie dort. */
+      for (const m of done) if (serverAufloeserFuer(m.type)) laufendeServerAufloesungen.add(m.id);
+      fleet.missions = fleet.missions.filter(m => now < m.endTime || serverMissionLaeuft(m));
       for (const m of done){
         /* Abbaumission zurueck (v8.478.0). Bewusst VOR der type-Kette und mit continue statt als
            weiteres else-if: Die Kette ist lang gewachsen, und ein neuer Zweig mittendrin ist die
@@ -55855,33 +55980,23 @@ async function claimPendingRewards(){
           save().then(() => { if (asteroidMeinRecht(asteroidAn(m.system, m.platz))) asteroidClaim(m.system, m.platz, true); }).catch(()=>{});
           continue;
         }
-        /* Anfechtung angekommen (v8.491.0): Der Kampf wird serverseitig ausgefochten. Der Aufruf
-           laeuft asynchron weiter, waehrend der Tick normal endet - die Schiffe treten erst mit
-           der Antwort wieder in die Flotte ein (oder eben dezimiert). */
-        if (m.type === 'asteroid-contest'){
-          anfechtungAufloesen(m, planetKey, fleet);
-          continue;
-        }
-        // Festungsschlag angekommen - derselbe Weg wie die Anfechtung darueber.
-        if (m.type === 'festung-angriff'){
-          festungAufloesen(m, planetKey, fleet);
-          continue;
-        }
-        // Nest-Schlag angekommen - derselbe Weg wie die Festung darueber.
-        if (m.type === 'nest-angriff'){
-          nestAufloesen(m, planetKey, fleet);
-          continue;
-        }
-        // Wrackkonvoi-Schlag angekommen (A2) - derselbe Weg wie das Nest darueber.
-        if (m.type === 'konvoi-angriff'){
-          konvoiAufloesen(m, planetKey, fleet);
+        /* Der Ausgang liegt beim Server: Anfechtung (v8.491.0), Festungsschlag, Nest-Schlag,
+           Wrackkonvoi, Vorposten-Bau und Vorposten-Angriff. Der Aufruf laeuft asynchron weiter,
+           waehrend der Tick normal endet - die Schiffe treten erst mit der Antwort wieder in die
+           Flotte ein (oder eben dezimiert). Die sechs standen bis zur Behebung als sechs eigene
+           Zweige da; sie sind zu EINEM zusammengefasst, weil sie dieselbe Regel teilen und genau
+           das Auseinanderlaufen dieser Regel der Fehler war. */
+        const serverAufloeser = serverAufloeserFuer(m.type);
+        if (serverAufloeser){
+          serverAufloesungStarten(serverAufloeser, m, planetKey, fleet);
           continue;
         }
         // Vorposten (B2): Bau, Garnison und Angriff loesen ueber den Server auf; der Rueckruf
         // bringt die Schiffe wie der Eskorten-Rueckruf (m.schiffe) wieder in die Flotte.
-        if (m.type === 'vorposten-bau'){ vorpostenBauAnkunft(m, planetKey, fleet); continue; }
+        // vorposten-bau und vorposten-angriff laufen ueber den gemeinsamen Server-Zweig weiter
+        // oben; nur die Garnison bleibt hier, weil sie ihre Flotte im Body schickt und deshalb
+        // nie auf die Mission im Spielstand angewiesen war.
         if (m.type === 'vorposten-defend'){ vorpostenGarnisonAnkunft(m, planetKey, fleet); continue; }
-        if (m.type === 'vorposten-angriff'){ vorpostenAngriffAufloesen(m, planetKey, fleet); continue; }
         if (m.type === 'vorposten-rueckruf'){
           let zurueck = 0;
           for (const [k, v] of Object.entries(m.schiffe || {})) if (typeof v === 'number' && v > 0){ fleet[k] = (fleet[k]||0) + v; zurueck += v; }
@@ -62459,6 +62574,13 @@ async function claimPendingRewards(){
     if (!fleet || !fleet.missions) return;
     const m = fleet.missions.find(x=>x.id===missionId);
     if (!m) return;
+    /* Der Server rechnet gerade an dieser Mission. Sie steht nur deshalb noch in der Liste (siehe
+       serverAufloesungStarten) - ein Rueckruf gaebe die Schiffe zurueck, und die Verluste aus der
+       Antwort wuerden danach trotzdem gebucht. Diesen Zustand gab es vor der Behebung nicht. */
+    if (serverMissionLaeuft(m)){
+      log('Diese Mission wird gerade ausgewertet – ein Rückruf ist jetzt nicht mehr möglich.', 'ti-alert-triangle');
+      return;
+    }
     if (!confirm((m.fleetName||'Diese Flotte')+' wirklich zurückrufen? Die Mission wird ohne Ergebnis abgebrochen, verbrauchter Treibstoff wird nicht erstattet.')) return;
     if (m.type === 'relocate'){
       fleet[m.shipKey] = (fleet[m.shipKey]||0) + m.qty;
