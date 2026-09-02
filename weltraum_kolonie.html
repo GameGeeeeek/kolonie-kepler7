@@ -15998,22 +15998,25 @@
      leeres `verluste` (vollzaehlige Rueckkehr), `verpasst` (weg/ersetzt) kostet nichts und nennt den
      Grund, sonst werden GENAU die Verluste des Servers gebucht. */
   async function vorpostenAngriffAufloesen(m, planetKey, fleet){
-    let daten = null, status = 0;
+    let daten = null, status = 0, serverFehler = '';
     try {
       await save();
       const res = await backendFetch('/vorposten/angriff', { method:'POST', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ system: m.system, missionId: String(m.id), vorpostenId: String(m.vorpostenId||'') }) });
       status = res.status;
       daten = await res.json().catch(() => null);
-      if (!res.ok) daten = null;
+      if (!res.ok){ serverFehler = (daten && typeof daten.error === 'string') ? daten.error.replace(/[.\s]+$/, '') : ''; daten = null; }
     } catch(e){ daten = null; }
     const verluste = {};
     const sysName = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
     const zielName = (m.stufeName||'Vorposten') + ' von ' + (m.besitzerName||'?') + ' bei ' + sysName;
     if (!daten){
-      const grund = 'Der Angriff kam nicht zustande'
-        + (status === 403 ? ' – Bauschutz oder Abklingzeit' : status === 404 ? ' – der Server kennt Vorposten noch nicht' : ' – der Server war nicht erreichbar') + '.';
-      log('Der Angriff auf den ' + zielName + ' kam nicht zustande – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      /* Den Grund nennt der SERVER (daten.error), nicht der Statuscode - wie bei Festung, Nest und
+         Konvoi seit v8.631.0: Hinter 403 stehen Bauschutz, Abklingzeit, kein Spielstand und keine
+         Flotte, und der Server sagt woertlich, welcher. Der Statuscode bleibt nur als Ersatz. */
+      const grund = 'Der Angriff kam nicht zustande – '
+        + (serverFehler || (status === 403 ? 'Bauschutz oder Abklingzeit' : status === 404 ? 'der Server kennt Vorposten noch nicht' : 'der Server war nicht erreichbar')) + '.';
+      log('Der Angriff auf den ' + zielName + ' kam nicht zustande – ' + (serverFehler || (status === 403 ? 'Bauschutz oder Abklingzeit' : 'Server nicht erreichbar')) + '. Die Flotte kehrt vollzählig zurück; der Bericht liegt unter Berichte › Kämpfe.', 'ti-alert-triangle', 'warn');
       angriffOhneKampf('vorposten-angriff', zielName, grund, { fleetName:m.fleetName, system:m.system, systemName:sysName, besitzerName:m.besitzerName||'' });
     } else if (daten.verpasst){
       log(daten.text || ('Der Vorposten bei ' + sysName + ' stand nicht mehr – dein Verband kehrt vollzählig zurück.'), 'ti-arrows-shuffle', 'wichtig');
