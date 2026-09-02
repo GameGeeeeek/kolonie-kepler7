@@ -238,7 +238,20 @@ const verdrahtung = [
   ['Veteran → Verteidigung',      /combatBonus \+= veteranRoleExtra\(planetKey, 'def'\);/, 1],
   ['Veteran → Schiffsbauzeit',    /e \*= \(1 - veteranRoleExtra\(planetKey, 'build'\)\);/, 1],
   ['Veteran → Abgrundsplitter',   /veteranRoleExtra\(planetKey, 'abgrund'\)/, 1],
-  ['Aufklärung → PvP-Vorschau',   /attackPower\(previewFleet, state\.activeBasePlanet\) \* \(1 \+ spyEdge\)/, 1],
+  /* Hier stand die Wortform `attackPower(previewFleet, state.activeBasePlanet) * (1 + spyEdge)`.
+     Seit dem 01.09.2026 rechnet die Vorschau ueber pvpReichskraft() - gemessen rechnet der Server
+     die PvP-Angriffskraft ueber ALLE Standortflotten (computeAttackPower -> allFleetsOf), die
+     Vorschau tat es ueber die Auswahl am aktiven Standort und war damit fuer jeden mit
+     Kolonieflotten zu pessimistisch.
+     Die Pruefung wird dabei STAERKER, nicht schwaecher: Sie haelt weiterhin fest, dass der
+     Aufklaerungsvorteil eingerechnet wird - und zusaetzlich, dass die Kraft aus der Reichsflotte
+     kommt. Eine Rueckkehr zur alten, zu kleinen Bezugsgroesse faellt damit auf; vorher waere sie
+     unbemerkt geblieben, solange nur die Zeichenkette stimmte. */
+  ['Aufklärung → PvP-Vorschau',   /pvpReichskraft\(null\) \* \(1 \+ spyEdge\)/, 1],
+  ['PvP-Vorschau rechnet über die REICHSFLOTTE, nicht über eine Standort-Auswahl',
+   /for \(const e of allFleetsWithPlanet\(\)\)\{[\s\S]{0,400}?attackPowerRaw\(f\) \* fleetDiversityMult\(f\)/, 1],
+  ['PvP-Vorschau: der Konter kommt aus derselben Reichsflotte',
+   /pvpReichskraft\(zielFlotte\) \/ rohKraft/, 1],
   ['Aufklärung → Solo-Auflösung', /attackPower\(m\.composition\|\|fleet, planetKey\) \* \(1 \+ spyIntelEdge\(m\.targetId\)\)/, 1],
   ['Aufklärung → Spionagebericht',/attackPower\(currentFleet\(\)\) \* \(1 \+ berichtEdge\)/, 1],
   // Die Berichte-Box hat einen Wertlisten-Signatur-Cache. Der Aufklärungsvorteil fällt nach 30

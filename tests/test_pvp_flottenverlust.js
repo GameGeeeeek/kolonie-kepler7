@@ -34,7 +34,19 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
     return a < 0 ? '' : src.slice(a, src.indexOf("if (r.type === 'bounty'){", a));
   })();
   check('A: der Client kennt die Meldung "pvp-fleet-loss"', block.length > 600, block.length);
-  check('A: der Abzug trifft JEDEN Standort mit Flotte', /allFleetsWithPlanet\(\)/.test(block));
+  /* Seit dem 01.09.2026 (PvP auf alle Standorte) gilt die alte Zusage nur noch als RUECKFALL.
+     Traegt die Meldung einen `planetKey`, galt der Angriff genau einem Standort - dann darf auch
+     nur dessen Flotte Schiffe verlieren, sonst waere ein Standort-Angriff fuer den Verteidiger
+     haerter als der frueher kontoweite. Geprueft werden deshalb BEIDE Faelle: Die alte Zeile
+     allein waere seitdem eine Momentaufnahme, die das halbe Verhalten uebersieht. */
+  check('A: ohne planetKey trifft der Abzug weiterhin JEDEN Standort mit Flotte',
+    /allFleetsWithPlanet\(\)/.test(block));
+  check('A: mit planetKey trifft er NUR diesen einen Standort',
+    /\.filter\(x => x\.planet === zielKey\)/.test(block), { block: block.length });
+  check('A: der Rueckfall ist an das FEHLEN des Feldes gebunden, nicht an eine Namensliste',
+    /const zielKey = \(typeof r\.planetKey === 'string' && r\.planetKey\) \? r\.planetKey : null/.test(block));
+  check('A: der Bericht traegt den Standort weiter, damit die Karte ihn nennen kann',
+    /\.\.\.\(zielKey \? \{ planetKey: zielKey \} : \{\}\)/.test(block));
   check('A: er nutzt dieselbe Verlustfunktion wie alle anderen Kämpfe',
     /applyCombatLosses\(eintrag\.fleet, ATTACK_SHIP_KEYS/.test(block));
   check('A: mit derselben Rückzugs-Dämpfung wie beim Überfall', /applyRetreatDampening\(/.test(block));

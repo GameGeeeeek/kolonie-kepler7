@@ -8550,7 +8550,7 @@
     ]},
     { version:'8.386.0', date:'02.08.2026', changes:[
       '<strong>Ein durchgebrochener Spielerangriff kostet den Verteidiger jetzt auch Schiffe.</strong> Bisher zerstörte ein Angriff nur Verteidigungs<em>gebäude</em> – die stationierte Flotte des Ziels blieb unberührt, egal wie deutlich es verlor. Neu: rund <strong>6 bis 12,5 %</strong> der Verteidigungsflotte, also die Hälfte des Ressourcenverlusts. Das ist genau dieselbe Regel, nach der schon der NPC-Überfall die stationierte Flotte trifft – bewusst keine neue Zahl.',
-      'Der Verlust betrifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird. An jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Der Angreifer bekommt davon nichts: Die Änderung ist Abnutzung, kein neuer Beutekanal.',
+      'Wohin der Verlust trifft, hängt davon ab, <em>was</em> angegriffen wurde: Gilt der Angriff einem einzelnen Standort, verliert auch nur die Flotte dort Schiffe. Trifft er dein gesamtes Reich, betrifft der Verlust <em>jeden</em> Standort mit Flotte – dann wird auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet. An jedem betroffenen Standort entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Der Angreifer bekommt davon nichts: Die Änderung ist Abnutzung, kein neuer Beutekanal.',
       'Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff – und bringt zusätzlich die Abwehrprämie in Kommandopunkten.',
       '<strong>Anti-Farming nachgezogen:</strong> Der 30-Minuten-Schutzschild greift jetzt auch dann, wenn beim Ziel gar nichts mehr zu holen war. Sonst wäre ein leergeräumtes Konto ab sofort unbegrenzt auf reine Schiffszerstörung farmbar gewesen – genau das Dauer-Drangsalieren schwächerer Spieler, gegen das der Schild eingeführt wurde.',
       'Technisch ungewöhnlich gebaut, aus einem Grund: Der Server rechnet den Verlust aus, <em>zieht ihn aber nicht selbst ab</em>. Ein direkter Eingriff in einen fremden Spielstand wird still zurückgenommen, sobald der Betroffene online ist – sein nächster Auto-Save überschreibt ihn mit seinem eigenen, älteren Stand. Stattdessen wird der Verlust in dieselbe Warteschlange gelegt, über die auch Modulbörsen-Erlöse laufen, und vom Client des Betroffenen angewendet. Übertragen wird nur ein Prozentsatz; die Stückzahlen entstehen erst beim Anwenden und werden dabei am tatsächlichen Bestand gedeckelt – eine Meldung kann also nie mehr Schiffe kosten, als wirklich dastehen.',
@@ -13843,6 +13843,43 @@
      Nur die Felder, die das Frontend WIRKLICH braucht: `blockade` und `proto` fuer die Vorschau,
      `kern` fuer die Kartenanzeige, `name` fuer die Texte. Hort-Raten und Abklingzeiten bleiben
      beim Server - was er allein entscheidet, gehoert nicht in eine zweite Tabelle. */
+  /* ===== PvP auf alle Standorte (Etappe 1) - Spiegel von server.js ==========================
+     Der SERVER entscheidet den Standort-Kampf; das Frontend braucht die Zahlen trotzdem, weil die
+     Angriffs-Vorschau VOR dem Serveraufruf laeuft und sonst eine Beute nennen wuerde, die der
+     Kampf nicht einhaelt. Dieselbe Kopie-Familie wie FESTUNG_STUFEN darunter, mit demselben
+     Waechter-Gedanken: tests/test_pvp_standorte.js haelt beide Seiten zusammen.
+
+     Die Ressourcen des Ziels sind KONTOWEIT (ein Topf, nicht je Planet). Der Faktor bildet ab,
+     dass an einer Kolonie weniger zu holen ist als an der Heimat - er ist bewusst FEST und nicht
+     aus der Standortgroesse abgeleitet: Ein abgeleiteter Anteil waere vom VERTEIDIGER
+     manipulierbar (wer seine Kolonien leer laesst, macht sie als Beuteziel wertlos und haette die
+     alte Lage wiederhergestellt). Heimat 1,0 haelt den Altpfad byte-gleich. */
+  const STANDORT_BEUTE_FAKTOR = { heimat: 1.0, kolonie: 0.5, mond: 0.35 };
+  const STANDORT_ART_LABEL = { heimat: 'Heimatbasis', kolonie: 'Kolonie', mond: 'Mond' };
+  // Spiegel von standortArtVon() in server.js. Ein Mond traegt seinen Schluessel als
+  // `moon_<planet>` in colonies - dieselbe Ablage wie jede Kolonie, nur der Beutefaktor
+  // unterscheidet sich.
+  function standortArtVon(key){
+    if (!key || key === 'home') return 'heimat';
+    return String(key).startsWith('moon_') ? 'mond' : 'kolonie';
+  }
+  /* Der Name eines FREMDEN Standorts - bewusst NICHT planetDisplayName.
+     Kolonieschluessel sind GLOBALE Planeten-IDs: Spieler A und Spieler B koennen beide auf Vesna
+     siedeln. planetDisplayName liest als erstes state.colonyNames, also die EIGENEN
+     Umbenennungen - wer seine Vesna-Kolonie "Erzhafen" genannt hat, saehe im Bericht ueber einen
+     Angriff auf die FREMDE Vesna-Kolonie seinen eigenen Namen. Fuer eigene Standorte
+     (attack-received, pvp-fleet-loss) bleibt planetDisplayName richtig und wird dort weiter
+     benutzt. */
+  function fremdStandortName(key){
+    if (!key || key === 'home') return 'Heimatbasis';
+    if (String(key).startsWith('moon_')){
+      const eltern = String(key).slice(5);
+      const pm = PLANETS.find(x => x.id === eltern);
+      return 'Mond von ' + (pm ? pm.name : eltern);
+    }
+    const p = PLANETS.find(x => x.id === key);
+    return p ? p.name : key;
+  }
   const FESTUNG_STUFEN = {
     schanze:      { name:'Schanze',      kern:30000,   blockade:0.25, proto:0.50, verlust:0.06, kampfpunkte:15, farbe:'#c98f5a' },
     kastell:      { name:'Kastell',      kern:250000,  blockade:0.40, proto:0.75, verlust:0.09, kampfpunkte:40, farbe:'#b06c9a' },
@@ -23616,6 +23653,15 @@
       festungZiel = b.getAttribute('data-fest-ziel');
       zeichneFlottenwahl();
     });
+    /* Die Standort-Zielknoepfe des Spielerangriffs - dieselbe Bauart wie die Festungsziele darueber.
+       Der Unterschied ist `pvpZielFuer`: Kolonieschluessel sind globale Planeten-IDs, die Wahl muss
+       also an den Spieler gebunden sein, fuer den sie getroffen wurde. Die Spieler-ID steht am
+       Auftrag, nicht in einer zweiten Modulvariable - so kann sie nicht auseinanderlaufen. */
+    ov.querySelectorAll('[data-pvp-ziel]').forEach(b => b.onclick = () => {
+      pvpZiel = b.getAttribute('data-pvp-ziel');
+      pvpZielFuer = (fwahlAuftrag && fwahlAuftrag.pvpZielId) || null;
+      zeichneFlottenwahl();
+    });
     ov.querySelectorAll('[data-fwahl-vorlage]').forEach(b => b.onclick = () => {
       applyFleetTemplate(b.getAttribute('data-fwahl-vorlage'));
       zeichneFlottenwahl();
@@ -28658,6 +28704,47 @@
     power *= t2OffenseAuraMult(fleet); // Tier-2 Offensiv-Aura (Nanoklinge/Vernichter), gedeckelt
     return Math.round(power);
   }
+  /* ===== Die Angriffskraft eines SPIELERANGRIFFS - ueber ALLE Standorte ======================
+     (01.09.2026, Entscheidung Sascha: "mitbeheben")
+
+     GEMESSEN: /api/attack nimmt keine Flottenangabe entgegen (der Request traegt nur targetUserId).
+     Der Server bildet die Angriffskraft in computeAttackPower() ueber allFleetsOf(save) - also
+     Heimatflotte PLUS jede Kolonieflotte. Die Vorschau rechnete dagegen mit buildAttackFleet(),
+     also mit der Auswahl am AKTIVEN Standort. Wer Flotten auf Kolonien stehen hatte, bekam damit
+     eine zu pessimistische Siegchance angezeigt - und zwar seit jeher.
+
+     Diese Funktion spiegelt die Server-Schleife: rohe Kraft und Vielfalt JE Standortflotte
+     (der Vielfaltsbonus ist eine Eigenschaft der zusammenstehenden Flotte, nicht des Reiches),
+     Konter ebenfalls je Flotte, danach die kontoweiten Faktoren genau einmal.
+
+     WAS SIE BEWUSST NICHT LEISTET: Der Client kennt standortgebundene Faktoren, die der Server
+     nicht hat (Planetenrolle, Orbitalring, Planetenereignisse - siehe defensePower). Sie fliessen
+     ueber attackCombatBonusRaw(state.activeBasePlanet) ein, also vom aktiven Standort aus. Das ist
+     eine BESTEHENDE Abweichung zwischen beiden Seiten und wird hier nicht groesser; die
+     Hauptursache der falschen Zahl war die Flottenmenge, nicht die Faktorkette.
+
+     attackPower() bleibt unangetastet - seine 20+ Aufrufer sind NPC-, Boss- und PvE-Kaempfe, und
+     dort rechnet der Server wirklich aus der mitgeschickten composition
+     (computeAttackPowerFromComposition). Eine gemeinsame Funktion waere dort schlicht falsch. */
+  function pvpReichskraft(gegnerFlotte){
+    let power = 0;
+    const gesamt = emptyFleet();
+    for (const e of allFleetsWithPlanet()){
+      const f = e.fleet;
+      if (!f) continue;
+      let fp = attackPowerRaw(f) * fleetDiversityMult(f);
+      if (gegnerFlotte) fp *= counterMultiplier(f, gegnerFlotte);
+      power += fp;
+      for (const k of ATTACK_SHIP_KEYS) gesamt[k] = (gesamt[k]||0) + (f[k]||0);
+    }
+    power *= doctrineMultOf('atkMult');
+    power *= currentStance().atkMult;
+    power *= (1 + deckelWeich(attackCombatBonusRaw(state.activeBasePlanet), 1.0));
+    const jetzt = Date.now();
+    for (const buff of (state.buffs||[])){ if (buff.kind==='atk' && buff.expiresAt > jetzt) power *= buff.mult; }
+    power *= t2OffenseAuraMult(gesamt);
+    return Math.round(power);
+  }
   function buildingSetFor(planetKey){
     if (planetKey === 'home') return state.buildings;
     const col = state.colonies[planetKey];
@@ -30000,7 +30087,19 @@
             const gedaempft = applyRetreatDampening(rohPct).pct;
             const verlusteGesamt = {};
             let truemmerGesamt = 0;
-            for (const eintrag of allFleetsWithPlanet()){
+            /* PvP-Etappe 1: Traegt die Meldung einen `planetKey`, galt der Angriff genau EINEM
+               Standort - dann trifft der Abzug auch nur dessen Flotte. Ohne das Feld bleibt es
+               beim kontoweiten Altpfad, und der Rueckfall ist PFLICHT: Eine Meldung kann tagelang
+               in der Warteschlange liegen und aus der Zeit vor dieser Etappe stammen.
+               Ohne diese Verzweigung waere der Standort-Angriff fuer den VERTEIDIGER haerter als
+               der Konto-Angriff - er verloere Schiffe an jedem Standort, obwohl nur einer
+               angegriffen wurde. Der Server verspricht das Feld ausdruecklich; bis hierher hat es
+               niemand gelesen. */
+            const zielKey = (typeof r.planetKey === 'string' && r.planetKey) ? r.planetKey : null;
+            const betroffen = zielKey
+              ? allFleetsWithPlanet().filter(x => x.planet === zielKey)
+              : allFleetsWithPlanet();
+            for (const eintrag of betroffen){
               // applyCombatLosses deckelt je Schiffstyp am echten Bestand - eine eingereihte
               // Meldung kann also nie mehr Schiffe kosten, als wirklich dastehen, auch wenn sie
               // tagelang in der Warteschlange lag.
@@ -30011,11 +30110,15 @@
             }
             const txt = lostCountsToText(verlusteGesamt);
             if (txt){
-              log('Angriff von '+(r.attackerName||'einem Spieler')+': Deine Verteidigungsflotte hat '+txt+' verloren'+(truemmerGesamt>0?' – '+fmt(truemmerGesamt)+' Trümmer treiben an deinen Planeten':'')+'.', 'ti-shield', 'warn');
+              // planetDisplayName ist hier RICHTIG (anders als im Bericht des Angreifers): Es ist
+              // der eigene Standort, also gilt auch der eigene Kolonienname.
+              const ortTxt = zielKey ? ' auf '+planetDisplayName(zielKey) : '';
+              log('Angriff von '+(r.attackerName||'einem Spieler')+': Deine Verteidigungsflotte'+ortTxt+' hat '+txt+' verloren'+(truemmerGesamt>0?' – '+fmt(truemmerGesamt)+' Trümmer treiben an deinen Planeten':'')+'.', 'ti-shield', 'warn');
               playSound('lose');
               pushReport({ type:'pvp-fleet-loss', attackerName: r.attackerName||'Unbekannt',
                            lossPct: Math.round(gedaempft*1000)/10, ownLostShips: verlusteGesamt,
-                           debrisTotal: truemmerGesamt });
+                           debrisTotal: truemmerGesamt,
+                           ...(zielKey ? { planetKey: zielKey } : {}) });
             }
             save();
           }
@@ -33191,7 +33294,7 @@
     log(fleetName+' ('+(useDeep?'Spionagekreuzer, Tiefen-Aufklärung':'Spähschiff')+') von '+planetDisplayName(state.activeBasePlanet)+' Richtung '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-target');
     render(); save();
   }
-  function resolveSpyMission(m, planetKey, showLog){
+  async function resolveSpyMission(m, planetKey, showLog){
     const entry = m.pendingIntel || {};
     const deep = !!m.deep;
     const name = m.targetName || 'Unbekannt';
@@ -33208,11 +33311,17 @@
     // Honeypot / Falschinformation (Spionage-Vertiefung): ein ENTDECKTER Späher bekommt vom Ziel bewusst
     // aufgeblähte Verteidigungswerte untergeschoben (Faktor ~1,6-2,6). Eine hohe Spionageabwehr wird so
     // zur echten Abschreckung - der ertappte Angreifer überschätzt die Verteidigung und lässt eher ab.
+    /* Der Honeypot-Faktor wird EINMAL gezogen und mitgefuehrt (01.09.2026, PvP-Standorte).
+       Bis hierher entstand er direkt in der Zeile darunter. Seit die Aufklaerung zusaetzlich die
+       STANDORTLISTE des Ziels holt, braucht sie denselben Faktor: Eine aufgeblaehte Gesamtzahl
+       neben ehrlichen Standortzahlen wuerde den Honeypot in einer Subtraktion entlarven und damit
+       genau die Abschreckung entwerten, fuer die er gebaut ist. */
+    const honig = detected ? (1.6 + Math.random()) : 1;
     let storedEntry = entry;
     if (detected && entry.defensePower !== undefined){
-      storedEntry = Object.assign({}, entry, { defensePower: Math.round(entry.defensePower * (1.6 + Math.random())) });
+      storedEntry = Object.assign({}, entry, { defensePower: Math.round(entry.defensePower * honig) });
     }
-    state.spyIntel[m.targetId] = { entry: storedEntry, capturedAt: Date.now(), deep, detected, system: entry.homeSystem || null };
+    state.spyIntel[m.targetId] = { entry: storedEntry, capturedAt: Date.now(), deep, detected, honig, system: entry.homeSystem || null };
     const shipLine = Object.keys(SHIP_SCORE_WEIGHTS)
       .filter(k => (entry[k]||0) > 0).map(k => (entry[k])+'x '+shipDisplayName(k)).join(', ') || 'keine bekannten Schiffe';
     const defLine = storedEntry.defensePower!==undefined ? ' · Verteidigungspunkte: '+fmt(storedEntry.defensePower) : '';
@@ -33220,7 +33329,13 @@
     const shieldNote = entry.spyShielded ? ' Achtung: Das Ziel betreibt Spionageabwehr – diese Werte können ungenau sein.' : '';
     const detNote = detected ? ' ⚠ Dein Späher wurde entdeckt – die Werte sind lückenhaft/verfälscht.' : '';
     if (showLog !== false) log((m.fleetName||'Spähschiff')+': Aufklärung von '+name+' abgeschlossen. Flotte: '+shipLine+defLine+lootLine+' · Punktestand: '+(entry.score||0)+'.'+shieldNote+detNote, 'ti-target');
-    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:storedEntry.defensePower, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, resBreak: deep?entry.resBreak:undefined, detected });
+    /* Die Standortliste des Ziels (PvP-Etappe 1). Sie kommt NACH dem log und VOR dem Bericht:
+       Das log ist die sofortige Rueckmeldung, der Bericht das bleibende Protokoll - und nur der
+       Bericht soll die Standorte tragen. Scheitert der Abruf (alter Server, Netz weg), bleibt die
+       Aufklaerung im Uebrigen vollstaendig gueltig; die Zielwahl zeigt dann nur die Heimat. */
+    const standorte = await ladeZielStandorte(m.targetId, honig);
+    if (standorte && state.spyIntel[m.targetId]) state.spyIntel[m.targetId].standorte = standorte;
+    pushReport({ type:'spy-report', targetId: m.targetId, targetName:name, ships:entry, score:entry.score||0, defensePower:storedEntry.defensePower, standorte, buildLvl:entry.buildLvl, colonyCount:entry.colonyCount, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, spyShielded:!!entry.spyShielded, deep, resTotal: deep?entry.resTotal:undefined, resBreak: deep?entry.resBreak:undefined, detected });
     // Verteidiger benachrichtigen (Phase 2): meldet dem Ziel serverseitig "du wurdest ausgespäht".
     notifySpyTarget(m.targetId, deep);
     loadReports();
@@ -33228,6 +33343,155 @@
   // Verteidiger-Benachrichtigung: schreibt einen kurzlebigen "spy-ping" in den geteilten Speicher unter
   // dem Namensraum des Ziels; das Backend leitet daraus (wie bei Pakt-Angeboten/Bewerbungen) eine
   // Benachrichtigung + optional Web-Push an das Ziel ab. Reiner Info-Ping, kein Spielstand-Zugriff.
+  /* Holt die Standorte des Ziels vom Server (GET /api/spieler-standorte). Der Server ist die EINE
+     Quelle fuer die Verteidigung je Standort - dieselbe Funktion (standortVerteidigung), mit der er
+     den Kampf entscheidet. Eine Frontend-Rechnung waere hier unmoeglich: Der fremde Spielstand
+     liegt nicht vor.
+
+     `honig` ist der Honeypot-Faktor der zugehoerigen Aufklaerung: Wurde der Spaeher entdeckt,
+     werden die Standortzahlen mit DEMSELBEN Faktor aufgeblaeht wie die Gesamtzahl. Ohne das waere
+     der Honeypot ueber den neuen Weg schlicht umgangen.
+
+     Der Rueckgabewert ist null, wenn nichts Verlaessliches vorliegt - der Aufrufer laesst das Feld
+     dann weg, statt eine leere Liste zu schreiben, die wie "dieses Ziel hat keine Kolonien"
+     aussaehe. */
+  async function ladeZielStandorte(targetId, honig){
+    if (!useBackend() || !targetId) return null;
+    try {
+      const res = await backendFetch('/spieler-standorte?target=' + encodeURIComponent(targetId));
+      if (!res.ok) return null;
+      const daten = await res.json();
+      if (!daten || !Array.isArray(daten.standorte) || !daten.standorte.length) return null;
+      const f = honig || 1;
+      return daten.standorte.map(st => ({
+        key: st.key,
+        art: st.art || standortArtVon(st.key),
+        verteidigung: Math.round((st.verteidigung || 0) * f),
+        beuteFaktor: (typeof st.beuteFaktor === 'number') ? st.beuteFaktor : (STANDORT_BEUTE_FAKTOR[standortArtVon(st.key)] || 1)
+      }));
+    } catch(e){ return null; }
+  }
+  /* ===== Die Zielwahl des Spielerangriffs (PvP-Etappe 1) ====================================
+     Vorbild ist `festungZiel` beim Festungsschlag: Der Bedienzustand liegt in einer MODULVARIABLE,
+     nicht im DOM. Die Vorschau wird bei jedem Klick auf +/- komplett neu gebaut; ein <select> oder
+     ein data-Attribut darin verloere seinen Wert. Beim Allianz-Raid hat genau das einmal still die
+     falsche Dauer gestartet.
+
+     ZWEI Variablen statt einer, und das ist der Unterschied zur Festung: Kolonieschluessel sind
+     GLOBALE Planeten-IDs - Spieler A und Spieler B koennen beide auf Vesna siedeln. Eine reine
+     "steht der Schluessel in der Liste?"-Pruefung wie bei der Festung greift dann NICHT, und ein
+     Ziel, das man bei Spieler A gewaehlt und dann abgebrochen hat, wuerde bei Spieler B still
+     weiterwirken. `pvpZielFuer` bindet die Wahl an den Spieler, fuer den sie getroffen wurde. */
+  let pvpZiel = null;
+  let pvpZielFuer = null;
+  /* Die bekannten Standorte eines Ziels. Ohne verwertbare Aufklaerung ist das NUR die Heimat -
+     eine klientenseitige SPIELREGEL, keine Sicherheitsgrenze (der Server prueft die Zielwahl
+     ohnehin gegen den echten Spielstand und liefert die Liste jedem, der fragt).
+     Die 6-Stunden-Schranke ist dieselbe wie bei der Beute-Schaetzung im Profil (intelUsable) -
+     eine zweite Frist waere eine zweite Wahrheit. */
+  function pvpStandorte(targetId){
+    const heimatNur = [{ key:'home', art:'heimat', verteidigung:null, beuteFaktor:STANDORT_BEUTE_FAKTOR.heimat }];
+    const it = (state.spyIntel||{})[targetId];
+    if (!it || !Array.isArray(it.standorte) || !it.standorte.length) return { liste: heimatNur, bekannt:false, frisch:false, alter:0 };
+    const alter = Date.now() - (it.capturedAt||0);
+    if (alter >= 6*3600*1000) return { liste: heimatNur, bekannt:false, frisch:false, alter };
+    return { liste: it.standorte, bekannt:true, frisch: alter < SPY_EDGE_MS, alter, detected: !!it.detected };
+  }
+  // Der gewaehlte Standort - mit Rueckfall auf die Heimat, sobald die Wahl einem ANDEREN Spieler
+  // galt oder das Ziel aus der Liste verschwunden ist (aufgegebene Kolonie, abgelaufene
+  // Aufklaerung). Beide Faelle sind echt: die Wahl ueberlebt das Schliessen des Feldes.
+  function pvpZielFuerTarget(targetId, liste){
+    if (pvpZielFuer !== targetId) return 'home';
+    if (!pvpZiel) return 'home';
+    return liste.some(st => st.key === pvpZiel) ? pvpZiel : 'home';
+  }
+  /* Die Standortzeile eines Berichts - EINE Quelle fuer alle Berichtsarten.
+     `fremd` entscheidet ueber den Namensaufloeser, und das ist keine Kosmetik: planetDisplayName
+     liest zuerst state.colonyNames, also die EIGENEN Umbenennungen. Im Bericht des ANGREIFERS
+     ueber eine fremde Kolonie stuende dort sonst der eigene Kolonienname, wenn er selbst auf
+     demselben Planeten siedelt - Kolonieschluessel sind global. */
+  function standortBerichtszeile(r, fremd){
+    const key = r.targetPlanet;
+    if (!key) return '';
+    const name = fremd ? (r.standortName || fremdStandortName(key)) : planetDisplayName(key);
+    const art = r.standortArt || standortArtVon(key);
+    const label = STANDORT_ART_LABEL[art] || 'Standort';
+    return '<br><i class="ti ti-target" aria-hidden="true"></i> Angegriffener Standort: <strong>'
+         + escapeHtml(name) + '</strong> (' + escapeHtml(label) + ')'
+         + (typeof r.beuteFaktor === 'number' && r.beuteFaktor !== 1
+             ? ' \u2013 Beute \u00d7' + r.beuteFaktor.toFixed(2) + ' des vollen Satzes' : '');
+  }
+  /* Die Vorschau des Spielerangriffs (PvP-Etappe 1). Bis hierher hatte dieser Auftrag als einziger
+     Angriffsauftrag GAR KEINE Vorschau - seine Siegchance stand im Spielerprofil, also auf einer
+     Flaeche, die beim Zusammenstellen der Flotte gar nicht mehr offen ist und die von einer
+     Standortwahl nichts wissen kann.
+
+     DREI EHRLICHKEITEN, die hier bewusst dastehen, statt eine glatte Zahl zu behaupten:
+     (a) Der KONTER wird gegen die bekannte GESAMTflotte des Ziels gerechnet - der Server rechnet
+         ihn im Standort-Fall gegen die Flotte DIESES Standorts (standortFleetSummary), die keine
+         Aufklaerung liefert.
+     (b) Die VERTEIDIGUNG ist die Serverzahl aus /api/spieler-standorte - aber Aufstellung und
+         Gefechtsvorrat des Verteidigers kommen im Kampf noch obendrauf.
+     (c) Die FLUGZEIT haengt am Spieler, nicht am Standort (pseudoDistanceSeconds hasht die
+         Spieler-ID). Ein Mond ist genauso weit weg wie die Heimat. */
+  function pvpVorschauHtml(flotte, target){
+    const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
+    if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+    const st = pvpStandorte(target.id);
+    const gewaehlt = pvpZielFuerTarget(target.id, st.liste);
+    const ziel = st.liste.find(x => x.key === gewaehlt) || st.liste[0];
+    let html = '';
+    if (st.bekannt && st.liste.length > 1){
+      html += `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-target" aria-hidden="true"></i> <strong>Standort wählen</strong>`
+            + `${st.frisch ? '' : ` <span style="color:#e0a548;">(Aufklärung ${fmtDuration(st.alter/1000)} alt)</span>`}`
+            + `${st.detected ? ' <span style="color:#e24b4a;">⚠ Späher wurde entdeckt – die Zahlen können verfälscht sein</span>' : ''}:</div>`;
+      html += '<div style="display:flex; gap:4px; flex-wrap:wrap; margin:4px 0 6px;">';
+      for (const stO of st.liste){
+        const aktiv = stO.key === gewaehlt;
+        html += `<button type="button" data-pvp-ziel="${escapeHtml(stO.key)}"${aktiv ? ' class="primary"' : ''} style="font-size:11px; padding:4px 8px;">`
+              + `${escapeHtml(fremdStandortName(stO.key))} <span style="opacity:.75;">`
+              + `${stO.verteidigung !== null ? '🛡 '+fmt(stO.verteidigung)+' · ' : ''}Beute ×${(stO.beuteFaktor||1).toFixed(2)}</span></button>`;
+      }
+      html += '</div>';
+    } else if (!st.bekannt){
+      html += `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-target" aria-hidden="true"></i> `
+            + `Nur die Heimatbasis bekannt – <strong>spähe ${escapeHtml(target.name)} aus</strong>, um seine Kolonien und Monde als Ziel zu sehen.</div>`;
+    }
+    // Struktur exakt wie im Backend: rohe Reichskraft, Konter als Verhaeltnis der beiden Aufrufe,
+    // dann battleWinChance mit den PvP-Phasen.
+    const spyEdge = spyIntelEdge(target.id);
+    const vorrat = gefechtsvorratVorschau('angriff');
+    const it = (state.spyIntel||{})[target.id];
+    const zielFlotte = {};
+    if (it && it.entry) for (const k of Object.keys(SHIP_SCORE_WEIGHTS)) if ((it.entry[k]||0) > 0) zielFlotte[k] = it.entry[k];
+    const roh = pvpReichskraft(null);
+    const konter = roh > 0 && Object.keys(zielFlotte).length ? pvpReichskraft(zielFlotte) / roh : 1;
+    const kraft = Math.round(roh * (1 + spyEdge) * vorrat.mult);
+    const def = ziel && ziel.verteidigung !== null ? ziel.verteidigung : null;
+    if (def !== null && kraft > 0){
+      const pct = Math.round(battleWinChance(kraft, def, konter, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100);
+      const farbe = pct >= 60 ? '#5dcaa5' : (pct >= 30 ? '#e0a548' : '#e24b4a');
+      html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Siegchance gegen <strong>${escapeHtml(fremdStandortName(gewaehlt))}</strong>: `
+            + `<strong style="color:${farbe};">~${pct}%</strong> (deine Reichsflotte ${fmt(kraft)} gegen ${fmt(def)} Verteidigung dort).</div>`;
+      if (Object.keys(zielFlotte).length && Math.abs(konter - 1) > 0.005){
+        html += `<div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Konter ×${konter.toFixed(2)} – bereits eingerechnet, `
+              + `gerechnet gegen die bekannte <em>Gesamtflotte</em> des Ziels. Am Standort selbst kann eine andere Zusammensetzung stehen.</div>`;
+      }
+    } else {
+      html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Deine Reichsflotte bringt <strong>${fmt(kraft)}</strong> Angriffskraft mit. `
+            + `Wie stark die Heimatbasis verteidigt ist, verrät erst eine Aufklärung.</div>`;
+    }
+    const bf = (ziel && ziel.beuteFaktor) || 1;
+    const frachtRaum = fleetCargoCapacity(flotte);
+    html += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute: <strong>×${bf.toFixed(2)}</strong> `
+          + `${bf >= 1 ? '(voller Satz – die Heimat ist das fetteste Ziel)' : '(die Ressourcen liegen im gemeinsamen Konto des Ziels; an einer '+(standortArtVon(gewaehlt)==='mond'?'Mondkolonie':'Kolonie')+' ist weniger davon zu greifen)'}`
+          + `${frachtRaum > 0 ? '' : ' – <span style="color:#e24b4a;">ohne Frachter kommt nichts davon an</span>'}.</div>`;
+    const dur = missionDurationFor(pseudoDistanceSeconds(target.id), flotte, ATTACK_SHIP_KEYS);
+    const fuel = missionFuelCostSplit(dur, flotte);
+    html += `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Flugzeit ~${fmtDuration(dur)} · Treibstoff ${fuelCostText(fuel)}`
+          + `${canAfford(fuel) ? '' : ' <span style="color:#e24b4a;">(nicht genug)</span>'} – die Entfernung hängt am Spieler, nicht am Standort.</div>`;
+    return html;
+  }
   async function notifySpyTarget(targetId, deep){
     if (!useBackend() || !targetId) return;
     try {
@@ -33276,7 +33540,13 @@
       render(); save();
     } catch(e){ log('Server für das Störmanöver nicht erreichbar.', 'ti-alert-triangle'); }
   }
-  async function sendPlayerAttackMission(playerId, name){
+  async function sendPlayerAttackMission(playerId, name, zielStandort){
+    /* Der Standort wird als ERSTES festgehalten - vor jeder Sperrpruefung und vor dem `await`
+       weiter unten. Er kommt als Argument herein und nicht aus der Modulvariable `pvpZiel`, damit
+       ein zwischenzeitlich gewaehltes anderes Ziel diese Mission nicht mehr erreichen kann.
+       'home' und null bedeuten dasselbe wie bisher: der Request laesst das Feld dann weg und der
+       Server laeuft seinen unveraenderten Altpfad (Konto-Kampf gegen die Heimat). */
+    const zielKey = (zielStandort && zielStandort !== 'home') ? String(zielStandort) : null;
     const pactAtk = activePactWith(playerId);
     if (pactAtk){ log('Nichtangriffspakt mit '+name+' aktiv - Angriffe sind blockiert (läuft noch '+fmtDuration(Math.max(0,((pactAtk.cancelEffectiveAt||pactAtk.expiresAt)-Date.now()))/1000)+').', 'ti-shield'); return; }
     const cf = currentFleet();
@@ -33325,7 +33595,11 @@
     if (fleetLimitBlocks()) return;
     pay(fuel);
     const fleetName = resolveFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag });
+    cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag,
+      // Der Standortname reist als TEXT mit, nicht nur als Schluessel: planetDisplayName loest
+      // ueber state.colonyNames auf, also ueber die EIGENEN Umbenennungen - bei einem fremden
+      // Standort auf demselben Planeten stuende dort sonst der eigene Kolonienname.
+      ...(zielKey ? { targetPlanet: zielKey, standortArt: standortArtVon(zielKey), standortName: fremdStandortName(zielKey) } : {}) });
     trackEvent('attack_sent');
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
@@ -33366,6 +33640,13 @@
       if (typeof data.defenderLossPct === 'number' && data.defenderLossPct > 0) d.defenderLossPct = data.defenderLossPct;
       if (data.destroyedBuilding) d.destroyedBuilding = data.destroyedBuilding;
       if (data.destroyedBuildingCount) d.destroyedBuildingCount = data.destroyedBuildingCount;
+      /* Die drei Standort-Felder (PvP-Etappe 1). Sie MUESSEN hier stehen: Diese Funktion ist eine
+         Whitelist, und was sie nicht kennt, erreicht keinen Bericht - die halbe Etappe waere
+         unsichtbar, ohne dass irgendetwas fehlschlaegt. Ihr FEHLEN ist zugleich der zuverlaessige
+         Erkennungsweg fuer einen Server ohne Etappe 1 bzw. fuer einen Konto-Angriff. */
+      if (typeof data.targetPlanet === 'string') d.targetPlanet = data.targetPlanet;
+      if (typeof data.standortArt === 'string') d.standortArt = data.standortArt;
+      if (typeof data.beuteFaktor === 'number') d.beuteFaktor = data.beuteFaktor;
       return d;
     }
     const applyWinLoss = () => { addVeteranXp(planetKey, 20); return fleet ? applyCombatLosses(fleet, ATTACK_SHIP_KEYS, 0.05+Math.random()*0.1, planetKey, m.composition) : {}; };
@@ -33376,7 +33657,10 @@
       // Server-Kampf läuft jetzt erst hier, bei tatsächlicher Ankunft.
       let data;
       try {
-        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId }) });
+        /* `targetPlanet` reist NUR mit, wenn die Mission eines traegt. Fehlt das Feld, laeuft im
+           Backend byte-gleich der bisherige Konto-Kampf - eine beim Update schon fliegende
+           Altmission bekommt also weiterhin genau das Ergebnis, mit dem sie losgeschickt wurde. */
+        const res = await backendFetch('/attack', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ targetUserId: m.targetId, ...(m.targetPlanet ? { targetPlanet: m.targetPlanet } : {}) }) });
         myAttackShieldUntil = 0; // eigener Angriff hebt den eigenen Schutzschild auf (Server tut dasselbe)
         data = await res.json();
         if (res.status === 403 && data && data.shieldMs > 0){
@@ -33432,7 +33716,7 @@
           log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(data.destroyedBuilding?(' '+(data.destroyedBuildingCount>1?(data.destroyedBuildingCount+' Verteidigungsgebäude wurden zerstört.'):'Ein Verteidigungsgebäude wurde zerstört.')):'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
-        const __battleReport = { type:'player-attack', result:'win', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
+        const __battleReport = { type:'player-attack', result:'win', targetName:name, ...(m.targetPlanet ? { standortName: m.standortName, standortArt: m.standortArt } : {}), attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       } else {
@@ -33441,7 +33725,7 @@
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
         if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
-        const __battleReport = { type:'player-attack', result:'loss', targetName:name, attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
+        const __battleReport = { type:'player-attack', result:'loss', targetName:name, ...(m.targetPlanet ? { standortName: m.standortName, standortArt: m.standortArt } : {}), attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
       }
@@ -33530,7 +33814,7 @@
     // ohnehin nicht (kein Server), dort besteht also nie das Risiko, das diese Änderung behebt.
     render();
   }
-  async function attackPlayer(playerId, name){ return sendPlayerAttackMission(playerId, name); }
+  async function attackPlayer(playerId, name, zielStandort){ return sendPlayerAttackMission(playerId, name, zielStandort); }
 
   let reportsCache = [];
   // Holt den aktuellen Angriffs-Schutzschild-Status vom Server (leichtes /me), damit der Banner auch
@@ -34066,8 +34350,13 @@
     const spyEdge = isMeForCompare ? 0 : spyIntelEdge(entry.id);
     const vorschauVorrat = gefechtsvorratVorschau('angriff');
     if (!isMeForCompare && useBackend()){
-      const previewFleet = buildAttackFleet(state.activeBasePlanet, currentFleet());
-      previewPower = Math.round(attackPower(previewFleet, state.activeBasePlanet) * (1 + spyEdge) * vorschauVorrat.mult);
+      /* Seit 01.09.2026 ueber die GESAMTE Reichsflotte (pvpReichskraft) statt ueber die Auswahl am
+         aktiven Standort. Gemessen: /api/attack traegt gar keine Flottenangabe, der Server bildet
+         die Angriffskraft in computeAttackPower() ueber allFleetsOf(save) - Heimat plus jede
+         Kolonieflotte. Die Zahl hier war damit fuer jeden mit Kolonieflotten zu pessimistisch, und
+         zwar seit jeher. Der Kommentar darueber sagt ausdruecklich, Vorschau und Kampfergebnis
+         sollten dieselbe Zahl meinen - genau das loest sie erst jetzt ein. */
+      previewPower = Math.round(pvpReichskraft(null) * (1 + spyEdge) * vorschauVorrat.mult);
     }
     // Echte Siegchance statt eines Ja/Nein-Urteils (25.07.2026). Vorher stand hier "erfolgversprechend"
     // bzw. "aussichtslos", rein aus dem Vergleich Angriffskraft >= Verteidigung. Seit v8.295.0 löst der
@@ -34083,8 +34372,11 @@
       // mit dem LIVE-Bestand des Verteidigers - deshalb bleibt das eine Schätzung, keine Zusage.
       const zielFlotte = {};
       for (const k of Object.keys(SHIP_SCORE_WEIGHTS)) if ((entry[k]||0) > 0) zielFlotte[k] = entry[k];
-      const konter = Object.keys(zielFlotte).length
-        ? counterMultiplier(buildAttackFleet(state.activeBasePlanet, currentFleet()), zielFlotte) : 1;
+      /* Der Konter ebenfalls ueber alle Standortflotten - der Server bildet ihn als Verhaeltnis
+         zweier computeAttackPower-Aufrufe (mit und ohne Gegnerflotte), nicht ueber eine einzelne. */
+      const rohKraft = pvpReichskraft(null);
+      const konter = (rohKraft > 0 && Object.keys(zielFlotte).length)
+        ? pvpReichskraft(zielFlotte) / rohKraft : 1;
       previewChance = Math.round(battleWinChance(previewPower, defVal, konter, PVP_PHASE_MIN, PVP_PHASE_MAX) * 100);
     }
     // Werftmarken auch hier ausweisen (01.08.2026). v8.354.0 hat sie in die NPC-Vorschau und in alle
@@ -34144,7 +34436,7 @@
       sec('Wirtschaft') +
       prow('ti-star','#c3bef5','Punktzahl', `${fmt(entry.score||0)}${cmpH(myStats.score, entry.score)}`, barH(myStats.score, entry.score, '#8f86ea')) +
       (entry.buildLvl!==undefined ? prow('ti-building-factory-2','#fac775','Gebäude-Level', `${fmt(entry.buildLvl)}${cmpH(myStats.buildLvl, entry.buildLvl)}`, barH(myStats.buildLvl, entry.buildLvl, '#e8c15a')) : '') +
-      ((intelUsable && intel.deep && intel.entry && intel.entry.resTotal!==undefined) ? prow('ti-diamond','#9fe1cb','Beute (Aufklärung)', `${fmt(intel.entry.resTotal)}${intelFresh?'':' <span style="color:#7d8199;font-weight:400;">(veraltet)</span>'}`, '') : '') +
+      ((intelUsable && intel.deep && intel.entry && intel.entry.resTotal!==undefined) ? prow('ti-diamond','#9fe1cb','Bestand (Aufklärung)', `${fmt(intel.entry.resTotal)}${intelFresh?'':' <span style="color:#7d8199;font-weight:400;">(veraltet)</span>'}`, 'Der gesamte Ressourcenbestand des Ziels. Wie viel davon ein Angriff erbeutet, hängt am gewählten Standort.') : '') +
       sec('Militär') +
       (entry.defensePower!==undefined ? prow('ti-shield-lock','#378add','Verteidigung', `${fmt(entry.defensePower)}${cmpH(myStats.defensePower, entry.defensePower)}`, barH(myStats.defensePower, entry.defensePower, '#e24b4a')) : '') +
       prow('ti-sword','#f0997b','Kampfpunkte', `${fmt(entry.bp||0)}${cmpH(myStats.bp, entry.bp)}`, barH(myStats.bp, entry.bp, '#f0997b')) +
@@ -41145,7 +41437,7 @@
       { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.<br><br><strong>Eine erfolgreiche Abwehr wird seit dem 02.08.2026 bezahlt.</strong> Vorher bekam der siegreiche Angreifer 25 Kampfpunkte, der <em>geschlagene</em> Angreifer 3 – und der erfolgreiche Verteidiger nichts. Der Verlierer wurde also besser bezahlt als der Sieger. Jetzt bringt jeder abgewehrte Spielerangriff <strong>5 bis 40 Kommandopunkte</strong>, gestaffelt danach, wie stark der Angriff im Verhältnis zu deiner Verteidigung war: eine chancenlose Belästigung bringt das Minimum, ein knapp gescheiterter Großangriff das Maximum. Bewusst <em>Kommandopunkte</em> und nicht Kampfpunkte – Kampfpunkte gehen in den Punktestand, und eine Verteidigung, die den Rang hebt, wäre über abgesprochene Angriffe farmbar. Damit steht der Offiziersausbau erstmals auch dem Spieler offen, der nie selbst angreift. Die Prämie steht im Kampfbericht, die Zahl der abgewehrten Angriffe in der Kampf-Bilanz im Berichte-Tab.<br><br><strong>Ein durchgebrochener Angriff kostet seit dem 02.08.2026 auch Schiffe.</strong> Bis dahin zerstörte ein Spielerangriff nur Verteidigungs<em>gebäude</em>; die stationierte Flotte blieb unberührt, egal wie hoch man verlor. Jetzt verliert sie bei einem <em>erfolgreichen</em> Angriff rund <strong>6 bis 12,5 %</strong> ihrer Schiffe – die Hälfte des Ressourcenverlusts, dieselbe Regel wie beim NPC-Überfall. Der Verlust trifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird, und an jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff. Der Angreifer bekommt von diesen Trümmern nichts – die Änderung ist Abnutzung, kein neuer Beutekanal.' },
       { title:'Flottenaufbau & Kampfbonus-Deckel', body:'<strong>Flottenaufbau:</strong> Wie gleichmäßig sich die Angriffskraft deiner Flotte über die drei Konterrollen verteilt, gibt bis zu <strong>+8%</strong> Angriffs- UND Verteidigungskraft – volle Prämie bei einer zu Dritteln ausgewogenen Flotte, nichts bei einer reinen Ein-Rollen-Flotte. Gewichtet wird nach Angriffskraft, nicht nach Stückzahl: ein einzelnes Alibi-Schiff macht eine Flotte nicht ausgewogen. Damit hast du eine echte Wahl: <strong>ausgewogen</strong> bringt die sichere Prämie, ist aber konterneutral; <strong>spezialisiert</strong> verzichtet darauf und holt dafür beim richtigen Ziel bis zu +25% Konterbonus (beim falschen -15%). Aufklären lohnt sich also. Wirkt bei jeder Flottengröße, unabhängig vom separaten Grenznutzen-Effekt bei riesigen Einzelflotten (der erst ab 300 Schiffen eines Typs greift). <strong>Kampfbonus-Deckel:</strong> Viele Quellen (Prestige, Aufstieg, Fähigkeitsbaum, Mega-Projekte, Veteranen-Ausbildung, Artefakt-Set, Offizier/Module, Flaggschiff, Allianz-Techs) speisen zusammen einen bei +100% gedeckelten Bonus-Topf – im Offiziere-Tab siehst du oben, wie nah du am Deckel bist. <strong>Über dem Deckel ist nicht Schluss:</strong> Seit v8.477.0 läuft er weich aus – der erste Punkt darüber zählt noch fast voll, jeder weitere weniger, insgesamt kommen bis zu einem Viertel des Deckels zusätzlich an. Weiter zu investieren lohnt sich also, es lohnt sich nur immer weniger. Der Aufstiegs-Zweig <strong>Verschobene Grenzen</strong> hebt den Deckel zusätzlich um 3% je Stufe.' },
       { title:'Flaggschiff', body:'Im <strong>Offiziere-Tab</strong> baust du dein <strong>einzigartiges Flaggschiff</strong> – ein Kapitalschiff getrennt von der Massenflotte, das nicht zerstört werden kann und keine Slots belegt. Jede Ausbaustufe (max. 20) gibt <strong>+1,5% Angriffs- UND Verteidigungskraft</strong>, die in die gedeckelte Kampf-Bonus-Gruppe einfließt (siehe „Flottenvielfalt & Kampfbonus-Deckel"). Bau und Ausbau kosten Ressourcen + Kredite (steigend je Stufe). Du kannst deinem Flaggschiff einen eigenen Namen geben. Es <strong>überlebt einen Prestige-Reset</strong> (wie Offiziere und Module); erst ein Aufstieg (Transzendenz) setzt es zurück.' },
-      { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
+      { title:'Spionagekreuzer – Tiefen-Aufklärung', body:'Der <strong>Spionagekreuzer</strong> (ab Spionageabwehr-Forschung) ist mit Geschwindigkeit 320 deutlich schneller unterwegs als das normale Spähschiff (220) und liefert vor allem <strong>Tiefen-Aufklärung</strong>: zusätzlich zur Flotte und Verteidigung des Ziels eine <strong>Beute-Schätzung</strong> (erbeutbare Ressourcen, im Aufklärungsbericht nach Erz/Kristalle/Deuterium/Antimaterie aufgeschlüsselt) - ideal, um lohnende Angriffsziele zu finden. Seit der Standort-Zielwahl deckt <strong>jede</strong> Aufklärung zusätzlich die <strong>Standorte</strong> des Ziels auf – Heimat, Kolonien und Monde, je mit ihrer eigenen Verteidigung und ihrem Beutefaktor. Erst damit lässt sich beim Angriff ein Ziel wählen; ohne Aufklärung kennst du nur die Heimatbasis. Die <strong>Beute-Schätzung</strong> nennt den <em>gesamten</em> Bestand des Ziels: Wie viel davon du greifst, entscheidet der Standort. Ein einfaches Spähschiff meldet nur die Basisdaten. Ist ein Spionagekreuzer stationiert, fliegt bevorzugt dieser. Beide zählen zum gemeinsamen Spionage-Slot-Pool (je ein Schiff = ein gleichzeitiger Einsatz).' },
       { title:'Aufklärung wird nutzbar (Angriffs-Vorschau)', body:'Ausgespähte Daten werden jetzt <strong>gespeichert und weiterverwendet</strong>: Im Spielerprofil zeigt die <strong>Angriffs-Vorschau</strong>, wie frisch deine letzte Aufklärung ist, und eine Tiefen-Aufklärung blendet die geschätzte Beute direkt im Profil ein. So siehst du auf einen Blick, ob sich ein Angriff lohnt. <strong>Gegenspionage:</strong> Ziele mit hoher Spionageabwehr-Forschung können deinen Späher entdecken - dann ist der Bericht als unzuverlässig markiert. Umgekehrt wirst du benachrichtigt, wenn dich jemand ausspäht.<br><br><strong>Aufklärungsvorteil (seit 01.08.2026):</strong> Frische Aufklärung ist nicht mehr nur Information, sondern ein <strong>echter Kampfvorteil</strong>. Ist dein Bericht über ein Ziel <strong>keine 30 Minuten alt</strong> und wurde dein Späher <strong>nicht entdeckt</strong>, greifst du dieses Ziel mit <strong>+8% Angriffskraft</strong> an. Der Zuschlag steht in der Angriffs-Vorschau und im Spionagebericht ausgewiesen, und der Server rechnet ihn im PvP genauso nach – Vorschau und Kampfergebnis meinen dieselbe Zahl. Zwei Folgen: Wer angreifen will, späht <em>kurz vorher</em> statt irgendwann; und die <strong>Spionageabwehr</strong> des Ziels verteidigt jetzt zweimal – sie schiebt dem ertappten Späher aufgeblähte Verteidigungswerte unter <em>und</em> nimmt dem Angreifer den Zuschlag. Ein <strong>Bündnis mit dem Schattenbund</strong> senkt die Entdeckungschance um 25% bzw. 50% und schützt damit genau diesen Vorteil.<br><br><strong>Nach dem Kampf siehst du ohnehin, was dort stand.</strong> Seit dem 02.08.2026 führt der Bericht eines Spielerangriffs die <strong>Flotte</strong> und die <strong>Verteidigungsanlagen</strong> des Ziels mit – du hast ihnen gegenübergestanden, also stehen sie im Bericht. Die Aufklärung verliert dadurch nichts: Sie klärt <em>vorher</em> auf, also genau dann, wenn die Auskunft die Entscheidung noch beeinflussen kann – und nur sie bringt den +8%-Zuschlag.' },
       { title:'Karte bedienen (Maus, Finger, Tastatur)', body:'Die Karte hat drei Ebenen: <strong>Übersicht</strong> (die acht Regionen) → <strong>Sektoransicht</strong> (die Systeme einer Region) → <strong>geöffnetes System</strong> (Sonne, Planeten, Marker). Ein Klick geht eine Ebene tiefer, der Zurück-Knopf oben links wieder heraus.<br><br><strong>Im geöffneten System:</strong> Ziehen verschiebt den Ausschnitt, die Knöpfe rechts unten zoomen, und die ‹ ›-Knöpfe links und rechts blättern zum nächsten System – ohne den Umweg über die Sektoransicht. Am <strong>PC</strong> geht dasselbe über die Tastatur: <strong>← und →</strong> blättern zum vorherigen bzw. nächsten System, <strong>+ und −</strong> zoomen. Die Tasten <strong>↑ und ↓ sind bewusst nicht belegt</strong>, damit du die Seite weiterhin normal scrollen kannst, während die Karte offen ist. <strong>Esc</strong> klappt das System wieder zu. Das Mausrad zoomt nur zusammen mit <strong>Strg</strong> – ohne Strg scrollt es die Seite, wie man es erwartet.' },
       { title:'Sektoren haben Eigenschaften', body:(function(){
@@ -41204,6 +41496,7 @@
       { title:'Piraten-Trümmerräuber', body:'Gelegentlich taucht bei einem deiner Trümmerfelder (ab ca. 300 Ressourcen Gesamtgröße) eine kleine Piratenflotte auf, die es abbaut - überwiegend Recycler mit nur <strong>schwachem Begleitschutz</strong>. Deine normale Verteidigung (Gebäude, stationierte Flotte) greift hier bewusst <strong>nicht automatisch</strong> - du musst aktiv eine Angriffsflotte vom aktuell gewählten Standort losschicken, um sie abzufangen (Button erscheint im Verteidigung-Tab, solange die Piraten dort sind). Gelingt das rechtzeitig (der <strong>Hinflug</strong> muss innerhalb der verbleibenden Zeit liegen), fällt der Kampf im Moment der Ankunft - danach fliegt die Flotte denselben Weg wieder zurück und steht dir erst zu Hause wieder zur Verfügung. Die Mission dauert also doppelt so lange wie der Hinflug, und der Treibstoff deckt beide Strecken. Bei Erfolg bleibt das Trümmerfeld erhalten und du bekommst Kampfpunkte; scheitert der Abfangversuch, kannst du es erneut probieren, solange noch Zeit bleibt. Ohne Abfangversuch ziehen die Piraten nach 10 Minuten mit einem Teil des Feldes ab. Ab Forschung <strong>KI-Technologie</strong> gibt es als Sicherheitsnetz die <strong>KI-Abfangautomatik</strong> (Schalter im Verteidigung-Tab, <strong>nur mit Unterstützer-Rang</strong> - siehe „Die drei Automatiken sind Unterstützern vorbehalten"): Ist sie an und fängst du nicht selbst ab, vertreiben KI-Abfangdrohnen die Piraten automatisch, sobald 60% der Zeit verstrichen sind - Kosten: 3 KI-Kerne je Einsatz. Der KI-Einsatz gelingt garantiert, bringt aber bewusst <strong>keine Kampfpunkte, keine Veteranen-Erfahrung und keine zerstörten Piratenschiffe</strong> - manuelles Abfangen bleibt immer lohnender, die KI verhindert nur den Beute-Verlust.' },
       { title:'Grundformel', body:'Jeder Kampf vergleicht Gesamt-Angriffskraft gegen Gesamt-Verteidigungspunkte (Gebäude + stationierte Flotte). Das Verhältnis bestimmt die Erfolgschance bzw. die Verlustquote – kein reines Alles-oder-Nichts.' },
       { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
+      { title:'Angriffsziel wählen: Heimat, Kolonie oder Mond', body:'Ein Angriff auf einen Mitspieler traf früher immer sein <strong>gesamtes Reich</strong>: Du kämpftest gegen die Verteidigung aller seiner Standorte zusammen. Seit der Standort-Zielwahl greifst du <strong>einen bestimmten Ort</strong> an – seine Heimatbasis, eine Kolonie oder einen Mond –, und es zählt nur, was <em>dort</em> steht: die Verteidigungsanlagen dieses Standorts und die Flotte, die dort stationiert ist. Auch die Verluste beim Verteidiger treffen nur diesen einen Ort, und zerstört werden ausschließlich Anlagen dort.<br><br><strong>Der Preis dafür ist die Beute.</strong> Die Ressourcen deines Ziels liegen in <em>einem</em> gemeinsamen Konto, nicht je Planet. Damit ein schwach verteidigter Außenposten nicht zum Hintereingang zum ganzen Vermögen wird, hängt am Standort ein fester Beutefaktor: <strong>Heimatbasis ×'+STANDORT_BEUTE_FAKTOR.heimat.toFixed(2)+'</strong> (voller Satz), <strong>Kolonie ×'+STANDORT_BEUTE_FAKTOR.kolonie.toFixed(2)+'</strong>, <strong>Mond ×'+STANDORT_BEUTE_FAKTOR.mond.toFixed(2)+'</strong>. Die Heimat bleibt also das fetteste Ziel – dafür ist sie am besten verteidigt und trägt zusätzlich ihren Heimatbonus. Eine schwache Kolonie ist der leichte Weg mit halbem Ertrag. Genau diese Abwägung ist der Sinn der Sache.<br><br><strong>Du musst die Standorte erst finden.</strong> Angezeigt wird nur, was eine <strong>Aufklärung</strong> aufgedeckt hat – ohne sie kennst du bloß die Heimatbasis. Der Späh-Bericht listet jeden Standort mit seiner Verteidigung und seinem Beutefaktor auf; die Angaben altern mit der Aufklärung und werden nach sechs Stunden nicht mehr angeboten. Wurde dein Späher dabei <em>entdeckt</em>, sind auch diese Zahlen aufgebläht – die Spionageabwehr des Ziels verfälscht sie genauso wie die Gesamtverteidigung.<br><br><strong>Was sich NICHT je Standort ändert:</strong> Der Angriffs-Schutzschild gilt weiterhin für das ganze Konto – du kannst die Standorte eines Spielers also nicht nacheinander abklappern. Ebenso der Anti-Farming-Abschlag und die Sperre gegen viel schwächere Ziele. Und die <strong>Flugzeit</strong> hängt am Spieler, nicht am Ort: Ein Mond ist genauso weit weg wie seine Heimat.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. <strong>Anfängerschutz:</strong> Frisch registrierte Konten starten zusätzlich mit einem <strong>4 Tage langen Schild</strong>, damit du in Ruhe aufbauen kannst, bevor dich etablierte Spieler angreifen dürfen. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung/Startphase gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft.' },
       { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln. Der Deckel ist dabei <strong>weich</strong>: Was darüber liegt, verpufft nicht, sondern läuft aus - bis zu einem Viertel des Deckels kommt zusätzlich an. Und er ist <strong>verschiebbar</strong>: Der Aufstiegs-Zweig „Verschobene Grenzen" hebt ihn um 3% je Stufe. Was für dich gilt, steht in der Boni-Bilanz im Fortschritt-Tab und in der Kampfbonus-Übersicht im Offiziere-Tab.' },
@@ -41871,6 +42164,7 @@
       } else if (r.type === 'attack-sent'){
         title = (won?'Sieg':'Niederlage')+' – Angriff auf '+escapeHtml(r.targetName);
         body = 'Deine Angriffspunkte: '+r.attackPower+' vs. Verteidigungspunkte: '+r.defensePower;
+        body += standortBerichtszeile(r, true);
         // Kampfverlauf, Konter und die Aufstellung des Ziels (01.08.2026). Der Server schickt alle
         // drei Felder seit dem Phasen-Umbau in JEDEM PvP-Bericht mit - gerendert wurden sie bisher
         // nur im NPC-Bericht und im Überfall. Die Hilfe verspricht an drei Stellen ausdrücklich,
@@ -41890,6 +42184,7 @@
       } else if (r.type === 'attack-received'){
         title = (won?'Erfolgreich abgewehrt':'Überfallen')+' – von '+escapeHtml(r.attackerName);
         body = 'Angreifer-Angriffspunkte: '+r.attackPower+' vs. deine Verteidigungspunkte: '+r.defensePower;
+        body += standortBerichtszeile(r, false);
         body += '<br>Angegriffen mit: '+shipCountRowHtml(r.fleet, true);
         // Aus Verteidigersicht: Die Phasen sind die des ANGREIFERS (so würfelt der Server sie), die
         // Aufstellung dagegen die eigene. Beides deshalb ausdrücklich beschriftet - eine Zeile
@@ -42088,10 +42383,14 @@
         // Wird vom eigenen Client erzeugt, wenn er eine eingereihte Flottenverlust-Meldung abholt
         // (siehe claimPendingRewards). Der Kampf selbst steht im Bericht 'attack-received', den der
         // Server schreibt - dieser hier nennt die STUECKZAHLEN, die erst beim Anwenden feststanden.
-        title = '⚔ Flottenverluste durch Spielerangriff';
-        body = '<strong>'+escapeHtml(r.attackerName||'Ein Spieler')+' hat deine Verteidigung durchbrochen.</strong>';
+        title = '⚔ Flottenverluste durch Spielerangriff'+(r.planetKey ? ' – '+planetDisplayName(r.planetKey) : '');
+        body = '<strong>'+escapeHtml(r.attackerName||'Ein Spieler')+' hat deine Verteidigung'
+             + (r.planetKey ? ' auf '+escapeHtml(planetDisplayName(r.planetKey)) : '')+' durchbrochen.</strong>';
         body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Verlorene Schiffe: '+shipCountRowHtml(r.ownLostShips||{});
-        if (r.lossPct) body += ' (rund '+String(r.lossPct).replace('.',',')+'% der Verteidigungsflotte je Standort)';
+        // Die Formulierung haengt am Fall: Ein Standort-Angriff trifft NUR die Flotte dort, der
+        // kontoweite Altpfad jeden Standort.
+        if (r.lossPct) body += ' (rund '+String(r.lossPct).replace('.',',')+'% der Flotte '
+             + (r.planetKey ? 'an diesem Standort' : 'je Standort')+')';
         if (r.debrisTotal > 0) body += '<br><i class="ti ti-recycle" aria-hidden="true" style="color:#5dcaa5;"></i> Trümmerfeld an deinen Planeten: '+fmt(r.debrisTotal)+' Einheiten – mit Recyclern abbaubar.';
         body += '<br><span class="bmeta">Nur ein <em>erfolgreicher</em> Angriff kostet Schiffe. Eine abgewehrte Attacke lässt deine Flotte unberührt und bringt zusätzlich Kommandopunkte.</span>';
       } else if (r.type === 'pirate-debris-raid'){
@@ -42346,6 +42645,7 @@
         title = (r.warTag?'⚔ ':'')+'Angriff auf Spieler '+escapeHtml(r.targetName);
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
         if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
+        body += standortBerichtszeile(r, true);
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
         body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
         // Im PvP rechnet der SERVER die Angriffskraft (rawFleetPower mit demselben Markenfaktor wie
@@ -42398,8 +42698,25 @@
         if (r.buildLvl!==undefined) body += '<br><i class="ti ti-building-factory-2" aria-hidden="true"></i> Gebäude-Level (gesamt): '+fmt(r.buildLvl);
         if (r.colonyCount!==undefined) body += '<br><i class="ti ti-planet" aria-hidden="true"></i> Kolonien: '+r.colonyCount;
         if (r.deep && r.resTotal!==undefined){
-          body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#9fe1cb;"></i> Beute (geschätzt): '+fmt(r.resTotal);
+          /* "Gesamtbestand" statt "Beute": Die Zahl kommt aus dem KONTOWEITEN Ressourcenpool des
+             Ziels. Seit der Standort-Zielwahl entscheidet der angegriffene Standort, welcher
+             Anteil davon ueberhaupt erreichbar ist - ohne diese Klarstellung waere die Zeile fuer
+             eine Kolonie um Faktor 2 und fuer einen Mond um Faktor 2,86 zu hoch. */
+          body += '<br><i class="ti ti-diamond" aria-hidden="true" style="color:#9fe1cb;"></i> Gesamtbestand des Ziels: '+fmt(r.resTotal);
           if (r.resBreak) body += ' <span style="color:#7d8199;">(Erz '+fmt(r.resBreak.erz||0)+' · Kristalle '+fmt(r.resBreak.kristalle||0)+' · Deuterium '+fmt(r.resBreak.deuterium||0)+' · Antimaterie '+fmt(r.resBreak.antimaterie||0)+')</span>';
+          body += ' <span class="bmeta">– wie viel du davon greifst, entscheidet der angegriffene Standort.</span>';
+        }
+        /* Die aufgedeckten Standorte (PvP-Etappe 1). Sie stehen im Bericht selbst und nicht in
+           state.spyIntel: Ein Bericht ist eine Momentaufnahme und darf nicht spaeter andere Zahlen
+           zeigen als am Tag der Aufklaerung. */
+        if (Array.isArray(r.standorte) && r.standorte.length){
+          body += '<br><i class="ti ti-target" aria-hidden="true" style="color:#e0a548;"></i> <strong>Angreifbare Standorte:</strong>';
+          for (const stO of r.standorte){
+            body += '<br>&nbsp;&nbsp;· '+escapeHtml(fremdStandortName(stO.key))
+                  + ' <span style="color:#7d8199;">('+escapeHtml(STANDORT_ART_LABEL[stO.art]||'Standort')
+                  + (stO.verteidigung!==undefined && stO.verteidigung!==null ? ' · 🛡 '+fmt(stO.verteidigung) : '')
+                  + ' · Beute ×'+((stO.beuteFaktor||1).toFixed(2))+')</span>';
+          }
         }
         body += '<br>Punktestand: '+fmt(r.score||0);
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
@@ -55054,7 +55371,7 @@
         } else if (m.type === 'attack-player'){
           resolvePlayerAttackMission(m, planetKey, showLog, fleet).catch(()=>{});
         } else if (m.type === 'spy-player'){
-          resolveSpyMission(m, planetKey, showLog);
+          resolveSpyMission(m, planetKey, showLog).catch(()=>{});
         } else if (m.type === 'colonize'){
           const planet = PLANETS.find(p => p.id === m.targetId);
           if (!planet) continue;
@@ -57037,7 +57354,11 @@
   // --- Kampfbericht-Karte (Teilen-Button direkt am Bericht). ---
   function battleCardData(r){
     if (r.type === 'npc-attack') return { won: r.result==='win', vs: r.npcName||'NPC', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
-    if (r.type === 'player-attack') return { won: r.result==='win', vs: r.targetName||'Spieler', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
+    /* Der Standort gehoert in die geteilte Karte: Sie ist die EINZIGE Anzeigestelle, die das
+       Spiel verlaesst - ohne ihn behauptet ein Bild einen Sieg ueber ein ganzes Reich, wo nur ein
+       Mond getroffen wurde. Der Name kommt als TEXT aus dem Bericht (nicht ueber
+       planetDisplayName): Er beschreibt einen FREMDEN Standort. */
+    if (r.type === 'player-attack') return { won: r.result==='win', vs: (r.targetName||'Spieler') + (r.targetPlanet ? ' \u00b7 ' + (r.standortName || fremdStandortName(r.targetPlanet)) : ''), atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
     if (r.type === 'alliance-base-attack') return { won: r.result!=='loss', vs: 'Allianzbasis ['+(r.targetTag||'?')+']', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints, extra: r.result==='destroyed' ? 'BASIS ZERST\u00D6RT!' : null };
     if (r.type === 'pirate-debris-raid') return { won: r.result==='win' || r.result==='ki-intercept', vs: 'Piraten-Tr\u00FCmmerr\u00E4uber', atk: r.attackPower, def: r.defensePower, loot: null, bp: r.battlePoints };
     if (r.type === 'void-rift') return { won: r.result==='win', vs: 'Leerenriss', atk: r.attackPower, def: r.defensePower, loot: r.loot, bp: r.battlePoints };
@@ -64264,7 +64585,7 @@
           return `
             <div class="card-row" style="flex-direction:column; align-items:stretch;" title="${shipsTooltip}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="bname"><i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Angriff: ${m.targetName||'Spieler'}</div>
+                <div class="bname"><i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i>${m.fleetName?m.fleetName+' · ':''}Angriff: ${m.targetName||'Spieler'}${m.targetPlanet?' · '+escapeHtml(m.standortName||fremdStandortName(m.targetPlanet)):''}</div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span class="lvl-pill">${fmtDuration(remaining/1000)}</span>
                   ${m.id?`<button data-recall="${m.id}" title="Flotte zurückrufen" style="font-size:10px; padding:4px 7px;"><i class="ti ti-refresh" aria-hidden="true"></i></button>`:''}
@@ -66249,15 +66570,31 @@
         const pendingBtn = document.getElementById('pendingAttackBtn');
         if (pendingBtn) pendingBtn.onclick = () => {
           const target = pendingAttackTarget;
+          /* Die Standortwahl gilt immer nur fuer EIN Ziel. Beim Oeffnen wird sie deshalb
+             zurueckgesetzt, wenn sie einem anderen Spieler galt - sonst wirkte eine bei Spieler A
+             getroffene und dann abgebrochene Wahl still bei Spieler B weiter, weil beide auf
+             demselben Planeten siedeln koennen. */
+          if (pvpZielFuer !== target.id){ pvpZiel = null; pvpZielFuer = null; }
           oeffneFlottenwahl({
             art: 'Angriff auf einen Spieler',
             titel: target.name + ' angreifen',
             keys: ATTACK_SHIP_KEYS,
             fracht: true,
+            pvpZielId: target.id,
+            vorschau: (flotte) => pvpVorschauHtml(flotte, target),
             startLabel: 'Angriff starten',
             sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((n,k)=>n+(flotte[k]||0),0) > 0
               ? null : 'Wähle mindestens ein Schiff aus.',
-            start: () => { pendingAttackTarget = null; attackPlayer(target.id, target.name); }
+            /* Das Ziel wird HIER eingefroren, nicht in sendPlayerAttackMission aus der
+               Modulvariable gelesen: Dort liegt ein `await loadPlayerEntry` zwischen Auswahl und
+               missions.push, und das Overlay ist zu diesem Zeitpunkt schon geschlossen - der
+               Spieler kann in dem Netzfenster laengst ein neues Ziel markiert haben. Genau dagegen
+               frieren isWarAttack und targetAllianceTag daneben ihre Werte ein. */
+            start: () => {
+              const zielStandort = pvpZielFuerTarget(target.id, pvpStandorte(target.id).liste);
+              pendingAttackTarget = null;
+              attackPlayer(target.id, target.name, zielStandort);
+            }
           });
         };
         const cancelBtn = pendingAttackBox.querySelector('[data-cancel-pending-attack]');
@@ -66558,7 +66895,8 @@
             shipsTooltip = 'Unterwegs: '+fleetBreakdownHtml(composition);
           } else if (m.type === 'attack-player'){
             icon = 'ti-sword'; color = '#e24b4a';
-            label = (m.fleetName?m.fleetName+' → ':'')+'Spieler: '+(m.targetName||'?');
+            label = (m.fleetName?m.fleetName+' → ':'')+'Spieler: '+(m.targetName||'?')
+                  + (m.targetPlanet ? ' ('+(m.standortName||fremdStandortName(m.targetPlanet))+')' : '');
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           } else if (m.type === 'worldboss'){
             icon = 'ti-skull'; color = '#e24b4a';
