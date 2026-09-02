@@ -2770,6 +2770,18 @@
           <span class="bmeta" id="adminBroadcastCount">0/300</span>
           <button id="adminBroadcastSendBtn" class="login-submit" style="width:auto; padding:8px 16px;"><i class="ti ti-building-broadcast-tower" aria-hidden="true" style="margin-right:5px;"></i>An alle Spieler senden</button>
         </div>
+        <!-- E-Mail an alle (02.09.2026). Bewusst NEBEN der Chat-Ankündigung und nicht statt ihr:
+             Die Ankündigung erreicht, wer gerade spielt; die Mail erreicht die, die es nicht tun.
+             Abgemeldet wird über die vorhandene Einstellung „Neuigkeiten per E-Mail", nicht über
+             einen zweiten Schalter - deshalb steht die Zahl der Abgemeldeten im Ergebnis. -->
+        <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:14px;">
+          <div class="bname"><i class="ti ti-mail" aria-hidden="true" style="margin-right:5px;"></i>E-Mail an alle mit bestätigter Adresse</div>
+          <div class="bmeta" style="line-height:1.5;">Erreicht auch, wer gerade nicht spielt. Wer „Neuigkeiten per E-Mail" abgeschaltet hat, bekommt sie nicht – das Ergebnis sagt, wie viele das waren. Höchstens 40 Mails je Versand.</div>
+          <input id="adminMailAlleBetreff" type="text" maxlength="120" placeholder="Betreff" autocomplete="off" style="width:100%; font-size:13px;">
+          <textarea id="adminMailAlleText" maxlength="2000" placeholder="Text der E-Mail (max. 2000 Zeichen) – Absätze bleiben erhalten." style="width:100%; min-height:80px; resize:vertical; font-size:13px;"></textarea>
+          <div id="adminMailAlleStand" class="bmeta"></div>
+          <button id="adminMailAlleBtn" style="width:100%; font-size:12px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:5px;"></i>E-Mail an alle senden</button>
+        </div>
       </div>
       <!-- Unterstützer-Rang manuell vergeben (05.08.2026, Wunsch Sascha). Drei feste Laufzeiten
            statt eines freien Zahlenfelds - der Server nimmt auch nur diese drei an. -->
@@ -36626,6 +36638,14 @@ async function claimPendingRewards(){
           ${reaktionenHtml(k.reaktionen)}
           ${k.sperre ? zeile('Sperre', '<span style="color:#f0997b;">' + (k.sperre.grund ? escapeHtml(k.sperre.grund) : 'ohne Grund') + ' · ' + (k.sperre.bis ? 'bis ' + adminZeit(k.sperre.bis) : 'unbefristet') + (k.sperre.seit ? ' · seit ' + adminZeit(k.sperre.seit) : '') + '</span>') : ''}
           ${k.stumm ? zeile('Stummgeschaltet', '<span style="color:#fac775;">bis ' + adminZeit(k.stumm.bis) + (k.stumm.grund ? ' · ' + escapeHtml(k.stumm.grund) : '') + '</span>') : ''}
+          ${k.loeschung ? zeile('Löschung vorgemerkt', '<span style="color:#f0997b;">wird am ' + adminZeit(k.loeschung.ab) + ' gelöscht' + (k.loeschung.grund ? ' · ' + escapeHtml(k.loeschung.grund) : '') + '</span>') : ''}
+          ${k.anmeldung ? zeile('Anmeldungen', (k.anmeldung.fehlversuche
+              ? '<span style="color:' + (k.anmeldung.fehlversuche >= 5 ? '#f0997b' : '#fac775') + ';">' + adminZahl(k.anmeldung.fehlversuche) + ' Fehlversuch' + (k.anmeldung.fehlversuche === 1 ? '' : 'e') + ' seit der letzten Anmeldung' + (k.anmeldung.fehlerZuletzt ? ', zuletzt ' + adminZeit(k.anmeldung.fehlerZuletzt) : '') + '</span> · '
+              : '')
+            + (k.anmeldung.letzte ? 'zuletzt ' + adminZeit(k.anmeldung.letzte) : 'noch nie angemeldet')
+            + ' · ' + adminZahl(k.anmeldung.gesamt) + ' insgesamt'
+            + (k.anmeldung.fehlversucheVorher ? ' · davor ' + adminZahl(k.anmeldung.fehlversucheVorher) + ' Fehlversuche' : '')
+            + (k.anmeldung.sitzungOffen ? ' · Sitzung offen seit ' + adminZeit(k.anmeldung.sitzungSeit) : ' · keine offene Sitzung')) : ''}
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
             <input type="text" maxlength="200" data-konto-grund="${escapeHtml(k.username)}" placeholder="Grund (für Sperre oder Stummschaltung, optional)" autocomplete="off" style="flex:2 1 170px; font-size:11.5px;">
             <select data-konto-tage="${escapeHtml(k.username)}" aria-label="Dauer der Sperre" style="flex:1 1 110px; font-size:11.5px;">
@@ -36645,6 +36665,12 @@ async function claimPendingRewards(){
             <button data-konto-spielstand="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Spielstand ansehen${k.schattenDa ? ' (Schatten da)' : ''}</button>
           </div>
           <div data-konto-spielstand-box="${escapeHtml(k.username)}"></div>
+          <!-- Kampfverlauf (02.09.2026): die Antwort auf eine Meldung. Er liegt am Nutzerobjekt und
+               ueberlebt deshalb, dass der Gemeldete seine eigenen Berichte loescht. -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button data-konto-verlauf="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Kampfverlauf ansehen${k.kampfVerlauf ? ' (' + adminZahl(k.kampfVerlauf) + ')' : ''}</button>
+          </div>
+          <div data-konto-verlauf-box="${escapeHtml(k.username)}"></div>
           <div class="bmeta" style="margin-top:6px;">Support: E-Mail setzen, umbenennen, Reset-Link erzeugen – alles landet im Protokoll.</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <input type="email" data-konto-email="${escapeHtml(k.username)}" placeholder="Neue E-Mail-Adresse (gilt als bestätigt)" autocomplete="off" style="flex:2 1 180px; font-size:11.5px;">
@@ -36657,6 +36683,20 @@ async function claimPendingRewards(){
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button data-konto-resetlink="${escapeHtml(k.username)}" style="flex:1 1 140px; font-size:11px;"><i class="ti ti-key" aria-hidden="true" style="margin-right:4px;"></i>Passwort-Reset-Link erzeugen</button>
             <input type="text" readonly data-konto-resetlink-feld="${escapeHtml(k.username)}" placeholder="Der Link erscheint hier – eine Stunde gültig" style="flex:2 1 200px; font-size:11px;">
+          </div>
+          <!-- E-Mail an genau dieses Konto (02.09.2026). Push sieht nur, wer sie erlaubt hat. -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <input type="text" maxlength="120" data-konto-mailbetreff="${escapeHtml(k.username)}" placeholder="Betreff der E-Mail" autocomplete="off" style="flex:2 1 180px; font-size:11.5px;">
+            <button data-konto-mail="${escapeHtml(k.username)}" style="flex:1 1 110px; font-size:11px;"><i class="ti ti-mail" aria-hidden="true" style="margin-right:4px;"></i>E-Mail senden</button>
+          </div>
+          <textarea maxlength="2000" data-konto-mailtext="${escapeHtml(k.username)}" placeholder="Text der E-Mail – Absätze bleiben erhalten." style="width:100%; min-height:60px; resize:vertical; font-size:12px;"></textarea>
+          <!-- Loeschung mit Frist (02.09.2026): der einzige Eingriff, der sich nicht zuruecknehmen
+               laesst - deshalb sieben Tage Vorlauf und bis dahin ein Abbrechen-Knopf an dieser Stelle. -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${k.loeschung
+              ? `<button data-konto-loeschen-ab="${escapeHtml(k.username)}" style="flex:1; font-size:11px;"><i class="ti ti-refresh" aria-hidden="true" style="margin-right:4px;"></i>Löschung abbrechen (läuft bis ${adminZeit(k.loeschung.ab)})</button>`
+              : `<input type="text" maxlength="200" data-konto-loeschgrund="${escapeHtml(k.username)}" placeholder="Grund der Löschung (Pflicht)" autocomplete="off" style="flex:2 1 180px; font-size:11.5px;">
+                 <button data-konto-loeschen="${escapeHtml(k.username)}" style="flex:1 1 150px; font-size:11px; color:#f0997b;"><i class="ti ti-user-x" aria-hidden="true" style="margin-right:4px;"></i>Konto löschen (7 Tage Frist)</button>`}
           </div>
         </div>`).join('');
       box.querySelectorAll('[data-konto-sperre]').forEach(b => b.onclick = async () => {
@@ -36695,6 +36735,24 @@ async function claimPendingRewards(){
       });
       box.querySelectorAll('[data-konto-sitzungen]').forEach(b => b.onclick = () =>
         adminSitzungenBeenden(b.getAttribute('data-konto-sitzungen')));
+      box.querySelectorAll('[data-konto-verlauf]').forEach(b => b.onclick = () =>
+        adminKontoVerlauf(b.getAttribute('data-konto-verlauf')));
+      box.querySelectorAll('[data-konto-mail]').forEach(b => b.onclick = async () => {
+        const name = b.getAttribute('data-konto-mail');
+        const bet = box.querySelector('[data-konto-mailbetreff="' + CSS.escape(name) + '"]');
+        const txt = box.querySelector('[data-konto-mailtext="' + CSS.escape(name) + '"]');
+        if (await adminKontoMail(name, bet ? bet.value.trim() : '', txt ? txt.value.trim() : '', b)){
+          if (bet) bet.value = ''; if (txt) txt.value = '';
+        }
+      });
+      box.querySelectorAll('[data-konto-loeschen]').forEach(b => b.onclick = async () => {
+        const name = b.getAttribute('data-konto-loeschen');
+        const feld = box.querySelector('[data-konto-loeschgrund="' + CSS.escape(name) + '"]');
+        if (await adminKontoLoeschen(name, feld ? feld.value.trim() : '')) loadAdminKonto();
+      });
+      box.querySelectorAll('[data-konto-loeschen-ab]').forEach(b => b.onclick = async () => {
+        if (await adminKontoLoeschenAbbrechen(b.getAttribute('data-konto-loeschen-ab'))) loadAdminKonto();
+      });
     } catch(e){ box.innerHTML = adminListenFehler(null, 'die Kontosuche'); }
   }
   /* Support-Werkzeuge (02.09.2026). Die Regeln prueft der Server (dieselben wie bei Registrierung
@@ -36718,6 +36776,94 @@ async function claimPendingRewards(){
       const d = await res.json().catch(() => ({}));
       if (!res.ok){ log(d.error || 'Umbenennen fehlgeschlagen.', 'ti-alert-triangle'); return false; }
       log(d.alterName + ' heißt jetzt ' + d.username + ' – der Spieler muss sich neu anmelden.', 'ti-check', 'ok');
+      return true;
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); return false; }
+  }
+  /* Kampfverlauf, E-Mail und Loeschung (02.09.2026). Der Verlauf ist eine reine Leseansicht; die
+     beiden Eingriffe fragen nach, und die Loeschung nennt in der Rueckfrage, was verschwindet und
+     was bleibt - nach der Frist ist nichts davon mehr zurueckzuholen. */
+  async function adminMailAlle(){
+    const betEl = document.getElementById('adminMailAlleBetreff');
+    const txtEl = document.getElementById('adminMailAlleText');
+    const stand = document.getElementById('adminMailAlleStand');
+    const btn = document.getElementById('adminMailAlleBtn');
+    const betreff = betEl ? betEl.value.trim() : '', text = txtEl ? txtEl.value.trim() : '';
+    if (!betreff || !text){ log('Bitte Betreff und Text ausfüllen.', 'ti-alert-triangle'); return; }
+    if (!confirm('E-Mail an ALLE Spieler mit bestätigter Adresse senden?\n\nBetreff: ' + betreff + '\n\nDas lässt sich nicht zurückholen.')) return;
+    if (btn) btn.disabled = true;                       // gegen den zweiten Klick bei langsamer Antwort
+    if (stand) stand.textContent = 'Wird verschickt…';
+    try {
+      const res = await backendFetch('/admin/mail-alle', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ betreff, text }) });
+      const d = await res.json().catch(() => ({}));
+      // Die Zahlen stehen AUCH im Fehlerfall da: Ein Rundlauf, bei dem nichts rausging, antwortet
+      // mit 502 und traegt trotzdem, wie viele abgemeldet oder ohne Adresse waren.
+      const zahlen = (typeof d.gesendet === 'number')
+        ? adminZahl(d.gesendet) + ' verschickt · ' + adminZahl(d.abgemeldet) + ' abgemeldet · ' + adminZahl(d.ohneAdresse) + ' ohne bestätigte Adresse'
+          + (d.fehlgeschlagen ? ' · ' + adminZahl(d.fehlgeschlagen) + ' fehlgeschlagen' : '')
+          + (d.uebrig ? ' · ' + adminZahl(d.uebrig) + ' über dem Deckel übrig' : '')
+        : '';
+      if (stand) stand.textContent = zahlen;
+      if (!res.ok){ log(d.error || 'Der Rundversand ist gescheitert.', 'ti-alert-triangle'); return; }
+      log('E-Mail an alle: ' + zahlen, 'ti-check', 'ok');
+      if (betEl) betEl.value = ''; if (txtEl) txtEl.value = '';
+    } catch(e){ if (stand) stand.textContent = ''; log('Keine Verbindung – nichts verschickt.', 'ti-alert-triangle'); }
+    finally { if (btn) btn.disabled = false; }
+  }
+  async function adminKontoVerlauf(name){
+    const box = document.querySelector('[data-konto-verlauf-box="' + CSS.escape(name) + '"]');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Kampfverlauf wird geladen…</div>`;
+    try {
+      const res = await backendFetch('/admin/konto/verlauf?targetUsername=' + encodeURIComponent(name));
+      if (!res.ok){ box.innerHTML = adminListenFehler(res, 'den Kampfverlauf'); return; }
+      const d = await res.json();
+      const liste = d.verlauf || [];
+      if (!liste.length){ box.innerHTML = `<div class="bmeta" style="margin-top:4px;">Für dieses Konto ist noch kein Kampf verzeichnet. Der Verlauf beginnt mit dem ersten Angriff nach dem 02.09.2026 – ältere Kämpfe stehen nicht darin.</div>`; return; }
+      const kopf = `<div class="bmeta" style="margin-top:4px;">${adminZahl(d.angriffeGesamt)} eigene Angriffe in den letzten ${adminZahl(d.merken)} Kämpfen`
+        + (d.haeufigstesZiel ? ` · häufigstes Ziel <strong>${escapeHtml(d.haeufigstesZiel.name)}</strong> (${adminZahl(d.haeufigstesZiel.anzahl)}×)` : '')
+        + (d.letzteStunde ? ` · <span style="color:${d.letzteStunde >= 5 ? '#f0997b' : '#c9d4e8'};">${adminZahl(d.letzteStunde)} in der letzten Stunde</span>` : '')
+        + `</div>`;
+      box.innerHTML = kopf + `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:3px; margin-top:4px;">`
+        + liste.map(e => `<div style="display:flex; justify-content:space-between; gap:8px;">
+            <span class="bmeta">${adminZeit(e.zeit)} · ${e.rolle === 'angriff' ? 'griff an' : 'verteidigte gegen'} ${escapeHtml(e.gegner || 'unbekannt')}${e.ziel && e.ziel !== 'home' ? ' (' + escapeHtml(e.ziel) + ')' : ''}</span>
+            <span class="bmeta" style="color:${e.erfolg ? '#5dcaa5' : '#f0997b'}; text-align:right;">${e.erfolg ? 'gewonnen' : 'verloren'} · ${adminZahl(e.angriff)} gegen ${adminZahl(e.verteidigung)}${e.beute ? ' · ' + adminZahl(e.beute) + ' Rohstoffarten' : ''}</span>
+          </div>`).join('') + `</div>`;
+    } catch(e){ box.innerHTML = adminListenFehler(null, 'den Kampfverlauf'); }
+  }
+  async function adminKontoMail(name, betreff, text, knopf){
+    if (!betreff || !text){ log('Bitte Betreff und Text ausfüllen.', 'ti-alert-triangle'); return false; }
+    if (!confirm('E-Mail an „' + name + '" senden?\n\nBetreff: ' + betreff)) return false;
+    if (knopf) knopf.disabled = true;
+    try {
+      const res = await backendFetch('/admin/mail', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name, betreff, text }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Die E-Mail ging nicht raus.', 'ti-alert-triangle'); return false; }
+      log('E-Mail an ' + name + ' verschickt (' + (d.empfaenger || 'Adresse hinterlegt') + ').', 'ti-check', 'ok');
+      return true;
+    } catch(e){ log('Keine Verbindung – nichts verschickt.', 'ti-alert-triangle'); return false; }
+    finally { if (knopf) knopf.disabled = false; }
+  }
+  async function adminKontoLoeschen(name, grund){
+    if (!grund){ log('Bitte kurz begründen, warum das Konto gelöscht wird.', 'ti-alert-triangle'); return false; }
+    if (!confirm('Konto „' + name + '" zur Löschung vormerken?\n\nDer Spieler wird sofort ausgesperrt und liest beim Anmelden Frist und Grund. Nach sieben Tagen verschwinden Konto, Spielstand, Bestenlisten-Eintrag, Allianz-Mitgliedschaft und Vorposten endgültig; Chat-Nachrichten und Feedback bleiben stehen und tragen dann „Geloeschtes Konto".\n\nBis zum Ablauf lässt sich das hier abbrechen – danach nicht mehr.')) return false;
+    try {
+      const res = await backendFetch('/admin/konto/loeschen', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name, grund }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Vormerkung fehlgeschlagen.', 'ti-alert-triangle'); return false; }
+      log(name + ' wird am ' + adminZeit(d.ab) + ' gelöscht – bis dahin abbrechbar.', 'ti-check', 'ok');
+      return true;
+    } catch(e){ log('Keine Verbindung – nichts vorgemerkt.', 'ti-alert-triangle'); return false; }
+  }
+  async function adminKontoLoeschenAbbrechen(name){
+    try {
+      const res = await backendFetch('/admin/konto/loeschen-abbrechen', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ targetUsername: name }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Abbrechen fehlgeschlagen.', 'ti-alert-triangle'); return false; }
+      log(d.lief ? 'Die Löschung von ' + name + ' ist abgebrochen – das Konto bleibt.' : 'Für dieses Konto lief keine Löschung.', 'ti-check', 'ok');
       return true;
     } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); return false; }
   }
@@ -71132,6 +71278,8 @@ async function claimPendingRewards(){
     if (adminSupporterGrantBtn) adminSupporterGrantBtn.onclick = adminGrantSupporter;
     const adminSupporterRevokeBtn = document.getElementById('adminSupporterRevokeBtn');
     if (adminSupporterRevokeBtn) adminSupporterRevokeBtn.onclick = adminRevokeSupporter;
+    const adminMailAlleBtn = document.getElementById('adminMailAlleBtn');
+    if (adminMailAlleBtn) adminMailAlleBtn.onclick = () => adminMailAlle();
     const adminBroadcastSendBtn = document.getElementById('adminBroadcastSendBtn');
     if (adminBroadcastSendBtn) adminBroadcastSendBtn.onclick = sendAdminBroadcast;
     const adminBroadcastInput = document.getElementById('adminBroadcastInput');

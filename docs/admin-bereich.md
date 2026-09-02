@@ -158,3 +158,41 @@ weg, Antworten schickt UND leer schickt nichts, Banner zählt herunter UND ist o
 unsichtbar und leer, Setzen zeigt das Banner sofort UND Aufheben nimmt es sofort weg, Umbenennen
 und Reset-Link nach Bestätigung UND nicht nach Abbruch, vier Lage-Karten UND ohne Route nur die
 404-Meldung. Gegenprobe gegen origin/main (v8.629.0): 36 von 42 fallen, Prüflisten identisch.
+
+## Kampfverlauf, Anmelde-Forensik, E-Mail, Löschung mit Frist (02.09.2026)
+
+Fünfte Runde (Auftrag „Weitere Ideen für Admin Funktionen", alle vier gewählt). Backend #203 zuerst
+live (`/api/health` blob geprüft), dann dieser Stand.
+
+**Kampfverlauf im Konto-Blatt.** „Kampfverlauf ansehen (N)" lädt `GET /admin/konto/verlauf` in eine
+Box unter der Karte: je Zeile Zeitpunkt, Rolle („griff an" / „verteidigte gegen"), Gegner, Standort
+falls nicht die Heimat, Ausgang in Grün oder Orange und beide Kräfte. Darüber die drei Kennzahlen
+des Servers — eigene Angriffe, häufigstes Ziel, Angriffe in der letzten Stunde (ab fünf orange).
+Ohne die Route steht die 404-Meldung, kein Kampf. Der Verlauf beginnt mit dem ersten Angriff nach
+dem 02.09.2026; die leere Box sagt das, statt „keine Kämpfe" zu behaupten.
+
+**Anmelde-Forensik** steht als Zeile im Blatt, neben Sperre und Stummschaltung: laufende
+Fehlversuche seit der letzten Anmeldung (ab fünf orange, darunter gelb) mit Zeitpunkt, die letzte
+Anmeldung, die Gesamtzahl, die Fehlversuche vor der letzten gelungenen Anmeldung und ob eine Sitzung
+offen ist. Gab es keine Fehlversuche, fehlt die Angabe ersatzlos — eine „0 Fehlversuche" wäre eine
+Zeile, die nie etwas mitteilt.
+
+**E-Mail.** Im Konto-Blatt Betreff und Text mit Rückfrage; die Meldung nennt die verkürzte Adresse
+(`a***@example.org`), nie die volle. Im Ankündigungs-Reiter steht die Karte „E-Mail an alle mit
+bestätigter Adresse" **neben** der Chat-Ankündigung und nicht statt ihr: Die Ankündigung erreicht,
+wer gerade spielt, die Mail die anderen. Das Ergebnis zeigt verschickt / abgemeldet / ohne
+bestätigte Adresse / fehlgeschlagen / über dem Deckel übrig — und es steht **auch im Fehlerfall**
+da, wenn der Server mit 502 meldet, dass gar nichts hinausging; die Felder bleiben dann gefüllt,
+damit der Text nicht verloren ist. Der Knopf sperrt sich während des Versands (dieselbe Lehre wie
+beim Geschenk-Knopf, #521).
+
+**Löschung mit Frist.** Grundfeld und „Konto löschen (7 Tage Frist)" stehen am Ende der Karte. Die
+Rückfrage nennt alles drei: die Frist, was verschwindet (Konto, Spielstand, Bestenliste, Allianz,
+Vorposten) und was bleibt (Chat und Feedback, dann unter „Geloeschtes Konto"), dazu dass sich das
+bis zum Ablauf abbrechen lässt und danach nicht mehr. Läuft eine Löschung, steht statt des Feldes
+eine orange Zeile „Löschung vorgemerkt" mit Frist und Grund sowie ein Abbrechen-Knopf — der
+Löschen-Knopf ist dann weg, damit die Frist nicht versehentlich neu gesetzt wird.
+
+**Wächter** `tests/test_admin_konto2_ui.js` (33 Prüfungen) mit den Paaren 1a/1b, 2a/2b, 3a/3b,
+3c/3d, 4a/4b und 5a/5b. Gegenprobe gegen origin/main v8.636.0: 28 von 33 fallen, Prüflisten
+identisch; die fünf verbleibenden sind im Kopf der Testdatei einzeln begründet.
