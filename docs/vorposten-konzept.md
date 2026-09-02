@@ -547,6 +547,74 @@ Schalter steht auf `true`, fremde Vorposten werden gerendert und tragen den Anfe
 
 ---
 
+## 13. Stand der Umsetzung (02.09.2026)
+
+**Entschieden (Sascha, per Auswahl):** Option B – der Vorposten ist ein **echtes PvP-Ziel in
+`db.shared`** – und **alle vier Nutzen-Kanäle** (Flugzeit, Aufklärung, Produktion, Stationierung).
+Die Weiche aus §4.2 wurde nicht eigens abgefragt; gebaut ist die dortige Empfehlung (i): Der
+Flugzeit-Nutzen wirkt **nur auf Nicht-PvP-Missionsarten**. Dafür trägt `missionDurationFor` ein
+fünftes Argument `art`; wer es nicht mitgibt, bekommt keinen Bonus (die sichere Richtung), und
+kein PvP-Missionsstart (Spielerangriff, Spionage, Mondbelagerung, Anfechtung, Allianzbasis) gibt es
+mit – `tests/test_vorposten_ui.js` 5b misst das datengetrieben über alle `missions.push`-Blöcke.
+
+**Backend (kolonie-kepler7-backend#194, hinter `VORPOSTEN_AKTIV = false`):** Dokumente
+`vorposten:<sys>` in `db.shared`, Schreibsperre über die generische Storage-Route
+(`checkVorpostenKeyPermission`), die Endpunkte `GET /api/vorposten`, `bauen`, `ausbauen`,
+`stationieren`, `rueckruf`, `aufgeben` und `angriff`, Stufentabelle `VORPOSTEN_STUFEN` (Feldlager /
+Stützpunkt / Bastion), Bauschutz 12 h, Abklingzeit 4 h je Angreifer und Vorposten, Ausbau-Sperre
+12 h, höchstens drei je Konto. Entscheidungen und Messungen: `docs/vorposten.md` im Backend-Repo.
+**Die Stufentabelle reist mit der GET-Antwort** – das Frontend führt bewusst KEINE Kopie, es gibt
+also keine Kopie-Familie und keinen Paritätstest; alle Zahlen im Kartenmenü kommen vom Server.
+
+**Frontend (diese Etappe):**
+
+- **Karte:** ein Knoten je System auf der Allianzbasis-Bahn (0,86 der äußersten Planetenbahn,
+  145°), durch `kbMarkerFrei` geschoben und in `platzierteMarker` angemeldet (§5): eigener
+  Vorposten grün, fremder bernstein, dazu der gestrichelte graue **Bauplatz**, wenn hier gebaut
+  werden könnte (fremdes System, kein Vorposten, Deckel nicht erreicht). Kern-Balken, Antenne,
+  Beschriftung; `karteAuffangSignatur` und die Sektor-Abzeichen kennen ihn.
+- **Kartenmenü:** fremd → „Vorposten angreifen" (gesperrt mit Grund bei Bauschutz, Abklingzeit,
+  fehlenden Kampfschiffen, laufendem Verband); eigen → Ausbauen, Garnison stationieren, Garnison
+  zurückrufen, Vorposten aufgeben (mit Rückfrage, beide Zahlen, §9); Bauplatz → „Vorposten
+  errichten" mit Baukosten, Stufe-1-Werten und Nutzen.
+- **Missionen (§6):** `vorposten-bau` und `vorposten-angriff` als **Rundflug (Form A)**;
+  `vorposten-defend` / `vorposten-defend-return` **einwegig** nach dem `defend-base`-Muster (die
+  Schiffe verlassen die Flotte beim Start, der Rückweg ist eine eigene Mission) und stehen in
+  `EINWEGIG_ERLAUBT` von `tests/test_rundflug.js`. Dabei hat sich der dortige Detektor als blind
+  für eine dritte Einweg-Form erwiesen (Dauer VOR dem push halbiert, `endTime: jetzt + dur*1000`) –
+  er erkennt sie jetzt und belegt an den zwei Garnisons-Missionen, dass er sie findet.
+- **Berichte (§6):** `vorposten-bau` (auch der ERFOLG, plus Fehlschlag mit Grund),
+  `vorposten-angriff` (Schaden = das Angekommene, Durchschlag, Garnisonsverluste, Beuteanteil beim
+  Fall) und `vorposten-verlust` (der eigene ist gefallen – ein Rückschlag ohne Ergebnisbegriff,
+  deshalb namentlich in `REPORT_OHNE_ERGEBNIS_NEGATIV`).
+- **Belohnungen:** Zweige `vorposten` (Kampfpunkte, Erfahrung, Kredite) und `vorposten-verlust`
+  (schreibt den Bericht) in `claimPendingRewards`, beide mit `save()` (Regel 73).
+- **Die vier Kanäle:** Flugzeit über `vorpostenFlugMult(targetSystem, art)` in
+  `missionDurationFor` (bester eigener Vorposten im Umkreis von 2 Sektoren, Deckel 0,5);
+  Produktion als Summand in `productionBonusRaw` (die Boni-Bilanz nennt die Quelle); Aufklärung
+  senkt die Entdeckungschance der Spionage um 15 % je Stufe im Umkreis; Stationierung über die
+  Garnison (Kampfschiffe, Deckel je Stufe, Überzählige kehren sofort um).
+- **Baukosten (§6, Regel 57):** 20.000 Erz, 12.000 Kristalle, 6.000 Deuterium plus **ein
+  Kolonieschiff**, das verbaut wird – jeder Posten liegt unter dem Lagerdeckel eines mittleren
+  Kontos; Ausbau Stufe 2: 20.000 / 15.000 / 9.000, Stufe 3: 20.000 / 20.000 / 12.000 + 40
+  Antimaterie. Bezahlt wird der Ausbau erst nach dem Ja des Servers. Aufgeben erstattet nichts.
+- **Hilfe:** eigener Eintrag „Vorposten: deine Präsenz in einem fremden System".
+
+**Wächter:** `tests/test_vorposten_ui.js` (47 Prüfungen am gerenderten Spiel). Die Kernmessung
+ist die **Flugzeit-Wirkung als Drei-Läufe-Messung** (Regel 61/62): dieselbe Fixture, derselbe
+Angriff – ohne eigenen Vorposten, mit einem Stufe-3-Vorposten in `abyss` (0,85 Sektor vom Ziel:
+Missionsdauer 85 %), mit einem in `zenith` (3,2 Sektor: unverändert). Dazu die geschnittene
+Funktion (PvP-Arten, fehlendes `art`, fehlendes Ziel → Faktor 1, Deckel 0,5), Bauplatz mit
+Kostenabbuchung und Kolonieschiff, Bauschutz-Sperre, Beute als PAAR gegen einen Lauf ohne
+Belohnung, Verlustbericht, und die Gegenrichtung „Server meldet aktiv:false → kein Knoten".
+Betroffene Bestandstests: `test_kartenmarker` (neue benannte Aufrufstelle), `test_berichtspflicht`
+(`vorposten-verlust` als benannter Rückschlag), `test_rundflug` (siehe oben).
+
+**Auslieferung:** dieses Repo ZUERST, dann der Backend-Schalter (`VORPOSTEN_AKTIV = true`, plus
+Admin-Notaus `vorposten` für den Bau) – wie bei den Wrackkonvois: Solange der Server
+`aktiv:false` meldet, zeichnet das Frontend nichts, und die Patchnote liegt im selben Fenster wie
+die Wirkung.
+
 ## Änderungen gegenüber dem Entwurf
 
 Eingearbeitete Kritik-Befunde (Blocker/wichtig aufgelöst, Hinweise abgewogen):

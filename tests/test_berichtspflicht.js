@@ -356,9 +356,11 @@ const felder = t => ({
 
     // Die zwei, die auch OHNE `result` ein Rueckschlag sind. Steht die Liste im Spiel anders da,
     // ist das ein Befund - nicht ein Grund, hier nachzuziehen.
-    const NEGATIV_OHNE_ERGEBNIS = ['pvp-fleet-loss','deckelkappung'];
+    // vorposten-verlust (B2, 02.09.2026): der eigene Vorposten ist gefallen - ein Rueckschlag ohne
+    // Ergebnisbegriff, wie der PvP-Flottenverlust; er steht dafuer namentlich in REPORT_OHNE_ERGEBNIS_NEGATIV.
+    const NEGATIV_OHNE_ERGEBNIS = ['pvp-fleet-loss','deckelkappung','vorposten-verlust'];
     const falschRot = generisch.filter(a => !NEGATIV_OHNE_ERGEBNIS.includes(a) && posFn({ type:a }) !== true);
-    check('7a: keine Art ohne Ergebnisbegriff gilt als Rueckschlag - ausser den zwei benannten',
+    check('7a: keine Art ohne Ergebnisbegriff gilt als Rueckschlag - ausser den benannten',
       falschRot.length === 0,
       { falschRot, hinweis: 'sie truegen Pille "Verloren", roten Streifen und stuenden im Filter "Nur Rueckschlaege"' });
 

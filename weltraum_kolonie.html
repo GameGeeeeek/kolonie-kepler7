@@ -2828,7 +2828,7 @@
            "Notausschalter" und brauchten bis dahin einen Merge samt Deploy - also genau den Weg,
            der dreizehnmal ausgefallen ist. Der Knopf kann nur ABschalten, nie einschalten. -->
       <div id="adminSchalterView" style="display:none; max-height:60vh; overflow-y:auto;">
-        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Hält den <strong>Nachschub</strong> der PvE-Ziele an, ohne Merge und ohne Deploy - sofort wirksam. Vorhandene Festungen und Nester bleiben stehen und angreifbar; es entstehen nur keine neuen mehr, und Nester wachsen nicht weiter. Wieder einschalten geht jederzeit; was im ausgelieferten Stand ohnehin aus ist, lässt sich hier nicht anschalten.</div>
+        <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Hält den <strong>Nachschub</strong> der PvE-Ziele an, ohne Merge und ohne Deploy - sofort wirksam. Vorhandene Ziele (Festungen, Nester, Wrackkonvois, Vorposten) bleiben stehen und angreifbar; es entstehen nur keine neuen mehr, Nester wachsen nicht weiter, Konvois driften nicht, und neue Vorposten lassen sich nicht errichten. Wieder einschalten geht jederzeit; was im ausgelieferten Stand ohnehin aus ist, lässt sich hier nicht anschalten.</div>
         <div id="adminSchalterListe" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
       <!-- Konto-Blatt (28.08.2026). Sperren ging ausschliesslich ueber eine vorhandene Meldung -
@@ -15080,7 +15080,7 @@
     const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
     if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
-    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId, 'festung-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     const kernMax = fest.kernMax || st.kern || 1;
     const anteil = Math.max(0, Math.min(1, (fest.kern||0) / kernMax));
@@ -15157,7 +15157,7 @@
     const stDef = nestStufeDef(nest.stufe);
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
     if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
-    const flug = missionDurationFor(asteroidFlugBasis(nest.sys), flotte, ATTACK_SHIP_KEYS, nest.sys);
+    const flug = missionDurationFor(asteroidFlugBasis(nest.sys), flotte, ATTACK_SHIP_KEYS, nest.sys, 'nest-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     const anteil = Math.max(0, Math.min(1, (nest.lp||0) / Math.max(1, nest.lpMax||1)));
     let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Beschuss · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
@@ -15204,7 +15204,7 @@
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
     if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
-    const flug = missionDurationFor(asteroidFlugBasis(nest.sys), flotte, ATTACK_SHIP_KEYS, nest.sys);
+    const flug = missionDurationFor(asteroidFlugBasis(nest.sys), flotte, ATTACK_SHIP_KEYS, nest.sys, 'nest-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -15233,7 +15233,7 @@
     if (!k) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Diesen Wrackkonvoi gibt es nicht mehr.</div>';
     const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
     if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
-    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys);
+    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys, 'konvoi-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     const anteil = Math.max(0, Math.min(1, (k.lp||0) / Math.max(1, k.lpMax||1)));
     let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Beschuss · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
@@ -15273,7 +15273,7 @@
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
     const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
     if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
-    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys);
+    const flug = missionDurationFor(asteroidFlugBasis(k.sys), flotte, ATTACK_SHIP_KEYS, k.sys, 'konvoi-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -15321,7 +15321,7 @@
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
     if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
-    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId, 'festung-angriff');
     const fuel = missionFuelCostSplit(flug, flotte);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -15407,6 +15407,439 @@
      Kein Kampf (Server nicht erreichbar, Ziel weitergezogen oder schon gefallen) heisst leeres
      `verluste` - die Flotte kommt dann wirklich vollzaehlig heim, ohne dass irgendetwas gebucht
      werden muesste. Waechter: tests/test_flotte_rueckkehr.js */
+  /* ===== B2: Vorposten (Aussenposten) - spielergebaute PvP-Ziele (02.09.2026) ==================
+     Auftrag Sascha ("beide umsetzten"; per Auswahl: echtes PvP-Ziel in db.shared, alle vier
+     Nutzen-Kanaele). Konzept docs/vorposten-konzept.md, Backend-Entscheidungen docs/vorposten.md
+     im Backend-Repo. Der SERVER fuehrt Stufe, Kern, Garnison und Verteidigung; der Client liest
+     alles ueber GET /api/vorposten in `vorpostenCache` - die Stufentabelle (Kern-LP, Nutzen je
+     Stufe) reist MIT, deshalb gibt es hier bewusst KEINE Kopie der Tabelle (keine Kopie-Familie,
+     kein Paritaetstest noetig). Ohne Server (Solo) existieren Vorposten nicht - wie Nester und
+     Konvois. Solange der Server aktiv:false meldet (Auslieferungs-Riegel VORPOSTEN_AKTIV), ist die
+     Liste leer und nichts davon sichtbar.
+
+     Die Flugzeit-Weiche (Konzept 4.2, Empfehlung i): Der Flugzeit-Nutzen wirkt NUR auf
+     Nicht-PvP-Missionsarten (VORPOSTEN_FLUG_ARTEN) - Angriff auf Spieler, Spionage,
+     Mondbelagerung, Anfechtung, Allianzbasis-Kriege bleiben unberuehrt, damit sich kein
+     Reaktionsfenster eines Verteidigers verschiebt. Dafuer traegt missionDurationFor ein fuenftes
+     Argument `art`; wer es nicht mitgibt, bekommt keinen Bonus (die sichere Richtung). */
+  const VORPOSTEN_FLUG_RADIUS_SEKTOR = 2.0;   // E3-Rahmen (Sprungnetz): Umkreis in Sektor-Einheiten
+  const VORPOSTEN_BAU_BASIS_SEC = 1800;       // Rundflug-Basis der Baukolonne vor Tempoboni
+  // Regel 57: gegen ein MITTLERES Konto (Lagerdeckel-Groessenordnung ~33.000) gerechnet - jeder
+  // Einzelposten bleibt darunter, die "teure" Haelfte ist die Zeit (Bauflug + Ausbau-Abklingzeit).
+  const VORPOSTEN_BAUKOSTEN = { erz: 20000, kristalle: 12000, deuterium: 6000 };
+  const VORPOSTEN_AUSBAUKOSTEN = { 2: { erz: 20000, kristalle: 15000, deuterium: 9000 }, 3: { erz: 20000, kristalle: 20000, deuterium: 12000, antimaterie: 40 } };
+  const VORPOSTEN_FLUG_ARTEN = new Set(['explore','colonize','mining','npc','nest-angriff','festung-angriff','konvoi-angriff','vorposten-bau','vorposten-angriff','vorposten-defend','vorposten-defend-return','relocate']);
+  let vorpostenCache = { aktiv:false, bauAktiv:false, maxJeKonto:3, schutzMs:0, abklingMs:0, ausbauMs:0, stufen:[], liste:[], eigene:0, geladen:0 };
+  async function loadVorposten(){
+    if (!useBackend()) return;
+    try {
+      const res = await backendFetch('/vorposten', { method:'GET' });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (d && d.ok) vorpostenCache = Object.assign({ liste:[], stufen:[] }, d, { geladen: Date.now() });
+    } catch(e){}
+  }
+  function vorpostenImSystem(sysId){ return (vorpostenCache.liste || []).find(v => v && v.sys === sysId) || null; }
+  function vorpostenEigene(){ return (vorpostenCache.liste || []).filter(v => v && v.eigener); }
+  function vorpostenStufeDef(stufe){
+    const s = vorpostenCache.stufen || [];
+    return s[Math.min(s.length, Math.max(1, (stufe|0) || 1)) - 1] || null;
+  }
+  // Bahn wie die Allianzbasis (aeusserste Planetenbahn, 0,86), fester Winkel 145 Grad - trifft
+  // weder Portal (325) noch Allianzbasis (205); den Rest erledigt kbMarkerFrei.
+  function vorpostenMarkerXY(sysId){
+    const orb = PLANETS.filter(p => p.system === sysId);
+    const maxOrbit = orb.length ? Math.max.apply(null, orb.map(p => p.orbit || 3)) : 6;
+    const rx = kbOrbitRx(maxOrbit) * 0.86, ry = rx * Math.max(0.55, kbOrbitMass().ry);
+    const rad = 145 * Math.PI / 180;
+    return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
+  }
+  function vorpostenEigeneSysteme(){
+    const s = new Set();
+    if (myHomeSystem) s.add(myHomeSystem);
+    for (const k of Object.keys(state.colonies || {})) s.add(planetSystemOf(k));
+    return s;
+  }
+  /* Wo ein Bauplatz ueberhaupt gezeigt wird (sichtbar) und ob dort gebaut werden kann (ok). Die
+     Sichtbarkeit haengt an den Bedingungen, die der Spieler nicht kurzfristig aendert (fremdes
+     System, kein Vorposten dort, Deckel); Kosten und Kolonieschiff nennt das Menue als Grund. */
+  function vorpostenBauplatzMoeglich(sysId){
+    if (!useBackend() || !vorpostenCache.aktiv) return { sichtbar:false, ok:false, grund:'Vorposten gibt es nur mit Serververbindung.' };
+    if (vorpostenImSystem(sysId)) return { sichtbar:false, ok:false, grund:'Hier steht schon ein Vorposten.' };
+    if (vorpostenEigeneSysteme().has(sysId)) return { sichtbar:false, ok:false, grund:'Im eigenen System braucht es keinen Vorposten.' };
+    if (vorpostenEigene().length >= (vorpostenCache.maxJeKonto || 3)) return { sichtbar:false, ok:false, grund:'Du hältst bereits ' + vorpostenCache.maxJeKonto + ' Vorposten.' };
+    if (!vorpostenCache.bauAktiv) return { sichtbar:true, ok:false, grund:'Der Bau neuer Vorposten ist derzeit angehalten.' };
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'vorposten-bau')) return { sichtbar:true, ok:false, grund:'Eine Baukolonne ist bereits unterwegs.' };
+    if ((cf.colonyShips || 0) < 1) return { sichtbar:true, ok:false, grund:'Die Baukolonne braucht ein Kolonieschiff auf ' + planetDisplayName(state.activeBasePlanet) + '.' };
+    if (!canAfford(VORPOSTEN_BAUKOSTEN)) return { sichtbar:true, ok:false, grund:'Baukosten fehlen: ' + fuelCostText(VORPOSTEN_BAUKOSTEN) + '.' };
+    return { sichtbar:true, ok:true, grund:'' };
+  }
+  // Kanal 1 Flugzeit: der beste eigene Vorposten im Umkreis des Ziels, nur fuer Nicht-PvP-Arten.
+  function vorpostenFlugMult(targetSystem, art){
+    if (!targetSystem || !art || !VORPOSTEN_FLUG_ARTEN.has(art)) return 1;
+    let best = 0;
+    for (const v of vorpostenEigene()){
+      if (systemSectorDistance(v.sys, targetSystem) <= VORPOSTEN_FLUG_RADIUS_SEKTOR) best = Math.max(best, (v.nutzen && v.nutzen.flug) || 0);
+    }
+    return Math.max(0.5, 1 - best);
+  }
+  // Kanal 3 Produktion: Summand in der gedeckelten Gruppe productionBonusRaw (die Boni-Bilanz liest dieselbe).
+  function vorpostenProdBonus(){ return vorpostenEigene().reduce((a, v) => a + ((v.nutzen && v.nutzen.prod) || 0), 0); }
+  // Kanal 2 Scan: hoechste Aufklaerungsstufe eines eigenen Vorpostens im Umkreis eines Systems.
+  function vorpostenScanStufe(sysId){
+    if (!sysId) return 0;
+    let best = 0;
+    for (const v of vorpostenEigene()){
+      if (systemSectorDistance(v.sys, sysId) <= VORPOSTEN_FLUG_RADIUS_SEKTOR) best = Math.max(best, (v.nutzen && v.nutzen.scan) || 0);
+    }
+    return best;
+  }
+  function vorpostenSysName(sysId){ return (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name; }
+  function vorpostenNutzenHtml(vp){
+    const n = vp.nutzen || {};
+    return `<div class="bmeta"><i class="ti ti-rocket" aria-hidden="true"></i> Nutzen: −${Math.round((n.flug||0)*100)}% Flugzeit im Umkreis (nur Erkundung, Kolonisierung, Abbau, PvE), +${(Math.round((n.prod||0)*1000)/10)}% Produktion, Aufklärung Stufe ${n.scan||0}${vp.eigener ? '' : ' (für den Besitzer)'}</div>`;
+  }
+  function vorpostenBauInfoHtml(sysId){
+    const st = vorpostenStufeDef(1) || {};
+    return `<div class="bmeta"><i class="ti ti-building-lighthouse" aria-hidden="true" style="color:#c9a96e;"></i> Ein Vorposten ist deine gehaltene Präsenz in einem fremden System – andere Spieler können ihn angreifen und schleifen.</div>`
+      + `<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Baukosten ${fuelCostText(VORPOSTEN_BAUKOSTEN)} + 1 Kolonieschiff · Baukolonne fliegt hin und zurück</div>`
+      + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Stufe 1 (${escapeHtml(st.name || 'Feldlager')}): Kern ${fmt(st.kernLp || 0)} · Garnison bis ${st.garnisonMax || 0} Kampfschiffe · Bauschutz ${fmtDuration((vorpostenCache.schutzMs||0)/1000)}</div>`
+      + `<div class="bmeta"><i class="ti ti-rocket" aria-hidden="true"></i> Nutzen ab Stufe 1: −${Math.round((st.flug||0)*100)}% Flugzeit im Umkreis von ${VORPOSTEN_FLUG_RADIUS_SEKTOR} Sektoren (nicht für Angriffe auf Spieler), +${(Math.round((st.prod||0)*1000)/10)}% Produktion, Aufklärung Stufe ${st.scan||0}</div>`
+      + `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Höchstens ${vorpostenCache.maxJeKonto || 3} Vorposten je Konto. Aufgeben erstattet nichts.</div>`;
+  }
+  function vorpostenMapMenu(ev, key){
+    key = String(key || '');
+    if (key.startsWith('bauplatz:')){
+      const sys = key.slice('bauplatz:'.length);
+      const m = vorpostenBauplatzMoeglich(sys);
+      openKarteMenu(ev, 'Bauplatz', 'Vorposten errichten', [
+        { icon:'ti-building-lighthouse', label:'Vorposten errichten', grund: m.ok ? 'Startet die Baukolonne (1 Kolonieschiff + Baukosten).' : m.grund, disabled: !m.ok,
+          fn: () => vorpostenBauStarten(sys) }
+      ], vorpostenBauInfoHtml(sys));
+      return;
+    }
+    const vp = vorpostenImSystem(key);
+    if (!vp) return;
+    const jetzt = Date.now();
+    const farbe = vp.eigener ? '#5dcaa5' : '#e0a548';
+    const kern = vp.kern || { lp:0, lpMax:1 };
+    let info = `<div class="bmeta"><i class="ti ti-building-lighthouse" aria-hidden="true" style="color:${farbe};"></i> ${escapeHtml(vp.name)} · Stufe ${vp.stufe} · Kern <strong>${fmt(Math.round(kern.lp||0))}</strong> von ${fmt(Math.round(kern.lpMax||0))}</div>`
+      + kartenFuellBalken(kern.lp||0, kern.lpMax||0, farbe, 'Wie viel vom Kern noch steht – fällt er, ist der Vorposten geschleift.')
+      + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Verteidigung <strong>${fmt(vp.verteidigung||0)}</strong> · Garnison ${vp.garnisonAnzahl||0} Kampfschiff(e)</div>`
+      + vorpostenNutzenHtml(vp);
+    if (vp.schutzBis && vp.schutzBis > jetzt) info += `<div class="bmeta"><i class="ti ti-shield-lock" aria-hidden="true"></i> Bauschutz noch ${fmtDuration((vp.schutzBis - jetzt)/1000)}</div>`;
+    if (vp.letzterKampf) info += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Letzter Angriff: ${escapeHtml(vp.letzterKampf.angreiferName||'?')} · ${fmt(vp.letzterKampf.schaden||0)} Schaden · ${fmtDuration(Math.max(0, jetzt - (vp.letzterKampf.zeit||jetzt))/1000)} her</div>`;
+    const cf = currentFleet();
+    const eintraege = [];
+    if (vp.eigener){
+      const naechste = (vp.stufe || 1) + 1;
+      const kosten = VORPOSTEN_AUSBAUKOSTEN[naechste];
+      const stMax = (vorpostenCache.stufen || []).length || 3;
+      let ausbauGrund = kosten ? 'Kosten ' + fuelCostText(kosten) + ' · sofort, Kern wächst um die Differenz.' : 'Voll ausgebaut.';
+      let ausbauSperre = !kosten;
+      if (kosten && vp.ausbauAb > jetzt){ ausbauGrund = 'Nächster Ausbau in ' + fmtDuration((vp.ausbauAb - jetzt)/1000) + '.'; ausbauSperre = true; }
+      else if (kosten && !canAfford(kosten)){ ausbauGrund = 'Kosten fehlen: ' + fuelCostText(kosten) + '.'; ausbauSperre = true; }
+      if ((vp.stufe||1) >= stMax) ausbauSperre = true;
+      eintraege.push({ icon:'ti-arrow-up', label:'Ausbauen (Stufe ' + Math.min(stMax, naechste) + ')', grund: ausbauGrund, disabled: ausbauSperre, fn: () => vorpostenAusbauen(vp.sys) });
+      const kampfschiffe = KAMPF_SHIP_KEYS.reduce((n, k) => n + (cf[k]||0), 0);
+      const unterwegs = cf.missions.some(m => m.type === 'vorposten-defend' && m.system === vp.sys);
+      const st = vorpostenStufeDef(vp.stufe) || {};
+      const frei = Math.max(0, (st.garnisonMax || 0) - (vp.garnisonAnzahl || 0));
+      eintraege.push({ icon:'ti-shield', label:'Garnison stationieren', grund: !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.' : unterwegs ? 'Eine Stationierung ist bereits unterwegs.' : !frei ? 'Die Garnison ist voll (' + st.garnisonMax + ').' : 'Öffnet die Flottenwahl · noch ' + frei + ' Plätze.', disabled: !kampfschiffe || unterwegs || !frei,
+        fn: () => oeffneVorpostenStationierung(vp.sys) });
+      eintraege.push({ icon:'ti-home', label:'Garnison zurückrufen', grund: (vp.garnisonAnzahl||0) ? 'Alle stationierten Schiffe fliegen zurück.' : 'Keine Garnison stationiert.', disabled: !(vp.garnisonAnzahl||0), fn: () => vorpostenRueckruf(vp.sys) });
+      eintraege.push({ icon:'ti-trash', label:'Vorposten aufgeben', grund: 'Mit Rückfrage · keine Rückerstattung · Garnison kehrt heim.', fn: () => vorpostenAufgeben(vp.sys) });
+    } else {
+      const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n, k) => n + (cf[k]||0), 0);
+      const schonUnterwegs = cf.missions.some(m => m.type === 'vorposten-angriff' && m.system === vp.sys);
+      const abklingBis = (vp.meinLetzterSchlag || 0) ? (vp.meinLetzterSchlag + (vorpostenCache.abklingMs || 0)) : 0;
+      let grund = 'Öffnet die Flottenwahl.', gesperrt = false;
+      if (schonUnterwegs){ grund = 'Ein Verband ist bereits zu diesem Vorposten unterwegs.'; gesperrt = true; }
+      else if (!kampfschiffe){ grund = 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.'; gesperrt = true; }
+      else if (vp.schutzBis && vp.schutzBis > jetzt){ grund = 'Bauschutz – angreifbar in ' + fmtDuration((vp.schutzBis - jetzt)/1000) + '.'; gesperrt = true; }
+      else if (abklingBis > jetzt){ grund = 'Deine Verbände sammeln sich neu – nächster Schlag in ' + fmtDuration((abklingBis - jetzt)/1000) + '.'; gesperrt = true; }
+      eintraege.push({ icon:'ti-sword', label:'Vorposten angreifen', grund, disabled: gesperrt, fn: () => oeffneVorpostenAngriff(vp.sys) });
+    }
+    openKarteMenu(ev, vp.eigener ? 'Dein Vorposten' : 'Fremder Vorposten', escapeHtml(vp.name) + ' [' + escapeHtml(vp.besitzerName || '?') + ']', eintraege, info);
+  }
+  function vorpostenVorschauHtml(flotte, sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Diesen Vorposten gibt es nicht mehr.</div>';
+    const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
+    if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId, 'vorposten-angriff');
+    const fuel = missionFuelCostSplit(flug, flotte);
+    const kern = vp.kern || { lp:0, lpMax:1 };
+    let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} · Angriff · Rückflug (gesamt ${fmtDuration(flug)})</div>`;
+    html += `<div class="bmeta"><i class="ti ti-building-lighthouse" aria-hidden="true" style="color:#e0a548;"></i> ${escapeHtml(vp.name)} von ${escapeHtml(vp.besitzerName||'?')} – Kern <strong>${fmt(Math.round(kern.lp||0))}</strong> von ${fmt(Math.round(kern.lpMax||0))}</div>`;
+    html += kartenFuellBalken(kern.lp||0, kern.lpMax||0, '#e0a548', 'Wie viel vom Kern noch steht.');
+    html += `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Verteidigung <strong>${fmt(vp.verteidigung||0)}</strong> (Struktur + ${vp.garnisonAnzahl||0} Kampfschiffe Garnison). Sie wirkt als Durchschlag: je stärker die Garnison, desto weniger kommt an – und desto teurer wird der Schlag.</div>`;
+    html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> ${n} Schiffe im Verband. Was ankommt, zählt auf deinen Anteil an der Beute beim Fall.</div>`;
+    // Die Verlustspanne ist gemessen am Server: 6 % Grundverlust + bis zu 20 % aus dem Kraefteverhaeltnis + Streuung, Deckel 45 %.
+    html += `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Der Vorposten wehrt sich: rechne mit 6–30% Verlusten, gegen eine starke Garnison mehr (Deckel 45%).</div>`;
+    html += `<div class="bmeta"><i class="ti ti-droplet" aria-hidden="true"></i> Treibstoff ${fuelCostText(fuel)} · Danach ${fmtDuration((vorpostenCache.abklingMs||0)/1000)} Abklingzeit an DIESEM Vorposten.</div>`;
+    return html;
+  }
+  function oeffneVorpostenAngriff(sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp){ log('Diesen Vorposten gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    oeffneFlottenwahl({
+      art: 'Vorposten',
+      titel: vp.name + ' angreifen',
+      keys: ATTACK_SHIP_KEYS,
+      vorschau: (flotte) => vorpostenVorschauHtml(flotte, sysId),
+      startLabel: 'Angriff starten',
+      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      start: () => sendVorpostenAngriffMission(sysId)
+    });
+  }
+  function sendVorpostenAngriffMission(sysId){
+    const cf = currentFleet();
+    const vp = vorpostenImSystem(sysId);
+    if (!vp){ log('Diesen Vorposten gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    const flotte = buildAttackFleet(state.activeBasePlanet, cf);
+    const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
+    if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
+    const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId, 'vorposten-angriff');
+    const fuel = missionFuelCostSplit(flug, flotte);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff für Hin- und Rückflug: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(fuel);
+    const jetzt = Date.now();
+    const fleetName = resolveFleetName();
+    cf.missions.push({
+      id: nextMissionId(), type:'vorposten-angriff', targetId: sysId, system: sysId, vorpostenId: String(vp.id),
+      startTime: jetzt, endTime: jetzt + flug*1000,   // Rundflug (Form A), NIE /2
+      fleetName, composition: flotte
+    });
+    log(fleetName+' fliegt zum Vorposten von '+(vp.besitzerName||'?')+' bei '+vorpostenSysName(sysId)+'. Ankunft in '+fmtDuration(flug/2)+', zurück in '+fmtDuration(flug)+'.', 'ti-sword');
+    render(); save();
+  }
+  function vorpostenBauStarten(sysId){
+    const m = vorpostenBauplatzMoeglich(sysId);
+    if (!m.ok){ log(m.grund || 'Hier kann kein Vorposten entstehen.', 'ti-alert-triangle'); return; }
+    const cf = currentFleet();
+    const flotte = { colonyShips: 1 };
+    const flug = missionDurationFor(VORPOSTEN_BAU_BASIS_SEC, flotte, ['colonyShips'], sysId, 'vorposten-bau');
+    const fuel = missionFuelCostSplit(flug, flotte);
+    const kosten = Object.assign({}, VORPOSTEN_BAUKOSTEN);
+    for (const [r, v] of Object.entries(fuel)) kosten[r] = (kosten[r]||0) + v;
+    if (!canAfford(kosten)){ log('Nicht genug für Baukosten und Treibstoff: benötigt '+fuelCostText(kosten)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(kosten);
+    // Das Kolonieschiff verlaesst die Flotte sofort (es wird verbaut); schlaegt der Bau fehl, kommt es
+    // mit der Kolonne zurueck (vorpostenBauAufloesen).
+    cf.colonyShips = Math.max(0, (cf.colonyShips||0) - 1);
+    const jetzt = Date.now();
+    const fleetName = resolveFleetName();
+    cf.missions.push({
+      id: nextMissionId(), type:'vorposten-bau', targetId: sysId, system: sysId,
+      startTime: jetzt, endTime: jetzt + flug*1000,   // Rundflug (Form A), NIE /2
+      fleetName, composition: flotte
+    });
+    log('Baukolonne '+fleetName+' fliegt nach '+vorpostenSysName(sysId)+'. Der Vorposten steht in '+fmtDuration(flug/2)+', die Kolonne ist in '+fmtDuration(flug)+' zurück.', 'ti-building-lighthouse');
+    render(); save();
+  }
+  function oeffneVorpostenStationierung(sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp || !vp.eigener){ log('Das ist nicht dein Vorposten.', 'ti-alert-triangle'); return; }
+    const st = vorpostenStufeDef(vp.stufe) || {};
+    const frei = Math.max(0, (st.garnisonMax || 0) - (vp.garnisonAnzahl || 0));
+    oeffneFlottenwahl({
+      art: 'Garnison',
+      titel: 'Garnison für ' + vp.name,
+      keys: KAMPF_SHIP_KEYS,
+      vorschau: (flotte) => {
+        const n = KAMPF_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
+        if (!n) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
+        const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId, 'vorposten-defend') / 2;
+        const fuel = missionFuelCostSplit(flug, flotte);
+        return `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Flug ${fmtDuration(flug)} · die Schiffe bleiben am Vorposten, bis du sie zurückrufst.</div>`
+          + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> ${n} Kampfschiffe · noch ${frei} Plätze frei (${st.garnisonMax||0} je ${escapeHtml(st.name||'Stufe')}). Überzählige kehren sofort um.</div>`
+          + `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Die Garnison verteidigt den Vorposten und verliert bei jedem Angriff Schiffe – fällt er, ist sie verloren.</div>`
+          + `<div class="bmeta"><i class="ti ti-droplet" aria-hidden="true"></i> Treibstoff ${fuelCostText(fuel)}</div>`;
+      },
+      startLabel: 'Stationieren',
+      sperre: (flotte) => KAMPF_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      start: () => sendVorpostenDefendMission(sysId)
+    });
+  }
+  function sendVorpostenDefendMission(sysId){
+    const cf = currentFleet();
+    const vp = vorpostenImSystem(sysId);
+    if (!vp || !vp.eigener){ log('Das ist nicht dein Vorposten.', 'ti-alert-triangle'); return; }
+    const defFleet = buildAttackFleet(state.activeBasePlanet, cf);
+    for (const k of ATTACK_SHIP_KEYS) if (!KAMPF_SHIP_KEYS.includes(k)) defFleet[k] = 0;
+    const total = ATTACK_SHIP_KEYS.reduce((a, k) => a + (defFleet[k]||0), 0);
+    if (total < 1){ log('Wähle zuerst Kampfschiffe im Flottenwahl-Feld aus.', 'ti-alert-triangle'); return; }
+    const dur = missionDurationFor(asteroidFlugBasis(sysId), defFleet, ATTACK_SHIP_KEYS, sysId, 'vorposten-defend') / 2;   // EINWEG (Muster defend-base)
+    const fuel = missionFuelCostSplit(dur, defFleet);
+    if (!canAfford(fuel)){ log('Nicht genug Treibstoff: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
+    if (fleetLimitBlocks()) return;
+    pay(fuel);
+    // Schiffe verlassen die Flotte sofort (Verlegungs-Muster wie defend-base) - Rueckholung ueber den Rueckruf.
+    for (const k of ATTACK_SHIP_KEYS){ if (defFleet[k] > 0) cf[k] = Math.max(0, (cf[k]||0) - defFleet[k]); }
+    const jetzt = Date.now();
+    cf.missions.push({ id: nextMissionId(), type:'vorposten-defend', targetId: sysId, system: sysId, startTime: jetzt, endTime: jetzt + dur*1000, fleetName: resolveFleetName(), composition: defFleet });
+    log('Garnison zum Vorposten bei '+vorpostenSysName(sysId)+' entsandt (~'+fmtDuration(dur)+' Flug).', 'ti-shield');
+    render(); save();
+  }
+  function vorpostenRueckflugAnlegen(sysId, schiffe, was){
+    const cf = currentFleet();
+    const n = Object.values(schiffe || {}).reduce((a, v) => a + (typeof v === 'number' && v > 0 ? v : 0), 0);
+    if (!n) return 0;
+    const dur = missionDurationFor(asteroidFlugBasis(sysId), schiffe, ATTACK_SHIP_KEYS, sysId, 'vorposten-defend-return') / 2;
+    const jetzt = Date.now();
+    cf.missions.push({ id: nextMissionId(), type:'vorposten-defend-return', targetId: sysId, system: sysId, startTime: jetzt, endTime: jetzt + dur*1000, fleetName: resolveFleetName(), composition: Object.assign({}, schiffe) });
+    log(n + ' Schiff(e) ' + (was || 'kehren vom Vorposten zurück') + ' (~' + fmtDuration(dur) + ').', 'ti-shield');
+    return n;
+  }
+  async function vorpostenRueckruf(sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp || !vp.eigener) return;
+    try {
+      const res = await backendFetch('/vorposten/rueckruf', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) });
+      const d = await res.json().catch(() => null);
+      if (!res.ok || !d || !d.ok){ log((d && d.error) || 'Der Rückruf ist gerade nicht möglich.', 'ti-alert-triangle'); return; }
+      vorpostenRueckflugAnlegen(sysId, d.garnison, 'kehren von der Garnison zurück');
+    } catch(e){ log('Der Server ist gerade nicht erreichbar.', 'ti-alert-triangle'); return; }
+    await loadVorposten();
+    render(); save();
+  }
+  async function vorpostenAufgeben(sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp || !vp.eigener) return;
+    // Rueckfrage mit BEIDEN Zahlen (Muster baustelleAufraeumen): was zurueckkommt, was verloren geht.
+    if (!confirm('Vorposten ' + vp.name + ' bei ' + vorpostenSysName(sysId) + ' aufgeben?\n\nZurück kommen: ' + (vp.garnisonAnzahl||0) + ' stationierte Schiff(e).\nVerloren gehen: Bau, Ausbau (Stufe ' + vp.stufe + ') und der Nutzen – keine Rückerstattung.')) return;
+    try {
+      const res = await backendFetch('/vorposten/aufgeben', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) });
+      const d = await res.json().catch(() => null);
+      if (!res.ok || !d || !d.ok){ log((d && d.error) || 'Aufgeben ist gerade nicht möglich.', 'ti-alert-triangle'); return; }
+      vorpostenRueckflugAnlegen(sysId, d.garnison, 'kehren vom aufgegebenen Vorposten zurück');
+      log('Vorposten bei ' + vorpostenSysName(sysId) + ' aufgegeben.', 'ti-trash', 'wichtig');
+    } catch(e){ log('Der Server ist gerade nicht erreichbar.', 'ti-alert-triangle'); return; }
+    await loadVorposten();
+    render(); save();
+  }
+  async function vorpostenAusbauen(sysId){
+    const vp = vorpostenImSystem(sysId);
+    if (!vp || !vp.eigener) return;
+    const kosten = VORPOSTEN_AUSBAUKOSTEN[(vp.stufe||1) + 1];
+    if (!kosten){ log('Dieser Vorposten ist voll ausgebaut.', 'ti-info-circle'); return; }
+    if (!canAfford(kosten)){ log('Kosten fehlen: ' + fuelCostText(kosten) + '.', 'ti-alert-triangle'); return; }
+    try {
+      const res = await backendFetch('/vorposten/ausbauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) });
+      const d = await res.json().catch(() => null);
+      if (!res.ok || !d || !d.ok){ log((d && d.error) || 'Der Ausbau ist gerade nicht möglich.', 'ti-alert-triangle'); return; }
+      // Erst nach dem Ja des Servers zahlen - eine Ablehnung (Abklingzeit) darf nichts kosten.
+      pay(kosten);
+      log('Vorposten bei ' + vorpostenSysName(sysId) + ' auf Stufe ' + (d.vorposten && d.vorposten.stufe) + ' ausgebaut (' + ((d.vorposten && d.vorposten.name) || '') + ').', 'ti-arrow-up', 'wichtig');
+    } catch(e){ log('Der Server ist gerade nicht erreichbar.', 'ti-alert-triangle'); return; }
+    await loadVorposten();
+    render(); save();
+  }
+  /* Ankunft der Baukolonne: Der Server legt den Vorposten an (er prueft die Mission im GESPEICHERTEN
+     Spielstand, deshalb zuerst save()). Jeder Ausgang schreibt einen Bericht - beim Offline-Nachholen
+     ist #log stumm, und ein stiller Bau waere fuer den Spieler unsichtbar. */
+  async function vorpostenBauAufloesen(m, planetKey, fleet){
+    let daten = null, status = 0;
+    try {
+      await save();
+      const res = await backendFetch('/vorposten/bauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: m.system, missionId: String(m.id) }) });
+      status = res.status;
+      daten = await res.json().catch(() => null);
+    } catch(e){ daten = null; }
+    const sysName = vorpostenSysName(m.system);
+    if (daten && daten.ok && daten.vorposten){
+      pushReport({ type:'vorposten-bau', fleetName:m.fleetName, system:m.system, systemName:sysName, targetPlanet:planetKey,
+        stufe: daten.vorposten.stufe || 1, name: daten.vorposten.name || 'Feldlager', kernLp: (daten.vorposten.kern||{}).lpMax || 0,
+        schutzBis: daten.vorposten.schutzBis || 0 });
+      log('Vorposten bei ' + sysName + ' errichtet: ' + (daten.vorposten.name || 'Feldlager') + '. Bauschutz ' + fmtDuration((vorpostenCache.schutzMs||0)/1000) + ' – stationiere eine Garnison, bevor er abläuft.', 'ti-building-lighthouse', 'wichtig');
+      loadVorposten();
+    } else {
+      // Fehlgeschlagen (schon belegt, Deckel, Server weg): das Kolonieschiff kommt mit der Kolonne zurueck.
+      fleet.colonyShips = (fleet.colonyShips||0) + 1;
+      const grund = (daten && daten.error) || (status ? 'Der Server hat den Bau abgelehnt (' + status + ').' : 'Der Server war nicht erreichbar.');
+      log('Bau bei ' + sysName + ' nicht möglich: ' + grund + ' Das Kolonieschiff ist zurück.', 'ti-alert-triangle', 'wichtig');
+      angriffOhneKampf('vorposten-bau', 'Vorposten bei ' + sysName, grund, { fleetName:m.fleetName, system:m.system, systemName:sysName, targetPlanet:planetKey, fehlgeschlagen:true });
+    }
+    render(); save();
+  }
+  /* Der Vorposten-Schlag bei der Rueckkehr: dasselbe Muster wie konvoiAufloesen - der Server rechnet,
+     der Client bucht die gemeldeten eigenen Verluste; `verpasst` (geschleift/aufgegeben/ersetzt) kostet
+     nichts und nennt den Grund. */
+  async function vorpostenAngriffAufloesen(m, planetKey, fleet){
+    let daten = null, status = 0;
+    try {
+      await save();
+      const res = await backendFetch('/vorposten/angriff', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ system: m.system, missionId: String(m.id), vorpostenId: String(m.vorpostenId||'') }) });
+      status = res.status;
+      daten = await res.json().catch(() => null);
+      if (!res.ok) daten = null;
+    } catch(e){ daten = null; }
+    const sysName = vorpostenSysName(m.system);
+    const verluste = {};
+    if (!daten){
+      log('Der Angriff auf den Vorposten bei ' + sysName + ' konnte nicht ausgewertet werden' + (status ? ' (' + status + ')' : '') + ' – dein Verband kehrt vollzählig zurück.', 'ti-alert-triangle', 'wichtig');
+      angriffOhneKampf('vorposten-angriff', 'Vorposten bei ' + sysName, status ? 'Der Server hat den Angriff abgelehnt (' + status + ').' : 'Der Server war nicht erreichbar.',
+        { fleetName:m.fleetName, system:m.system, systemName:sysName });
+    } else if (daten.verpasst){
+      log(daten.text || ('Der Vorposten bei ' + sysName + ' stand bei der Ankunft nicht mehr – dein Verband kehrt vollzählig zurück.'), 'ti-arrows-shuffle', 'wichtig');
+      angriffOhneKampf('vorposten-angriff', 'Vorposten bei ' + sysName,
+        daten.text || 'Der Vorposten stand bei der Ankunft nicht mehr – geschleift oder aufgegeben.',
+        { fleetName:m.fleetName, system:m.system, systemName:sysName, grundKurz: daten.grund || null });
+    } else {
+      for (const [k, val] of Object.entries(m.composition||{})){
+        const weg = (daten.eigeneVerluste || {})[k] || 0;
+        if (weg > 0) verluste[k] = Math.min(val, weg);
+      }
+      pushReport({ type:'vorposten-angriff', fleetName:m.fleetName, system:m.system, systemName:sysName, targetPlanet:planetKey,
+        besitzerName: daten.besitzerName || '?', stufe: daten.stufe || 1,
+        schaden: daten.schaden||0, gefallen: !!daten.gefallen, lp: daten.lp||0, lpMax: daten.lpMax||0,
+        verteidigung: daten.verteidigung||0, durchschlag: daten.durchschlag||0,
+        garnisonVerluste: daten.garnisonVerluste||{}, anteil: daten.anteil||0, teilnehmer: daten.teilnehmer||1, eigeneVerluste: daten.eigeneVerluste||{} });
+      log(daten.gefallen
+        ? 'Der Vorposten von ' + (daten.besitzerName||'?') + ' bei ' + sysName + ' ist geschleift! Dein Anteil an der Beute: ' + Math.round((daten.anteil||0)*100) + '%.'
+        : 'Vorposten von ' + (daten.besitzerName||'?') + ' bei ' + sysName + ' angegriffen: ' + fmt(daten.schaden||0) + ' Schaden, noch ' + fmt(daten.lp||0) + ' Kern.',
+        daten.gefallen ? 'ti-trophy' : 'ti-sword', daten.gefallen ? 'wichtig' : undefined);
+      loadVorposten();
+      if (daten.gefallen) claimPendingRewards();
+    }
+    pveVerlusteBuchen(fleet, verluste);
+    render(); save();
+  }
+  /* Ankunft der Garnison: Der Server nimmt an, was er annehmen kann (Bestand, freier Platz, nur
+     Kampfschiffe). Was er NICHT annimmt, kehrt sofort um - die Schiffe haben die Flotte beim Start
+     verlassen und muessen ueber eine Rueckflug-Mission wieder hinein (Muster defend-base-return). */
+  async function vorpostenDefendAufloesen(m, planetKey, fleet){
+    let daten = null;
+    try {
+      await save();
+      const res = await backendFetch('/vorposten/stationieren', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ system: m.system, planetKey: planetKey, composition: m.composition || {} }) });
+      daten = await res.json().catch(() => null);
+      if (!res.ok) daten = daten && daten.error ? { fehler: daten.error } : null;
+    } catch(e){ daten = null; }
+    const sysName = vorpostenSysName(m.system);
+    const rest = {};
+    const angenommen = (daten && daten.ok && daten.angenommen) || {};
+    for (const [k, v] of Object.entries(m.composition||{})){
+      if (typeof v !== 'number' || v <= 0) continue;
+      const bleibt = angenommen[k] || 0;
+      if (v - bleibt > 0) rest[k] = v - bleibt;
+    }
+    const dort = Object.values(angenommen).reduce((a, v) => a + v, 0);
+    if (dort > 0){
+      log(dort + ' Schiff(e) am Vorposten bei ' + sysName + ' stationiert' + (daten.garnisonAnzahl ? ' (Garnison jetzt ' + daten.garnisonAnzahl + ')' : '') + '.', 'ti-shield');
+      loadVorposten();
+    } else {
+      log('Stationierung bei ' + sysName + ' nicht möglich: ' + ((daten && daten.fehler) || 'Der Server hat nichts angenommen.') + ' Die Schiffe kehren zurück.', 'ti-alert-triangle', 'wichtig');
+    }
+    vorpostenRueckflugAnlegen(m.system, rest, 'kehren vom Vorposten zurück (nicht stationiert)');
+    render(); save();
+  }
   function pveVerlusteBuchen(fleet, verluste){
     for (const [k, weg] of Object.entries(verluste || {})) if (weg > 0) fleet[k] = Math.max(0, (fleet[k]||0) - weg);
   }
@@ -18328,6 +18761,7 @@
       const res = await backendFetch('/galaxy', { method:'GET' });
       if (!res.ok) return;
       galaxyCache = await res.json();
+      loadVorposten();   // B2: die Vorposten reisen nicht im Galaxie-Zustand, sondern ueber ihre eigene Liste
       // Verlust-Diff: welche eigenen Systeme sind seit dem letzten Laden verschwunden?
       const mineNow = myConqueredSystems();
       if (lastKnownConquered){
@@ -18795,7 +19229,7 @@
   // Niemals eine eigene Beitragsliste hier aufbauen - das waere die zweite Stelle, die veraltet.
   const BONUS_GROUPS = [
     { key:'prod', name:'Produktion', icon:'ti-bolt', richtung:'plus', ort:false,
-      quelle:'Allianz-Forschung, Saison-Events, Prestige-Perks, Fähigkeitsbaum, Allianz-Toprang, Territorium, Eroberungen, Megaprojekte, Exotenforschung, Artefakt, Pakte, Aufstieg, Allianzbasis, Weltprojekte, Schürfschiffe, Doktrin',
+      quelle:'Allianz-Forschung, Saison-Events, Prestige-Perks, Fähigkeitsbaum, Allianz-Toprang, Territorium, Eroberungen, Megaprojekte, Exotenforschung, Artefakt, Pakte, Aufstieg, Allianzbasis, Weltprojekte, Schürfschiffe, Doktrin, Vorposten',
       roh:()=>productionBonusRaw(), deckel:()=>PROD_BONUS_CAP },
     { key:'atk', name:'Angriffskraft', icon:'ti-sword', richtung:'plus', ort:true,
       quelle:'Allianz-Forschung, Prestige-Perks, Flaggschiff, Aufstieg, Fähigkeitsbaum, Megaprojekte, Veteranen, Artefakt, Piratennester, Offiziere, Waffenmodule',
@@ -23599,7 +24033,7 @@
   function computeAwayByType(fleet){
     const away = {};
     for (const m of (fleet.missions||[])){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) away[k] = (away[k]||0)+v;
       }
     }
@@ -23984,7 +24418,7 @@
     const powerRoh = attackPower(f);
     const schwaecheGenutzt = npcWeaknessAusgenutzt(npc, f);
     const effDefense = npcEffectiveDefense(npc);
-    const flug = missionDurationFor(npc.duration, f, ATTACK_SHIP_KEYS, npc.system);
+    const flug = missionDurationFor(npc.duration, f, ATTACK_SHIP_KEYS, npc.system, 'npc');
     const marken = gewaehlt > 0 ? fleetMarksSnapshot(f) : null;
     return {
       npc: npc,
@@ -24978,6 +25412,8 @@
     // Doktrin (18.08.2026): Erschliessung gibt hier, Bergung nimmt hier. BEWUSST als Summand in
     // dieser Gruppe und nicht als eigener Faktor - die Begruendung steht im Kopf der Gruppe.
     globalBonus += doctrineBonusOf('prodBonus');
+    // Vorposten (B2): Produktions-Kanal der eigenen Vorposten, Zahlen vom Server (GET /api/vorposten).
+    globalBonus += vorpostenProdBonus();
     // Ewigkeitsforschung "Rekursive Fertigungsoptimierung": bewusst NICHT in diese additive
     // Gruppe, sondern weiter unten als eigener Faktor - in der gedeckelten Gruppe wuerde sie am
     // +100%-Deckel anschlagen und der Zweig waere ab da wirkungslos. Ihre Logarithmus-Kurve
@@ -25507,7 +25943,7 @@
       desc:'−12% Schiffsbaukosten, dafür −5% Angriffskraft. Mehr Schiffe für dasselbe Erz, jedes einzelne etwas schwächer.' }
   ];
   function prestigePerkCount(key){ return (state.prestigePerks||[]).filter(k=>k===key).length; }
-  function missionDurationFor(sec, fleet, relevantKeys, targetSystem){
+  function missionDurationFor(sec, fleet, relevantKeys, targetSystem, art){
     const f = fleet || currentFleet();
     const lvl = state.research.rfusion||0;
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
@@ -25529,6 +25965,8 @@
     // Sektor des ZIELS (18.08.2026). Steht bewusst direkt neben allianceBaseFlightMult: Beide
     // haengen am Zielsystem, und beide lassen Missionsarten ohne echtes Ziel unberuehrt.
     mult *= sektorFlugMult(targetSystem);
+    // Vorposten (B2): nur fuer die Nicht-PvP-Arten, die `art` mitgeben - siehe VORPOSTEN_FLUG_ARTEN.
+    mult *= vorpostenFlugMult(targetSystem, art);
     mult *= Math.max(0.5, 1 - officerBonus('navigator')); // Offizier "Navigator"
     return sec * mult;
   }
@@ -29374,7 +29812,7 @@
     if (slotsUsed >= cf.colonyShips){ log('Alle Kolonieschiffe dort sind bereits unterwegs.', 'ti-alert-triangle'); return; }
     const planet = PLANETS.find(p=>p.id===planetId);
     const cost = colonizeCostFor(planetId);
-    const dur = missionDurationFor(planet.duration, { colonyShips:1 }, ['colonyShips'], planet.system);
+    const dur = missionDurationFor(planet.duration, { colonyShips:1 }, ['colonyShips'], planet.system, 'colonize');
     const fuel = missionFuelCostSplit(dur, { colonyShips:1 });
     const totalCost = Object.assign({}, cost);
     for (const [fr,fa] of Object.entries(fuel)) totalCost[fr] = (totalCost[fr]||0) + fa;
@@ -30277,6 +30715,31 @@ async function claimPendingRewards(){
             + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'),
             'ti-trophy', 'wichtig');
           save();   // siehe die Begruendung im Festungs-Zweig darueber - dasselbe gilt hier
+          continue;
+        }
+        if (r.type === 'vorposten'){
+          // B2: anteilige Beute beim Fall eines fremden Vorpostens (Kampfpunkte, Erfahrung, Kredite - flach
+          // je Stufe, vom Server gewuerfelt, siehe docs/vorposten.md im Backend).
+          const teile = [];
+          const kp = Math.max(0, Math.round(r.kampfpunkte||0));
+          if (kp > 0){ state.battlePoints = (state.battlePoints||0) + kp; teile.push(kp + ' Kampfpunkte'); }
+          const xp = Math.max(0, Math.round(r.xp||0));
+          if (xp > 0){ state.xp = (state.xp||0) + xp; teile.push(fmt(xp) + ' Erfahrung'); }
+          const cr = Math.max(0, Math.round(r.credits||0));
+          if (cr > 0){ state.credits = (state.credits||0) + cr; teile.push(fmt(cr) + ' Kredite'); }
+          log('Anteil an der Beute des geschleiften Vorpostens von ' + (r.besitzerName||'?') + ' bei ' + vorpostenSysName(r.system) + ' ('
+            + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'), 'ti-building-lighthouse', 'wichtig');
+          save();   // Regel 73: der Server hat die Belohnung beim Abholen schon geloescht
+          continue;
+        }
+        if (r.type === 'vorposten-verlust'){
+          // B2: der eigene Vorposten ist gefallen - das Dokument, aus dem der Client sonst liest, gibt es
+          // nicht mehr; der Bericht ist die einzige Spur. Die Garnison war serverseitig, hier ist nichts abzubuchen.
+          pushReport({ type:'vorposten-verlust', system: r.system, systemName: vorpostenSysName(r.system), stufe: r.stufe||1, name: r.name||'Vorposten',
+            angreiferName: r.angreiferName||'', teilnehmer: r.teilnehmer||1, garnisonVerloren: r.garnisonVerloren||{} });
+          log('Dein Vorposten bei ' + vorpostenSysName(r.system) + ' wurde geschleift' + (r.angreiferName ? ' – von ' + r.angreiferName : '') + '.', 'ti-alert-triangle', 'wichtig');
+          loadVorposten();
+          save();   // Regel 73
           continue;
         }
         if (r.type === 'wrackkonvoi'){
@@ -33600,7 +34063,9 @@ async function claimPendingRewards(){
     // an dem eine Fraktion die eigene Spionage anfasst. Es wirkt auf die BERECHNETE Chance und nicht
     // auf den Deckel, damit ein Ziel ganz ohne Spionageabwehr weiterhin exakt 0% bleibt.
     const shieldLvl = entry.rspyshieldLevel || 0;
-    const entdeckChance = Math.min(0.6, shieldLvl*0.06) * (1 - factionOutsideBonus('schatten'));
+    // Vorposten (B2, Scan-Kanal): ein eigener Vorposten im Umkreis des Zielsystems senkt die Entdeckungschance
+    // um 15 % je Aufklaerungsstufe - auf die BERECHNETE Chance, der Deckel und die Null bleiben.
+    const entdeckChance = Math.min(0.6, shieldLvl*0.06) * (1 - factionOutsideBonus('schatten')) * (1 - 0.15 * vorpostenScanStufe(entry.homeSystem));
     const detected = shieldLvl > 0 && Math.random() < entdeckChance;
     // Honeypot / Falschinformation (Spionage-Vertiefung): ein ENTDECKTER Späher bekommt vom Ziel bewusst
     // aufgeblähte Verteidigungswerte untergeschoben (Faktor ~1,6-2,6). Eine hohe Spionageabwehr wird so
@@ -42244,6 +42709,7 @@ async function claimPendingRewards(){
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
+      { title:'Vorposten: deine Präsenz in einem fremden System', body:'Ein <strong>Vorposten</strong> ist eine eigene Struktur, die du in einem fremden System errichtest und hältst – die erste spielergebaute Präsenz auf der Karte jenseits von Kolonie und Allianzbasis. In der Systemansicht zeigt ein gestrichelter <strong>Bauplatz</strong>, wo einer entstehen kann (nicht im eigenen System, höchstens drei je Konto); die Baukolonne braucht ein Kolonieschiff und Baukosten und fliegt hin und zurück. Der Vorposten hat <strong>drei Stufen</strong> mit wachsendem Kern und Nutzen: weniger <strong>Flugzeit</strong> für Erkundung, Kolonisierung, Abbau und PvE-Ziele im Umkreis (Angriffe auf Spieler und Spionage bleiben unberührt), etwas mehr <strong>Produktion</strong>, bessere <strong>Aufklärung</strong> gegen Ziele in der Nähe – und eine <strong>Garnison</strong> aus Kampfschiffen, die ihn verteidigt. Andere Spieler können ihn angreifen und schleifen: Nach zwölf Stunden Bauschutz zählt jeder Treffer gegen den Kern, die Garnison verliert dabei Schiffe, und fällt der Kern, ist der Vorposten samt Garnison verloren; die Angreifer teilen sich eine kleine Beute nach ihrem Anteil. Aufgeben erstattet nichts. Die genauen Zahlen je Stufe stehen im Kartenmenü.' },
       { title:'Vier Unterreiter', body:'Der Galaxie-Tab ist in vier klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten.' },
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
@@ -42396,8 +42862,8 @@ async function claimPendingRewards(){
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','konvoi-angriff','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung'] },
-    { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','konvoi-angriff','vorposten-angriff','vorposten-verlust','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung'] },
+    { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered','vorposten-bau'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event'] }
   ];
@@ -42418,7 +42884,7 @@ async function claimPendingRewards(){
                                       'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
-  const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
+  const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung','vorposten-verlust'];
   /* Ergebniswerte, die einen Erfolg bezeichnen. 'ki-intercept' fehlte bis v8.597.0: Die
      KI-Abfangautomatik vertreibt die Piraten und erhaelt das Truemmerfeld - im Bericht stand
      trotzdem "Verloren" (zweiter Fall desselben Spieler-Reports). 'escaped' steht bewusst NICHT
@@ -42452,6 +42918,8 @@ async function claimPendingRewards(){
     if (r.type === 'nest-angriff') return true;
     // Wrackkonvoi-Schlag (A2): wie Nest/Festung ein Fortschritt (Lebenspunkte sinken, Anteil waechst).
     if (r.type === 'konvoi-angriff') return true;
+    // Vorposten-Angriff (B2): wie Festung/Nest/Konvoi ein Fortschritt (Kern sinkt, Anteil waechst).
+    if (r.type === 'vorposten-angriff') return true;
     // 'destroyed' (zerstoerte gegnerische Basis - der beste Ausgang) galt hier bis v8.430.0 als
     // negativ: rote Karte, "Verloren"-Pille. battleCardData hatte den Fall laengst richtig, diese
     // Stelle war die zweite Anzeigestelle mit der alten Annahme (CLAUDE.md Pflicht 6).
@@ -43024,6 +43492,36 @@ async function claimPendingRewards(){
               + ' übrig. Nächster Schlag an DIESEM Nest in ' + NEST_ABKLING_STD + ' Stunden – Mitstreiter können in der Zwischenzeit weitermachen.');
         const nvs = eskorteSchiffssumme(r.eigeneVerluste);
         body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (nvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
+      } else if (r.type === 'vorposten-bau'){
+        title = r.keinKampf ? 'Vorposten-Bau nicht möglich' : 'Vorposten errichtet: ' + (r.name || 'Feldlager');
+        body = '<i class="ti ti-building-lighthouse" aria-hidden="true" style="color:' + (r.keinKampf ? '#e0a548' : '#5dcaa5') + ';"></i> ' + escapeHtml(r.systemName || r.system || '');
+        body += '<br>' + (r.keinKampf
+          ? escapeHtml(r.grund || 'Der Bau war nicht möglich.') + ' Das Kolonieschiff ist zurück.'
+          : 'Stufe ' + (r.stufe || 1) + ' · Kern <strong>' + fmt(r.kernLp || 0) + '</strong>. Bauschutz bis ' + (r.schutzBis ? new Date(r.schutzBis).toLocaleString('de-DE') : '–') + ' – stationiere eine Garnison, bevor er abläuft.');
+      } else if (r.type === 'vorposten-angriff'){
+        /* Wie Festung/Nest/Konvoi nennt der Bericht, was ANGEKOMMEN ist (`schaden`) - der Server zaehlt
+           genau das auf den Beuteanteil. Ein Angriff ohne Kampf (verpasst) traegt keinKampf und den Grund. */
+        title = r.keinKampf ? 'Vorposten-Angriff ohne Kampf' : (r.gefallen ? 'Vorposten geschleift' : 'Vorposten angegriffen');
+        body = '<i class="ti ti-building-lighthouse" aria-hidden="true" style="color:' + (r.gefallen ? '#5dcaa5' : '#e0a548') + ';"></i> '
+             + escapeHtml(r.systemName || r.system || '') + (r.besitzerName ? ' · Vorposten von ' + escapeHtml(r.besitzerName) : '');
+        if (r.keinKampf){
+          body += '<br>' + escapeHtml(r.grund || 'Kein Kampf.');
+        } else {
+          body += ' · Schaden <strong>' + fmt(r.schaden||0) + '</strong> (Durchschlag ' + Math.round((r.durchschlag||0)*100) + '% gegen Verteidigung ' + fmt(r.verteidigung||0) + ')';
+          body += '<br>' + (r.gefallen
+            ? 'Der Vorposten ist geschleift. Dein Anteil an der Beute: <strong>' + Math.round((r.anteil||0)*100) + '%</strong>' + ((r.teilnehmer||1) > 1 ? ' (von ' + r.teilnehmer + ' Beitragenden)' : '') + ' – sie liegt unter den Belohnungen.'
+            : 'Noch <strong>' + fmt(r.lp||0) + '</strong>' + (r.lpMax ? ' von ' + fmt(r.lpMax) : '') + ' Kern übrig.');
+          const gvs = eskorteSchiffssumme(r.garnisonVerluste);
+          if (gvs) body += '<br><i class="ti ti-skull" aria-hidden="true"></i> Garnison des Gegners verlor: ' + fleetBreakdownHtml(r.garnisonVerluste);
+          const kvs = eskorteSchiffssumme(r.eigeneVerluste);
+          body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (kvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
+        }
+      } else if (r.type === 'vorposten-verlust'){
+        title = 'Vorposten verloren: ' + (r.name || 'Vorposten');
+        body = '<i class="ti ti-building-lighthouse" aria-hidden="true" style="color:#e24b4a;"></i> ' + escapeHtml(r.systemName || r.system || '')
+             + '<br>Dein Vorposten (Stufe ' + (r.stufe || 1) + ') wurde geschleift' + (r.angreiferName ? ' – letzter Angreifer ' + escapeHtml(r.angreiferName) : '') + ((r.teilnehmer||1) > 1 ? ' (' + r.teilnehmer + ' Beitragende)' : '') + '.';
+        const gv = eskorteSchiffssumme(r.garnisonVerloren);
+        body += '<br><i class="ti ti-skull" aria-hidden="true"></i> Mit ihm verloren: ' + (gv ? fleetBreakdownHtml(r.garnisonVerloren) : 'keine Garnison');
       } else if (r.type === 'konvoi-angriff'){
         /* Wie beim Nest-/Festungsbericht nennt er, was ANGEKOMMEN ist (`schaden`) - der Server
            zaehlt genau das auf den Bergungsanteil. Ein Konvoi hat kein Volk und keine Stufe. */
@@ -54825,6 +55323,26 @@ async function claimPendingRewards(){
           konvoiAufloesen(m, planetKey, fleet);
           continue;
         }
+        // Vorposten (B2): Bau, Angriff und Stationierung loest der Server auf; die Rueckkehr der Garnison
+        // tritt wieder in die Flotte ein (die Schiffe hatten sie beim Start verlassen, Muster defend-base).
+        if (m.type === 'vorposten-bau'){
+          vorpostenBauAufloesen(m, planetKey, fleet);
+          continue;
+        }
+        if (m.type === 'vorposten-angriff'){
+          vorpostenAngriffAufloesen(m, planetKey, fleet);
+          continue;
+        }
+        if (m.type === 'vorposten-defend'){
+          vorpostenDefendAufloesen(m, planetKey, fleet);
+          continue;
+        }
+        if (m.type === 'vorposten-defend-return'){
+          let zurueck = 0;
+          for (const [k, v] of Object.entries(m.composition || {})) if (typeof v === 'number' && v > 0){ fleet[k] = (fleet[k]||0) + v; zurueck += v; }
+          if (showLog !== false) log(zurueck + ' Schiff(e) vom Vorposten wieder auf ' + planetDisplayName(planetKey) + '.', 'ti-shield');
+          continue;
+        }
         /* Rueckruf angekommen: Die Schiffe treten wieder in die Flotte ein. m.schiffe statt
            m.composition - siehe eskorteRueckruf. */
         if (m.type === 'mining-recall'){
@@ -56407,7 +56925,7 @@ async function claimPendingRewards(){
     // Leerenriss-Flüge NICHT. Jetzt durch die zentrale Formel geroutet: Pseudo-Flotte aus genau
     // einem Schiff des Typs; fleetSpeedMultiplier/effectiveShipSpeed decken dort den
     // SUPER_SPEED-Sonderfall des Superschlachtschiffs identisch ab.
-    return missionDurationFor(baseSec, { [shipKey]: 1 }, [shipKey], planetSystemOf(toPlanet));
+    return missionDurationFor(baseSec, { [shipKey]: 1 }, [shipKey], planetSystemOf(toPlanet), 'relocate');
   }
   function relocateShips(fromPlanet, toPlanet, shipKey, amount, forcedDur, forcedFleetName, skipFuelCharge, groupId){
     // Rueckgabewert (03.08.2026): true = Mission steht. Der Recycler-Sammelauftrag muss wissen,
@@ -58194,6 +58712,8 @@ async function claimPendingRewards(){
       // weitergedrifteter Konvoi verschwindet damit sofort von der Karte, statt bis zum Vollbau
       // stehen zu bleiben; die auf Tausender gerundeten LP vermeiden die Tick-Unruhe.
       (galaxyCache.wrackKonvois||[]).map(k => k.id + ':' + Math.round((k.lp||0)/1000)).join(','),
+      // Vorposten (B2): eigener Anteil, sonst bliebe ein gebauter oder geschleifter Vorposten bis zum Vollbau stehen.
+      (vorpostenCache.liste||[]).map(v => v.id + ':' + v.stufe + ':' + Math.round(((v.kern&&v.kern.lp)||0)/1000) + ':' + (v.garnisonAnzahl||0)).join(','),
       (karteSektorOffen || '')
     ].join('§');
   }
@@ -58958,6 +59478,9 @@ async function claimPendingRewards(){
       badges.push({ icon:'🏰', title:'Allianzbasis ['+myAllianceTag()+'] - hier klicken zum Wechseln' });
     if (karteEbeneAn('ereignisse') && galaxyCache.activePirateFaction && galaxyCache.activePirateFaction.system === sysId)
       badges.push({ icon:'🏴‍☠️', title:galaxyCache.activePirateFaction.name+' – Piratenbasis' });
+    // Vorposten (B2): EIN Abzeichen je System (es gibt je System hoechstens einen).
+    { const vp = karteEbeneAn('ereignisse') ? vorpostenImSystem(sysId) : null;
+      if (vp) badges.push({ icon:'🛰', title:(vp.eigener ? 'Dein Vorposten' : 'Vorposten von ' + vp.besitzerName) + ' – ' + vp.name + ' (Stufe ' + vp.stufe + ')' }); }
     /* Das 👽 zeigt an, WO ein Volk gesichtet wurde - der Server fuehrt diesen Ort auf das
        staerkste Nest des Volkes nach (nestOrteNachfuehren in server.js). Es war damit der
        Notnagel fuer Frontends, die die Nester noch nicht kannten. Seit E1 gibt es das 👾 daneben;
@@ -59640,7 +60163,7 @@ async function claimPendingRewards(){
   // Schließen bei Klick daneben, Escape, Scrollen und Tabwechsel. Der öffnende Klick selbst darf
   // nicht sofort wieder schließen - deshalb capture:false und die Prüfung auf das Menü selbst.
   document.addEventListener('click', (e) => {
-    if (karteMenuEl && !karteMenuEl.contains(e.target) && !e.target.closest('[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-asteroid]')) closeKarteMenu();
+    if (karteMenuEl && !karteMenuEl.contains(e.target) && !e.target.closest('[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-asteroid],[data-map-vorposten]')) closeKarteMenu();
   });
   // Esc gehört dem Menü, solange eines offen ist. stopImmediatePropagation, weil weiter unten ein
   // zweiter Esc-Handler auf document das aufgeklappte System zuklappt: Ohne das Anhalten würde ein
@@ -59745,7 +60268,7 @@ async function claimPendingRewards(){
     // Anzeigestelle mit eigenen Regeln wäre genau der Fehler, den Regel 6 dieses Projekts meint.
     const erkUnterwegs = cf.missions.some(m => m.type==='explore' && m.targetId === planetId);
     const erkFrei = cf.missions.filter(m => m.type==='explore').length < cf.ships;
-    const erkDur = missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system);
+    const erkDur = missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system, 'explore');
     eintraege.push({ icon:'ti-rocket', label: disc ? 'Erneut erkunden' : 'Erkunden',
       grund: erkUnterwegs ? 'Bereits eine Erkundung zu diesem Ziel unterwegs.'
         : (!erkFrei ? 'Kein freies Erkundungsschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'
@@ -59754,7 +60277,7 @@ async function claimPendingRewards(){
     if (!meins){
       const kolUnterwegs = cf.missions.some(m => m.type==='colonize' && m.targetId === planetId);
       const limitVoll = currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed();
-      const kolDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system);
+      const kolDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system, 'colonize');
       const kolKosten = disc ? colonizeCostFor(planetId) : p.colonizeCost;
       const gesamt = Object.assign({}, kolKosten);
       for (const [r,a] of Object.entries(missionFuelCostSplit(kolDur, { colonyShips:1 }))) gesamt[r] = (gesamt[r]||0) + a;
@@ -59834,7 +60357,7 @@ async function claimPendingRewards(){
     const cf = currentFleet();
     const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
     const gewaehlt = ATTACK_SHIP_KEYS.reduce((a,k) => a + (attackFleet[k]||0), 0);
-    const dur = npc ? missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system) : 0;
+    const dur = npc ? missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system, 'npc') : 0;
     const eintraege = [
       // Seit v8.425.0 oeffnet der Eintrag das Flottenwahl-Feld - die alte Sperre "erst im
       // Galaxie-Tab Schiffe waehlen" ist damit gegenstandslos, genau dafuer ist das Feld da.
@@ -60095,7 +60618,9 @@ async function claimPendingRewards(){
     relocate:        { hin:'#fac775', rueck:null,      rundflug:false, was:'Verlegung' },
     'nest-angriff':  { hin:'#8fd694', rueck:'#5dcaa5', rundflug:true,  was:'Nest-Angriff' },
     'festung-angriff': { hin:'#e0a548', rueck:'#5dcaa5', rundflug:true,  was:'Festungsschlag' },
-    'konvoi-angriff': { hin:'#8fd0ea', rueck:'#5dcaa5', rundflug:true,  was:'Wrackkonvoi' }
+    'konvoi-angriff': { hin:'#8fd0ea', rueck:'#5dcaa5', rundflug:true,  was:'Wrackkonvoi' },
+    'vorposten-bau':     { hin:'#c9a96e', rueck:'#5dcaa5', rundflug:true,  was:'Baukolonne' },
+    'vorposten-angriff': { hin:'#e0a548', rueck:'#5dcaa5', rundflug:true,  was:'Vorposten-Angriff' }
   };
   // Zielposition einer Mission im aktuell gezeigten System. Gibt zusätzlich zurück, ob das Ziel
   // ueberhaupt im Blick liegt - liegt es das nicht, nutzt der Zeichner die Sonne als Platzhalter
@@ -60122,6 +60647,10 @@ async function claimPendingRewards(){
     }
     /* Ein Wrackkonvoi ist KEIN Planet - wie das Nest ueber Index und konvoiMarkerXY, damit die
        Linie am Marker endet statt daneben. */
+    // Vorposten (B2): kein Planet - fester Marker je System (vorpostenMarkerXY).
+    if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-defend-return'){
+      return { system: m.system, pos: vorpostenMarkerXY(m.system) };
+    }
     if (m.type === 'konvoi-angriff'){
       const liste = konvoiImSystem(m.system);
       const i = liste.findIndex(x => String(x.id) === String(m.zielId));
@@ -60444,7 +60973,7 @@ async function claimPendingRewards(){
     const kennEl = document.getElementById('systemNavKenn');
     if (kennEl){
       const cfKenn = currentFleet();
-      const flug = sysPlanetsAll.length ? Math.min(...sysPlanetsAll.map(p=>missionDurationFor(p.duration, cfKenn, EXPLORE_SHIP_KEYS, p.system))) : 0;
+      const flug = sysPlanetsAll.length ? Math.min(...sysPlanetsAll.map(p=>missionDurationFor(p.duration, cfKenn, EXPLORE_SHIP_KEYS, p.system, 'explore'))) : 0;
       let basen = sysPlanetsAll.filter(p=>state.colonies[p.id]).length;
       sysPlanetsAll.forEach(p=>{ if (state.colonies['moon_'+p.id]) basen++; });
       if (curSys.id===myHomeSystem){ basen++; if (state.colonies['moon_home']) basen++; }
@@ -60794,6 +61323,35 @@ async function claimPendingRewards(){
             <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y - r - 6).toFixed(1)}" text-anchor="middle" style="fill:#8fd0ea;">Wrackkonvoi</text>
           </g>`;
       });
+    }
+    /* ===== Vorposten (B2) ==================================================================
+       Eigene (gruen), fremde (bernstein) und - wenn hier gebaut werden koennte - ein gestrichelter
+       Bauplatz (grau). Bahn wie die Allianzbasis, durch kbMarkerFrei geschoben, mit Obergrenze
+       (KB-20h), in platzierteMarker angemeldet; der sichtbare Radius ist die Antenne. */
+    if (karteEbeneAn('ereignisse') && useBackend() && vorpostenCache.aktiv){
+      const vp = vorpostenImSystem(activeSystem);
+      const bauplatz = !vp && vorpostenBauplatzMoeglich(activeSystem).sichtbar;
+      if (vp || bauplatz){
+        const r = 13, sichtR = 22;
+        const vpMax = kbOrbitRx(kbMaxOrbit) + 34 - sichtR;
+        const coord = kbMarkerFrei(vorpostenMarkerXY(activeSystem), sysPlanets, activeSunType.r, sichtR, platzierteMarker, vpMax);
+        platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
+        const farbe = vp ? (vp.eigener ? '#5dcaa5' : '#e0a548') : '#8a8fa3';
+        const anteil = vp ? Math.max(0, Math.min(1, ((vp.kern&&vp.kern.lp)||0) / Math.max(1, (vp.kern&&vp.kern.lpMax)||1))) : 0;
+        const hex = [0,60,120,180,240,300].map(g => { const rad = g*Math.PI/180; return (coord.x + r*Math.cos(rad)).toFixed(1)+','+(coord.y + r*Math.sin(rad)).toFixed(1); }).join(' ');
+        const label = vp ? (vp.eigener ? 'Dein Vorposten' : 'Vorposten ['+escapeHtml(vp.besitzerName||'?')+']') : 'Bauplatz';
+        const key = vp ? String(vp.sys) : 'bauplatz:' + activeSystem;
+        inner += `
+          <g class="planet-node" data-map-vorposten="${escapeHtml(key)}" style="cursor:pointer;">
+            <title>${vp ? escapeHtml(vp.name) + ' – Stufe ' + vp.stufe + ' – Kern ' + Math.round(anteil*100) + '%' : 'Hier ließe sich ein Vorposten errichten'} (antippen für das Menü)</title>
+            <polygon points="${hex}" fill="${vp ? 'rgba(10,13,26,0.6)' : 'none'}" stroke="${farbe}" stroke-width="${vp ? 1.6 : 1.1}" ${vp ? '' : 'stroke-dasharray="3 3" opacity="0.75"'}/>
+            ${vp ? `<line x1="${coord.x.toFixed(1)}" y1="${(coord.y - r*0.2).toFixed(1)}" x2="${coord.x.toFixed(1)}" y2="${(coord.y - r*1.55).toFixed(1)}" stroke="${farbe}" stroke-width="1.2"/>
+            <circle cx="${coord.x.toFixed(1)}" cy="${(coord.y - r*1.55).toFixed(1)}" r="2.2" fill="${farbe}"><animate attributeName="opacity" values="1;0.3;1" dur="2.4s" repeatCount="indefinite"/></circle>
+            <rect x="${(coord.x - r).toFixed(1)}" y="${(coord.y + r*1.05).toFixed(1)}" width="${(r*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
+            <rect x="${(coord.x - r).toFixed(1)}" y="${(coord.y + r*1.05).toFixed(1)}" width="${(r*2*anteil).toFixed(1)}" height="2.6" fill="${farbe}"/>` : ''}
+            <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y - r - (vp ? 12 : 6)).toFixed(1)}" text-anchor="middle" style="fill:${farbe};">${label}</text>
+          </g>`;
+      }
     }
     // Schuerfpeilungen (v8.481.0). Eigene, weiter aussen liegende Bahn und ein gestrichelter Ring -
     // sie sind privat und gehoeren sichtbar NICHT zum Guertel. Koennen in JEDEM bekannten System
@@ -61258,6 +61816,13 @@ async function claimPendingRewards(){
         konvoiMapMenu(e, node.getAttribute('data-map-konvoi'));
       });
     });
+    svg.querySelectorAll('[data-map-vorposten]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (galaxyMapDidDrag) return;
+        vorpostenMapMenu(e, node.getAttribute('data-map-vorposten'));
+      });
+    });
     svg.querySelectorAll('[data-map-moon]').forEach(node => {
       node.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -61453,7 +62018,7 @@ async function claimPendingRewards(){
     if (!fleet){ endAutoExploreTour('origin-lost'); return false; }
     const planet = PLANETS.find(p=>p.id===targetId);
     if (!planet) return false;
-    const dur = missionDurationFor(planet.duration, fleet, EXPLORE_SHIP_KEYS, planet.system);
+    const dur = missionDurationFor(planet.duration, fleet, EXPLORE_SHIP_KEYS, planet.system, 'explore');
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})) return false; // nächster Tick versucht es automatisch erneut
     pay({deuterium: fuelCost});
@@ -61562,7 +62127,7 @@ async function claimPendingRewards(){
     if (slotsUsed >= cf.ships){ log('Keine freien Erkundungsschiffe auf '+planetDisplayName(state.activeBasePlanet)+' verfügbar.', 'ti-alert-triangle'); return; }
     if (cf.missions.some(m => m.type==='explore' && m.targetId === planetId)){ log('Bereits eine Mission zu diesem Ziel unterwegs.', 'ti-alert-triangle'); return; }
     const planet = PLANETS.find(p => p.id === planetId);
-    const dur = missionDurationFor(planet.duration, cf, EXPLORE_SHIP_KEYS, planet.system);
+    const dur = missionDurationFor(planet.duration, cf, EXPLORE_SHIP_KEYS, planet.system, 'explore');
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})){ log('Nicht genug Treibstoff (Deuterium) für diese Mission: benötigt '+fuelCost+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -61686,7 +62251,7 @@ async function claimPendingRewards(){
     const fest = festungFaktoren(a.system);
     const ladung = Math.max(0, Math.min(a.vorrat, Math.round(ladungRoh * fest.ladung)));
     const abbau = Math.max(abbauMindestFuer(a.groesse) * ABBAU_BOHRUNG_BODEN, abbauBasis - tiefenbohrungSek());
-    const flug = missionDurationFor(asteroidFlugBasis(a.system), flotte, MINE_SHIP_KEYS, a.system);
+    const flug = missionDurationFor(asteroidFlugBasis(a.system), flotte, MINE_SHIP_KEYS, a.system, 'mining');
     return {
       rate, raum, ladung, ladungRoh, abbau, flug, gesamt: flug + abbau,
       // Was die Festung anrichtet, reist in der Vorschau MIT - sonst muesste jede Anzeigestelle
@@ -62199,7 +62764,7 @@ async function claimPendingRewards(){
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
     if (npc.requiresResearch && (state.research[npc.requiresResearch]||0) < 1){ log('Dieser Gegner ist erst mit der Forschung '+((RESEARCH_DEFS.find(r=>r.key===npc.requiresResearch)||{}).name||npc.requiresResearch)+' erreichbar.', 'ti-lock'); return; }
-    const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system);
+    const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system, 'npc');
     const fuel = missionFuelCostSplit(dur, attackFleet);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
     if (fleetLimitBlocks()) return;
@@ -65401,6 +65966,26 @@ async function claimPendingRewards(){
             </div>
           `;
         }
+        if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-defend-return'){
+          // Vorposten (B2): eigener Zweig - sonst "Erkundungsziel" (targetId ist eine System-ID).
+          const remaining = Math.max(0, m.endTime-now);
+          const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
+          const pct = 100 - (remaining/(totalDur*1000)*100);
+          const sysName = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system || '?' }).name;
+          const rund = m.type === 'vorposten-bau' || m.type === 'vorposten-angriff';
+          const phase = !rund ? 'Flug' : (remaining > (totalDur*1000)/2 ? 'Anflug' : 'Rückflug');
+          const was = m.type === 'vorposten-bau' ? 'Baukolonne' : m.type === 'vorposten-angriff' ? 'Vorposten-Angriff' : m.type === 'vorposten-defend' ? 'Garnison → Vorposten' : 'Rückkehr vom Vorposten';
+          return `
+            <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Unterwegs: ${fleetBreakdownHtml(m.composition||{})}">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="bname"><i class="ti ti-building-lighthouse" aria-hidden="true" style="color:#c9a96e;"></i>${m.fleetName?escapeHtml(m.fleetName)+' → ':''}${was}</div>
+                <div class="bmeta">${phase} · ${fmtDuration(remaining/1000)}</div>
+              </div>
+              <div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> ${escapeHtml(sysName)}</div>
+              <div class="progress-outer"><div class="progress-inner attackbar" style="width:${pct}%;"></div></div>
+            </div>
+          `;
+        }
         if (m.type === 'konvoi-angriff'){
           // Eigener Zweig wie beim Nest darueber - sonst stuende der Wrackkonvoi als "Erkundungsziel".
           const remaining = Math.max(0, m.endTime-now);
@@ -65603,7 +66188,7 @@ async function claimPendingRewards(){
     const slotsUsedExpedition = cf.missions.filter(m=>m.type==='expedition').length;
     const awayByType = {};
     for (const m of cf.missions){
-      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
+      if ((m.type==='attack' || m.type==='attack-player' || m.type==='piratelair' || m.type==='abgrund' || m.type==='worldboss' || m.type==='expedition' || m.type==='mining' || m.type==='mining-escort' || m.type==='asteroid-contest' || m.type==='festung-angriff' || m.type==='nest-angriff' || m.type==='konvoi-angriff' || m.type==='vorposten-angriff' || m.type==='intercept-pirates' || m.type==='void-rift' || m.type==='attack-alliance-base') && m.composition){
         for (const [k,v] of Object.entries(m.composition)) if (typeof v === 'number' && v>0) awayByType[k] = (awayByType[k]||0)+v;
       }
     }
@@ -66449,7 +67034,7 @@ async function claimPendingRewards(){
       const slotsFree = cf.missions.filter(m=>m.type==='explore').length < cf.ships;
       const canSend = slotsFree && !busy;
       const colCost = disc ? colonizeCostFor(p.id) : p.colonizeCost;
-      const colDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system);
+      const colDur = missionDurationFor(p.duration, { colonyShips:1 }, ['colonyShips'], p.system, 'colonize');
       const colFuelSplit = missionFuelCostSplit(colDur, { colonyShips:1 });  // siehe Mond oben
       const colonizeBusy = cf.missions.some(m=>m.type==='colonize' && m.targetId===p.id);
       const colonizeCostTotal = Object.assign({}, colCost);
@@ -66466,7 +67051,7 @@ async function claimPendingRewards(){
             <div class="bicon" style="background:${p.color}30; color:${p.color}; border-radius:50%;"><canvas data-planet-icon="${(state.planetTypeOverride||{})[p.id] || p.type}" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname">${p.name}${disc?'':' <span class="lvl-pill">unentdeckt</span>'}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
-              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system))} Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system), 1)} Treibstoff</div>
+              <div class="bmeta"><i class="ti ${planetTypeInfoFor(p).icon||'ti-planet'}" aria-hidden="true"></i> ${planetTypeInfoFor(p).label||''}${planetTypeInfoFor(p).bonusText ? ` <span style="color:#5dcaa5;">(${planetTypeInfoFor(p).bonusText})</span>` : ''} · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system, 'explore'))} Flugzeit · ${miniResIcon('deuterium')} ${missionFuelCost(missionDurationFor(p.duration, cf, EXPLORE_SHIP_KEYS, p.system, 'explore'), 1)} Treibstoff</div>
               ${p.orbit ? `<div class="bmeta">${orbitBonusLabel(p.orbit)}</div>` : ''}
               <div class="bcost">${(!disc && p.discoveryBonus) ? 'Erstfund: '+rewardHtml(p.discoveryBonus)+' <span class="bmeta" style="display:inline;">(einmalig)</span> · danach: '+rewardHtml(p.reward) : rewardHtml(p.reward)}</div>
               ${bonus ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Verborgener Bonus: ${bonus.labelText}</div>` : ''}
@@ -67614,6 +68199,12 @@ async function claimPendingRewards(){
             icon = 'ti-alien'; color = v.farbe;
             label = 'Nest-Angriff → ' + v.name + ' (' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name) + ')';
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + ' – ' + (m.stufeName || 'Nest') + '.';
+          } else if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-defend-return'){
+            // Vorposten (B2): eigener Zweig - sonst "Erkundungsziel".
+            icon = 'ti-building-lighthouse'; color = m.type === 'vorposten-angriff' ? '#e0a548' : '#c9a96e';
+            const vpWas = m.type === 'vorposten-bau' ? 'Baukolonne' : m.type === 'vorposten-angriff' ? 'Vorposten-Angriff' : m.type === 'vorposten-defend' ? 'Garnison' : 'Rückkehr';
+            label = vpWas + ' → ' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name);
+            shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + '.';
           } else if (m.type === 'konvoi-angriff'){
             // Eigener Zweig wie beim Nest darueber - sonst "Erkundungsziel".
             icon = 'ti-recycle'; color = '#8fd0ea';

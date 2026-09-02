@@ -101,6 +101,9 @@ const EINWEGIG_ERLAUBT = {
   'mining-recall':      'IST der Rueckweg der Eskorte',
   'defend-base':        'Schiffe bleiben an der Allianzbasis (Rueckweg: defend-base-return)',
   'defend-base-return': 'IST der Rueckweg von der Allianzbasis',
+  // B2 (02.09.2026): dasselbe Muster am Vorposten - die Garnison bleibt dort, der Rueckweg ist eigen.
+  'vorposten-defend':        'Garnison bleibt am Vorposten stationiert (Rueckweg: vorposten-defend-return)',
+  'vorposten-defend-return': 'IST der Rueckweg vom Vorposten (Rueckruf, Aufgabe, nicht angenommene Schiffe)',
   'relocate':           'Verlegung zwischen eigenen Standorten - die Schiffe bleiben dort',
   'colonize':           'das Kolonieschiff wird zur Kolonie',
   'colonize-moon':      'dito, Mondlandung'
@@ -136,7 +139,19 @@ check('1j-vorab: die Missionsarten liessen sich aus der Datei lesen',
    liefert die Rundreise, dort ist `dur*1000` also richtig. Ein Block, dessen Dauer aus
    relocationDuration kommt, muss sie deshalb verdoppeln (`*2000`) - oder ausdruecklich einwegig
    sein. */
-const halbiert     = b => /\/\s*2\b/.test(b.endTime) || /\*\s*500\b/.test(b.endTime);
+/* (c) Sie halbiert die Dauer VOR dem push in die Variable, die endTime dann liest:
+       const dur = missionDurationFor(...) / 2;   ...   endTime: jetzt + dur*1000
+       -> im endTime-Ausdruck steht nichts, und relocationDuration kommt nicht vor. Gefunden beim
+       Bau der Vorposten-Garnison (B2, 02.09.2026): beide Missionen waren fuer (a) und (b) unsichtbar,
+       die Pruefung war an ihnen gruen, ohne sie je gesehen zu haben. Gegriffen wird die VARIABLE aus
+       dem endTime-Ausdruck und ihre Zuweisung im Text davor - nicht irgendein /2 im Umfeld (dort
+       stuende z. B. das fmtDuration(flug/2) einer Vorschau und meldete Rundfluege als einwegig). */
+const vorHalbiert = b => {
+  const v = /^\s*\w+\s*\+\s*([A-Za-z_$][\w$]*)\s*\*\s*1000\b/.exec(b.endTime);
+  if (!v) return false;
+  return new RegExp('(?:const|let|var)\\s+' + v[1] + '\\s*=[^;\\n]*\\/\\s*2\\s*;').test(b.vor);
+};
+const halbiert     = b => /\/\s*2\b/.test(b.endTime) || /\*\s*500\b/.test(b.endTime) || vorHalbiert(b);
 const einwegQuelle = b => /relocationDuration\s*\(/.test(b.vor);
 const verdoppelt   = b => /\*\s*2000\b/.test(b.endTime) || /\*\s*2\b/.test(b.endTime) || /\b2\s*\*/.test(b.endTime);
 
@@ -146,6 +161,10 @@ const verdoppelt   = b => /\*\s*2000\b/.test(b.endTime) || /\*\s*2\b/.test(b.end
 const ausEinwegQuelle = missionsBloecke.filter(einwegQuelle);
 check('1j-quelle: die Einweg-Dauerquelle wird im Quelltext ueberhaupt gefunden',
   ausEinwegQuelle.length >= 2, { gefunden: ausEinwegQuelle.map(b => b.typ) });
+// Dasselbe fuer Form (c): Der Detektor muss seine Anlassfamilie (die Vorposten-Garnison) finden.
+const ausVorHalbiert = missionsBloecke.filter(vorHalbiert);
+check('1j-quelle-c: die vorab halbierte Dauer wird im Quelltext ueberhaupt gefunden',
+  ausVorHalbiert.length >= 2, { gefunden: ausVorHalbiert.map(b => b.typ) });
 
 const verdaechtig = missionsBloecke.filter(b => !EINWEGIG_ERLAUBT[b.typ] &&
   (halbiert(b) || (einwegQuelle(b) && !verdoppelt(b))));

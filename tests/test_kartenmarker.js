@@ -161,7 +161,7 @@ async function messe(page) {
        Lehre von KB-19, nur eine Ebene hoeher: eine Pruefung, die die Liste des Codes spiegelt,
        erbt dessen Luecke). */
     const marker = [];
-    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player], #galaxyMapSvg [data-map-nest], #galaxyMapSvg [data-map-festung], #galaxyMapSvg [data-map-wurmloch], #galaxyMapSvg [data-alliance-base]').forEach(g => {
+    document.querySelectorAll('#galaxyMapSvg [data-map-npc], #galaxyMapSvg [data-map-player], #galaxyMapSvg [data-map-nest], #galaxyMapSvg [data-map-festung], #galaxyMapSvg [data-map-wurmloch], #galaxyMapSvg [data-alliance-base], #galaxyMapSvg [data-map-vorposten]').forEach(g => {
       const kreise = [...g.querySelectorAll('circle')];
       const poly = g.querySelector('polygon');
       const bezug = kreise.length ? kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a)) : poly;
@@ -170,6 +170,7 @@ async function messe(page) {
         || (g.hasAttribute('data-map-nest') ? 'nest:' + g.getAttribute('data-map-nest') : null)
         || (g.hasAttribute('data-map-wurmloch') ? 'wurmloch:' + g.getAttribute('data-map-wurmloch') : null)
         || (g.hasAttribute('data-alliance-base') ? 'allianzbasis' : null)
+        || (g.hasAttribute('data-map-vorposten') ? 'vorposten:' + g.getAttribute('data-map-vorposten') : null)
         || 'festung';
       /* Das Portal traegt eine scale-Transformation (die Zeichnung ist fuer viewBox 0 0 100 100
          gebaut). getBoundingClientRect liefert deshalb den ECHTEN Bildschirmplatz, das <circle>
@@ -405,7 +406,11 @@ async function laufe(browser, store, viewport, mobil, systeme) {
        weg. Gefunden hat sie kein Test, sondern die Durchsicht vor dem Merge - der eigene
        "was faellt aus dem Kasten"-Durchgang hatte sie uebersehen, weil die Fixture gar keine
        Allianz hatte (seit dem hat sie eine, siehe oben). */
-    { was: 'Allianzbasis',       muster: /kbMarkerFrei\(\{ x: SUN_X \+ abRx/ }
+    { was: 'Allianzbasis',       muster: /kbMarkerFrei\(\{ x: SUN_X \+ abRx/ },
+    /* B2-Vorposten (02.09.2026): eigener oder fremder Vorposten bzw. der gestrichelte Bauplatz - EIN
+       Marker je System auf der Allianzbasis-Bahn (0,86 der aeussersten Planetenbahn, 145 Grad), durch
+       denselben Schieber wie alle anderen. */
+    { was: 'Vorposten',          muster: /kbMarkerFrei\(vorpostenMarkerXY\(/ }
   ];
   const fehlende = ERLAUBTE_MARKER.filter(m => !m.muster.test(OHNE_KOMMENTARE)).map(m => m.was);
   const aufrufe = (OHNE_KOMMENTARE.split('kbMarkerFrei(').length - 1) - definitionen;
