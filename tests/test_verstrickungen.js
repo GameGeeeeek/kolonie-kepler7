@@ -238,9 +238,48 @@ const verdrahtung = [
   ['Veteran → Verteidigung',      /combatBonus \+= veteranRoleExtra\(planetKey, 'def'\);/, 1],
   ['Veteran → Schiffsbauzeit',    /e \*= \(1 - veteranRoleExtra\(planetKey, 'build'\)\);/, 1],
   ['Veteran → Abgrundsplitter',   /veteranRoleExtra\(planetKey, 'abgrund'\)/, 1],
-  ['Aufklärung → PvP-Vorschau',   /attackPower\(previewFleet, state\.activeBasePlanet\) \* \(1 \+ spyEdge\)/, 1],
+  /* Hier stand die Wortform `attackPower(previewFleet, state.activeBasePlanet) * (1 + spyEdge)`.
+     Seit dem 01.09.2026 rechnet die Vorschau ueber pvpReichskraft() - gemessen rechnet der Server
+     die PvP-Angriffskraft ueber ALLE Standortflotten (computeAttackPower -> allFleetsOf), die
+     Vorschau tat es ueber die Auswahl am aktiven Standort und war damit fuer jeden mit
+     Kolonieflotten zu pessimistisch.
+     Die Pruefung wird dabei STAERKER, nicht schwaecher: Sie haelt weiterhin fest, dass der
+     Aufklaerungsvorteil eingerechnet wird - und zusaetzlich, dass die Kraft aus der Reichsflotte
+     kommt. Eine Rueckkehr zur alten, zu kleinen Bezugsgroesse faellt damit auf; vorher waere sie
+     unbemerkt geblieben, solange nur die Zeichenkette stimmte. */
+  ['Aufklärung → PvP-Vorschau',   /pvpReichskraft\(null\) \* \(1 \+ spyEdge\)/, 1],
+  ['PvP-Vorschau rechnet über die REICHSFLOTTE, nicht über eine Standort-Auswahl',
+   /for \(const e of allFleetsWithPlanet\(\)\)\{[\s\S]{0,400}?attackPowerRaw\(f\) \* fleetDiversityMult\(f\)/, 1],
+  ['PvP-Vorschau: der Konter kommt aus derselben Reichsflotte',
+   /pvpReichskraft\(zielFlotte\) \/ rohKraft/, 1],
   ['Aufklärung → Solo-Auflösung', /attackPower\(m\.composition\|\|fleet, planetKey\) \* \(1 \+ spyIntelEdge\(m\.targetId\)\)/, 1],
-  ['Aufklärung → Spionagebericht',/attackPower\(currentFleet\(\)\) \* \(1 \+ berichtEdge\)/, 1],
+  /* Hier stand die Wortform `attackPower(currentFleet()) * (1 + berichtEdge)`. Seit dem
+     02.09.2026 rechnet der Spionagebericht ueber dieselbe Funktion wie die Angriffs-Vorschau
+     (pvpSiegchance) - vorher war er eine ZWEITE Rechnung mit beiden alten Annahmen: nur der
+     aktive Standort statt der Reichsflotte, und die kontoweite Verteidigung, obwohl ein Angriff
+     einen Ort trifft. Der Kommentar an der Stelle warnte woertlich vor genau dieser Sorte
+     zweiter Anzeigestelle.
+     Drei Pruefungen statt einer, und alle drei sind STAERKER als die alte Wortform: dass es die
+     gemeinsame Funktion ist, dass sie den Aufklaerungsvorteil traegt, und dass der Bericht die
+     Standort-Verteidigung der kontoweiten VORZIEHT. Eine Rueckkehr zur zweiten Rechnung faellt
+     damit auf, statt nur eine geaenderte Zeichenkette zu sein. */
+  ['Aufklärung → Spionagebericht nutzt die GEMEINSAME Siegchance-Rechnung',
+   /const rechB = pvpSiegchance\(r\.targetId \|\| null, spyFlotte, defWert\)/, 1],
+  ['Die gemeinsame Rechnung traegt den Aufklaerungsvorteil',
+   /function pvpSiegchance\([\s\S]{0,600}?zielId \? spyIntelEdge\(zielId\) : 0/, 1],
+  /* Dieselbe Umstellung an der DRITTEN Anzeigestelle derselben Groesse: Profil-Vorschau und
+     Bedrohungs-Banner urteilten ueber entry.defensePower, also die Konto-Summe der Bestenliste -
+     waehrend ein Angriff ohne eigene Zielwahl die Heimatbasis mit DEREN Verteidigung trifft. Bei
+     einem Ziel mit Kolonien war das Urteil dadurch zu pessimistisch.
+     Die zweite Pruefung haelt fest, dass das Banner sagt, WORUEBER es urteilt: Ohne Aufklaerung
+     bleibt der Kontowert als Naeherung stehen, und dann muss es das auch dazusagen - sonst waere
+     die Zahl wieder eine Behauptung, die sie nicht einloest. */
+  ['Profil-Vorschau zieht die Standort-Verteidigung der kontoweiten vor',
+   /const defHeimat = entry\.id \? pvpStandortVerteidigung\(entry\.id, 'home'\) : null;[\s\S]{0,900}?const defVal = defAusAufklaerung \? defHeimat/, 1],
+  ['Bedrohungs-Banner benennt, worueber es urteilt',
+   /const wogegen = defAusAufklaerung \? ' gegen die Heimatbasis' : ' \(Schätzung übers ganze Reich\)'/, 1],
+  ['Spionagebericht zieht die Standort-Verteidigung der kontoweiten vor',
+   /const heimatDef = r\.targetId \? pvpStandortVerteidigung\(r\.targetId, 'home'\) : null;[\s\S]{0,200}?defWert = heimatDef !== null \? heimatDef : r\.defensePower/, 1],
   // Die Berichte-Box hat einen Wertlisten-Signatur-Cache. Der Aufklärungsvorteil fällt nach 30
   // Minuten von selbst weg - steht er nicht in der Signatur, friert die Zeile ein und behauptet
   // weiter einen Zuschlag, den es nicht mehr gibt.
