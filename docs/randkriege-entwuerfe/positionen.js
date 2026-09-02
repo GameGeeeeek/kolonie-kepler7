@@ -35,8 +35,15 @@ const nodeStart   = suche(/^  function galaxyNodeScale\(/);
 const nodeEnde    = endeVon(nodeStart, /^  }/);
 // galaxySlotPositions steht zwischen slotsStart und relaxStart – der ganze Block wandert mit,
 // inklusive galaxySpiralLayout und der Kommentare. Das ist gewollt: kein Nachbauen.
+// Deckel und Schubzahl aus der Spieldatei lesen statt sie hier festzuschreiben: 208 stand hier hart,
+// seit dem Startschub (02.09.2026) gilt 178, und das Spiralfeld rechnet 69 + 30 + 178 = 277 Plätze.
+const ganz = zeilen.join('\n');
+const deckel = (ganz.match(/const WEEKLY_SYSTEM_MAX = (\d+);/) || [])[1] || '208';
+const schubStart = ganz.indexOf('  const SCHUB_SYSTEMS = [');
+const schubZahl = schubStart < 0 ? 0 : (ganz.slice(schubStart, ganz.indexOf('\n  ];', schubStart)).match(/\bid:'syss_/g) || []).length;
 const quelle = [
-  'const WEEKLY_SYSTEM_MAX = 208;',
+  'const WEEKLY_SYSTEM_MAX = ' + deckel + ';',
+  'const SCHUB_SYSTEM_COUNT = ' + schubZahl + ';',
   schnitt(sysStart, sysEnde),
   'const BASE_STAR_SYSTEM_COUNT = STAR_SYSTEMS.length;',
   schnitt(hashStart, sunEnde),
