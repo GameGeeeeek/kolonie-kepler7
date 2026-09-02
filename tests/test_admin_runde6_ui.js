@@ -41,9 +41,14 @@ const JETZT = Date.now();
 {
   const i = JS.indexOf('const ADMIN_REITER = [');
   const literal = i >= 0 ? JS.slice(i, JS.indexOf('];', i)) : '';
-  check('0a: der Reiter Galaxie steht in ADMIN_REITER mit Ladefunktion, und es sind vierzehn Reiter',
-    /tab:'galaxie'[^\n]*laden:\(\) => loadAdminGalaxie\(\)/.test(literal) && (literal.match(/tab:'/g) || []).length === 14,
-    { reiter: (literal.match(/tab:'/g) || []).length });
+  // Bewusst OHNE feste Reiterzahl: Genau daran fiel test_admin_support_ui 0a, als dieser Reiter
+  // dazukam - und dieselbe Falle im Backend (test_admin_funktionen_http 3a zaehlte Notaus-Schalter).
+  // Geprueft wird, dass DIESER Reiter eingetragen ist und jeder Eintrag vollstaendig bleibt.
+  const eintraege = literal.split(/\n\s*\{ tab:/).slice(1);
+  check('0a: der Reiter Galaxie steht in ADMIN_REITER mit Ladefunktion, und jeder Eintrag ist vollstaendig',
+    /tab:'galaxie'[^\n]*laden:\(\) => loadAdminGalaxie\(\)/.test(literal)
+    && eintraege.length >= 14 && eintraege.every(e => /btn:'/.test(e) && /view:'/.test(e) && /laden:/.test(e)),
+    { reiter: eintraege.length });
   check('0b: das Postfach kennt beide neuen Meldungsarten',
     /'admin-alarm': \{ icon:'ti-alert-triangle'/.test(JS) && /'geschenk-konto': \{ icon:'ti-sparkles'/.test(JS));
   // ti-gift ist NICHT im 69er-Whitelist-Font - genau der Bug, wegen dem check-icons.js existiert
