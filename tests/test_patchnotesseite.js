@@ -47,8 +47,14 @@ check('VERSION aus der Spieldatei gelesen', !!version, version);
 // Die Patchnotes selbst ausfuehren statt per Regex zerlegen - die Eintraege enthalten Apostrophe
 // und HTML, eine naive Regex terminiert daran falsch (bekannter Fallstrick dieses Projekts).
 const von = src.indexOf('const PATCHNOTES = ['), bis = src.indexOf('\n  ];', von);
-const notes = new Function(src.slice(von, bis + 4) + '; return PATCHNOTES;')();
-check('PATCHNOTES-Array gelesen', notes.length > 100, notes.length);
+const imSpiel = new Function(src.slice(von, bis + 4) + '; return PATCHNOTES;')();
+// Seit dem 01.09.2026 stehen nur die neuesten Versionen im Spiel; die Historie liegt in
+// patchnotes-archiv.json (build-patchnotes.js rotiert). Die Seite muss BEIDES zeigen.
+const archivPfad = path.join(WURZEL, 'patchnotes-archiv.json');
+check('patchnotes-archiv.json existiert', fs.existsSync(archivPfad));
+const archiv = fs.existsSync(archivPfad) ? JSON.parse(fs.readFileSync(archivPfad, 'utf8')) : [];
+const notes = imSpiel.concat(archiv);
+check('PATCHNOTES aus Spiel und Archiv gelesen', imSpiel.length > 0 && notes.length > 100, { imSpiel: imSpiel.length, archiv: archiv.length });
 check('neuester Eintrag im Spiel entspricht der VERSION', notes[0].version === version,
   { version, neuester: notes[0].version });
 check('die Seite kennt die aktuelle Version – sonst ist sie veraltet (node build-patchnotes.js)',
@@ -81,8 +87,8 @@ const gen = path.join(WURZEL, 'build-patchnotes.js');
 check('build-patchnotes.js liegt im Repo', fs.existsSync(gen));
 if (fs.existsSync(gen)){
   const g = fs.readFileSync(gen, 'utf8');
-  check('der Generator liest die Spieldatei als einzige Quelle',
-    /weltraum_kolonie\.html/.test(g) && /const PATCHNOTES = \[/.test(g));
+  check('der Generator liest die Spieldatei und das Archiv - und sonst nichts',
+    /weltraum_kolonie\.html/.test(g) && /const PATCHNOTES = \[/.test(g) && /patchnotes-archiv\.json/.test(g));
   check('der Generator warnt, wenn VERSION und neuester Eintrag auseinanderlaufen',
     /WARNUNG: VERSION ist/.test(g));
 }

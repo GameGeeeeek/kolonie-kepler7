@@ -75,7 +75,7 @@ Der Pi-Deploy kopiert `*.html` ins Web-Verzeichnis und löscht dort nie; nginx n
 ## Patchnotes und Live-Dokumentation
 
 - `PATCHNOTES` sind unveränderliche Historie. Alte Einträge nicht rückwirkend umformulieren.
-- `patchnotes.html` nie von Hand pflegen; nach einem neuen Eintrag `node build-patchnotes.js` ausführen.
+- Im Spiel stehen nur die neuesten 20 Versionen; alles Ältere liegt in `patchnotes-archiv.json` (seit 01.09.2026). Neue Einträge werden weiterhin **nur** oben in `PATCHNOTES` geschrieben; `node build-patchnotes.js` rotiert die ältesten ins Archiv und schreibt `patchnotes.html`, `patchnotes-archiv.json`, `version.txt` und den Zähler `PATCHNOTES_ARCHIV_ANZAHL`. Alle diese Dateien gehören in denselben Commit; Archiv und `version.txt` nie von Hand anfassen.
 - Bei Mechanik-/Balance-Änderungen die aktuellen Texte in `HELP_SECTIONS` und `TUTORIAL_STEPS` mit aktualisieren.
 - Tests, die prüfen, dass ein alter Text nicht mehr existiert, dürfen nicht versehentlich im historischen `PATCHNOTES`-Block suchen.
 

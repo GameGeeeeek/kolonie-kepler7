@@ -169,8 +169,9 @@ function schnitt(von, bis){
   const ver = (src.match(/const VERSION = '([\d.]+)'/) || [])[1];
   const teile = (ver || '0.0.0').split('.').map(Number);
   check('5: VERSION ist mindestens 8.384.0', teile[0] > 8 || (teile[0] === 8 && teile[1] >= 384), ver);
+  // Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
   check('5: es gibt einen Patchnotes-Eintrag zu dieser Aenderung',
-    /Spieler-gegen-Spieler-Bericht zeigt endlich/.test(src));
+    /Spieler-gegen-Spieler-Bericht zeigt endlich/.test(require('./lib/patchnotes').patchnotesText(src)));
 }
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');

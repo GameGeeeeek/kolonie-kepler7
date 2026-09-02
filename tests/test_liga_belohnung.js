@@ -77,8 +77,9 @@ if (pnVon >= 0 && pnBis > pnVon) {
   check('3: keine Live-Anzeige nennt mehr die Werte von vor der Absenkung', treffer.length === 0, treffer);
   // Die Gegenprobe zur Gegenprobe: Der Ausschnitt muss die Historie WIRKLICH noch enthalten -
   // sonst hätte man die alten Werte nur aus dem Suchraum geschnitten statt aus der Anzeige.
+  // Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
   check('3-gegen: die Patchnotes-Historie nennt die alten Werte weiterhin',
-    S.slice(pnVon, pnBis).indexOf('60/30/15') >= 0);
+    require('./lib/patchnotes').patchnotesText(S).indexOf('60/30/15') >= 0);
 }
 
 ende();
