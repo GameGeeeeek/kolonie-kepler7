@@ -200,7 +200,18 @@ lassen (gedämpft, `aria-disabled`), Grund als `warn`-Toast. Und jede Sperre dar
 eine Sackgasse ist: Kosten oberhalb des Lagerdeckels lassen sich nie ansparen – dann gehört der
 Ausweg in den Text, nicht nur der Mangel.
 
-## 19. Wer erst aufräumt und dann fragt, fragt nach etwas, das er gerade weggeräumt hat
+## 19. Eine Bounding-Box misst auch das Label
+
+Der Test „der Marker wächst mit der Stufe" verglich `getBBox()` zweier Marker — und war am alten
+Stand mit **festem** Radius grün. Grund: In der Box steckt das `<text>` mit dem Namen, und
+„Sternenfestung" ist breiter als „Stützpunkt". Gemessen wurde die Textlänge, behauptet die Größe.
+
+Regel: Eine Größenmessung an einer Zeichnung braucht ein Element, das **nur** an der gesuchten Größe
+hängt (hier der Radius des Hof-Kreises). Und: Gefunden hat den Fehler die Gegenprobe, nicht der
+grüne Lauf — eine Prüfung, die am alten Stand grün bleibt, obwohl sie fallen müsste, ist der
+eigentliche Ertrag der Gegenprobe.
+
+## 20. Wer erst aufräumt und dann fragt, fragt nach etwas, das er gerade weggeräumt hat
 
 Sechs Missionsarten – Anfechtung, Festungsschlag, Nest-Schlag, Wrackkonvoi, Vorposten-Bau und
 Vorposten-Angriff – haben ihren Kampf **nie** ausgefochten, jede seit ihrer eigenen Auslieferung.

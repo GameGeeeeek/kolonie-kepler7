@@ -164,7 +164,7 @@ Paritätstest, gemessen gegen ein veraltetes eigenes `main`, sieht wie eine echt
 ## Eine Attrappe, die unbedingt Erfolg meldet, fälscht genau das, was fehlschlägt
 
 Sechs serverseitig entschiedene Mechaniken waren seit ihrer Auslieferung tot (siehe
-`docs/PROJECT_MEMORY.md`, Punkt 19) – und **jede hatte Tests**. Die Tests waren nicht schlampig
+`docs/PROJECT_MEMORY.md`, Punkt 20) – und **jede hatte Tests**. Die Tests waren nicht schlampig
 geschrieben; sie waren an genau einer Stelle blind: Ihre Backend-Attrappen antworteten
 *bedingungslos* mit einem Erfolgs-Objekt.
 

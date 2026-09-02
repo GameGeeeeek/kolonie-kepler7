@@ -294,7 +294,7 @@ synchron, aber `fetch()` geht im selben synchronen Durchlauf raus — vor dem Sp
 Gemessen (Playwright-Sonde, dreimal): `save+ save+ save+ >>attack<< save-`. Kommt das Speichern
 doch einmal zuerst an, fällt der Server auf `voll` zurück, also in die für den Spieler harmlose
 Richtung. Für die sechs PvE-Auflöser reichte genau das nicht — siehe `docs/PROJECT_MEMORY.md`,
-Punkt 19.
+Punkt 20.
 
 ### Die Kopie-Familie
 
