@@ -140,6 +140,35 @@ Paritätstest, gemessen gegen ein veraltetes eigenes `main`, sieht wie eine echt
 „behebt" dann etwas, das stromaufwärts längst geschlossen ist. Vor jeder Paritätsaussage deshalb
 **beide** Seiten auffrischen, nicht nur die, die der Prüflauf namentlich erwähnt.
 
+## Eine Attrappe, die unbedingt Erfolg meldet, fälscht genau das, was fehlschlägt
+
+Sechs serverseitig entschiedene Mechaniken waren seit ihrer Auslieferung tot (siehe
+`docs/PROJECT_MEMORY.md`, Punkt 18) – und **jede hatte Tests**. Die Tests waren nicht schlampig
+geschrieben; sie waren an genau einer Stelle blind: Ihre Backend-Attrappen antworteten
+*bedingungslos* mit einem Erfolgs-Objekt.
+
+```js
+if (p === 'festung/angriff') return j(antwort.body, antwort.status);   // fragt nie nach der Mission
+```
+
+Der echte Server sucht an dieser Stelle die Mission im gespeicherten Spielstand und antwortet ohne
+Fund mit 403. Die Attrappe übersprang genau diese Prüfung – also die einzige, die fehlschlug. Eine
+Prüfung wie „der Client ruft `/asteroid/contest` mit einer Missions-ID auf" war dadurch grün,
+während der Server diese ID nie zuordnen konnte.
+
+**Die Regel: Eine Attrappe muss die Vorbedingungen prüfen, an denen der echte Endpunkt scheitert –
+mindestens die, die er selbst aus dem mitgeschickten Zustand ableitet.** Wo ein Server aus dem
+gespeicherten Spielstand liest, muss die Attrappe aus dem zuletzt gespeicherten Stand lesen. Ein
+Erfolgs-Objekt aus dem Nichts prüft den Client gegen eine Welt, in der nichts schiefgehen kann.
+
+Erkennungsfrage beim Schreiben einer Attrappe: *Welche Antwort gibt der echte Endpunkt, wenn der
+Client etwas falsch macht – und kann meine Attrappe diese Antwort überhaupt erzeugen?* Lautet die
+Antwort „nein", prüft der Test den Fehlerfall nicht, egal wie viele Prüfungen er enthält.
+
+Gegenstück im Repo: `tests/test_server_aufloesung.js`. Seine Attrappe schlägt die Missions-ID im
+zuletzt gespeicherten Stand nach und antwortet ohne Fund mit 403 – das ist die tragende
+Eigenschaft dieses Tests, nicht ein Detail.
+
 ## Qualitätstor für KI-Agenten
 
 Ein KI-Agent darf eine Änderung nicht allein deshalb als fertig betrachten, weil der Patch plausibel aussieht. Für Kepler 7 gilt:

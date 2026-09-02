@@ -15876,7 +15876,13 @@
      Anfrage geht deshalb raus, bevor der Tick den Stand ohne Mission speichert. An diesem
      Unterschied ist der Fehler ueberhaupt aufgefallen. */
   const laufendeServerAufloesungen = new Set();
-  function serverMissionLaeuft(m){ return !!m && laufendeServerAufloesungen.has(m.id); }
+  /* `m.id !== undefined` ist keine Zierde: Ohne die Pruefung landete bei einer Mission ohne
+     Kennung `undefined` im Set - und danach gaelte JEDE kennungslose Mission als "beim Server",
+     bis die Antwort da ist. Schlimmer noch, das Aufraeumen unten sucht per findIndex nach
+     `x.id === m.id` und schnitte bei zwei kennungslosen Missionen die falsche heraus. Alle sechs
+     Missionsarten werden zwar mit nextMissionId() angelegt; ein von Hand verbogener Spielstand
+     ist aber genau der Fall, in dem eine stille Verwechslung am teuersten waere. */
+  function serverMissionLaeuft(m){ return !!m && m.id !== undefined && laufendeServerAufloesungen.has(m.id); }
   /* Bewusst eine Funktion mit switch und nicht eine Tabelle aus Funktionsverweisen: Ein
      Objektliteral auf oberster Ebene wird beim Laden ausgewertet und braeuchte die Aufloeser
      dort bereits - dieselbe Falle, die im Backend als temporale Todeszone dokumentiert ist. */
@@ -15909,7 +15915,8 @@
       .catch(e => { console.error(e); })
       .finally(() => {
         laufendeServerAufloesungen.delete(m.id);
-        const i = (fleet.missions || []).findIndex(x => x.id === m.id);
+        // Nur eine eindeutige Kennung darf zum Herausschneiden fuehren - siehe serverMissionLaeuft.
+        const i = m.id === undefined ? -1 : (fleet.missions || []).findIndex(x => x.id === m.id);
         if (i >= 0) fleet.missions.splice(i, 1);
         render(); save();
       });
@@ -34597,6 +34604,22 @@ async function claimPendingRewards(){
       html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Deine Reichsflotte bringt <strong>${fmt(kraft)}</strong> Angriffskraft mit. `
             + `Wie stark die Heimatbasis verteidigt ist, verrät erst eine Aufklärung.</div>`;
     }
+    /* PvP-Mindesteinsatz: die Warnung VOR dem Start. Sie ist der eigentliche Sinn dieser Etappe -
+       eine Regel, die dem Spieler erst im Bericht begegnet, bestraft ihn fuer etwas, das er beim
+       Zusammenstellen der Flotte nicht sehen konnte.
+       Sie haengt am Schalter, weil sie sonst luegen wuerde, solange der Server die Regel gar nicht
+       anwendet; PVP_MINDESTEINSATZ_AKTIV wird auf beiden Seiten in EINEM Zug umgelegt.
+       Gerechnet wird mit der eigenen Flottenauswahl - der Server rechnet dieselbe Form ueber den
+       gespeicherten Spielstand, die Zahl kann also um den Bruchteil abweichen, den eine seit dem
+       letzten Speichern gebaute Werft ausmacht. Deshalb steht hier eine Naeherung ("~") und im
+       BERICHT danach die Zahl des Servers. */
+    if (PVP_MINDESTEINSATZ_AKTIV){
+      const anteil = pvpEinsatzAnteil(flotte);
+      const pAnteil = Math.round(anteil*100), pNoetig = Math.round(PVP_MINDESTEINSATZ*100);
+      html += anteil < PVP_MINDESTEINSATZ
+        ? `<div class="bmeta" style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <strong>Unter dem Mindesteinsatz:</strong> Du schickst ~${pAnteil}% deiner Reichsflotte, nötig sind ${pNoetig}%. Der Kampf läuft mit der vollen Reichskraft, bringt aber nichts ein – keine Beute, keine Kampfpunkte, kein Schaden beim Ziel.</div>`
+        : `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Einsatz ~${pAnteil}% deiner Reichsflotte – über dem Mindesteinsatz von ${pNoetig}%.</div>`;
+    }
     const bf = (ziel && ziel.beuteFaktor) || 1;
     const frachtRaum = fleetCargoCapacity(flotte);
     html += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute: <strong>×${bf.toFixed(2)}</strong> `
@@ -34867,7 +34890,22 @@ async function claimPendingRewards(){
           state.resources[res] = Math.min(cargoCap, before+g);
           carried[res] = state.resources[res]-before;
         }
-        const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ') || 'nichts (Ziel hatte keine Ressourcen)';
+        /* Im Sockel schickt der Server gar keine Beute - der Grund ist der Einsatz, nicht ein
+           leeres Lager beim Ziel. Der alte Rueckfalltext waere hier woertlich falsch gewesen und
+           haette den Spieler ausgerechnet in die Irre gefuehrt, wo er eine Erklaerung braucht. */
+        const lootTxt = Object.entries(carried).map(([res,a])=>fmt(a)+' '+(RES_DEFS.find(x=>x.key===res)||{label:res}).label).join(', ')
+          || (ertragSockel ? 'nichts' : 'nichts (Ziel hatte keine Ressourcen)');
+        /* Der Sockel gehoert ins Log UND in den Bericht. Ein gewonnener Angriff ohne Beute, ohne
+           Kampfpunkte und ohne Schaden sieht sonst nach einem Fehler aus - und der Spieler kann
+           beim naechsten Mal nichts besser machen, wenn ihm niemand den Grund nennt.
+           Der Anteil kommt aus der ANTWORT (data.einsatzAnteil), nicht aus der eigenen Rechnung:
+           entschieden hat der Server, und genau seine Zahl soll dastehen. */
+        const anteilTxt = typeof data.einsatzAnteil === 'number'
+          ? ' (eingesetzt waren ' + Math.round(data.einsatzAnteil*100) + '% deiner Reichsflotte)' : '';
+        const sockelNote = ertragSockel
+          ? ' Der Einsatz lag unter dem Mindesteinsatz von ' + Math.round(PVP_MINDESTEINSATZ*100) + '%'
+            + anteilTxt + ' – der Angriff bringt deshalb weder Beute noch Kampfpunkte, und das Ziel nimmt keinen Schaden.'
+          : '';
         const bpGained = ertragSockel ? 0 : (warTag ? Math.round(25*1.5) : 25);
         if (bpGained > 0){
           awardBattlePoints(bpGained);
@@ -34875,11 +34913,15 @@ async function claimPendingRewards(){
         }
         // Kriegspunkte sind ebenfalls ein Ertrag - ein Nadelstich soll keinen Krieg entscheiden.
         if (warTag && !ertragSockel){ addWarScore(warTag, 1); state.warVictories = (state.warVictories||0)+1; }
-        const cargoNote = (m.cargoCapacity||0)<=0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale<1 ? ' Frachtraum reichte nicht für die volle Beute.' : '');
+        /* Im Sockel gab es gar keine Beute zu tragen. Ein Hinweis auf fehlende Frachter nennte
+           dann eine Ursache, die nicht die Ursache war - genau die Sorte zweiter Anzeigestelle,
+           die in diesem Projekt regelmaessig die alte Annahme behaelt. */
+        const cargoNote = ertragSockel ? ''
+          : ((m.cargoCapacity||0)<=0 ? ' Ohne Frachter konnte keine Beute abtransportiert werden!' : (cargoScale<1 ? ' Frachtraum reichte nicht für die volle Beute.' : ''));
         const ownLostWinBackend = applyWinLoss();
         const ownLossTxt = lostCountsToText(ownLostWinBackend);
         if (showLog !== false){
-          log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+cargoNote+(data.destroyedBuilding?(' '+(data.destroyedBuildingCount>1?(data.destroyedBuildingCount+' Verteidigungsgebäude wurden zerstört.'):'Ein Verteidigungsgebäude wurde zerstört.')):'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
+          log((m.fleetName||'Flotte')+': Angriff auf '+name+' erfolgreich! Erbeutet: '+lootTxt+'.'+sockelNote+cargoNote+(data.destroyedBuilding?(' '+(data.destroyedBuildingCount>1?(data.destroyedBuildingCount+' Verteidigungsgebäude wurden zerstört.'):'Ein Verteidigungsgebäude wurde zerstört.')):'')+(ownLossTxt?' Eigene Verluste: '+ownLossTxt+'.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')'+(warTag?' Kriegsangriff!':''), 'ti-sword');
           playSound('win');
         }
         const __battleReport = { type:'player-attack', result:'win', targetName:name, ...(m.targetPlanet ? { standortName: m.standortName, standortArt: m.standortArt } : {}), attackPower:data.attackPower, defensePower:data.defensePower, loot:carried, cargoCapacity:m.cargoCapacity, cargoLimited:cargoScale<1, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostWinBackend, debris:combatDebrisOf(ownLostWinBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
@@ -34894,7 +34936,10 @@ async function claimPendingRewards(){
         }
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
-        if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
+        // Auch hier der Grund: Ohne ihn fehlten dem Spieler die 3 Trostpunkte ohne jede Erklaerung.
+        const sockelNoteVerlust = ertragSockel
+          ? ' Der Einsatz lag unter dem Mindesteinsatz von ' + Math.round(PVP_MINDESTEINSATZ*100) + '% – deshalb gibt es nicht einmal den Trostpreis.' : '';
+        if (showLog !== false) log((m.fleetName||'Flotte')+': Angriff auf '+name+' gescheitert.'+sockelNoteVerlust+(ownLostLossTxt?' Verluste: '+ownLostLossTxt+'. Trümmerfeld hinterlassen.':'')+' (Angriffspunkte '+data.attackPower+' vs. Verteidigungspunkte '+data.defensePower+')', 'ti-shield');
         const __battleReport = { type:'player-attack', result:'loss', targetName:name, ...(m.targetPlanet ? { standortName: m.standortName, standortArt: m.standortArt } : {}), attackPower:data.attackPower, defensePower:data.defensePower, fromPlanet:planetDisplayName(planetKey), debrisPlanet:planetKey, warTag, ownLostShips:ownLostLossBackend, debris:combatDebrisOf(ownLostLossBackend), fleet:m.composition||fleet, ...pvpKampfDetails(data) };
             pushReport(__battleReport);
             maybeAutoWatchBattle(__battleReport);
@@ -43011,6 +43056,12 @@ async function claimPendingRewards(){
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Bergungsfrachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Der <strong>Recycler</strong> sammelt an dem Planeten, an dem er steht; zu einem fremden Trümmerfeld geschickt, wird daraus ein Auftrag mit Flottenslot und selbständiger Rückkehr. Drei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet - und <strong>Bergungsfrachter</strong> (braucht zusätzlich <em>Minentechnik</em>, 3.000 Frachtraum bei Geschwindigkeit 25) für den Asteroidenbergbau auf große Entfernung. Beim Bergungsfrachter zwei Dinge im Blick behalten: Eine Flotte fliegt immer im Tempo ihres <em>langsamsten</em> Schiffs, er verdoppelt die Flugzeit gegenüber dem Großen Frachter also fast - und er ist der einzige Frachter <strong>ohne</strong> passiven Lagerbeitrag, sein Rumpf ist reiner Frachtraum. Er lohnt sich dort, wo lange gegraben und selten geflogen wird. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
       { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.<br><br><strong>Drei Klassen haben am 02.08.2026 die Rolle gewechselt.</strong> Die Verteilung war 5 Abfangjäger / 5 Bomber / <em>11 Großkampfschiffe</em> – und die elf waren ausgerechnet die schweren, spät verfügbaren Klassen. Weil der Konter nach dem <em>Anteil</em> an der Gegnerflotte wirkt, wurde damit jede Flotte, die schlicht das jeweils Beste baut, automatisch kapitallastig; im Endspiel fiel Schere-Stein-Papier auf Stein-gegen-Stein zusammen. Der <strong>Carrier</strong> (ein Träger, der leichte Jäger ins Gefecht bringt) und der <strong>Riftwächter</strong> (leichter, schneller Rumpf) zählen jetzt als Abfangjäger, das <strong>Enterschiff</strong> (greift große, träge Ziele an, um sie zu kapern) als Bomber. Neue Verteilung: 7 / 6 / 8. Weil die Konterrolle zugleich die <strong>Werftmarken-Familie</strong> bestimmt, ändern sich für diese drei Klassen auch die Zuwächse je Marke.' },
       { title:'Kampfphasen', body:'Ein Kampf wird nicht mehr mit einem einzigen Wurf entschieden, sondern in <strong>drei Phasen</strong>: <strong>Anflug</strong>, <strong>Hauptgefecht</strong> und <strong>Rückzug</strong>. Wer zwei der drei Phasen gewinnt, gewinnt den Kampf. Der Clou ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen <strong>anderthalbfach</strong>, im Hauptgefecht normal, im Rückzug nur halb. Eine gut zusammengestellte Flotte entscheidet den Kampf also früh; wer gekontert wurde, kann sich im weiteren Verlauf noch fangen. <strong>Was sich dadurch ändert:</strong> Der Gesamt-Spielraum bleibt gleich (min. 5%, max. 95% Siegchance), aber der Stärkere gewinnt <em>verlässlicher</em> – bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Weniger Zufall, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln. <strong>Gegen andere Spieler</strong> ist der Spielraum bewusst enger: dort liegt die Siegchance immer zwischen <strong>10% und 90%</strong> – kein Angriff auf einen Mitspieler ist sicher, keiner chancenlos. Die Angriffs-Vorschau im Spielerprofil nennt genau diese Zahl – und seit dem 01.08.2026 auch der <strong>Spionagebericht</strong>, der dieselbe Lage vorher mit einer veralteten Formel und damit einer abweichenden Zahl bewertete. Sie bleibt aber eine Schätzung: Die <strong>Verteidigungs-Aufstellung</strong> des Ziels wird erst beim Eintreffen angewandt und ist vorher nicht einsehbar. Seit dem 02.08.2026 zeigt auch der <strong>Spieler-gegen-Spieler-Bericht</strong> jede Phase einzeln – er war bis dahin der einzige Kampfbericht, der nur das Endergebnis nannte, obwohl der Server die drei Phasen längst würfelte. Und seit dem 17.08.2026 würfelt auch die <strong>Überfall-Abwehr</strong> dieselben drei Phasen (NPC-Spielraum 5–95%) – sie war der letzte Kampf des Spiels, der noch mit einem einzigen Wurf entschieden wurde, und nutzte dabei sogar die engeren PvP-Grenzen. Überfall- und Späh-Bericht nennen die Phasenurteile und die Abwehrchance jetzt ebenfalls.' },
+      /* Der Hilfetext haengt am selben Schalter wie die Regel. Ein Abschnitt, der einen
+         Mindesteinsatz beschreibt, waehrend der Server ihn gar nicht anwendet, waere eine
+         Falschauskunft - und Hilfetexte sind in diesem Projekt schon mehrfach genau so zur
+         zweiten Anzeigestelle mit der alten Annahme geworden. Beim Umlegen des Schalters
+         erscheint er automatisch mit. */
+      ...(PVP_MINDESTEINSATZ_AKTIV ? [{ title:'Mindesteinsatz bei Spielerangriffen', body:'Deine Angriffskraft gegen einen Mitspieler ist die deiner <strong>gesamten Reichsflotte</strong> – nicht nur die der Schiffe, die du losschickst. Das ist Absicht und bleibt so. Es hatte aber eine unbeabsichtigte Folge: Ein Angriff mit einem <em>einzigen</em> Jäger kämpfte mit der vollen Reichskraft, riskierte aber nur diesen einen Jäger – und brachte trotzdem Kampfpunkte, zerstörte Anlagen und kostete den Verteidiger Flotte.<br><br>Deshalb gilt jetzt ein <strong>Mindesteinsatz von '+Math.round(PVP_MINDESTEINSATZ*100)+'%</strong> deiner Reichsflotte. Wer darunter bleibt, wird <em>nicht abgewiesen</em> – der Kampf läuft ganz normal, mit derselben Siegchance wie immer. Er bringt nur nichts ein: <strong>keine Beute, keine Kampfpunkte, keine Kriegspunkte, keine Veteranen-Erfahrung, kein Schaden beim Ziel</strong>. Deine eigenen Verluste fallen trotzdem an – ein Nadelstich ist damit nicht gratis, aber auch nicht mehr lohnend.<br><br><strong>Warum abweisen die schlechtere Lösung wäre:</strong> Beim Eintreffen hast du Treibstoff und Flugzeit längst bezahlt, und deine Flotte kann seit dem Start gewachsen sein. Eine Schwelle, die dort „nein" sagt, bestraft dich für etwas, das du nicht mehr ändern kannst.<br><br><strong>Du siehst es vorher:</strong> Die Angriffs-Vorschau nennt deinen Einsatzanteil, bevor die Flotte startet. Nach dem Kampf steht die Zahl des Servers im Bericht. Und ein Hinweis, falls deine Flotte über viele Standorte verteilt ist: Der Anteil wird über dein <em>ganzes</em> Reich gerechnet, ein Angriff startet aber von <em>einem</em> Standort – wer alles gleichmäßig verteilt, muss dafür Schiffe zusammenziehen.' }] : []),
       { title:'Enterung – die vierte Phase', body:'Das <strong>Enterschiff</strong> (Event-Schiff des „Piratenüberfalls") kann als einziges Schiff <strong>entern</strong>. Fliegt mindestens eines im Angriff mit und ist der Kampf gegen einen <strong>NPC-Gegner</strong> gewonnen, folgt eine vierte, eigen gewürfelte Phase. Sie läuft gegen den <em>überlebenden</em> Rest der Gegnerflotte – wer knapp gewinnt, hat mehr Widerstand vor sich als wer überrannt hat. <strong>Bei Erfolg</strong> übernimmst du gegnerische Schiffe: zwei Enterschiffe tragen ein Prisenkommando, also einen Kaperplatz (maximal 10 je Kampf). Kaperbar sind nur kleine bis mittlere Klassen bis Bomber – Schlachtschiff, Leerenjäger und Superschlachtschiff lassen sich nicht übernehmen, die Enterung ist keine Abkürzung zu Großschiffen. <strong>Der Preis:</strong> Gekaperte Schiffe fehlen anschließend im <strong>Trümmerfeld</strong> – du tauschst Recycler-Beute gegen Schiffe, es gibt nichts obendrauf. <strong>Bei Fehlschlag</strong> kommen 30% der eingesetzten Enterschiffe nicht zurück. Die Angriffs-Vorschau nennt Chance und Kaperplätze vorher, der Kampfbericht zeigt die Phase einzeln. <strong>Nicht möglich</strong> ist die Enterung gegen andere Spieler (dort rechnet der Server den Kampf allein) und gegen Piratennester (die haben keine modellierte Flotte).' },
       { title:'Prisengut & Prisenhof', body:'Jede geglückte Enterung bringt neben den Schiffen auch <strong>Prisengut</strong> – so viel, wie die gekaperten Schiffe an Punktegewicht wert sind. Es ist die einzige Beute, die man <em>nur</em> übers Entern bekommt, und die einzige Verwendung dafür ist der <strong>Prisenhof</strong> im Flotte-Tab (Unterreiter „Flotte & Verlegen", erscheint, sobald du Enterschiffe besitzt). Drei feste Angebote, bewusst ohne jede Kopplung an deine Produktionsgröße: <strong>Beutegut ausschlachten</strong> (400 Prisengut → 1 Modulfragment; dasselbe Fragment kostet im Kredit-Shop 4.000 Kredite), <strong>Prise verhökern</strong> (25 Prisengut → 200 Kredite, der schnellere aber leicht schlechtere Kurs) und der <strong>Enterhaken-Ausbau</strong> in fünf Stufen (300/700/1.300/2.200/3.500 Prisengut), der dauerhaft je Stufe <strong>+1 Kaperplatz</strong> und <strong>+4 Prozentpunkte</strong> Enterchance gibt. Damit ist Prisengut eine geschlossene Schleife: Es entsteht nur beim Entern und fließt vor allem ins Entern zurück.' },
       { title:'Verteidigungs-Aufstellung', body:'Im Verteidigung-Tab wählst du eine <strong>Aufstellung</strong>, die für alle deine Planeten gilt: <strong>Ausgewogen</strong> (keine Schwerpunkte, wirkt nie), <strong>Schilde vorn</strong> (+15% gegen Bomber, -10% gegen Abfangjäger) oder <strong>Geschütze vorn</strong> (+15% gegen Abfangjäger, -10% gegen Bomber). Sie ist das Gegenstück zur Konterrolle des Angreifers – nur legst du dich fest, <em>ohne</em> zu wissen, wer kommt. Genau das ist der Preis dafür, dass sie überhaupt etwas bringt. Wie die Konter wirkt sie anteilig: Ein einzelner Bomber in einer Abfangjäger-Flotte kippt nichts. Wirkt bei NPC-Überfällen und bei Spieler-Angriffen (dort serverseitig geprüft). Im Kampfbericht steht, wie stark deine Aufstellung gegen die konkrete Angriffsflotte getragen hat.<br><br><strong>Eine erfolgreiche Abwehr wird seit dem 02.08.2026 bezahlt.</strong> Vorher bekam der siegreiche Angreifer 25 Kampfpunkte, der <em>geschlagene</em> Angreifer 3 – und der erfolgreiche Verteidiger nichts. Der Verlierer wurde also besser bezahlt als der Sieger. Jetzt bringt jeder abgewehrte Spielerangriff <strong>5 bis 40 Kommandopunkte</strong>, gestaffelt danach, wie stark der Angriff im Verhältnis zu deiner Verteidigung war: eine chancenlose Belästigung bringt das Minimum, ein knapp gescheiterter Großangriff das Maximum. Bewusst <em>Kommandopunkte</em> und nicht Kampfpunkte – Kampfpunkte gehen in den Punktestand, und eine Verteidigung, die den Rang hebt, wäre über abgesprochene Angriffe farmbar. Damit steht der Offiziersausbau erstmals auch dem Spieler offen, der nie selbst angreift. Die Prämie steht im Kampfbericht, die Zahl der abgewehrten Angriffe in der Kampf-Bilanz im Berichte-Tab.<br><br><strong>Ein durchgebrochener Angriff kostet seit dem 02.08.2026 auch Schiffe.</strong> Bis dahin zerstörte ein Spielerangriff nur Verteidigungs<em>gebäude</em>; die stationierte Flotte blieb unberührt, egal wie hoch man verlor. Jetzt verliert sie bei einem <em>erfolgreichen</em> Angriff rund <strong>6 bis 12,5 %</strong> ihrer Schiffe – die Hälfte des Ressourcenverlusts, dieselbe Regel wie beim NPC-Überfall. Der Verlust trifft <em>jeden</em> Standort mit Flotte, weil auch deine Verteidigungskraft aus allen Standorten zusammen gerechnet wird, und an jedem entsteht ein <strong>Trümmerfeld</strong>, das du mit Recyclern wieder einsammeln kannst. Eine <em>abgewehrte</em> Attacke kostet dich weiterhin kein einziges Schiff. Der Angreifer bekommt von diesen Trümmern nichts – die Änderung ist Abnutzung, kein neuer Beutekanal.' },
@@ -44293,6 +44344,16 @@ async function claimPendingRewards(){
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';
         if (r.warTag) body += '<br><span style="color:#e24b4a;"><i class="ti ti-skull" aria-hidden="true"></i> Kriegsangriff gegen Allianz ['+escapeHtml(r.warTag)+'] – +50% Kampfpunkte, zählt für den Kriegspunktestand.</span>';
         body += standortBerichtszeile(r, true);
+        /* PvP-Mindesteinsatz - der wichtigste Satz des Berichts, wenn er greift. Ohne ihn stuende
+           dort ein GEWONNENER Angriff ohne Beute, ohne Kampfpunkte und ohne Schaden, und nichts
+           erklaerte das. Die Zeile erscheint nur, wenn der Server 'sockel' gemeldet hat; ein
+           aelterer Server schickt das Feld nicht, dann bleibt der Bericht wie bisher. */
+        if (r.ertragStufe === 'sockel'){
+          body += '<br><span style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> <strong>Unter dem Mindesteinsatz</strong> – '
+                + (typeof r.einsatzAnteil === 'number'
+                    ? 'eingesetzt waren ' + Math.round(r.einsatzAnteil*100) + '% deiner Reichsflotte, nötig sind ' + Math.round(PVP_MINDESTEINSATZ*100) + '%. ' : '')
+                + 'Der Kampf lief mit der vollen Reichskraft, brachte aber nichts ein: keine Beute, keine Kampfpunkte, kein Schaden beim Ziel.</span>';
+        }
         body += '<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt');
         body += '<br>Eingesetzte Flotte: '+shipCountRowHtml(r.fleet||{});
         // Im PvP rechnet der SERVER die Angriffskraft (rawFleetPower mit demselben Markenfaktor wie
@@ -44314,7 +44375,11 @@ async function claimPendingRewards(){
         if (r.defenderLossPct > 0) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e0a548;"></i> Die Verteidigungsflotte verliert rund '+String(Math.round(r.defenderLossPct*1000)/10).replace('.',',')+'% ihrer Schiffe (Trümmer bleiben beim Verteidiger).';
         if (r.defenseBefore && Object.keys(r.defenseBefore).length) body += '<br>Verteidigung des Ziels: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
         if (r.simulated) body += '<br><span class="bmeta">Simuliertes Duell (kein eigener Server aktiv) – kein echter Ressourcenverlust beim Gegner.</span>';
-        if (r.loot){
+        /* `r.ertragStufe !== 'sockel'`: Im Sockel ist `loot` ein LEERES Objekt - und dafuer ist
+           `if (r.loot)` wahr. Der Bericht schriebe sonst eine leere Beutezeile und darunter
+           womoeglich "Keine Frachter mitgefuehrt", obwohl es gar nichts zu tragen gab. Den Grund
+           nennt die Sockel-Zeile weiter oben. */
+        if (r.loot && r.ertragStufe !== 'sockel'){
           body += '<br>Beute: '+rewardHtml(r.loot);
           if (r.cargoCapacity <= 0) body += '<br><span style="color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Keine Frachter mitgeführt – Beute ging verloren!</span>';
           else if (r.cargoLimited) body += '<br><span style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Frachtraum war zu knapp (Kapazität: '+fmt(r.cargoCapacity)+') – ein Teil der Beute ging verloren.</span>';
@@ -55952,7 +56017,7 @@ async function claimPendingRewards(){
       /* Erst markieren, dann filtern - der Filter darunter laesst genau die markierten stehen.
          Sie muessen im Spielstand bleiben, bis der Server geantwortet hat (siehe
          serverAufloesungStarten); entfernt werden sie dort. */
-      for (const m of done) if (serverAufloeserFuer(m.type)) laufendeServerAufloesungen.add(m.id);
+      for (const m of done) if (m.id !== undefined && serverAufloeserFuer(m.type)) laufendeServerAufloesungen.add(m.id);
       fleet.missions = fleet.missions.filter(m => now < m.endTime || serverMissionLaeuft(m));
       for (const m of done){
         /* Abbaumission zurueck (v8.478.0). Bewusst VOR der type-Kette und mit continue statt als
