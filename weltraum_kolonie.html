@@ -7320,8 +7320,12 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.631.0';
+  const VERSION = '8.633.0';
   const PATCHNOTES = [
+    { version:'8.633.0', date:'02.09.2026', changes:[
+      '<strong>Abklingzeit an Wrackkonvois, Alien-Nestern und Festungen: sichtbar, und ein Angriff hinein kommt gar nicht erst zustande.</strong> Der Marker nennt im Tooltip, wann dein nächster Schlag möglich ist, das Kartenmenü zeigt eine eigene Zeile mit deinem letzten und nächsten Schlag, und der Angriffsknopf bleibt gesperrt, solange die Abklingzeit läuft – auch im Flottenwahl-Fenster. Neu ist außerdem: Die Sperre „ein Verband ist bereits unterwegs" gilt jetzt über alle deine Standorte. Bisher konnte eine Kolonie einen zweiten Verband losschicken, der Minuten nach dem ersten ankam und vom Server wegen Abklingzeit abgewiesen wurde. Danke an Sascha für die Meldung.',
+      '<strong>Verbrauchsgüter lassen sich direkt in der Sammlung aktivieren.</strong> Jedes Verbrauchsgut, das du besitzt, trägt dort einen Aktivieren-Knopf – dieselbe Wirkung wie im Inventar unter Fortschritt, ohne den Umweg. Module, Materialien und Reliquien bleiben reine Anzeige.'
+    ] },
     { version:'8.631.0', date:'02.09.2026', changes:[
       '<strong>Die Fernaufklärung hat 30 neue Sternsysteme kartiert – mitten in der bekannten Galaxie.</strong> Fünf davon im Kepler-Kern, fünf in den Meridian-Weiten, drei bis vier in jedem anderen Sektor, mit zusammen 236 neuen Planeten. Die Galaxie hat damit 111 Systeme; jeden Montag kommen weiterhin zwei am Rand dazu, der Deckel liegt jetzt bei 277 Systemen. Wer die Galaxie schon kannte, bekommt die Neuen einmal im Protokoll genannt.',
       '<strong>Die Asteroidengürtel bleiben, wo sie sind.</strong> Bisher rutschte die Auswahl der 20 Gürtelsysteme mit jedem neuen Wochensystem – ein System konnte seinen Gürtel verlieren, und damit Schürfrechte und dort stationierte Eskorten. Die Auswahl ist eingefroren. Außerdem rechneten Spiel und Server die Gürtel bisher verschieden: zehn Gürtel des Servers waren im Spiel unsichtbar, und zehn Systeme trugen einen Gürtelring ohne Feld dahinter. Jetzt gilt überall die Liste des Servers – in Abyss, Nebel, Orion, Kepler und sechs weiteren Systemen erscheinen deshalb Brocken, die es dort längst gab.',
@@ -14179,6 +14183,30 @@
     const mein = (k && k.schlaege && state.player && k.schlaege[state.player.id]) || 0;
     return mein ? mein + KONVOI_ABKLING_STD*3600*1000 : 0;
   }
+  /* Verband schon unterwegs - ueber ALLE Standorte (02.09.2026, Spieler-Report Sascha: "wenn cooldown
+     da sollte man erst garnicht angreifen koennen"). Die Kartenmenues prueften nur die Flotte des
+     aktiven Standorts (cf.missions): Ein zweiter Verband von einer Kolonie flog los, kam Minuten
+     nach dem ersten an und lief in die 403-Abklingzeit des Servers - fuer den Spieler ein Angriff,
+     den das Spiel zugelassen und der Server verworfen hat. Die Abklingzeit gilt je SPIELER, also
+     gilt auch die Sperre je Spieler. Gilt fuer Konvoi, Nest und Festung gleichermassen. */
+  function pveVerbandUnterwegs(typ, feld, wert){
+    return allFleetsWithPlanet().some(x => ((x.fleet && x.fleet.missions) || []).some(m => m && m.type === typ && String(m[feld]) === String(wert)));
+  }
+  /* Die eigene Abklingzeit als Menuezeile - sichtbar auch dann, wenn der Knopf aus einem anderen
+     Grund gesperrt ist (Konvoi und Nest; die Festung hat festungBeitragZeilen). Leer ohne eigenen Schlag. */
+  function pveAbklingZeile(letzter, bis, ziel){
+    const jetzt = Date.now();
+    if (!letzter) return '';
+    return `<div class="bmeta" data-pve-abkling="${bis > jetzt ? '1' : '0'}"><i class="ti ti-clock" aria-hidden="true"></i> Dein letzter Schlag an ${ziel}: vor ${fmtDuration((jetzt - letzter)/1000)}${bis > jetzt ? ' – nächster in <strong>' + fmtDuration((bis - jetzt)/1000) + '</strong>' : ' – du kannst wieder angreifen'}. Jeder Schlag steht unter Berichte › Kämpfe.</div>`;
+  }
+  /* Nach einem gewerteten Schlag den eigenen Stempel SOFORT am Ziel setzen: Der Server hat ihn
+     gesetzt, aber loadGalaxyState() holt ihn erst asynchron - bis dahin liesse das Menue einen
+     zweiten Start zu, der bei der Ankunft an der Abklingzeit scheitert. */
+  function pveSchlagMerken(ziel){
+    if (!ziel || !state.player || !state.player.id) return;
+    ziel.schlaege = ziel.schlaege || {};
+    ziel.schlaege[state.player.id] = Date.now();
+  }
   // Wann entkommt der Konvoi (Lebensdauer)? Fuer die "entkommt in X"-Zeile im Kartenmenue.
   function konvoiEntkommtBis(k){
     return (k && k.seit) ? k.seit + KONVOI_LEBENSDAUER_STD*3600*1000 : 0;
@@ -15316,7 +15344,8 @@
       keys: ATTACK_SHIP_KEYS,
       vorschau: (flotte) => nestVorschauHtml(flotte, nestId),
       startLabel: 'Angriff starten',
-      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      sperre: (flotte) => nestAbklingBis(nest) > Date.now() ? 'Abklingzeit – nächster Schlag an diesem Nest in ' + fmtDuration((nestAbklingBis(nest) - Date.now())/1000) + '.'
+        : ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
       start: () => sendNestMission(nestId)
     });
   }
@@ -15324,6 +15353,10 @@
     const cf = currentFleet();
     const nest = (galaxyCache.alienNester || []).find(n => n && String(n.id) === String(nestId));
     if (!nest){ log('Dieses Nest gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    // Torwaechter am START (02.09.2026) - siehe sendKonvoiMission.
+    const abklingN = nestAbklingBis(nest);
+    if (abklingN > Date.now()){ log('Deine Verbände sammeln sich neu – nächster Schlag an diesem Nest in ' + fmtDuration((abklingN - Date.now())/1000) + '.', 'ti-clock', 'warn'); return; }
+    if (pveVerbandUnterwegs('nest-angriff', 'nestId', nest.id)){ log('Ein Verband ist bereits zu diesem Nest unterwegs – warte seinen Schlag ab.', 'ti-alert-triangle', 'warn'); return; }
     const v = nestVolk(nest.volk);
     const stDef = nestStufeDef(nest.stufe);
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
@@ -15387,7 +15420,8 @@
       keys: ATTACK_SHIP_KEYS,
       vorschau: (flotte) => konvoiVorschauHtml(flotte, konvoiId),
       startLabel: 'Angriff starten',
-      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      sperre: (flotte) => konvoiAbklingBis(k) > Date.now() ? 'Abklingzeit – nächster Schlag an diesem Konvoi in ' + fmtDuration((konvoiAbklingBis(k) - Date.now())/1000) + '.'
+        : ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
       start: () => sendKonvoiMission(konvoiId)
     });
   }
@@ -15395,6 +15429,11 @@
     const cf = currentFleet();
     const k = (galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(konvoiId));
     if (!k){ log('Diesen Wrackkonvoi gibt es nicht mehr.', 'ti-alert-triangle'); return; }
+    /* Torwaechter am START (02.09.2026): Abklingzeit und "schon unterwegs" nicht nur im Kartenmenue,
+       sondern hier, wo die Mission entsteht - der Dialog kann laenger offen stehen, als der Zustand gilt. */
+    const abklingK = konvoiAbklingBis(k);
+    if (abklingK > Date.now()){ log('Deine Verbände sammeln sich neu – nächster Schlag an diesem Konvoi in ' + fmtDuration((abklingK - Date.now())/1000) + '.', 'ti-clock', 'warn'); return; }
+    if (pveVerbandUnterwegs('konvoi-angriff', 'zielId', k.id)){ log('Ein Verband ist bereits zu diesem Konvoi unterwegs – warte seinen Schlag ab.', 'ti-alert-triangle', 'warn'); return; }
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
     const n = ATTACK_SHIP_KEYS.reduce((sm, key) => sm + (flotte[key]||0), 0);
     if (n < 1){ log('Wähle mindestens ein Kampfschiff für den Angriff.', 'ti-alert-triangle'); return; }
@@ -15662,7 +15701,9 @@
       keys: ATTACK_SHIP_KEYS,
       vorschau: (flotte) => festungVorschauHtml(flotte, sysId),
       startLabel: 'Angriff starten',
-      sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null,
+      sperre: (flotte) => { const l = (fest.schlaege && state.player && fest.schlaege[state.player.id]) || 0, bis = l ? l + FESTUNG_ABKLING_STD*3600*1000 : 0;
+        return bis > Date.now() ? 'Abklingzeit – nächster Schlag an dieser Festung in ' + fmtDuration((bis - Date.now())/1000) + '.'
+          : ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : null; },
       start: () => sendFestungsMission(sysId)
     });
   }
@@ -15671,6 +15712,11 @@
     const feld = state.asteroidFeld && state.asteroidFeld[sysId];
     const fest = feld && feld.festung;
     if (!fest){ log('Diese Festung steht nicht mehr.', 'ti-alert-triangle'); return; }
+    // Torwaechter am START (02.09.2026) - siehe sendKonvoiMission.
+    const letzterF = (fest.schlaege && state.player && fest.schlaege[state.player.id]) || 0;
+    const abklingF = letzterF ? letzterF + FESTUNG_ABKLING_STD*3600*1000 : 0;
+    if (abklingF > Date.now()){ log('Deine Verbände sammeln sich neu – nächster Schlag an dieser Festung in ' + fmtDuration((abklingF - Date.now())/1000) + '.', 'ti-clock', 'warn'); return; }
+    if (pveVerbandUnterwegs('festung-angriff', 'system', sysId)){ log('Ein Verband ist bereits zu dieser Festung unterwegs – warte seinen Schlag ab.', 'ti-alert-triangle', 'warn'); return; }
     const st = FESTUNG_STUFEN[fest.stufe] || FESTUNG_STUFEN.schanze;
     const flotte = buildAttackFleet(state.activeBasePlanet, cf);
     const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
@@ -15887,6 +15933,7 @@
          Nestes. Die Funktion heisst loadGalaxyState, NICHT loadGalaxy - der erste Entwurf hatte
          den Namen geraten und ihn hinter einem typeof-Waechter versteckt, der den Fehler still
          gemacht haette (Arbeitsregel 4: Namen aus dem Code ablesen, nie raten). */
+      pveSchlagMerken((galaxyCache.alienNester || []).find(n => n && String(n.id) === String(m.nestId)));
       loadGalaxyState();
       if (daten.gefallen) claimPendingRewards();
     }
@@ -15944,6 +15991,7 @@
         : 'Wrackkonvoi bei '+sysName+' beschossen: '+fmt(daten.schaden||0)+' Schaden, noch '+fmt(daten.lp||0)+' übrig.',
         daten.gefallen ? 'ti-trophy' : 'ti-sword',
         'wichtig'); // jeder Schlag ist wichtig (wartender Toast, 9 s) - siehe pushToast
+      pveSchlagMerken((galaxyCache.wrackKonvois || []).find(x => x && String(x.id) === String(m.zielId)));
       loadGalaxyState();
       if (daten.gefallen) claimPendingRewards();
     }
@@ -15954,22 +16002,25 @@
      leeres `verluste` (vollzaehlige Rueckkehr), `verpasst` (weg/ersetzt) kostet nichts und nennt den
      Grund, sonst werden GENAU die Verluste des Servers gebucht. */
   async function vorpostenAngriffAufloesen(m, planetKey, fleet){
-    let daten = null, status = 0;
+    let daten = null, status = 0, serverFehler = '';
     try {
       await save();
       const res = await backendFetch('/vorposten/angriff', { method:'POST', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ system: m.system, missionId: String(m.id), vorpostenId: String(m.vorpostenId||'') }) });
       status = res.status;
       daten = await res.json().catch(() => null);
-      if (!res.ok) daten = null;
+      if (!res.ok){ serverFehler = (daten && typeof daten.error === 'string') ? daten.error.replace(/[.\s]+$/, '') : ''; daten = null; }
     } catch(e){ daten = null; }
     const verluste = {};
     const sysName = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
     const zielName = (m.stufeName||'Vorposten') + ' von ' + (m.besitzerName||'?') + ' bei ' + sysName;
     if (!daten){
-      const grund = 'Der Angriff kam nicht zustande'
-        + (status === 403 ? ' – Bauschutz oder Abklingzeit' : status === 404 ? ' – der Server kennt Vorposten noch nicht' : ' – der Server war nicht erreichbar') + '.';
-      log('Der Angriff auf den ' + zielName + ' kam nicht zustande – die Flotte kehrt vollzählig zurück.', 'ti-alert-triangle', 'warn');
+      /* Den Grund nennt der SERVER (daten.error), nicht der Statuscode - wie bei Festung, Nest und
+         Konvoi seit v8.631.0: Hinter 403 stehen Bauschutz, Abklingzeit, kein Spielstand und keine
+         Flotte, und der Server sagt woertlich, welcher. Der Statuscode bleibt nur als Ersatz. */
+      const grund = 'Der Angriff kam nicht zustande – '
+        + (serverFehler || (status === 403 ? 'Bauschutz oder Abklingzeit' : status === 404 ? 'der Server kennt Vorposten noch nicht' : 'der Server war nicht erreichbar')) + '.';
+      log('Der Angriff auf den ' + zielName + ' kam nicht zustande – ' + (serverFehler || (status === 403 ? 'Bauschutz oder Abklingzeit' : 'Server nicht erreichbar')) + '. Die Flotte kehrt vollzählig zurück; der Bericht liegt unter Berichte › Kämpfe.', 'ti-alert-triangle', 'warn');
       angriffOhneKampf('vorposten-angriff', zielName, grund, { fleetName:m.fleetName, system:m.system, systemName:sysName, besitzerName:m.besitzerName||'' });
     } else if (daten.verpasst){
       log(daten.text || ('Der Vorposten bei ' + sysName + ' stand nicht mehr – dein Verband kehrt vollzählig zurück.'), 'ti-arrows-shuffle', 'wichtig');
@@ -16059,6 +16110,7 @@
       state.asteroidStats = state.asteroidStats || { missionen:0, geschuerft:0, anfechtungen:0 };
       state.asteroidStats.festungsschlaege = (state.asteroidStats.festungsschlaege||0) + 1;
       if (daten.gefallen) state.asteroidStats.festungenGestuerzt = (state.asteroidStats.festungenGestuerzt||0) + 1;
+      pveSchlagMerken(state.asteroidFeld && state.asteroidFeld[m.system] && state.asteroidFeld[m.system].festung);
       pushReport({ type:'festung-angriff', fleetName:m.fleetName, system:m.system, systemName:sysName,
         targetPlanet:planetKey, stufe:m.stufe, stufeName:m.stufeName||'Festung',
         schaden:daten.schaden||0, gefallen:!!daten.gefallen, kern:daten.kern||0, kernMax:daten.kernMax||0,
@@ -42776,7 +42828,8 @@ async function claimPendingRewards(){
     { key:'sammlung', icon:'ti-backpack', title:'Sammlung', entries:[
       { title:'Was der Reiter zeigt', body:'Das Spiel führt seine Gegenstände in <strong>fünf getrennten Listen</strong>: Standortmodule, Schiffsmodule, Verbrauchsgüter, seltene Materialien und die Reliquien der Tiefe. Der Reiter <strong>Sammlung</strong> ist die einzige Stelle, an der sie zusammen stehen - mit Symbol, Beschreibung, Fundort und deinem Bestand. Was du noch nie besessen hast, steht blass und mit „noch nicht" da; es ist also zugleich eine Liste dessen, was es überhaupt zu finden gibt. Die Knöpfe darüber filtern nach Art, „Nur besessene" blendet alles aus, was dir fehlt.' },
       { title:'Der Fundort ist die eigentliche Auskunft', body:'Die Zeile mit der Nadel unter jedem Eintrag sagt, <strong>wo ein Stück wirklich fällt</strong>. Das ist keine Kosmetik: Das Spiel hält bestimmte Ausrüstung aus <em>jedem</em> regulären Fundtopf heraus - Abgrund-Ausrüstung fällt ausschließlich bei Tauchgängen, die Boss-Set-Teile bei einer Raid-Welle und an schweren PvE-Zielen, und die Unikate nur bei ihrer eigenen Jagd. Sie erscheinen deshalb nie bei Expeditionen, nie im Kredit-Shop, nie an der Börse und lassen sich in keiner Schmiede fertigen. Bis zum 28.08.2026 stand diese Regel nirgends im Spiel - man merkte sie nur daran, dass ein Stück partout nicht fallen wollte.' },
-      { title:'Was hier NICHT steht', body:'Die Sammlung zeigt <strong>Typen</strong>, nicht einzelne Exemplare. Ein Modul trägt seine Seltenheit, seine Stufe und seinen Wurf am <em>Exemplar</em>, nicht am Typ - deshalb steht bei den Modulen hier keine Seltenheit, und der Bestand zählt alle Exemplare eines Typs zusammen. Wer einzelne Module vergleichen, aufwerten oder verschmelzen will, tut das weiterhin im Reiter <strong>Offiziere</strong>; wer Verbrauchsgüter einsetzen will, im Fortschritt-Reiter unter „Inventar".' }
+      { title:'Was hier NICHT steht', body:'Die Sammlung zeigt <strong>Typen</strong>, nicht einzelne Exemplare. Ein Modul trägt seine Seltenheit, seine Stufe und seinen Wurf am <em>Exemplar</em>, nicht am Typ - deshalb steht bei den Modulen hier keine Seltenheit, und der Bestand zählt alle Exemplare eines Typs zusammen. Wer einzelne Module vergleichen, aufwerten oder verschmelzen will, tut das weiterhin im Reiter <strong>Offiziere</strong>; wer Verbrauchsgüter einsetzen will, im Fortschritt-Reiter unter „Inventar".' },
+      { title:'Verbrauchsgüter direkt aktivieren', body:'Bei jedem <strong>Verbrauchsgut</strong>, das du besitzt, steht hier ein <strong>Aktivieren</strong>-Knopf – dieselbe Wirkung wie im Inventar unter Fortschritt, nur ohne den Umweg. Ein Gegenstand, der gerade nichts bewirken kann, bleibt dir erhalten und sagt, warum.' }
     ]},
     { key:'fortschritt', icon:'ti-trophy', title:'Fortschritt', entries:[
       { title:'Tagesaufgaben', body:'Täglich werden 5 Aufgaben zufällig aus dem Vorlagen-Pool ausgewählt (Kampfpunkte, Forschung, Bau, Handel, Fraktionsauftrag, Expedition, NPC-Kämpfe, neuer Planet, Item aktivieren, Zufallsereignis lösen, Fraktions-Tribut zahlen, Kredit-Shop-Kauf, Fähigkeitspunkt investieren, Allianz-Beitrag, sobald mindestens eine Tier-2-Fabrik existiert „5 Tier-2-Ressourcen produzieren" (gezählt wird die echte Fabrik-Produktion aller Ketten) sowie, ab 15 abgeschlossenen Expeditionen, „1 Peilung ansteuern"). Nach dem Fraktions-Ausbau kommen vier <strong>Fraktions-Aufgaben</strong> dazu: „1 Posten in einem Fraktionsladen kaufen" (sobald mindestens eine Fraktion freundlich ist), „In einem Fraktionskrieg Partei ergreifen" (nur solange wirklich ein Krieg läuft und du noch keine Seite gewählt hast), „1 Fraktionsrang aufsteigen" und „Bei 3 Fraktionen Kontakt halten" – letztere ist die Gegenaufgabe zum Ruf-Verfall: als Kontakt zählt jeder abgeschlossene Auftrag, Tribut, Ladenkauf, jede abgeholte Belohnung und jede Parteinahme. Botschaften zählen dabei bewusst nicht mit, sonst wäre die Aufgabe von selbst fast erledigt. Seit dem Abgrund-Ausbau kommen zwei <strong>Tiefen-Aufgaben</strong> hinzu: „1 Tauchgang in den Abgrund abschließen" und „Eine neue Rekordtiefe erreichen" – beide erscheinen erst, wenn du den Abgrund freigeschaltet hast. Dazu kommt die <strong>Modul-Werkbank</strong>: „1 Modul aufwerten, verschmelzen, zerlegen oder neu würfeln" – erfüllt mit jeder dieser Werkbank-Aktionen in einem der beiden Modulsysteme (auch dem Hauptwert-Neuschmieden). Seit dem Asteroidenbergbau kommen zwei <strong>Gürtel-Aufgaben</strong> dazu: „2 Abbaumissionen abschließen" und „6.000 Rohstoffe aus Asteroiden schürfen" – beide erscheinen erst, wenn du die Forschung <em>Minentechnik</em> hast, denn ohne Minenschiff wäre keine Abbaumission startbar. Gezählt wird die geschürfte Ladung selbst; der Zuschlag der Aufbereitungsanlage entsteht erst beim Entladen und zählt nicht mit. <strong>Schürfrechte und Anfechtungen sind bewusst keine Tagesaufgabe</strong> – beide brauchen den Server, und im Solo-Betrieb wäre so eine Aufgabe den ganzen Tag unerfüllbar, erscheint, sobald überhaupt ein Modul im Besitz ist; Ausrüsten zählt bewusst nicht. Insgesamt sind es damit 25 Vorlagen – jeden Tag eine andere Auswahl. Bereits abgeholte Aufgaben verschwinden aus der Leiste; sind alle erledigt, zeigt eine Banner-Pille die Serienlänge bis zum nächsten Tag. Sind <strong>mindestens zwei</strong> Aufgaben gleichzeitig fertig, erscheint zusätzlich der Sammel-Knopf <strong>„Alle abholen"</strong>, der sie in einem Rutsch abholt (bei nur einer fertigen Aufgabe direkt die einzelne Pille antippen). Warten darüber hinaus noch weitere fällige Belohnungen aus anderen Systemen (abholbare <strong>Fraktionsgeschenke</strong>, erreichte <strong>Dominanz-Stufen</strong>), fasst der Knopf <strong>„Alles einsammeln"</strong> ab zwei fälligen Belohnungen insgesamt alles zusammen und holt es mit einem Klick ab. Offene (noch nicht erledigte) Aufgaben lassen sich außerdem antippen, um direkt zum passenden Menü zu springen. Eine offene (noch nicht erledigte) Aufgabe lässt sich gegen eine andere, gerade nicht aktive Vorlage tauschen (kostet Kommandopunkte). Wer an einem Tag <strong>alle</strong> Aufgaben abholt, erhält zusätzlich einen <strong>Komplett-Tag-Bonus</strong>, der mit der Serienlänge (aufeinanderfolgende Komplett-Tage) bis maximal 10 Tage steigt: Kredite (40 je Serientag, also bis 400), <strong>Modulfragmente</strong> (1 je zwei Serientage, mindestens 1, also 1 bis 5) und ab Serientag 3 auch <strong>Kommandopunkte</strong> (1 je drei Serientage, also bis 3). Modulfragmente und Kommandopunkte wachsen bewusst <em>nicht</em> mit deiner Wirtschaft mit – anders als die Einzelbelohnungen, die sich an deiner Produktion orientieren. Genau deshalb bleibt der Bonus auch für ein weit entwickeltes Imperium interessant: Fragmente und Kommandopunkte sind dort das Knappe, nicht Erz. Ein einzelner unvollständiger Tag setzt die Serie zurück, eine reine Pause ohne begonnenen Tag lässt sie nur ruhen. Am Wochenwechsel gibt es zusätzlich zur Wochenliga einen separaten Kredit-Bonus für jeden Komplett-Tag der Vorwoche.' },
@@ -53990,6 +54043,12 @@ async function claimPendingRewards(){
       const pille = n > 0
         ? `<span class="lvl-pill" style="background:rgba(92,225,255,0.18); color:#5ce1ff;">${g.art === 'reliquie' ? '✓ geborgen' : fmt(n) + 'x'}</span>`
         : '<span class="lvl-pill" style="opacity:0.45;">noch nicht</span>';
+      /* Verbrauchsgueter direkt hier aktivieren (02.09.2026, Wunsch Sascha): derselbe Knopf und
+         dieselbe Funktion wie im Inventar unter Fortschritt (activateItem) - eine Implementierung,
+         zwei Einstiegspunkte. Nur fuer besessene Exemplare; Module und Materialien haben keinen. */
+      const aktivieren = (g.art === 'verbrauch' && n > 0)
+        ? `<button data-item-activate="${escapeHtml(g.key)}" class="buy affordable" style="font-size:10.5px; padding:4px 9px;"><i class="ti ti-bolt" aria-hidden="true" style="margin-right:4px;"></i>Aktivieren</button>`
+        : '';
       return `<div class="card-row" style="${n>0?'':'opacity:0.55;'}">
         <div class="left" style="min-width:0;">
           <div class="bicon" style="background:rgba(255,255,255,0.07); color:${art.farbe};">${gegenstandIconHtml(g)}</div>
@@ -54000,7 +54059,7 @@ async function claimPendingRewards(){
             <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}</div>
           </div>
         </div>
-        ${pille}
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">${pille}${aktivieren}</div>
       </div>`;
     }).join('');
 
@@ -54024,6 +54083,7 @@ async function claimPendingRewards(){
     box.querySelectorAll('[data-sammlung-art]').forEach(b => b.onclick = () => { sammlungArt = b.getAttribute('data-sammlung-art'); renderSammlung(); });
     const bb = box.querySelector('[data-sammlung-besitz]');
     if (bb) bb.onclick = () => { sammlungNurBesitz = !sammlungNurBesitz; renderSammlung(); };
+    box.querySelectorAll('[data-item-activate]').forEach(btn => btn.onclick = (e) => { e.stopPropagation(); activateItem(btn.getAttribute('data-item-activate')); renderSammlung(); });
   }
 
   // ===== Wochenliga =====
@@ -61384,7 +61444,7 @@ async function claimPendingRewards(){
         }).join('');
         inner += `
           <g class="planet-node" data-map-nest="${escapeHtml(String(nest.id))}" style="cursor:pointer;">
-            <title>${escapeHtml(v.name)} – ${escapeHtml(stDef.name)}, ${Math.round(anteil*100)}% (antippen für das Menü)</title>
+            <title>${escapeHtml(v.name)} – ${escapeHtml(stDef.name)}, ${Math.round(anteil*100)}%${nestAbklingBis(nest) > Date.now() ? ' · dein nächster Schlag in ' + fmtDuration((nestAbklingBis(nest) - Date.now())/1000) : ''} (antippen für das Menü)</title>
             <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.7).toFixed(1)}" fill="none" stroke="${v.farbe}" stroke-width="1.3" stroke-opacity="0.45">
               <animate attributeName="r" values="${(r*1.45).toFixed(1)};${(r*2.0).toFixed(1)};${(r*1.45).toFixed(1)}" dur="3.1s" repeatCount="indefinite"/>
               <animate attributeName="stroke-opacity" values="0.5;0.1;0.5" dur="3.1s" repeatCount="indefinite"/>
@@ -61420,7 +61480,7 @@ async function claimPendingRewards(){
         }).join('');
         inner += `
           <g class="planet-node" data-map-konvoi="${escapeHtml(String(k.id))}" style="cursor:pointer;">
-            <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}% (antippen für das Menü)</title>
+            <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}%${konvoiAbklingBis(k) > Date.now() ? ' · dein nächster Schlag in ' + fmtDuration((konvoiAbklingBis(k) - Date.now())/1000) : ''} (antippen für das Menü)</title>
             <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4">
               <animateTransform attributeName="transform" type="rotate" from="0 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" to="360 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" dur="9s" repeatCount="indefinite"/>
             </circle>
@@ -62640,7 +62700,7 @@ async function claimPendingRewards(){
     const cf = currentFleet();
     const anteil = Math.max(0, Math.min(1, (nest.lp||0) / Math.max(1, nest.lpMax||1)));
     const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n,k) => n + (cf[k]||0), 0);
-    const schonUnterwegs = cf.missions.some(m => m.type === 'nest-angriff' && String(m.nestId) === String(nest.id));
+    const schonUnterwegs = pveVerbandUnterwegs('nest-angriff', 'nestId', nest.id); // alle Standorte (02.09.2026)
     const abklingBis = nestAbklingBis(nest);
     const wartet = abklingBis > Date.now();
 
@@ -62667,6 +62727,7 @@ async function claimPendingRewards(){
       + kartenFuellBalken(nest.lp||0, nest.lpMax||0, v.farbe,
           'Wie viel vom Nest noch steht - nicht ein Vergleich mit anderen Nestern.')
       + nestBergungZeile(stDef)
+      + pveAbklingZeile((nest.schlaege && state.player && nest.schlaege[state.player.id]) || 0, abklingBis, 'diesem Nest')
       + (v.schwaeche ? `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Wirksam dagegen: <strong>${escapeHtml(nestSchwaecheName(v.schwaeche))}</strong> im Verband</div>` : '')
       + (v.art ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> ${escapeHtml(v.art.charAt(0).toUpperCase() + v.art.slice(1))}.</div>` : '')
       + reifText
@@ -62681,7 +62742,7 @@ async function claimPendingRewards(){
     if (!k) return;
     const cf = currentFleet();
     const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n,key) => n + (cf[key]||0), 0);
-    const schonUnterwegs = cf.missions.some(m => m.type === 'konvoi-angriff' && String(m.zielId) === String(k.id));
+    const schonUnterwegs = pveVerbandUnterwegs('konvoi-angriff', 'zielId', k.id); // alle Standorte (02.09.2026)
     const abklingBis = konvoiAbklingBis(k);
     const wartet = abklingBis > Date.now();
 
@@ -62706,6 +62767,7 @@ async function claimPendingRewards(){
       + kartenFuellBalken(k.lp||0, k.lpMax||0, '#8fd0ea',
           'Wie viel vom Konvoi noch steht - nicht ein Vergleich mit anderen Zielen.')
       + konvoiBergungZeile(k)
+      + pveAbklingZeile((k.schlaege && state.player && k.schlaege[state.player.id]) || 0, abklingBis, 'diesem Konvoi')
       + driftText);
   }
   /* Was DEINE Schlaege bewirkt haben - an der Festung selbst ablesbar, nicht nur im Bericht.
@@ -62799,7 +62861,7 @@ async function claimPendingRewards(){
     const kernMax = fest.kernMax || st.kern || 1;
     const anteil = Math.max(0, Math.min(1, (fest.kern||0) / kernMax));
     const kampfschiffe = ATTACK_SHIP_KEYS.reduce((n,k) => n + (cf[k]||0), 0);
-    const schonUnterwegs = cf.missions.some(m => m.type === 'festung-angriff' && m.system === sysId);
+    const schonUnterwegs = pveVerbandUnterwegs('festung-angriff', 'system', sysId); // alle Standorte (02.09.2026)
     /* Die Abklingzeit steht AN DER FESTUNG und kommt mit dem Felddokument - sie ist deshalb hier
        ablesbar, ohne den Server zu fragen. Das ist genau der Vorteil des Ablageorts: Die Sperre
        ist serverseitig durchgesetzt UND fuer den Spieler sichtbar, statt ihn in eine Ablehnung
