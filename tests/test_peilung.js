@@ -98,8 +98,11 @@ function ereignisUhrenPinnen(st){
   // Ein System OHNE Guertel suchen - genau dort muss eine Peilung trotzdem erscheinen.
   const guertel = Object.keys(stA.asteroidFeld || {});
   const ohneGuertel = (stA.discovered ? Object.keys(stA.discovered) : []).length ? null : null;
-  const zielSystem = 'kepler';
-  check('0 Testvoraussetzung: kepler traegt keinen Guertel', guertel.indexOf(zielSystem) < 0, { guertel: guertel.length });
+  // Seit dem 02.09.2026 ist kepler Guertelsystem (die lokale Auswahl folgt jetzt der Backend-Formel,
+  // siehe docs/galaxie-wachstum.md) - das Zielsystem wird deshalb als REGEL bestimmt: das erste aus
+  // einer festen Kandidatenliste, das keinen Guertel traegt, statt eines fest verdrahteten Namens.
+  const zielSystem = ['kepler', 'vega', 'orion', 'chronos'].find(sys => guertel.indexOf(sys) < 0) || 'vega';
+  check('0 Testvoraussetzung: das Zielsystem traegt keinen Guertel', guertel.indexOf(zielSystem) < 0, { zielSystem, guertel: guertel.length });
 
   const c = await tab(browser, abgewandelt(stA, st => {
     ereignisUhrenPinnen(st);

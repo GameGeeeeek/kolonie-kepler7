@@ -44,11 +44,13 @@ const LINK = 'https://gamegeeeeek.de/?reset=0123456789abcdef0123456789abcdef0123
   check('0c: das Banner steht im DOM, und die Ankuendigung wird beim Start und jede Minute geholt',
     /id="wartungBanner" role="status"/.test(HTML) && /setInterval\(\(\) => \{ try \{ ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 60000\)/.test(JS)
     && /loadNotificationEvents\(\); ladeAnkuendigung\(\); \} catch\(e\)\{\} \}, 2500\)/.test(JS));
-  // Der PvP-Pfad zeigt data.error des Servers; die vier PvE-/Vorposten-Pfade (Festung, Nest, Konvoi,
-  // Vorposten seit #531) werfen den Antworttext bei !ok weg und nennen den Grund nach Status - der 503
-  // der Angriffspause gehoert dazu.
-  check('0d: Festung, Nest, Konvoi und Vorposten nennen bei 503 die Angriffspause statt nur "kam nicht zustande"',
-    (JS.match(/status === 503 \? ' – Angriffe sind gerade pausiert \(Wartung\)'/g) || []).length === 4);
+  // Der PvP-Pfad zeigt data.error des Servers. Festung, Nest und Konvoi zeigen seit #530 ebenfalls den
+  // Servertext (serverFehler, je zweimal: Bericht und Meldung) - der nennt die Angriffspause von selbst.
+  // Der Vorposten-Pfad (#531) wirft den Antworttext bei !ok weg und nennt den Grund nach Status; dort
+  // steht der 503-Zweig. Vor #530 sagten alle vier nur "kam nicht zustande".
+  check('0d: Festung, Nest, Konvoi zeigen den Servertext und der Vorposten-Pfad nennt bei 503 die Angriffspause',
+    (JS.match(/\(serverFehler \|\| \(status === /g) || []).length >= 6
+    && (JS.match(/status === 503 \? ' – Angriffe sind gerade pausiert \(Wartung\)'/g) || []).length === 1);
 }
 
 function konto(extra){
