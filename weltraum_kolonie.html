@@ -41326,16 +41326,42 @@ async function claimPendingRewards(){
      der Karte, sondern ins Unerkundete. Ein Klick, der irgendwohin springt, waere schlechter als
      keiner - deshalb nennt der Waechter sie namentlich als Ausnahme, statt sie zu uebergehen. */
   const FP_OHNE_KARTENORT = ['expedition', 'abgrund', 'recycler-auftrag', 'shipbuild', 'research', 'construction'];
-  function missionsKartenziel(m){
+  /* RUECKFLUEGE zeigen nach HAUSE, nicht dorthin, wo sie herkommen. Sie tragen in `system`/`platz`
+     den VERLASSENEN Ort - bei mining-recall den Asteroiden, bei vorposten-rueckruf das aufgegebene
+     System. Der erste Entwurf schickte den Klick genau dorthin und behauptete damit das Gegenteil
+     dessen, was die Zeile sagt ("Eskorte kehrt zurück"). Gefunden von der Durchsicht am PR, im Code
+     nachgeprueft: `zielFlotte.missions.push` haengt die Mission an die Flotte des ZIELstandorts,
+     also ist deren Schluessel (originKey) das Ziel. */
+  const FP_RUECKFLUG = ['mining-recall', 'vorposten-rueckruf', 'defend-base-return'];
+  /* Ein Ortsschluessel ist NICHT immer eine PLANETS-Kennung: 'home' und Monde ('moon_...') stehen
+     dort nicht, und genau die sind bei Umzuegen und Rueckfluegen die haeufigsten Ziele. Sie werden
+     deshalb ueber planetSystemOf aufgeloest - dieselbe Funktion, die das Spiel schon fuer die
+     Flugbahnen benutzt - und Monde tragen auf der Karte data-map-moon, nicht data-planet. */
+  function fpOrtZiel(key, was){
+    if (!key) return null;
+    const sys = planetSystemOf(key);
+    if (!sys) return null;
+    const sel = isMoonKey(key) || key === 'home' ? "[data-map-moon='" + key + "']" : "[data-planet='" + key + "']";
+    return { system: sys, selektor: sel, was: was || planetDisplayName(key) };
+  }
+  function missionsKartenziel(m, originKey){
     if (!m || !m.type || FP_OHNE_KARTENORT.includes(m.type)) return null;
-    // Guertelplatz: Abbau, Eskorte und ihre Rueckkehr meinen denselben Platz auf der Bahn.
-    if (m.type === 'mining' || m.type === 'mining-escort' || m.type === 'mining-recall' || m.type === 'asteroid-eskorte'){
+    // Rueckflug: Ziel ist der Standort, an dessen Flotte die Mission haengt.
+    if (FP_RUECKFLUG.includes(m.type)) return fpOrtZiel(originKey, planetDisplayName(originKey));
+    // Guertelplatz: Abbau und die hinfliegende Eskorte meinen denselben Platz auf der Bahn.
+    if (m.type === 'mining' || m.type === 'mining-escort' || m.type === 'asteroid-eskorte'){
       if (!m.system || m.platz === undefined || m.platz === null) return null;
       return { system: m.system, selektor: "[data-map-asteroid='" + m.platz + "']", was: 'Vorkommen' };
     }
     if (m.type === 'attack'){
       const npc = NPCS.find(n => n.id === m.targetId);
       return npc && npc.system ? { system: npc.system, selektor: "[data-map-npc='" + npc.id + "']", was: npc.name } : null;
+    }
+    /* Der Angriff auf einen Spieler traegt in targetId die BENUTZERKENNUNG, nicht einen Ort - der
+       gewaehlte Standort steht in targetPlanet (so liest ihn /attack in Zeile ~30576 auch). Ohne
+       diesen Zweig bekaeme die Zeile nie ein Klickziel, obwohl sie einen Standort nennt. */
+    if (m.type === 'attack-player' || m.type === 'spy-player'){
+      return m.targetPlanet ? fpOrtZiel(m.targetPlanet, m.standortName || m.targetName || 'Ziel') : null;
     }
     if (m.type.indexOf('vorposten-') === 0){
       return m.system ? { system: m.system, selektor: '[data-map-vorposten]', was: 'Vorposten' } : null;
@@ -41345,10 +41371,10 @@ async function claimPendingRewards(){
     if (m.type === 'festung-angriff') return m.system ? { system: m.system, selektor: '[data-map-festung]', was: 'Asteroidenfestung' } : null;
     if (m.type === 'nest-angriff')    return m.system ? { system: m.system, selektor: '[data-map-nest]', was: 'Alien-Nest' } : null;
     if (m.type === 'konvoi-angriff')  return m.system ? { system: m.system, selektor: '[data-map-konvoi]', was: 'Wrackkonvoi' } : null;
-    // Alles Uebrige zielt auf einen Planeten (Erkunden, Kolonisieren, Umziehen, Angriff auf einen
-    // Standort). Der Planet kennt sein System selbst.
-    const pl = PLANETS.find(x => x.id === m.targetId);
-    if (pl && pl.system) return { system: pl.system, selektor: "[data-planet='" + pl.id + "']", was: pl.name };
+    // Alles Uebrige zielt auf einen Ort (Erkunden, Kolonisieren, Umziehen). fpOrtZiel deckt dabei
+    // auch 'home' und Monde ab, die in PLANETS nicht stehen.
+    const ort = fpOrtZiel(m.targetId, null);
+    if (ort) return ort;
     return m.system ? { system: m.system, selektor: null, was: 'Zielsystem' } : null;
   }
   function zeigeAsteroidFundort(reportId){
@@ -66285,7 +66311,7 @@ async function claimPendingRewards(){
              Abbaufortschritt nennt - sie sagt mehr als die allgemeine Fassung, und der Waechter
              test_flottenposition_abbau prueft genau sie. */
           if (!klickAttr){
-            const mz = missionsKartenziel(m);
+            const mz = missionsKartenziel(m, originKey);
             if (mz) klickAttr = ' data-fp-mziel="' + escapeHtml(mz.system) + '|' + escapeHtml(mz.selektor || '')
                               + '" data-fp-mwas="' + escapeHtml(mz.was || '') + '" style="cursor:pointer;"'
                               + ' title="' + escapeHtml((mz.was || 'Ziel') + ' – antippen öffnet die Karte dort') + '"';

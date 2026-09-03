@@ -30,7 +30,14 @@ const MISSIONEN = [
   { id: 4, type:'mining-escort',   system:'kepler', platz:1, startTime:now, endTime:ende_, fleetName:'Wache', composition:{ jaeger:4 } },
   { id: 5, type:'vorposten-bau',   targetId:'orion',   system:'orion',  startTime:now, endTime:ende_, fleetName:'Bautrupp', composition:{ transporter:5 } },
   { id: 6, type:'festung-angriff', system:'nebel',     startTime:now, endTime:ende_, fleetName:'Sturm',   composition:{ bomber:8 } },
-  { id: 7, type:'expedition',      startTime:now, endTime:ende_, fleetName:'Fernflug', escortPower:120, escortComposition:{ jaeger:6 } }
+  { id: 7, type:'expedition',      startTime:now, endTime:ende_, fleetName:'Fernflug', escortPower:120, escortComposition:{ jaeger:6 } },
+  /* Die drei folgenden kamen aus der Durchsicht am PR (03.09.2026) - der erste Entwurf dieses
+     Tests hatte KEINEN Rueckflug, keinen Umzug nach Hause und keinen Spielerangriff im Feld, und
+     genau deshalb sind dort drei Fehler durchgegangen. Ein Waechter ist nur so gut wie sein
+     Fixture; diese drei Zeilen sind der eigentliche Ertrag der Durchsicht. */
+  { id: 8, type:'mining-recall',   system:'kepler', platz:2, startTime:now, endTime:ende_, fleetName:'Eskorte kehrt', schiffe:{ jaeger:3 } },
+  { id: 9, type:'relocate',        targetId:'home',    startTime:now, endTime:ende_, fleetName:'Umzug', composition:{ transporter:3 } },
+  { id:10, type:'attack-player',   targetId:'u_fremd', targetPlanet:'rhea', targetName:'Fremdling', standortName:'Eismond Rhea', startTime:now, endTime:ende_, fleetName:'Raubzug', composition:{ jaeger:20 } }
 ];
 const OHNE_ZIEL_ERWARTET = [7];   // die Expedition, namentlich
 
@@ -102,6 +109,22 @@ function backend(store){ return async r => {
   check('3) die Expedition bleibt bewusst OHNE Klickziel (kein Ort auf der Karte)',
     !!expZeile && !expZeile.hatZiel, expZeile);
 
+  /* 4-6: die drei Faelle aus der PR-Durchsicht. Sie pruefen nicht "hat ein Ziel", sondern
+     "zeigt auf das RICHTIGE" - ein Rueckflug, der zum verlassenen Ort springt, behauptet das
+     Gegenteil dessen, was in seiner Zeile steht. */
+  const rueck = zeilen.find(z => /kehrt/i.test(z.text));
+  check('4) der Rückflug zeigt nach HAUSE, nicht zum verlassenen Vorkommen',
+    !!rueck && rueck.hatZiel && !/data-map-asteroid|asteroid=/.test(rueck.ziel) && /home|data-map-moon/.test(rueck.ziel),
+    rueck);
+
+  const umzug = zeilen.find(z => /Umzug/i.test(z.text));
+  check('5) ein Umzug zur Heimatbasis hat ein Ziel (home steht nicht in PLANETS)',
+    !!umzug && umzug.hatZiel, umzug);
+
+  const raub = zeilen.find(z => /Raubzug|Fremdling/i.test(z.text));
+  check('6) der Spielerangriff nimmt den gewählten Standort, nicht die Benutzerkennung',
+    !!raub && raub.hatZiel && raub.ziel.indexOf('u_fremd') < 0 && /rhea/.test(raub.ziel), raub);
+
   // Und der Klick tut wirklich etwas: Angriff auf raider1 -> dessen System kepler, NPC blinkt.
   const wirkung = await page.evaluate(async () => {
     const l = document.getElementById('fleetPositionList');
@@ -116,7 +139,7 @@ function backend(store){ return async r => {
       blinkt: !!document.querySelector('.fundort-blink')
     };
   });
-  check('4) ein Klick öffnet die Karte am Ziel und hebt es hervor',
+  check('7) ein Klick öffnet die Karte am Ziel und hebt es hervor',
     wirkung.karteOffen && wirkung.npcDa && wirkung.blinkt, wirkung);
 
   await ctx.close();
