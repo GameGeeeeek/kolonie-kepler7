@@ -39,7 +39,11 @@ const BEGRENZT = [
   { was: 'Math.max(…)-Deckel',        muster: /Math\.max\(\s*0?\.\d+\s*,/ },
   { was: 'Anteil 0..1 (1 - x*frac)',  muster: /\(\s*1\s*-\s*0?\.\d+\s*\*\s*\w+/ },
   { was: 'feste Konstante',           muster: /\*=\s*0?\.\d+\s*;/ },
-  { was: 'Funktion mit eigenem Deckel', muster: /(fleetSpeedMultiplier|allianceBaseFlightMult|sektorFlugMult)\(/ },
+  /* Funktionen mit eigenem Deckel. wurmlochFlugMult kam am 03.09.2026 dazu und wurde von genau
+     dieser Pruefung gemeldet, bevor er eingetragen war - das ist der Zweck der Liste: Ein neuer
+     Faktor muss hier benannt werden, mit dem Nachweis, warum er begrenzt ist. Er gibt 0,75 oder
+     1 zurueck, sonst nichts (Abschnitt 4 fuehrt das aus). */
+  { was: 'Funktion mit eigenem Deckel', muster: /(fleetSpeedMultiplier|allianceBaseFlightMult|sektorFlugMult|wurmlochFlugMult)\(/ },
   { was: 'Tempo-Buff (endliche Laufzeit)', muster: /buff\.mult/ }
 ];
 const zeilen = CODE.split('\n').map(z => z.trim()).filter(z => /mult\s*\*?=/.test(z) && !/^let mult/.test(z));
@@ -73,5 +77,30 @@ check('3b: ab 23 Spaehern greift er, und tiefer als die Haelfte geht es nie',
 check('3c: ohne Deckel waere derselbe Stapel 10-fach schneller',
   Math.pow(0.97, 100) < 0.05 && punkte.p100 / Math.pow(0.97, 100) > 10,
   { ohneDeckel: +Math.pow(0.97, 100).toFixed(5), mitDeckel: punkte.p100 });
+
+/* ---- 4) Der neue Faktor, ausgefuehrt (V4 Passage, 03.09.2026) -------------------------------
+   Der Eintrag in der Liste oben behauptet "begrenzt" - hier wird es gemessen. Geprueft wird die
+   REGEL: an beiden Muendungen 0,75, sonst 1, und ein abgelaufenes Wurmloch wirkt gar nicht. */
+let whFn = null, whBau = null;
+try {
+  const a = S.indexOf('  function wurmlochFlugMult(sysId){');
+  const e = a >= 0 ? S.indexOf('\n  }', a) : -1;
+  if (a < 0 || e < 0) throw new Error('Anker nicht gefunden');
+  whFn = (cache) => new Function('galaxyCache', S.slice(a, e + 4) + '\n return wurmlochFlugMult;')(cache);
+} catch(err){ whBau = String(err.message || err); }
+check('4-bau: wurmlochFlugMult laesst sich schneiden und ausfuehren', whBau === null, { whBau });
+if (whFn){
+  const offen = whFn({ activeWormhole: { from:'kepler', to:'abyss', expiresAt: Date.now() + 3600000 } });
+  const zu    = whFn({ activeWormhole: { from:'kepler', to:'abyss', expiresAt: Date.now() - 1000 } });
+  const ohne  = whFn({ activeWormhole: null });
+  const werte = { keplerOffen: offen('kepler'), abyssOffen: offen('abyss'), fremdOffen: offen('vega'),
+    ohneZiel: offen(null), abgelaufen: zu('kepler'), keinWurmloch: ohne('kepler') };
+  check('4a: an BEIDEN Muendungen gilt 0,75 - das Wurmloch hat zwei Enden',
+    werte.keplerOffen === 0.75 && werte.abyssOffen === 0.75, werte);
+  check('4b: jedes andere System und ein fehlendes Ziel bleiben unberuehrt',
+    werte.fremdOffen === 1 && werte.ohneZiel === 1, werte);
+  check('4c: ein abgelaufenes oder fehlendes Wurmloch wirkt nicht',
+    werte.abgelaufen === 1 && werte.keinWurmloch === 1, werte);
+}
 
 ende();

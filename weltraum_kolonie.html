@@ -9634,6 +9634,34 @@
     const sk = sysId ? sektorVonSystemId(sysId) : null;
     return 1 - ((sk && sk.mod && sk.mod.flug) || 0);
   }
+  /* Die Passage (Konzept V4, 03.09.2026): Solange ein Wurmloch offen steht, fliegt man zu BEIDEN
+     seiner Muendungen ein Viertel schneller. Bis hierher war das Wurmloch reine Zeichnung - acht
+     Fundstellen, alle im Anzeigepfad, keine einzige Wirkung.
+     Warum das erst jetzt geht: Bis zum 03.09.2026 stand im Backend fest from: 'kepler', und das
+     Wurmloch steht gemessen 74 % der Zeit offen (12 h Lebensdauer, danach 6 % je 15-Minuten-Takt).
+     Ein Rabatt auf beide Enden waere damit drei Viertel der Zeit ein Dauerrabatt auf Fluege in die
+     eigene Heimat gewesen - kein Ort, nur ein Anhaengsel. Seit kolonie-kepler7-backend#214 zieht
+     der Takt zwei zufaellige Systeme, und der Bonus haengt wirklich an der Verbindung.
+     25 % ist bewusst der staerkste Ortsbonus des Spiels (Allianzbasis 10 %, Sektor hoechstens
+     12 %): Er gilt nur fuer zwei Systeme, nur zeitweise, und beide Seiten sehen ihn - anders als
+     der private Vorposten-Vorteil ist er kein verstecktes Reaktionsfenster. Deshalb steht er hier
+     in missionDurationFor und wirkt auf JEDE Missionsart, wie seine beiden Nachbarn auch.
+     Zielsystem unbekannt -> 1, wie bei den Nachbarn: Missionsarten ohne echtes Ziel bleiben
+     unberuehrt. */
+  /* Die EINE Quelle fuer "steht die Passage offen?". Sie ist noetig geworden, weil die Frist ab
+     jetzt etwas bedeutet: Der Server raeumt ein abgelaufenes Wurmloch erst im 15-Minuten-Takt weg,
+     und bis dahin sah der Client eines, das nichts mehr bewirkt. Ohne gemeinsame Wache haette die
+     Karte eine Passage versprochen, die die Flugzeit laengst nicht mehr verkuerzt - gemessen an
+     test_wurmloch_passage 5b, das genau das gefangen hat. */
+  function wurmlochOffen(){
+    const wh = galaxyCache.activeWormhole;
+    return (wh && wh.expiresAt > Date.now()) ? wh : null;
+  }
+  function wurmlochFlugMult(sysId){
+    const wh = wurmlochOffen();
+    if (!sysId || !wh) return 1;
+    return (wh.from === sysId || wh.to === sysId) ? 0.75 : 1;
+  }
   /* EINGEFROREN am 02.09.2026 (Entscheidung Sascha) und an das Backend angeglichen - zwei Befunde:
      1) Frontend und Backend rechneten den Gürtelsatz mit VERSCHIEDENEN Hashes und Seeds
         (hashStringToFloat mit 'kepler7-guertel-v1' hier, astHash mit 'kepler7-asteroiden-v1' dort);
@@ -21589,6 +21617,8 @@
     // Sektor des ZIELS (18.08.2026). Steht bewusst direkt neben allianceBaseFlightMult: Beide
     // haengen am Zielsystem, und beide lassen Missionsarten ohne echtes Ziel unberuehrt.
     mult *= sektorFlugMult(targetSystem);
+    // Die Passage: dieselbe Wache wie die zwei Zeilen darueber - beide haengen am Zielsystem.
+    mult *= wurmlochFlugMult(targetSystem);
     mult *= Math.max(0.5, 1 - officerBonus('navigator')); // Offizier "Navigator"
     return sec * mult;
   }
@@ -39348,7 +39378,7 @@ async function claimPendingRewards(){
       { title:'NPC-Reiche: die Wehrkraft der Galaxie', body:'Ein globaler Multiplikator (gedeckelt bei 2,5x) macht alle NPC-Verteidigungswerte für jeden Spieler härter – zusätzlich zur persönlichen Steigerung durch eigene Kämpfe. Er ist <strong>kein Zeitzähler mehr</strong>: Der Server leitet aus dem <strong>Bestand an Alien-Nestern</strong> einen Zielwert ab und lässt die Wehrkraft langsam dorthin laufen (spürbar innerhalb eines Tages, ein einzelner Schlag ändert die Weltlage nicht). Wer den Schwarm zurückdrängt, macht die Galaxie <strong>für alle</strong> leichter; wer die Nester wachsen lässt, bezahlt es mit härteren NPC-Gegnern. Wohin sie gerade läuft und warum, steht oben im Galaxie-Tab.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
       { title:'Supernovas', body:'Zerstört zeitweise (48 Stunden) ein zufälliges, komplett unbesiedeltes System. Ein System, in dem tatsächlich ein Spieler zuhause ist, wird garantiert nie ausgewählt. Auf der Sektorkarte als dunkel-roter, kollabierter Systemknoten mit 💥-Symbol sichtbar.' },
-      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab UND direkt sichtbar auf der Sektorkarte: ⚔️ markiert einen umkämpften Krieg-Standort, 👽 ein gesichtetes Alienvolk, 🏴‍☠️ eine aktive Piratenbasis, ein 🌀-Abzeichen an beiden Endpunkt-Systemen ein offenes Wurmloch. Kriege, Piratenbasen und Wurmlöcher sind dabei reine Weltgeschichte ohne tiefe mechanische Kopplung. Die <strong>Alienvölker</strong> dagegen nicht mehr: Sie legen echte, angreifbare Nester an, und ihr Bestand steuert die Wehrkraft der NPC-Reiche (siehe „NPC-Reiche").' }
+      { title:'Kriege, neue Völker, Piratenbasen, Wurmlöcher', body:'Erscheinen als Nachrichten im Galaxie-Tab UND direkt sichtbar auf der Sektorkarte: ⚔️ markiert einen umkämpften Krieg-Standort, 👽 ein gesichtetes Alienvolk, 🏴‍☠️ eine aktive Piratenbasis, ein 🌀-Abzeichen an beiden Endpunkt-Systemen ein offenes Wurmloch. Das <strong>Wurmloch</strong> ist seit v8.649.0 keine bloße Weltgeschichte mehr: Solange es offen steht, dauern Flüge zu <strong>beiden</strong> seiner Mündungen 25% weniger – und ein Tipp auf das Portal in der Systemansicht springt direkt auf die andere Seite. Seine Enden sind zufällig, es kann also jedes Systempaar verbinden. Kriege und Piratenbasen bleiben Weltgeschichte ohne tiefe mechanische Kopplung. Die <strong>Alienvölker</strong> dagegen auch nicht mehr: Sie legen echte, angreifbare Nester an, und ihr Bestand steuert die Wehrkraft der NPC-Reiche (siehe „NPC-Reiche").' }
     ]},
     { key:'faq', icon:'ti-list-details', title:'Häufige Fragen', entries:[
       { title:'Warum werden meine Jäger im Kampf nicht mitgezählt?', body:'Vermutlich fehlt Hangar-Kapazität. 1 Trägerschiff ermöglicht 6 Jäger. Ohne genug Träger bleiben überzählige Jäger "nicht einsatzbereit" und tragen nichts zur Angriffs- oder Verteidigungskraft bei.' },
@@ -55464,6 +55494,11 @@ async function claimPendingRewards(){
       // weitergedrifteter Konvoi verschwindet damit sofort von der Karte, statt bis zum Vollbau
       // stehen zu bleiben; die auf Tausender gerundeten LP vermeiden die Tick-Unruhe.
       (galaxyCache.wrackKonvois||[]).map(k => k.id + ':' + Math.round((k.lp||0)/1000)).join(','),
+      /* Das Wurmloch (V4): Seit es die Flugzeit aendert, muss ein neues oder geschlossenes sofort
+         auf der Karte stehen statt erst beim 5-Sekunden-Vollbau - sonst rechnet die Vorschau mit
+         einer Passage, die der Spieler gar nicht mehr sieht. NUR die beiden Enden, NICHT expiresAt:
+         eine mitlaufende Restzeit erzwaenge einen Kartenneubau je Sekunde. */
+      (function(){ const w = wurmlochOffen(); return w ? (w.from + '↔' + w.to) : ''; })(),
       // Vorposten (B2): entstehen, wachsen, fallen - schlank wie Nest und Konvoi.
       (vorpostenCache.liste||[]).map(v => v.id + ':' + v.stufe + ':' + Math.round(((v.kern||{}).lp||0)/1000) + ':' + (v.garnisonAnzahl||0)).join(','),
       (karteSektorOffen || '')
@@ -56248,10 +56283,14 @@ async function claimPendingRewards(){
       badges.push({ icon:'⚔️', title:'Krieg: '+galaxyCache.activeWar.factionA+' vs. '+galaxyCache.activeWar.factionB });
     // Wurmloch als Abzeichen an BEIDEN Endpunkt-Systemen (KB-6) - die fruehere Linie lebte auf
     // der Galaxie-Leinwand, die es als Uebersicht nicht mehr gibt.
-    if (karteEbeneAn('ereignisse') && galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === sysId || galaxyCache.activeWormhole.to === sysId)){
-      const wA = STAR_SYSTEMS.find(w => w.id === galaxyCache.activeWormhole.from);
-      const wB = STAR_SYSTEMS.find(w => w.id === galaxyCache.activeWormhole.to);
-      if (wA && wB) badges.push({ icon:'🌀', title:'Wurmloch: ' + wA.name + ' ↔ ' + wB.name });
+    const whBadge = wurmlochOffen();
+    if (karteEbeneAn('ereignisse') && whBadge && (whBadge.from === sysId || whBadge.to === sysId)){
+      const wA = STAR_SYSTEMS.find(w => w.id === whBadge.from);
+      const wB = STAR_SYSTEMS.find(w => w.id === whBadge.to);
+      // Die Wirkung gehoert in den Titel, nicht nur die Verbindung (Anzeigestellen-Regel): Seit V4
+      // verkuerzt das Wurmloch die Flugzeit zu beiden Muendungen. BEWUSST OHNE Restzeit - eine
+      // sekundengenaue Angabe im Titel erzwaenge den Neuaufbau der ganzen Karte je Tick.
+      if (wA && wB) badges.push({ icon:'🌀', title:'Wurmloch: ' + wA.name + ' ↔ ' + wB.name + ' – Flüge zu beiden Enden dauern 25% weniger' });
     }
     /* ===== Landmarken (E1) ====================================================================
        Festung, Nest und NPC lebten bis hierher AUSSCHLIESSLICH im aufgeklappten System. Wer eine
@@ -57738,11 +57777,11 @@ async function claimPendingRewards(){
     const metaEl = document.getElementById('systemNavMeta');
     if (metaEl){
       let metaText = discAll+'/'+sysPlanetsAll.length+' erkundet · System '+(idx+1)+'/'+visSys.length+' · '+sunTypeFor(activeSystem).label;
-      const wh = galaxyCache.activeWormhole;
+      const wh = wurmlochOffen();
       if (wh && (wh.from === activeSystem || wh.to === activeSystem)){
         const otherSysId = wh.from === activeSystem ? wh.to : wh.from;
         const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
-        metaText += ' · 🌀 Wurmloch → '+(otherSys?otherSys.name:'unbekanntes System');
+        metaText += ' · 🌀 Wurmloch → '+(otherSys?otherSys.name:'unbekanntes System')+' (−25% Flugzeit, antippbar)';
       }
       metaEl.textContent = metaText;
     }
@@ -58189,8 +58228,9 @@ async function claimPendingRewards(){
        geworden, also genau das, was ein Spieler wegschalten WILL.
        Das Gate umschliesst bewusst auch kbMarkerFrei und platzierteMarker: Was nicht gezeichnet
        wird, darf auch keinen Platz fuer andere Marker blockieren. */
-    if (karteEbeneAn('ereignisse') && galaxyCache.activeWormhole && (galaxyCache.activeWormhole.from === activeSystem || galaxyCache.activeWormhole.to === activeSystem)){
-      const otherSysId = galaxyCache.activeWormhole.from === activeSystem ? galaxyCache.activeWormhole.to : galaxyCache.activeWormhole.from;
+    const whPortal = wurmlochOffen();
+    if (karteEbeneAn('ereignisse') && whPortal && (whPortal.from === activeSystem || whPortal.to === activeSystem)){
+      const otherSysId = whPortal.from === activeSystem ? whPortal.to : whPortal.from;
       const otherSys = STAR_SYSTEMS.find(s=>s.id===otherSysId);
       /* Die Bahn kommt aus derselben Quelle wie alles andere auf dieser Karte (KB-20b): knapp
          INNERHALB der aeussersten Planetenbahn, oben rechts. Vorher stand hier ein fester Punkt
@@ -58603,6 +58643,17 @@ async function claimPendingRewards(){
         e.stopPropagation();
         if (galaxyMapDidDrag) return;
         nestMapMenu(e, node.getAttribute('data-map-nest'));
+      });
+    });
+    /* Das Portal springt auf die andere Seite (V4). Es trug sein data-Attribut seit jeher, aber
+       keinen Handler - man sah die Muendung und konnte nichts damit tun. galaxyMapDidDrag wie bei
+       allen Kartenknoten, damit ein Wischen nicht als Tipp durchgeht. */
+    svg.querySelectorAll('[data-map-wurmloch]').forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (galaxyMapDidDrag) return;
+        const ziel = node.getAttribute('data-map-wurmloch');
+        if (ziel) switchToSystem(ziel);
       });
     });
     svg.querySelectorAll('[data-map-konvoi]').forEach(node => {
