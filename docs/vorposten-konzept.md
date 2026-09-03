@@ -882,3 +882,55 @@ genau der Konstante, die im Backend steht.
 Wächter: `tests/test_vorposten_abbau_ui.js` (20). Gegenprobe gegen v8.649.0: 12 rot, 8 grün,
 Prüflisten identisch. Die acht grünen messen den Bootvorgang und den Übergangszustand — dort
 verhält sich der alte Stand richtigerweise wie ein Server ohne Abbau.
+
+## Etappe V1: Die Station zeigt, was in ihr steckt (03.09.2026)
+
+Auftrag Sascha: die gesamte Vorposten-Auswahl umsetzen. Dies ist ihr optischer Teil — und er war
+die größte Lücke des Systems: Bis hierher trug die Silhouette **nur Stufe und Zweig**. Sechs
+Modultypen in fünf Seltenheiten, fünf Projekte, der Zustand des Kerns, die Garnison, der laufende
+Ausbau, der laufende Abbau und der Anflug — nichts davon war zu sehen. Ein Sprungtor kostet
+6 Mio. Erz, 40 Singularitätskerne und 24 Stunden Bauzeit, und die Station sah danach aus wie vorher.
+
+**Kein Backend-Schritt nötig.** Gemessen an `vorpostenFuerClient`: `module`, `projekte`, `kern`,
+`abbauAb` und `garnisonAnzahl` gehen an **jeden** (damit ein Angreifer sieht, worauf er sich
+einlässt), `projektLaeuft`, `anflug` und `kampfverlauf` nur an den Besitzer. Es fehlte allein das Bild.
+
+### Was dazukommt
+
+- **Module** (`vorpostenModulTeile`): Jedes eingebaute Stück hängt sichtbar an der Station. **Wo** es
+  sitzt, entscheidet sein Typ (`VP_MODUL_WINKEL`), nicht der Steckplatz — so hängt eine Geschützbank
+  an jeder Station an derselben Stelle, und zwei gleich ausgerüstete Stationen sehen gleich aus.
+  Steckt ein Typ mehrfach, wandert das zweite Stück eine Stufe weiter nach außen. Die Seltenheit
+  färbt das Akzentteil; die Farbe kommt aus `MODULE_RARITY`, gelesen im **Funktionsrumpf**
+  (`vpSeltenheitFarbe`) — ein direkter Verweis liefe in die temporale Todeszone, eine eigene
+  Farbtabelle wäre eine Kopie-Familie.
+- **Projekte** (`vorpostenProjektTeile`): Bollwerk als schwerer Panzergürtel, Dockring als zweiter
+  Liegeplatzring mit vier Klauen, Handelskammer als Kontorblock, Tiefenhorchposten als weit
+  ausgefahrene Lauschanlage, Sprungtor als offenstehender Torus über der Station. Das Sprungtor ist
+  bewusst das **einzige** Teil mit einer Füllung — es soll aus jeder Entfernung zuerst auffallen.
+- **Zustand** (`vorpostenSchaden`): Risse ab zwei Dritteln Kern, ab einem Drittel zusätzlich ein
+  dunkles Bruchsegment und ein rot blinkender Kern. Der Balken unter dem Marker war bisher die
+  einzige Auskunft.
+- **Baustelle und Abbau** (`vorpostenBaustelle`, `vorpostenAbbauZeichen`): ein Kranausleger mit
+  blitzendem Schweißpunkt am laufenden Vorhaben, ein Demontagegerüst über der Station im Abbau.
+- **Garnison** (`vorpostenGarnisonZeichen`): fünf Rumpfzeichen unter der Station, gefüllt nach
+  Belegung. Bewusst **nicht** an den Dockpads — die gibt es erst ab Stufe 5, die Garnison aber ab
+  der ersten Stationsstufe.
+- **Anflug** (A4): ein zweiter, roter Ring um den Marker, der schneller schlägt, je näher der
+  Einschlag ist (2,4 s bei zwei Stunden, 0,7 s bei wenigen Minuten).
+- **Übersicht** (D3): die Liste auf der Startseite nennt jetzt Kernzustand, Garnison und — falls
+  etwas läuft — Vorhaben oder Abbaufrist. Der Abbau verdrängt das Vorhaben, weil er das Wichtigere
+  ist. **Alles Neue steht in der Signatur** (`vpSig`), sonst friert der Countdown ein — genau der
+  Befund, der beim Anflug schon einmal zugeschlagen hat.
+- **Kampfverlauf** (D2): das Kartenmenü zeigt die Angriffe **vor** dem jüngsten. Der Server führt
+  `doc.kampfverlauf` (zehn Vermerke) seit dem ersten Tag; angezeigt wurde nur `letzterKampf`.
+
+### Was bewusst NICHT passiert
+
+Das Bodenlager (Stufe 1–3) bekommt nichts davon, auch nicht mit Modulen im Gepäck: Es hat keine
+Steckplätze (`vpModulSlots` liefert dort 0), und ein Feldlager mit Sprungtor wäre eine Falschaussage.
+
+Wächter: `tests/test_vorposten_zustand.js` (30 Prüfungen). Gegenprobe in beide Richtungen: gegen den
+Stand ohne die Zeichenschicht fallen 15, gegen den Stand ohne Übersicht und Kampfverlauf weitere 7 —
+Prüflisten per `diff` verglichen. Grün bleiben in beiden Fällen genau die Prüfungen, die das
+**Ausbleiben** einer Zeichnung belegen; sie sind nur zusammen mit ihrem positiven Gegenstück etwas wert.
