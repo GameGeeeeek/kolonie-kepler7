@@ -358,8 +358,15 @@ check('6: die Beute bleibt Sache des Bergungskrans',
   check('7: alle drei Aufrufstellen reichen den Nullkiel durch',
     (js.match(/abgrundSektorMitBann\([^;]*nullkielAktiv\(/g)||[]).length === 3,
     { stellen:(js.match(/abgrundSektorMitBann\([^;]*nullkielAktiv\(/g)||[]).length });
+  // Geprueft wird die AUSSAGE, nicht die Schreibweise. Die alte Fassung nagelte den kompletten
+  // Aufruf zeichengenau fest und fiel am 03.09.2026, als der Waechterruf als vierter mitgereister
+  // Wert dazukam (abgrundSektor(tiefe, !!m.ruf)) - also genau dann, als die Regel, die sie schuetzen
+  // soll, VERSTAERKT wurde. Vierte Kopie derselben Zeile; die drei anderen stehen in
+  // test_abgrund.js und test_abgrund_gegenstaende.js und sind am selben Tag umgestellt worden.
+  const aufrufAbrechnung = js.split('\n').find(z => z.includes('abgrundSektorMitBann(') && z.includes('m.bann')) || '';
+  check('7: die Abrechnungs-Aufrufstelle ist auffindbar', !!aufrufAbrechnung);
   check('7: und die Abrechnung nimmt die MITGEFLOGENE Flotte, nicht die daheim',
-    /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js));
+    aufrufAbrechnung.includes('nullkielAktiv(m.composition || fleet)'), aufrufAbrechnung.trim().slice(0, 200));
 }
 // Grundgaenger: hebt den Wiederholungsabschlag an - dauerhaft, aber nur teilweise.
 {
