@@ -10737,7 +10737,9 @@
       daten = await res.json().catch(() => null);
       if (!res.ok){ log((daten && daten.error) || 'Der Server hat abgelehnt.', 'ti-alert-triangle'); return; }
     } catch(e){ log('Der Server war nicht erreichbar.', 'ti-alert-triangle'); return; }
-    const schiffe = daten.garnison || {};
+    // Beim ABBAU bleibt die Garnison stehen (sie verteidigt weiter) - der Server schickt sie
+    // deshalb gar nicht mit. Kein Rueckflug, kein "0 Schiffe kehren zurueck".
+    const schiffe = (daten && daten.abbau) ? {} : (daten.garnison || {});
     const anzahl = Object.values(schiffe).reduce((a, b) => a + (typeof b === 'number' && b > 0 ? b : 0), 0);
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
     if (anzahl > 0){
@@ -10749,11 +10751,31 @@
       log('Die Garnison (' + anzahl + ' Schiffe) kehrt aus ' + sysN + ' nach ' + planetDisplayName(state.activeBasePlanet) + ' zurück (' + fmtDuration(flug/2) + ').', 'ti-shield');
     }
     if (weg === 'aufgeben'){
-      log('Vorposten in ' + sysN + ' aufgegeben – keine Rückerstattung.', 'ti-trash', 'warn');
-      pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:sysId, systemName:sysN, grund:'Auf eigenen Wunsch aufgegeben.' });
+      /* Seit dem 03.09.2026 ist Aufgeben ein ABBAU ueber 24 Stunden: Der Server meldet `abbau`
+         und die Frist, der Vorposten steht weiter, und die Garnison bleibt bei ihm - sie kommt
+         erst mit dem fertigen Abbau ueber die Belohnungs-Warteschlange zurueck. Der alte Zweig
+         (sofort weg, Garnison im Rueckflug) bleibt daneben stehen, solange der Serverschalter
+         aus ist; sonst saehe ein Spieler an einem aelteren Backend gar keine Rueckmeldung. */
+      if (daten && daten.abbau){
+        log('Der Abbau in ' + sysN + ' läuft – fertig in ' + fmtDuration((daten.dauerMs || 0) / 1000)
+          + '. Bis dahin steht der Vorposten und bleibt angreifbar.', 'ti-trash', 'warn');
+      } else {
+        log('Vorposten in ' + sysN + ' aufgegeben – keine Rückerstattung.', 'ti-trash', 'warn');
+        pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:sysId, systemName:sysN, grund:'Auf eigenen Wunsch aufgegeben.' });
+      }
     }
     await ladeVorposten();
     render(); save();
+  }
+  async function vorpostenAbbauAbbrechen(sysId){
+    const v = vorpostenAn(sysId);
+    if (!v || !v.eigener) return;
+    const res = await backendFetch('/vorposten/abbau/abbrechen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) }).catch(() => null);
+    const daten = res ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok){ log((daten && daten.error) || 'Der Server hat den Abbruch abgelehnt.', 'ti-alert-triangle', 'warn'); return; }
+    const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
+    log('Der Abbau in ' + sysN + ' ist abgebrochen – der Vorposten bleibt stehen.', 'ti-refresh', 'wichtig');
+    await ladeVorposten(); render(); save();
   }
   async function vorpostenAusbauen(sysId){
     const v = vorpostenAn(sysId);
@@ -26417,6 +26439,33 @@ async function claimPendingRewards(){
           if (crV > 0){ state.credits = (state.credits||0) + crV; teile.push(fmt(crV) + ' Kredite'); }
           const sysNameV = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
           log('Anteil an der Beute des geschleiften ' + (r.name||'Vorpostens') + ' von ' + (r.besitzerName||'?') + ' bei ' + sysNameV + ' (' + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'), 'ti-trophy', 'wichtig');
+          save();
+          continue;
+        }
+        /* Der Abbau ist fertig (03.09.2026). Die Garnison kommt HIER an, nicht als Rueckflug: Beim
+           Ablauf der 24 Stunden ist der Spieler ueblicherweise gar nicht da, und der Server
+           schreibt keinen fremden Spielstand. Die Schiffe landen deshalb direkt auf dem aktiven
+           Standort - wie bei jeder anderen Belohnung aus der Warteschlange.
+           Die Module liegen im Bestand am NUTZEROBJEKT; das Spiel muss dafuer nichts buchen, es
+           nennt sie nur, damit der Rueckweg sichtbar ist. */
+        if (r.type === 'vorposten-abbau'){
+          const sysNameA = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          const flotteA = currentFleet();
+          const zurueck = [];
+          for (const [k, n] of Object.entries(r.garnison || {})){
+            const anz = Math.max(0, Math.round(Number(n) || 0));
+            if (!anz || !SHIP_DEFS[k]) continue;
+            flotteA[k] = (flotteA[k] || 0) + anz;
+            zurueck.push(anz + '\u00d7 ' + (SHIP_DEFS[k].name || k));
+          }
+          const modA = (r.module || []).length;
+          log('Der Abbau bei ' + sysNameA + ' ist fertig – der ' + (r.name||'Vorposten') + ' ist abgetragen'
+            + (zurueck.length ? ', die Garnison ist zurück (' + zurueck.join(', ') + ')' : '')
+            + (modA ? ' und ' + modA + ' Modul' + (modA === 1 ? '' : 'e') + ' liegen wieder in deinem Bestand' : '') + '.',
+            'ti-trash', 'wichtig');
+          pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:r.system, systemName:sysNameA,
+            grund:'Abbau nach 24 Stunden abgeschlossen.' });
+          ladeVorposten();
           save();
           continue;
         }
@@ -59487,8 +59536,27 @@ async function claimPendingRewards(){
                  : 'Dauerhafte Vorhaben ab Stufe ' + ((vorpostenCache.projektDefs || []).reduce((m, d) => Math.min(m, d.stufeAb), 99) || 5) + '.',
           fn: () => vorpostenProjekteOeffnen(sysId) });
       }
-      eintraege.push({ icon:'ti-trash', label:'Vorposten aufgeben', grund:'Keine Rückerstattung – die Garnison kommt zurück.',
-        fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. Die Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) fliegt nach Hause.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+      /* Aufgeben ist seit dem 03.09.2026 ein ABBAU ueber 24 Stunden. Laeuft er schon, steht hier
+         statt dessen die Restzeit und der Weg zurueck - ein zweiter "aufgeben"-Klick wuerde vom
+         Server ohnehin abgewiesen, und ein Eintrag, der nur eine Fehlermeldung erzeugt, ist ein
+         Versprechen ohne Gegenstand. */
+      const abbauBis = v.abbauAb || 0;
+      /* Solange der SERVER den Abbau noch nicht fuehrt (`abbauAktiv`), loescht /vorposten/aufgeben
+         weiterhin sofort. Ein Eintrag, der dann "Dauert 24h" verspricht, waere eine Luege in der
+         Oberflaeche - zwischen diesem Release und dem Umlegen des Schalters liegt genau ein
+         Deploy. Deshalb haengt der Wortlaut an der Serverangabe, nicht an diesem Release. */
+      if (!vorpostenCache.abbauAktiv){
+        eintraege.push({ icon:'ti-trash', label:'Vorposten aufgeben', grund:'Keine Rückerstattung – die Garnison kommt zurück.',
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. Die Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) fliegt nach Hause.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+      } else if (abbauBis > jetzt){
+        eintraege.push({ icon:'ti-refresh', label:'Abbau abbrechen',
+          grund:'Noch ' + fmtDuration((abbauBis - jetzt) / 1000) + ' – bis dahin steht der Vorposten und bleibt angreifbar.',
+          fn: () => { if (confirm('Den Abbau in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbrechen?\n\nDer Vorposten bleibt dann stehen. Die bereits verstrichene Zeit ist verloren.')) vorpostenAbbauAbbrechen(sysId); } });
+      } else {
+        eintraege.push({ icon:'ti-trash', label:'Vorposten abbauen',
+          grund:'Dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + ' – so lange bleibt er angreifbar. Keine Rückerstattung.',
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbauen?\n\nDer Abbau dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + '. So lange steht der Vorposten weiter da und kann angegriffen werden.\n\nDie Baukosten werden NICHT erstattet. Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) und eingebaute Module kommen erst zurück, wenn der Abbau fertig ist.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+      }
     } else {
       const schutz = (v.schutzBis||0) > jetzt;
       const abklingBis = v.meinLetzterSchlag ? v.meinLetzterSchlag + (vorpostenCache.abklingMs||0) : 0;
@@ -59517,6 +59585,7 @@ async function claimPendingRewards(){
       + zweigZeile
       + ((v.slots || 0) ? `<div class="bmeta" data-vp-module="${(v.module||[]).length}"><i class="ti ti-adjustments" aria-hidden="true"></i> Steckplätze: <strong>${(v.module||[]).length} von ${v.slots}</strong>${(v.module||[]).length ? ' – ' + (v.module||[]).map(m => escapeHtml(vpModulName(m))).join(', ') : ' (leer)'}</div>` : '')
       + ((v.projekte || []).length ? `<div class="bmeta" data-vp-projekte="${(v.projekte||[]).length}"><i class="ti ti-building-factory-2" aria-hidden="true"></i> Projekte: <strong>${(v.projekte||[]).map(k => escapeHtml(vpProjektName(k))).join(', ')}</strong></div>` : '')
+      + ((v.abbauAb || 0) > jetzt ? `<div class="bmeta" data-vp-abbau="${v.abbauAb}" style="color:#e0a548;"><i class="ti ti-trash" aria-hidden="true"></i> Wird abgebaut – noch <strong>${fmtDuration((v.abbauAb - jetzt)/1000)}</strong>, bis dahin angreifbar.</div>` : '')
       + `<div class="bmeta"><i class="ti ti-sparkles" aria-hidden="true"></i> Nutzen: −${Math.round((nutzen.flug||0)*100)}% Flugzeit für eigene Nicht-PvP-Missionen hierher · +${Math.round((nutzen.prod||0)*1000)/10}% Produktion aller Standorte · Aufklärung Stufe ${nutzen.scan||0}</div>`;
     if ((v.schutzBis||0) > jetzt) info += `<div class="bmeta"><i class="ti ti-shield-lock" aria-hidden="true"></i> Bauschutz noch ${fmtDuration((v.schutzBis - jetzt)/1000)}</div>`;
     if (v.letzterKampf) info += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Letzter Angriff: ${escapeHtml(v.letzterKampf.angreiferName||'?')} – ${fmt(v.letzterKampf.schaden||0)} Schaden${v.letzterKampf.gefallen ? ', geschleift' : ''} (${fmtDuration((jetzt - (v.letzterKampf.zeit||jetzt))/1000)} her)</div>`;

@@ -815,3 +815,43 @@ Server-Tabellen. Gegenprobe gemessen: `ti-atom-2` des Sprungtors testweise auf `
 
 Wächter: `tests/test_vorposten_projekte_ui.js` (17). Gegenprobe gegen v8.646.0: 13 rot, 4 grün
 (die vier messen die Backend-Icons und den Bootvorgang, nicht diese Änderung), Prüflisten identisch.
+
+## Aufgeben ist ein Abbau über 24 Stunden (03.09.2026)
+
+Auftrag Sascha: „vorposten sollen auch aufgebar sein allerdings müssen die abgebaut werden dauert
+24 stunden."
+
+Der Punkt der Frist ist nicht das Warten: Bis hierher verschwand ein Vorposten in dem Moment, in
+dem sein Besitzer es wollte — auch mitten im Angriff, und der Angreifer stand vor einem leeren
+System. **Das Spiel muss das sagen**, sonst klickt jemand „abbauen" und glaubt, damit aus einem
+Angriff zu sein. Deshalb steht am Eintrag nicht nur die Dauer, sondern die Folge: *„so lange bleibt
+er angreifbar"*.
+
+- **Kartenmenü, kein laufender Abbau:** „Vorposten abbauen", mit Dauer und Folge. Die Rückfrage
+  nennt zusätzlich, dass Garnison und Module erst mit dem fertigen Abbau zurückkommen.
+- **Kartenmenü, laufender Abbau:** statt eines zweiten Starts der **Abbruch**, mit Restzeit. Ein
+  zweiter „abbauen"-Klick würde vom Server ohnehin abgewiesen — ein Eintrag, der nur eine
+  Fehlermeldung erzeugt, ist ein Versprechen ohne Gegenstand.
+- **Infozeile:** die Restzeit steht an **jedem** Vorposten, auch an einem fremden. Eine Station,
+  die in Kürze verschwindet, ist für einen Angreifer eine echte Information.
+- **Keine Rückflug-Mission beim Start.** Die Garnison bleibt am Vorposten und verteidigt weiter;
+  der Server schickt sie gar nicht mit. Legte das Spiel trotzdem einen Rückflug an, fehlten die
+  Schiffe zu Hause *und* am Vorposten.
+- **Der fertige Abbau kommt über die Belohnungs-Warteschlange** (`vorposten-abbau`): Die Schiffe
+  landen direkt auf dem aktiven Standort. Beim Ablauf der 24 Stunden ist der Spieler üblicherweise
+  gar nicht da, und der Server schreibt keinen fremden Spielstand.
+
+### Der Wortlaut hängt an der Serverangabe, nicht an diesem Release
+
+Zwischen diesem Frontend-Release und dem Umlegen von `VORPOSTEN_ABBAU_AKTIV` liegt genau ein
+Deploy. In dieser Zeit löscht `/vorposten/aufgeben` weiterhin **sofort** — ein Eintrag, der dann
+„Dauert 24h" verspräche, wäre eine Lüge in der Oberfläche. Der Menüpunkt liest deshalb
+`vorpostenCache.abbauAktiv` und heißt so lange weiter „Vorposten aufgeben". Prüfung 4a/4b hält das
+fest, damit die Absicherung nicht still verlorengeht.
+
+Ebenso kommt die **Dauer** als `abbauMs` vom Server. Eine `24` im Spiel wäre eine Kopie-Familie mit
+genau der Konstante, die im Backend steht.
+
+Wächter: `tests/test_vorposten_abbau_ui.js` (20). Gegenprobe gegen v8.649.0: 12 rot, 8 grün,
+Prüflisten identisch. Die acht grünen messen den Bootvorgang und den Übergangszustand — dort
+verhält sich der alte Stand richtigerweise wie ein Server ohne Abbau.
