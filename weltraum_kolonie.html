@@ -26433,6 +26433,32 @@ async function claimPendingRewards(){
           save();
           continue;
         }
+        if (r.type === 'vorposten-abbau'){
+          /* Der freiwillige Abbau (Backend #216, 03.09.2026) laeuft 24 Stunden und endet in einem
+             Server-Tick - der Besitzer ist dabei ueblicherweise gar nicht da. Deshalb kommt die
+             Garnison als ausstehende Belohnung und nicht als Rueckflug-Mission wie beim Rueckruf:
+             Der Vorposten ist beim Ablauf der Frist bereits geloescht, es gaebe also kein System
+             mehr, aus dem etwas zurueckfliegen koennte. Die Schiffe treten hier direkt wieder in
+             die Flotte des aktiven Standorts ein.
+             Dieser Zweig fehlte, seit der Server den Typ einreiht - gefunden vom Paritaetstest
+             (test_vorposten_paritaet 3b), nicht im Spiel. Ohne ihn faellt die Belohnung durch alle
+             Zweige und ist still weg: die Garnison eines abgebauten Vorpostens, ersatzlos. */
+          const flotteAbbau = currentFleet();
+          let zurueckAbbau = 0;
+          for (const [k, v] of Object.entries(r.garnison || {})){
+            if (typeof v === 'number' && v > 0){ flotteAbbau[k] = (flotteAbbau[k]||0) + v; zurueckAbbau += v; }
+          }
+          const sysNameAbbau = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          // Die Module hat der Server schon in den Bestand gelegt (vpModulGeben) - hier werden sie
+          // nur genannt. Sie hier ein zweites Mal zu geben, waere eine stille Verdopplung.
+          const modAbbau = (Array.isArray(r.module) ? r.module : []).length;
+          log('Abbau abgeschlossen: Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameAbbau + ' ist zurückgebaut.'
+            + (zurueckAbbau ? ' Die Garnison (' + zurueckAbbau + ' Schiff(e)) ist wieder auf ' + planetDisplayName(state.activeBasePlanet) + '.' : '')
+            + (modAbbau ? ' ' + modAbbau + ' Modul(e) liegen wieder im Bestand.' : ''), 'ti-shield', 'ok');
+          ladeVorposten();
+          save();
+          continue;
+        }
         if (r.type === 'wrackkonvoi'){
           // A2: der Wrackkonvoi zahlt anteilig Sternenessenz (state.ascension.essence - die einzige
           // Waehrung, die Prestige UND Aufstieg uebersteht) plus Kampfpunkte/Erfahrung/Kredite und
