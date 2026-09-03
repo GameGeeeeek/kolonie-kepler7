@@ -37,6 +37,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const WURZEL = __dirname;
@@ -74,6 +75,24 @@ alle.forEach((f, i) => stuecke[i % GLEICHZEITIG].push(f));
 const marke = i => path.join(ABLAGE, 'fertig_' + i);
 const protokoll = i => path.join(ABLAGE, 'lauf_' + i + '.txt');
 
+/* DER FINGERABDRUCK - ohne ihn ist `--fortsetzen` eine Falle (Review-Befund 03.09.2026).
+   Eine Marke sagte bisher nur "Stueck 3 war fertig, EXIT=0". Womit, stand nirgends. Nach einer
+   Aenderung an der Spieldatei, einem Merge, einer anderen `--gleichzeitig`-Zahl oder einem zweiten
+   Checkout auf demselben Rechner beschreibt dieselbe Marke eine ANDERE Dateimenge - und ein alter
+   Exit-Code 0 laesst den Lauf gruen melden, ohne die aktuellen Tests gefahren zu haben. Ein
+   Release-Tor, dessen Ausfall wie Normalbetrieb aussieht, ist keins.
+   Im Abdruck steckt alles, was das Ergebnis eines Stuecks bestimmt: der Inhalt der Spieldatei UND
+   aller Testdateien (nicht nur ihre Namen - eine geaenderte Pruefung waere sonst unsichtbar), die
+   Stueckzahl, die Dateiliste genau dieses Stuecks und das Wurzelverzeichnis. */
+function abdruckVon(dateienDesStuecks) {
+  const h = crypto.createHash('sha1');
+  h.update(WURZEL + '\n' + GLEICHZEITIG + '\n' + dateienDesStuecks.join(',') + '\n');
+  const spiel = path.join(WURZEL, 'weltraum_kolonie.html');
+  if (fs.existsSync(spiel)) h.update(fs.readFileSync(spiel));
+  for (const f of alle) { try { h.update(fs.readFileSync(path.join(WURZEL, 'tests', f))); } catch (e) {} }
+  return h.digest('hex').slice(0, 16);
+}
+
 if (!FORTSETZEN) {
   for (let i = 0; i < 64; i++) { try { fs.unlinkSync(marke(i)); } catch (e) {} }
 }
@@ -84,9 +103,17 @@ console.log('Ablage: ' + ABLAGE);
 function starte(i) {
   return new Promise(fertig => {
     if (FORTSETZEN && fs.existsSync(marke(i))) {
-      const code = parseInt(fs.readFileSync(marke(i), 'utf8').trim(), 10);
-      console.log('  Stück ' + i + ' war schon fertig (EXIT=' + code + ')');
-      return fertig({ i, code, uebersprungen: true });
+      const roh = fs.readFileSync(marke(i), 'utf8').trim().split(/\s+/);
+      const code = parseInt(roh[0], 10);
+      const gemerkt = roh[1] || '';
+      const jetzt = abdruckVon(stuecke[i]);
+      // Nur ueberspringen, wenn der Abdruck passt. Sonst ist die Marke von einem anderen Stand,
+      // und ihr Exit-Code sagt nichts ueber DIESEN.
+      if (gemerkt === jetzt && Number.isFinite(code)) {
+        console.log('  Stück ' + i + ' war schon fertig (EXIT=' + code + ', Abdruck passt)');
+        return fertig({ i, code, uebersprungen: true });
+      }
+      console.log('  Stück ' + i + ': Marke verworfen (' + (gemerkt ? 'anderer Stand' : 'ohne Abdruck') + ') - wird neu gefahren.');
     }
     const start = Date.now();
     const aus = fs.openSync(protokoll(i), 'w');
@@ -95,7 +122,7 @@ function starte(i) {
     kind.on('exit', code => {
       try { fs.closeSync(aus); } catch (e) {}
       const c = code === null ? 1 : code;
-      fs.writeFileSync(marke(i), String(c));
+      fs.writeFileSync(marke(i), String(c) + ' ' + abdruckVon(stuecke[i]));
       const dauer = Math.round((Date.now() - start) / 1000);
       console.log('  Stück ' + i + ' fertig: EXIT=' + c + ' (' + stuecke[i].length + ' Dateien, ' + dauer + 's)');
       fertig({ i, code: c, dauer });
