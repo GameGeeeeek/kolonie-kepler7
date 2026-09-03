@@ -26454,11 +26454,15 @@ async function claimPendingRewards(){
           const sysNameA = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
           const flotteA = currentFleet();
           const zurueck = [];
+          // Positive Bedingung statt `continue`: In einem Belohnungszweig ist jedes `continue` vor
+          // dem save() eine Falle - fuer den Leser wie fuer den Waechter, der den Zweig bis zu
+          // seinem Ende liest (test_vorposten_paritaet 3c).
           for (const [k, n] of Object.entries(r.garnison || {})){
             const anz = Math.max(0, Math.round(Number(n) || 0));
-            if (!anz || !SHIP_DEFS[k]) continue;
-            flotteA[k] = (flotteA[k] || 0) + anz;
-            zurueck.push(anz + '\u00d7 ' + (SHIP_DEFS[k].name || k));
+            if (anz && SHIP_DEFS[k]){
+              flotteA[k] = (flotteA[k] || 0) + anz;
+              zurueck.push(anz + '\u00d7 ' + (SHIP_DEFS[k].name || k));
+            }
           }
           const modA = (r.module || []).length;
           log('Der Abbau bei ' + sysNameA + ' ist fertig – der ' + (r.name||'Vorposten') + ' ist abgetragen'

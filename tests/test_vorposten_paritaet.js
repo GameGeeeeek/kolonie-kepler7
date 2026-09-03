@@ -53,9 +53,25 @@ const srvTypen = [...new Set([...SRV.matchAll(/type: 'vorposten(-[a-z]+)?'/g)].m
 const claimVon = JS.indexOf('async function claimPendingRewards(');
 const claimBlock = JS.slice(claimVon, claimVon + 80000);
 const ohneZweig = srvTypen.filter(t => !new RegExp("r\\.type === '" + t + "'").test(claimBlock));
-check('3a: der Server reiht genau zwei Vorposten-Belohnungstypen ein', srvTypen.length === 2 && srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust'), srvTypen);
+/* Bis zum 03.09.2026 stand hier "genau ZWEI" - eine Momentaufnahme (Regel 3), die bei jedem
+   legitimen neuen Typ fiel, obwohl die Paritaet stimmte. Die REGEL steht in 3b: Jeder Typ des
+   Servers braucht einen Zweig im Spiel. 3a sichert nur noch, dass ueberhaupt etwas gefunden wurde
+   und die bekannten Kerntypen dabei sind - sonst misst 3b nichts. */
+check('3a-vorab: die Belohnungstypen des Servers wurden gelesen (sonst misst 3b nichts)',
+  srvTypen.length >= 2 && srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust'), srvTypen);
 check('3b: fuer jeden davon hat claimPendingRewards einen Zweig', claimVon > 0 && ohneZweig.length === 0, { ohneZweig });
-const zweigSave = srvTypen.every(t => { const i = claimBlock.indexOf("r.type === '" + t + "'"); const b = claimBlock.slice(i, claimBlock.indexOf('continue;', i)); return /\bsave\(\);/.test(b); });
+/* Der Zweig reicht bis zum NAECHSTEN Zweig, nicht bis zum ersten `continue;`. GEMESSEN am
+   03.09.2026: Der neue Zweig 'vorposten-abbau' hatte ein `continue` INNERHALB einer Schleife -
+   der Schnitt endete dort, das save() dahinter lag ausserhalb, und 3c fiel an einem Zweig, der
+   save() sehr wohl ruft. Eine Heuristik, die am ersten `continue` schneidet, misst nicht den
+   Zweig, sondern seine erste Schleife. */
+const zweigSave = srvTypen.every(t => {
+  const i = claimBlock.indexOf("r.type === '" + t + "'");
+  if (i < 0) return false;
+  const naechster = claimBlock.indexOf("if (r.type === '", i + 10);
+  const b = claimBlock.slice(i, naechster > 0 ? naechster : i + 4000);
+  return /\bsave\(\);/.test(b);
+});
 check('3c: und jeder Zweig ruft save() (Regel 73)', zweigSave);
 
 // ---- 4) Missionsfamilie ---------------------------------------------------------------------------
