@@ -314,3 +314,42 @@ einen Folgeauftrag.
 wenn die Reparatur das Schließen ganz abgeschaltet hätte. Die beiden Gegenstücke — Seitenscroll
 und ein fremder Scrollkasten schließen weiterhin — laufen deshalb im **selben** Durchgang mit,
 nicht als Nachgedanke (`tests/test_kartenmenue_scrollen.js` 5 und 6).
+
+---
+
+## Wer misst, welche Quellen eine Währung speisen, zählt die Auszahlungen — nicht die Tabellen
+
+Sternenessenz ist die einzige Währung, die **jeden** Reset überlebt. Beim Schließen der letzten
+Lücke (Vollreset, 03.09.2026) musste die Frage beantwortet werden: *Welche Marken halten fest,
+dass sie schon ausgezahlt wurde?* Ich habe sie zweimal falsch beantwortet:
+
+| Anlauf | Methode | Ergebnis |
+|---|---|---|
+| 1 | „aus dem Kopf" | vier Marken, davon zwei falsch |
+| 2 | `grep essence:` in den *offensichtlichen* Tabellen | **zwei** Marken, 184 Essenz |
+| 3 | jede Stelle zählen, die `state.ascension.essence` erhöht | **fünf** Marken, **320** Essenz |
+
+Anlauf 2 übersah den Kodex (`CODEX_TIERS[].reward.essence` — die Zahl steht eine Ebene tiefer als
+gesucht) und die Abgrund-Tiefenmarken (`ABGRUND_TIEFEN_MEILENSTEINE`, eine Tabelle, an die beim
+Stichwort „Belohnung" niemand denkt). Beide Fehler haben dieselbe Form: **Die Suche ging von den
+Orten aus, an denen die Antwort vermutet wurde, statt von der Wirkung, um die es geht.**
+
+**Die übertragbare Regel:** Wer wissen will, was eine Größe verändert, sucht nach der
+**Zuweisung** an diese Größe, nicht nach den Tabellen, die sie vermutlich füttern. Eine Tabelle
+kann man übersehen; eine Zuweisung nicht, denn ohne sie passiert nichts.
+
+Und für den Wächter folgt daraus dieselbe Richtung: `tests/test_essenzmarken.js` zählt die
+**Auszahlungsstellen** und verlangt, dass jede einzeln eingeordnet ist — als bewachte Marke oder
+mit Begründung als markenlos (der Wrackkonvoi, dessen Essenz vom Server kommt). Eine sechste
+Quelle lässt den Test fallen, bis jemand sie einordnet. Eine Prüfung, die stattdessen die fünf
+bekannten Marken abgehakt hätte, wäre bei genau dem Fehler grün geblieben, der hier zweimal
+passiert ist.
+
+**Nebenlehre aus derselben Datei:** Ein Schnitt, der sein Ziel verfehlt, sieht aus wie ein
+gefallener Test. Der erste Entwurf schnitt die drei Reset-Ausgänge bis zum ersten
+`applyStateDefaults` — alle drei erwähnen den Namen aber vorher in einem Kommentar, und alle fünf
+Prüfungen fielen bei richtigem Code. Seither steht eine eigene Ankerprüfung daneben
+(„jeder Schnitt enthält wirklich das Zustands-Literal"); sie unterscheidet *rot* von *unbrauchbar*,
+und die beiden sehen sonst gleich aus. Dasselbe galt für den Anker selbst: Das Prestige-Literal
+lebt nicht in `doPrestige()`, sondern in `confirmPrestigeWithPerk()` — `doPrestige` öffnet nur die
+Perk-Auswahl.
