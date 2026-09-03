@@ -17870,8 +17870,21 @@
   }
   /* Der Sektorfaktor reiht sich hier ein, NEBEN npcEmpireStrength - nicht darin: Jener sagt, wie
      es der Galaxie geht, dieser, wie es DIESER Region geht. Beide sind serverseitig gerechnet;
-     der Client liest sie nur (siehe sektorNpcMult). */
-  function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1) * sektorNpcMult(npc && npc.system) * prestigeChallengeMult()); }
+     der Client liest sie nur (siehe sektorNpcMult). Zusammen sind sie der WELT-Anteil der
+     Verteidigung: das, was sich unter dem Spieler bewegt, waehrend seine Flotte fliegt. */
+  function npcWeltFaktor(npc){ return (galaxyCache.npcEmpireStrength||1) * sektorNpcMult(npc && npc.system); }
+  /* `weltFaktor` erlaubt der Aufloesung, den beim Start gemessenen Welt-Anteil einzusetzen.
+     EINGEFROREN WIRD NUR ER - der Siegzaehler npcScalingCount bleibt in BEIDEN Richtungen live.
+     Der erste Entwurf fror die GANZE Verteidigung ein, und die Codex-Pruefung hat gezeigt, was
+     das kostet: npcEffectiveLoot liest den Zaehler bei der Ankunft, npcScaling waechst nach
+     jedem Sieg. Mit mehreren Missionen gleichzeitig auf denselben Gegner (bis zu elf Flotten)
+     kaempfte damit jede gegen die Verteidigung vom Start, waehrend die Beute mit jedem Sieg
+     stieg - Belohnung und Schwierigkeit waren entkoppelt. Beide haengen jetzt wieder am selben
+     lebenden Zaehler, und eingefroren ist genau das, was das Konzept verlangt hat. */
+  function npcEffectiveDefense(npc, weltFaktor){
+    const welt = (typeof weltFaktor === 'number' && weltFaktor > 0) ? weltFaktor : npcWeltFaktor(npc);
+    return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * welt * prestigeChallengeMult());
+  }
   // Echte NPC-Flotten (16.07.2026, Feature-Wunsch): jeder NPC hat statt eines rein abstrakten
   // Verteidigungswerts eine konkrete Flottenzusammensetzung, deren Gesamt-Angriffskraft ungefähr
   // seiner effektiven Verteidigung entspricht. Deterministisch aus NPC-ID + Skalierungszähler
@@ -53476,9 +53489,10 @@ async function claimPendingRewards(){
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
-          // Der beim Start eingefrorene Wert hat Vorrang; aeltere, noch fliegende Missionen
-          // tragen ihn nicht und rechnen wie bisher.
-          const effDefense = (typeof m.effDefense === 'number' && m.effDefense > 0) ? m.effDefense : npcEffectiveDefense(npc);
+          // Der beim Start gemessene Welt-Anteil hat Vorrang; aeltere, noch fliegende Missionen
+          // tragen ihn nicht und rechnen wie bisher. Der Siegzaehler wird IMMER frisch gelesen -
+          // er steht auf derselben Seite wie die Beute.
+          const effDefense = npcEffectiveDefense(npc, m.weltFaktor);
           const effLoot = npcEffectiveLoot(npc);
           let power = m.power || attackPower(fleet);
           // Konterrollen greifen jetzt auch gegen NPCs (25.07.2026). Bis dahin rief das Frontend
@@ -60750,8 +60764,10 @@ async function claimPendingRewards(){
        was die Vorschau gezeigt hat, 'auch falls sich Skalierung oder globaler Schwierigkeitsgrad
        waehrend des Flugs aendern'. Die ZAHL wurde bei Ankunft trotzdem neu gerechnet. Mit der
        Sektorlage kommt ein Faktor dazu, der sich alle 15 Minuten bewegt; ein Flug dauert laenger.
-       Ohne dieses Feld zeigte die Vorschau eine Verteidigung, die der Kampf nicht mehr benutzt. */
-    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFrozen, effDefense: npcEffectiveDefense(npc) });
+       Ohne dieses Feld zeigte die Vorschau eine Verteidigung, die der Kampf nicht mehr benutzt.
+       Eingefroren wird der WELT-Anteil, nicht die fertige Zahl: Der Siegzaehler muss live
+       bleiben, weil die Beute an ihm haengt (siehe npcEffectiveDefense). */
+    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFrozen, weltFaktor: npcWeltFaktor(npc) });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+powerAngezeigt+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }

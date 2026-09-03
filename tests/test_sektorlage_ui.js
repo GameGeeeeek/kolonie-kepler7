@@ -25,10 +25,52 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 // ---- 0) Quelltext-Anker -------------------------------------------------------------------------
 check('0a: der Faktor sitzt in npcEffectiveDefense',
   /sektorNpcMult\(npc && npc\.system\)/.test(JS));
-check('0b: der Missionsstart friert die Verteidigung ein',
-  /effDefense: npcEffectiveDefense\(npc\)/.test(JS));
-check('0c: die Aufloesung bevorzugt den eingefrorenen Wert und faellt sonst zurueck',
-  /typeof m\.effDefense === 'number' && m\.effDefense > 0\) \? m\.effDefense : npcEffectiveDefense\(npc\)/.test(JS));
+check('0b: der Missionsstart friert den WELT-Anteil ein, nicht die fertige Verteidigung',
+  /weltFaktor: npcWeltFaktor\(npc\)/.test(JS) && !/effDefense: npcEffectiveDefense\(npc\)/.test(JS));
+check('0c: die Aufloesung setzt ihn ein und faellt ohne ihn auf den lebenden Wert zurueck',
+  /const effDefense = npcEffectiveDefense\(npc, m\.weltFaktor\);/.test(JS)
+  && /typeof weltFaktor === 'number' && weltFaktor > 0\) \? weltFaktor : npcWeltFaktor\(npc\)/.test(JS));
+
+/* ---- 0e) DER ANLASSFALL DER CODEX-PRUEFUNG (P1), als ausgefuehrte Regel ---------------------
+   Der erste Entwurf fror die GANZE Verteidigung beim Start ein. npcEffectiveLoot liest den
+   Siegzaehler aber bei der ANKUNFT, und npcScaling waechst nach jedem Sieg: Wer mehrere
+   Flotten gleichzeitig auf denselben Gegner schickt (bis zu elf), kaempfte damit jedes Mal
+   gegen die Verteidigung vom Start, waehrend die Beute mit jedem Sieg stieg. Belohnung und
+   Schwierigkeit waren entkoppelt.
+   Geprueft wird die REGEL, nicht die eine Zeile: Beide Funktionen werden geschnitten,
+   ausgefuehrt und mit demselben steigenden Zaehler gefuettert - waechst die eine, muss die
+   andere mitwachsen. */
+const schneideFn = (kopf) => {
+  const i = JS.indexOf(kopf);
+  if (i < 0) return null;
+  const j = JS.indexOf('\n  }', i);
+  return j < 0 ? null : JS.slice(i, j + 4);
+};
+const FN_DEF = schneideFn('  function npcEffectiveDefense(npc, weltFaktor){');
+const FN_LOOT = schneideFn('  function npcEffectiveLoot(npc){');
+check('0e-anker: beide Funktionen lassen sich schneiden', !!FN_DEF && !!FN_LOOT,
+  { def: !!FN_DEF, loot: !!FN_LOOT });
+if (FN_DEF && FN_LOOT){
+  const bau = new Function('siege', `
+    function npcScalingCount(){ return siege; }
+    function prestigeChallengeMult(){ return 1; }
+    function seasonalLootMult(){ return 1; }
+    function sektorNpcMult(){ return 1; }
+    const galaxyCache = { npcEmpireStrength: 1 };
+    function npcWeltFaktor(){ return 1; }
+    ${FN_DEF}
+    ${FN_LOOT}
+    return { npcEffectiveDefense, npcEffectiveLoot };`);
+  const npcProbe = { id:'x', defense: 1000, system:'kepler', loot: { erz: 1000 } };
+  const reihe = [0, 1, 2, 5].map(s => {
+    const a = bau(s);
+    // MIT dem eingefrorenen Welt-Anteil gerechnet - genau so, wie die Aufloesung es tut.
+    return { siege: s, def: a.npcEffectiveDefense(npcProbe, 1), beute: a.npcEffectiveLoot(npcProbe).erz };
+  });
+  const beideSteigen = reihe.every((r, i) => i === 0 || (r.def > reihe[i-1].def && r.beute > reihe[i-1].beute));
+  check('0e: Verteidigung und Beute haengen am SELBEN lebenden Siegzaehler - auch mit eingefrorenem Welt-Anteil',
+    beideSteigen, reihe);
+}
 /* Der Client rechnet die Lage nicht nach. Faellt diese Pruefung, hat jemand `punkte` in die
    Frontend-Kopie geschrieben - der erste Schritt zu zwei Quellen fuer dieselbe Zahl, von denen
    die zweite die ist, die niemand pflegt. */

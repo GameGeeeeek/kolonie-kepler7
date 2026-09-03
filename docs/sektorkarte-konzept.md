@@ -820,14 +820,30 @@ Doppelte ihres Anteils trägt. Details und Sabotage-Liste:
 | **vierte Textzeile** am Regionsknoten | **farbiger Rand** + Tooltip + `aria-label` | Der Knoten trägt schon Name, Systemzahl, Eigenschaft und Abzeichenzeile; die Entscheidung vom 29.08.2026 steht als Kommentar im Code, samt Messung (am Handy 6–9 px, die „N Systeme"-Zeile fällt dort bereits weg) |
 | Kampfbericht als Anzeigestelle | **nicht angefasst** | Der Bericht zeigt `defensePower` = den beim Start eingefrorenen Wert, der den Faktor bereits enthält. Er ist also nicht veraltet, nur unerklärt — und sein Renderer bedient sechs Kampfarten |
 
-### Der eingefrorene Wert
+### Der eingefrorene Wert — und was der erste Entwurf davon kostete
 
 Bis hierher fror der Missionsstart nur die **Flotte** ein, obwohl sein eigener Kommentar
 versprach, die Auflösung kämpfe gegen das, was die Vorschau gezeigt hat, „auch falls sich
 Skalierung oder globaler Schwierigkeitsgrad während des Flugs ändern". Die **Zahl** wurde bei
 Ankunft neu gerechnet. Mit einem Faktor, der sich alle 15 Minuten bewegt, während ein Flug länger
-dauert, wäre daraus ein sichtbarer Widerspruch geworden. Die Mission trägt jetzt `effDefense`;
-ältere, noch fliegende Missionen rechnen wie bisher.
+dauert, wäre daraus ein sichtbarer Widerspruch geworden.
+
+**Der erste Entwurf fror deshalb die ganze Verteidigung ein — und das war falsch.** Die
+Codex-Prüfung am PR hat gezeigt, warum: `npcEffectiveLoot()` liest den Siegzähler bei der
+**Ankunft**, und `npcScaling` wächst nach jedem Sieg. Wer mehrere Flotten gleichzeitig auf
+denselben Gegner schickt — das Spiel erlaubt bis zu elf —, kämpfte damit jedes Mal gegen die
+Verteidigung vom Start, während die Beute mit jedem Sieg stieg. **Belohnung und Schwierigkeit
+waren entkoppelt**, und zwar durch diese Etappe.
+
+Eingefroren wird seither nur der **Welt-Anteil** (`npcWeltFaktor` = `npcEmpireStrength` ×
+Sektorfaktor) — genau das, was das Konzept verlangt hat: das, was sich unter dem Spieler bewegt,
+während seine Flotte fliegt. Der Siegzähler bleibt auf **beiden** Seiten live, Verteidigung und
+Beute hängen also wieder am selben Wert. Ältere, noch fliegende Missionen tragen das Feld nicht
+und rechnen wie bisher.
+
+Die Lehre ist allgemeiner als dieser Fall: **Wer eine Größe einfriert, friert damit auch jede
+Beziehung ein, in der sie steht.** Hier stand die Verteidigung in einer Waage mit der Beute, und
+die Waage kippte, weil nur eine Seite festgehalten wurde.
 
 ### Wächter
 
@@ -836,6 +852,11 @@ Gegner-Verteidigung mit und ohne belastete Region, gemessen am Kartenmenü — 3
 ×1,25. Ohne diese Messung belegte der Test nur, dass irgendwo „+25 %" geschrieben steht.
 Gegenprobe: 9 von 16 fallen am Stand davor; die sieben, die grün bleiben, sind die Anker und die
 **Neutralitäts**-Prüfungen (ohne `sektorLage` ändert sich nichts, keine Seitenfehler).
+
+Prüfung **0e** hält die Waage aus dem Abschnitt darüber fest, und zwar ausgeführt statt gelesen:
+Beide Funktionen werden geschnitten und mit demselben steigenden Zähler gefüttert — wächst die
+eine, muss die andere mitwachsen (gemessen 1000 → 1180 → 1360 → 1900 gegen
+1000 → 1150 → 1300 → 1750). Nimmt man der Verteidigung den Zähler weg, fällt genau diese Prüfung.
 
 Zwei Befunde aus dem Bau der Messvorrichtung, beide als Kommentar im Test:
 
