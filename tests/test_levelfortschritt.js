@@ -201,8 +201,16 @@ check('state.vorboten wird beim Laden normalisiert',
 // Sie hat ihren eigenen Effekt um ein Viertel zu klein ausgewiesen.
 const wkMech = /deckelWeich\(werftkernLvl\*0\.015, 0\.20\)/.test(src);
 check('die Mechanik deckelt bei 20%', wkMech);
-check('die Karte nennt denselben Deckel', src.includes('nach Ausbau (Deckel: -20%)'));
-check('die alte 15%-Angabe ist weg', !ohnePatchnotes.includes('nach Ausbau (Deckel: -15%)'));
+// Geprueft wird die AUSSAGE, nicht die Schreibweise: Die Karte muss denselben Deckel nennen, mit dem
+// gerechnet wird. Die alte Fassung nagelte den Wortlaut 'nach Ausbau (Deckel: -20%)' fest und fiel
+// am 03.09.2026, als die Beschriftung praeziser wurde ('ab -20% wird jede weitere Stufe stark
+// abgeschwaecht') - der weiche Deckel laeuft oberhalb von 20% noch bis knapp 25% aus, "Deckel: -20%"
+// widersprach ab vierzehn Stufen der Zahl direkt davor. Der Deckel selbst blieb dabei unveraendert.
+const wkZeile = (zeilen.find(z => z.includes('Schiffsbauzeit (imperiumsweit)')) || '');
+check('die Werftkern-Vorschauzeile ist auffindbar', !!wkZeile);
+check('die Karte nennt denselben Deckel', /(^|[^\d])20\s*%/.test(wkZeile), wkZeile.trim().slice(0, 200));
+check('die alte 15%-Angabe ist weg', !!wkZeile && !/(^|[^\d])15\s*%/.test(wkZeile)
+  && !ohnePatchnotes.includes('nach Ausbau (Deckel: -15%)'));
 
 // ---- 7: Der Erfolgstext ohne Ziffer ------------------------------------------------------------
 // "alle 9 Faehigkeitsbaum-Knoten" waere mit der zweiten Baumstufe still falsch geworden. Rechnen

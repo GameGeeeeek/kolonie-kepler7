@@ -129,9 +129,27 @@ check('3: und reisen in der Mission mit', /composition: flotte, fleetName: sekto
 // Beide Funktionen haben seit v8.339.0 einen Parameter mehr (Nullkiel bzw. Grundgaenger, beide
 // aus der MITGEFLOGENEN Flotte). Die Aussage dieses Checks bleibt dieselbe: Was in der Mission
 // steht, entscheidet - nicht der Zustand von jetzt.
-check('3: die Aufloesung liest sie AUS DER MISSION, nicht aus dem aktuellen Zustand',
-  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js) &&
-  /abgrundWiederholungsFaktor\(tiefe, !!m\.grund, m\.composition \|\| fleet\)/.test(js));
+// Geprueft wird die EIGENSCHAFT, nicht die Schreibweise (03.09.2026): In der Zeile, die den Sektor
+// bei der Rueckkehr nachbaut, muss JEDER der vier mitgereisten Werte aus `m.` kommen. Vorher stand
+// hier der komplette Aufruf als Zeichenkette - und genau daran ist der Test gefallen, als der
+// WAECHTERRUF (m.ruf) als vierter Wert dazukam, obwohl die Aenderung die gepruefte Aussage
+// verstaerkt hat. Ein Test, der die Schreibweise festnagelt, faellt auf besserem Code durch.
+{
+  // Es gibt ZWEI Aufrufe von abgrundSektorMitBann: einen beim Abtauchen (der liest den lebenden
+  // Zustand, und das ist dort richtig) und einen bei der Rueckkehr. Gemeint ist der zweite, und
+  // erkennbar ist er daran, dass er ueberhaupt mit einer Mission arbeitet - nicht an seiner
+  // Reihenfolge in der Datei. Beim ersten Anlauf hat mein Anker den Abtauch-Aufruf erwischt und
+  // gemeldet, alle vier Werte fehlten.
+  const alleAufrufe = js.match(/abgrundSektorMitBann\([^\n]*/g) || [];
+  const zeile = alleAufrufe.filter(z => z.indexOf('m.') >= 0)[0] || '';
+  check('3: die Aufloesung baut den Sektor ueberhaupt nach', zeile.length > 40,
+    { gefunden: alleAufrufe.length, ausgewaehlt: zeile.slice(0, 130) });
+  const fehlend = ['m.bann', 'm.spule', 'm.composition', 'm.ruf'].filter(x => zeile.indexOf(x) < 0);
+  check('3: die Aufloesung liest sie AUS DER MISSION, nicht aus dem aktuellen Zustand',
+    fehlend.length === 0, { fehlend, zeile: zeile.slice(0, 160) });
+  check('3: dasselbe fuer den Wiederholungsfaktor',
+    /abgrundWiederholungsFaktor\(tiefe, !!m\.grund, m\.composition \|\| fleet\)/.test(js));
+}
 // Die Spule braucht einen gewaehlten Bann - sonst haette sie nichts zu streichen und wuerde beim
 // Abtauchen still verpuffen.
 check('3: ohne gewaehlte Gegenmassnahme wird die Spule NICHT verbraucht',
@@ -181,7 +199,29 @@ check('6: mit Ruf wird die ANGESTEUERTE Tiefe zur Waechtertiefe', ruf(7, 7, true
 // Waechter, die es gar nicht gibt - und die Vorschau widerspraeche der Karte.
 check('6: alle anderen Tiefen bleiben unberuehrt', ruf(8, 7, true) === false && ruf(6, 7, true) === false);
 check('6: ein leerer Spielstand stuerzt nicht ab', RUF({})(1) === false);
-check('6: abgrundWaechterDef beruecksichtigt den Ruf', /!abgrundIstWaechter\(tiefe\) && !abgrundRufAktiv\(tiefe\)/.test(js));
+/* AUSGEFUEHRT statt gegreppt (03.09.2026). Hier stand ein Suchmuster auf die genaue Schreibweise
+   der if-Zeile - es war gruen, waehrend der gerufene Waechter bei der Rueckkehr des Tauchgangs
+   spurlos verschwand: `a.ruf` ist beim Abtauchen laengst verbraucht, und die Abrechnung baute den
+   Sektor aus dem LEBENDEN Zustand nach. Ein legendaerer Gegenstand meldete zweimal Vollzug und
+   bewirkte nichts. Ab jetzt wird die Eigenschaft gemessen, die zaehlt: Ein mitgereister Ruf muss
+   auch dann einen Waechter ergeben, wenn im Zustand keiner mehr steht. */
+{
+  const WD = new Function('state, abgrundIstWaechter, abgrundRufAktiv, ABGRUND_WAECHTER_ALLE, ABGRUND_WAECHTER_NAMEN',
+    fnAus('abgrundWaechterDef') + '; return abgrundWaechterDef;');
+  const NAMEN = [{ name:'Pruefwaechter', text:'x' }];
+  const ALLE = zahl('ABGRUND_WAECHTER_ALLE') || 10;
+  // Ein Zustand OHNE Ruf - genau die Lage bei der Rueckkehr, nachdem der Ruf verbraucht wurde.
+  const wd = (tiefe, rufErzwungen) => WD({ abgrund:{ ruf:false } }, () => false, () => false, ALLE, NAMEN)(tiefe, rufErzwungen);
+  check('6: ohne Ruf und ohne Waechtertiefe gibt es keinen Waechter', wd(ALLE*2, false) === null);
+  check('6: ein MITGEREISTER Ruf ergibt einen Waechter, auch wenn im Zustand keiner mehr steht',
+    !!wd(ALLE*2, true) && typeof (wd(ALLE*2, true)||{}).name === 'string', wd(ALLE*2, true));
+  // Gegenprobe: Ohne Argument faellt die Funktion auf den lebenden Zustand zurueck - so bleiben
+  // Vorschau und Abtauchen unveraendert, wo der Ruf noch nicht verbraucht ist.
+  const wdLebend = (tiefe, rufImZustand) =>
+    WD({ abgrund:{ ruf:rufImZustand } }, () => false, () => rufImZustand, ALLE, NAMEN)(tiefe);
+  check('6: ohne Argument entscheidet weiterhin der lebende Zustand',
+    wdLebend(ALLE*2, false) === null && !!wdLebend(ALLE*2, true));
+}
 
 // ---- 7) Tiefenlot: Sicht, die von selbst aufgebraucht wird ----
 const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state, lotsenbootSicht',
