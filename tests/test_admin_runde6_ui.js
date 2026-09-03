@@ -327,11 +327,20 @@ const post = (z, p) => z.posts.filter(x => x.p === p);
     { id: 'n2', type: 'geschenk-konto', time: JETZT - 2000, payload: { grund: 'Entschaedigung fuer den Fehler', gaben: { credits: 500 } } } ] });
   const s5 = await seite(browser, z5);
   const t5 = await s5.text('#notificationEventsBox');
+  /* 5a und 5b pruefen, WAS in der Zeile steht, nicht mit welchen Bindewoertern (Regel 3).
+     GEMESSEN am 03.09.2026: Beide hingen am Wortlaut EINER von ZWEI Fassungen, die
+     NOTIF_EVENT_INFO fuer 'admin-alarm' und 'geschenk-konto' gleichzeitig fuehrte - zwei
+     Sitzungen hatten dieselbe Luecke unabhaengig geschlossen. Im Objektliteral gewinnt der
+     spaetere Eintrag; der Test las den frueheren und war auf origin/main (v8.645.0) rot.
+     Die Doppelung ist entfernt (die spaetere Fassung bleibt: sie schickt Freitext durch
+     escapeHtml), test_pushkategorien 2d faengt sie kuenftig ab. */
   check('5a: der Alarm steht im Postfach mit Konto, Messwert und Schwelle',
-    /Angriffe in einer Stunde bei anna/.test(t5) && /18 Angriffe geflogen/.test(t5) && /gemessen 18, Schwelle 15/.test(t5),
+    /Angriffe in einer Stunde/.test(t5) && /\banna\b/.test(t5) && /18 Angriffe geflogen/.test(t5)
+      && /gemessen 18, Schwelle 15/.test(t5),
     { auszug: t5.slice(0, 160) });
   check('5b: das Geschenk nennt den Grund - ohne ihn wuesste der Beschenkte nichts',
-    /Ein Geschenk vom Betreiber: Entschaedigung fuer den Fehler/.test(t5));
+    /Geschenk vom Betreiber/.test(t5) && /Entschaedigung fuer den Fehler/.test(t5),
+    { auszug: t5.slice(0, 200) });
   check('5c: keine der beiden Meldungen faellt auf das generische "Ereignis" zurueck', !/>Ereignis</.test(await s5.page.innerHTML('#notificationEventsBox')));
   await s5.ctx.close();
 

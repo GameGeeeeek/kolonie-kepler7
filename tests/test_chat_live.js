@@ -94,15 +94,28 @@ const ICH = 'u-ich';
 const GOLD = { namensfarbe: 'nf_gold', emblem: 'em_leuchtfeuer' };
 const OHNE = { namensfarbe: 'nf_standard', emblem: 'em_keins' };
 
-// 160 globale Nachrichten: 1..150 auf "gestern" (26 h zurück, minütlich), 151..160 auf "heute".
-// Das 30er-Startfenster (131..160) überspannt damit BEIDE Tage -> zwei Tages-Trenner; nach
-// "Ältere anzeigen" (31..160) ebenso. Die Texte sind durchnummeriert, damit die Zählung im DOM
-// über /Nachricht \d+/ läuft statt über ein Markup-Detail (Regel 3).
+// 160 globale Nachrichten: 1..150 auf "gestern", 151..160 auf "heute". Das 30er-Startfenster
+// (131..160) überspannt damit BEIDE Tage -> zwei Tages-Trenner; nach "Ältere anzeigen" (31..160)
+// ebenso. Die Texte sind durchnummeriert, damit die Zählung im DOM über /Nachricht \d+/ läuft
+// statt über ein Markup-Detail (Regel 3).
+//
+// Beide Gruppen werden aus der HEUTIGEN Mitternacht abgeleitet, nicht aus einem festen Abstand zu
+// jetzt. GEMESSEN am 03.09.2026, als der Volltest hier fiel: Das frühere "26 h zurück, 75 Minuten
+// breit" überquerte kurz nach Mitternacht selbst eine Tagesgrenze - die 150 Nachrichten lagen dann
+// auf ZWEI Kalendertagen und Prüfung 1b sah drei Trennzeilen statt zwei. Der Aufbau maß damit die
+// Uhrzeit des Laufs mit (Regel 3); das Fenster war rund 75 Minuten pro Tag breit.
 const JETZT = Date.now();
+const MITTERNACHT = (() => { const d = new Date(JETZT); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+// Die jüngere Gruppe füllt die letzten Minuten, höchstens aber den bisher vergangenen Tag: So
+// liegt sie IMMER auf heute und nie in der Zukunft, auch um 00:00:30.
+const HEUTE_SPANNE = Math.min(500e3, JETZT - MITTERNACHT);
 function globalNachrichten() {
   const liste = [];
   for (let i = 1; i <= 160; i++) {
-    const ts = i <= 150 ? JETZT - 26 * 3600e3 + i * 30e3 : JETZT - 600e3 + (i - 150) * 50e3;
+    // 1..150: gestern 12:00:30 bis 13:15 - mit Abstand zu beiden Tagesgrenzen.
+    const ts = i <= 150
+      ? MITTERNACHT - 12 * 3600e3 + i * 30e3
+      : JETZT - HEUTE_SPANNE + (i - 150) * (HEUTE_SPANNE / 10);
     liste.push({ authorId: i % 2 ? 'u-lume' : 'u-ohne', authorName: i % 2 ? 'Lumekx' : 'Aryen82',
       authorAllianceTag: i % 2 ? 'GG' : null, text: 'Nachricht ' + i, ts });
   }
