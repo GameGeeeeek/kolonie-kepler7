@@ -991,7 +991,7 @@
        Eintraege tragen (kepler: 10 von 15 Systemen) - ohne Deckel raegte es unten aus dem Bild.
        Bei den bisherigen Menues mit zwei bis fuenf Eintraegen aendert sich dadurch nichts. */
     .kmenu { position:fixed; z-index:9000; min-width:170px; max-width:min(240px, 88vw);
-             max-height:min(60vh, 420px); overflow-y:auto;
+             max-height:min(60vh, 420px); overflow-y:auto; overscroll-behavior:contain;
              background:rgba(13,18,36,0.97); border:var(--bw-1) solid rgba(var(--primary-rgb),0.45);
              box-shadow:0 10px 30px rgba(0,0,0,0.45); padding:0; }
     .kmenu-kopf { padding:7px 10px 6px; border-bottom:var(--bw-1) solid var(--line);
@@ -26459,6 +26459,32 @@ async function claimPendingRewards(){
           log('Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameV + ' wurde von ' + (r.angreiferName||'einem Spieler') + ' geschleift' + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – die Garnison ist verloren' : '') + '.', 'ti-alert-triangle', 'warn');
           pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{} });
           playSound('lose');
+          ladeVorposten();
+          save();
+          continue;
+        }
+        if (r.type === 'vorposten-abbau'){
+          /* Der freiwillige Abbau (Backend #216): Nach Ablauf der Frist raeumt der Server die
+             Station ab und schickt die GARNISON ueber pushPendingReward zurueck - er schreibt
+             keinen fremden Spielstand, und der Besitzer ist beim Ablauf der Frist ueblicherweise
+             gar nicht da. Die Module hat er bereits selbst in den Bestand gelegt.
+
+             WARUM DIESER ZWEIG SCHON JETZT DA IST, obwohl VORPOSTEN_ABBAU_AKTIV serverseitig noch
+             auf false steht: Der Server LOESCHT den Eintrag beim Abholen (list.shift() + saveDb()),
+             es gibt keinen zweiten Versuch. Faellt ein Eintrag in den Rueckfall-Zweig, meldet der
+             "Dankeschoen vom Team: +500 Kredite fuer deinen Bug-Report!" und die Garnison ist
+             endgueltig weg (Regel 73). Der Zweig muss also VOR dem Schalter da sein, nicht danach.
+
+             Jeder Wert einzeln gefiltert: claimPendingRewards laeuft in einem stillen try/catch -
+             eine Ausnahme hier braeche die Schleife ab und verloere den Eintrag. */
+          const sysNameA = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          let zurueck = 0;
+          for (const [sk, sv] of Object.entries(r.garnison || {})){
+            const anz = Math.floor(Number(sv) || 0);
+            if (anz > 0){ state.fleet[sk] = (state.fleet[sk]||0) + anz; zurueck += anz; }
+          }
+          log('Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameA + ' ist abgebaut'
+              + (zurueck ? ' – ' + zurueck + ' Schiffe sind zurück in der Flotte' : '') + '.', 'ti-box');
           ladeVorposten();
           save();
           continue;
@@ -56980,7 +57006,19 @@ async function claimPendingRewards(){
     closeKarteMenu();
     e.stopImmediatePropagation();
   });
-  window.addEventListener('scroll', closeKarteMenu, true);
+  /* Scrollt die SEITE, verliert das Menue seinen Marker (es ist position:fixed) - deshalb wird
+     es dann geschlossen. Der Lauscher hing aber mit capture:true am window und bekam damit AUCH
+     das Scrollen IM Menue: Seit dem Hoehendeckel (max-height/overflow-y) ist das Kartenmenue eines
+     eigenen Vorpostens laenger als das Fenster, und der erste Radschlag darin schloss es sofort
+     wieder. Gemessen am Handyformat 390x844: scrollHeight 590 gegen clientHeight 420 - 170 px
+     Inhalt (Aufgeben, Projekte, Steckplaetze) waren nicht erreichbar, obwohl die Bildlaufleiste
+     sichtbar danebenstand. Spieler-Report Sascha, 03.09.2026: "kann draufklicken, aber die Liste
+     kann nicht runter scrollen". Scroll-Ereignisse steigen NICHT auf, aber die Einfangphase laeuft
+     durch window - deshalb reicht ein Blick auf das Ziel. */
+  window.addEventListener('scroll', (e) => {
+    if (karteMenuEl && e.target instanceof Node && karteMenuEl.contains(e.target)) return;
+    closeKarteMenu();
+  }, true);
   window.addEventListener('resize', closeKarteMenu);
 
   /* KB-20e: Ein Fenster kann seine Groesse aendern, WAEHREND ein System offen steht - Handy

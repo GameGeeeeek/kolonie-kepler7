@@ -53,7 +53,16 @@ const srvTypen = [...new Set([...SRV.matchAll(/type: 'vorposten(-[a-z]+)?'/g)].m
 const claimVon = JS.indexOf('async function claimPendingRewards(');
 const claimBlock = JS.slice(claimVon, claimVon + 80000);
 const ohneZweig = srvTypen.filter(t => !new RegExp("r\\.type === '" + t + "'").test(claimBlock));
-check('3a: der Server reiht genau zwei Vorposten-Belohnungstypen ein', srvTypen.length === 2 && srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust'), srvTypen);
+/* Die ZAHL stand hier bis zum 03.09.2026 fest auf zwei - eine Momentaufnahme (Hausregel 3).
+   Der Server darf jederzeit einen Typ dazunehmen; 'vorposten-abbau' kam mit der Abbau-Frist, und
+   die richtige Reaktion darauf ist ein Frontend-Zweig, nicht ein roter Test. Was hier bleibt, ist
+   der ANKER: Der Fund darf nie LEER sein, sonst waeren 3b und 3c stumm gruen, ohne etwas zu
+   pruefen (Hausregel 62 - eine Aussage ueber jedes Element einer leeren Liste ist immer wahr).
+   Und kein einmal bekannter Typ darf verschwinden. Die eigentliche Zusage steht in 3b und 3c. */
+const PFLICHTTYPEN = ['vorposten', 'vorposten-verlust', 'vorposten-abbau'];
+check('3a-anker: die Vorposten-Belohnungstypen des Servers sind auffindbar und keiner fehlt',
+  srvTypen.length >= PFLICHTTYPEN.length && PFLICHTTYPEN.every(t => srvTypen.includes(t)),
+  { gefunden: srvTypen, fehlt: PFLICHTTYPEN.filter(t => !srvTypen.includes(t)) });
 check('3b: fuer jeden davon hat claimPendingRewards einen Zweig', claimVon > 0 && ohneZweig.length === 0, { ohneZweig });
 const zweigSave = srvTypen.every(t => { const i = claimBlock.indexOf("r.type === '" + t + "'"); const b = claimBlock.slice(i, claimBlock.indexOf('continue;', i)); return /\bsave\(\);/.test(b); });
 check('3c: und jeder Zweig ruft save() (Regel 73)', zweigSave);

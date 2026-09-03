@@ -279,3 +279,38 @@ Muster (`count != erwartet` → Abbruch, nichts geschrieben). Er hat einmal ange
 verhindert, dass `HERKUNFT_BOSS` mit umbenannt wird — die Wache war hier nicht Formsache, sondern
 der Grund, warum die Item-Begriffe unangetastet blieben (nachgezählt: 31× `HERKUNFT_ABGRUND` vorher
 wie nachher).
+
+## Ein Lauscher mit `capture:true` am `window` sieht auch die eigenen Ereignisse (03.09.2026)
+
+Das Kartenmenü ließ sich nicht scrollen. Es hatte seit E1b-2 einen Höhendeckel
+(`max-height`/`overflow-y:auto`), die Bildlaufleiste stand sichtbar daneben — und der erste
+Radschlag darin schloss es. Gemessen am Handyformat 390×844: `scrollHeight` 590 gegen
+`clientHeight` 420, also **170 px unerreichbarer Inhalt**, darunter „Vorposten aufgeben".
+
+Die Ursache war eine Zeile, die zwei Dinge auf einmal tat:
+
+```js
+window.addEventListener('scroll', closeKarteMenu, true);
+```
+
+Gemeint war das Scrollen **der Seite** — das Menü ist `position:fixed` und stünde danach neben
+seinem Marker. Getroffen hat es jedes Scrollen der ganzen Seite, auch das **im Menü selbst**.
+Scroll-Ereignisse steigen nicht auf, aber die **Einfangphase** läuft durch `window`, und genau
+dort hängt `capture:true`.
+
+**Die übertragbare Regel:** Ein Lauscher mit `capture:true` am `window` oder `document` hört
+jedes gleichnamige Ereignis der Seite — auch die aus dem eigenen Aufbau. Wer einen schreibt,
+muss sagen, **wessen** Ereignis er meint (`e.target` prüfen), sonst wächst der Fehler erst
+später ein: Solange die Menüs zwei bis fünf Einträge hatten, war die Zeile folgenlos. Erst der
+Höhendeckel und ein gewachsenes Menü machten aus ihr eine Sperre. **Eine Zeile, die heute
+richtig aussieht, weil der Fall noch nicht eintritt, ist nicht richtig — sie ist unbenutzt.**
+
+**Der zweite Halbfehler wäre das Weiterscrollen der Seite am Listenende gewesen** (Scroll-Chaining):
+Das schließt das Menü dann völlig zu Recht, und der Spieler sähe dasselbe „geht nicht" eine Zeile
+später wieder. Deshalb gehört `overscroll-behavior:contain` zu dieser Reparatur dazu, nicht in
+einen Folgeauftrag.
+
+**Was die Gegenprobe hier tragen musste:** „schließt nicht mehr beim Scrollen" wäre auch grün,
+wenn die Reparatur das Schließen ganz abgeschaltet hätte. Die beiden Gegenstücke — Seitenscroll
+und ein fremder Scrollkasten schließen weiterhin — laufen deshalb im **selben** Durchgang mit,
+nicht als Nachgedanke (`tests/test_kartenmenue_scrollen.js` 5 und 6).

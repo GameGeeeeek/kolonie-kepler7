@@ -49,9 +49,18 @@ check('schliesst mit Escape', /if \(e\.key !== 'Escape' \|\| !karteMenuEl\) retu
 // geoeffneten Menue nur heraus, indem man nebenbei das System verliert.
 check('Escape gehoert dem Menue und klappt nicht zusaetzlich das System zu',
   /closeKarteMenu\(\);\s*e\.stopImmediatePropagation\(\);/.test(src));
-check('schliesst beim Scrollen und bei Groessenaenderung',
-  /window\.addEventListener\('scroll', closeKarteMenu, true\);/.test(src)
+// Gemeint ist das Scrollen DER SEITE - das Menue ist fixed und stuende danach neben seinem
+// Marker. Bis zum 03.09.2026 stand hier die feste Zeile "closeKarteMenu, true", und genau die
+// schloss auch das Scrollen IM Menue mit (capture:true am window sieht jedes Scroll-Ereignis der
+// Seite): ein uebervolles Vorposten-Menue liess sich deshalb nicht bedienen. Geprueft wird
+// seitdem die SACHE - es gibt einen Scroll- und einen Resize-Lauscher, und der Scroll-Lauscher
+// unterscheidet, wessen Ereignis er bekommen hat. Das Verhalten dazu misst
+// tests/test_kartenmenue_scrollen.js.
+check('schliesst beim Scrollen der Seite und bei Groessenaenderung',
+  /window\.addEventListener\('scroll',[\s\S]{0,240}closeKarteMenu\(\);[\s\S]{0,40}\}, true\);/.test(src)
   && /window\.addEventListener\('resize', closeKarteMenu\);/.test(src));
+check('und das Scrollen IM Menue schliesst es nicht mit',
+  /window\.addEventListener\('scroll',[\s\S]{0,240}karteMenuEl\.contains\(e\.target\)[\s\S]{0,60}return;/.test(src));
 
 // ---------------------------------------------------------------- 3. Alle vier Marker umgestellt
 const marker = [
