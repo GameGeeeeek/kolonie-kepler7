@@ -41,17 +41,36 @@ const MARKEN = [
   { feld: 'abgrund.meilensteine',essenz: 58,  wo: 'checkAbgrundMeilensteine' },
   { feld: 'statthalterKills',    essenz: 24,  wo: 'Erstsieg gegen einen Statthalter' }
 ];
-/* Die EINE Auszahlung ohne Marke - hier ausdruecklich benannt, damit sie nicht als Luecke zaehlt
-   und niemand sie "vervollstaendigt": Der Wrackkonvoi zahlt anteilig Essenz aus einer
-   pendingReward des SERVERS. Der Server hat den Eintrag beim Abholen bereits geloescht; eine
-   Marke im Spielstand gaebe es dafuer nicht zu bewachen. */
-const OHNE_MARKE = 1;
+/* Die Auszahlungen OHNE Marke - hier ausdruecklich benannt, damit sie nicht als Luecke zaehlen
+   und niemand sie "vervollstaendigt":
+     1. Der Wrackkonvoi zahlt anteilig Essenz aus einer pendingReward des SERVERS. Der Server hat
+        den Eintrag beim Abholen bereits geloescht; eine Marke im Spielstand gaebe es dafuer nicht
+        zu bewachen.
+     2. Der AUFSTIEG selbst (asc.essence += gain) - das ist der Lohn fuer den Aufstieg, keine
+        einloesbare Belohnung. Die "Marke" ist der Aufstieg, und der setzt ohnehin alles zurueck. */
+const OHNE_MARKE = 2;
 
-const auszahlungen = (JS.match(/state\.ascension\.essence\s*=\s*\(state\.ascension\.essence\s*\|\|\s*0\)\s*\+/g) || []).length;
-check('0: jede Stelle, die Sternenessenz auszahlt, ist unten eingeordnet',
+/* GEZAEHLT WIRD JEDE ZUWEISUNG AN EIN FELD NAMENS `essence`, nicht eine Schreibweise.
+   Der erste Entwurf suchte woertlich nach
+   `state.ascension.essence = (state.ascension.essence || 0) + …` - gemeldet von der
+   Codex-Pruefung an PR #561 (P2) mit dem Hinweis, ein `+=` rutsche durch. Nachgemessen war es
+   schlimmer als gemeldet: Eine SIEBTE Auszahlung gab es damals schon, und sie rutschte bereits
+   durch - der Aufstieg schreibt ueber einen Alias (`asc.essence = (asc.essence||0) + gain`).
+   Der Waechter, der jede Quelle einordnen wollte, war also selbst blind fuer eine.
+   DIE BENANNTE RESTLUECKE: Ein Zugriff ueber `['essence']` oder ueber eine Hilfsfunktion, die
+   den Feldnamen nicht im Text traegt, faellt hier weiterhin nicht auf. Das ist kein Versehen,
+   sondern die Grenze einer Textpruefung - sie steht hier, statt verschwiegen zu werden. */
+const auszahlungen = (JS.match(/\.essence\s*\+?=[^=]/g) || []).length;
+check('0: JEDE Zuweisung an ein essence-Feld ist unten eingeordnet',
   auszahlungen === MARKEN.length + OHNE_MARKE,
   { gefunden: auszahlungen, eingeordnet: MARKEN.length + OHNE_MARKE,
     hinweis: 'Kommt eine Quelle dazu, gehoert sie in MARKEN (mit ihrer Marke) oder in die Begruendung von OHNE_MARKE' });
+/* Gegenprobe im selben Durchgang: Die alte, enge Schreibweise findet WENIGER als die neue. Ohne
+   diese Zeile koennte jemand den Ausdruck oben wieder verengen, und Pruefung 0 bliebe gruen,
+   solange er die Zahl daneben mitzieht. */
+const engGezaehlt = (JS.match(/state\.ascension\.essence\s*=\s*\(state\.ascension\.essence\s*\|\|\s*0\)\s*\+/g) || []).length;
+check('0b: die enge Schreibweise wuerde weniger finden - der weite Ausdruck ist noetig',
+  engGezaehlt < auszahlungen, { eng: engGezaehlt, weit: auszahlungen });
 
 // ---- 1) Die drei Reset-Ausgaenge ---------------------------------------------------------------
 /* Geschnitten wird jeweils das Zustands-Literal, aus dem der Reset den neuen Spielstand baut -
@@ -108,5 +127,13 @@ check('2b: und zaehlt auf, dass die Marken eingeloester Belohnungen bleiben',
    selbst fangen neu an - eine Kategorie kann danach als "abgeholt" markiert auf 0 stehen. */
 check('2c: und sagt die Kehrseite dazu - die Sammlungen selbst fangen neu an',
   /Sammlungen selbst fängst du neu an/.test(dlg), {});
+/* Und die AUSNAHME davon (Codex-Pruefung P2 an PR #561): Bei den Statthaltern ist die Marke
+   zugleich die Sammlung - die Kompendium-Kategorie zaehlt ueber statthalterErstsiege() dieselbe
+   Liste, die der Vollreset mitnimmt. Der pauschale Satz "die Sammlungen fangen neu an" waere fuer
+   sie falsch, und zwar in dem Dialog, der vor einer nicht umkehrbaren Aktion warnt. */
+check('2d: und nennt die Statthalter als Ausnahme - ihre Erstsiege SIND die Sammlung',
+  /bis auf die Statthalter/.test(dlg), dlg.slice(-220));
+check('2d-beleg: die Kompendium-Kategorie zaehlt wirklich dieselbe mitgenommene Liste',
+  /have:\(\)=>statthalterErstsiege\(\)/.test(JS) && /statthalterKills\s*:\s*keepStatthalterKills/.test(JS), {});
 
 ende();

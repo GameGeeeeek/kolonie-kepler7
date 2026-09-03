@@ -345,6 +345,23 @@ Quelle lässt den Test fallen, bis jemand sie einordnet. Eine Prüfung, die stat
 bekannten Marken abgehakt hätte, wäre bei genau dem Fehler grün geblieben, der hier zweimal
 passiert ist.
 
+**Nachtrag, und er ist die eigentliche Pointe:** Der Wächter, der genau diesen Fehler verhindern
+sollte, hatte ihn selbst. Er zählte die Auszahlungen — aber über den *Wortlaut* einer Zuweisung
+(`state.ascension.essence = (state.ascension.essence || 0) + …`). Die Codex-Prüfung am PR meldete
+das als Möglichkeit („ein `+=` rutscht durch"); nachgemessen war es bereits Wirklichkeit: Eine
+**siebte** Auszahlung existierte längst und rutschte durch, weil der Aufstieg über einen Alias
+schreibt (`asc.essence = (asc.essence||0) + gain`). Der Test zählt seither **jede Zuweisung an ein
+Feld namens `essence`** und nennt seine Restlücke ausdrücklich (Zugriff über `['essence']` oder
+eine Hilfsfunktion). Eine zweite Prüfung daneben belegt im selben Durchgang, dass der enge Ausdruck
+weniger findet als der weite — sonst könnte jemand ihn wieder verengen und die Zahl mitziehen.
+
+**Die Regel dahinter, zum dritten Mal an einem Tag:** Eine Prüfung, die eine *Schreibweise* festhält
+statt der *Sache*, ist keine Prüfung — sie ist eine Wette darauf, dass niemand die Schreibweise
+ändert. Am selben Tag traf das `test_endlos` Prüfung 6 (Regex auf die einzeilige Fassung von
+`npcEffectiveDefense`, gefallen an einer richtigen Änderung) und diesen Zähler hier (blind für
+eine bestehende Quelle). Die eine war zu streng, die andere zu nachsichtig; beide hingen am Text
+statt an der Wirkung.
+
 **Nebenlehre aus derselben Datei:** Ein Schnitt, der sein Ziel verfehlt, sieht aus wie ein
 gefallener Test. Der erste Entwurf schnitt die drei Reset-Ausgänge bis zum ersten
 `applyStateDefaults` — alle drei erwähnen den Namen aber vorher in einem Kommentar, und alle fünf
