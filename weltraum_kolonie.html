@@ -21450,7 +21450,16 @@
     const f = fleet || currentFleet();
     const lvl = state.research.rfusion||0;
     let mult = lvl ? Math.max(0.4, 1 - lvl*RESEARCH_DEFS.find(r=>r.key==='rfusion').effectPerLevel) : 1;
-    mult *= Math.pow(0.97, f.spaeher||0);
+    /* Der EINZIGE Faktor dieser Kette ohne Deckel - bis zum 03.09.2026. Gemessen (Papierrechnung
+       aus den Werten dieser Funktion): Die zehn gedeckelten Faktoren zusammen ergeben im Vollausbau
+       0,0147, aus 60 Minuten werden also 53 Sekunden; 0,97^n zog das ohne Untergrenze weiter nach
+       unten - bei 100 Spaehern auf 0,0007, also 2,5 Sekunden. Ein Spaeherstapel konnte damit jede
+       Flugzeit gegen null druecken, und mit ihr jedes Reaktionsfenster eines Verteidigers.
+       Der Deckel ist bewusst dieselbe Form und derselbe Wert wie bei den fuenf Nachbarn
+       (Prestige, Aufstieg, Faehigkeit, Navigator, Fusionsantrieb): hoechstens die Haelfte. Er
+       greift ab 23 Spaehern IN DIESER Flotte (0,97^22 = 0,512, 0,97^23 = 0,496) - darunter
+       aendert sich nichts. */
+    mult *= Math.max(0.5, Math.pow(0.97, f.spaeher||0));
     mult *= fleetSpeedMultiplier(f, relevantKeys);
     if (state.allianceResearch) mult *= (1-0.10*allianceTechFrac('a_speed'));
     if (state.allianceResearch) mult *= (1-0.15*allianceTechFrac('ep_logistik')); // Permanentes Allianzprojekt "Logistiknetzwerk"
@@ -55940,11 +55949,16 @@ async function claimPendingRewards(){
     // auf die Zeile oeffnete bisher ausnahmslos die Sektoransicht).
     svg.querySelectorAll('[data-sektor-hinweise-treffer]').forEach(function(g){
       const oeffne = function(ev){ if (ev){ ev.stopPropagation(); ev.preventDefault(); } kbRegionHinweisMenu(ev, g.getAttribute('data-sektor-hinweise-treffer')); };
-      g.onclick = oeffne;
+      /* Wisch-Schutz (03.09.2026): Schwenken und Zoomen sind auf ALLEN drei Kartenebenen aktiv,
+         galaxyMapDidDrag schuetzte aber nur die 13 Klickstellen im aufgeklappten System - die
+         Regionsuebersicht und die Sektoransicht gingen leer aus. Ein Wischen konnte dort als Tipp
+         durchgehen und ungewollt eine Region oeffnen. Nur der ZEIGER braucht den Schutz: Die
+         Tastatur zieht nicht, ihr Zweig bleibt deshalb unberuehrt. */
+      g.onclick = function(e){ if (galaxyMapDidDrag) return; oeffne(e); };
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') oeffne(e); };
     });
     svg.querySelectorAll('[data-sektor]').forEach(function(g){
-      g.onclick = function(){ sektorOeffnenKB(g.getAttribute('data-sektor')); };
+      g.onclick = function(){ if (galaxyMapDidDrag) return; sektorOeffnenKB(g.getAttribute('data-sektor')); };
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sektorOeffnenKB(g.getAttribute('data-sektor')); } };
     });
   }
@@ -56371,7 +56385,7 @@ async function claimPendingRewards(){
     lastGalaxyMapMarkup = null;
     svg.querySelectorAll('[data-sektor-sys]').forEach(function(g){
       const oeffnen = function(){ galaxyOeffne(g.getAttribute('data-sektor-sys')); };
-      g.onclick = oeffnen;
+      g.onclick = function(){ if (galaxyMapDidDrag) return; oeffnen(); };
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); oeffnen(); } };
     });
     const aktionen = { heimweg: function(){ karteSektorOffen = null; lastGalaxyMapMarkup = null; buildGalaxyMap(); },
@@ -67595,15 +67609,27 @@ async function claimPendingRewards(){
   // auf dieser Seite nichts zu scrollen gibt; ihre Belegung kostet deshalb niemanden etwas.
   // Dieselbe Abwägung wie beim Mausrad, das nur MIT Strg zoomt, damit die Seite scrollbar bleibt.
   //
-  // Die Tasten wirken nur bei OFFENEM System: In den Sektor-Ansichten gibt es kein "nächstes
-  // System", und ein Zoom ohne Bezugspunkt wäre dort nur verwirrend. preventDefault deshalb auch
-  // erst NACH dieser Prüfung - sonst schluckte die Karte Tastendrücke, die ihr gar nicht gelten.
+  // ← / → wirken seit dem 03.09.2026 AUCH in der Sektoransicht, dort auf den Nachbarsektor. Hier
+  // stand bis dahin "in den Sektor-Ansichten gibt es kein nächstes System" - das stimmte, als der
+  // Satz geschrieben wurde, und war seit KB-4 überholt: Die Sektoransicht hat einen Nachbarsektor,
+  // erreichbar über die ‹ ›-Knöpfe UND eine Wischgeste, nur eben nicht über die Tastatur. Am PC
+  // war dieselbe Bewegung damit als einzige der drei Ebenen nicht mit der Hand auf den Tasten zu
+  // machen. Der ZOOM bleibt dem offenen System vorbehalten: Er hat auf den oberen Ebenen keinen
+  // Bezugspunkt, und das war schon immer die eigentliche Begründung dieser Zeile.
+  // preventDefault erst NACH den Prüfungen - sonst schluckte die Karte Tastendrücke, die ihr gar
+  // nicht gelten.
   document.addEventListener('keydown', (e) => {
-    if (!galaxyOpenSystem) return;
+    if (!galaxyOpenSystem && !karteSektorOffen) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;   // Browser-Kürzel (Strg +/-, Zurück) bleiben
     const a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
     if (a && a.isContentEditable) return;
+    if (!galaxyOpenSystem){
+      // Sektoransicht: dieselbe Bewegung wie die ‹ ›-Knöpfe daneben, dieselbe Funktion.
+      if (e.key === 'ArrowLeft'){ e.preventDefault(); sektorNachbarKB(-1); return; }
+      if (e.key === 'ArrowRight'){ e.preventDefault(); sektorNachbarKB(1); return; }
+      return;
+    }
     if (e.key === 'ArrowLeft'){ e.preventDefault(); systemNachbarOeffnen(-1); return; }
     if (e.key === 'ArrowRight'){ e.preventDefault(); systemNachbarOeffnen(1); return; }
     if (e.key === '+' || e.key === '='){ e.preventDefault(); galaxyTastenZoom(1.4); return; }

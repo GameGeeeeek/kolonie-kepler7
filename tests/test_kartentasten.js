@@ -77,9 +77,12 @@ const viewBoxVon = page => page.evaluate(() => {
   await page.waitForTimeout(1200);
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 
-  // ---- 0) In der SEKTORANSICHT dürfen die Tasten noch nichts tun -------------------------------
-  // Dort gibt es kein "nächstes System"; ein Tastendruck, der dort etwas täte, wäre nur verwirrend -
-  // und er dürfte vor allem das Seitenscrollen nicht schlucken.
+  // ---- 0) In der SEKTORANSICHT öffnet keine Taste ein SYSTEM -----------------------------------
+  // Hier stand bis zum 03.09.2026 "dort dürfen die Tasten noch nichts tun", begründet mit "es gibt
+  // kein nächstes System". Seit v8.647.0 wechselt → dort den NACHBARSEKTOR (dieselbe Bewegung wie
+  // die ‹ ›-Knöpfe daneben, gemessen in tests/test_kartenrichtungen.js Abschnitt 3). Was hier
+  // geprüft wird, gilt unverändert weiter und ist der eigentliche Kern des Abschnitts: Auf dieser
+  // Ebene darf keine Taste ein System AUFKLAPPEN - ein Sprung, den niemand angefordert hat.
   await oeffneSektorMitSystem(page, 'kepler');
   await page.evaluate(() => window.scrollTo(0, 400));
   await page.waitForTimeout(300);
