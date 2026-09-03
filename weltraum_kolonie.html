@@ -9076,7 +9076,89 @@
      ein Dutzend animierter Elemente je Station kostet auf dem Telefon spuerbar Bilder. */
   function vorpostenRadius(stufe){ return 11 + Math.max(0, Math.min(7, (stufe||1) - 1)) * 0.85; }
   function vorpostenIstStation(vp){ return (vp && (vp.stufe||1)) >= (vorpostenCache.zweigAb || 4); }
+  /* DAS BODENLAGER, drei eigene Stufen (03.09.2026). Spieler-Urteil zur alten Zeichnung: "sieht
+     billig und langweilig aus". Sie war fuer alle drei Bodenstufen DIESELBE Palisade; nur drei
+     Punkte darunter zaehlten die Stufe mit - man sah dem Vorposten seinen Ausbau nicht an.
+     Jetzt hat jede Stufe ihr eigenes Bild, und die Reihe erzaehlt eine Geschichte: aus zwei
+     Zelten wird ein befestigter Posten, daraus eine geschlossene Bastion. */
+  function vorpostenLager(vp, x, y, r, farbe){
+    const st = Math.max(1, Math.min(3, (vp && vp.stufe) || 1));
+    const dunkel = 'rgba(10,13,26,0.85)';
+    const P = (n) => n.toFixed(1);
+    // Die Fahne waechst mit: Wimpel, Fahne, Banner - immer am selben Mast, damit die Reihe sitzt.
+    const masthoehe = [0.95, 1.2, 1.45][st-1];
+    const fahnenbreite = [0.4, 0.6, 0.72][st-1];
+    const mast = `<line x1="${P(x)}" y1="${P(y - r*0.35)}" x2="${P(x)}" y2="${P(y - r*masthoehe)}" stroke="${farbe}" stroke-width="1.3"/>`
+      + (st >= 3
+        ? `<rect x="${P(x)}" y="${P(y - r*masthoehe)}" width="${P(r*fahnenbreite)}" height="${P(r*0.34)}" fill="${farbe}" opacity="0.92"/>`
+        : `<polygon points="${P(x)},${P(y - r*masthoehe)} ${P(x + r*fahnenbreite)},${P(y - r*(masthoehe-0.13))} ${P(x)},${P(y - r*(masthoehe-0.26))}" fill="${farbe}" opacity="0.92"/>`);
+    if (st === 1){
+      /* FELDLAGER: zwei Zelte und ein paar Kisten - alles, was eine Baukolonne absetzt. Bewusst
+         ohne Mauer: Der Unterschied zur naechsten Stufe soll sofort ins Auge fallen. */
+      const zelt = (dx, w, h) => `<polygon points="${P(x + r*dx)},${P(y + r*0.45 - r*h)} ${P(x + r*(dx + w))},${P(y + r*0.45)} ${P(x + r*(dx - w))},${P(y + r*0.45)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.4" stroke-linejoin="round"/>`
+        + `<line x1="${P(x + r*dx)}" y1="${P(y + r*0.45 - r*h)}" x2="${P(x + r*dx)}" y2="${P(y + r*0.45)}" stroke="${farbe}" stroke-width="0.8" stroke-opacity="0.55"/>`;
+      return `<g>${zelt(-0.45, 0.42, 0.62)}${zelt(0.5, 0.34, 0.48)}`
+        + `<rect x="${P(x - r*0.12)}" y="${P(y + r*0.2)}" width="${P(r*0.26)}" height="${P(r*0.24)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1"/>`
+        + `<line x1="${P(x - r*0.95)}" y1="${P(y + r*0.45)}" x2="${P(x + r*0.95)}" y2="${P(y + r*0.45)}" stroke="${farbe}" stroke-width="1.5" stroke-opacity="0.75"/>`
+        + mast + `</g>`;
+    }
+    if (st === 2){
+      /* STUETZPUNKT: eine Palisade mit TOR und ein Wachturm - der Posten haelt jetzt etwas aus.
+         Die Luecke in der Mauer ist die Erzaehlung: befestigt, aber noch nicht geschlossen. */
+      const zinnen = [[-1,0.5],[-1,-0.12],[-0.78,-0.12],[-0.78,-0.34],[-0.56,-0.34],[-0.56,-0.12],[-0.2,-0.12],[-0.2,0.5]]
+        .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
+      const zinnen2 = [[0.2,0.5],[0.2,-0.12],[0.56,-0.12],[0.56,-0.34],[0.78,-0.34],[0.78,-0.12],[1,-0.12],[1,0.5]]
+        .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
+      return `<g><polygon points="${zinnen}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5" stroke-linejoin="round"/>`
+        + `<polygon points="${zinnen2}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5" stroke-linejoin="round"/>`
+        + `<rect x="${P(x - r*0.95)}" y="${P(y - r*0.62)}" width="${P(r*0.34)}" height="${P(r*1.12)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5"/>`
+        + `<line x1="${P(x - r*0.95)}" y1="${P(y - r*0.62)}" x2="${P(x - r*0.61)}" y2="${P(y - r*0.62)}" stroke="${farbe}" stroke-width="2"/>`
+        + mast + `</g>`;
+    }
+    /* BASTION: geschlossener Wehrring mit zwei Tuermen und einem Landefeld davor - die letzte
+       Bodenstufe, sichtbar bereit fuer den Sprung in den Orbit. */
+    const mauer = [[-1,0.5],[-1,-0.18],[-0.8,-0.18],[-0.8,-0.42],[-0.55,-0.42],[-0.55,-0.18],[-0.25,-0.18],[-0.25,-0.42],[0.25,-0.42],[0.25,-0.18],[0.55,-0.18],[0.55,-0.42],[0.8,-0.42],[0.8,-0.18],[1,-0.18],[1,0.5]]
+      .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
+    const turm = (v) => `<rect x="${P(x + v*r*0.9 - r*0.19)}" y="${P(y - r*0.85)}" width="${P(r*0.38)}" height="${P(r*1.35)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.6"/>`
+      + `<polygon points="${P(x + v*r*0.9 - r*0.26)},${P(y - r*0.85)} ${P(x + v*r*0.9)},${P(y - r*1.12)} ${P(x + v*r*0.9 + r*0.26)},${P(y - r*0.85)}" fill="${farbe}" opacity="0.9"/>`;
+    return `<g><polygon points="${mauer}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.6" stroke-linejoin="round"/>`
+      + turm(-1) + turm(1)
+      + `<circle cx="${P(x)}" cy="${P(y + r*0.16)}" r="${P(r*0.26)}" fill="none" stroke="${farbe}" stroke-width="1.1" stroke-dasharray="2,2"/>`
+      + mast + `</g>`;
+  }
+  /* Was die Station ab Stufe 5 dazubekommt - fuer ALLE Zweige gleich, damit der Ausbau ablesbar
+     bleibt, waehrend der Kern die Ausrichtung erzaehlt. Jede Stufe legt genau eine Schicht drauf. */
+  function vorpostenAufbauten(vp, x, y, r, farbe){
+    const st = Math.max(4, Math.min(8, (vp && vp.stufe) || 4));
+    const P = (n) => n.toFixed(1);
+    let out = '';
+    if (st >= 5){
+      // Zwei Ausleger mit Landeplattformen - die Station kann andocken lassen.
+      out += [1, -1].map(v => `<line x1="${P(x + v*r*0.7)}" y1="${P(y - r*0.7*0.75)}" x2="${P(x + v*r*1.16)}" y2="${P(y - r*1.16*0.75)}" stroke="${farbe}" stroke-width="1.7"/>`
+        + `<rect data-vp-dockpad="1" x="${P(x + v*r*1.16 - r*0.17)}" y="${P(y - r*1.16*0.75 - r*0.1)}" width="${P(r*0.34)}" height="${P(r*0.2)}" fill="rgba(10,13,26,0.9)" stroke="${farbe}" stroke-width="1.2"/>`).join('');
+    }
+    if (st >= 6){
+      // Solarfluegel - die Station versorgt sich selbst.
+      out += [1, -1].map(v => `<rect data-vp-solar="1" x="${P(x + v*r*1.02 - r*0.1)}" y="${P(y + r*0.28)}" width="${P(r*0.2)}" height="${P(r*0.62)}" fill="rgba(93,202,165,0.18)" stroke="${farbe}" stroke-width="1.1" transform="rotate(${v*22} ${P(x + v*r*1.02)} ${P(y + r*0.59)})"/>`).join('');
+    }
+    if (st >= 7){
+      out += `<circle cx="${P(x)}" cy="${P(y)}" r="${P(r*1.12)}" fill="none" stroke="${farbe}" stroke-width="1" stroke-opacity="0.5" stroke-dasharray="4,3"/>`;
+    }
+    if (st >= 8){
+      // Die Krone der Endstufe: geschlossener Aussenring mit acht Knoten, ruhig pulsierend.
+      const knoten = [0,45,90,135,180,225,270,315].map(g => {
+        const rad = g*Math.PI/180;
+        return `<circle cx="${P(x + Math.cos(rad)*r*1.3)}" cy="${P(y + Math.sin(rad)*r*1.3)}" r="${P(r*0.09)}" fill="${farbe}"/>`;
+      }).join('');
+      out += `<circle cx="${P(x)}" cy="${P(y)}" r="${P(r*1.3)}" fill="none" stroke="${farbe}" stroke-width="1.5" stroke-opacity="0.75"/>${knoten}`;
+    }
+    return out;
+  }
   function vorpostenSilhouette(vp, x, y, r, farbe){
+    // Kern (Zweig) PLUS Aufbauten (Stufe) - die eine Stelle, die beides zusammensetzt.
+    return vorpostenSilhouetteKern(vp, x, y, r, farbe) + vorpostenAufbauten(vp, x, y, r, farbe);
+  }
+  function vorpostenSilhouetteKern(vp, x, y, r, farbe){
     const zweig = vp && vp.zweig;
     const dreh = (s) => `<animateTransform attributeName="transform" type="rotate" from="0 ${x.toFixed(1)} ${y.toFixed(1)}" to="360 ${x.toFixed(1)} ${y.toFixed(1)}" dur="${s}s" repeatCount="indefinite"/>`;
     const nabe = `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*0.28).toFixed(1)}" fill="rgba(10,13,26,0.9)" stroke="${farbe}" stroke-width="1.6"/>`
@@ -9098,7 +9180,7 @@
       // Breiter Ring mit angedockten Containern - die Fracht macht die Silhouette.
       const container = [0, 60, 120, 180, 240, 300].map(g => {
         const rad = g * Math.PI/180, cx = x + Math.cos(rad)*r*0.82, cy = y + Math.sin(rad)*r*0.82;
-        return `<rect x="${(cx - r*0.16).toFixed(1)}" y="${(cy - r*0.11).toFixed(1)}" width="${(r*0.32).toFixed(1)}" height="${(r*0.22).toFixed(1)}" fill="rgba(10,13,26,0.85)" stroke="${farbe}" stroke-width="1.1" transform="rotate(${g} ${cx.toFixed(1)} ${cy.toFixed(1)})"/>`;
+        return `<rect data-vp-container="1" x="${(cx - r*0.16).toFixed(1)}" y="${(cy - r*0.11).toFixed(1)}" width="${(r*0.32).toFixed(1)}" height="${(r*0.22).toFixed(1)}" fill="rgba(10,13,26,0.85)" stroke="${farbe}" stroke-width="1.1" transform="rotate(${g} ${cx.toFixed(1)} ${cy.toFixed(1)})"/>`;
       }).join('');
       return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*0.82).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="2.2" stroke-opacity="0.85"/>`
         + `<g>${container}${dreh(26)}</g>${nabe}</g>`;
@@ -58279,8 +58361,6 @@ async function claimPendingRewards(){
         const farbeV = vp.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD;
         const anteilV = Math.max(0, Math.min(1, ((vp.kern||{}).lp||0) / Math.max(1, (vp.kern||{}).lpMax||1)));
         const bV = rV * 1.15;
-        const zinnen = [[-1,0.6],[-1,-0.2],[-0.7,-0.5],[-0.35,-0.2],[0,-0.6],[0.35,-0.2],[0.7,-0.5],[1,-0.2],[1,0.6]]
-          .map(([dx,dy]) => (posV.x + dx*rV).toFixed(1) + ',' + (posV.y + dy*rV).toFixed(1)).join(' ');
         inner += `
           <g class="planet-node" data-map-vorposten="${escapeHtml(String(vp.id))}" style="cursor:pointer;">
             <title>${escapeHtml(vp.name||'Vorposten')} von ${escapeHtml(vp.besitzerName||'?')} – Kern ${Math.round(anteilV*100)}%, ${vp.garnisonAnzahl||0} Schiffe Garnison (antippen für das Menü)</title>
@@ -58294,11 +58374,7 @@ async function claimPendingRewards(){
               <animate attributeName="r" values="${(rV*1.45).toFixed(1)};${(rV*2.0).toFixed(1)};${(rV*1.45).toFixed(1)}" dur="3.4s" repeatCount="indefinite"/>
               <animate attributeName="stroke-opacity" values="0.45;0.1;0.45" dur="3.4s" repeatCount="indefinite"/>
             </circle>
-            ${vorpostenIstStation(vp) ? vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV) : `
-            <polygon points="${zinnen}" fill="rgba(10,13,26,0.7)" stroke="${farbeV}" stroke-width="1.5"/>
-            <line x1="${posV.x.toFixed(1)}" y1="${(posV.y - rV*0.6).toFixed(1)}" x2="${posV.x.toFixed(1)}" y2="${(posV.y - rV*1.35).toFixed(1)}" stroke="${farbeV}" stroke-width="1.4"/>
-            <polygon points="${posV.x.toFixed(1)},${(posV.y - rV*1.35).toFixed(1)} ${(posV.x + rV*0.6).toFixed(1)},${(posV.y - rV*1.15).toFixed(1)} ${posV.x.toFixed(1)},${(posV.y - rV*0.95).toFixed(1)}" fill="${farbeV}"/>
-            ${[1,2,3].filter(i => i <= (vp.stufe||1)).map(i => `<circle cx="${(posV.x - rV*0.5 + (i-1)*rV*0.5).toFixed(1)}" cy="${(posV.y + rV*0.25).toFixed(1)}" r="${(rV*0.14).toFixed(1)}" fill="${farbeV}"/>`).join('')}`}
+            ${vorpostenIstStation(vp) ? vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV) : vorpostenLager(vp, posV.x, posV.y, rV, farbeV)}
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2*anteilV).toFixed(1)}" height="2.6" fill="${farbeV}"/>
             <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(posV.y - rV - 8).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.name||'Vorposten') : (vp.name||'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>

@@ -104,23 +104,36 @@ async function lauf(browser, vp){
   // ---- 1) Bodenlager ----------------------------------------------------------------------------
   const a = await lauf(browser, doc(2, null, 'Stützpunkt'));
   check('1-vorab: Boot ohne Skriptfehler, der Vorposten steht auf der Karte', a.errs.length === 0 && a.mark.da === true, { errs: a.errs.slice(0,2), da: a.mark.da });
-  check('1a: bis zur Wahlstufe bleibt die Palisade (Zinnen-Polygon mit neun Punkten)', /<polygon points="[-\d.]+,[-\d.]+ (?:[-\d.]+,[-\d.]+ ){7}[-\d.]+,[-\d.]+"/.test(a.mark.html || ''), (a.mark.html||'').slice(0, 120));
-  check('1b: und die Fahne dazu (Mast als <line> plus Wimpel)', /<line [^>]*stroke-width="1\.4"/.test(a.mark.html || ''));
-  check('1c: KEINE Stationsteile (weder Container noch Tuerme noch Dockklammern)',
-    !/rotate\(\d+ /.test(a.mark.html || '') && !/stroke-width="2\.1"/.test(a.mark.html || ''), (a.mark.html||'').length);
+  /* 1a/1b halten seit dem 03.09.2026 die REGEL fest, nicht die Form. Vorher stand hier
+     "Zinnen-Polygon mit NEUN Punkten" und "Mast mit stroke-width 1.4" - eine Momentaufnahme
+     genau der Zeichnung, die der Spieler dann "billig und langweilig" nannte. Ein solcher Test
+     blockiert den Neuentwurf, den er eigentlich absichern soll (Regel 3). Gemessen wird jetzt,
+     dass das Bodenlager ueberhaupt gezeichnet ist und die Fahne dazugehoert - WIE, ist frei. */
+  check('1a: bis zur Wahlstufe steht ein Bodenlager (gefuellte Formen, kein blosser Punkt)',
+    ((a.mark.html || '').match(/<polygon /g) || []).length >= 2 && /fill="rgba\(10,13,26/.test(a.mark.html || ''),
+    (a.mark.html||'').slice(0, 120));
+  check('1b: mit Mast und Fahne', /<line [^>]*stroke-width="1\.3"/.test(a.mark.html || '')
+    && /(<polygon points="[^"]*" fill="#|<rect [^>]*fill="#)/.test(a.mark.html || ''));
+  check('1c: KEINE Stationsteile (weder Container noch Dockklammern noch Aufbauten)',
+    !/rotate\(\d+ /.test(a.mark.html || '') && !/stroke-width="2\.1"/.test(a.mark.html || '')
+    && !/stroke-dasharray="4,3"/.test(a.mark.html || ''), (a.mark.html||'').length);
   const kleinHof = a.mark.hofR;   // rV * 1,7 - der pulsende Hof ist die einzige Groesse, die NUR am Radius haengt
   check('1d-anker: der Hof-Kreis ist messbar (sonst misst 3a nichts)', kleinHof > 0, kleinHof);
   await a.ctx.close();
 
   // ---- 2) Die drei Stationen ---------------------------------------------------------------------
   const w = await lauf(browser, doc(6, 'werft', 'Schiffsschmiede'));
+  /* Gezaehlt wird der Container SELBST (data-vp-container), nicht "irgendein gedrehtes Rechteck".
+     Der alte Stellvertreter fiel am 03.09.2026, als die Station ab Stufe 6 Solarfluegel bekam -
+     die sind ebenfalls gedrehte Rechtecke, waren aber nie ein Container-Ring. Ein Test, der eine
+     Sache an einem Merkmal misst, das ihr nicht gehoert, meldet frueher oder spaeter das Falsche. */
   check('2a: Werft - zwei Dockklammern und ein Rumpf im Bau (fuenfeckiges Polygon), kein Container-Ring',
     /stroke-width="2\.1"/.test(w.mark.html || '') && /<polygon points="(?:[-\d.]+,[-\d.]+ ){4}[-\d.]+,[-\d.]+" fill="rgba\(10,13,26,0\.9\)"/.test(w.mark.html || '')
-    && !/<rect [^>]*transform="rotate/.test(w.mark.html || ''), (w.mark.html||'').slice(0, 100));
+    && !/data-vp-container/.test(w.mark.html || ''), (w.mark.html||'').slice(0, 100));
   await w.ctx.close();
   const h = await lauf(browser, doc(7, 'handel', 'Handelsknoten'));
-  check('2b: Handelsknoten - sechs gedrehte Container am Ring',
-    ((h.mark.html || '').match(/<rect [^>]*transform="rotate\(/g) || []).length === 6, ((h.mark.html||'').match(/<rect [^>]*transform="rotate\(/g) || []).length);
+  check('2b: Handelsknoten - sechs Container am Ring',
+    ((h.mark.html || '').match(/data-vp-container/g) || []).length === 6, ((h.mark.html||'').match(/data-vp-container/g) || []).length);
   check('2c: und er dreht sich (eine Rotation, nicht ein Dutzend Einzelanimationen)',
     ((h.mark.html || '').match(/<animateTransform[^>]*type="rotate"/g) || []).length === 1, ((h.mark.html||'').match(/<animateTransform/g) || []).length);
   await h.ctx.close();
@@ -142,6 +155,25 @@ async function lauf(browser, vp){
     f.mark.links >= f.mark.svgL - 2 && f.mark.oben >= f.mark.svgT - 2 && f.mark.rechts <= f.mark.svgR + 2 && f.mark.unten <= f.mark.svgB + 2,
     { marker: [Math.round(f.mark.links), Math.round(f.mark.oben), Math.round(f.mark.rechts), Math.round(f.mark.unten)],
       karte: [Math.round(f.mark.svgL), Math.round(f.mark.svgT), Math.round(f.mark.svgR), Math.round(f.mark.svgB)] });
+  /* ---- 5) Jede Stufe hat ihr eigenes Bild (03.09.2026) ----------------------------------------
+     Spieler-Urteil zur alten Zeichnung: "billig und langweilig". Sie war fuer die drei Bodenstufen
+     DIESELBE Palisade, und ab der Wahlstufe aenderte nur der Zweig etwas - der Ausbau war am
+     Marker nicht zu sehen. Gemessen wird die REGEL: acht Stufen, acht verschiedene Bilder, und
+     jede bleibt anklickbar. Eine neunte Stufe oder ein neuer Aufbau faellt hier nicht durch. */
+  const formen = [];
+  for (let stufe = 1; stufe <= 8; stufe++){
+    const l = await lauf(browser, doc(stufe, stufe >= 4 ? 'festung' : null, 'Stufe ' + stufe));
+    // Zahlen raus: verglichen wird die FORM (welche Teile), nicht die Position im Bild.
+    formen.push({ stufe, sig: String(l.mark.html || '').replace(/[-\d.]+/g, '#'), da: !!l.mark.da });
+    await l.ctx.close();
+  }
+  check('5-vorab: alle acht Stufen wurden gezeichnet', formen.every(f => f.da && f.sig.length > 200), formen.map(f => f.sig.length));
+  const eindeutig = new Set(formen.map(f => f.sig)).size;
+  check('5a: acht Stufen ergeben acht verschiedene Bilder', eindeutig === 8, { verschiedene: eindeutig, laengen: formen.map(f => f.sig.length) });
+  // Und die Reihe waechst: jede Stufe ab 5 legt eine Schicht drauf, statt nur umzufaerben.
+  const teile = formen.map(f => (f.sig.match(/<(circle|rect|polygon|line|path)/g) || []).length);
+  check('5b: der Ausbau LEGT ZU - Stufe 8 zeigt mehr Teile als Stufe 4', teile[7] > teile[3], { stufe4: teile[3], stufe8: teile[7] });
+
   check('4b: keine Skriptfehler', f.errs.length === 0, f.errs.slice(0,2));
   await f.ctx.close();
 
