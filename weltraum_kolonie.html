@@ -28384,7 +28384,16 @@ async function claimPendingRewards(){
     // Riegel für die Allianzforschung: ohne Mitgliedschaft gar nicht erst starten. Steht hier und
     // nicht nur an der Karte, weil auch die Warteschlange über startResearch läuft.
     if (istAllianzForschung(key) && !inAllianz()){ log('Allianzforschung braucht eine Allianz - tritt einer bei oder gründe eine (Allianz-Tab).', 'ti-lock'); return; }
-    if (!techUnlocked(r)){ log('Voraussetzung nicht erfüllt.', 'ti-alert-triangle'); return; }
+    if (!techUnlocked(r)){
+      /* Den fehlenden Namen NENNEN, nicht nur "nicht erfuellt" (SP-1, 03.09.2026). Diese Meldung
+         ist seit dem Wegfall des disabled-Riegels die einzige Auskunft, die der Spieler bekommt,
+         wenn er auf einen gesperrten Knopf tippt - "Voraussetzung nicht erfuellt" zwingt ihn dann
+         zum Suchen, statt die Frage zu beantworten. Dieselbe Liste, die die Karte schon zeigt. */
+      const fehlt = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level)
+        .map(req => (findeForschung(req.key)||{name:req.key}).name + ' Stufe ' + req.level).join(', ');
+      log(fehlt ? 'Dafür fehlt noch: ' + fehlt + '.' : 'Diese Forschung ist noch nicht freigeschaltet.',
+          'ti-alert-triangle'); return;
+    }
     const curLvl = state.research[key]||0;
     if (curLvl >= r.maxLevel){ log('Maximale Stufe bereits erreicht.', 'ti-alert-triangle'); return; }
     const targetLevel = curLvl+1;
@@ -28396,7 +28405,14 @@ async function claimPendingRewards(){
        groesser als das Lager fasst, er wuerde beim Umweg gekappt. */
     const bstSchluessel = baustelleSchluessel(key, targetLevel);
     const restKosten = baustelleRestKosten(cost, bstSchluessel);
-    if (!canAfford(restKosten)){ log('Nicht genug Ressourcen.', 'ti-alert-triangle'); return; }
+    if (!canAfford(restKosten)){
+      // Welche Ressource fehlt und wie viel - "nicht genug" allein beantwortet die Frage nicht.
+      const fehlend = Object.entries(restKosten)
+        .filter(([k, n]) => costAmountAvailable(k) < n)
+        .map(([k, n]) => fmt(Math.ceil(n - costAmountAvailable(k))) + ' ' + (resDefFor(k)||{label:k}).label)
+        .join(', ');
+      log(fehlend ? 'Dafür fehlt noch: ' + fehlend + '.' : 'Nicht genug Ressourcen.', 'ti-alert-triangle'); return;
+    }
     pay(restKosten);
     // Verbraucht, nicht freigegeben: baustelleFreigeben zahlt zurueck, hier ist das Guthaben
     // gerade in die Forschung geflossen.
@@ -64061,7 +64077,7 @@ async function claimPendingRewards(){
             </div>
             ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
               <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-                <button class="buy ${ok?'affordable':''}" data-research="${r.key}" ${ok?'':'disabled'}><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Erforschen</button>
+                <button class="buy ${ok?'affordable':''}" data-research="${r.key}"><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Erforschen</button>
                 ${(drin && unlocked) ? `<button data-research-queue="${r.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>Warteschlange</button>` : ''}
               </div>
             `}
@@ -64134,7 +64150,7 @@ async function claimPendingRewards(){
           </div>
           ${maxed ? `<span class="badge-done"><i class="ti ti-check" aria-hidden="true"></i>Max. Stufe</span>` : `
             <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-              <button class="buy ${ok?'affordable':''}" data-research="${r.key}" ${ok?'':'disabled'}><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Erforschen</button>
+              <button class="buy ${ok?'affordable':''}" data-research="${r.key}"><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Erforschen</button>
               ${unlocked ? `<button data-research-queue="${r.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>Warteschlange</button>` : ''}
             </div>
           `}
