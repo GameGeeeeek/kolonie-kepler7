@@ -51357,6 +51357,23 @@ async function claimPendingRewards(){
       renderWorldBoss();
     } catch(e){ /* geteilter Speicher optional */ }
   }
+  /* DIE KILL-BELOHNUNG ALS EINE FUNKTION (03.09.2026, Wunsch Sascha "bei weltboss moegliche
+     belohnung anzeigen"). Vorher stand die Rechnung nur in der Auszahlung; eine Vorschau haette sie
+     abschreiben muessen - also zwei Wahrheiten, die beim naechsten Balancing auseinanderlaufen.
+     Jetzt rechnet DIESE Funktion, und Auszahlung wie Anzeige rufen sie.
+     `share` ist der Schadensanteil (0..1), `isTop` der Top-Schaediger. Beide gehen hinein, statt
+     drinnen aus dem Zustand gelesen zu werden: Die Anzeige braucht sie fuer den JETZIGEN Stand,
+     die Auszahlung fuer den beim Kill - dieselbe Rechnung, verschiedene Eingaben. */
+  function worldBossKillReward(level, share, isTop){
+    const s = Math.max(0, Math.min(1, share || 0));
+    return {
+      credits: Math.round((500 + level*250) * (0.3 + 0.7*s) * (isTop ? 1.5 : 1)),
+      bp: Math.round((10 + level*5) * (0.3 + 0.7*s)),
+      modulChance: Math.min(1, 0.15 + s*0.35),
+      unikatChance: Math.min(1, 0.04 + s*0.10 + (isTop ? 0.06 : 0)),
+      splitter: (state.research.rleere||0) >= 1 ? Math.max(1, Math.round(2 * (1 + ascBonus('leere')*0.04))) : 0
+    };
+  }
   // Belohnung nach dem Kill: proportional zum Schadensanteil, einmalig pro Boss (claimedBossKills).
   function maybeClaimWorldBossReward(b){
     if (!b || !b.defeatedAt || !state.player.id) return;
@@ -51370,23 +51387,24 @@ async function claimPendingRewards(){
     const share = my.dmg / total;
     const maxDmg = Math.max(...Object.values(b.contributions).map(x=>x.dmg||0));
     const isTop = my.dmg >= maxDmg;
-    let credits = Math.round((500 + b.level*250) * (0.3 + 0.7*share) * (isTop ? 1.5 : 1));
-    const bp = Math.round((10 + b.level*5) * (0.3 + 0.7*share));
+    const lohn = worldBossKillReward(b.level, share, isTop);
+    let credits = lohn.credits;
+    const bp = lohn.bp;
     state.credits = (state.credits||0) + credits;
     awardBattlePoints(bp);
     logScoreChange(bp*3, 'Leviathan Stufe '+b.level+' erlegt (Beitrag '+Math.round(share*100)+'%)', 'ti-skull');
     let moduleMsg = '';
-    if (Math.random() < 0.15 + share*0.35){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
+    if (Math.random() < lohn.modulChance){ const mod = grantRandomModule(); moduleMsg = ' Modul erbeutet: '+mod+'!'; }
     // Unikat-Jagd (v8.463.0): Das Leviathanherz faellt NUR hier. 4% Grundchance,
     // +10% x Schadensanteil, Top-Schaediger +6% - maximal also 20%. Laeuft ZUSAETZLICH
     // zum normalen Modul-Wurf darueber, ersetzt ihn nicht.
-    if (Math.random() < 0.04 + share*0.10 + (isTop ? 0.06 : 0)){
+    if (Math.random() < lohn.unikatChance){
       const unikat = grantUnikatModul('leviathanherz');
       if (unikat) moduleMsg += ' \u2B50 UNIKAT geborgen: '+unikat+'! Es liegt gesperrt im Inventar.';
     }
     log('Weltboss besiegt! Dein Anteil: '+Math.round(share*100)+'% Schaden'+(isTop?' (Top-Schädiger, +50% Bonus!)':'')+'. Belohnung: '+credits+' Kredite, '+bp+' Kampfpunkte.'+moduleMsg, 'ti-skull');
-    if ((state.research.rleere||0) >= 1){
-      const wbShards = Math.max(1, Math.round(2 * (1 + ascBonus('leere')*0.04)));
+    if (lohn.splitter > 0){
+      const wbShards = lohn.splitter;
       state.rareItems.leerensplitter = (state.rareItems.leerensplitter||0) + wbShards;
       log(wbShards+'x Leerensplitter aus den Überresten des Leviathans geborgen.', 'ti-diamond');
     }
@@ -51466,6 +51484,27 @@ async function claimPendingRewards(){
         <div class="bmeta" style="margin-bottom:4px;">Gemeinsamer Boss aller Spieler: Jeder Angriff (Angriffsflotte, echte Flugzeit) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab. Der Boss schlägt zurück (${8+b.level}-${15+b.level}% Verluste). Beim Kill: Belohnung nach Schadensanteil, Top-Schädiger +50%. <strong>Einmal pro Tag</strong> pro Spieler angreifbar.</div>
         ${top3.length ? `<div class="bmeta" style="margin-bottom:4px;">Top-Schaden: ${top3.map((t,i)=>(i+1)+'. '+escapeHtml(t.name||'?')+' ('+fmt(t.dmg)+')').join(' · ')}</div>` : ''}
         ${my ? `<div class="bmeta" style="margin-bottom:6px; color:#5dcaa5;">Dein Beitrag: ${fmt(my.dmg)} Schaden</div>` : ''}
+        ${(() => {
+          /* MOEGLICHE BELOHNUNG (03.09.2026, Wunsch Sascha). Die Karte nannte bisher nur die REGEL
+             ("nach Schadensanteil, Top-Schaediger +50%") - daraus laesst sich nicht ablesen, ob sich
+             der heutige Schlag lohnt. Gerechnet wird mit worldBossKillReward, also mit DERSELBEN
+             Funktion, die beim Kill auszahlt; eine zweite Formel hier waere beim naechsten
+             Balancing sofort falsch.
+             EHRLICH BLEIBEN: Der Anteil wandert bis zum Kill (jeder fremde Schlag verschiebt ihn).
+             Der Text sagt deshalb "bei deinem jetzigen Anteil" und verspricht nichts. Wer noch gar
+             nicht getroffen hat, sieht stattdessen, was der Sockel ohne Beitrag waere - sonst
+             stuende dort eine 0, die nach "es gibt nichts" aussieht. */
+          const summe = Object.values(b.contributions||{}).reduce((a,x)=>a+(x.dmg||0), 0);
+          const meinDmg = my ? (my.dmg||0) : 0;
+          const anteil = summe > 0 ? meinDmg / summe : 0;
+          const maxDmg = Math.max(0, ...Object.values(b.contributions||{}).map(x=>x.dmg||0));
+          const top = !!my && meinDmg > 0 && meinDmg >= maxDmg;
+          const lohn = worldBossKillReward(b.level, anteil, top);
+          const kopf = my
+            ? 'Bei deinem jetzigen Anteil von <strong>'+Math.round(anteil*100)+'%</strong>'+(top?' (Top-Schädiger, +50%)':'')
+            : 'Noch ohne eigenen Schaden – ein erster Treffer bringt dich in die Wertung. Sockel';
+          return `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-award" aria-hidden="true" style="margin-right:3px; color:#fac775;"></i><strong style="color:#fac775;">Mögliche Belohnung beim Kill:</strong> ${kopf}: <strong>${fmt(lohn.credits)}</strong> Kredite · <strong>${fmt(lohn.bp)}</strong> Kampfpunkte · ${Math.round(lohn.modulChance*100)}% Chance auf ein Modul, ${Math.round(lohn.unikatChance*100)}% auf das <em>Leviathanherz</em>${lohn.splitter ? ' · '+lohn.splitter+'x Leerensplitter' : ''}. Der Anteil verschiebt sich, solange andere weiter schlagen.</div>`;
+        })()}
         <button data-attack-worldboss ${(busy||cdLeft>0)?'disabled':''}>${busy?'Angriff läuft ...':cdLeft>0?'Bereit in '+fmtDuration(cdLeft/1000):'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Leviathan angreifen'}</button>
       </div>`);
     const btn = box.querySelector('[data-attack-worldboss]');
