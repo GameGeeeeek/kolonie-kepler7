@@ -41283,31 +41283,73 @@ async function claimPendingRewards(){
      Gebaeude und keine Produktionsansicht, `activeBasePlanet` darf nicht auf ihn zeigen - sonst
      stuende der Basis-Tab vor einem Standort, den es dort nicht gibt. Der Klick tut dasselbe wie
      beim Asteroiden: Karte auf, System auf, Marker kurz blinken. */
-  function springeZuVorposten(system){
+  /* EIN Sprung zur Karte fuer alle Aufrufer (FL-1, 03.09.2026). Vorher stand dasselbe Muster
+     zweimal fast wortgleich da - Reiterwechsel, System oeffnen, neu zeichnen, nach 260 ms den
+     Zielknoten blinken lassen. Mit dem Missions-Ziel unten waere es die dritte Kopie geworden,
+     und die naechste Aenderung an der Kamerafahrt haette wieder alle drei finden muessen.
+     Hervorheben statt nur hinspringen: Auf einer Bahn mit bis zu zehn Plaetzen findet man den
+     richtigen sonst nicht. Die Marke haengt am DOM-Knoten und ueberlebt kein Neuzeichnen - das ist
+     hier richtig so, sie soll ja nur kurz blinken. */
+  function springeZuKartenziel(system, selektor){
     if (!system) return false;
     switchTab('karte');
     galaxyOeffne(system);
     render();
+    if (!selektor) return true;
     setTimeout(() => {
-      const el = document.querySelector('[data-map-vorposten]');
+      const el = document.querySelector(selektor);
       if (el) el.classList.add('fundort-blink');
     }, 260);
     return true;
   }
+  function springeZuVorposten(system){
+    return springeZuKartenziel(system, '[data-map-vorposten]');
+  }
   function springeZuAsteroid(system, platz){
     if (!system) return false;
-    switchTab('karte');
-    galaxyOeffne(system);
-    render();
-    if (platz === undefined || platz === null) return false;
-    // Hervorheben statt nur hinspringen: Auf einer Bahn mit bis zu zehn Plaetzen findet man den
-    // richtigen sonst nicht. Die Marke haengt am DOM-Knoten und ueberlebt kein Neuzeichnen - das
-    // ist hier richtig so, sie soll ja nur kurz blinken.
-    setTimeout(() => {
-      const el = document.querySelector('[data-map-asteroid="' + platz + '"]');
-      if (el) el.classList.add('fundort-blink');
-    }, 260);
-    return true;
+    if (platz === undefined || platz === null){ springeZuKartenziel(system, null); return false; }
+    return springeZuKartenziel(system, '[data-map-asteroid="' + platz + '"]');
+  }
+  /* Wohin fliegt diese Mission? (FL-1, Wunsch des Betreibers: "wenn eine Flotte unterwegs ist,
+     soll immer anklickbar sein, wohin sie fliegt")
+
+     GEMESSEN vorher: Von den Missionszeilen im Seitenmenue trug genau EINE ein Klickziel - die
+     Abbaumission. Alle anderen Zeilen nannten ihr Ziel im Text und waren toter Text; wer wissen
+     wollte, wo seine Flotte gerade hinfliegt, musste das Ziel auf der Karte selbst suchen.
+
+     EIN Aufloeser statt eines Zweigs je Art: Die Zuordnung steht damit an einer Stelle, und eine
+     neue Missionsart faellt im Waechter auf, statt still ohne Klickziel zu bleiben. Das Zielsystem
+     kommt aus den Daten - NPCS und PLANETS tragen beide ein `system`-Feld, abgelesen, nicht
+     angenommen.
+
+     BEWUSST OHNE ZIEL bleiben Expedition und Abgrund-Tauchgang: Sie fliegen nicht zu einem Ort auf
+     der Karte, sondern ins Unerkundete. Ein Klick, der irgendwohin springt, waere schlechter als
+     keiner - deshalb nennt der Waechter sie namentlich als Ausnahme, statt sie zu uebergehen. */
+  const FP_OHNE_KARTENORT = ['expedition', 'abgrund', 'recycler-auftrag', 'shipbuild', 'research', 'construction'];
+  function missionsKartenziel(m){
+    if (!m || !m.type || FP_OHNE_KARTENORT.includes(m.type)) return null;
+    // Guertelplatz: Abbau, Eskorte und ihre Rueckkehr meinen denselben Platz auf der Bahn.
+    if (m.type === 'mining' || m.type === 'mining-escort' || m.type === 'mining-recall' || m.type === 'asteroid-eskorte'){
+      if (!m.system || m.platz === undefined || m.platz === null) return null;
+      return { system: m.system, selektor: "[data-map-asteroid='" + m.platz + "']", was: 'Vorkommen' };
+    }
+    if (m.type === 'attack'){
+      const npc = NPCS.find(n => n.id === m.targetId);
+      return npc && npc.system ? { system: npc.system, selektor: "[data-map-npc='" + npc.id + "']", was: npc.name } : null;
+    }
+    if (m.type.indexOf('vorposten-') === 0){
+      return m.system ? { system: m.system, selektor: '[data-map-vorposten]', was: 'Vorposten' } : null;
+    }
+    // Festung, Nest und Konvoi liegen im System, aber nicht an einem festen Platz - das System
+    // reicht, der Marker ist dort das auffaelligste Objekt.
+    if (m.type === 'festung-angriff') return m.system ? { system: m.system, selektor: '[data-map-festung]', was: 'Asteroidenfestung' } : null;
+    if (m.type === 'nest-angriff')    return m.system ? { system: m.system, selektor: '[data-map-nest]', was: 'Alien-Nest' } : null;
+    if (m.type === 'konvoi-angriff')  return m.system ? { system: m.system, selektor: '[data-map-konvoi]', was: 'Wrackkonvoi' } : null;
+    // Alles Uebrige zielt auf einen Planeten (Erkunden, Kolonisieren, Umziehen, Angriff auf einen
+    // Standort). Der Planet kennt sein System selbst.
+    const pl = PLANETS.find(x => x.id === m.targetId);
+    if (pl && pl.system) return { system: pl.system, selektor: "[data-planet='" + pl.id + "']", was: pl.name };
+    return m.system ? { system: m.system, selektor: null, was: 'Zielsystem' } : null;
   }
   function zeigeAsteroidFundort(reportId){
     const r = (reportsCache || []).find(x => x && x.id === reportId);
@@ -66238,6 +66280,16 @@ async function claimPendingRewards(){
             label = (m.fleetName?m.fleetName+' → ':'')+(target?target.name:'Erkundungsziel');
             shipsTooltip = m.composition ? 'Unterwegs: '+fleetBreakdownHtml(m.composition) : '';
           }
+          /* FL-1: Jede Zeile, die noch KEIN Klickziel hat, bekommt eines aus dem Aufloeser. Die
+             Abbaumission behaelt bewusst ihr eigenes `data-fp-asteroid` samt der Meldung, die den
+             Abbaufortschritt nennt - sie sagt mehr als die allgemeine Fassung, und der Waechter
+             test_flottenposition_abbau prueft genau sie. */
+          if (!klickAttr){
+            const mz = missionsKartenziel(m);
+            if (mz) klickAttr = ' data-fp-mziel="' + escapeHtml(mz.system) + '|' + escapeHtml(mz.selektor || '')
+                              + '" data-fp-mwas="' + escapeHtml(mz.was || '') + '" style="cursor:pointer;"'
+                              + ' title="' + escapeHtml((mz.was || 'Ziel') + ' – antippen öffnet die Karte dort') + '"';
+          }
           return `<div class="fleet-position-item" title="${shipsTooltip}"${klickAttr}>
             <div class="fp-name"><i class="ti ${icon}" aria-hidden="true" style="color:${color};"></i>${label}</div>
             <div class="fp-timer">von ${planetDisplayName(originKey)} · ${ss}</div>
@@ -66261,6 +66313,20 @@ async function claimPendingRewards(){
             log(da ? 'Hier baut deine Flotte gerade ab: ' + asteroidName(da) + ' in ' + sysName + '.'
                    : 'Deine Flotte ist hier im Einsatz (' + sysName + ') – das Vorkommen ist inzwischen erschöpft, die Fuhre kommt trotzdem an.',
                 'ti-pick');
+          };
+        });
+        /* FL-1: dieselbe Verdrahtungsstelle, damit beide Wege nach jedem Neuschreiben der Box
+           wieder haengen (setBoxHtml-Muster, siehe Kommentar darueber). */
+        fpList.querySelectorAll('[data-fp-mziel]').forEach(el => {
+          el.onclick = () => {
+            const roh = el.getAttribute('data-fp-mziel') || '';
+            const trenner = roh.indexOf('|');
+            if (trenner < 0) return;
+            const sys = roh.slice(0, trenner), selektor = roh.slice(trenner + 1);
+            const sysName = (STAR_SYSTEMS.find(x => x.id === sys) || { name: sys }).name;
+            const was = el.getAttribute('data-fp-mwas') || 'Ziel';
+            springeZuKartenziel(sys, selektor || null);
+            log('Dorthin fliegt deine Flotte: ' + was + ' in ' + sysName + '.', 'ti-rocket');
           };
         });
       }
