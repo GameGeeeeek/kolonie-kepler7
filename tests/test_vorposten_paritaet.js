@@ -53,17 +53,16 @@ const srvTypen = [...new Set([...SRV.matchAll(/type: 'vorposten(-[a-z]+)?'/g)].m
 const claimVon = JS.indexOf('async function claimPendingRewards(');
 const claimBlock = JS.slice(claimVon, claimVon + 80000);
 const ohneZweig = srvTypen.filter(t => !new RegExp("r\\.type === '" + t + "'").test(claimBlock));
-// 3a war bis zum 03.09.2026 eine MOMENTAUFNAHME ("genau zwei ... naemlich diese beiden") und ist
-// prompt an genau der Stelle angeschlagen, an der sie nichts schuetzen sollte: Der Server bekam mit
-// dem 24-Stunden-Abbau einen dritten, voellig korrekten Belohnungstyp ('vorposten-abbau'), und der
-// Test meldete das als Fehler - waehrend die Pruefung, um die es wirklich geht (3b: hat JEDER Typ
-// einen Zweig?), unabhaengig davon zuschlug. Ein Test, der bei jedem neuen Typ von Hand nachgezogen
-// werden muss, schuetzt beim naechsten Mal nur mit Glueck (dieselbe Lehre wie in
-// test_angriffssumme.js und test_flotte_v8375.js). Geprueft wird deshalb nur noch, dass die
-// Extraktion ueberhaupt etwas gefunden hat - sonst waeren 3b und 3c still gruen, weil sie ueber eine
-// leere Liste laufen.
-check('3a: die Belohnungstypen des Servers wurden ueberhaupt gefunden (sonst messen 3b/3c nichts)',
-  srvTypen.length >= 2 && srvTypen.includes('vorposten'), srvTypen);
+/* 3a ist der Stummheitsschutz fuer 3b und 3c, nicht ihre Zaehlung (umgestellt 03.09.2026).
+   Findet der Regex oben nichts, ist srvTypen leer - dann ist auch ohneZweig leer, und 3b/3c melden
+   OK, ohne irgendetwas geprueft zu haben. Deshalb muessen die bekannten Typen NAMENTLICH auftauchen.
+   Die frueher zusaetzlich geforderte Gesamtzahl ("genau zwei") ist entfallen: Sie schuetzte nichts,
+   was 3b nicht besser prueft - ein neuer Typ ohne Frontend-Zweig faellt dort und mit Namen -, und
+   verlangte bei jedem neuen Typ eine Pflege, die keine Aussage traegt. Genau das ist am 03.09.2026
+   passiert: 'vorposten-abbau' kam im Backend dazu, 3b nannte die Luecke praezise, und 3a meldete
+   nur, dass es jetzt drei statt zwei sind. */
+check('3a: die bekannten Belohnungstypen werden im Server ueberhaupt gefunden',
+  srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust') && srvTypen.includes('vorposten-abbau'), srvTypen);
 check('3b: fuer jeden davon hat claimPendingRewards einen Zweig', claimVon > 0 && ohneZweig.length === 0, { ohneZweig });
 const zweigSave = srvTypen.every(t => { const i = claimBlock.indexOf("r.type === '" + t + "'"); const b = claimBlock.slice(i, claimBlock.indexOf('continue;', i)); return /\bsave\(\);/.test(b); });
 check('3c: und jeder Zweig ruft save() (Regel 73)', zweigSave);

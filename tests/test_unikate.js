@@ -168,9 +168,34 @@ check('5b2: und alle Schmiede-Einstiege gehen durch die gesperrte Funktion',
 check('5c: beide Wurf-Knoepfe verschwinden fuer Unikate',
   JS.includes("${istUnikatModul(false, instKey)?'':`<button data-wertreroll-module=") &&
   JS.includes("${istUnikatModul(true, instKey)?'':`<button data-wertreroll-shipmodule="));
-check('5d: die Drop-Haken existieren an Weltboss und Waechter mit den dokumentierten Regeln',
-  JS.includes("grantUnikatModul('leviathanherz')") &&
-  JS.includes('0.04 + share*0.10 + (isTop ? 0.06 : 0)') &&
+/* 5d prueft die REGEL, nicht den Wortlaut an einem Ort (umgestellt 03.09.2026).
+   Vorher stand hier `JS.includes('0.04 + share*0.10 + (isTop ? 0.06 : 0)')` - eine woertliche
+   Kopie des Ausdrucks an der Stelle, an der er damals stand. Als die Weltboss-Belohnung in
+   worldBossKillReward(level, share, isTop) herausgezogen wurde (damit Vorschau und Auszahlung
+   dieselbe Rechnung lesen), hiess der Parameter dort `s` statt `share` - rechnerisch identisch,
+   der Test fiel trotzdem. Das ist die Sorte Pruefung, die einen Refactor bestraft statt einen
+   Fehler zu finden.
+   Gehalten wird jetzt die dokumentierte Zusage: 4% Grundchance, +10% mal Schadensanteil,
+   Top-Schaediger +6% - und der Drop haengt an genau dieser Chance. Wie die Variable heisst und in
+   welcher Funktion sie steht, ist dabei egal; dass die drei Zahlen zusammen EINE Chance bilden,
+   ist es nicht. */
+// Bis zum ZEILENENDE lesen, nicht bis zum ersten Komma: Der Ausdruck enthaelt selbst Kommas
+// (Math.min(1, ...)), und eine bei "Math.min(1" abgeschnittene Zeile enthaelt keine der drei
+// Zahlen mehr - die Pruefung faende dann nie etwas und waere immer rot.
+const unikatChanceZeile = (JS.match(/unikatChance:[^\n]*/) || [''])[0];
+check('5d: die Weltboss-Unikatchance haelt die dokumentierte Regel (4% + 10%*Anteil + 6% Top)',
+  /0\.04/.test(unikatChanceZeile) && /\*\s*0\.10/.test(unikatChanceZeile) && /0\.06/.test(unikatChanceZeile),
+  { zeile: unikatChanceZeile });
+// Und der Drop haengt AN dieser Chance - sonst stuende die Regel da, ohne etwas auszuloesen.
+const drop = JS.indexOf("grantUnikatModul('leviathanherz')");
+check('5d2: das Leviathanherz faellt an genau dieser Chance',
+  drop > 0 && /Math\.random\(\)\s*<\s*\w+\.unikatChance/.test(JS.slice(Math.max(0, drop - 200), drop)),
+  { davor: JS.slice(Math.max(0, drop - 90), drop).trim().slice(-80) });
+// Die Chance darf nur EINMAL im Code stehen - zwei Kopien liefen beim naechsten Balance-Pass
+// auseinander, und die Vorschau zeigte dann etwas anderes als die Auszahlung gibt.
+const chanceKopien = (JS.match(/unikatChance:/g) || []).length;
+check('5d3: sie steht genau einmal im Code', chanceKopien === 1, { kopien: chanceKopien });
+check('5d4: der Waechter hat weiterhin seinen eigenen Drop-Haken',
   JS.includes("? grantUnikatModul('waechterauge') : null;"));
 // Beide Unikate fallen ZUSAETZLICH, nicht anstelle der bisherigen Beute. Beim Waechter ist das
 // die Bedingung dafuer, dass seine dokumentierte Zusage ("garantiert ein Modul", Hilfe +
