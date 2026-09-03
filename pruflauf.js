@@ -41,6 +41,28 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const WURZEL = __dirname;
+
+/* WAS DIE NACHPRUEFUNG NICHT WEISS - Befund vom 03.09.2026, an einem echten Lauf gemessen.
+   Die Nachpruefung unten schliesst aus "beim Stueck rot, einzeln gruen" auf "Lastsymptom". Dieser
+   Schluss stimmt nur, solange sich zwischen beiden Messungen NICHTS geaendert hat. An diesem Tag
+   war das nicht so: test_paritaet_tabellen fiel in Stueck 1 um 19:15 (ein echter Fehler - ein neues
+   Verteidigungsgebaeude fehlte im Backend), das Backend wurde um 19:22 im Nachbar-Klon korrigiert,
+   und die Nachpruefung lief danach. Sie meldete "war ein Lastsymptom der Gleichzeitigkeit" - und
+   war damit sachlich falsch. Der Test war gruen, weil der Fehler behoben war.
+   Das ist die gefaehrlichere Richtung: Ein falsches "echt rot" kostet eine Nachpruefung, ein
+   falsches "Lastsymptom" verschweigt einen echten Fund.
+   Das Skript nimmt deshalb einen Fingerabdruck der beiden Dateien, von denen die Tests abhaengen
+   und die es nicht selbst kontrolliert - die Spieldatei und die server.js des Nachbar-Repos - und
+   vergleicht ihn vor der Nachpruefung erneut. Weicht er ab, faellt das Wort "Lastsymptom" weg. */
+function weltAbdruck(){
+  const h = crypto.createHash('sha1');
+  for (const f of [path.join(WURZEL, 'weltraum_kolonie.html'),
+                   path.join(WURZEL, '..', 'kolonie-kepler7-backend', 'server.js')]){
+    try { h.update(f + ':' + fs.statSync(f).size + ':'); h.update(fs.readFileSync(f)); }
+    catch (e) { h.update(f + ':fehlt:'); }
+  }
+  return h.digest('hex').slice(0, 12);
+}
 const argumente = process.argv.slice(2);
 
 // --nur-pflicht und --nummer sind Sache von tests/run.js - hier nur durchreichen, damit niemand
@@ -132,6 +154,7 @@ function starte(i) {
 
 (async () => {
   const start = Date.now();
+  const abdruckVorher = weltAbdruck();
   const ergebnisse = await Promise.all(stuecke.map((_, i) => starte(i)));
   const rot = ergebnisse.filter(e => e.code !== 0);
 
@@ -160,6 +183,13 @@ function starte(i) {
      nacheinander, ohne Last. Was dann noch rot ist, ist echt. */
   const verdaechtig = [...new Set(roteZeilen.map(z => (z.match(/^FAIL (\S+)/) || [])[1]).filter(Boolean))];
   const echtRot = [];
+  const abdruckNachher = weltAbdruck();
+  const weltUnveraendert = abdruckNachher === abdruckVorher;
+  if (verdaechtig.length && !weltUnveraendert) {
+    console.log('\nACHTUNG: Spieldatei oder die server.js des Nachbar-Repos haben sich waehrend des Laufs');
+    console.log('geaendert (Abdruck ' + abdruckVorher + ' -> ' + abdruckNachher + '). Die Nachpruefung misst damit');
+    console.log('einen anderen Stand als die Stuecke - "Lastsymptom" ist hier keine gueltige Erklaerung.');
+  }
   if (verdaechtig.length) {
     console.log('\n' + verdaechtig.length + ' rote Datei(en) - jetzt einzeln nachgefahren, ohne Last:');
     for (const datei of verdaechtig) {
@@ -168,7 +198,10 @@ function starte(i) {
           { cwd: WURZEL, stdio: 'ignore' });
         k.on('exit', c => f(c === null ? 1 : c));
       });
-      if (code === 0) console.log('  ' + datei + ': einzeln GRUEN - war ein Lastsymptom der Gleichzeitigkeit.');
+      if (code === 0) console.log('  ' + datei + (weltUnveraendert
+        ? ': einzeln GRUEN - war ein Lastsymptom der Gleichzeitigkeit.'
+        : ': einzeln GRUEN - ABER Spieldatei oder Nachbar-server.js haben sich waehrend des Laufs geaendert.'
+          + ' Das kann eine Korrektur gewesen sein, kein Lastsymptom. Ergebnis von Hand einordnen.'));
       else { console.log('  ' + datei + ': einzeln ROT - echter Fehler.'); echtRot.push(datei); }
     }
     console.log('\nDie Protokolle der Stücke liegen unter ' + ABLAGE + '.');
@@ -178,6 +211,9 @@ function starte(i) {
      Waere es umgekehrt, muesste jeder Aufrufer die Ausgabe lesen, und genau das verbietet CLAUDE.md.
      ACHTUNG BEIM AUFRUF: `node pruflauf.js | tail` verwirft diesen Code (die Pipe liefert den von
      tail). Ohne Pipe aufrufen oder $PIPESTATUS lesen. */
-  if (verdaechtig.length && !echtRot.length) console.log('Alle roten Tests waren Lastsymptome - der Lauf ist gruen.');
+  if (verdaechtig.length && !echtRot.length) console.log(weltUnveraendert
+    ? 'Alle roten Tests waren Lastsymptome - der Lauf ist gruen.'
+    : 'Alle roten Tests sind einzeln gruen - aber die Welt hat sich waehrend des Laufs geaendert.'
+      + ' Kein automatisches Gruen-Urteil; siehe Hinweis oben.');
   process.exit(echtRot.length ? 1 : (rot.length && !verdaechtig.length ? 1 : 0));
 })();
