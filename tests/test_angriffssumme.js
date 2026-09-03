@@ -17,6 +17,23 @@
 //
 // Der Test prüft deshalb nicht Zahlen, sondern die EIGENSCHAFT: Was angreifen darf, muss auch
 // zählen. Eine vierte Wiederholung fällt hier auf und nicht erst im Spiel.
+//
+// NACHTRAG 03.09.2026 - die SECHSTE Wiederholung, und diesmal hat dieser Test sie NICHT gefangen.
+// Spieler-Befund Sascha mit Bildschirmfoto ("werden garnicht bei angriffen mit einbezogen"):
+// Kausalitaetsbrecher, Paktkorvette, Bundeskreuzer und Sternenbanner fehlten in rawFleetPower()
+// des Backends - der Summe, die den PvP-Kampf, Nester, Festungen, Anfechtungen und
+// Vorposten-Garnisonen wirklich entscheidet. Abschnitt 3 prueft SHIP_ATK_VALUES, und die Tabelle
+// war vollstaendig; gerechnet wird aber nebenan. DER WAECHTER STAND VOR DER FALSCHEN TUER.
+// Abschnitt 3b prueft ab jetzt die Summe selbst, 3c zusaetzlich Zahl gegen Zahl.
+//
+// GEGENPROBE (gemessen, nicht behauptet): mit KEPLER_BACKEND_SERVER auf den Stand vor der Behebung
+//   KEPLER_BACKEND_SERVER=/pfad/zum/alten/server.js node tests/test_angriffssumme.js
+// fallen GENAU ZWEI Pruefungen, und beide benennen dieselben vier Klassen:
+//   FAIL - 3b: jede Angriffsklasse traegt auch serverseitig Angriffskraft bei
+//   FAIL - 3c: jede Klasse ist auf beiden Seiten ablesbar
+// "3c: und traegt beidseitig denselben Angriffswert" bleibt dabei bewusst gruen - es vergleicht nur
+// die Klassen, die auf beiden Seiten ablesbar sind. Faellt diese dritte Zeile in einer kuenftigen
+// Gegenprobe mit, ist das ein anderer Fehler (abweichende ZAHL), kein fehlender Eintrag.
 const fs = require('fs');
 const path = require('path');
 // Pfad ueber die gemeinsame Quelle: Dieser Test bindet lib/umgebung ein und las die Datei
@@ -121,6 +138,44 @@ const KAMPF = ATTACK.filter(k => TRANSPORT_OHNE_WAFFEN.indexOf(k) < 0);
     check('3: jede Angriffsklasse steht auch in der Backend-Tabelle', fehlend.length === 0,
       { fehlend, hinweis:'server.js SHIP_ATK_VALUES mitpflegen, sonst rechnet der PvP-Kampf anders als die Vorschau.' });
     check('3: die Gegenprobe greift (die Backend-Tabelle wurde wirklich gelesen)', BE_KEYS.length >= 20, BE_KEYS.length);
+
+    // ---- 3b) Die Summe, die den Kampf WIRKLICH entscheidet
+    // Warum es diesen Abschnitt gibt (03.09.2026, Spieler-Befund Sascha mit Bildschirmfoto):
+    // Abschnitt 3 darueber pruefte zehn Monate lang SHIP_ATK_VALUES - eine Tabelle, die
+    // vollstaendig war und die der PvP-Kampf gar nicht liest. Gerechnet wird in rawFleetPower(),
+    // einer ZWEITEN handgeschriebenen Summe daneben. Dort fehlten Kausalitaetsbrecher,
+    // Paktkorvette, Bundeskreuzer und Sternenbanner: in der Verteidigung zaehlten sie voll
+    // (weightedFleetDefensePower und fleetShieldSum laufen ueber SHIP_ATK_VALUES), im Angriff null.
+    // Der Waechter stand vor der falschen Tuer. Ab hier steht er vor beiden.
+    const beFn = (() => { const a = be.indexOf('function rawFleetPower('); if (a < 0) return '';
+      const e = be.indexOf('\n}', a); return e < 0 ? '' : be.slice(a, e); })();
+    check('3b: rawFleetPower() im Backend gefunden', beFn.length > 500, beFn.length);
+    // Gegenprobe zuerst: Ohne diese Zeile waere die Pruefung darunter still gruen, sobald sich der
+    // Funktionsname aendert und der Ausschnitt leer bleibt.
+    check('3b: die Gegenprobe greift (der Ausschnitt enthaelt wirklich die Summe)',
+      /dm\('cruisers'/.test(beFn) && /dm\('destroyers'/.test(beFn), beFn.slice(0, 80));
+    const fehltImKampf = KAMPF.filter(k => beFn.indexOf("dm('" + k + "'") < 0);
+    check('3b: jede Angriffsklasse traegt auch serverseitig Angriffskraft bei', fehltImKampf.length === 0,
+      { fehlend: fehltImKampf, hinweis: 'In server.js rawFleetPower() eine dm(...)-Zeile ergaenzen. SHIP_ATK_VALUES allein reicht NICHT - der Kampf liest diese Summe.' });
+    check('3b: reine Frachter bleiben auch serverseitig draussen',
+      TRANSPORT_OHNE_WAFFEN.every(k => beFn.indexOf("dm('" + k + "'") < 0), TRANSPORT_OHNE_WAFFEN);
+
+    // ---- 3c) Gleiche Klasse, gleiche Zahl auf beiden Seiten
+    // Anwesenheit allein reicht nicht: Eine Zeile mit falschem Angriffswert laesst Vorschau und
+    // Kampf genauso auseinanderlaufen wie eine fehlende. Verglichen wird Zahl gegen Zahl, aus den
+    // beiden Summen selbst gelesen - nicht gegen eingetippte Erwartungswerte.
+    const feFn = schnitt('function attackPowerRaw(', '\n  }');
+    const atkZahl = (txt, k) => { const m = new RegExp("dm\\('" + k + "',[^)]*\\)\\s*\\*\\s*(\\d+)").exec(txt); return m ? +m[1] : null; };
+    const unvergleichbar = [], abweichend = [];
+    for (const k of KAMPF){
+      const fz = atkZahl(feFn, k), bz = atkZahl(beFn, k);
+      if (fz === null || bz === null) { unvergleichbar.push(k + ' (fe:' + fz + ' be:' + bz + ')'); continue; }
+      if (fz !== bz) abweichend.push(k + ': Frontend ' + fz + ' vs Backend ' + bz);
+    }
+    check('3c: jede Klasse ist auf beiden Seiten ablesbar', unvergleichbar.length === 0, unvergleichbar);
+    check('3c: und traegt beidseitig denselben Angriffswert', abweichend.length === 0, abweichend);
+    // Ohne diese Zeile waere 3c still gruen, wenn KAMPF je leer liefe.
+    check('3c: die Gegenprobe greift (es wurde wirklich verglichen)', KAMPF.length >= 20, KAMPF.length);
   }
 }
 
