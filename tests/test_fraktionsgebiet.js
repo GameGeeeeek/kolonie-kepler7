@@ -83,9 +83,13 @@ check('Frontsegment-Block ist entfernt (Front lebt am Kontrollbalken der Sektora
 
 // Die Wurmloch-LINIE ist mit KB-6 ebenfalls von der Leinwand verschwunden - dafuer traegt jedes
 // Endpunkt-System in den Sektor-Ansichten ein 🌀-Abzeichen aus der gemeinsamen Badge-Quelle.
+/* Geprueft wird die REGEL, nicht die Schreibweise: An BEIDEN Endpunkt-Systemen haengt ein
+   🌀-Abzeichen. Hier stand bis zum 03.09.2026 der zeichengenaue Ausdruck
+   `galaxyCache.activeWormhole && (…from === sysId || …to === sysId)` - eine Momentaufnahme, die
+   fiel, sobald die Quelle in die gemeinsame Funktion wurmlochOffen() wanderte, obwohl das Abzeichen
+   unveraendert an beiden Enden haengt. */
 check('Wurmloch lebt als Abzeichen in karteSystemBadges',
-  /galaxyCache\.activeWormhole && \(galaxyCache\.activeWormhole\.from === sysId \|\| galaxyCache\.activeWormhole\.to === sysId\)/.test(src)
-  && src.indexOf("icon:'🌀'") >= 0);
+  /(\w+)\.from === sysId \|\| \1\.to === sysId/.test(src) && src.indexOf("icon:'🌀'") >= 0);
 
 // ---- 6. Wappen am Knoten ------------------------------------------------------------------------
 check('Wappen wird als verschachteltes SVG eingehängt', /ownerWappen/.test(src));

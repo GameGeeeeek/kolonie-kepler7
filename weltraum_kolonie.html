@@ -9655,7 +9655,13 @@
      test_wurmloch_passage 5b, das genau das gefangen hat. */
   function wurmlochOffen(){
     const wh = galaxyCache.activeWormhole;
-    return (wh && wh.expiresAt > Date.now()) ? wh : null;
+    if (!wh) return null;
+    /* Die Frist entscheidet nur, WENN der Server sie mitschickt. Ein Wurmloch ohne expiresAt ist
+       keine abgelaufene Passage, sondern eine unvollstaendige Angabe - es stumm zu schalten hiesse,
+       eine Verbindung zu entwerten, die die Karte in derselben Sekunde zeichnet. Der strenge
+       Entwurf (Frist strikt groesser als jetzt) hat genau das getan und wurde von
+       test_kartenbeschriftung gefangen, dessen Fixture nur from/to fuehrt. */
+    return (wh.expiresAt && wh.expiresAt <= Date.now()) ? null : wh;
   }
   function wurmlochFlugMult(sysId){
     const wh = wurmlochOffen();

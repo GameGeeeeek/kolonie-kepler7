@@ -83,10 +83,18 @@ check('3c: ohne Deckel waere derselbe Stapel 10-fach schneller',
    REGEL: an beiden Muendungen 0,75, sonst 1, und ein abgelaufenes Wurmloch wirkt gar nicht. */
 let whFn = null, whBau = null;
 try {
+  /* BEIDE Funktionen schneiden: wurmlochFlugMult ruft seit dem 03.09.2026 wurmlochOffen(), und ein
+     Schnitt, der nur die eine mitnimmt, stirbt mit "wurmlochOffen is not defined" - im vollen Lauf
+     gemessen, nachdem der Einzellauf noch gruen war. Dieselbe Fehlerklasse wie die
+     HERKUNFT-Preludes: Wer eine Funktion aus der Spieldatei schneidet, muss ihre Aufrufe
+     mitschneiden, statt sie zu erraten. */
+  const aOffen = S.indexOf('  function wurmlochOffen(){');
+  const eOffen = aOffen >= 0 ? S.indexOf('\n  }', aOffen) : -1;
   const a = S.indexOf('  function wurmlochFlugMult(sysId){');
   const e = a >= 0 ? S.indexOf('\n  }', a) : -1;
-  if (a < 0 || e < 0) throw new Error('Anker nicht gefunden');
-  whFn = (cache) => new Function('galaxyCache', S.slice(a, e + 4) + '\n return wurmlochFlugMult;')(cache);
+  if (a < 0 || e < 0 || aOffen < 0 || eOffen < 0) throw new Error('Anker nicht gefunden');
+  whFn = (cache) => new Function('galaxyCache',
+    S.slice(aOffen, eOffen + 4) + '\n' + S.slice(a, e + 4) + '\n return wurmlochFlugMult;')(cache);
 } catch(err){ whBau = String(err.message || err); }
 check('4-bau: wurmlochFlugMult laesst sich schneiden und ausfuehren', whBau === null, { whBau });
 if (whFn){

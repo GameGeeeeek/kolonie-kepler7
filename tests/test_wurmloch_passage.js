@@ -210,6 +210,23 @@ const kennzahlen = page => page.evaluate(() => {
     { abgelaufen: dauerInSekunden(abgelaufen), ohneWurmloch: sOhne });
   check('5b: und es steht auch nicht mehr auf der Karte', portalAbgelaufen === false, { portalAbgelaufen });
 
+  /* ---- 6) Ein Wurmloch OHNE Frist gilt als offen ----------------------------------------------
+     Die Entscheidung, die der volle Pruefllauf erzwungen hat: Der erste Entwurf verlangte
+     `expiresAt > jetzt` und machte damit jede Angabe ohne Frist stumm - test_kartenbeschriftung
+     zeichnete daraufhin kein Portal mehr, obwohl seine Fixture ein Wurmloch fuehrt. Ein fehlendes
+     Feld ist keine abgelaufene Passage, sondern eine unvollstaendige Angabe; die Karte zeichnet
+     das Wurmloch dann, und die Wirkung muss dazu passen. Diese Pruefung haelt die Entscheidung
+     fest - wer wieder auf die strenge Lesart umstellt, faellt hier auf. */
+  const t4 = await tab(browser, fixture(), { wurmloch: { from: HEIMAT, to: ZIEL } });
+  await t4.page.waitForTimeout(2500);
+  await aufKarte(t4, ZIEL);
+  const ohneFrist = await kennzahlen(t4.page);
+  const portalOhneFrist = await (async () => { await aufKarte(t4, HEIMAT); return t4.page.evaluate(() => !!document.querySelector('#galaxyMapSvg [data-map-wurmloch]')); })();
+  await t4.ctx.close();
+  check('6: ein Wurmloch ohne Frist wirkt und wird gezeichnet',
+    dauerInSekunden(ohneFrist) === sMit && portalOhneFrist === true,
+    { ohneFrist: dauerInSekunden(ohneFrist), mitFrist: sMit, portal: portalOhneFrist });
+
   await browser.close();
   ende();
 })();
