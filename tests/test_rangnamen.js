@@ -177,8 +177,24 @@ check('4b: keine Stelle baut einen Titel selbst aus Name und Nummer zusammen',
 // ---- 5) Die alten Sammeltitel sind weg ---------------------------------------------------------
 // Auch aus dem Hilfetext: Er beschrieb die Staffelung "Galaktische Legende 1-12" usw. und waere
 // nach dieser Aenderung eine Falschaussage. Ein Hilfetext ist eine Anzeigestelle.
+/* OHNE den PATCHNOTES-Block (CLAUDE.md: "Tests, die pruefen, dass ein alter Text nicht mehr
+   existiert, duerfen nicht versehentlich im historischen PATCHNOTES-Block suchen").
+   Gemessener Anlass: Der Patchnote zu v8.655.0 - also der dieser Aenderung selbst - ZITIERT
+   den alten Sammeltitel, um zu erklaeren, was ersetzt wurde ("Stufe 163 hiess Kosmischer
+   Souveraen 131"). Diese Pruefung riss daran, und zwar auf main selbst: sie war ab dem Merge
+   ihres eigenen PRs rot. Patchnotes sind unveraenderliche Historie, der Wortlaut dort laesst
+   sich also nicht anpassen - die Pruefung muss es. Derselbe Griff wie in
+   tests/test_bedarfsliste.js (JS_OHNE_HISTORIE). */
+const JS_OHNE_HISTORIE = (() => {
+  const v = JS.indexOf('  const PATCHNOTES = [');
+  const b = v < 0 ? -1 : JS.indexOf('\n  ];', v);
+  return (v >= 0 && b > v) ? JS.slice(0, v) + JS.slice(b) : JS;
+})();
+check('5-anker: der PATCHNOTES-Block laesst sich herausschneiden (sonst waere 5a vacuous)',
+  JS_OHNE_HISTORIE.length > 0 && JS_OHNE_HISTORIE.length < JS.length,
+  { ganz: JS.length, ohneHistorie: JS_OHNE_HISTORIE.length });
 const altGefunden = ['DOMINANCE_LEGEND_TIERS', 'DOMINANCE_LEGEND_SPAN', 'Kosmischer Souverän', 'Galaktische Legende 1-12']
-  .filter(x => JS.indexOf(x) >= 0);
+  .filter(x => JS_OHNE_HISTORIE.indexOf(x) >= 0);
 check('5a: die alten Sammeltitel stehen nirgends mehr im Spiel', altGefunden.length === 0, altGefunden);
 
 ende();
