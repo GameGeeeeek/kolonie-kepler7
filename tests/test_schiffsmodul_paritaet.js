@@ -43,6 +43,34 @@ function block(quelle, anfang, endeMarke){
   const bis = von < 0 ? -1 : quelle.indexOf(endeMarke, von);
   return (von < 0 || bis < 0) ? null : quelle.slice(von, bis + endeMarke.length);
 }
+/* Eine Deklaration ueber ihre KLAMMERTIEFE schneiden statt ueber einen Endanker.
+   Der Sammler kannte zwei Endanker - `\n};` (Objektliteral) und `\n})();` (IIFE) - und lief an
+   allem anderen vorbei bis zum naechsten fremden Blockende; die Wache "Anker traf zu spaet"
+   verwarf die Deklaration dann still, und der Aufbau starb an "is not defined". Genau so am
+   22.08.2026 mit `const SHIP_MODULE_SET_DEFS = [` aus Backend #158 passiert: ein ARRAY, also die
+   dritte Form. Ein dritter Anker waere wieder eine Schreibweise mehr gewesen (Arbeitsregel 40) -
+   die Tiefe faengt auch die vierte, an die niemand gedacht hat. */
+function schneideDeklaration(quelle, von){
+  const zeilenende = quelle.indexOf('\n', von);
+  const ersteZeile = quelle.slice(von, zeilenende < 0 ? quelle.length : zeilenende);
+  if (/;\s*(\/\/.*)?$/.test(ersteZeile)) return ersteZeile;      // einzeilig
+  const auf = { '{': '}', '[': ']', '(': ')' };
+  let i = von, tiefe = 0, gesehen = false;
+  for (; i < quelle.length; i++){
+    const c = quelle[i];
+    if (auf[c]){ tiefe++; gesehen = true; }
+    else if (c === '}' || c === ']' || c === ')'){
+      tiefe--;
+      if (gesehen && tiefe === 0){
+        // hinter der schliessenden Klammer noch das Semikolon (und ggf. `)();` der IIFE) mitnehmen
+        let j = i + 1;
+        while (j < quelle.length && /[)(;\s]/.test(quelle[j]) && quelle[j] !== '\n') j++;
+        return quelle.slice(von, j);
+      }
+    }
+  }
+  return null;
+}
 function fuehreAus(code, rueckgabe){
   try { return new Function(code + '\nreturn ' + rueckgabe + ';')(); } catch (e) { return null; }
 }
@@ -67,17 +95,8 @@ function mitAbhaengigkeiten(quelle, code, schonDa){
         const marke = '\n  const ' + n + ' = ';
         const von = quelle.indexOf(marke);
         if (von < 0) continue;
-        const zeilenende = quelle.indexOf('\n', von + 1);
-        const ersteZeile = quelle.slice(von + 1, zeilenende);
-        let d;
-        if (/;\s*(\/\/.*)?$/.test(ersteZeile)) d = ersteZeile;
-        else {
-          const bis = quelle.indexOf('\n  };', von);
-          if (bis < 0) continue;
-          const blk = quelle.slice(von + 1, bis + 5);
-          if ((blk.match(/\n  const [A-Z][A-Z0-9_]* = /g) || []).length) continue;   // Anker traf zu spaet
-          d = blk;
-        }
+        const d = schneideDeklaration(quelle, von + 1);
+        if (!d) continue;
         gefunden.set(n, d);
         naechste.push(d);
       }
@@ -106,24 +125,8 @@ function mitAbhaengigkeitenBackend(quelle, code){
         const marke = '\nconst ' + n + ' = ';
         const von = quelle.indexOf(marke);
         if (von < 0) continue;
-        const zeilenende = quelle.indexOf('\n', von + 1);
-        const ersteZeile = quelle.slice(von + 1, zeilenende);
-        let d;
-        if (/;\s*(\/\/.*)?$/.test(ersteZeile)) d = ersteZeile;
-        else {
-          /* Mehrzeilig - und der Endanker gehoert selbst geprueft (Arbeitsregel 6). Es gibt ZWEI
-             Formen: das gewoehnliche Objektliteral (\n};) und die IIFE (\n})();). SHIP_KLASSE_VON
-             ist eine IIFE, und mit nur der ersten Form lief der Sammler an ihr vorbei bis zum
-             naechsten fremden Blockende - der Aufbau starb dann an "is not defined". */
-          const kandidaten = [quelle.indexOf('\n};', von), quelle.indexOf('\n})();', von)]
-            .filter(x => x >= 0);
-          if (!kandidaten.length) continue;
-          const bis = Math.min.apply(null, kandidaten);
-          const laenge = quelle.startsWith('\n})();', bis) ? 6 : 3;
-          const blk = quelle.slice(von + 1, bis + laenge);
-          if ((blk.match(/\nconst [A-Z][A-Z0-9_]* = /g) || []).length) continue;
-          d = blk;
-        }
+        const d = schneideDeklaration(quelle, von + 1);
+        if (!d) continue;
         gefunden.set(n, d);
         naechste.push(d);
       }
@@ -236,6 +239,20 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
   const fehlend = teile.map((t, i) => t ? null : i).filter(i => i !== null);
   check('4-bau: alle Backend-Bausteine gefunden', fehlend.length === 0, { fehlendeIndizes: fehlend });
 
+  /* Und die Wache DARUEBER: Ein Laufzeitfehler IN den Messaufrufen muss eine BENANNTE Pruefung
+     reissen, nicht den Test toeten. Der Aufbau-try/catch in fuehreAus() genuegt dafuer nicht - er
+     umschliesst nur das ERZEUGEN der Funktion, waehrend eine fehlende Konstante erst beim AUFRUF
+     auffaellt. Genau so ist der Test am 22.08.2026 gestorben: 15 statt 22 Pruefungen, KEINE
+     FAIL-Zeile, und der rote Exit sah aus wie ein Befund (Arbeitsregel 34).
+     Die URSACHE jenes Vorfalls ist im Sammler behoben (er schneidet ueber die Klammertiefe und
+     kennt damit auch die Form, an die niemand gedacht hat). Diese Wache ist die zweite Linie: Sie
+     gilt fuer JEDEN Laufzeitfehler, nicht nur fuer eine fehlende Konstante - jede Messung liefert
+     dann null, die einzelnen Pruefungen fallen mit {"gemessen":null}, und 4-bau3 nennt den Grund. */
+  let laufFehler = null;
+  const sicher = fn => (typeof fn !== 'function') ? fn : function(){
+    try { return fn.apply(null, arguments); }
+    catch (e) { if (!laufFehler) laufFehler = String((e && e.message) || e); return null; }
+  };
   let W = null, S = null;
   if (fehlend.length === 0) {
     /* Auch hier KEINE Namensliste als Abhaengigkeitsangabe: Die Bausteine oben ziehen ihrerseits
@@ -243,8 +260,8 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
        der Test genau daran mitten im Abschnitt abgestuerzt - 4b bis 4f liefen nie, und der rote
        Exit sah aus wie ein Befund, Arbeitsregel 34). Gesammelt wird deshalb wieder transitiv. */
     const code = mitAbhaengigkeitenBackend(BACK, teile.join('\n'));
-    W = fuehreAus(code, 'weightedFleetDefensePower');
-    S = fuehreAus(code, 'fleetShieldSum');
+    W = sicher(fuehreAus(code, 'weightedFleetDefensePower'));
+    S = sicher(fuehreAus(code, 'fleetShieldSum'));
   }
   check('4-bau2: die zwei Rechenfunktionen laufen', typeof W === 'function' && typeof S === 'function');
 
@@ -301,6 +318,91 @@ const GESPIEGELT = ['atk', 'hull', 'shield', 'siegechance'];
     const ohneSub = W(nurSS, null, save('schlachtschiff', ['ss_panzerung:gewoehnlich:1']));
     check('4f: Zweitwerte (Substats) zaehlen auf denselben Kanal', mitSub > ohneSub,
       { mitSubstat: mitSub, ohneSubstat: ohneSub });
+
+    // Ist irgendein Messaufruf oben in eine Ausnahme gelaufen, steht der Grund hier - statt dass
+    // der Test mitten im Abschnitt stirbt und die restlichen Pruefungen nie fahren.
+    check('4-bau3: kein Laufzeitfehler in den Messaufrufen', laufFehler === null, { fehler: laufFehler });
   }
 }
+// ---- 5) Die Klassen-Sets (21.08.2026) -------------------------------------------------------
+{
+  const fSetB = block(FRONT, '  const SHIP_MODULE_SET_DEFS = [', '\n  ];');
+  const bSetB = block(BACK, 'const SHIP_MODULE_SET_DEFS = [', '\n];');
+  check('5-anker: beide Set-Tabellen sind abgegrenzt', !!fSetB && !!bSetB, { front: !!fSetB, back: !!bSetB });
+  const FS = fSetB ? fuehreAus(mitAbhaengigkeiten(FRONT, fSetB, ['SHIP_MODULE_SET_DEFS']), 'SHIP_MODULE_SET_DEFS') : null;
+  const BS = bSetB ? fuehreAus(bSetB, 'SHIP_MODULE_SET_DEFS') : null;
+  check('5-bau: beide Set-Tabellen lassen sich ausfuehren', !!FS && !!BS, { front: !!FS, back: !!BS });
+
+  if (FS && BS) {
+    const fk = FS.map(x => x.key).sort(), bk = BS.map(x => x.key).sort();
+    check('5a: beide Seiten kennen dieselben Sets', JSON.stringify(fk) === JSON.stringify(bk), { front: fk, back: bk });
+
+    const abweichung = [];
+    for (const f of FS) {
+      const b = BS.find(x => x.key === f.key);
+      if (!b) continue;
+      if (b.klasse !== f.klasse) abweichung.push({ set: f.key, feld: 'klasse', front: f.klasse, back: b.klasse });
+      const fr = [...f.req].sort(), br = [...(b.req || [])].sort();
+      if (JSON.stringify(fr) !== JSON.stringify(br)) abweichung.push({ set: f.key, feld: 'req', front: fr, back: br });
+      const norm = (st) => (st || []).map(x => x.teile + ':' + Object.keys(x.bonuses || {}).sort()
+        .map(k => k + '=' + x.bonuses[k]).join(',')).join(' | ');
+      if (norm(f.stufen) !== norm(b.stufen)) abweichung.push({ set: f.key, feld: 'stufen', front: norm(f.stufen), back: norm(b.stufen) });
+    }
+    check('5b: Klasse, Teileliste und Stufenboni stimmen je Set ueberein', abweichung.length === 0, abweichung);
+
+    // Jedes verlangte Modul muss es geben UND zu dieser Klasse gehoeren - sonst ist das Set
+    // unerfuellbar, und zwar unsichtbar: Es fehlt einfach immer ein Teil.
+    const kaputt = [];
+    for (const f of FS) for (const r of f.req) {
+      const mod = F_MOD.find(m => m.key === r);
+      if (!mod) kaputt.push({ set: f.key, modul: r, problem: 'gibt es nicht' });
+      else if (mod.klasse !== f.klasse) kaputt.push({ set: f.key, modul: r, problem: 'gehoert zu ' + mod.klasse });
+    }
+    check('5c: jedes verlangte Modul existiert und gehoert zur Klasse des Sets', kaputt.length === 0, kaputt);
+
+    /* 5d ist die eigentliche Wache: Ein Set darf keinen Kanal vergeben, den seine Klasse gar nicht
+       VERBRAUCHT - sonst steht in der Beschreibung eine Wirkung, die nirgends ankommt
+       (Arbeitsregel 59). Welche Kanaele wo wirken, wird aus der Spieldatei ABGELEITET, nicht
+       eingetippt: `shipModuleBonusFor(cls, 'x')` ist generisch, `shipModuleBonusFor('klasse','x')`
+       gilt nur dort. Fuehrt jemand einen Kanal neu generisch ein, wird die Wache automatisch
+       lockerer - und schafft jemand eine Verbrauchsstelle ab, schlaegt sie an. */
+    const generisch = new Set(), jeKlasse = {};
+    for (const m of FRONT.matchAll(/shipModuleBonusFor\(\s*(?:'([a-z_]+)'|([A-Za-z_][A-Za-z0-9_]*))\s*,\s*'([a-zA-Z_]+)'\s*\)/g)) {
+      const kanal = m[3];
+      if (m[1]) (jeKlasse[kanal] = jeKlasse[kanal] || new Set()).add(m[1]);
+      else generisch.add(kanal);            // ueber eine Variable -> gilt fuer jede Klasse
+    }
+    check('5d-vorab: die Verbrauchsstellen lassen sich ueberhaupt ableiten',
+      generisch.size >= 3 && Object.keys(jeKlasse).length >= 2,
+      { generisch: [...generisch], jeKlasse: Object.keys(jeKlasse) });
+    const inert = [];
+    for (const f of FS) for (const st of f.stufen) for (const kanal of Object.keys(st.bonuses || {})) {
+      if (generisch.has(kanal)) continue;
+      const erlaubt = jeKlasse[kanal];
+      if (!erlaubt || !erlaubt.has(f.klasse)) inert.push({ set: f.key, klasse: f.klasse, kanal });
+    }
+    check('5d: kein Set vergibt einen Kanal, den seine Klasse nicht verbraucht', inert.length === 0, inert);
+
+    // Und die WIRKUNG serverseitig: zwei Teile des Linienschiff-Sets muessen den Huellenbonus
+    // heben, drei Teile zusaetzlich den Angriff (Arbeitsregel 61 - nicht die Tabelle, die Zahl).
+    // Eigener Aufbau statt `teile` aus Abschnitt 4 - das liegt in dessen Blockscope. Der Sammler
+    // holt ohnehin alles Weitere transitiv, es genuegt die eine Zielfunktion.
+    const B = fuehreAus(mitAbhaengigkeitenBackend(BACK, block(BACK, 'function shipModulKlassenBoni(', '\n}')),
+      'shipModulKlassenBoni');
+    if (typeof B === 'function') {
+      const mk = (...keys) => ({ equippedShipModules: { schlachtschiff: keys.map(k => k + ':gewoehnlich:1') }, research: {} });
+      const eins = B(mk('ss_panzerung'), 'hull').schlachtschiff;
+      const zwei = B(mk('ss_panzerung', 'ss_zielcomputer'), 'hull').schlachtschiff;
+      check('5e: zwei Set-Teile heben den Huellenbonus serverseitig', zwei > eins + 0.07,
+        { einTeil: eins, zweiTeile: zwei });
+      const atk2 = B(mk('ss_panzerung', 'ss_zielcomputer'), 'atk').schlachtschiff;
+      const atk3 = B(mk('ss_panzerung', 'ss_zielcomputer', 'ss_schildverstaerker'), 'atk').schlachtschiff;
+      check('5f: erst das DRITTE Teil bringt den Angriffsbonus', atk3 > atk2 + 0.05,
+        { zweiTeile: atk2, dreiTeile: atk3 });
+    } else {
+      check('5e/5f: shipModulKlassenBoni laesst sich ausfuehren', false, 'Aufbau gescheitert');
+    }
+  }
+}
+
 ende();

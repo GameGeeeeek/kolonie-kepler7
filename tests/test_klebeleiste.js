@@ -22,7 +22,7 @@
 //
 // Der Test prüft zusätzlich, dass der Beschnitt erhalten bleibt (kein waagerechter Überlauf) -
 // sonst wäre "clip statt hidden" die Reparatur einer Sache auf Kosten einer anderen.
-const { starteBrowser, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const path = require('path');
 const fs = require('fs');
 const FILE = 'file://' + path.resolve(SPIELDATEI);
@@ -44,7 +44,7 @@ function backend(store){ return async r => {
 
 // Alle Reiter-Hinweise als gesehen markiert: Die Hinweisleiste ist ein hoher Block, der den Inhalt
 // nach unten schiebt - mit ihr würde der Test messen, wie weit man scrollen muss, statt was klebt.
-const SPEICHER = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SPEICHER = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   seenTabHints:{ basis:1, verteidigung:1, forschung:1, flotte:1, expedition:1, karte:1,
                  galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1 },
   resources:{ energie:412000, erz:388000, kristalle:264000, deuterium:151000, antimaterie:19400, forschungspunkte:31200 },

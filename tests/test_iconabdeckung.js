@@ -32,6 +32,10 @@
 //      Event-Gegenstände, die in DERSELBEN Liste stehen und deshalb mitmüssen.
 //   6) Gebäude - und dabei BEIDE Grafiksysteme mitgerechnet: gezeichnetes SVG oder animiertes
 //      Canvas. Die erste Zählung kannte nur ICONS und meldete deshalb 11 statt 4 Lücken.
+//  13) jede fest eingetippte ti-Klasse hat eine CSS-Regel. Die Tabler-Schrift ist ein im Dokument
+//      eingebettetes SUBSET - ein Name ohne Regel rendert lautlos NICHTS. Gegenprobe gefahren:
+//      mit `ti-shield-check` in der Angriffs-Vorschau fällt genau diese Prüfung und nennt die
+//      Klasse beim Namen.
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
 
@@ -256,9 +260,10 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   if (new Set(kerne).size !== liste.length) doppelt.push(klasse+' ('+liste.map(d=>d.k).join(', ')+')');
 }
 check('8: innerhalb jeder Schiffsklasse sind die Icons unterscheidbar', doppelt.length === 0, doppelt);
-// Und die Begründung der zwei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese vier
-// Module, die sich in ihrer Klasse doppelten. Faellt eine Wirkung weg, faellt auch diese Prüfung
-// auf - dann ist der Sonderkern womöglich gar nicht mehr nötig.
+// Und die Begründung der drei Sonderkerne nachprüfbar halten: OHNE sie waeren es genau diese sechs
+// Module, die sich in ihrer Klasse doppelten (raffiniert:hull, jagdgeschwader:shield und - seit dem
+// A2-Wrackkonvoi, 28.08.2026 - schwerelinie:hull mit sl_kompositpanzer+kv_bergungspanzer). Faellt
+// eine Wirkung weg, faellt auch diese Prüfung auf - dann ist der Sonderkern womöglich nicht mehr nötig.
 const nachWirkung = [];
 for (const [klasse, liste] of Object.entries(proKlasse)){
   const zaehler = {};
@@ -266,8 +271,8 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
   for (const [ef,n] of Object.entries(zaehler)) if (n > 1)
     nachWirkung.push(klasse+':'+ef+' ('+liste.filter(d=>d.effect===ef).map(d=>d.k).join('+')+')');
 }
-check('8: genau zwei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
-  nachWirkung.length === 2, nachWirkung);
+check('8: genau drei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
+  nachWirkung.length === 3, nachWirkung);
 
 // Die schmalen Fertigungs-Knöpfe bleiben bewusst flach (font-size:10px, ein 24px-SVG sprengt die
 // Zeile) - und zwar fuer BEIDE Modulfamilien gleich. Festgehalten, damit die Ausnahme eine Regel
@@ -663,6 +668,22 @@ const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
     check('11b: keine einzige Zeile ist noch flach', inv.mitSchrift === 0, inv);
     check('11b: und die Zeilen zeigen verschiedene Bilder', inv.verschieden === inv.anzahl, inv);
   }
+
+  /* 13) Jede benutzte ti-Klasse braucht eine CSS-Regel.
+     Die Tabler-Schrift steckt als base64-woff2 IM Dokument und ist ein SUBSET. Ein Symbolname,
+     den keine `.ti-xxx:before`-Regel kennt, faellt deshalb nicht auf - er rendert einfach nichts,
+     ohne Fehler, ohne leeres Kaestchen. Genau so ist `ti-shield-check` in die Angriffs-Vorschau
+     geraten (02.09.2026): ein gaengiger Tabler-Name, im Subset dieses Spiels aber nicht enthalten.
+     Diese Pruefung ist bewusst STATISCH und kennt ihre Grenze: Zur Laufzeit zusammengesetzte
+     Namen ('ti-brand-'+key) enden im Quelltext auf einen Bindestrich und werden uebersprungen -
+     sie liessen sich hier gar nicht aufloesen. Der haeufige Fall ist der fest eingetippte Name,
+     und den faengt sie vollstaendig. */
+  const cssKlassen = new Set([...src.matchAll(/\.(ti-[a-z0-9-]+):before/g)].map(m => m[1]));
+  const benutzt = new Map();
+  for (const m of src.matchAll(/["' ](ti-[a-z0-9-]+)/g)) benutzt.set(m[1], (benutzt.get(m[1]) || 0) + 1);
+  const ohneRegel = [...benutzt.keys()].filter(k => !k.endsWith('-') && !cssKlassen.has(k)).sort();
+  check('13: jede fest eingetippte ti-Klasse hat eine CSS-Regel (sonst rendert sie lautlos nichts)',
+    ohneRegel.length === 0, { ohneRegel, cssKlassen: cssKlassen.size, benutzt: benutzt.size });
 
   check('keine Konsolenfehler', errs.length === 0, errs.slice(0,3));
   console.log('\n' + (fail ? 'FAIL' : 'PASS'));

@@ -15,11 +15,11 @@
 //   7) Der Leuchthof schrumpft mit der Galaxiegröße, aber nicht unter die Untergrenze
 //   8) Die Planeten im offenen System sind anklickbar (Erkundungsmission) und tragen echte Texturen
 //   9) Der zweite Zoom/Pan-Block ist weg, und die Hilfe beschreibt die neue Bedienung
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
 
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:22,mine:20,labor:14,lager:16,werft:14}, research:{}, fleet:{jaeger:600,spaeher:20,missions:[]},
   colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},
@@ -80,9 +80,14 @@ function layoutPruefen(){
   const ids = [...src.slice(src.indexOf('const STAR_SYSTEMS = ['), src.indexOf('const TERRAFORM_TARGET_TYPES')).matchAll(/\bid:\s*'([^']+)'/g)].map(m=>m[1]);
   const BASE = ids.length;
   const WEEKLY = +(src.match(/const WEEKLY_SYSTEM_MAX = (\d+);/)||[])[1];
+  // Startschub (02.09.2026): 30 fest verortete Systeme zwischen Basis und Wochensystemen; das
+  // Spiralfeld hält 69 + 30 + 178 = 277 Plätze vor.
+  const schubLiteral = src.slice(src.indexOf('const SCHUB_SYSTEMS = ['), src.indexOf('\n  ];', src.indexOf('const SCHUB_SYSTEMS = [')));
+  const SCHUB = (schubLiteral.match(/\bid:\s*'syss_/g) || []).length;
   const umgebung = {
     BASE_STAR_SYSTEM_COUNT: BASE,
-    GALAXY_SPIRAL_SLOTS: BASE + WEEKLY,
+    SCHUB_SYSTEM_COUNT: SCHUB,
+    GALAXY_SPIRAL_SLOTS: BASE + SCHUB + WEEKLY,
     GALAXY_SPIRAL_RMAX: +(src.match(/const GALAXY_SPIRAL_RMAX = (\d+);/)||[])[1],
     GALAXY_GOLDEN_ANGLE: +(src.match(/const GALAXY_GOLDEN_ANGLE = ([\d.]+);/)||[])[1],
     GALAXY_MIN_NODE_DIST: +(src.match(/const GALAXY_MIN_NODE_DIST = (\d+);/)||[])[1],

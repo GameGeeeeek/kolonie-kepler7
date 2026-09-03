@@ -73,8 +73,17 @@ for (const d of defs){
 }
 check('alle in Beschreibungen genannten Forschungsnamen existieren wirklich', stapelFehler.length === 0, stapelFehler);
 
-// Hausstil der Anfuehrungszeichen: oeffnend „ , schliessend das gerade " (364x in der Datei).
-check('Anführungszeichen im Hausstil („…")', !roh.includes('“'));
+// Hausstil der Anfuehrungszeichen: oeffnend „ , schliessend das gerade ". Die REGEL liegt in
+// tests/lib/hausstil.js - sie kennt seit dem 22.08.2026 auch die ESCAPE-Schreibweise `\u201c`,
+// die zur Laufzeit dasselbe Zeichen ist und fuer eine Literal-Suche unsichtbar war (gemessen:
+// 0 Literale, 8 Escapes, vier davon in lebendem Spielertext). Hier und in tests/run.js stehen
+// nur noch die zwei AUSFUEHRUNGSSTELLEN derselben Regel, keine zweite Fassung davon.
+{
+  const { hausstilVerstoesse } = require('./lib/hausstil');
+  const verstoesse = hausstilVerstoesse(roh);
+  check('Anführungszeichen im Hausstil („…")', verstoesse.length === 0,
+    verstoesse.slice(0, 4).map(v => v.art + ' Zeile ' + v.zeile + ': ' + v.stelle));
+}
 
 // ---- Teil 2: kommt der Text bei Stufe 0 vollstaendig im Spiel an?
 function backend(store){ return async r => {

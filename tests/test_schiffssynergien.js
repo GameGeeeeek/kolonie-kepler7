@@ -22,13 +22,22 @@ const { check, ende } = pruefer();
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
+// Die HERKUNFT_*-Konstanten werden aus der Datei SELBST gezogen, nicht als feste Liste getippt
+// (Regel 40/43): eine getippte Vier-Konstanten-Liste veraltet, sobald eine fuenfte dazukommt -
+// genau so ist HERKUNFT_KONVOI (A2) durchgefallen. So ist jede kuenftige HERKUNFT-Konstante dabei.
+const herkunftDecls = (JS.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+
 function arrAus(name){
   const i = JS.indexOf('const '+name+' = [');
   if (i < 0) return null;
   let d = 0, st = JS.indexOf('[', i), k = st;
   for (; k < JS.length; k++){ if (JS[k]==='[') d++; else if (JS[k]===']'){ d--; if(!d) break; } }
-  try { return new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+JS.slice(st, k+1)+';')(); }
-  catch(e){ return null; }
+  try { return new Function(herkunftDecls + "; return "+JS.slice(st, k+1)+';')(); }
+  // Den Grund NICHT verschlucken: Fehlt dem Praeambel-Text eine Herkunfts-Konstante, ist das
+  // ein ReferenceError - und ohne diese Zeile meldete 1a nur "mods:null", was nach einem
+  // kaputten Anker aussieht statt nach einer fehlenden Konstante. Gemessen am 02.09.2026 mit
+  // HERKUNFT_KONVOI; die naechste neue Konstante laeuft sonst in dieselbe stumme Meldung.
+  catch(e){ parseFehler.push(name + ': ' + e.message); return null; }
 }
 function fnAus(name){
   const von = JS.indexOf('function '+name+'(');
@@ -37,11 +46,12 @@ function fnAus(name){
   return bis > von ? JS.slice(von, bis + 4) : '';
 }
 
+const parseFehler = [];
 const SYN = arrAus('SHIP_SYNERGY_DEFS');
 const MODS = arrAus('SHIP_MODULE_DEFS');
 const KLASSEN = arrAus('SHIP_CLASS_DEFS');
 check('1a: SHIP_SYNERGY_DEFS, SHIP_MODULE_DEFS und SHIP_CLASS_DEFS geparst',
-  !!(SYN && MODS && KLASSEN), { syn: SYN && SYN.length, mods: MODS && MODS.length });
+  !!(SYN && MODS && KLASSEN), { syn: SYN && SYN.length, mods: MODS && MODS.length, parseFehler });
 if (!SYN || !MODS || !KLASSEN) return ende();
 
 // ---- 1) Vollstaendigkeit
@@ -65,8 +75,18 @@ check('2b: jeder Einzelwert bleibt klein (<= 0.10 - Synergien sind Zulage, kein 
 
 // ---- 3) Verrechnung ausgefuehrt
 {
-  const quelle = fnAus('shipSynergyAktiv') + '\n' + fnAus('shipSynergyBonusFor') + '\n' + fnAus('shipModuleBonusFor');
-  check('3a: alle drei Funktionen gefunden', quelle.length > 600, quelle.length);
+  /* shipModuleBonusFor addiert seit dem 21.08.2026 auch den KLASSEN-SET-Bonus. Die zwei dafuer
+     noetigen Funktionen und ihre Tabelle werden AUS DER DATEI geschnitten, nicht durch einen
+     Platzhalter ersetzt (Arbeitsregel 36) - sonst maesse dieser Test einen Nachbau. Ohne sie
+     starb er mit "shipModuleSetBonus is not defined"; das ist dieselbe Bausteinlisten-Falle wie
+     in test_protomaterie am selben Tag. */
+  const setTab = (() => { const v = JS.indexOf('  const SHIP_MODULE_SET_DEFS = [');
+                          const b = v < 0 ? -1 : JS.indexOf('\n  ];', v);
+                          return (v >= 0 && b > v) ? JS.slice(v, b + 5) : ''; })();
+  const quelle = setTab + '\n' + fnAus('shipModuleSetTeile') + '\n' + fnAus('shipModuleSetBonus') + '\n'
+    + fnAus('shipSynergyAktiv') + '\n' + fnAus('shipSynergyBonusFor') + '\n' + fnAus('shipModuleBonusFor');
+  check('3a: alle Funktionen gefunden - inklusive der Set-Bausteine', quelle.length > 600
+    && /SHIP_MODULE_SET_DEFS/.test(quelle) && /function shipModuleSetBonus/.test(quelle), quelle.length);
   const mach = (ausruestung) => new Function('SHIP_SYNERGY_DEFS', 'equippedShipModulesAt', 'shipModuleInstanceInfo',
     quelle + '\nreturn shipModuleBonusFor;')(SYN, (kl) => ausruestung[kl] || [], () => null);
   const sy = SYN.find(x => x.key === 'konvoi');

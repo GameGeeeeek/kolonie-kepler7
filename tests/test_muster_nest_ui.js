@@ -149,8 +149,14 @@ async function messen(browser, galaxy, extraStore, waehleNest) {
   const cbis = JS.indexOf('async function refreshAllianceMusterAttack(');
   check('5a-anker: der claim-Block ist auffindbar', cvon > 0 && cbis > cvon);
   const cblock = (cvon > 0 && cbis > cvon) ? JS.slice(cvon, cbis) : '';
-  const nestZweig = cblock.slice(cblock.indexOf('if (data.nest){'), cblock.indexOf('const lostParts'));
-  check('5b: es gibt einen Nest-Zweig', cblock.indexOf('if (data.nest){') > 0);
+  /* Seit dem Verband gegen Festungen (01.09.2026) deckt der Zweig alle Ziele ohne Allianz ab -
+     `if (data.nest || data.festung || data.vorposten){`. Gesucht wird der Kopf, der als ERSTES
+     `data.nest` prueft; ein Zweig, der das Nest nicht mehr kennt, waere hier zu Recht rot.
+     Die Zahl der weiteren Glieder ist offen, damit ein viertes Ziel diesen Test nicht bricht. */
+  const zweigKopf = (cblock.match(/if \(data\.nest(?: \|\| data\.\w+)*\)\{/) || [''])[0];
+  // Ohne gefundenen Kopf gibt es KEINE Scheibe - sonst begaenne sie bei 0 und 5c waere stumm.
+  const nestZweig = zweigKopf ? cblock.slice(cblock.indexOf(zweigKopf), cblock.indexOf('const lostParts')) : '';
+  check('5b: es gibt einen Nest-Zweig', !!zweigKopf && cblock.indexOf(zweigKopf) > 0, { kopf: zweigKopf || '(keiner)' });
   check('5c: und er fasst die Waehrungsfelder NICHT an',
     !!nestZweig && !/state\.credits\s*=/.test(nestZweig) && !/newForschungspunkte/.test(nestZweig),
     { hinweis: 'der Server schickt sie bei einem Nest nicht - uebernommen waere das undefined im Spielstand' });

@@ -1,6 +1,6 @@
 // Verteidigungskarten: groessere Kacheln + gesperrte Anlagen zeigen Grafik und Wirkung.
 // Das Spiel laeuft in einer IIFE - alles wird ueber den Spielstand gesetzt und im DOM gemessen.
-const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const path = require('path');
 const FILE = SPIEL_URL;
 function backend(store){ return async r => {
@@ -14,7 +14,7 @@ function backend(store){ return async r => {
 };}
 // Bewusst OHNE die Forschungen, die die spaeteren Anlagen freischalten - so entstehen im selben
 // Tab beide Kartenarten (baubar und gesperrt) und beide lassen sich in einem Lauf pruefen.
-const mkSave = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const mkSave = () => JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:5e5,erz:5e5,kristalle:3e5,deuterium:2e5,antimaterie:9e3,forschungspunkte:2e4},
   buildings:{solar:20,mine:18,lager:14,werft:8,turm:6,flak:6,laser:6}, research:{rsolar:6,rerz:6},
   fleet:{jaeger:50,missions:[]}, colonies:{}, activeBasePlanet:'home',

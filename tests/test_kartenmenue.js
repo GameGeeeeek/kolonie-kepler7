@@ -18,7 +18,7 @@
 //      und stuende dort als sichtbarer <i class=...>-Text. Dafuer gibt es costText().
 //   5. DER TEXT ERZAEHLT ETWAS ANDERES ALS DER CODE (Regel 6). Die Mond-Tooltips sagten
 //      "anklicken zum Wechseln" - das stimmte, solange der Klick genau das tat.
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
 
@@ -131,14 +131,15 @@ check('die Hilfe erklaert, warum Angreifen nicht beim Planeten steht',
 // Patchnotes-Array waechst nach OBEN, ein Byte-Fenster rutscht mit jeder neuen Version am gesuchten
 // Eintrag vorbei und der Test wird rot, ohne dass sich an der Sache etwas geaendert hat. Genau das
 // ist am 01.08.2026 bei test_abgrund_module2.js passiert.
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
 check('das Kartenmenue steht in den Patchnotes',
-  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(src));
+  /Ein Klick auf die Sektorkarte öffnet jetzt ein kleines Menü/.test(require('./lib/patchnotes').patchnotesText(src)));
 
 // ---------------------------------------------------------------- 8. Im Browser
 // Der statische Teil oben prueft, dass der Code so AUSSIEHT, wie er soll. Dass das Menue auch
 // wirklich aufgeht, an document.body haengt und das aufgeklappte System nicht hinter sich zuzieht,
 // zeigt nur ein echter Klick.
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:22,mine:20,labor:14,lager:16,werft:14}, research:{rkolonisation:4}, 
   fleet:{jaeger:600,spaeher:20,ships:6,colonyShips:3,missions:[]},

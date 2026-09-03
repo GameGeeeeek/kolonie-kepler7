@@ -15,7 +15,7 @@
 //      (Avatare, Statuspunkte, border-radius:50%) sind ausgenommen - sie sind gewollt.
 // Punkt 3 ist der eigentliche Wächter: Punkt 1+2 lassen sich umgehen, indem jemand eine neue
 // CSS-Klasse mit border-radius anlegt. Der Laufzeit-Durchgang sieht das trotzdem.
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const fs = require('fs');
 
 let fail=false;
@@ -33,7 +33,7 @@ function backend(store){ return async r => {
 
 // Realistischer Stand: viele Gebäude/Schiffe/Erfolge, damit möglichst viele Kachel- und
 // Kartentypen wirklich gerendert werden. Ein leerer Stand zeigt die halbe Oberfläche nicht.
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:22,mine:20,kristallmine:18,deutsynth:16,labor:14,lager:16,werft:14,hangar:10,habitat:12,orbitalstation:4,raketenwerfer:12,laser:10,schild:6},
   research:{rkampf:9,rsolar:9,rerz:8,rmodultechnik:4,rexpedition:5},

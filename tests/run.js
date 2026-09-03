@@ -4,7 +4,7 @@
  *
  *   node tests/run.js              alles
  *   node tests/run.js selects      nur Tests, deren Dateiname "selects" enthält
- *   node tests/run.js --nur-pflicht   nur Syntax + Icon-Whitelist + Dateigleichheit (Sekunden statt Minuten)
+ *   node tests/run.js --nur-pflicht   nur Syntax + Icon-Whitelist + Kopie-Verbot (Sekunden statt Minuten)
  *   node tests/run.js --nummer     Pflichtprüfungen + die vier Tests, die an VERSION/PATCHNOTES hängen
  *
  * --nummer ist fuer EINEN bestimmten Ablauf da (eingefuehrt 15.08.2026): Die Versionsnummer wird
@@ -34,7 +34,9 @@ const nurPflicht = argumente.includes('--nur-pflicht');
 // Die vier Tests, die WIRKLICH am Patchnotes-Block oder an VERSION haengen - ermittelt per
 // `grep -l "PATCHNOTES\|const VERSION" tests/*.js` und danach einzeln nachgesehen, welche den
 // Inhalt auch benutzen statt ihn nur zu erwaehnen. Zusammen rund 14 Sekunden.
-const NUMMER_TESTS = ['test_patchnotesseite.js', 'test_patchnotes_lazy.js', 'test_zaehlangaben.js', 'test_seo.js'];
+// Dazu seit dem 01.09.2026 die beiden Tests am Patchnotes-Archiv und an version.txt - beide lesen
+// VERSION und den Block und fallen, wenn build-patchnotes.js nach der Nummernvergabe nicht lief.
+const NUMMER_TESTS = ['test_patchnotesseite.js', 'test_patchnotes_lazy.js', 'test_zaehlangaben.js', 'test_seo.js', 'test_patchnotes_archiv.js', 'test_versionscheck.js'];
 const nurNummer = argumente.includes('--nummer');
 const filter = argumente.filter(a => !a.startsWith('--'));
 
@@ -68,15 +70,15 @@ try {
   melde('Icon-Whitelist (check-icons.js)', false, (e.stdout ? e.stdout.toString() : '').trim().split('\n').pop());
 }
 
-// 3. Die beiden HTML-Dateien müssen byte-gleich sein (der Pi-Deploy kopiert weltraum_kolonie.html,
-//    index.html ist die Kopie - laufen sie auseinander, sieht der Spieler etwas anderes als getestet)
-try {
-  const a = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'));
-  const b = fs.readFileSync(path.join(WURZEL, 'index.html'));
-  melde('weltraum_kolonie.html == index.html', a.equals(b),
-    a.equals(b) ? '' : 'cp weltraum_kolonie.html index.html');
-} catch (e) {
-  melde('weltraum_kolonie.html == index.html', false, String(e.message).slice(0, 80));
+// 3. Es darf KEINE index.html mehr geben. Bis zum 01.09.2026 lag hier eine byte-gleiche Kopie der
+//    Spieldatei, nur weil nginx standardmäßig index.html als Startseite erwartet; seit
+//    `index weltraum_kolonie.html;` in der nginx.conf des Pi ist sie überflüssig. Der Deploy kopiert
+//    aber pauschal *.html und löscht nie - eine aus Gewohnheit wieder angelegte Kopie würde live
+//    ausgeliefert und beim nächsten Release still veralten. Deshalb ist die Kopie jetzt ein Fehler.
+{
+  const kopie = fs.existsSync(path.join(WURZEL, 'index.html'));
+  melde('keine index.html-Kopie im Repo', !kopie,
+    kopie ? 'git rm index.html - nginx liefert weltraum_kolonie.html direkt aus' : '');
 }
 
 // 4. VERSION und der oberste PATCHNOTES-Eintrag müssen zusammenpassen - sonst wurde beim Commit
@@ -89,6 +91,21 @@ try {
     v === erster ? v : 'VERSION=' + v + ' / Patchnotes=' + erster);
 } catch (e) {
   melde('VERSION passt zum obersten Patchnotes-Eintrag', false, String(e.message).slice(0, 80));
+}
+
+// 4a. version.txt muss zur VERSION passen. Der Client liest seit dem 01.09.2026 diese Datei statt
+//     der ganzen Spieldatei, um ein Update zu bemerken - eine veraltete version.txt hiesse, dass KEIN
+//     Spieler das naechste Update angezeigt bekommt, und nichts sonst wuerde das melden.
+//     build-patchnotes.js schreibt sie; hier faellt auf, wenn der Lauf nach der Nummernvergabe fehlte.
+try {
+  const html = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'), 'utf8');
+  const v = (html.match(/const VERSION = '([^']+)'/) || [])[1];
+  const pfad = path.join(WURZEL, 'version.txt');
+  const txt = fs.existsSync(pfad) ? fs.readFileSync(pfad, 'utf8').trim() : null;
+  melde('version.txt passt zur VERSION', !!v && txt === v,
+    txt === v ? v : (txt === null ? 'version.txt fehlt - node build-patchnotes.js' : 'VERSION=' + v + ' / version.txt=' + txt));
+} catch (e) {
+  melde('version.txt passt zur VERSION', false, String(e.message).slice(0, 80));
 }
 
 // 4b. Hausstil der Anführungszeichen. Die REGEL selbst gehört tests/test_forschungstexte.js
@@ -108,17 +125,21 @@ try {
 //     deshalb in die Pflichtprüfungen, wo sie in ALLEN drei Modi läuft - auch in `--nummer`,
 //     also im letzten Moment vor dem Merge. Sie kostet einen Substring-Scan über eine ohnehin
 //     gelesene Datei.
+//
+//     NACHTRAG 22.08.2026: Der Satz oben („kommt NULL Mal vor") galt nur für die SCHREIBWEISE,
+//     nach der gesucht wurde. Gemessen an derselben Datei: 0 Literale, aber 8 `\u201c`-Escapes,
+//     vier davon in lebendem Spielertext. Ein Escape ist zur Laufzeit dasselbe Zeichen und für
+//     eine Literal-Suche unsichtbar - die Prüfung war gegen genau das blind, wofür sie gebaut
+//     wurde. Die Regel liegt seither in tests/lib/hausstil.js und kennt beide Schreibweisen;
+//     hier steht nur noch, WANN sie läuft.
 try {
+  const { hausstilVerstoesse } = require('./lib/hausstil');
   const html = fs.readFileSync(path.join(WURZEL, 'weltraum_kolonie.html'), 'utf8');
-  // Öffnend „ (U+201E), schließend das GERADE " - so steht es im ganzen Spiel. Verboten ist damit
-  // U+201C, das im Deutschen als schließendes und im Englischen als öffnendes Zeichen auftritt.
-  const treffer = html.indexOf('“');
-  let wo = '';
-  if (treffer >= 0) {
-    const zeile = html.slice(0, treffer).split('\n').length;
-    wo = 'Zeile ' + zeile + ': …' + html.slice(Math.max(0, treffer - 45), treffer + 25).replace(/\s+/g, ' ') + '…';
-  }
-  melde('Anführungszeichen im Hausstil („…")', treffer < 0, wo);
+  const verstoesse = hausstilVerstoesse(html);
+  const wo = verstoesse.length
+    ? verstoesse.length + 'x, erster: ' + verstoesse[0].art + ' Zeile ' + verstoesse[0].zeile + ': ' + verstoesse[0].stelle
+    : '';
+  melde('Anführungszeichen im Hausstil („…")', verstoesse.length === 0, wo);
 } catch (e) {
   melde('Anführungszeichen im Hausstil („…")', false, String(e.message).slice(0, 80));
 }

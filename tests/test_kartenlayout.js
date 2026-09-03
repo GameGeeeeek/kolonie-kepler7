@@ -28,7 +28,7 @@
 //   3) der Knopf ist voll da und anklickbar (er war halb abgeschnitten)
 //   4) Boni-Bilanz: kein Überlauf und keine Überlappung, über vier Gerätebreiten
 //   5) kein Wortumbruch mitten im Wort im Titel
-const { starteBrowser, devices, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const fs = require('fs');
 
 function backend(store){ return async r => {
@@ -43,7 +43,7 @@ function backend(store){ return async r => {
 
 // prestige:2 sorgt dafür, dass in der Boni-Bilanz wirklich Werte stehen (sonst wäre Prüfung 4 an
 // lauter Nullzeilen gemessen und damit fast leer wahr).
-const SAVE = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
+const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:22,mine:20,labor:14,lager:16,werft:14}, research:{}, fleet:{jaeger:600,missions:[]},
   colonies:{}, activeBasePlanet:'home', player:{id:'u',name:'A',avatarKey:null},

@@ -32,10 +32,11 @@ if (layoutVon < 0 || layoutBis < layoutVon || hashVon < 0){ console.log('\nFAIL'
 // Der Test baut sich eine eigene Galaxie: 69 fest eingetragene Systeme (davon zwei versteckt, wie im
 // Spiel) plus so viele Wochen-Systeme, wie der jeweilige Fall braucht.
 function layout(systeme, alleSysteme){
-  return new Function('STAR_SYSTEMS', 'BASE_STAR_SYSTEM_COUNT', 'WEEKLY_SYSTEM_MAX', 'systeme',
+  // 69 Basis + 30 Schub + 178 Wochen = 277 Plätze (seit dem Startschub am 02.09.2026; vorher 69 + 208).
+  return new Function('STAR_SYSTEMS', 'BASE_STAR_SYSTEM_COUNT', 'SCHUB_SYSTEM_COUNT', 'WEEKLY_SYSTEM_MAX', 'systeme',
     src.slice(hashVon, hashBis) + '\n' + src.slice(layoutVon, layoutBis) +
     '\nreturn { pos: galaxySpiralLayout(systeme), ratio: galaxyFillRatio(), SLOTS: GALAXY_SPIRAL_SLOTS, RMAX: GALAXY_SPIRAL_RMAX };'
-  )(alleSysteme, 69, 208, systeme);
+  )(alleSysteme, 69, 30, 178, systeme);
 }
 
 function galaxie(wochen){
@@ -87,7 +88,7 @@ const sichtbar = (alle, entdeckt) => alle.filter(s => !s.hidden || entdeckt);
   // an drei Stellen: Der Flaechenzuwachs je Platz muss ueberall gleich sein. Bei einem linear
   // wachsenden, gedeckelten Radius waere der Zuwachs am Rand ein Bruchteil des Zuwachses im Kern.
   const { SLOTS, RMAX } = layout([], galaxie(0));
-  check('3: es gibt Plätze für die Kern-Galaxie plus alle Wochen-Systeme', SLOTS === 69 + 208, SLOTS);
+  check('3: es gibt Plätze für die Kern-Galaxie plus Startschub plus alle Wochen-Systeme', SLOTS === 69 + 30 + 178, SLOTS);
   const r = i => Math.sqrt((i + 0.5) / SLOTS) * RMAX;
   const flaeche = i => Math.PI * (r(i+1)*r(i+1) - r(i)*r(i));
   const innen = flaeche(5), mitte = flaeche(140), aussen = flaeche(SLOTS-2);
@@ -178,7 +179,9 @@ const sichtbar = (alle, entdeckt) => alle.filter(s => !s.hidden || entdeckt);
     }
     return { anzahl: p.length, min: Math.round(min*10)/10, eng };
   };
-  const heute = messe(echt(2)), voll = messe(echt(208));
+  // Voll heisst seit dem Startschub 178 Wochensysteme (69 + 30 + 178 = 277 Plätze); mit 208 lägen
+  // 30 Systeme ohne eigenen Platz auf dem letzten (gemessen: min 0, 465 enge Paare).
+  const heute = messe(echt(2)), voll = messe(echt(178));
   // Ein Systemknoten ist rund 6 Pixel im Durchmesser - darunter beginnt echte Ueberdeckung.
   check('7: heute liegt kein Systempaar dichter als 6 Pixel', heute.min >= 6, heute);
   check('7: auch bei voll ausgebauter Galaxie nicht', voll.min >= 6, voll);

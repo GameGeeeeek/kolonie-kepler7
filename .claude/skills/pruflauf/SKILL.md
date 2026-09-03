@@ -14,14 +14,16 @@ Spielern steht. Vor jedem Commit an `weltraum_kolonie.html`, in dieser Reihenfol
 1. **`node tests/run.js`** (voller Lauf, ~25 Min) oder **`node tests/run.js --nur-pflicht`**
    (Sekunden) für schnelle Zwischenstände. Exit-Code 0 = sauber.
 2. Prüft automatisch: Syntax des `<script>`-Blocks, Icon-Whitelist (`check-icons.js`),
-   `weltraum_kolonie.html == index.html`, ob der Backend-Nachbar-Klon aktuell ist — danach alle
-   Tests unter `tests/`.
-3. **`cp weltraum_kolonie.html index.html`** am Ende der Session, falls noch nicht durch den
-   Prüflauf selbst als Fehler aufgefallen.
+   dass keine `index.html`-Kopie im Repo liegt, ob der Backend-Nachbar-Klon aktuell ist — danach
+   alle Tests unter `tests/`.
+3. **Keine `index.html` anlegen.** Die Kopie ist seit dem 01.09.2026 abgeschafft (nginx liefert
+   `weltraum_kolonie.html` direkt); ein `cp` aus Gewohnheit lässt den Prüflauf fallen.
 4. **VERSION-Konstante erhöhen + neuer PATCHNOTES-Eintrag** (deutsch, nie rückwirkend editieren).
    Erst **unmittelbar vor** dem Commit vergeben, `main` in diesem Moment nochmal ansehen — bei
    parallelen PRs kollidieren Versionsnummern sonst mehrfach. **`node build-patchnotes.js`**
-   danach ausführen (erzeugt `patchnotes.html` neu, nie von Hand editieren).
+   danach ausführen: Es rotiert die ältesten Einträge aus dem Spiel nach `patchnotes-archiv.json`,
+   schreibt `patchnotes.html`, `version.txt` und den Zähler im Spiel. Alle geänderten Dateien
+   gehören in denselben Commit; keine davon von Hand editieren.
 5. Bei Mechanik-/Balance-Änderungen: siehe Skill `anzeigestellen` (HELP_SECTIONS, TUTORIAL_STEPS,
    alle Anzeigestellen derselben Größe).
 

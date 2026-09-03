@@ -80,10 +80,12 @@ check('1: die Seltenheiten decken die ganze Spanne ab (selten bis mythisch)',
 check('2: es gibt eine Herkunftspruefung fuer die Modulboerse', /function istAbgrundModul/.test(js));
 const IAM = new Function('MODULE_DEFS, SHIP_MODULE_DEFS, HERKUNFT_ABGRUND',
   fnAus('istAbgrundModul')+'; return istAbgrundModul;');
-// HERKUNFT_UNIKAT in beiden Literal-Parsern (Arbeitsregel 9, v8.463.0): die Unikat-Defs
-// nutzen die vierte Herkunfts-Konstante - ohne sie ReferenceError beim Array-Parsen.
-const MD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('MODULE_DEFS'))();
-const SMD = new Function("const HERKUNFT_NORMAL='normal', HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+arrAus('SHIP_MODULE_DEFS'))();
+// Herkunfts-Konstanten aus der Datei ableiten, nicht eintippen (Regel 40/43): Sowohl MODULE_DEFS
+// als auch SHIP_MODULE_DEFS nutzen inzwischen HERKUNFT_UNIKAT (v8.463.0) UND HERKUNFT_KONVOI (A2) -
+// eine feste Namensliste riesse den Literal-Parser bei jeder neuen Herkunft mit "... is not defined".
+const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+const MD = new Function(herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
+const SMD = new Function(herkunftDecls + "; return "+arrAus('SHIP_MODULE_DEFS'))();
 const istAbgrund = IAM(MD, SMD, 'abgrund');
 const abgrundStandort = MD.filter(d=>d.quelle==='abgrund').map(d=>d.key);
 const abgrundSchiff   = SMD.filter(d=>d.quelle==='abgrund').map(d=>d.key);

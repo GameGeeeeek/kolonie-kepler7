@@ -450,3 +450,199 @@ mit 4 Bossen und der Sektorverteilung 12/3/1/1/1/0/0/0; die Verteidigungsreihe 3
 ohne Produkt-Boden; `npcMapMenu` mit einem Eintrag; `npcEmpireStrength` mit zwei Fundstellen;
 `activeWormhole` ausschließlich in Anzeigepfaden; `SEKTOR_DEFS[].desc` ohne Leser;
 `performSectorSearch` ohne Festungen/Nester/NPCs.
+
+## 6. Gebaut: Wem gehört ein System? Der Ring sagt es (01.09.2026)
+
+Auftrag Sascha: „anzeige welche macht ein system dominiert". Gewählt: **eine Rangfolge, eine
+Farbe** — der Knoten trägt das Zeichen genau der stärksten anwesenden Macht.
+
+**Der Befund war größer als „es fehlt eine Anzeige".** Beide Kartenstellen prüften die Eroberung
+nur gegen die EIGENE Spieler-ID. `galaxyCache.controlledSystems` ist aber die globale Karte
+`systemId -> userId` aller Spieler: Ein von einem **fremden** Spieler erobertes System sah aus wie
+ein unbeanspruchtes. Ebenso unsichtbar war die Kolonie-Herrschaft, obwohl
+`computeSystemControllers` sie vollständig führt. Alle vier Machtquellen waren vorhanden; die
+Etappe ist eine Verdrahtung plus Rangfolge — und beseitigt die Doppelung, dass die
+Ring-plus-Wappen-Regel zweimal stand (Nachbarpunkte der Systemebene und Sektoransicht).
+
+### Die Rangfolge (`systemDominanz`, die eine Quelle für alle Kartenebenen)
+
+| Rang | Art | warum dort |
+|---|---|---|
+| 1 | kollabiert | Zustand, kein Machtträger; in einem zerstörten System ist die Besitzfrage gegenstandslos. |
+| 2 | erobert | Die einzige Macht, die der Server exklusiv führt und die militärisch genommen wird. Schlägt das Territorium, weil man genau Fraktionssysteme erobert. |
+| 3 | Kolonie-Herrschaft | Alleinherrschaft über die besiedelten Planeten (nur bei EINER Identität, +5 % Produktion). |
+| 4 | Fraktions-Territorium | Politische Zuordnung ohne Präsenz — die weichste Aussage. Hängt wie bisher an der Ebene „fraktionen". |
+| 5 | Alien-Nest | Beansprucht nichts. Steht nur, wenn sonst niemand herrscht; sitzt ein Spieler drauf, bleibt das Nest Abzeichen (dieselbe Entdopplung wie 👽/👾). |
+
+Farben abgelesen, nicht erfunden: grün/rot aus der Chip-Zeile des offenen Systems, das Rosa
+fremder Kolonie-Herrschaft aus `renderTerritoryBox`, Fraktions- und Volksfarben aus ihren
+Tabellen. **Eigener Besitz ist gefüllt, Fremdes nur umrandet.** Die Betonung folgt der Rangstufe
+(`DOMINANZ_BETONUNG`) — am gerenderten Bild gemessen ging „von einem fremden Spieler erobert" mit
+den Bestandswerten des Fraktionsrings (Breite 1,2 / Deckkraft 0,55) unter; der Fraktionswert
+bleibt unverändert, alles darüber wird lauter.
+
+### Vier Anzeigestellen
+
+Sektoransicht (Ring, Statuszeile), Nachbarpunkte der offenen Systemebene (Ring, `meta`),
+Chip-Zeile im offenen System (Kolonie-Herrschaft dort neu — sonst widerspräche sie der Karte), und
+die **Systempunkte der Regionsübersicht**. Dort bewusst keine fünfte Textzeile und keine
+Regions-Aggregation: KB-21 hat gemessen, dass am Handy alle Beschriftungen bei 6–9 px liegen. Die
+Punkte kosten keinen Platz und sagen mehr als eine Summe — man sieht, WELCHE Systeme wem gehören.
+Auf Regionsebene ist das eine Zugabe, keine Karte.
+
+### Der Riegel gegen die quadratische Form
+
+`computeSystemControllers()` macht je besessenem Planeten ein lineares `PLANETS.find`.
+Ausgeführt gemessen (30 Spieler à 18 Planeten): 540 `find`-Aufrufe, 269.460 Vergleiche,
+**3,9 ms je Aufruf** — je Systemknoten gerufen wären das bei 81 Systemen **317 ms je
+Kartenaufbau**. `systemHerrscherCached()` (900 ms, Muster `storageCapCached`) verhindert das; die
+Bestandsaufrufer profitieren mit. Wer eine neue Machtquelle ergänzt, misst zuerst ihre Kosten je
+Knoten.
+
+Die Ringnamen `kontrolle` und `fraktion` sind Bestands-Anker (vier Tests greifen darauf) und
+bleiben; alles Neue trägt `data-ring="dominanz"` plus `data-dominanz="<art>"`.
+
+Wächter: `tests/test_systemdominanz.js` (28 Prüfungen, jede Kernmessung als PAAR; Gegenprobe
+gegen den Stand davor: 21 rot bei identischer Prüfliste). `test_fraktionsgebiet` prüft die
+Ring-Regel seither als Eigenschaft statt als Literal und verlangt zusätzlich, dass es sie nur
+EINMAL gibt.
+
+## 7. Gebaut: Die Systemansicht bekommt Licht und Schatten (01.09.2026)
+
+Auftrag Sascha: „generell die systemansicht ausbauen das es optisch ein meisterwerk werden könnte".
+Vorgelegt wurden drei gerenderte Varianten auf denselben Daten (Sonne, Bahnen, echte
+Planetentexturen aus dem Markup des Heimatsystems): A „Licht und Schatten", B „Sternkarte",
+C „Nebelwelt". Gewählt: **A als Basis, plus Gasriesen-Ringe und sichtbare Mondbahnen aus C.** Die
+Mockups samt Generator liegen nicht im Repo (Sitzungs-Scratchpad); die Entscheidung steht hier.
+
+### Was die offene Systemansicht jetzt zeichnet
+
+| Element | Regel |
+|---|---|
+| Nebelschleier | drei weiche Flächen hinter allem, eine davon in der Farbe der Sonne dieses Systems |
+| Sterne | 48 statt 30, über das ganze sichtbare Feld; die hellsten mit Glanzkreuz |
+| Bahnen | durchgezogen (0,6 breit, 10 % Deckkraft) statt gepunktet |
+| Bahnspur | kurzer Bogen in der Typfarbe **hinter** jedem Planeten, endet exakt an der Scheibe; unerforscht blasser |
+| Sonne | Korona (radialer Verlauf, Radius 95·Sonnentyp) und zehn Strahlen, die in 150 s einmal wandern; Randlicht am Kern |
+| Tag-/Nachtseite | je Scheibe ein Verlauf mit Mittelpunkt auf der **Sonnenseite** (halber Radius Richtung Sonne), dunkel zum abgewandten Rand |
+| Atmosphären-Halo | zwei Ringe in der Typfarbe, **nur erforschte** Welten |
+| Unerforscht | Scheibe 0,7 plus dunkle Deckung 0,32, gestrichelter Rand bleibt |
+| Gasriesen-Ring | hintere Hälfte vor, vordere Hälfte nach der Scheibe (clipPath im gekippten Raum) |
+| Mondbahn | feiner Kreis mit Radius Versatz·√2 – der bestehende Mond-Marker liegt darauf, er wurde nicht bewegt |
+| Beschriftung | dunkler Saum (`paint-order: stroke`, 2,4 px) für alle `.planet-label` |
+
+### Drei Entscheidungen
+
+1. **Kein SVG-Filter.** Die Mockups A und C nutzten `feGaussianBlur`. Im Spiel wird jeder Filter bei
+   jeder Neuzeichnung gerastert, und die Ebene trägt Dauer-Animationen (Pulse, Strahlen). Jeder
+   Verlauf ist deshalb ein `radialGradient`; die Halos sind zwei Ringe statt eines Weichzeichners.
+   `test_systemansicht_optik` 0b hält das fest.
+2. **Die Sterne kommen aus einem Generator, nicht aus `hashStringToFloat` je Stern.** Gemessen: Der
+   Hash rechnet `h*31+Zeichen mod 10000`; zwei Schlüssel, die sich nur in der Sternnummer
+   unterscheiden, liegen 31/10000 auseinander, also 1,4 Karteneinheiten. 48 Sterne ergaben zwei
+   „Perlenschnüre" aus je acht bis zehn Sternen, die im Bild wie gestrichelte Striche aussahen.
+   `sysZufall` (mulberry32) nimmt den Hash nur als Startwert.
+3. **Der Mond-Marker bleibt, wo er ist.** An ihm hängen Klick-Handler und `test_kartenmenue`. Die
+   Bahn übernimmt seinen Abstand: Planeten `r+2`, Heimat 13. Der erste Entwurf riet den Versatz aus
+   dem Radius und legte die Heimatbahn 1,4 Einheiten neben ihren Mond (1f2 hat es gemeldet).
+
+### Kosten, gemessen (Heimatsystem, 1280×900, alt gegen neu)
+
+| | alt | neu |
+|---|---|---|
+| Markup der Ebene | 56.158 Zeichen | 69.475 Zeichen |
+| Elemente | 106 | 244 |
+| Verläufe / Filter | 1 / 0 | 15 / 0 |
+| Dauer-Animationen | 1 | 2 |
+| Neuaufbau bis zum nächsten Frame (5 Messungen) | 30–42 ms | 32–56 ms |
+| Frames je Sekunde bei ruhender Karte | 59,5 | 59,5 |
+
+### Wächter
+
+`tests/test_systemansicht_optik.js` – 28 Prüfungen. Die Kernmessungen sind Regeln, keine
+Momentaufnahmen: Spur endet an der Bildmitte, Schatten-Verlauf liegt näher an der Sonne als die
+Scheibe, Mondbahn-Radius gleich Markerabstand; Halo und Abdunklung als Paar erforscht/unerforscht;
+Determinismus über einen echten Systemwechsel (Vega und zurück, zeichengleiches Markup). Gegenprobe
+gegen `origin/main`: 18 rot, 10 grün, identische Prüflisten. Drei Werkzeugfehler beim Bau: Der
+Anker „`let inner = \`<defs>`" traf zuerst die Galaxie-Ebene (zwei Vorkommen); ein Schnitt „von den
+Sternen bis zur Sonne" umfasste 36 kB samt Wurmloch-Filter und ließ 0b aus dem falschen Grund
+fallen; und weder Warten noch Fenstergröße noch Tab-Wechsel lösen einen Neuaufbau aus
+(`__karteAufbauten` blieb dreimal bei 6) – erst der Systemwechsel tut es.
+
+## 8. Gebaut: Drei Reparaturen in jede Richtung (03.09.2026)
+
+Auftrag Sascha: „prüfe, was wir noch betreffend Sektorkarte machen können. prüfen jede Richtung."
+Zuerst eine **Bestandsaufnahme gegen dieses Konzept** (gemessen am Stand v8.646.0), dann die drei
+Befunde, die sich daraus als Bestandsreparatur ergaben.
+
+### Was von §2/§4 inzwischen steht
+
+| Etappe | Stand (03.09.2026) |
+|---|---|
+| **E1 Landmarken** | **geliefert** — #456 (drei Ebenen), #487 (Gegnerstärke im `npcMapMenu`), #494 (antippbare Abzeichenzeile) |
+| **E2 Statthalter** | **offen** — null Fundstellen. 52 der 67 Systeme tragen weiterhin keinen NPC, drei Regionen gar keinen |
+| **E3 Sprungnetz** | **faktisch ersetzt** durch B2 Vorposten (#531): Der Vorposten *ist* der Sprungknoten, mit Flugzeit-Nutzen im Umkreis. Der Backend-Kommentar führt ihn ausdrücklich als „E3-Rahmen (SPRUNGBAKEN_MAX = 3)" |
+| **E4 Passage** | **offen** — und der stärkste noch offene Befund: `activeWormhole` hat **acht** Fundstellen, **alle** im Anzeigepfad (Knoten zeichnen, eine Zeile im Systemkopf). Der Server würfelt das Wurmloch aus, die Karte malt einen Wirbel, und es tut nichts |
+| **E5 Sektorlage** | **offen** — null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
+
+Dazu ungeplant geliefert: Dominanz-Ring (§6), Licht und Schatten (§7), Wrackkonvois (#516),
+Vorposten (#531).
+
+### Zwei Messfragen aus §5 sind beantwortet
+
+**§5-2 (Flugzeitkette, „blockierend"): gemessen.** Die Papierrechnung aus den Werten von
+`missionDurationFor` selbst — die zehn gedeckelten Faktoren ergeben im Vollausbau **0,0147**, aus
+60 Minuten werden 53 Sekunden; `0,97^spaeher` zog das ohne Untergrenze weiter, bei 100 Spähern auf
+**0,0007** (2,5 Sekunden). Der im Konzept vorgeschlagene Boden von 0,25 wäre damit **keine
+Reparatur, sondern eine 17-fache Verlangsamung** jedes ausgebauten Kontos gewesen.
+
+Entscheidung Sascha aus drei vorgelegten Varianten: **nur der Späher-Faktor bekommt einen Deckel,
+kein Produkt-Boden.** `Math.max(0.5, Math.pow(0.97, …))` ist dieselbe Form und derselbe Wert wie
+bei seinen fünf Nachbarn (Prestige, Aufstieg, Fähigkeit, Navigator, Fusionsantrieb) und greift ab
+**23** Spähern — 0,97²² = 0,512, 0,97²³ = 0,496. Darunter ändert sich nichts.
+
+**§5-4 (Wisch-Schutz auf den oberen Ebenen): gemessen und behoben.** `galaxyMapDidDrag` schützte
+13 Klickstellen, **alle** im aufgeklappten System; Regionsübersicht und Sektoransicht gingen leer
+aus, obwohl Schwenken und Zoomen dort genauso aktiv sind — der Handler hängt am `svg`, nicht an
+einer Ebene. Am alten Stand am gerenderten Spiel belegt: Ein Wischen öffnet die Region bzw. das
+System. Nur der **Zeiger** bekommt den Schutz; die Tastatur zieht nicht.
+
+### Die dritte Richtung: die Tastatur kannte nur eine Ebene
+
+← / → wirkten nur bei offenem System. Die Begründung im Code lautete „in den Sektor-Ansichten gibt
+es kein nächstes System" — das stimmte, als sie geschrieben wurde, und war seit KB-4 überholt: Die
+Sektoransicht **hat** einen Nachbarsektor, erreichbar über die ‹ ›-Knöpfe **und** eine Wischgeste,
+nur nicht über die Tastatur. Am PC war sie damit die einzige der drei Ebenen ohne Tastenweg.
+
+Der **Zoom** bleibt bewusst dem offenen System vorbehalten (auf den oberen Ebenen hat er keinen
+Bezugspunkt), **↑/↓ bleiben frei** fürs Seiten-Scrollen — dieselbe Abwägung wie seit KB-14, jetzt
+zusätzlich auf der Sektorebene mitgeprüft.
+
+### Wächter
+
+`tests/test_flugzeit_deckel.js` prüft die **Regel** statt der einen Zeile: jede `mult *=`-Zeile der
+Kette gegen eine namentliche Liste nachweislich begrenzter Formen. Ein siebzehnter Faktor derselben
+Bauart fällt damit auf, ohne dass jemand an ihn gedacht haben muss.
+`tests/test_kartenrichtungen.js` misst am gerenderten Spiel, **jede Sperre mit ihrer
+Gegenrichtung** — derselbe Knoten öffnet beim Tipp und öffnet beim Wischen nicht.
+
+### Drei Befunde aus dem Bau der Messvorrichtung
+
+Sie stehen als Kommentar in den Tests, weil jeder beim nächsten Kartentest wieder zuschlägt:
+
+1. Der Deckel greift ab **23** Spähern, nicht ab 24. Der erste Entwurf behauptete 24 und fiel an
+   der eigenen Prüfung durch — die Zahl kam aus dem Kopf, nicht aus der Rechnung.
+2. Die **Bounding-Box-Mitte einer Region liegt außerhalb ihres Polygons** (Regionen sind
+   unregelmäßige Flächen). Der erste Testentwurf zielte daneben, und „nichts ging auf" sah aus wie
+   ein bestandener Wisch-Schutz — eine Prüfung, die aus dem falschen Grund grün ist.
+3. Im ausgeloggten Zustand liegt die **Login-Karte über dem Kartenkasten** (`elementFromPoint`
+   liefert `INPUT#loginPassword`) und hält den **Tastaturfokus**. Ohne `blur()` kommt kein
+   Tastendruck an, und beide Tastenprüfungen melden „wirkt nicht", obwohl der Code stimmt. Deshalb
+   arbeitet der Test mit synthetischen Ereignissen — derselbe Weg wie `tests/lib/karte.js`.
+
+### Was als Nächstes ansteht
+
+**E4 Passage** hat das beste Verhältnis von Aufwand zu Wirkung: Das Objekt steht schon auf der
+Karte und ist antippbar, ihm fehlt nur eine Wirkung. E2 und E5 bleiben eigene Etappen, E5
+zusätzlich mit Backend und Schalter.
+

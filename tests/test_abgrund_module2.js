@@ -26,6 +26,11 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
+// Die HERKUNFT_*-Konstanten werden aus der Datei SELBST gezogen, nicht als feste Liste getippt
+// (Regel 40/43): eine getippte Liste veraltet, sobald eine weitere dazukommt - genau so ist
+// HERKUNFT_KONVOI (A2) hier durchgefallen. So ist jede kuenftige HERKUNFT-Konstante dabei.
+const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+
 // Ein Array-Literal ausfuehrbar herausschneiden (Klammern zaehlen statt Regex - die desc-Texte
 // enthalten Klammern und Anfuehrungszeichen, eine naive Regex terminiert daran falsch).
 function arrAus(name){
@@ -33,7 +38,7 @@ function arrAus(name){
   if (i < 0) throw new Error('Array nicht gefunden: '+name);
   let d = 0, s = js.indexOf('[', i), k = s;
   for (; k < js.length; k++){ if (js[k]==='[') d++; else if (js[k]===']'){ d--; if(!d) break; } }
-  return new Function("const HERKUNFT_ABGRUND='abgrund', HERKUNFT_BOSS='boss', HERKUNFT_UNIKAT='unikat'; return "+js.slice(s, k+1)+';')();
+  return new Function(herkunftDecls + "; return "+js.slice(s, k+1)+';')();
 }
 const MODULE_DEFS = arrAus('MODULE_DEFS');
 const SHIP_MODULE_DEFS = arrAus('SHIP_MODULE_DEFS');
@@ -217,9 +222,11 @@ check('sie sagt, dass sich keins nachbauen laesst', /Keins der sechs lässt sich
 // und der Test wurde zwei Versionen spaeter rot, ohne dass sich an der geprueften Sache etwas
 // geaendert hatte. Ein Test, der am Kalender scheitert statt an der Sache, verliert genau dann sein
 // Vertrauen, wenn man es braucht. Jetzt wird der Eintrag namentlich gesucht.
-const pn356 = js.indexOf("{ version:'8.356.0'");
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+const PN = require('./lib/patchnotes').patchnotesText(js);
+const pn356 = PN.indexOf("{ version:'8.356.0'");
 check('der Patchnotes-Eintrag zu v8.356.0 existiert noch', pn356 > 0);
-const eintrag356 = pn356 > 0 ? js.slice(pn356, js.indexOf("{ version:'8.355.0'", pn356)) : '';
+const eintrag356 = pn356 > 0 ? PN.slice(pn356, PN.indexOf("{ version:'8.355.0'", pn356)) : '';
 check('die Patchnotes nennen beide Fehler',
   /nie gefallen/.test(eintrag356) && /Modulfragmenten nachbauen/.test(eintrag356));
 const version = (js.match(/const VERSION = '([\d.]+)'/) || [])[1];

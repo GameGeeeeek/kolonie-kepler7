@@ -323,9 +323,45 @@ if (!SERVER_JS || !fs.existsSync(SERVER_JS)){
   check('10b: und zwar mit DENSELBEN Zahlen wie das Frontend',
     Number(srvMax) === API.BASTION_MARK_MAX && Math.abs(Number(srvStep) - API.BASTION_MARK_PER_STEP) < 1e-9,
     { frontend: { max: API.BASTION_MARK_MAX, step: API.BASTION_MARK_PER_STEP }, backend: { max: Number(srvMax), step: Number(srvStep) } });
-  check('10c: computeDefensePower() wendet die Marke an BEIDEN Summierstellen an (Heimat UND Kolonien)',
-    (srv.match(/bastionMarkMultServer\(save, k\)/g)||[]).length === 2,
-    { stellen: (srv.match(/bastionMarkMultServer\(save, k\)/g)||[]).length });
+  /* 10c ist seit der Standort-Zerlegung (29.08.2026, "PvP auf alle Standorte") STAERKER statt
+     passend (Hausregel 43): Vorher standen zwei woertliche bastionMarkMultServer-Stellen im Rumpf
+     von computeDefensePower - also zwei Kopien, die auseinanderlaufen koennen; der Zaehler === 2
+     war dabei eine Schreibweisen-Momentaufnahme (Regel 3). Jetzt traegt standortDefGebaeude() die
+     Marke GENAU EINMAL, und geprueft wird die DELEGATION: computeDefensePower laeuft fuer Heimat
+     UND Kolonien durch diese eine Funktion, und standortVerteidigung (die Zielwahl-Route der
+     Angriffs-UI) erbt die Marke automatisch mit - eine Anzeigestelle ohne Marke kann so gar nicht
+     mehr entstehen.
+     Die Rumpfe werden ueber die FUNKTIONSGRENZE geschnitten (bis zur naechsten function-
+     Deklaration), nicht ueber eine geratene Zeichenzahl: Ein wachsender Kommentar im Rumpf hatte
+     den ersten Entwurf (400-Zeichen-Fenster) sofort gerissen - ein geratenes Fenster ist kein
+     Scope. Der Anker wird vorab geprueft, sonst ist der Slice vacuous (Regel 6). */
+  const rumpfVon = (name) => {
+    const von = srv.indexOf('function ' + name);
+    if (von < 0) return '';
+    const bis = srv.indexOf('\nfunction ', von + 1);
+    return srv.slice(von, bis > von ? bis : von + 2000);
+  };
+  const sdgRumpf = rumpfVon('standortDefGebaeude(save, key)');
+  check('10c: die Marke lebt GENAU EINMAL in standortDefGebaeude()',
+    (srv.match(/bastionMarkMultServer\(save, k\)/g)||[]).length === 1 &&
+    sdgRumpf.includes('bastionMarkMultServer(save, k)'),
+    { stellen: (srv.match(/bastionMarkMultServer\(save, k\)/g)||[]).length, rumpfGefunden: sdgRumpf.length > 0 });
+  /* Geprueft wird die EIGENSCHAFT ("beide Wege delegieren"), nicht die Schreibweise der Schleife.
+     Der erste Entwurf verlangte den Kolonien-Aufruf woertlich als
+     "for (const key of Object.keys(save.colonies || {})) power += standortDefGebaeude(save, key)" -
+     ein Umbau auf forEach oder ein Zeilenumbruch drueben haette ihn auf korrektem Code gerissen,
+     also genau der Fehler, gegen den dieser Abschnitt gerade umgebaut wurde (Regel 3). Und jede
+     Haelfte wird EINZELN belegt, damit der Fehlschlag sagt, WELCHE fehlt (Regel 37). */
+  const cdpRumpf = rumpfVon('computeDefensePower(save)');
+  const cdpHeimat = /standortDefGebaeude\(save, 'home'\)/.test(cdpRumpf);
+  const cdpKolonien = /standortDefGebaeude\(save, key\)/.test(cdpRumpf) && /save\.colonies/.test(cdpRumpf);
+  check('10c2: computeDefensePower delegiert BEIDE Gebaeude-Summierwege an standortDefGebaeude (Heimat UND Kolonien)',
+    cdpRumpf.length > 0 && cdpHeimat && cdpKolonien,
+    { rumpfGefunden: cdpRumpf.length > 0, heimat: cdpHeimat, kolonien: cdpKolonien });
+  const svRumpf = rumpfVon('standortVerteidigung(save, key)');
+  check('10c3: auch standortVerteidigung (Zielwahl-Route) laeuft durch die markentragende Funktion',
+    svRumpf.length > 0 && svRumpf.includes('standortDefGebaeude(save, key)'),
+    { rumpfGefunden: svRumpf.length > 0 });
   check('10d: der Server deckelt den Wert selbst - der Spielstand ist klientenautoritativ',
     /Math\.min\(BASTION_MARK_MAX, Math\.floor\(v\)\)/.test(srv));
 

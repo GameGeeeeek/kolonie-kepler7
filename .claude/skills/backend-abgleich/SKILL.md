@@ -38,8 +38,8 @@ im Fehlerfall oft auf einem eigenen Branch ohne Fernbezug steht und `@{u}` dort 
   gearbeitet wird. Auch das Backend-Arbeitsverzeichnis kann auf einem eigenen, nicht
   gemergten Branch stehen.
 - Passt derselbe Mechanismus auch auf die **Frontend**-Seite: prüfen, ob ein Melder versehentlich
-  die veraltete `index.html` statt `weltraum_kolonie.html` gelesen hat — Zeilennummern passen dann
-  auf die falsche Datei.
+  eine veraltete Kopie statt `weltraum_kolonie.html` gelesen hat (bis 01.09.2026 lag eine
+  `index.html`-Kopie im Repo) — Zeilennummern passen dann auf die falsche Datei.
 
 ## Von außen messen, welchen Stand der Pi wirklich fährt
 

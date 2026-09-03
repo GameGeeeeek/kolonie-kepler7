@@ -179,7 +179,8 @@ const beStufen = objektNach(be, 'RK_TAGESSTUFEN', '[', ']');
   // und die steht jetzt auch hier. Geprüft wird, dass IRGENDEIN Eintrag alle Gewichte zusammen
   // nennt. Ändern sich die Zahlen im Code, findet sich kein Eintrag mehr - es muss also eine neue
   // Patchnote geschrieben werden, statt eine alte umzuschreiben.
-  const eintraege = fe.match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,8000}?\n    \]\},/g) || [];
+  // Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+  const eintraege = require('./lib/patchnotes').patchnotesText(fe).match(/\{ version:'[\d.]+', date:'[^']*', changes:\[[\s\S]{0,8000}?\n    \]\},/g) || [];
   check('5: es wurden Patchnote-Einträge gefunden', eintraege.length > 10, eintraege.length);
   const alleGewichte = Object.values(beHandlungen).map(h => String(h.punkte)).concat(String(bePunkte));
   check('5: ein Patchnote-Eintrag nennt alle Gewichte zusammen',

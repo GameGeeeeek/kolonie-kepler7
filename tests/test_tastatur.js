@@ -11,7 +11,7 @@
 //   3) Enter schaltet wirklich um - am gespeicherten Spielstand nachgewiesen, nicht nur am DOM
 //   4) die Leertaste ebenso, ohne dass die Seite darunter wegscrollt
 //   5) aria-pressed folgt dem sichtbaren Schalter
-const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const fs = require('fs');
 
 const FILE = SPIEL_URL;
@@ -47,6 +47,7 @@ function backend(store){ return async r => {
 
 // soundOn bewusst true, damit das Umschalten eine sichtbare Richtung hat.
 const SPIELSTAND = JSON.stringify({
+  ...ruhigeUhren(),
   tutorialSeen: true, newbieWelcomeSeen: true, seenTabHints: {}, soundOn: true,
   resources: { energie: 9999, erz: 9999, kristalle: 9999, deuterium: 999, antimaterie: 99, forschungspunkte: 99 },
   buildings: { solar: 8, mine: 8 }, research: {}, fleet: { jaeger: 10, missions: [] }, colonies: {},

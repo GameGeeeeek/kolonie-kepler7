@@ -110,14 +110,28 @@ check('1: alle vier Kanaele kommen in der Sammlung vor',
 // ---- 2) Zuordnung Waechter -> Reliquie ----
 check('2: eine Tiefe ohne Waechter hat keine Reliquie',
   leer.abgrundReliktDef(7) === null && leer.abgrundReliktDef(15) === null);
-check('2: jede der zwoelf Waechtertiefen hat eine eigene, verschiedene Reliquie',
-  new Set(R.map((_,i) => leer.abgrundReliktDef((i+1)*10).key)).size === R.length);
-// Die Wiederkehr darf KEINE neue Reliquie bringen - sonst waere die Sammlung endlos statt bei 120
+check('2: jede Waechtertiefe hat eine eigene, verschiedene Reliquie',
+  new Set(R.map((_,i) => leer.abgrundReliktDef((i+1)*10).key)).size === R.length,
+  { waechtertiefen: R.length });
+// Die Wiederkehr darf KEINE neue Reliquie bringen - sonst waere die Sammlung endlos statt
 // vollstaendig. Der Index muss zyklisch derselbe sein wie bei Name und Portrait.
-check('2: ab der Wiederkehr wiederholt sich die Reliquie (Sammlung endet bei Tiefe 120)',
-  leer.abgrundReliktDef(130).key === leer.abgrundReliktDef(10).key
-    && leer.abgrundReliktDef(250).key === leer.abgrundReliktDef(10).key,
-  { t10: leer.abgrundReliktDef(10).key, t130: leer.abgrundReliktDef(130).key });
+//
+// Die Tiefen werden aus R.length ABGELEITET, nicht eingetippt: Hier stand bis zur zweiten
+// Reliquienreihe fest "abgrundReliktDef(130)", weil die Sammlung damals bei zwoelf endete. Mit
+// achtzehn Reliquien ist Tiefe 130 die DREIZEHNTE und damit ein voellig regulaerer Erstfund - die
+// Pruefung waere auf korrektem Code durchgefallen (Arbeitsregel 3: die REGEL, nicht die
+// Momentaufnahme). Die Regel lautet: die Wiederkehr beginnt eine Waechtertiefe hinter der letzten.
+// Die Periode ist R.length*10 - die Wiederkehr EINER Tiefe t liegt also bei t + Periode, nicht bei
+// "erste Wiederkehr + t". Genau das hatte der erste Entwurf dieser Zeile verwechselt und fiel mit
+// {"letzteNeue":180,"ersteWiederkehr":190,...} auf korrektem Code durch; gefangen hat es nur der
+// Beleg, der die Zahlen mitfuehrt (Arbeitsregel 37).
+const periode = R.length * 10;
+const nichtZyklisch = [];
+for (let t = 10; t <= periode; t += 10)
+  if (leer.abgrundReliktDef(t + periode).key !== leer.abgrundReliktDef(t).key) nichtZyklisch.push(t);
+check('2: ab der Wiederkehr wiederholt sich die Reliquie (die Sammlung ist endlich)',
+  nichtZyklisch.length === 0 && leer.abgrundReliktDef(periode + 10).key === leer.abgrundReliktDef(10).key,
+  { periode, letzteNeue: periode, ersteWiederkehr: periode + 10, abweichungen: nichtZyklisch });
 // Reliquie und Waechtername muessen aus derselben Rechnung kommen.
 const versatz = [];
 for (let t = 10; t <= 10*R.length*2; t += 10){
@@ -263,10 +277,18 @@ check('6: es gibt einen Erfolg fuer die vollstaendige Sammlung',
 
 // Regel 6: die Hilfe nennt Zahlen, die aus den Daten kommen muessen.
 const hilfe = js.slice(js.indexOf('Reliquien – was ein Wächter zurücklässt'));
+// Beide Pruefungen suchten bis zur zweiten Reihe die LITERALE 'zwölf' und 'Tiefe 120' - obwohl
+// der Kommentar darueber schon sagte, die Zahlen muessten aus den Daten kommen. Sie taten es
+// nicht, und ein Erweitern der Tabelle haette den Hilfetext still falsch werden lassen, ohne dass
+// hier etwas anschlaegt. Jetzt wird das Zahlwort aus R.length ABGELEITET.
+const ZAHLWORT = { 6:'sechs', 9:'neun', 12:'zwölf', 15:'fünfzehn', 18:'achtzehn', 21:'einundzwanzig', 24:'vierundzwanzig' };
+check('6-vorab: fuer diese Sammlungsgroesse gibt es ein Zahlwort',
+  !!ZAHLWORT[R.length], { anzahl: R.length, bekannt: Object.keys(ZAHLWORT) });
 check('6: die Hilfe nennt dieselbe Anzahl Reliquien wie das Array',
-  hilfe.slice(0,3000).includes('zwölf'), { anzahl: R.length });
+  !!ZAHLWORT[R.length] && hilfe.slice(0,4000).includes(ZAHLWORT[R.length]),
+  { anzahl: R.length, gesucht: ZAHLWORT[R.length] });
 check('6: die Hilfe nennt die Tiefe der letzten Reliquie richtig',
-  hilfe.slice(0,3000).includes('Tiefe 120'), { erwartet: R.length*10 });
+  hilfe.slice(0,4000).includes('Tiefe ' + (R.length*10)), { erwartet: 'Tiefe ' + (R.length*10) });
 
 console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
 process.exit(fail ? 1 : 0);

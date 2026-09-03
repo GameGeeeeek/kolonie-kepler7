@@ -17,7 +17,7 @@
 //   5. EIN WERT, DER DEN SAVE SPRENGT. Ein zu hoher shipMarks-Wert wuerde vom Backend abgelehnt -
 //      und eine Ablehnung friert das Speichern KOMPLETT ein (Vorfall 21.07.2026). Der Test prueft
 //      den Deckel im Frontend und die Existenz der Sanity-Grenze im Backend.
-const { SPIELDATEI } = require('./lib/umgebung');
+const { SPIELDATEI, SERVER_JS } = require('./lib/spieldatei');
 const fs = require('fs');
 const path = require('path');
 
@@ -321,13 +321,12 @@ const jaegerGesamt = [...Array(9)].reduce((a,_,i)=> a + fe.shipMarkCost('jaeger'
 check('Jaeger-Gesamtweg kostet ~2,26 Mio Erz', jaegerGesamt > 2.2e6 && jaegerGesamt < 2.35e6, jaegerGesamt);
 
 // ---------------------------------------------------------------- 6. FE/BE-Gleichstand (Fund 3)
-const backend = path.resolve(__dirname, '../../../workspace/kolonie-kepler7-backend/server.js');
-const bePfade = [
-  backend,
-  '/workspace/kolonie-kepler7-backend/server.js',
-  path.resolve(__dirname, '../../kolonie-kepler7-backend/server.js')
-];
-const bePfad = bePfade.find(p => { try { return fs.existsSync(p); } catch(e){ return false; } });
+// Der Pfad kommt aus lib/spieldatei, NICHT aus einer eigenen Kandidatenliste. Vorher stand hier
+// eine mit veralteten /workspace-Pfaden, und die ignorierte KEPLER_BACKEND_SERVER still: Eine
+// Gegenprobe gegen eine sabotierte Backend-Kopie las die ECHTE Datei und sah damit aus wie
+// bestanden (gemessen 22.08.2026 - beide Laeufe byte-identisch). Dieselbe Falle wie bei
+// test_pvp_deckel; die Pfadlogik gehoert an EINE Stelle.
+const bePfad = SERVER_JS;
 if (!bePfad){
   console.log('SKIP - Backend nicht im Arbeitsbereich, FE/BE-Vergleich ausgelassen');
 } else {
@@ -445,10 +444,12 @@ check('VERSION und neuester Patchnotes-Eintrag stimmen ueberein',
 // test_abgrund_module2.js: Das Array waechst nach oben, das Fenster rutscht vorbei. Geprueft wird
 // der Einfuehrungs-Eintrag v8.350.0 selbst, nicht "irgendwo steht Werftmarke" (das erfuellt
 // inzwischen jeder spaetere Eintrag, der sie nur erwaehnt).
-const pn350 = src.indexOf("{ version:'8.350.0'");
+// Die Historie liegt seit dem 01.09.2026 an zwei Stellen (Spiel + patchnotes-archiv.json); tests/lib/patchnotes.js setzt sie zusammen.
+const PN = require('./lib/patchnotes').patchnotesText(src);
+const pn350 = PN.indexOf("{ version:'8.350.0'");
 check('der Einfuehrungs-Eintrag v8.350.0 existiert noch', pn350 > 0);
 check('die Werftmarken sind in den Patchnotes dokumentiert',
-  pn350 > 0 && /Werftmarke/.test(src.slice(pn350, src.indexOf("{ version:'8.349.0'", pn350))));
+  pn350 > 0 && /Werftmarke/.test(PN.slice(pn350, PN.indexOf("{ version:'8.349.0'", pn350))));
 
 // ---------------------------------------------------------------- 10. Grafik
 // Seit dem 01.08.2026 nimmt der Maler eine Uebersteuerung entgegen: Im Profil eines FREMDEN
@@ -615,9 +616,25 @@ check('alle sechs Kampfberichte zeigen die Zeile (NPC, Spieler, Allianzbasis, Ue
   berichte === 6, berichte);
 check('der Ueberfall-Bericht nennt ausdruecklich die Flottenverteidigung',
   /markReportLine\(r\.marken, r\.markAtkShare, 'Flottenverteidigung'\)/.test(src));
+/* MITGEZOGEN AM 22.08.2026 (E1b) - und dabei SCHAERFER geworden, nicht passend gemacht.
+   Hier stand die WORTFORM `const markenPreview = totalSelected > 0 ? fleetMarksSnapshot(...)`,
+   also die Zeile, in der die Marken-Vorschau inline im Galaxie-Reiter berechnet wurde. Seit E1b
+   liegt die Rechnung in npcKampfLage(), weil die KARTE dieselben Zahlen braucht - die Zeile gibt
+   es dort nicht mehr, und die Pruefung fiel auf voellig korrektem Code durch (Arbeitsregel 3).
+   Der eigentliche Punkt ist derselbe wie bei test_enterung: Bis E1b nannte NUR der Galaxie-Reiter
+   die Marken. Geprueft wird deshalb die Eigenschaft (die Rechnung existiert und weist sie als
+   eingerechnet aus) UND ihre Reichweite (beide Angriffs-Vorschauen zeigen sie). */
 check('auch die NPC-Angriffsvorschau nennt die Marken',
-  /const markenPreview = totalSelected > 0 \? fleetMarksSnapshot\(attackFleet\) : null;/.test(src)
+  /const marken = gewaehlt > 0 \? fleetMarksSnapshot\(f\) : null;/.test(src)
+  && /markAnteil: marken \? fleetMarkAtkShare\(f\) : 0/.test(src)
   && /bereits eingerechnet/.test(src));
+{
+  /* Die Reichweite: Kartenvorschau UND Galaxie-Reiter zeichnen die Marken-Zeile. `Werftmarken: ${`
+     kommt gemessen genau an diesen beiden Stellen vor - der Kampfbericht baut dieselbe Liste in
+     einer anderen Form und ist hier bewusst nicht mitgezaehlt. */
+  const n = (src.match(/Werftmarken: \$\{/g) || []).length;
+  check('und zwar in BEIDEN Angriffs-Vorschauen', n === 2, { stellen: n });
+}
 check('die Hilfe sagt, dass Vorschau und Bericht sie ausweisen',
   /<strong>Im Kampf sind sie ausgewiesen:<\/strong>/.test(src));
 

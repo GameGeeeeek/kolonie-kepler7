@@ -98,6 +98,25 @@ async function spiel(browser, zustand){
   page.on('console', m=>{ if(m.type()==='error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });
   await page.route('**/api/**', backend(store));
   await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
+  /* Alle Protokollzeilen MITSCHNEIDEN statt am Ende den Endstand von #log abzulesen. #log
+     ueberschreibt sich mit JEDER Meldung selbst - kam zwischen Klick und Ablesen irgendeine
+     andere Zeile, stand die geprüfte Auskunft nicht mehr da, obwohl der Knopf sie korrekt
+     erzeugt hatte. Genau diese Fehlerklasse hat test_fundort_knopf am 17.08.2026 in der Suite
+     rot werden und einzeln gruen bleiben lassen; hier ist sie am 28.08.2026 nachgemessen worden
+     (Kopie der Spieldatei mit einer Stoermeldung alle 300 ms - von 13 Tests, die #log oder Toasts
+     lesen, faellt genau dieser). Der Beobachter laeuft vor dem ersten Tick und sammelt lueckenlos. */
+  await page.addInitScript(() => {
+    window.__logZeilen = [];
+    const start = () => {
+      const box = document.getElementById('log');
+      if (!box) return false;
+      const merke = () => { const t = (box.innerText||'').trim(); if (t && window.__logZeilen[window.__logZeilen.length-1] !== t) window.__logZeilen.push(t); };
+      new MutationObserver(merke).observe(box, { childList:true, characterData:true, subtree:true });
+      merke();
+      return true;
+    };
+    if (!start()) document.addEventListener('DOMContentLoaded', start);
+  });
   await page.goto(SPIEL_URL); await page.waitForTimeout(2700);
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
   return { page, ctx, errs };
@@ -143,10 +162,14 @@ async function spiel(browser, zustand){
     await page.evaluate(()=>{const b=document.querySelector('[data-queue="solar"]'); if(b) b.click();});
     await page.waitForTimeout(1200);
     const nachKlick = await page.evaluate(()=>{
-      const l=document.getElementById('log');
+      const zeilen = window.__logZeilen || [];
       const b=document.getElementById('buildings');
-      return { gemeldet: l ? /Solarkraftwerk.*ausgebaut/.test(l.textContent) : false,
-               marke: !!(b && b.firstElementChild && b.firstElementChild.__marke) };
+      // Die geprüfte Aussage ist "die Zeile ist ERSCHIENEN", nicht "sie steht am Ende noch da" -
+      // das sind zwei verschiedene Fragen, und nur die erste gehoert dem Knopf.
+      return { gemeldet: zeilen.some(z => /Solarkraftwerk.*ausgebaut/.test(z)),
+               marke: !!(b && b.firstElementChild && b.firstElementChild.__marke),
+               // Bei fehlendem Treffer zeigen, was STATTDESSEN dastand (Arbeitsregel 37).
+               letzteZeilen: zeilen.slice(-4) };
     });
     check('2: der Einreihen-Knopf wirkt auch nach übersprungenen Ticks noch',
       nachKlick.gemeldet === true, nachKlick);

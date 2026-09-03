@@ -43,7 +43,11 @@ const NPC_NAME = 'Sternenzerstörer-Flotte';
 
 check('1a: die Landmarken stehen in karteSystemBadges', /Landmarken \(E1\)/.test(JS));
 check('1b: mit eigenem Abzeichen je Art', /icon:'🛡'/.test(JS) && /'👑' : '👾'/.test(JS) && /icon:'🎯'/.test(JS));
-check('1c: die Kartensuche kennt sie', /Landmarken \(E1\)/.test(JS) && /Landmarken<\/div>/.test(JS));
+// Seit dem 22.08.2026 sind Landmarken BEWUSST nicht suchbar (Entscheidung Sascha: "man soll
+// schon bisschen suchen auf der Karte"). Geprueft wird die Gegenrichtung - und zwar an der
+// SACHE (kein Landmarken-Abschnitt, keine Sammelschleife), nicht an einer Schreibweise.
+check('1c: die Kartensuche fuehrt KEINEN Landmarken-Abschnitt mehr',
+  !/Landmarken<\/div>/.test(JS) && !/const landMatches/.test(JS));
 
 function nest(){
   return { id:'nest-l1', volk:'kryll', sys:SYS, stufe:3, lp:260000, lpMax:400000,
@@ -165,23 +169,29 @@ async function abzeichenAmSystem(page, sysId){
     check('6: die Sektor-Beschreibung steht im Tooltip der Region',
       regTitel.split('\n').filter(z => z.trim()).length >= 2, { titel: regTitel.slice(0,220) });
 
-    // Die Kartensuche.
-    const treffer = await t.page.evaluate(() => {
+    /* Die Kartensuche als PAAR (Arbeitsregel 28): "findet die Festung nicht" allein waere auch
+       bei einer voellig kaputten Suche gruen. Gemessen wird deshalb BEIDES am selben Feld - ein
+       Systemname MUSS eine Trefferzeile liefern, der Name der Festung KEINE. */
+    const suche = await t.page.evaluate(async () => {
       const f = document.getElementById('sectorSearchInput');
-      if (!f) return { da:false };
-      f.value = 'Sternenfeste';
-      f.dispatchEvent(new Event('input', { bubbles:true }));
       const box = document.getElementById('sectorSearchResults');
-      if (!box) return { da:true, zeilen:[], offen:false };
-      return { da:true, offen: box.style.display !== 'none',
-        zeilen: [...box.querySelectorAll('[data-search-system]')].map(z => (z.textContent||'').replace(/\s+/g,' ').trim()) };
+      if (!f || !box) return { da:false };
+      const frag = async (q) => {
+        f.value = q; f.dispatchEvent(new Event('input', { bubbles:true }));
+        await new Promise(r => setTimeout(r, 220));
+        return { offen: box.style.display !== 'none',
+          zeilen: [...box.querySelectorAll('.search-result-row')].map(z => (z.textContent||'').replace(/\s+/g,' ').trim()) };
+      };
+      return { da:true, system: await frag('Chronos'), festung: await frag('Sternenfeste'),
+        nest: await frag('Kryll'), gegner: await frag('Sternenzerstörer') };
     });
-    /* Gemessen wird eine echte TREFFERZEILE, nicht das Vorkommen des Wortes: Die leere Box
-       antwortet 'Keine Treffer für "Sternenfeste".' und ZITIERT damit den Suchbegriff - genau
-       daran war diese Prüfung am alten Stand aus dem falschen Grund grün (Arbeitsregel 28). */
-    check('5: die Kartensuche findet die Festung als eigene Trefferzeile',
-      treffer.da && treffer.offen && treffer.zeilen.some(z => /Sternenfeste/.test(z) && /Asteroidenfestung/.test(z)),
-      { zeilen: treffer.zeilen.slice(0,4) });
+    check('5-vorab: die Suche antwortet ueberhaupt - ein Systemname liefert eine Trefferzeile',
+      suche.da && suche.system.offen && suche.system.zeilen.length > 0, { system: suche.system });
+    check('5: aber KEINE Landmarke ist suchbar (Festung, Nest, Gegner)',
+      suche.da && !suche.festung.zeilen.some(z => /Asteroidenfestung|Sternenfeste/.test(z))
+               && !suche.nest.zeilen.some(z => /Kryll/.test(z))
+               && !suche.gegner.zeilen.some(z => /Sternenzerstörer/.test(z)),
+      { festung: suche.festung.zeilen.slice(0,3), nest: suche.nest.zeilen.slice(0,3), gegner: suche.gegner.zeilen.slice(0,3) });
 
     // 4) Die Entdopplung als PAAR - erste Hälfte: MIT Nest kein 👽.
     const alienBeiNest = /👽/.test(ueber.txt || '');

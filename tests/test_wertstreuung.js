@@ -14,8 +14,9 @@
 //      das Ergebnis traegt den besten Wurf der verbrauchten drei.
 //   5) Reroll laesst den Hauptwert stehen.
 //   6) SERVER: MODULE_INSTKEY_RE akzeptiert das Token (ausgefuehrt gegen die echte Regex),
-//      moduleWertMultServer liest es identisch (ausgefuehrt), und BEIDE Nachrechnungs-
-//      stellen (PvP-Kampfmodule, Ueberfall-Schutz) multiplizieren ihn.
+//      moduleWertMultServer liest es identisch (ausgefuehrt), und JEDE Nachrechnungsstelle
+//      multipliziert ihn - namentlich gefuehrt in WURF_STELLEN, mit beiden Richtungen
+//      (eine erlaubte darf nicht verschwinden, eine neue gehoert eingetragen).
 //   7) Hilfe nennt Spanne, Fertigungs-Ausnahme und die neue Schmelzregel.
 //
 // GEGENPROBE (Arbeitsregel 1, beim Einfuehren ausgefuehrt): am alten Stand fallen 1, 2, 4
@@ -68,8 +69,11 @@ check('1c: moduleWertOf liest den Wurf, klemmt Ausreisser und gibt Altbestand 10
 // ---- 3) Fundpfade wuerfeln, Fertigung nicht
 // Gezaehlt werden die AUFRUFE im Schluesselbau (":1:'+mitWertWurf") - die blosse
 // Funktionsdefinition matcht dasselbe Kurzmuster und verfaelschte die Zaehlung (erster Lauf).
-check('3a: alle fuenf Fundpfade haengen den Wurf an (mitWertWurf)',
-  (JS.match(/:1:'\+mitWertWurf\(subs\)/g) || []).length === 5);
+// Sechster Pfad seit A2 (28.08.2026): konvoiModulAusServerwurf legt kv_bergungslogik/kv_bergungspanzer
+// aus dem Server-Belohnungsfach ins Inventar und wuerfelt dabei denselben Wert-Token wie jeder Fund -
+// ein Boss-Set-Teil-artiges Herkunfts-Schloss (quelle:'konvoi'), aber im Schluessel ein regulaerer Wurf.
+check('3a: alle sechs Fundpfade haengen den Wurf an (mitWertWurf)',
+  (JS.match(/:1:'\+mitWertWurf\(subs\)/g) || []).length === 6);
 check('3b: die Fragment-Fertigung bleibt bei 100% (kein Token im gefertigten Schluessel)',
   JS.includes("const instKey = defKey+':'+rarity;"));
 
@@ -133,8 +137,65 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
   check('6d: der Server liest den Wurf identisch (104 -> 1.04, ohne Token -> 1, geklammert)',
     Math.abs(srvWert('waffen:selten:1:prod15.w104') - 1.04) < 1e-9 &&
     srvWert('waffen:selten') === 1 && Math.abs(srvWert('x:y:1:w999') - 1.1) < 1e-9);
-  check('6e: BEIDE Nachrechnungsstellen multiplizieren den Wurf (PvP-Kampfmodule + Ueberfall-Schutz)',
-    (srv.match(/\* moduleWertMultServer\(instKey\);/g) || []).length === 2);
+  /* Die Nachrechnungsstellen NAMENTLICH statt als Zaehler (Arbeitsregel 33).
+     Hier stand `...length === 2`. Backend #156 hat mit `shipModulKlassenBoni` eine dritte,
+     voellig legitime Stelle hinzugefuegt - ein Modul mit 104 % Wurf muss auch in der
+     Verteidigung 104 % bringen, sonst rechnet der Kampf anders als die Anzeige - und der
+     Zaehler fiel auf richtigem Code durch. Er sagte dabei nicht einmal, WELCHE Stelle
+     dazugekommen war; das musste von Hand gesucht werden.
+     Die Musterliste faengt MEHR als die Zahl, und zwar in beide Richtungen:
+       - verschwindet eine erlaubte Stelle, faellt es auf (sie rechnet dann ohne Wurf);
+       - kommt eine UNBEKANNTE dazu, faellt es auf (sie gehoert bewusst eingetragen). */
+  const WURF_STELLEN = ['shipModulKlassenBoni', 'shipModuleBonus', 'raidlossProtectionMult'];
+  /* Kommentare LEEREN, nicht entfernen - sonst faltet ein mehrzeiliger Blockkommentar auf eine
+     Zeile zusammen und JEDE gemeldete Zeilennummer stimmt nicht mehr. Gemessen am 22.08.2026:
+     raidlossProtectionMult wurde als "Zeile 2243" gemeldet und steht in server.js bei 3577 - eine
+     Fehlermeldung, die auf die falsche Zeile zeigt, schickt den Naechsten an den falschen Ort. */
+  const srvOhneKommentar = srv
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m, v) => v + ' '.repeat(m.length - v.length));
+  const srvZeilen = srvOhneKommentar.split('\n');
+  function funktionVor(nr){
+    for (let i = nr - 1; i >= 0; i--){
+      const m = srvZeilen[i].match(/^function ([a-zA-Z0-9_]+)\s*\(/);
+      if (m) return m[1];
+    }
+    return '(unbekannt)';
+  }
+  const wurfZeilen = srvZeilen
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(x => x.z.indexOf('* moduleWertMultServer(instKey);') >= 0);
+  const gefundeneStellen = wurfZeilen.map(x => funktionVor(x.nr));
+  const unbekannt = gefundeneStellen.filter(f => WURF_STELLEN.indexOf(f) < 0);
+  const fehlend = WURF_STELLEN.filter(f => gefundeneStellen.indexOf(f) < 0);
+  check('6e: jede bekannte Nachrechnungsstelle multipliziert den Wurf',
+    fehlend.length === 0, fehlend.length ? { fehlend, gefunden: gefundeneStellen } : undefined);
+  check('6e2: und keine UNBEKANNTE Stelle tut es (eine neue gehoert eingetragen)',
+    unbekannt.length === 0,
+    unbekannt.length ? { unbekannt, zeilen: wurfZeilen.filter(x => unbekannt.indexOf(funktionVor(x.nr)) >= 0).map(x => x.nr) } : undefined);
+
+  /* 6e3 - die DRITTE Richtung, und sie ist die gefaehrlichste. 6e/6e2 gehen von den Zeilen aus,
+     die den Wurf ENTHALTEN. Eine neue Stelle, die Seltenheit x Stufe rechnet und den Wurf
+     VERGISST, steht in dieser Liste gar nicht - sie ist weder "fehlend" (nicht in WURF_STELLEN)
+     noch "unbekannt" (hat den Wurf ja nicht) und faellt durch beide Maschen. Genau dann rechnet
+     der Server aber anders als der Client, und das entscheidet PvP.
+     Gemessen an einer Backend-Kopie mit einer vierten Stelle ohne Wurf: 6e und 6e2 bleiben gruen,
+     6e3 faellt und nennt die Zeile.
+     Ausgegangen wird deshalb von der RECHENFORM (Seltenheit mal Stufe), nicht vom Wurf - das ist
+     die Groesse, welche die Regel verletzt, nicht ihre Erscheinungsform (Arbeitsregel 40). Die
+     Vorab-Pruefung belegt, dass die Form ueberhaupt gefunden wird; ohne sie waere 6e3 an einem
+     Stand, der die Rechnung gar nicht kennt, trivial erfuellt (Arbeitsregel 28). */
+  const RECHENFORM = 'MODULE_RARITY_MULT[rarity] || 1) * moduleLevelMultServer(instKey)';
+  const formZeilen = srvZeilen
+    .map((z, i) => ({ z, nr: i + 1 }))
+    .filter(x => x.z.indexOf(RECHENFORM) >= 0);
+  const ohneWurf = formZeilen.filter(x => x.z.indexOf('moduleWertMultServer(instKey)') < 0);
+  check('6e3-vorab: die Rechenform (Seltenheit mal Stufe) wird ueberhaupt gefunden',
+    formZeilen.length >= 2, { gefunden: formZeilen.length });
+  check('6e3: und JEDE Stelle mit dieser Rechenform nimmt den Wurf mit',
+    formZeilen.length > 0 && ohneWurf.length === 0,
+    ohneWurf.length ? { stellen: formZeilen.length,
+      ohneWurf: ohneWurf.map(x => 'Zeile ' + x.nr + ' (' + funktionVor(x.nr) + '): ' + x.z.trim().slice(0, 90)) } : undefined);
 }
 
 // ---- 7) Hilfe (zweite Anzeigestelle)
