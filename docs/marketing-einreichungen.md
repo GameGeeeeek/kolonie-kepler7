@@ -486,6 +486,81 @@ search and browse pages." Das Risiko ist asymmetrisch – schlimmstenfalls bleib
 un-indexiert, also genau der Zustand, den ein reiner Link ohnehin gehabt hätte. Deshalb erst als
 **Draft** anlegen und ansehen, bevor er öffentlich wird.
 
+### Nachgemessen am 03.09.2026: „eingereicht" ist nicht „gelistet"
+
+Beide internationalen Verzeichnisse wurden am 21.08.2026 eingetragen, und beide haben eine
+**menschliche Freigabe**. Zwei Wochen später nachgesehen — und zwar nicht am Formular, sondern am
+Ergebnis (Hausregel 61: die Wirkung messen, nicht das Etikett):
+
+**thebigmmorpglist.com — der Eintrag ist NICHT gelistet.** Dreifach abgesichert:
+
+| Prüfung | Ergebnis |
+|---|---|
+| Sitemap: 523 Seiten unter `/game/` | **0** Treffer für „kepler" |
+| `GET /game/kolonie-kepler-7/` | **404** |
+| Gegenkontrolle `GET /game/travian/` | **200**, 18.805 B, `<title>Travian \| TheBigMMORPGList.com` |
+| Negativkontrolle `GET /game/gibtesnicht-xyz-123/` | **404** — dasselbe Verhalten wie Kepler |
+
+Die Sitemap-Suche deckt auch einen abweichenden Slug ab: Unter allen 523 Spielseiten kommt
+„kepler" kein einziges Mal vor.
+
+**browsermmorpg.com — von hier aus NICHT feststellbar.** Die Seite baut ihre Suche im Browser auf;
+`/search` liefert mit und ohne Suchbegriff **byte-identische** 90.557 Bytes und dieselben 20
+Spiele, filtert also nicht. Ein `sitemap.xml` gibt es nicht (404). **Das heißt ausdrücklich nicht
+„nicht gelistet"** — es heißt, dass die Frage einen Blick von Hand braucht.
+
+**Drei Fehlversuche, die zur Methode gehören** (sonst wiederholt sie jemand): `search.php?q=` bei
+browsermmorpg existiert gar nicht (**404** — geratene Adresse, Hausregel 4); die Suche bei
+thebigmmorpglist findet auch „ogame" und „travian" nicht, taugt also selbst nicht als Beleg; und
+**beide** Seiten haben einen Catch-All, bei dem ein erfundener Slug mit **200** antwortet. Erst die
+Unterscheidung über **Größe und Titel** trennt einen echten Eintrag von der Auffangseite — genau
+dieselbe Falle wie beim eigenen Server (`marketing-kanaele-recherche.md`, Abschnitt 13).
+
+**Was daraus folgt:** Bei beiden lohnt ein Nachfassen. Bei browsermmorpg.com genügt ein Blick ins
+eigene Konto; bei thebigmmorpglist.com ist eine kurze Nachfrage über `/contact-us/` angebracht —
+die Einreichung ist entweder noch in der Warteschlange oder untergegangen. **Ein Eintrag, den
+niemand freigegeben hat, ist keine Reichweite.**
+
+### pwa.directory — **kostenlos**, neu am 03.09.2026
+
+Der einzige Kanal dieser Liste, der das Spiel als **PWA** listet statt als Browserspiel. Er passt,
+weil er nur verweist: Das Spiel bleibt auf `gamegeeeeek.de`, mit Backend, Konto und Mehrspieler.
+Am Quelltext geprüft (03.09.2026): 660 gelistete PWAs, Kategorie **Games** vorhanden, 30 Treffer
+für „2026" — die Seite ist aktiv. Wörtlich zur Aufnahme:
+
+> „The catalogue combines discovered public PWAs and submitted listings. […] submitted and paid
+> listings are reviewed before approval. Paid placement is always labelled Featured or Sponsored."
+
+Es gibt also eine redaktionelle Freigabe. **Der kostenlose Weg heißt dort „Submit free"**; daneben
+steht ein bezahltes „Pro Launch · $49" — das ist Hervorhebung, keine Voraussetzung.
+
+**Die Feldnamen des Formulars konnten NICHT abgelesen werden** — es wird erst im Browser
+aufgebaut, im Quelltext steht nur der Formularname. Sie werden deshalb hier nicht geraten
+(Hausregel 4). Was das Formular erfahrungsgemäß braucht, liegt aber vollständig vor:
+
+| Was gebraucht wird | Wert |
+|---|---|
+| Name | Kolonie Kepler-7 |
+| URL | `https://www.gamegeeeeek.de/` |
+| Kategorie | **Games** |
+| Kurzbeschreibung | der 250-Zeichen-Text aus Abschnitt 2 (deutsch) bzw. Abschnitt 3 (englisch) |
+| Manifest | `https://www.gamegeeeeek.de/manifest.json` — liegt vor, `200 application/json` |
+| Icon | `icon-512.png`, live erreichbar |
+| Screenshots | die fünf aus `presse-bilder/` (`node marketing-screenshots.js`) |
+| Preis | kostenlos → „Free"-Abzeichen |
+
+**Erwartung ehrlich halten:** 660 Einträge sind ein kleines Verzeichnis. Der Wert liegt fast
+vollständig im eingehenden Link, nicht in einem Besucherstrom. Der Eintrag kostet Minuten und
+ersetzt keinen der Punkte weiter oben.
+
+**Zwei Nachbarn geprüft, beide nicht nutzbar:** `appsco.pe` ist **tot** (HTTP 503).
+`findpwa.com` antwortet mit `200`, liefert aber **33 Bytes** — von hier aus nicht beurteilbar
+(**ungeprüft**, nicht „tot").
+
+**Der große PWA-Kanal ist ein eigenes Dokument:** Google Play über eine Trusted Web Activity —
+siehe `google-play-pwa.md`. Er ist der aufwendigste offene Kanal und ausdrücklich **nicht** der
+erste Schritt.
+
 ## 5. Was die Einträge wert sind – die offene Frage
 
 **Gemessen am Backend (`server.js`, Registrierung und Login):** Ein neuer Spieler braucht

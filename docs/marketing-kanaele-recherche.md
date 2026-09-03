@@ -373,3 +373,87 @@ Diese Liste gehört zum Ergebnis.
    Verzeichnis landet.
 3. **Den teilbaren Kampfbericht.** Der einzige Kanal dieser Liste, der mit jedem neuen Spieler
    stärker wird statt schwächer.
+
+---
+
+## 13. Nachtrag 03.09.2026: die zwei Klassen von Kanälen
+
+Auftrag Sascha: „wo können wir das spiel noch veröffentlichen um spieler zu bekommen". Die
+Antwort ist keine längere Liste, sondern eine **Unterscheidung**, die vorher nicht ausgesprochen
+war und die über jeden künftigen Kanal mitentscheidet.
+
+### Klasse A: Portale, die das Spiel SELBST hosten — strukturell ausgeschlossen
+
+Gemeint sind die großen HTML5-Portale: CrazyGames, Poki, Y8, GameDistribution. Sie nehmen einen
+Build entgegen, liefern ihn von ihrer eigenen Domain aus und verdienen an Werbung davor.
+
+**Für dieses Spiel sind sie nicht schwer zu erreichen, sondern unerreichbar** — und zwar nicht
+wegen einer Regel, die man umgehen könnte:
+
+| Portal | Zitat aus der Entwicklerdokumentation | Belegstufe |
+|---|---|---|
+| **CrazyGames** | „Disable any external login options (e.g. Facebook, Google, email)" · „Allow both guests and registered CrazyGames users to play your game as guests by default" | **geprüft** |
+| **Poki** | „**No external requests. Poki blocks all external requests by default.** Bundle fonts, assets, and libraries into your build." | **geprüft** |
+
+Poki ist der härtere Fall und der aufschlussreichere: Ein Spiel, das dort läuft, darf **gar nicht
+mit einem fremden Server sprechen**. Kolonie Kepler-7 spricht ausschließlich mit `/api` auf dem
+eigenen Server — es könnte dort nicht einmal starten, geschweige denn anmelden oder speichern.
+CrazyGames verbietet zusätzlich ausdrücklich den eigenen Konto-Zwang.
+
+**Die Ursache ist dieselbe wie bei r/WebGames und Show HN in Abschnitt 2** — die
+E-Mail-Registrierung mit Bestätigungsklick. Sie ist damit nicht ein Hindernis unter vielen,
+sondern **der Filter, der über eine ganze Kanalklasse entscheidet**. Y8 und GameDistribution sind
+**ungeprüft**; sie gehören demselben Geschäftsmodell an, und es wäre eine Überraschung, wenn sie
+abwichen — aber eine Vermutung bleibt eine Vermutung.
+
+**Der Gastmodus ist der eine Hebel, der diese Klasse auf einen Schlag öffnen würde.** Er ist am
+21.08.2026 bewusst verworfen worden (Abschnitt 11); das steht hier nicht, um die Entscheidung
+aufzurollen, sondern weil ihr Preis jetzt beziffert ist: Es ist nicht ein Kanal, sondern eine
+Klasse.
+
+### Klasse B: Verzeichnisse, die auf das Spiel VERWEISEN — hier geht etwas
+
+Sie listen einen Link. Das Spiel bleibt, wo es ist; Backend, Konto und Mehrspieler bleiben
+unangetastet. Alles bisher Eingetragene gehört hierher (browsermmorpg.com, thebigmmorpglist.com),
+und alles noch Offene ebenfalls.
+
+**Neu geprüft am 03.09.2026:**
+
+| Kanal | Stand | Belegstufe |
+|---|---|---|
+| **Google Play als TWA** | **machbar** — das Spiel ist eine vollständige PWA (Manifest, Service Worker, alle vier Icons live gemessen). Eigenes Dokument: `google-play-pwa.md` | **geprüft** |
+| **pwa.directory** | **aktiv** — 660 gelistete PWAs, Kategorie „Games", kostenloser Weg („Submit free"; daneben ein bezahltes „Pro Launch · $49"). 30 Treffer für „2026" im Quelltext | **geprüft** |
+| appsco.pe | **tot** — HTTP 503 | **geprüft** |
+| findpwa.com | antwortet `200`, liefert aber **33 Bytes**; reine Client-Anwendung ohne serverseitigen Inhalt — von hier aus nicht beurteilbar | **ungeprüft** |
+| IndieDB | blockt maschinelle Abrufe (`403`) — **nicht** dasselbe wie tot | **ungeprüft** |
+| Game Jolt | erreichbar (`200`), aber reine Client-Anwendung; Hilfeseiten liefern keinen Text an einen Abruf | **ungeprüft** |
+
+**Zur Einordnung von pwa.directory, damit die Erwartung stimmt:** 660 Einträge sind ein kleines
+Verzeichnis. Der Wert liegt fast vollständig im **eingehenden Link** gegen das Sichtbarkeitsproblem
+aus Abschnitt 1, nicht in einem Besucherstrom. Ein Eintrag kostet Minuten — er ersetzt aber keinen
+der Punkte aus Abschnitt 12.
+
+### Der Befund, der nebenbei herausfiel: der Server hat einen Catch-All
+
+Beim Prüfen des Ausliefer-Wegs für Google Play gemessen, mit Negativkontrolle im selben Lauf:
+
+```
+200  5.964.483 B  text/html   /gibtesnicht     <- Negativkontrolle
+200  5.964.483 B  text/html   /wp-admin
+200      1.645 B  text/html   /impressum.html  <- echte Datei, korrekt
+```
+
+**Jeder unbekannte Pfad liefert die 5,96-MB-Spieldatei mit Status 200** statt eines 404. Zwei
+Folgen, und sie sind unterschiedlich schwer:
+
+- **Für SEO weitgehend entschärft.** Die ausgelieferte Seite trägt
+  `<link rel="canonical" href="https://www.gamegeeeeek.de/">` — Suchmaschinen führen die Duplikate
+  damit auf die Startseite zusammen. **Gemessen, nicht angenommen**; ohne den Canonical wäre es
+  ein klassisches „Soft 404"-Problem.
+- **Für Google Play ist es eine Diagnose-Falle.** Die Verifikationsdatei muss unter
+  `/.well-known/assetlinks.json` als `application/json` ankommen. Fehlt sie, antwortet der
+  Catch-All mit HTML und Status 200 — ein „noch nicht angelegt" **sieht dann aus wie ein Erfolg**.
+  Wer dort prüft, misst den **Inhaltstyp**, nie den Statuscode allein.
+
+Bandbreite ist der dritte, kleinere Punkt: Jeder Bot-Scan auf `/wp-admin` und Verwandtes zieht
+5,96 MB vom Pi. Das ist kein Notfall, aber es ist messbar und war vorher nicht bekannt.
