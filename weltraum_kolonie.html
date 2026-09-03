@@ -27298,9 +27298,11 @@ async function claimPendingRewards(){
               zurueck.push(anz + '\u00d7 ' + (SHIP_DEFS[k].name || k));
             }
           }
+          // Die Module hat der SERVER schon in den Bestand gelegt (vpModulGeben) - hier werden sie
+          // nur genannt. Sie hier ein zweites Mal zu geben, waere eine stille Verdopplung.
           const modA = (r.module || []).length;
           log('Der Abbau bei ' + sysNameA + ' ist fertig – der ' + (r.name||'Vorposten') + ' ist abgetragen'
-            + (zurueck.length ? ', die Garnison ist zurück (' + zurueck.join(', ') + ')' : '')
+            + (zurueck.length ? ', die Garnison ist zurück auf ' + planetDisplayName(state.activeBasePlanet) + ' (' + zurueck.join(', ') + ')' : '')
             + (modA ? ' und ' + modA + ' Modul' + (modA === 1 ? '' : 'e') + ' liegen wieder in deinem Bestand' : '') + '.',
             'ti-trash', 'wichtig');
           pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:r.system, systemName:sysNameA,
@@ -27309,37 +27311,39 @@ async function claimPendingRewards(){
           save();
           continue;
         }
-        if (r.type === 'vorposten-verlust'){
-          const sysNameV = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
-          log('Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameV + ' wurde von ' + (r.angreiferName||'einem Spieler') + ' geschleift' + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – die Garnison ist verloren' : '') + '.', 'ti-alert-triangle', 'warn');
-          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{} });
-          playSound('lose');
+        /* DAS ABGEHOLTE LAGER (Etappe V4, Backend #226). Der Ertrag kommt ueber die Warteschlange
+           und nicht direkt in den Spielstand: Der Besitzer kann online sein, und sein naechster
+           Auto-Save wuerde eine direkte Gutschrift mit seinem aelteren Stand ueberschreiben.
+           Gebucht wird auf den AKTIVEN Standort - wie bei jeder anderen Belohnung von dort.
+           Der Zweig steht hier, bevor der Server-Schalter VP_LAGER_AKTIV faellt: Eine Belohnung
+           ohne Zweig faellt still durch und ist ersatzlos weg (test_vorposten_paritaet 3b). */
+        if (r.type === 'vorposten-lager'){
+          const sysNameL = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          const teileL = [];
+          for (const k of ['erz','kristalle','deuterium']){
+            const menge = Math.max(0, Math.round(Number(r[k]) || 0));
+            if (menge){
+              state.resources[k] = (state.resources[k] || 0) + menge;
+              teileL.push(fmt(menge) + ' ' + resDefFor(k).label);
+            }
+          }
+          log('Das Lager deines ' + (r.name||'Vorposten') + ' bei ' + sysNameL + ' ist eingetroffen'
+            + (teileL.length ? ': ' + teileL.join(', ') : ' – es war leer') + '.', 'ti-truck', 'ok');
           ladeVorposten();
           save();
           continue;
         }
-        if (r.type === 'vorposten-abbau'){
-          /* Der freiwillige Abbau (Backend #216, 03.09.2026) laeuft 24 Stunden und endet in einem
-             Server-Tick - der Besitzer ist dabei ueblicherweise gar nicht da. Deshalb kommt die
-             Garnison als ausstehende Belohnung und nicht als Rueckflug-Mission wie beim Rueckruf:
-             Der Vorposten ist beim Ablauf der Frist bereits geloescht, es gaebe also kein System
-             mehr, aus dem etwas zurueckfliegen koennte. Die Schiffe treten hier direkt wieder in
-             die Flotte des aktiven Standorts ein.
-             Dieser Zweig fehlte, seit der Server den Typ einreiht - gefunden vom Paritaetstest
-             (test_vorposten_paritaet 3b), nicht im Spiel. Ohne ihn faellt die Belohnung durch alle
-             Zweige und ist still weg: die Garnison eines abgebauten Vorpostens, ersatzlos. */
-          const flotteAbbau = currentFleet();
-          let zurueckAbbau = 0;
-          for (const [k, v] of Object.entries(r.garnison || {})){
-            if (typeof v === 'number' && v > 0){ flotteAbbau[k] = (flotteAbbau[k]||0) + v; zurueckAbbau += v; }
-          }
-          const sysNameAbbau = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
-          // Die Module hat der Server schon in den Bestand gelegt (vpModulGeben) - hier werden sie
-          // nur genannt. Sie hier ein zweites Mal zu geben, waere eine stille Verdopplung.
-          const modAbbau = (Array.isArray(r.module) ? r.module : []).length;
-          log('Abbau abgeschlossen: Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameAbbau + ' ist zurückgebaut.'
-            + (zurueckAbbau ? ' Die Garnison (' + zurueckAbbau + ' Schiff(e)) ist wieder auf ' + planetDisplayName(state.activeBasePlanet) + '.' : '')
-            + (modAbbau ? ' ' + modAbbau + ' Modul(e) liegen wieder im Bestand.' : ''), 'ti-shield', 'ok');
+        if (r.type === 'vorposten-verlust'){
+          const sysNameV = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          /* V4: Was im Lager lag, ist mit gefallen - der Besitzer soll es beziffert sehen, sonst
+             wirkt der Deckel wie eine Schikane statt wie ein Grund, oefter abzuholen. */
+          const verlorenL = r.lagerVerloren && Object.entries(r.lagerVerloren)
+            .filter(([, v]) => (Number(v) || 0) > 0)
+            .map(([k, v]) => fmt(Math.round(v)) + ' ' + resDefFor(k).label);
+          log('Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameV + ' wurde von ' + (r.angreiferName||'einem Spieler') + ' geschleift' + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – die Garnison ist verloren' : '')
+            + ((verlorenL && verlorenL.length) ? ', und das Lager ist mitgegangen (' + verlorenL.join(', ') + ')' : '') + '.', 'ti-alert-triangle', 'warn');
+          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{} });
+          playSound('lose');
           ladeVorposten();
           save();
           continue;

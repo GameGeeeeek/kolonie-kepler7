@@ -70,10 +70,11 @@ function spielstand(){
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
 }
-async function lauf(browser, vp){
+async function lauf(browser, vp, belohnung){
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
+  let belohnungRaus = false;
   const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand() };
   await page.route('**/api/**', async r => {
     const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
@@ -88,7 +89,7 @@ async function lauf(browser, vp){
     if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
     if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
     if (p === 'players-map') return j({ players:[] });
-    if (p === 'pending-rewards/claim') return j({ reward:null });
+    if (p === 'pending-rewards/claim'){ const b = belohnung && !belohnungRaus ? (belohnungRaus = true, belohnung) : null; return j({ reward: b }); }
     if (p === 'chat/global' || p === 'chat/allianz') return j({ ok:true, nachrichten:[], neuesteTs:0 });
     if (p === 'storage-list'){ const pref = decodeURIComponent((u.split('prefix=')[1] || '').split('&')[0]); return j({ keys: Object.keys(st).filter(k => k.startsWith(pref)) }); }
     if (p.startsWith('storage/')){ const k = decodeURIComponent(p.slice(8)); if (req.method() === 'PUT'){ try { st[k] = JSON.parse(req.postData()||'{}').value; } catch(e){} return j({ ok:true, version:2 }); } if (st[k] !== undefined) return j({ key:k, value:st[k], version:1 }); return j({ error:'nicht gefunden' }, 404); }
@@ -136,7 +137,14 @@ async function lauf(browser, vp){
     return { da: !!m, verlauf: m ? m.querySelectorAll('[data-vp-verlauf]').length : 0,
       text: m ? m.textContent.replace(/\s+/g, ' ').trim() : '' };
   });
-  return { ctx, page, errs, mess, liste, menue };
+  /* GEMESSEN WIRD DER GESPEICHERTE SPIELSTAND, nicht das Protokoll: `log()` schreibt in ein
+     EINZELNES Element (#log), das jede spaetere Meldung ueberschreibt - als Messpunkt fuer ein
+     Ereignis beim Start ist es untauglich (erster Entwurf, fiel prompt). Der Spielstand aus der
+     nachgebauten Storage-Route belegt dagegen beides auf einmal: dass gutgeschrieben wurde UND
+     dass der Zweig save() gerufen hat. */
+  let gespeichert = null;
+  try { gespeichert = JSON.parse(st['kepler7-save-v3']); } catch (e) {}
+  return { ctx, page, errs, mess, liste, menue, gespeichert };
 }
 (async () => {
   const browser = await starteBrowser();
@@ -258,7 +266,26 @@ async function lauf(browser, vp){
   check('10d: ohne Verlauf steht kein leerer Abschnitt da', voll.menue.da && voll.menue.verlauf === 0,
     { verlauf: voll.menue.verlauf });
 
-  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft];
+  // ---- 11) Der Belohnungszweig fuer das abgeholte Lager (Etappe V4) ----------------------------
+  /* Der Server reiht das Lager als eigenen Typ ein (`vorposten-lager`). Ein Typ ohne Zweig faellt
+     im Client still durch alle if-Ketten und ist ERSATZLOS weg - deshalb prueft
+     test_vorposten_paritaet 3b, DASS es den Zweig gibt. Hier wird gemessen, dass er auch etwas
+     tut: Der Ertrag muss im Spielstand ankommen und im Protokoll stehen. */
+  const MENGE = 777777;
+  const mitLager = await lauf(browser, doc({}), { type:'vorposten-lager', system:SYS, name:'Sternenwerft',
+    erz: MENGE, kristalle: 111111, deuterium: 22222, zeit: now });
+  const vorher = voll.gespeichert && voll.gespeichert.resources;
+  const nachher = mitLager.gespeichert && mitLager.gespeichert.resources;
+  check('11a: der Ertrag ist im gespeicherten Spielstand angekommen - gutgeschrieben UND gesichert',
+    !!nachher && !!vorher && nachher.erz >= vorher.erz + MENGE,
+    { erzNachher: nachher && nachher.erz, erzVorher: vorher && vorher.erz, gutschrift: MENGE });
+  check('11b: ALLE drei Rohstoffe kommen an, nicht nur das Erz', (() => {
+    if (!nachher || !vorher) return false;
+    return nachher.kristalle >= vorher.kristalle + 111111 && nachher.deuterium >= vorher.deuterium + 22222;
+  })(), { nachher: nachher && { erz: nachher.erz, kristalle: nachher.kristalle, deuterium: nachher.deuterium },
+          vorher: vorher && { erz: vorher.erz, kristalle: vorher.kristalle, deuterium: vorher.deuterium } });
+
+  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, mitLager];
   check('8: keine Skriptfehler in irgendeinem Lauf', alleLaeufe.every(l => l.errs.length === 0),
     { fehler: alleLaeufe.flatMap(l => l.errs).slice(0, 3) });
 
