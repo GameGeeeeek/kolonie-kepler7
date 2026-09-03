@@ -518,4 +518,13 @@ sehen, welches der kostenlosen Verzeichnisse aus Abschnitt 4 wirklich Spieler br
 bisher die offene Frage („Was die Einträge wert sind" in `marketing-einreichungen.md`).
 
 Technische Einzelheiten und alle Testbefunde: Backend `docs/admin.md`, Abschnitt „Woher ein Konto
-kam"; Wächter `tests/test_herkunft.js` (Frontend) und `tests/test_herkunft_http.js` (Backend).
+kam"; Wächter `tests/test_besucherquelle.js` (Frontend) und `tests/test_besucherquelle_http.js`
+(Backend).
+
+**Zum Namen, weil er einen Fehler gekostet hat:** Der erste Entwurf hieß „Herkunft" — und dieser
+Begriff ist im Spiel längst vergeben, für die **Herkunft eines GEGENSTANDS**
+(`HERKUNFT_ABGRUND`, `HERKUNFT_BOSS`, `HERKUNFT_UNIKAT`, `HERKUNFT_NORMAL`, `HERKUNFT_KONVOI`,
+129 Fundstellen). Es gab sogar bereits eine `tests/test_herkunft.js`, die genau dieses
+Herkunfts-Schloss bewacht — und mein gleichnamiger neuer Test hat sie **überschrieben**. Aufgefallen
+ist es erst im vollen Prüflauf, an einem fallenden `test_abgrundbilanz.js`, das die überschriebene
+Datei mitprüft. Alles Besucherseitige heißt deshalb jetzt **`besucherquelle`**.

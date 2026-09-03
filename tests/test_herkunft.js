@@ -1,244 +1,311 @@
-// Woher ein Besucher kam - die Frontend-Haelfte (03.09.2026, Auftrag Sascha).
+// Das Herkunfts-Schloss (28.07.2026, v8.332.0).
 //
-// DER ANLASS, woertlich: "macht es sinn auf tiktok werbung zu schalten ?" Die Antwort war nein,
-// unter anderem weil es im ganzen Spiel KEINE Kampagnen-Messung gab - gemessen null Treffer fuer
-// utm_source, utm_campaign, document.referrer, gtag(, ttq, fbq( und dataLayer. Diese Haelfte sammelt
-// die Herkunft ein; der Server legt sie ab (Backend-Waechter: test_herkunft_http.js, Port 3253).
+// „Nur im Abgrund findbar" ist keine Eigenschaft, die ein Eintrag mitbringt - es ist eine
+// Eigenschaft ALLER ANDEREN Fundquellen. Solange irgendeine davon blind aus dem vollen DEFS-Array
+// zieht, ist jeder exklusive Inhalt am Tag seiner Einfuehrung auch im Markt, in Expeditionsfunden
+// und in Allianz-Belohnungen.
 //
-// GEMESSEN WIRD DIE WIRKUNG, NICHT DIE ANWESENHEIT (Hausregel 61): Die Kernpruefung liest den
-// Rumpf der ECHTEN Registrierungs-Anfrage am Server mit. Eine Pruefung auf "der
-// localStorage-Eintrag existiert" waere auch dann gruen, wenn das Feld nie mitgeschickt wird - und
-// genau daran haengt der ganze Nutzen.
+// Vor v8.332.0 zogen SECHS Stellen zufaellig aus den Modul-Arrays, davon VIER ungefiltert -
+// darunter grantAllianceMissionBonusModule(), das craftOnly- und Event-Module ausschuetten konnte,
+// anders als grantRandomShipModule() zwei Bildschirme weiter.
 //
-// WARUM EIN EIGENER HTTP-SERVER STATT file:// - das hat einen Anlauf gekostet und gehoert
-// aufgeschrieben: Unter file:// blockiert CORS jeden /api-Aufruf, BEVOR ein Playwright-`page.route`
-// ihn sehen kann (gemessen: "Access to fetch at 'file:///api/health' from origin 'null' has been
-// blocked by CORS policy"). Das Spiel faellt dann in den Solo-Modus, das AGB-Haekchen bleibt
-// unsichtbar, und die Registrierung findet nie statt - der Rumpf blieb null, und das sah aus wie
-// ein Fehler der geprueften Aenderung statt wie ein Werkzeugfehler. Ueber HTTP gelingt
-// checkBackend(), und das Formular verhaelt sich wie im echten Spiel. Vorbild und derselbe Grund:
-// test_csp_verbindung.js.
+// Dieser Test hat zwei Haelften, und die zweite ist die wichtigere:
 //
-// Der ZWEITE Server (PORT_FREMD) ist die verweisende fremde Seite. Nur so laesst sich messen, dass
-// aus document.referrer der HOSTNAME wird und nicht die volle Adresse - `location.host` enthaelt
-// den Port, zwei Server auf 127.0.0.1 sind also verschiedene Hosts.
-// GEGENPROBE gegen die Spieldatei ohne die Aenderung (KEPLER_SPIELDATEI auf eine Kopie), beide
-// Richtungen gefahren, Pruefnamen per `diff` verglichen statt gezaehlt - die Schlusszeile "FAIL"
-// wuerde sonst mitzaehlen: neu EXIT=0, alt EXIT=1, 10 von 17 fallen bei identischer Liste.
-// Die SIEBEN, die auch am alten Stand gruen bleiben, sind kein Mangel und gehoeren benannt:
-//   * 1a-vorab / 7-vorab / 8-vorab - Vorpruefungen der Messvorrichtung, sie MUESSEN beidseitig
-//     gruen sein (sonst misst der Test sein eigenes Werkzeug statt der Seite).
-//   * 3b-vorab - der Anker `const body = { username, password };` steht auch im alten Stand.
-//   * 5a / 8a - "nichts gespeichert": am alten Stand wird ueberhaupt nie etwas gespeichert.
-//   * 6a - "ausserhalb des register-Zweigs kein body.herkunft": ohne die Zeile trivial erfuellt.
-//     Sie misst die Gegenrichtung und muss gruen bleiben.
+//   A) HEUTE: fundPool() filtert wirklich, und zwar ausgefuehrt an eingeschleusten Testeintraegen -
+//      nicht am Quelltext abgelesen.
+//   B) MORGEN: Es gibt keine direkte Array-Ziehung mehr im ganzen Spiel. Das ist die eigentliche
+//      Absicherung. Der Code oben laesst sich jederzeit korrekt schreiben; was schiefgeht, ist die
+//      NAECHSTE Fundstelle, die jemand baut, ohne an die Filter zu denken. Ein Test, der nur das
+//      Vorhandene prueft, faengt genau die nicht.
 const fs = require('fs');
-const http = require('http');
-const { SPIELDATEI, starteBrowser, pruefer } = require('./lib/umgebung');
+const path = require('path');
+// Pfad ueber die gemeinsame Quelle, nicht fest verdrahtet: Sonst wird KEPLER_SPIELDATEI
+// still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
+// bestanden (CLAUDE.md, Korrektur zu Regel 14).
+const { SPIELDATEI } = require('./lib/spieldatei');
+const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
-const PORT = 3245;          // gemessen frei: grep -hoE "PORT *= *3[0-9]{3}" tests/*.js
-const PORT_FREMD = 3246;    // die verweisende Seite
+const zeilenVon = (t) => t.split('\n');
 
-(async () => {
-  const { check, ende } = pruefer();
-  const QUELLE = fs.readFileSync(SPIELDATEI, 'utf8');
+let fail = false;
+const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 
-  // Was an /api/register bzw. /api/login geschickt wurde - am Server mitgelesen, nicht geraten.
-  let letzterRumpf = null, letzterPfad = null;
-  const server = http.createServer((req, res) => {
-    if (req.url.startsWith('/api/register') || req.url.startsWith('/api/login')) {
-      let roh = '';
-      req.on('data', d => { roh += d; });
-      req.on('end', () => {
-        letzterPfad = req.url;
-        try { letzterRumpf = JSON.parse(roh || '{}'); } catch (e) { letzterRumpf = { parseFehler: true, roh: roh.slice(0, 200) }; }
-        res.writeHead(400, { 'Content-Type': 'application/json' });   // gemessen wird, was RAUSGEHT
-        res.end(JSON.stringify({ error: 'Testabbruch' }));
-      });
-      return;
-    }
-    // /api/me MUSS 401 liefern, sonst haelt das Spiel die leere Antwort fuer eine gueltige Sitzung,
-    // startet durch und zeigt gar kein Anmeldeformular - gemessen: loginOverlay auf display:none,
-    // stattdessen das tutorialOverlay. Ein zu grosszuegiger Mock misst dann das eigene Wunschbild.
-    if (req.url.startsWith('/api/me')) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: 'nicht angemeldet' }));
-    }
-    if (req.url.startsWith('/api/')) {          // checkBackend() muss gelingen (prueft nur res.ok)
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end('{}');
-    }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(QUELLE);
-  });
-  const fremd = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end('<!doctype html><meta charset="utf-8"><a id="w" href="http://127.0.0.1:' + PORT + '/">weiter</a>');
-  });
-  await new Promise(r => server.listen(PORT, '127.0.0.1', r));
-  await new Promise(r => fremd.listen(PORT_FREMD, '127.0.0.1', r));
-  const BASIS = 'http://127.0.0.1:' + PORT + '/';
+function fnAus(n){
+  const m = js.match(new RegExp('function\\s+'+n+'\\s*\\('));
+  if (!m) throw new Error('Funktion nicht gefunden: '+n);
+  const i = js.indexOf(m[0]);
+  let d = 0, s = js.indexOf('{', i + m[0].length), k = s;
+  for (; k < js.length; k++){ if (js[k]==='{') d++; else if (js[k]==='}'){ d--; if(!d) break; } }
+  return js.slice(i, k+1);
+}
 
-  const browser = await starteBrowser();
-  const aufraeumen = async () => {
-    try { await browser.close(); } catch (e) {}
-    try { server.close(); } catch (e) {}
-    try { fremd.close(); } catch (e) {}
-  };
+// ---- A) fundPool an eingeschleusten Eintraegen AUSFUEHREN ----
+// Erfundene Eintraege statt der echten DEFS, weil sich nur so ALLE Faelle abdecken lassen - auch
+// die Kombination Abgrund+craftOnly, die es im Spiel (noch) nicht gibt. Abschnitt C prueft dieselbe
+// Funktion danach an den echten MODULE_DEFS; das eine ersetzt das andere nicht.
+const G = new Function(`
+  const HERKUNFT_NORMAL = 'normal';
+  const HERKUNFT_ABGRUND = 'abgrund';
+  ${fnAus('fundPool')}
+  ${fnAus('zieheAusPool')}
+  return { fundPool, zieheAusPool };
+`)();
 
-  // Das Anmeldeformular erscheint nur im 401-Zweig von initAuth - also dann, wenn eine GESPEICHERTE
-  // Sitzung abgelaufen ist. Ohne Token startet das Spiel durch und legt ein tutorialOverlay ueber
-  // die Seite (gemessen: loginOverlay auf display:none). Ein abgelaufener Token ist damit kein
-  // Trick, sondern der echte Spielerweg zum Formular; der Mock beantwortet /api/me passend mit 401.
-  async function seiteMitAnmeldung(kontext) {
-    const p = await kontext.newPage();
-    await p.addInitScript(() => { try { localStorage.setItem('kepler7_token', 'abgelaufen'); } catch (e) {} });
-    return p;
+const PROBE = [
+  { key:'a_normal' },                              // ohne Feld -> gilt als normal
+  { key:'b_normal_ausdruecklich', quelle:'normal' },
+  { key:'c_abgrund', quelle:'abgrund' },
+  { key:'d_craft', craftOnly:true },
+  { key:'e_event', eventKey:'winter' },
+  { key:'f_abgrund_craft', quelle:'abgrund', craftOnly:true }
+];
+const keys = p => p.map(x => x.key);
+
+const normal = G.fundPool(PROBE);
+check('A: die Vorgabe liefert nur normale Eintraege - kein Abgrund, kein Craft, kein Event',
+  JSON.stringify(keys(normal)) === JSON.stringify(['a_normal','b_normal_ausdruecklich']), keys(normal));
+check('A: ein Eintrag OHNE quelle-Feld gilt als normal (Rueckwaertskompatibilitaet)',
+  keys(normal).includes('a_normal'));
+check('A: quelle:"abgrund" liefert nur die Abgrund-Eintraege',
+  JSON.stringify(keys(G.fundPool(PROBE, { quelle:'abgrund' }))) === JSON.stringify(['c_abgrund']),
+  keys(G.fundPool(PROBE, { quelle:'abgrund' })));
+check('A: craft:true nimmt craftOnly dazu, aber weiterhin keinen Abgrund-Eintrag',
+  JSON.stringify(keys(G.fundPool(PROBE, { craft:true }))) === JSON.stringify(['a_normal','b_normal_ausdruecklich','d_craft']),
+  keys(G.fundPool(PROBE, { craft:true })));
+check('A: event:true nimmt Event-Eintraege dazu',
+  keys(G.fundPool(PROBE, { event:true })).includes('e_event'));
+check('A: quelle:"alle" mit allen Schaltern liefert wirklich alles',
+  G.fundPool(PROBE, { quelle:'alle', craft:true, event:true }).length === PROBE.length);
+// Die Kombination ist der Fall, an dem eine schlampige Filterkette auffliegt: Abgrund UND craftOnly.
+check('A: ein Abgrund-Eintrag mit craftOnly faellt auch bei quelle:"abgrund" ohne craft:true raus',
+  !keys(G.fundPool(PROBE, { quelle:'abgrund' })).includes('f_abgrund_craft'));
+
+// zieheAusPool muss aus DEMSELBEN Pool ziehen - eine eigene Filterlogik dort waere die zweite
+// Wahrheit, die dieser ganze Umbau abschaffen soll.
+const gezogen = new Set();
+for (let i = 0; i < 400; i++){
+  const z = G.zieheAusPool(PROBE);
+  if (z) gezogen.add(z.key);
+}
+check('A: zieheAusPool zieht ueber 400 Versuche NIE etwas ausserhalb des Pools',
+  [...gezogen].every(k => ['a_normal','b_normal_ausdruecklich'].includes(k)), [...gezogen]);
+check('A: und es erreicht dabei jeden Eintrag des Pools (kein toter Eintrag)',
+  gezogen.size === 2, [...gezogen]);
+check('A: ein leerer Pool liefert null statt undefined-Absturz',
+  G.zieheAusPool([{ key:'x', quelle:'abgrund' }]) === null);
+
+// ---- B) Es gibt keine direkte Array-Ziehung mehr ----
+// DAS ist die eigentliche Absicherung. Gesucht wird "IRGENDEIN_GROSSGESCHRIEBENES_ARRAY[Math.floor(
+// Math.random" im ganzen Spiel-Quelltext. Bewusst NICHT auf *_DEFS eingeschraenkt: Der teuerste
+// Befund dieser Runde hiess RARE_ITEMS und waere durch ein Muster auf "_DEFS" glatt durchgerutscht
+// (zwoelf Ziehstellen, siehe Abschnitt D).
+//
+// Die Ausnahmeliste ist der heikle Teil dieses Tests. Sie darf nur Arrays enthalten, die
+// nachweislich KEIN Fundpool sind - also nichts, was der Spieler als Gegenstand/Modul/Schiff/
+// Material ins Inventar bekommt. Wer hier etwas eintraegt, um den Test gruen zu bekommen, hebelt
+// genau die Absicherung aus, um derentwillen er existiert. Jeder Eintrag braucht deshalb einen
+// Grund danebst.
+const KEIN_FUNDPOOL = {
+  RES_DEFS:                  'die 6 Kern-Ressourcen - welche einen Produktionsbonus bekommt',
+  RANDOM_EVENTS:             'welches Zufallsereignis ausgeloest wird',
+  PLANET_EVENT_DEFS:         'welches Planetenereignis ausgeloest wird',
+  PLANET_BONUS_POOL:         'welchen Bonus ein neu entdeckter Planet traegt',
+  RAID_FACTIONS:             'welche Fraktion einen Raid fliegt',
+  PIRATE_DEBRIS_ESCORT_POOL: 'Zusammensetzung einer NPC-Eskorte, kein Spielerbesitz',
+  EXPEDITION_SPECIAL_EVENTS: 'welches Sonderereignis die Expedition trifft',
+  EXPEDITION_NOTHING_FLAVOR: 'reiner Anzeigetext',
+  EXPEDITION_RESCUED_FLAVOR: 'reiner Anzeigetext',
+  EXPEDITION_WEAKENED_FLAVOR:'reiner Anzeigetext',
+  EXPEDITION_DEFENDED_FLAVOR:'reiner Anzeigetext'
+};
+const zeilen = js.split('\n');
+const direkte = [];
+for (const m of js.matchAll(/([A-Z][A-Z_0-9]{2,})\s*\[\s*Math\.floor\s*\(\s*Math\.random/g)){
+  const zeile = js.slice(0, m.index).split('\n').length;
+  if (zeilen[zeile-1].trim().startsWith('//')) continue;   // Erwaehnung im Kommentar ist keine Ziehung
+  if (KEIN_FUNDPOOL[m[1]]) continue;
+  direkte.push(m[1]+' (Zeile ~'+zeile+' im <script>)');
+}
+check('B: keine Stelle zieht mehr direkt aus einem Fundpool-Array', direkte.length === 0, direkte);
+
+// Auch der Umweg ueber ein selbst gefiltertes Zwischenarray ist einer: Wer erst .filter(...) schreibt
+// und das Ergebnis dann zufaellig indiziert, hat die Filterregeln von Hand nachgebaut - genau so sah
+// randomFindableRareItem() bis v8.332.0 aus, und genau deshalb kannte es nur die chance-Regel und
+// nicht die Herkunft.
+const eigeneFilter = [];
+for (const m of js.matchAll(/\.filter\([^\n]{0,160}?\)\s*\[\s*Math\.floor\s*\(\s*Math\.random/g)){
+  eigeneFilter.push('~Zeile '+js.slice(0, m.index).split('\n').length);
+}
+check('B: niemand filtert von Hand und zieht dann selbst aus dem Ergebnis', eigeneFilter.length === 0, eigeneFilter);
+
+// Die vier bekannten Fundfunktionen muessen den Pool wirklich benutzen.
+const pflicht = ['grantRandomModule','grantRandomShipModule','grantAllianceMissionBonusModule','dailyModuleOffers'];
+const ohnePool = pflicht.filter(n => !/(fundPool|zieheAusPool)\(/.test(fnAus(n)));
+check('B: jede bekannte Fundfunktion zieht ueber den gemeinsamen Pool', ohnePool.length === 0, ohnePool);
+
+// Der Nebenbefund: grantAllianceMissionBonusModule zog aus dem VOLLEN SHIP_MODULE_DEFS und
+// ignorierte damit craftOnly/eventKey. Beide Zweige der Funktion muessen jetzt ueber den Pool laufen.
+const allianz = fnAus('grantAllianceMissionBonusModule');
+check('B: beide Zweige der Allianz-Belohnung (Schiffs- UND Standort-Modul) laufen ueber den Pool',
+  (allianz.match(/zieheAusPool\(/g)||[]).length === 2,
+  { aufrufe: (allianz.match(/zieheAusPool\(/g)||[]).length });
+
+// Expeditionen sind eine normale Fundquelle und duerfen keine Abgrund-Gegenstaende ausschuetten.
+check('B: der Expeditions-Itempool laeuft ueber fundPool',
+  /const itemPool = fundPool\(ITEM_DEFS\)/.test(js));
+// ...aber die Event-Gegenstaende muessen weiterhin dazukommen koennen, sonst waere ein Beute-Event
+// wirkungslos - und DAS faellt erst auf, wenn das naechste laeuft.
+check('B: waehrend eines Beute-Events kommen die Event-Gegenstaende weiterhin dazu',
+  /activeLootEvent \? fundPool\(EVENT_ITEM_DEFS, \{ event:true \}\)/.test(js));
+
+/* Der Fund vom 21.08.2026, und der Grund, warum die zwei Pruefungen darueber nicht genuegten:
+   Sie nennen die Expedition BEIM NAMEN. Die ERKUNDUNG daneben - eine zweite, aeltere Fundstelle
+   im selben checkMissions - zog die ganze Zeit roh aus dem vollen Array. Gemessen fielen dadurch
+   SECHS Abgrund-Gegenstaende aus ganz gewoehnlicher Erkundung, bis hinauf zur mythischen
+   Grundberuehrung (Erwartungswert 0,176 je Funddurchlauf) - waehrend grantAbgrundItem() sie
+   eigens nach Seltenheit gewichtet, damit die Grundberuehrung ein Ereignis bleibt.
+   Eine namensbasierte Pruefung findet nur, woran man schon gedacht hat (Arbeitsregel 40). Diese
+   hier kennt keine Namen: Sie verbietet die FORM. Gemessen war der Bestand vorher zwei rohe
+   Stellen (ITEM_DEFS und RARE_ITEMS, beide im Erkundungszweig), heute null - eine neue Fundstelle
+   faellt damit auf, ohne dass jemand an sie gedacht haben muss.
+   `.find(` bleibt erlaubt: Das ist ein Nachschlagen ueber den Schluessel, keine Ziehung. */
+const ZIEH_ARRAYS = ['ITEM_DEFS', 'EVENT_ITEM_DEFS', 'RARE_ITEMS'];
+const rohForm = new RegExp(
+  'for\\s*\\(\\s*(?:const|let|var)\\s+\\w+\\s+of\\s+(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\)'
+  + '|(?:' + ZIEH_ARRAYS.join('|') + ')\\s*\\[\\s*Math\\.floor');
+// Geprueft wird die FUNDSTELLE, nicht jede Schleife ueber eine Gegenstandsliste. Der Unterschied
+// ist nicht kosmetisch: Eine Anzeige-Schleife MUSS alle Eintraege sehen - der Gegenstands-Katalog
+// (Etappe D, 28.08.2026) zeigt Abgrund-Beute, Boss-Teile und Unikate ja gerade deshalb an, damit
+// der Spieler ihren Fundort erfaehrt. Sie auf fundPool zu schicken waere inhaltlich falsch.
+// Unterschieden wird deshalb ueber die EIGENSCHAFT der Schleife, nicht ueber ihren Namen (eine
+// Ausnahmeliste haette die naechste Anzeige-Schleife wieder gerissen, Regel 40): Wer ZIEHT,
+// wuerfelt (`Math.random`), liest eine Fundchance (`.chance`) oder schreibt in einen Bestand
+// (`state....=`). Wer nur ZEIGT, tut nichts davon.
+function schleifenRumpf(text, ab){
+  const auf = text.indexOf('{', ab);
+  if (auf < 0) return '';
+  let t = 0;
+  for (let j = auf; j < text.length; j++){
+    const c = text[j];
+    if (c === '{') t++;
+    else if (c === '}'){ t--; if (!t) return text.slice(auf, j + 1); }
   }
+  return text.slice(auf);
+}
+function ziehtWirklich(rumpf){
+  return /Math\.random/.test(rumpf) || /\.chance\b/.test(rumpf) || /\bstate\.[A-Za-z.\[\]']+\s*=/.test(rumpf);
+}
+const roheZiehungen = zeilenVon(js)
+  .map((z, i) => ({ z, nr: i + 1 }))
+  .filter(x => !x.z.trim().startsWith('//') && rohForm.test(x.z))
+  .filter(x => {
+    // Index der Zeile in der Datei, dann ihren Rumpf schneiden.
+    const ab = zeilenVon(js).slice(0, x.nr - 1).reduce((n, z) => n + z.length + 1, 0);
+    return ziehtWirklich(schleifenRumpf(js, ab));
+  })
+  .map(x => 'Zeile ' + x.nr + ': ' + x.z.trim().slice(0, 100));
+check('B: KEINE Fundstelle iteriert oder indiziert ein Gegenstands-Array roh',
+  roheZiehungen.length === 0, roheZiehungen);
+// Die Unterscheidung selbst gehoert geprueft - sonst waere sie ein Loch statt einer Regel.
+check('B-vorab2: ziehende und zeigende Schleifen werden unterschieden',
+  ziehtWirklich('{ if (Math.random() < 0.1) x(); }')
+  && ziehtWirklich('{ if (r < item.chance) x(); }')
+  && ziehtWirklich('{ state.inventory[k] = 1; }')
+  && !ziehtWirklich('{ aus.push({ key:d.key, name:d.name }); }'));
+// Und die Gegenrichtung: Die Form muss ueberhaupt erkennbar sein. Ohne diese Zeile waere die
+// Pruefung darueber auch dann gruen, wenn der regulaere Ausdruck gar nichts mehr trifft
+// (Arbeitsregel 71 - eine Wache, die sagt, was sie findet, statt nur zu schweigen).
+check('B-vorab: die verbotene Form wird ueberhaupt erkannt',
+  rohForm.test('for (const item of ITEM_DEFS){') && rohForm.test('RARE_ITEMS[Math.floor(x)]')
+  && !rohForm.test('for (const item of fundPool(ITEM_DEFS)){'));
+// Positiv: die zwei Fundstellen des Erkundungszweigs laufen wirklich ueber den Filter.
+check('B: der Erkundungszweig zieht Gegenstaende UND seltene Materialien ueber fundPool',
+  /for \(const item of fundPool\(ITEM_DEFS\)\)/.test(js)
+  && /for \(const ri of fundPool\(RARE_ITEMS\)\)/.test(js));
 
-  const gemerkt = p => p.evaluate(() => { try { return localStorage.getItem('kepler7_herkunft'); } catch (e) { return 'FEHLER'; } });
-  const lesen = async p => { const r = await gemerkt(p); return r && r !== 'FEHLER' ? JSON.parse(r) : null; };
+// ---- C) Die Sperre traegt echten Inhalt ----
+// Bis v8.333.0 stand hier "noch traegt kein Eintrag quelle:'abgrund'" - Phase 0 war reine
+// Infrastruktur. Seit v8.334.0 gibt es die ersten Abgrund-Module, und damit dreht sich die Pruefung
+// um: Eine Sperre ohne Inhalt dahinter kann nicht falsch sein und beweist deshalb auch nichts.
+const abgrundEintraege = (js.match(/quelle:\s*HERKUNFT_ABGRUND/g)||[]).length;
+check('C: es gibt Eintraege mit Abgrund-Herkunft', abgrundEintraege >= 4, { eintraege: abgrundEintraege });
+// Kommentarzeilen ausgenommen: Die Prosa oben ERKLAERT das Feld und schreibt es dabei aus - das ist
+// kein loser Wert im Code, sondern der Grund, warum es die Konstante gibt.
+const loseHerkunft = zeilenVon(js)
+  .map((z,i) => ({ z, nr:i+1 }))
+  .filter(x => !x.z.trim().startsWith('//') && /quelle:\s*'abgrund'/.test(x.z))
+  .map(x => 'Zeile '+x.nr);
+check('C: die Herkunft steht als KONSTANTE dran, nicht als lose Zeichenkette',
+  loseHerkunft.length === 0, loseHerkunft);
+check('C: die beiden Herkunfts-Konstanten sind benannt, nicht als Zeichenkette verstreut',
+  /const HERKUNFT_NORMAL = 'normal'/.test(js) && /const HERKUNFT_ABGRUND = 'abgrund'/.test(js));
 
-  async function formularAbschicken(page, modus) {
-    letzterRumpf = null; letzterPfad = null;
-    if (modus === 'register') await page.click('#registerTabBtn').catch(() => {});
-    await page.waitForTimeout(300);
-    await page.fill('#loginUsername', 'probekonto').catch(() => {});
-    await page.fill('#loginPassword', 'probelauf-9271').catch(() => {});
-    const email = await page.$('#loginEmail');
-    if (email && await email.isVisible().catch(() => false)) await page.fill('#loginEmail', 'probe@example.invalid').catch(() => {});
-    const tos = await page.$('#loginTosCheckbox');
-    if (tos && await tos.isVisible().catch(() => false)) await tos.check().catch(() => {});
-    await page.click('#loginSubmitBtn').catch(() => {});
-    await page.waitForTimeout(1200);
-  }
+// Und die Gegenprobe, die den ganzen Umbau erst rechtfertigt: Ein Abgrund-Eintrag darf aus KEINER
+// normalen Quelle kommen. Gemessen wird das an den echten MODULE_DEFS, ausgefuehrt.
+const MD = (() => {
+  const i = js.indexOf('const MODULE_DEFS = [');
+  let d=0, s=js.indexOf('[', i), k=s;
+  for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
+  // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
+  // sobald die Herkunfts-Konstanten definiert sind.
+  // ALLE HERKUNFT_*-Konstanten werden AUS DER DATEI abgeleitet, nicht eingetippt (Hausregel 43):
+  // Fuer jede neue Herkunft (v8.463.0 HERKUNFT_UNIKAT, A2 HERKUNFT_KONVOI fuer die Wrackkonvois)
+  // steht sonst frueher oder spaeter ein ReferenceError beim Literal-Parsen - eine Namensliste
+  // waere blind gegen genau die Erweiterung, die diesen Test spaeter reisst.
+  const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+  return new Function(herkunftDecls + '; return ' + js.slice(s,k+1))();
+})();
+const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
+check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);
+const normalerPool = G.fundPool(MD).map(d => d.key);
+check('C: KEIN Abgrund-Modul liegt im normalen Fundpool (Markt, Expedition, Kiste, Allianz)',
+  abgrundKeys.every(k => !normalerPool.includes(k)),
+  abgrundKeys.filter(k => normalerPool.includes(k)));
+const abgrundPool = G.fundPool(MD, { quelle:'abgrund' }).map(d => d.key);
+check('C: und der Abgrund-Pool enthaelt AUSSCHLIESSLICH sie (keine normalen Module von unten)',
+  abgrundPool.length === abgrundKeys.length && abgrundPool.every(k => abgrundKeys.includes(k)),
+  abgrundPool);
+// Unikate (v8.463.0): vierte Herkunft, gleiche Gegenprobe - kein Unikat darf aus dem normalen
+// Fundpool kommen (einziger Vergabeweg ist grantUnikatModul an Weltboss/Waechter).
+const unikatKeys = MD.filter(d => d.quelle === 'unikat').map(d => d.key);
+check('C: die echten MODULE_DEFS tragen die Unikate', unikatKeys.length >= 2, unikatKeys);
+check('C: KEIN Unikat liegt im normalen Fundpool',
+  unikatKeys.every(k => !normalerPool.includes(k)),
+  unikatKeys.filter(k => normalerPool.includes(k)));
 
-  // --- 1: die Kampagnen-Parameter werden eingesammelt --------------------------------------
-  let ctx = await browser.newContext();
-  let page = await seiteMitAnmeldung(ctx);
-  await page.goto(BASIS + '?utm_source=tiktok&utm_medium=cpc&utm_campaign=herbst26');
-  await page.waitForTimeout(1800);
-  let roh = await gemerkt(page);
-  let h = roh && roh !== 'FEHLER' ? JSON.parse(roh) : null;
-  check('1a-vorab Der Speicher ist lesbar (kein blockierter localStorage)', roh !== 'FEHLER', { roh });
-  check('1a Quelle, Medium und Kampagne sind gemerkt',
-        !!h && h.quelle === 'tiktok' && h.medium === 'cpc' && h.kampagne === 'herbst26', { gemerkt: h });
+// ---- D) chance:0 - der Nebenbefund, der den Umbau bezahlt hat ----
+// Beim Zusammenziehen der Ziehstellen fiel auf: RARE_ITEMS hat SECHS Eintraege, einer davon
+// (leerensplitter) traegt chance:0 und ist laut eigener Definition "KEIN Direktfund bei
+// Expeditionen" - er soll nur aus Leere-NPCs, Weltboss und Piraten-Endboss kommen. Genau eine
+// Funktion hielt sich daran; ZWOELF weitere Fundstellen zogen daneben direkt aus dem vollen Array
+// und schuetteten die Endgame-Ressource mit rund 1/6 je Fund aus.
+//
+// Die Regel liegt jetzt in fundPool(), damit sie nicht ein zweites Mal vergessen werden kann - und
+// sie wird hier AUSGEFUEHRT geprueft, nicht am Quelltext abgelesen.
+check('D: fundPool wirft chance:0 raus - unabhaengig von der Herkunft',
+  G.fundPool([{key:'nie',chance:0},{key:'doch',chance:0.005}]).length === 1 &&
+  G.fundPool([{key:'nie',chance:0}], { quelle:'alle', craft:true, event:true }).length === 0);
+check('D: chance:undefined und chance>0 bleiben drin (nur die ausdrueckliche 0 fliegt)',
+  G.fundPool([{key:'ohne'},{key:'klein',chance:0.001}]).length === 2);
+// Ueber 400 Ziehungen darf der gesperrte Eintrag KEIN einziges Mal kommen. Ein Filter, der nur
+// meistens greift, waere hier nicht zu unterscheiden von einem, der gar nicht greift.
+const rar = [{key:'a',chance:0.006},{key:'gesperrt',chance:0},{key:'b',chance:0.005}];
+let leck = 0;
+for (let i=0;i<400;i++){ const z = G.zieheAusPool(rar); if (z && z.key === 'gesperrt') leck++; }
+check('D: ueber 400 Ziehungen kommt der chance:0-Eintrag kein einziges Mal', leck === 0, { leck });
 
-  // --- 2: die Parameter fliegen aus der Adresszeile -----------------------------------------
-  // Sonst zaehlt jeder Folgebesucher eines WEITERGEGEBENEN Links als dieselbe Quelle, und die
-  // Messung ist nach dem ersten Teilen wertlos.
-  const adresse = await page.evaluate(() => location.search);
-  check('2a Die utm-Parameter stehen nicht mehr in der Adresszeile', !/utm_/.test(adresse), { search: adresse });
+// Und die zwoelf Fundstellen muessen wirklich auf der einen Funktion sitzen.
+check('D: keine Fundstelle zieht mehr am Filter vorbei aus dem vollen RARE_ITEMS',
+  !/RARE_ITEMS\s*\[\s*Math\.floor/.test(js));
+const roh = fnAus('randomFindableRareItem');
+check('D: randomFindableRareItem baut den Pool nicht mehr selbst, sondern zieht ueber zieheAusPool',
+  /zieheAusPool\(\s*RARE_ITEMS\s*\)/.test(roh) && !/\.filter\(/.test(roh), roh.trim());
+// 15 Aufrufe = 12 umgestellte + 3, die es vorher schon richtig machten. Die Zahl steht hier, damit
+// ein spaeteres Wiederauftauchen einer eigenen Ziehung auffaellt, auch wenn sie anders geschrieben ist.
+const aufrufe = (js.match(/randomFindableRareItem\(\)/g)||[]).length - 0;
+check('D: alle Fundstellen fuer seltene Materialien laufen ueber die eine Funktion',
+  aufrufe >= 15, { aufrufe });
 
-  // --- 3: der Sendepfad - gescopt auf den Registrierungsblock, plus ausgefuehrter Leser -------
-  // WAS HIER NICHT GEMESSEN WIRD, und das ist eine ehrliche Grenze statt einer stillen Luecke:
-  // der Klick auf "Konto erstellen" im laufenden Spiel. Das Anmeldeformular erscheint nur im
-  // 401-Zweig von initAuth; ueber HTTP mit gemocktem Backend startet das Spiel stattdessen durch
-  // und legt ein tutorialOverlay ueber die Seite (fuenf Anlaeufe, jeder gemessen: loginOverlay
-  // bleibt display:none). Statt den Weg dorthin zu erzwingen - und damit das Messwerkzeug zu
-  // messen (Hausregel 15/17/19) - wird die Kette in zwei Haelften belegt:
-  //   (a) der LESER liefert wirklich das, was Abschnitt 1 im Speicher gemessen hat  -> ausgefuehrt
-  //   (b) der Rumpf bekommt das Feld GENAU im register-Zweig                        -> gescopt
-  // Wer den Formularweg spaeter doch stellt, ersetzt beide Haelften durch die eine echte Messung.
-  const quelltext = QUELLE;
-  const leserBlock = (quelltext.match(/function herkunftLesen\(\)\{[\s\S]*?\n  \}/) || [null])[0];
-  check('3-vorab Der Leser-Block laesst sich aus der Spieldatei schneiden', !!leserBlock,
-        { gefunden: !!leserBlock });
-  let gelesen = null, leserFehler = null;
-  try {
-    const speicher = { kepler7_herkunft: JSON.stringify({ quelle: 'tiktok', medium: 'cpc', kampagne: 'herbst26' }) };
-    const f = new Function('localStorage', 'HERKUNFT_SPEICHER',
-      leserBlock + '; return herkunftLesen();');
-    gelesen = f({ getItem: k => (k in speicher ? speicher[k] : null) }, 'kepler7_herkunft');
-  } catch (e) { leserFehler = String(e).slice(0, 120); }
-  check('3a Der Leser liefert genau das, was im Speicher steht (ausgefuehrt)',
-        !!gelesen && gelesen.quelle === 'tiktok' && gelesen.medium === 'cpc' && gelesen.kampagne === 'herbst26',
-        { gelesen, leserFehler });
-
-  // Gescopt auf den Block, der den Anfrage-Rumpf baut - eine ungescopte Suche traefe auch einen
-  // Kommentar oder eine spaetere zweite Stelle (Hausregel 39).
-  const bau = quelltext.indexOf("const body = { username, password };");
-  const bauEnde = quelltext.indexOf("const res = await fetch('/api/'+loginMode", bau);
-  check('3b-vorab Der Anker des Rumpf-Blocks existiert', bau > 0 && bauEnde > bau, { bau, bauEnde });
-  const bauBlock = bau > 0 && bauEnde > bau ? quelltext.slice(bau, bauEnde) : '';
-  check('3b Der Rumpf bekommt die Herkunft NUR im register-Zweig',
-        /loginMode === 'register'[\s\S]{0,200}body\.herkunft/.test(bauBlock) &&
-        (bauBlock.match(/body\.herkunft/g) || []).length === 1,
-        { treffer: (bauBlock.match(/body\.herkunft/g) || []).length, block: bauBlock.slice(0, 160) });
-  await ctx.close();
-
-  // --- 4: ein zweiter Besuch ueberschreibt die Quelle NICHT --------------------------------
-  // Der Normalfall: erster Kontakt ueber eine Kampagne, Registrierung erst beim naechsten Besuch.
-  // Wuerde ueberschrieben, staende dort "unbekannt" - also fast immer.
-  ctx = await browser.newContext();
-  page = await ctx.newPage();
-  await page.goto(BASIS + '?utm_source=tiktok&utm_medium=cpc&utm_campaign=herbst26');
-  await page.waitForTimeout(1200);
-  await page.goto(BASIS);                                   // zweiter Besuch, direkt
-  await page.waitForTimeout(1200);
-  let h4a = await lesen(page);
-  check('4a Der zweite, direkte Besuch laesst die erste Quelle stehen',
-        !!h4a && h4a.quelle === 'tiktok', { gemerkt: h4a });
-  await page.goto(BASIS + '?utm_source=zweitquelle');        // dritter Besuch, andere Kampagne
-  await page.waitForTimeout(1200);
-  let h4b = await lesen(page);
-  check('4b Auch eine spaetere andere Kampagne ueberschreibt nicht',
-        !!h4b && h4b.quelle === 'tiktok', { gemerkt: h4b });
-  await ctx.close();
-
-  // --- 5: ohne Parameter wird NICHTS gespeichert -------------------------------------------
-  // Ein leerer Eintrag wuerde die Erfassung fuer immer sperren (der Nicht-Ueberschreiben-Riegel aus
-  // 4 wendet sich sonst gegen sich selbst), und ein spaeterer echter Kampagnen-Link kaeme nie an.
-  ctx = await browser.newContext();
-  page = await seiteMitAnmeldung(ctx);
-  await page.goto(BASIS);
-  await page.waitForTimeout(1800);
-  const roh5 = await gemerkt(page);
-  check('5a Ohne Kampagnen-Parameter und ohne Verweis entsteht gar kein Eintrag',
-        roh5 === null, { roh: roh5 });
-
-  // --- 6: Gegenrichtung - beim LOGIN darf nichts mitreisen --------------------------------
-  // Der Server setzt die Herkunft nur beim Anlegen des Kontos. Ein Feld beim Login waere eines,
-  // das aussieht, als taete es etwas. Gemessen an derselben Blockgrenze wie 3b.
-  check('6a Ausserhalb des register-Zweigs wird die Herkunft nicht gesetzt',
-        !/^\s*body\.herkunft/m.test(bauBlock.replace(/if \(loginMode === 'register'\)\{[\s\S]*?\n      \}/g, '')),
-        { block: bauBlock.slice(0, 200) });
-  await ctx.close();
-
-  // --- 7: der Verweis wird auf den HOSTNAMEN eingedampft -----------------------------------
-  // Ueber die fremde Seite geklickt, damit ein echter document.referrer anliegt.
-  ctx = await browser.newContext();
-  page = await ctx.newPage();
-  await page.goto('http://127.0.0.1:' + PORT_FREMD + '/');
-  await page.click('#w');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(1500);
-  const ref = await page.evaluate(() => document.referrer);
-  const h7 = await lesen(page);
-  check('7-vorab Ein echter fremder Verweis liegt an', ref.includes(String(PORT_FREMD)), { referrer: ref });
-  check('7a Der Verweis ist gemerkt', !!h7 && !!h7.verweis, { gemerkt: h7 });
-  check('7b Es ist der HOSTNAME, nicht die volle Adresse',
-        !!h7 && h7.verweis === '127.0.0.1:' + PORT_FREMD, { verweis: h7 && h7.verweis, referrer: ref });
-  check('7c Ohne Kampagne bleiben quelle/medium/kampagne leer',
-        !!h7 && h7.quelle === undefined && h7.medium === undefined && h7.kampagne === undefined, { gemerkt: h7 });
-  await ctx.close();
-
-  // --- 8: die eigene Herkunft zaehlt NICHT als Verweis -------------------------------------
-  // Interne Navigation ist keine Quelle. Ohne diese Regel traege jedes Konto den eigenen Host.
-  ctx = await browser.newContext();
-  page = await ctx.newPage();
-  await page.goto(BASIS + 'spielanleitung.html');
-  await page.waitForTimeout(400);
-  // NICHT per Klick: Im Spiel liegt nach dem Start ein tutorialOverlay ueber der Seite und faengt
-  // jeden Zeiger ab (gemessen: "intercepts pointer events", 56 Wiederholungen bis zum Timeout).
-  // Eine Navigation per location.href setzt denselben Referrer und braucht kein klickbares Element.
-  await page.evaluate(() => { location.href = '/'; });
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(1500);
-  const refIntern = await page.evaluate(() => document.referrer);
-  const hIntern = await lesen(page);
-  check('8-vorab Der Verweis kommt von der EIGENEN Herkunft', refIntern.includes(String(PORT)), { referrer: refIntern });
-  check('8a Die eigene Herkunft erzeugt keinen Eintrag', hIntern === null, { gemerkt: hIntern, referrer: refIntern });
-
-  await ende(aufraeumen);
-})().catch(e => { console.error(e); process.exit(1); });
+console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
+process.exit(fail ? 1 : 0);

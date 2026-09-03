@@ -68575,8 +68575,8 @@ async function claimPendingRewards(){
       // fasst sie danach nie wieder an. Beim Login mitzuschicken hätte also keine Wirkung und wäre
       // nur ein Feld, das aussieht, als täte es etwas. Ein altes Backend ignoriert es stillschweigend.
       if (loginMode === 'register'){
-        const h = herkunftLesen();
-        if (h) body.herkunft = h;
+        const h = besucherquelleLesen();
+        if (h) body.besucherquelle = h;
       }
       const res = await fetch('/api/'+loginMode, {
         method: 'POST',
@@ -68716,10 +68716,10 @@ async function claimPendingRewards(){
 
      localStorage kann blockiert sein (Drittanbieter-iframe, Privatmodus). Dann passiert nichts,
      und die Registrierung läuft unverändert - die Messung ist ein Zusatz, kein Tor. */
-  const HERKUNFT_SPEICHER = 'kepler7_herkunft';
-  function herkunftErfassen(){
+  const BESUCHERQUELLE_KEY = 'kepler7_besucherquelle';
+  function besucherquelleErfassen(){
     try {
-      if (localStorage.getItem(HERKUNFT_SPEICHER)) return;   // Entscheidung 1
+      if (localStorage.getItem(BESUCHERQUELLE_KEY)) return;   // Entscheidung 1
       const p = new URLSearchParams(location.search);
       const h = {};
       const q = p.get('utm_source'), m = p.get('utm_medium'), k = p.get('utm_campaign');
@@ -68733,7 +68733,7 @@ async function claimPendingRewards(){
         } catch(e){}
       }
       if (!Object.keys(h).length) return;                    // Entscheidung 2
-      localStorage.setItem(HERKUNFT_SPEICHER, JSON.stringify(h));
+      localStorage.setItem(BESUCHERQUELLE_KEY, JSON.stringify(h));
       if (q || m || k){                                      // Entscheidung 3
         const rest = new URLSearchParams(location.search);
         rest.delete('utm_source'); rest.delete('utm_medium'); rest.delete('utm_campaign');
@@ -68742,8 +68742,8 @@ async function claimPendingRewards(){
       }
     } catch(e){}
   }
-  function herkunftLesen(){
-    try { const r = localStorage.getItem(HERKUNFT_SPEICHER); return r ? JSON.parse(r) : null; }
+  function besucherquelleLesen(){
+    try { const r = localStorage.getItem(BESUCHERQUELLE_KEY); return r ? JSON.parse(r) : null; }
     catch(e){ return null; }
   }
   let supersededAtBoot = false;
@@ -68766,7 +68766,7 @@ async function claimPendingRewards(){
         history.replaceState(null, '', location.pathname + (rest ? '?'+rest : ''));
       }
     } catch(e){}
-    herkunftErfassen();
+    besucherquelleErfassen();
     const available = await checkBackend();
     if (!available){
       // Nur-Multiplayer: Ohne erreichbaren Server wird NICHT mehr solo/offline gestartet. Stattdessen
