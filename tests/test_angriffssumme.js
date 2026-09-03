@@ -46,6 +46,12 @@ const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
+// Wie schnitt(), aber auf einem uebergebenen Text - gebraucht fuer die Backend-Datei.
+function schnittIn(txt, von, bis, ab){
+  const a = txt.indexOf(von, ab||0); if (a < 0) return '';
+  const b = txt.indexOf(bis, a);     if (b < 0) return '';
+  return txt.slice(a, b);
+}
 function schnitt(von, bis, ab){
   const a = js.indexOf(von, ab||0); if (a < 0) return '';
   const b = js.indexOf(bis, a);     if (b < 0) return '';
@@ -176,6 +182,81 @@ const KAMPF = ATTACK.filter(k => TRANSPORT_OHNE_WAFFEN.indexOf(k) < 0);
     check('3c: und traegt beidseitig denselben Angriffswert', abweichend.length === 0, abweichend);
     // Ohne diese Zeile waere 3c still gruen, wenn KAMPF je leer liefe.
     check('3c: die Gegenprobe greift (es wurde wirklich verglichen)', KAMPF.length >= 20, KAMPF.length);
+  }
+}
+
+// ---- 4) Wer angreifen darf, braucht auch eine KONTERROLLE
+// Anlass (03.09.2026, Vollpruefung nach dem rawFleetPower-Befund): Der Kausalitaetsbrecher - das
+// staerkste Schiff des Spiels - stand in KEINER der vier Rollentabellen. Drei Folgen, alle
+// unsichtbar: sein Kontermultiplikator war immer 1 (er konterte nichts und wurde von nichts
+// gekontert, als einziges Kampfschiff ausserhalb von Schere-Stein-Papier), fleetDiversityMult
+// uebersprang ihn (Klassen ohne Rolle zaehlen dort nicht, seine 340 Angriff waren fuer die
+// Rollenbalance nicht vorhanden), und shipMarkFamily fiel bis auf 'zivil' durch - Werftmarken-Texte
+// eines Zivilschiffs plus ein Laderaum-Zweig an einem Schiff ohne Frachtraum.
+//
+// Die gepruefte Eigenschaft braucht KEINE Ausnahmeliste und ist damit dauerhaft: Wer in
+// ATTACK_SHIP_KEYS steht UND einen eigenen Angriffswert hat, ist ein Kampfschiff - und ein
+// Kampfschiff ohne Rolle ist immer ein Fehler. Die bewusst rollenlosen Schiffe (Frachter, Spaeher,
+// Spionageschiff, Forscher, Recycler, Kolonieschiff, Gesandtenschiff, Schuerfschiff) fallen von
+// selbst heraus, weil sie atk 0 haben; die Erkundungsschiffe ('ships', atk 5) stehen gar nicht erst
+// in ATTACK_SHIP_KEYS.
+//
+// GEGENPROBE, in BEIDE Richtungen gemessen:
+//   KEPLER_BACKEND_SERVER=<server.js vor der Behebung>  -> es fallen DREI: 4a, 4b und 4e
+//                                       (4e meldet "kausalitaetsbrecher: FE bomber / BE null")
+//   KEPLER_SPIELDATEI=<Spieldatei vor der Behebung>     -> ebenfalls DREI: 4c, 4d und 4e
+//                                       (4e meldet dann "FE null / BE bomber")
+// 4e faellt in beiden Richtungen mit, weil eine fehlende Rolle auf einer Seite zugleich eine
+// Abweichung zwischen den Seiten IST. Das ist gemessen, nicht geschaetzt - eine Pflichtliste,
+// die man sich zusammenreimt, ist beim naechsten Umbau wertlos.
+{
+  const rollenKeys = (txt, von, bis) => {
+    const s = schnittIn(txt, von, bis);
+    if (!s) return null;
+    const ohneKommentar = s.split('\n').map(z => z.replace(/\/\/.*$/, '')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
+    return [...new Set((ohneKommentar.match(/([a-zA-Z][a-zA-Z0-9]*)\s*:/g) || []).map(x => x.replace(/\s*:$/, '')))];
+  };
+  // Kampfschiffe = in ATTACK_SHIP_KEYS UND mit eigenem Angriffswert. atkAus() liefert null fuer das
+  // Superschlachtschiff (es steht nicht in SHIP_DEFS, sondern hat eigene Konstanten) - das ist ein
+  // Kampfschiff und muss mitzaehlen, deshalb wird nur atk === 0 ausgeschlossen.
+  const MIT_ROLLE = ATTACK.filter(k => atkAus(k) !== 0);
+  check('4: die Liste der rollenpflichtigen Klassen ist nicht leer', MIT_ROLLE.length >= 20, MIT_ROLLE.length);
+
+  const feOf  = rollenKeys(js, 'const COUNTER_ROLE_OF = {', '\n  };');
+  const feAtk = rollenKeys(js, 'const COUNTER_ROLE_ATK = {', '\n  };');
+  check('4: die Frontend-Rollentabellen wurden gelesen', !!feOf && !!feAtk && feOf.length >= 20 && feAtk.length >= 20,
+    { of: feOf && feOf.length, atk: feAtk && feAtk.length });
+  check('4c: jedes Kampfschiff hat im Frontend eine Konterrolle',
+    !!feOf && MIT_ROLLE.every(k => feOf.indexOf(k) >= 0), feOf ? MIT_ROLLE.filter(k => feOf.indexOf(k) < 0) : 'Tabelle fehlt');
+  check('4d: und ein Gewicht in COUNTER_ROLE_ATK',
+    !!feAtk && MIT_ROLLE.every(k => feAtk.indexOf(k) >= 0), feAtk ? MIT_ROLLE.filter(k => feAtk.indexOf(k) < 0) : 'Tabelle fehlt');
+
+  const { SERVER_JS: SJ } = require('./lib/umgebung');
+  if (!SJ){
+    console.log('OK   - 4a/4b: uebersprungen, das Backend-Repo liegt hier nicht daneben');
+  } else {
+    const beSrc = fs.readFileSync(SJ, 'utf8');
+    const beOf  = rollenKeys(beSrc, 'const COUNTER_ROLE_OF = {', '\n};');
+    const beAtk = rollenKeys(beSrc, 'const COUNTER_ROLE_ATK = {', '\n};');
+    check('4: die Backend-Rollentabellen wurden gelesen', !!beOf && !!beAtk && beOf.length >= 20 && beAtk.length >= 20,
+      { of: beOf && beOf.length, atk: beAtk && beAtk.length });
+    check('4a: jedes Kampfschiff hat auch im Backend eine Konterrolle',
+      !!beOf && MIT_ROLLE.every(k => beOf.indexOf(k) >= 0), beOf ? MIT_ROLLE.filter(k => beOf.indexOf(k) < 0) : 'Tabelle fehlt');
+    check('4b: und ein Gewicht in der Backend-COUNTER_ROLE_ATK',
+      !!beAtk && MIT_ROLLE.every(k => beAtk.indexOf(k) >= 0), beAtk ? MIT_ROLLE.filter(k => beAtk.indexOf(k) < 0) : 'Tabelle fehlt');
+    // Und die Rollen muessen UEBEREINSTIMMEN - eine Klasse, die vorne Bomber und hinten Kapital ist,
+    // waere ein Kontermultiplikator, der im Kampf anders faellt als in der Vorschau, UND ein
+    // abweichender Werftmarken-Zuwachs (shipMarkAtkPerStep/shipMarkShieldPerStep haengen daran).
+    const rolleVon = (txt, k, von, bis) => {
+      const s = schnittIn(txt, von, bis) || '';
+      const m = new RegExp("\\b" + k + "\\s*:\\s*'(abfang|bomber|kapital)'").exec(s);
+      return m ? m[1] : null;
+    };
+    const schief = MIT_ROLLE.filter(k =>
+      rolleVon(js, k, 'const COUNTER_ROLE_OF = {', '\n  };') !== rolleVon(beSrc, k, 'const COUNTER_ROLE_OF = {', '\n};'));
+    check('4e: und beide Seiten geben derselben Klasse dieselbe Rolle', schief.length === 0,
+      schief.map(k => k + ': FE ' + rolleVon(js, k, 'const COUNTER_ROLE_OF = {', '\n  };')
+                    + ' / BE ' + rolleVon(beSrc, k, 'const COUNTER_ROLE_OF = {', '\n};')));
   }
 }
 

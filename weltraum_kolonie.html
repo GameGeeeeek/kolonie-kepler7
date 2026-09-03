@@ -21691,6 +21691,23 @@
     // ein gepanzerter Verband (Grosskampfschiff), das Sternenbanner schlaegt auf grosse Ziele
     // (Bomber). Neue Verteilung: 8 / 7 / 9.
     ,paktkorvette:'abfang', bundeskreuzer:'kapital', sternenbanner:'bomber'
+    // Kausalitaetsbrecher (03.09.2026, Vollpruefung nach dem rawFleetPower-Befund): KAPITAL.
+    // Er fehlte in dieser Tabelle KOMPLETT - das staerkste Schiff des Spiels stand damit als
+    // einziges Kampfschiff ausserhalb von Schere-Stein-Papier (Kontermultiplikator immer 1), war
+    // fuer fleetDiversityMult unsichtbar (Klassen ohne Rolle werden uebersprungen) und fiel im
+    // Frontend durch shipMarkFamily bis auf 'zivil' durch - Werftmarken-Texte eines Zivilschiffs
+    // und ein Laderaum-Zweig an einem Schiff ohne Frachtraum.
+    // BOMBER, und der Weg dorthin gehoert dazu: Der erste Entwurf war KAPITAL, nach derselben
+    // Regel wie beim Urmaterie-Koloss darueber (Tempo 34 - das langsamste Kampfschiff des
+    // Spiels - und Schild 120, der hoechste Wert). Gemessen hat das die Verteilung auf
+    // 8/7/11 gebracht, Abstand 4, und tests/test_flotte_v8375.js hat angeschlagen: Kapital
+    // war mit 10 bereits die vollste Rolle und lag exakt am erlaubten Hoechstabstand.
+    // Der Kausalitaetsbrecher ist die SPAETESTE Klasse des Spiels - also genau der Fall, vor
+    // dem die Regel warnt ('keine Rolle darf die spaeten Klassen an sich ziehen').
+    // Bomber ist ebenso gut belegt: hoechster Angriffswert des Spiels (340), dieselbe Rolle
+    // wie der Singularitaets-Vernichter (280). Neue Verteilung 8/8/10, Abstand 2 - der beste
+    // Wert seit dem Umbau vom 02.08.2026. Entscheidung Sascha.
+    ,kausalitaetsbrecher:'bomber'
     // Bewusst OHNE Rolle (Multiplikator 1): Frachter, Späher, Spionageschiff, Forscher, Recycler,
     // Kolonieschiff, Gesandtenschiff, Schürfschiff - alles Schiffe ohne oder ohne nennenswerte
     // Kampfkraft. Sie sollen weder kontern noch gekontert werden.
@@ -22433,7 +22450,10 @@
     // Schluessel tragen: Ein Schiff mit Rolle, aber ohne Gewicht zaehlt in der Rollenbalance
     // stillschweigend als 0 - im Frontend anders als im Backend, das seine eigene Kopie fuehrt.
     // Genau das ist beim ersten Anlauf passiert und von tests/test_flottenbalance.js gemeldet worden.
-    paktkorvette:40, bundeskreuzer:110, sternenbanner:240
+    paktkorvette:40, bundeskreuzer:110, sternenbanner:240,
+    // Ein Schluessel mit Rolle, aber ohne Gewicht zaehlt in der Rollenbalance still als 0 -
+    // siehe den Kommentar darueber. Wert identisch zu SHIP_DEFS (atk 340).
+    kausalitaetsbrecher:340
   };
   function fleetDiversityMult(fleet){
     if (!fleet) return 1;
