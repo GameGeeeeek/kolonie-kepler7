@@ -2116,6 +2116,20 @@
     .ach-cat-count.ach-cat-full { color:var(--c-secondary); border-color:var(--c-secondary-dark); background:rgba(var(--secondary-dark-rgb),0.14); }
     .ach-pts { font-family:var(--font-mono, monospace); font-size:9.5px; font-weight:700; color:#fac775; background:rgba(250,199,117,0.13);
       border:var(--bw-1) solid rgba(250,199,117,0.35); padding:0 4px; margin-left:5px; vertical-align:middle; white-space:nowrap; }
+    /* Hort-Laufschrift (03.09.2026): der seltenste Expeditionsfund, serverweit gemeldet. */
+    #hortTicker { position:fixed; top:0; left:0; right:0; z-index:9000; overflow:hidden;
+      background:linear-gradient(90deg, rgba(250,199,117,0.10), rgba(250,199,117,0.22), rgba(250,199,117,0.10));
+      border-bottom:var(--bw-1) solid rgba(250,199,117,0.45); padding:6px 0; display:none; }
+    #hortTicker.an { display:block; }
+    #hortTickerText { display:inline-block; white-space:nowrap; padding-left:100%;
+      font-size:12.5px; color:#fac775; font-weight:600;
+      animation:hortLauf 18s linear 1; }
+    /* Wer Bewegung im Bild nicht vertraegt, bekommt den Text stehend statt laufend - abgeschnitten
+       waere er dann aber unlesbar, deshalb zusaetzlich umbrechend. */
+    @media (prefers-reduced-motion: reduce) {
+      #hortTickerText { animation:none; padding-left:0; white-space:normal; text-align:center; display:block; }
+    }
+    @keyframes hortLauf { from { transform:translateX(0); } to { transform:translateX(-100%); } }
     /* Markt-Vertiefung (20.07.2026): Preisverlauf-Sparkline + Ereignis-Banner */
     .mkt-spark-wrap { flex-shrink:0; opacity:1; align-self:flex-start; }
     .mkt-spark { display:block; width:150px; height:44px; }
@@ -3420,6 +3434,7 @@
         <div id="raidScoutedFleetRow" style="display:none; flex-wrap:wrap; font-size:11px; padding-left:22px;"></div>
       </div>
 
+      <div id="hortTicker" role="status" aria-live="polite"><span id="hortTickerText"></span></div>
       <div class="event-banner" id="eventBanner" style="display:none;">
         <div style="display:flex; align-items:center; gap:8px;">
           <i class="ti" id="eventBannerIcon" aria-hidden="true" style="font-size:20px;"></i>
@@ -14330,12 +14345,44 @@
   // Merkt sich die zuletzt bekannte Liste eigener Systeme (nur Sitzung), um Verluste durch
   // Fraktions-Rückeroberungen zu erkennen und dem Spieler direkt zu melden.
   let lastKnownConquered = null;
+  // Die Laufschrift fuer den seltensten Fund im ganzen Spiel.
+  //
+  // ERKANNT WIRD AN DER ART, nicht am Wortlaut: Das Backend setzt art:'hort' (seit 03.09.2026).
+  // Ein Filter auf den Satzanfang waere genau die zufaellige Momentaufnahme, vor der CLAUDE.md
+  // warnt - eine umformulierte Meldung braeche das Banner lautlos.
+  //
+  // ZWEI SIEBE, weil eines allein nicht reicht: Die Menge der schon gezeigten IDs verhindert die
+  // Wiederholung innerhalb einer Sitzung; das Zeitfenster verhindert, dass beim ersten Laden nach
+  // einem Neustart die letzten 40 Weltlage-Meldungen nacheinander durchlaufen. Der Ringpuffer haelt
+  // sie naemlich lange, und ein Ereignis von gestern ist keine Nachricht mehr.
+  const HORT_TICKER_FENSTER = 15 * 60 * 1000;
+  const hortGezeigt = new Set();
+  function zeigeHortLaufschrift(){
+    const el = document.getElementById('hortTicker');
+    const txt = document.getElementById('hortTickerText');
+    if (!el || !txt || !galaxyCache) return;
+    const jetzt = Date.now();
+    const neu = (galaxyCache.news||[]).filter(e =>
+      e && e.art === 'hort' && e.id && !hortGezeigt.has(e.id) && (jetzt - (e.time||0)) < HORT_TICKER_FENSTER);
+    if (!neu.length) return;
+    for (const e of neu) hortGezeigt.add(e.id);
+    // Die aelteste zuerst waere die Reihenfolge des Ringpuffers, nicht die der Aufmerksamkeit:
+    // Bei mehreren auf einmal laeuft die JUENGSTE, die anderen stehen im Log.
+    const zeigen = neu.sort((a,b) => (b.time||0) - (a.time||0))[0];
+    for (const e of neu) log(e.text, e.icon || 'ti-trophy', 'ok');
+    txt.textContent = zeigen.text;
+    el.classList.remove('an');
+    void el.offsetWidth;          // Neustart der Animation erzwingen, sonst laeuft sie nicht erneut
+    el.classList.add('an');
+    setTimeout(() => { el.classList.remove('an'); }, 18500);
+  }
   async function loadGalaxyState(){
     if (!useBackend()) return;
     try {
       const res = await backendFetch('/galaxy', { method:'GET' });
       if (!res.ok) return;
       galaxyCache = await res.json();
+      zeigeHortLaufschrift();
       ladeVorposten();   // B2: dieselbe Kadenz wie der Galaxie-Zustand (alle 2 Min.)
       // Verlust-Diff: welche eigenen Systeme sind seit dem letzten Laden verschwunden?
       const mineNow = myConqueredSystems();
@@ -19528,13 +19575,87 @@
   // Angriffsmissionen (dort 0 Frachtraum ohne Frachter = Totalverlust der Beute, bewusst hart) sollen
   // normale Expeditionsfunde (siehe b_resource-Zweig unten, typischerweise 250-450*mult) nicht plötzlich
   // Frachter zur Pflicht machen - der Deckel soll nur bei außergewöhnlich großen Funden wirklich greifen.
-  const EXPEDITION_BASE_CARGO = 2000;
-  // Grobe Obergrenze eines EINZELNEN Ressourcenfunds (bester Fall: Zufalls-Roll -> 1, kein
-  // Kampfverlust) - dient nur der Frachtraum-Warnung im UI vor dem Start. Spiegelt die Formel in der
-  // Fundauflösung: rawAmt = (250 + rand*450) * mult, also max. 700 * baseRewardMult (siehe b_resource-
-  // Zweig in checkMissions). Bewusst separat gehalten, damit die Warnung ohne echte Auswürfelung
-  // abschätzen kann, ob der Frachtraum bei einem Glücksfund knapp würde.
-  const EXPEDITION_MAX_RESOURCE_FIND_BASE = 700;
+  const EXPEDITION_BASE_CARGO = 15000;
+  // Die Fundleiter (03.09.2026, Spieler-Wunsch Sascha: "man soll auch mal 1 millionen funde
+  // bekommen sollen selten sein - was soll der spieler mit 700er funden anfangen?").
+  //
+  // VORHER: rawAmt = (250 + rand*450) * mult, also 250-700 * mult, im Mittel 475. Gemessen an der
+  // Wirtschaft, in der dieser Fund landet, war das nichts: Eine ausgebaute Erzmine (20 wirksame
+  // Stufen a 0,225/s, siehe wirksameStufen) bringt mit Habitat, Forschung, Modulen, Rolle und
+  // Orbitalring rund 103.000 Erz je Planet und Stunde - bei 15 Kolonien 1,5 Millionen. Ein
+  // 700er-Fund war 1,6 Sekunden Produktion.
+  //
+  // JETZT eine feste Leiter mit sechs benannten Stufen. Benannt, weil eine Stufe mit Namen
+  // wiedererkannt wird: "ein Hort!" ist ein Ereignis, "+643.221 Erz" ist eine Zahl. Die Gewichte
+  // fallen steil, waehrend die Betraege steil steigen - der Wunsch war ausdruecklich
+  // "um so mehr desto seltener".
+  //
+  // GEMESSEN, bevor die Zahlen hier standen (Mittelwert je Fund 10.743, Faktor 23 gegenueber vorher):
+  //    Frueh    1,3 Funde/h ->  11.345/h gefunden,   3.955/h heimgebracht (der Frachtraum kappt 65%)
+  //    Mitte    3,2 Funde/h ->  48.422/h gefunden,  31.732/h heimgebracht
+  //    Endgame 15,0 Funde/h -> 354.519/h gefunden, 310.194/h heimgebracht = 20% der eigenen Minen
+  // Der Hort trifft den Maximalspieler alle 22 Stunden, den Anfaenger alle 253 - und dessen
+  // Frachtraum deckelt ihn dort auf einen Bruchteil. Die Leiter reguliert sich also ueber den
+  // Ausbaustand, ohne eine einzige Abfrage auf den Ausbaustand.
+  //
+  // Die Icons kommen aus den 72 ti-Klassen, fuer die dieses Dokument eine CSS-Regel mitbringt
+  // (Tabler ist hier ein eingebettetes SUBSET; ein Name ohne Regel rendert lautlos nichts -
+  // test_iconabdeckung.js Abschnitt 13). Sechs verschiedene, aufsteigend in der Wertigkeit.
+  const EXPEDITION_FUND_LEITER = [
+    { name:'Splitterfund', icon:'ti-pick',          betrag:     700, p:0.550 },
+    { name:'Ader',         icon:'ti-mountain',      betrag:    2800, p:0.260 },
+    { name:'Reiche Ader',  icon:'ti-diamond',       betrag:   11000, p:0.120 },
+    { name:'Kammer',       icon:'ti-box',           betrag:   45000, p:0.050 },
+    { name:'Depot',        icon:'ti-building-bank', betrag:  180000, p:0.017 },
+    { name:'Hort',         icon:'ti-trophy',        betrag: 1000000, p:0.003 }
+  ];
+  // Streuung INNERHALB einer Stufe: Zwei Adern sollen sich nicht auf die Einerstelle gleichen.
+  // Bewusst schmal - der Abstand zweier Stufen ist mindestens Faktor 3,9, und eine breitere
+  // Streuung liesse die Stufen ineinanderlaufen, bis die Leiter nur noch Deko waere.
+  const EXPEDITION_FUND_STREUUNG = 0.15;
+  // Ein Wurf, EINE Stelle: Fundaufloesung und Vorschau lesen dieselbe Leiter.
+  //
+  // ohneSpitze (03.09.2026): Die oberste Stufe kommt AUSSCHLIESSLICH vom Server - er wuerfelt sie
+  // beim Expeditionsstart und meldet sie allen. Wuerfelte der Client sie daneben selbst, gaebe es
+  // Horte OHNE Meldung: dieselbe Stufe, mal mit und mal ohne das Ereignis, das sie ausmacht. Der
+  // Wurf faellt dann der zweithoechsten Stufe zu - 0,3% mehr Depots, gemessen unerheblich; die
+  // Alternative (die Gewichte neu normieren) haette die Leiter zu einer Tabelle gemacht, die man
+  // nicht mehr ablesen kann.
+  function expeditionFundStufe(roll, ohneSpitze){
+    const r = typeof roll === 'number' ? roll : Math.random();
+    const letzter = EXPEDITION_FUND_LEITER.length - 1;
+    let kum = 0;
+    for (let i = 0; i < EXPEDITION_FUND_LEITER.length; i++){
+      kum += EXPEDITION_FUND_LEITER[i].p;
+      if (r < kum) return EXPEDITION_FUND_LEITER[(ohneSpitze && i === letzter) ? letzter - 1 : i];
+    }
+    // Die Gewichte summieren sich auf 1,000 - ein Gleitkomma-Rest darf trotzdem nicht durchfallen.
+    // Der Rueckfall geht auf die HAEUFIGSTE Stufe, nicht auf die letzte: Faellt der Rest der
+    // seltensten zu, waere das ein stiller Zuschlag auf genau den Fund, der selten bleiben soll.
+    return EXPEDITION_FUND_LEITER[0];
+  }
+  // Frachtraum einer Expedition - EINE Stelle fuer Vorschau und Auswertung. Bis zum 03.09.2026
+  // stand diese Summe zweimal im Code (Fundaufloesung und Expeditionsfenster), genau wie
+  // expeditionRewardMult() bis zum 01.08.2026; dort lief die Vorschau der Auswertung um bis zu
+  // 13% hinterher und meldete "passt", wo der Fund in Wirklichkeit gekappt wurde.
+  //
+  // Der Faktor auf die Frachter: Mit der Leiter reicht ein Frachtraum in Schiffsgroesse nicht mehr -
+  // ein Hort braeuchte sonst 333 Bergungsfrachter. Er gilt AUSDRUECKLICH nur hier. Bei PvP-Beute
+  // und NPC-Angriffen bleibt fleetCargoCapacity() unveraendert die Wahrheit; dort ist der knappe
+  // Frachtraum eine gewollte Entscheidung und kein Hindernis, das weggeraeumt werden soll.
+  // Damit staffelt sich, was ohne Frachter heimkommt: Splitterfund bis Reiche Ader vollstaendig,
+  // eine Kammer braucht 1 Bergungsfrachter, ein Depot 6, ein Hort 33.
+  const EXPEDITION_CARGO_FAKTOR = 10;
+  function expeditionCargoCapacity(fleet){
+    return EXPEDITION_BASE_CARGO + Math.round(fleetCargoCapacity(fleet) * EXPEDITION_CARGO_FAKTOR);
+  }
+  // Obergrenze eines EINZELNEN Ressourcenfunds - die Spitze der Leiter samt oberer Streuung, damit
+  // die Frachtraum-Warnung ohne echte Auswürfelung abschätzen kann, ob es bei einem Glücksfund knapp
+  // würde. Bis zum 03.09.2026 stand hier die Zahl 700 als ZWEITE WAHRHEIT neben der Fundformel: Wer
+  // die eine anfasste, musste an die andere denken. Jetzt ist sie abgeleitet und kann nicht mehr
+  // auseinanderlaufen.
+  const EXPEDITION_MAX_RESOURCE_FIND_BASE =
+    Math.round(EXPEDITION_FUND_LEITER[EXPEDITION_FUND_LEITER.length-1].betrag * (1 + EXPEDITION_FUND_STREUUNG));
   // Der Beute-Multiplikator einer Expedition - EINE Stelle fuer Schaetzung und echte Auswuertung.
   //
   // Bis zum 01.08.2026 stand diese Formel zweimal im Code: hier fuer die Frachtraum-Warnung und in
@@ -19550,6 +19671,11 @@
     const ring = planetKey ? orbitalStationOf(planetKey) : null;
     const signal = (ring && ring.focus==='signal') ? ring.level * ORBITAL_SIGNAL_PER_LEVEL : 0;
     return (rewardMult||1) * expeditionExperienceMult() * (1 + ascBonus('expedition')*0.02 + prestigePerkCount('expedition')*0.04 + deckelWeich(moduleBonusTotal('expedition'), 1.0) + officerBonus('aufklaerer') + codexExpeditionBonus() + doctrineBonusOf('expBonus') + sektorBonus(planetKey, 'expedition') + signal) * seasonalLootMult();
+  }
+  // Welche Ressourcen eine Expedition ueberhaupt finden kann - eine Stelle fuer die Fundaufloesung
+  // und fuer die Hort-Anfrage beim Start (03.09.2026).
+  function expeditionResKeys(etDef){
+    return (etDef && etDef.resKeys) || ['erz','kristalle','deuterium','antimaterie','energie'];
   }
   function expeditionMaxResourceFind(rewardMult, planetKey){
     return Math.round(EXPEDITION_MAX_RESOURCE_FIND_BASE * expeditionRewardMult(rewardMult, planetKey));
@@ -27402,7 +27528,13 @@ async function claimPendingRewards(){
     { key:'build', name:'1 Gebäude oder Schiff fertigstellen', icon:'ti-building-factory-2', target:1, reward:{erz:600,energie:400} },
     { key:'trade', name:'1 Handel am Markt abschließen', icon:'ti-truck', target:1, reward:{credits:60}, nav:{ tab:'markt' } },
     { key:'fquest', name:'1 Fraktionsauftrag abschließen', icon:'ti-medal', target:1, reward:{credits:80} },
-    { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100}, nav:{ tab:'expedition' } },
+    // hinweis (03.09.2026, Spieler-Wunsch Sascha "auf die todoliste mal aufführen wieviele ressourcen
+    // man finden kann bei der expedition"): landet im title der Pille. Bewusst OHNE den Beute-
+    // Multiplikator - der Text muss über Ticks byte-gleich bleiben, sonst fällt die Markup-Signatur
+    // der Tagesaufgaben-Leiste (v8.382.0, sechs Ticks byte-gleich gemessen). Die vollständige Leiter
+    // mit allen sechs Stufen steht im Expeditionsfenster, wohin die Pille ohnehin springt.
+    { key:'expedition', name:'1 Expedition abschließen', icon:'ti-map-2', target:1, reward:{forschungspunkte:20,deuterium:100}, nav:{ tab:'expedition' },
+      hinweis:'Ressourcenfunde reichen vom Splitterfund (700) bis zum Hort (1 Mio.) – je größer, desto seltener.' },
     { key:'npc', name:'3 NPC-Kämpfe gewinnen', icon:'ti-target', target:3, reward:{erz:500,kristalle:250}, nav:{ tab:'galaxie' } },
     { key:'explore', name:'1 neuen Planeten entdecken', icon:'ti-planet', target:1, reward:{credits:70}, nav:{ tab:'galaxie' } },
     // 18.07.2026 (Spieler-Wunsch "Tägliche Missionen Variation erweitern"): von 8 auf 11 Typen
@@ -39095,7 +39227,7 @@ async function claimPendingRewards(){
       { title:'Expeditions-Signale (Peilungen)', body:'Expeditionen sind sonst reiner Zufall – Signale machen daraus eine Entscheidung. Jede heimkehrende Expedition fängt mit rund 14% Wahrscheinlichkeit eine <strong>Peilung</strong> auf – und spätestens nach acht erfolglosen Expeditionen ist die nächste <strong>garantiert</strong>, damit eine Pechsträhne dich nicht ausbremst. Eine Peilung ist: ein zeitlich begrenztes Ziel in einem <strong>bereits entdeckten</strong> Sternsystem, dessen Fundart du vorher <strong>kennst</strong>. Es gibt vier Arten: <strong>Materialpeilung</strong> (ein seltenes Material), <strong>Technik-Echo</strong> (ein Standort-Modul plus 4 Modulfragmente), <strong>Frachtsignal</strong> (ein großer Ressourcen-Cache) und <strong>Kartenfragment-Signal</strong> (ein Sternenkarten-Fragment für die Schatzdepot-Kette). Peilungen erscheinen im Expeditions-Reiter über dem Startknopf und als 📡 auf der Galaxie-Karte. Steuerst du eine an, <strong>ersetzt</strong> sie beim Eintreffen den normalen Fundwurf durch ihren Fund – garantiert, ohne Würfeln. Das Ziel wird wie der Rückzugsschalter beim <strong>Start</strong> in die Mission eingebacken, und ein bereits angesteuertes Signal lässt sich nicht ein zweites Mal wählen. Es sind höchstens 3 Peilungen gleichzeitig aktiv, höchstens eine je System, und jede verfällt nach 2 Stunden. Läuft sie ab, während deine Expedition noch fliegt, würfelt diese ganz normal – die Begegnungs- und Verlustmechanik ist von Signalen völlig unberührt. Angekommene Peilungen zählt der <strong>Expeditions-Kodex</strong> mit: zwölf davon schalten die Stufe „Signalhorcher" frei (8 Sternenessenz und dauerhaft +3% Expeditionsbeute). Außerdem gibt es die Tagesaufgabe <strong>„1 Peilung ansteuern"</strong>, sobald du 15 Expeditionen abgeschlossen hast.' },
       { title:'Was bei einer Begegnung passiert', body:'Trifft eine Expedition auf eine feindliche Flotte, entscheidet allein das <strong>Kräfteverhältnis</strong> zwischen deiner Eskorte und dem Gegner über den Ausgang – es gibt drei: <strong>abgewehrt</strong> (keine Verluste, volle Beute), <strong>geschwächt</strong> (das Forschungsschiff geht verloren, die Beute schrumpft auf 40%) und <strong>schwerer Verlust</strong> (Forschungsschiff plus 50–80% der Eskorte, keine Beute – der Rest der Eskorte setzt sich ab). Die Eskorte wirkt dabei stark überproportional: Bei ausgeglichenen Kräften liegt das Risiko eines schweren Verlusts bei rund 10%, bei deutlicher Überlegenheit unter 2%, ohne jede Eskorte dagegen bei 40%. Es lohnt sich also, lieber eine ordentliche Eskorte mitzuschicken als gar keine – anders als früher vervielfacht eine größere Eskorte den zu erwartenden Verlust nicht, sondern senkt ihn. Die Stärke der Gegner wächst mit deinem Punktestand, aber nur bis zu einer festen Obergrenze; ein gut ausgebautes Imperium wächst also aus dem Risiko heraus. Verlorene Schiffe hinterlassen ein <strong>Trümmerfeld</strong> am Startplaneten, das sich mit Recyclern bergen lässt, und <strong>Hyperjäger</strong> in der Eskorte senken die eigenen Verluste um 3% je Stück (max. −30%).' },
       { title:'Expeditions-Kette & Kodex', body:'<strong>Sternenkarten-Fragmente</strong> tauchen gelegentlich als Sonderfund auf. Hast du drei gesammelt, sind die Koordinaten eines verschollenen <strong>Schatzdepots</strong> vollständig – deine nächste erfolgreiche Expedition birgt dann garantiert einen wertvollen Fund (großer Ressourcen-Cache, ein Standort-Modul, Modulfragmente und XP). Der <strong>Expeditions-Kodex</strong> (aufklappbar im Expedition-Tab) sammelt deinen Fortschritt: entdeckte Sonderfunde, gefundene seltene Materialien, entdeckte Systeme und abgeschlossene Schatzdepots. Das Sammeln zahlt sich aus: Der Kodex hat sieben <strong>Stufen</strong>, die sich einmalig einlösen lassen – 15, 30, 45 und alle Sonderfunde, jedes auffindbare Material, drei abgeschlossene Schatzdepot-Ketten sowie zwölf angesteuerte Peilungen. Sie bringen Sternenessenz und Kredite, vier davon zusätzlich einen <strong>dauerhaften Beutebonus</strong> auf alle künftigen Expeditionen (+3%, +5%, +2% und +3%, zusammen bis zu +13%). Der Bonus fließt in dieselbe gedeckelte Bonus-Gruppe wie Aufstiegs-, Prestige-, Modul- und Offiziersboni. Eingelöste Stufen bleiben über Prestige UND Aufstieg hinweg erhalten – sie lassen sich also weder verlieren noch nach einem Reset erneut kassieren.' },
-      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Alle Funde außer der reinen Ressourcenbeute tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
+      { title:'Expeditionsfunde & Seltenheitsstufen', body:'Bei jeder erfolgreich abgeschlossenen Expedition (mind. 1 Forschungsschiff nötig) wird neben der üblichen Ressourcenbeute gewürfelt, was zusätzlich gefunden wird: nichts, Ressourcen (häufigster Fall), ein besonderes Einzelereignis, ein Verbrauchsgegenstand/Booster, ein selteneres Material (oder ein Fragment davon, oder ein exklusiver kosmetischer Avatar), ein Schiffsmodul oder eine <strong>verlassene Flotte</strong> (fügt der eigenen Flotte direkt einige Schiffe hinzu - neben Jägern und Kreuzern gelegentlich auch stärkere Typen wie Bomber, Zerstörer, Trägerschiff oder Schlachtschiff, wobei stärkere Schiffe seltener und in kleinerer Stückzahl gefunden werden). Der <strong>Ressourcenfund</strong> läuft über eine eigene, feste Leiter aus sechs Stufen: Splitterfund (700), Ader (2.800), Reiche Ader (11.000), Kammer (45.000), Depot (180.000) und – in weniger als jedem dreihundertsten Fund – der <strong>Hort</strong> mit einer vollen Million. Je größer die Stufe, desto seltener; alle sechs werden zusätzlich mit deinem Beute-Multiplikator verrechnet. Was davon wirklich ankommt, entscheidet der <strong>Frachtraum</strong>: Die unteren drei Stufen trägt jede Expedition heim, für die oberen drei brauchst du Frachter in der Eskorte (ein voller Hort etwa 33 Bergungsfrachter). Das Expeditionsfenster zeigt vor dem Start, bis zu welcher Stufe dein Frachtraum reicht. Alle übrigen Funde tragen eine von fünf <strong>Seltenheitsstufen</strong> (Gewöhnlich, Ungewöhnlich, Selten, Episch, Legendär, farblich unterschieden) - je höher, desto seltener und wertvoller. <strong>Einflussfaktoren auf seltenere Funde:</strong> die Expeditionsstufe (Tiefenraum > Standard > Kurz), eine stärkere Eskorte, die Forschung <strong>Expeditionsanalytik</strong> (eigenständiger Forschungszweig) und aktive saisonale Beute-Events (z.B. Kopfgeldtag, Perseiden) - diese schalten zusätzlich besondere <strong>Event-Items</strong> frei, die außerhalb solcher Events gar nicht im Fundpool sind. Der ausführliche Bericht zu jeder Expedition (Berichte-Tab) zeigt Beute, Fundart und Seltenheitsstufe. <strong>Frachtraum:</strong> ein großzügiger Basis-Frachtraum deckt praktisch jeden normalen Ressourcenfund ab, auch ganz ohne Eskorte - erst bei außergewöhnlich hohen Funden (z.B. Tiefenraum-Expeditionen mit gestapelten Boni) lohnt sich <strong>Frachter/Großer Frachter</strong> als zusätzliche Eskorte-Wahl, um den vollen Fund mitnehmen zu können.' },
       { title:'Expeditions-Limit: nur 1 gleichzeitig zu Beginn', body:'Zusätzlich zur Forschungsschiff-Anzahl je Planet und dem allgemeinen Flottenentsendelimit gibt es ein eigenes, planetenübergreifendes Limit für gleichzeitig laufende Expeditionen - anfangs nur <strong>1</strong>. Die eigenständige Forschung <strong>Expeditionskoordination</strong> (Kategorie Logistik) erhöht dieses Limit um 1 je Stufe, bis maximal <strong>5</strong> gleichzeitige Expeditionen bei Stufe 4. Der aktuelle Stand wird direkt im Expedition-Tab beim Start-Formular angezeigt.' },
       { title:'Verbrauchsgegenstände & seltene Materialien', body:'Neben Ressourcen bringen Expeditionen zwei Arten von Fundstücken mit. <strong>Verbrauchsgegenstände</strong> liegen im Inventar und werden per Klick eingelöst – neben den bekannten Boostern gibt es inzwischen Fundstücke, die gezielt in vorhandene Systeme eingreifen: <strong>Bergungsdrohnen</strong> räumen ein eigenes Trümmerfeld ohne Recycler ab, die <strong>Sternenkarten-Kopie</strong> zählt auf die Schatzdepot-Kette ein, der <strong>Modul-Katalysator</strong> liefert Modulfragmente, der <strong>Veteranen-Drillbefehl</strong> Veteranen-Erfahrung, das <strong>Empfehlungsschreiben</strong> Fraktionsruf, der <strong>Umschulungsbefehl</strong> einen kostenlosen Doktrin-Wechsel und die <strong>Treibstoff-Notration</strong> Deuterium und Antimaterie. Seit dem 28.07.2026 gibt es eine sechste, höchste Stufe: <strong>Mythisch</strong>. Sie ist rund viermal seltener als legendär und beherbergt die zwei stärksten Fundstücke des Spiels – das <strong>Werftkommando</strong> (stellt ALLE bezahlten Bauaufträge sofort fertig; vorher episch, was seine Wirkung deutlich untertrieb) und den <strong>Forschungsdurchbruch</strong>, der die laufende Forschung sofort abschließt. Dazu das <strong>Urwerkzeug</strong>, das ein Modul mythischer Güte fertigt. <strong>Episch</strong> sind unter anderem der <strong>Störsender</strong> (verschiebt den nächsten Piratenüberfall um zwei Stunden), die <strong>Quantenpeilung</strong> (schützt drei Expeditionen vor schweren Verlusten), die <strong>Bergungs-Modulkiste</strong> und die <strong>Tiefenkarte</strong>, die eine Gegenmaßnahme für den Abgrund liefert. Drei der neuen Stücke verbinden Expeditionen mit dem Abgrund, der bisher eine geschlossene Schleife war – die <strong>Splitterkiste</strong> ist sogar der einzige Weg, an Abgrundsplitter zu kommen, ohne selbst abzutauchen. Insgesamt fallen bei Expeditionen jetzt spürbar mehr Gegenstände an: Der Fundtopf für Gegenstände wurde von 12% auf 18% angehoben, zulasten der reinen Rohstofffunde. <strong>Seltene Materialien</strong> dagegen verbraucht man nicht direkt: Sie schalten Gebäude frei (Kristallherz → Kristallfestung, <strong>Resonanzkristall</strong> → Resonanzschild-Emitter, <strong>Urmaterie</strong> → Urmaterie-Reaktor) oder werden für Allianz-Weltprojekte und Spezialschiffe gebraucht. Von jedem Material gibt es auch <strong>Fragmente</strong> – ein häufigerer, kleinerer Fund; je vier davon lassen sich zum vollen Material zusammensetzen, sodass Pech beim Würfeln nicht endlos bestraft wird.' },
       { title:'Letzte Sendung wiederholen', body:'Sobald in der aktuellen Sitzung schon einmal erfolgreich eine Expedition gestartet wurde, erscheint neben „Expedition starten" der Knopf <strong>„Letzte wiederholen"</strong>: stellt Typ und Eskorte-Zusammensetzung der zuletzt gestarteten Expedition wieder her und startet SOFORT - ideal zum wiederholten Farmen, ohne die Eskorte jedes Mal neu zusammenzuklicken. Ist am aktuellen Standort inzwischen weniger verfügbar als beim letzten Mal, wird automatisch auf das tatsächlich Vorhandene gekappt statt die Sendung zu blockieren.' },
@@ -53094,7 +53226,11 @@ async function claimPendingRewards(){
               state.expeditionCodex = state.expeditionCodex || {};
               state.expeditionCodex.chainCompleted = (state.expeditionCodex.chainCompleted||0)+1;
               // Jackpot: großer Ressourcen-Cache + garantiertes Standort-Modul (bis Legendär) + Fragmente + XP.
-              const jackRes = { erz: Math.round(3000*mult), kristalle: Math.round(2200*mult), deuterium: Math.round(1400*mult), antimaterie: Math.round(180*mult) };
+              // Zusammen 272.000 (03.09.2026, mit der Fundleiter): ueber einem Depot (180.000), unter
+              // einem Hort (1.000.000). Das Schatzdepot ist der Lohn fuer drei gesammelte Fragmente -
+              // es muss ueber dem liegen, was ein Gluecksfall nebenbei liefert, und unter dem, was der
+              // seltenste Fund des Spiels bringt.
+              const jackRes = { erz: Math.round(120000*mult), kristalle: Math.round(90000*mult), deuterium: Math.round(55000*mult), antimaterie: Math.round(7000*mult) };
               gainResources(jackRes);
               const modName = grantRandomModule();
               state.moduleFragments = (state.moduleFragments||0) + 6;
@@ -53107,21 +53243,33 @@ async function claimPendingRewards(){
               findText = EXPEDITION_NOTHING_FLAVOR[Math.floor(Math.random()*EXPEDITION_NOTHING_FLAVOR.length)];
             } else if (findRoll < b_resource){
               // Ausbau A: Forschungsexpeditionen schütten bevorzugt Forschungspunkte aus (etDef.resKeys).
-              const resKeys = etDef.resKeys || ['erz','kristalle','deuterium','antimaterie','energie'];
-              const res = resKeys[Math.floor(Math.random()*resKeys.length)];
-              const rawAmt = Math.round((250+Math.random()*450)*mult);
+              const resKeys = expeditionResKeys(etDef);
+              const res = m.hortZusage ? m.hortZusage.res : resKeys[Math.floor(Math.random()*resKeys.length)];
+              // ohne die Spitze: Der Hort kommt allein vom Server (m.hortZusage), damit es keinen
+              // Hort ohne die Meldung gibt, die ihn zum Ereignis macht.
+              const fundStufe = m.hortZusage ? EXPEDITION_FUND_LEITER[EXPEDITION_FUND_LEITER.length-1] : expeditionFundStufe(undefined, true);
+              // Bei einer Server-Zusage ist DESSEN Betrag die Wahrheit - sonst stuende in der Meldung
+              // an alle eine andere Zahl als im eigenen Bericht.
+              const rawAmt = m.hortZusage ? m.hortZusage.betrag
+                : Math.round(fundStufe.betrag * (1 - EXPEDITION_FUND_STREUUNG + Math.random()*2*EXPEDITION_FUND_STREUUNG) * mult);
               // Frachtraum-Deckelung (20.07.2026, Spieler-Wunsch "bei vielen Ressourcen müssen die
-              // mitgenommen werden können"): großzügiger Basis-Frachtraum deckt praktisch jeden
-              // normalen Fund ab, erst bei außergewöhnlich hohem mult (Tiefenraum + gestapelte Boni)
-              // greift der Deckel wirklich - Frachter in der Eskorte (siehe EXPEDITION_SHIP_KEYS)
-              // heben ihn zusätzlich an, genau wie bei regulären Angriffsmissionen.
-              const cargoCapacity = EXPEDITION_BASE_CARGO + fleetCargoCapacity(m.composition||fleet);
+              // mitgenommen werden können"). Seit der Fundleiter (03.09.2026) ist der Deckel keine
+              // Randerscheinung mehr, sondern der Regler: Die unteren drei Stufen kommen ohne
+              // Frachter vollständig heim, die oberen drei nur mit - und genau deshalb ist die
+              // Meldung unten ehrlich und nennt beide Zahlen statt nur der gekappten.
+              const cargoCapacity = expeditionCargoCapacity(m.composition||fleet);
               const amt = Math.min(rawAmt, cargoCapacity);
               const cargoLimited = amt < rawAmt;
               const cap = storageCap(); const before = state.resources[res]||0; state.resources[res] = Math.min(cap, before+amt); const gained = state.resources[res]-before;
               addXp(outcome==='weakened' ? 10 : 25);
-              findText = 'Beute: +'+fmt(gained)+' '+((RES_DEFS.find(r=>r.key===res)||{}).label||res)+'.'+(cargoLimited?' <span style="color:#e0a548;">Frachtraum war zu knapp für den vollen Fund – mehr Frachter in der Eskorte helfen beim nächsten Mal.</span>':'');
-              reportExtra = { reward: {[res]: gained}, cargoLimited };
+              const resLabel = ((RES_DEFS.find(r=>r.key===res)||{}).label||res);
+              findIcon = fundStufe.icon;
+              // Bei Kappung BEIDE Zahlen nennen. "Frachtraum war zu knapp" allein verschweigt, was
+              // man verpasst hat - und damit genau den Grund, Frachter zu bauen.
+              findText = cargoLimited
+                ? fundStufe.name+' entdeckt: '+fmt(rawAmt)+' '+resLabel+'! <span style="color:#e0a548;">Dein Frachtraum fasste davon '+fmt(gained)+' – mehr Frachter in der Eskorte holen beim nächsten Mal mehr heraus.</span>'
+                : fundStufe.name+': +'+fmt(gained)+' '+resLabel+'.';
+              reportExtra = { reward: {[res]: gained}, cargoLimited, fundStufe: fundStufe.name, fundRoh: rawAmt };
             } else if (findRoll < b_special){
               const ev = EXPEDITION_SPECIAL_EVENTS[Math.floor(Math.random()*EXPEDITION_SPECIAL_EVENTS.length)];
               const result = ev.resolve(mult);
@@ -60447,7 +60595,10 @@ async function claimPendingRewards(){
       addXp(Math.round(60*mult));
       return { text:'Der Tiefenspur gefolgt: '+fmt(menge)+' Bergungsgut und eine fertige Gegenmaßnahme für deinen nächsten Tauchgang geborgen!', icon:'ti-infinity' };
     }
-    const cache = { erz: Math.round(1600*mult), kristalle: Math.round(1200*mult), deuterium: Math.round(700*mult), antimaterie: Math.round(90*mult) };
+    // Zusammen 89.750 (03.09.2026, mit der Fundleiter): ueber einer Kammer (45.000), unter einem
+    // Depot (180.000). Eine angesteuerte Peilung hat den Spieler eine ganze Expedition gekostet;
+    // sie muss besser sein als der Fund, den dieselbe Expedition zufaellig gemacht haette.
+    const cache = { erz: Math.round(40000*mult), kristalle: Math.round(30000*mult), deuterium: Math.round(17500*mult), antimaterie: Math.round(2250*mult) };
     gainResources(cache);
     addXp(Math.round(60*mult));
     return { text:'Dem Frachtsignal gefolgt: ein großer Ressourcen-Cache geborgen ('+Object.entries(cache).map(([r,a])=>fmt(a)+' '+((RES_DEFS.find(x=>x.key===r)||{label:r}).label)).join(', ')+')!', icon: typ.icon };
@@ -60649,6 +60800,35 @@ async function claimPendingRewards(){
   // (SAVE_SANITY_LIMITS) - ein Spielstand kann daran nicht scheitern (CLAUDE.md-Regel zu neuen
   // speicherbaren Zahlenfeldern).
   function letzteExpedition(){ return state.lastExpeditionSend || null; }
+  // Der Hort ist die oberste Stufe der Fundleiter, und ueber ihn entscheidet der SERVER - nicht
+  // aus Misstrauen gegen den Fund (der Spielstand ist ohnehin klientenautoritativ), sondern weil
+  // er allen gemeldet wird: Ein Banner, das jeder Client ausloesen kann, ist ein Spam-Kanal.
+  //
+  // GEFRAGT WIRD BEIM START, nicht bei der Aufloesung. checkMissions() ist synchron; ein await
+  // mitten in der Missionsschleife waere ein Eingriff in sie. So liegt die Antwort Minuten vor der
+  // Auswertung an der Mission bereit und blockiert nichts.
+  //
+  // OHNE SERVER GIBT ES KEINEN HORT, aber auch keinen Bruch: Es gibt schlicht keine Zusage, die
+  // Leiter wuerfelt ihre unteren fuenf Stufen und die Expedition laeuft normal. Deshalb ist das
+  // hier bewusst ein "fire and forget" ohne await und mit stillem catch - ein Serverfehler darf
+  // den Start einer Expedition nicht verhindern, die auch ohne ihn vollstaendig funktioniert.
+  function hortAnfragen(m, et, risk){
+    if (!m || !useBackend()) return;
+    const keys = expeditionResKeys(et);
+    const res = keys[Math.floor(Math.random()*keys.length)];
+    const mult = expeditionRewardMult(et.rewardMult*risk.rew, state.activeBasePlanet);
+    backendFetch('/expedition/hort', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ res, mult }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || !d.hort) return;
+        // An DIE MISSION, nicht in eine Modulvariable: Es koennen mehrere Expeditionen gleichzeitig
+        // unterwegs sein, und die Zusage gehoert genau zu dieser einen.
+        m.hortZusage = { res: d.res || res, betrag: d.betrag };
+        save();
+      })
+      .catch(() => {});
+  }
   function sendExpeditionMission(){
     const cf = currentFleet();
     if ((cf.forscher||0) < 1){ log('Du brauchst mindestens ein Forschungsschiff auf '+planetDisplayName(state.activeBasePlanet)+' für eine Expedition.', 'ti-alert-triangle'); return; }
@@ -60695,6 +60875,7 @@ async function claimPendingRewards(){
       state.expeditionTargetSignal = null;
     }
     cf.missions.push({ id: nextMissionId(), type:'expedition', startTime: Date.now(), endTime: Date.now()+dur*1000, escortPower, fleetName, composition: escortFleet, expType: et.key, encounterChance: Math.min(0.9, et.encounterChance*risk.enc*hostileEncounterMult()), rewardMult: et.rewardMult*risk.rew, riskMode: state.expeditionRisk||'normal', withdrawOnContact: !!state.expeditionWithdraw, sensorBoosted: quantensensorActive(), signalId });
+    hortAnfragen(cf.missions[cf.missions.length-1], et, risk);
     state.lastExpeditionSend = { type: et.key, composition: ESCORT_KEYS.reduce((acc,k) => { if ((escortFleet[k]||0) > 0) acc[k] = escortFleet[k]; return acc; }, {}) };
     log(fleetName+' ('+et.name+') von '+planetDisplayName(state.activeBasePlanet)+' in unerforschten Raum aufgebrochen. Eskorte: '+escortSummary+' (Kampfkraft '+Math.round(escortPower)+'). Treibstoff verbraucht: '+fuelCostText(fuel)+'.'+signalTxt, 'ti-map-2');
     render(); save();
@@ -63708,17 +63889,32 @@ async function claimPendingRewards(){
           <div class="bmeta"${usedExpSlots>=maxExpSlots?' style="color:#e0a548;"':''}><i class="ti ti-rocket" aria-hidden="true"></i> Expeditions-Limit (planetenübergreifend): ${usedExpSlots}/${maxExpSlots}${usedExpSlots>=maxExpSlots?' – erreicht, Expeditionskoordination erforschen für mehr':''}</div>
           <div class="bmeta">Treibstoff: ~${fuelCostIconHtml(expFuel)}${!canAfford(expFuel)?' <span style="color:#e24b4a;">(nicht genug)</span>':''}${(state.expeditionsCompleted||0)>=10?' · <span style="color:#5dcaa5;">Erfahrene Crew: +'+Math.round((expeditionExperienceMult()-1)*100)+'% Beute</span>':''}</div>
           ${(() => {
-            // Frachtraum-Vorschau + Warnung (Vorschlag #3, 21.07.2026): grober Best-Case-Fund vs.
-            // aktueller Frachtraum (Basis 2000 + Frachter der Eskorte). Nur warnen, wenn ein Glücksfund
-            // den Frachtraum tatsächlich überschreiten könnte - sonst ist der Basis-Frachtraum still ok.
-            const expCargo = EXPEDITION_BASE_CARGO + fleetCargoCapacity(escortFleet);
+            // Frachtraum-Vorschau (Vorschlag #3, 21.07.2026; auf die Fundleiter umgestellt 03.09.2026).
+            // Seit der Leiter ist die interessante Frage nicht mehr "reicht es?", sondern "bis wohin
+            // reicht es?" - deshalb nennt die Zeile die höchste Stufe, die noch vollständig heimkommt,
+            // und die erste, die es nicht mehr tut. Beide aus derselben Leiter wie die Auswertung.
+            const expCargo = expeditionCargoCapacity(escortFleet);
             const maxFind = expeditionMaxResourceFind(selectedEt.rewardMult, state.activeBasePlanet);
             // Sicherheitspuffer: schon ab 90% Auslastung warnen, nicht erst bei striktem Überlauf - ein
             // Glücks-Fund liegt nah am rechnerischen Maximum, und mit einem aktiven Beute-Event oder
             // Aufstiegsbonus kippt es schnell über den Deckel. So sieht man die Warnung z.B. bei
             // Tiefenraum-Expeditionen mit erfahrener Crew rechtzeitig, statt erst nach dem gekappten Fund.
             const tight = maxFind > expCargo * 0.9;
-            return `<div class="bmeta"${tight?' style="color:#e0a548;"':''}><i class="ti ti-truck" aria-hidden="true"></i> Frachtraum: ${fmt(expCargo)}${tight?` – ein großer Ressourcenfund (bis ~${fmt(maxFind)}) könnte gedeckelt werden. Frachter/Großen Frachter als Eskorte mitnehmen, um nichts zu verlieren.`:' – deckt auch große Funde ab.'}</div>`;
+            // Der Beute-Multiplikator gilt fuer JEDE Stufe gleich - eine Stufe passt also genau dann
+            // in den Frachtraum, wenn ihr oberer Streuungsrand mal mult hineinpasst.
+            const stufenMult = expeditionRewardMult(selectedEt.rewardMult, state.activeBasePlanet) * (1 + EXPEDITION_FUND_STREUUNG);
+            const passt = EXPEDITION_FUND_LEITER.filter(st => st.betrag * stufenMult <= expCargo);
+            const ersteZuGross = EXPEDITION_FUND_LEITER.find(st => st.betrag * stufenMult > expCargo);
+            const bisWohin = passt.length
+              ? ` – trägt jeden Fund bis <strong>${passt[passt.length-1].name}</strong>${ersteZuGross?` heim; ab <strong>${ersteZuGross.name}</strong> (${fmt(Math.round(ersteZuGross.betrag*stufenMult))}) bliebe der Rest liegen`:' heim, also jeden'}.`
+              : ` – zu klein selbst für einen ${EXPEDITION_FUND_LEITER[0].name}. Frachter als Eskorte mitnehmen.`;
+            const leiterHtml = EXPEDITION_FUND_LEITER.map(st => {
+              const wert = Math.round(st.betrag * stufenMult);
+              const traegt = wert <= expCargo;
+              return `<span style="white-space:nowrap; color:${traegt?'#c8ccd8':'#7d8199'};" title="${st.name}: ${fmt(wert)} · Chance ${(st.p*100).toFixed(1).replace('.',',')}%${traegt?'':' · passt nicht in deinen Frachtraum'}"><i class="ti ${st.icon}" aria-hidden="true" style="font-size:10px;"></i> ${fmt(wert)}</span>`;
+            }).join('<span style="color:#4a4f63;">·</span> ');
+            return `<div class="bmeta"${tight?' style="color:#e0a548;"':''}><i class="ti ti-truck" aria-hidden="true"></i> Frachtraum: ${fmt(expCargo)}${bisWohin}</div>
+            <div class="bmeta" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"><i class="ti ti-pick" aria-hidden="true"></i> Ressourcenfund: ${leiterHtml} <span style="color:#7d8199;">– je größer, desto seltener</span></div>`;
           })()}
           ${(state.research.rquantenphysik||0)>=1 ? (quantensensorActive()
             ? `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-sparkles" aria-hidden="true"></i> Quantensensoren kalibriert - jetzt gestartete Expeditionen finden deutlich mehr</div>`
@@ -65603,7 +65799,10 @@ async function claimPendingRewards(){
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
         const border = done ? 'rgba(250,199,117,0.5)' : 'rgba(255,255,255,0.1)';
         const navigable = !done && !!d.nav;
-        const pillTitle = done ? d.name+' – antippen zum Abholen' : (navigable ? d.name+' – antippen, um direkt zum passenden Menü zu springen' : d.name);
+        // Der Hinweis haengt hinten an, nicht davor: Was die Pille TUT (abholen, springen) muss die
+        // erste Zeile des Tooltips bleiben, der Hinweis ist Zusatzwissen.
+        const pillTitle = (done ? d.name+' – antippen zum Abholen' : (navigable ? d.name+' – antippen, um direkt zum passenden Menü zu springen' : d.name))
+          + (d.hinweis ? ' · '+d.hinweis : '');
         return `<div class="lvl-pill" style="display:flex; align-items:center; gap:5px; padding:5px 9px; background:${bg}; border:var(--bw-1) solid ${border};" title="${pillTitle}">
           <span style="cursor:${(done||navigable)?'pointer':'default'}; display:flex; align-items:center; gap:5px;" ${done?`data-claim-quest="${d.key}"`:(navigable?`data-quest-nav="${d.key}"`:'')}>
             <i class="ti ${d.icon}" aria-hidden="true" style="color:${done?'#fac775':'#9296ac'};"></i>

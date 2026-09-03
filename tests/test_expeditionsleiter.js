@@ -74,7 +74,9 @@ if (Array.isArray(LEITER)){
 // ---- 2: die Verteilung wird wirklich gewuerfelt --------------------------------------------------
 // expeditionFundStufe() bekommt den Wurf hereingereicht - damit ist die Verteilung messbar, ohne
 // sich auf Math.random zu verlassen. Genau dafuer nimmt die Funktion den Parameter.
-const fnAnfang = src.indexOf('function expeditionFundStufe(roll){');
+// Ohne die Parameterliste: Sie waechst (roll, ohneSpitze) - ein Anker auf die genaue Signatur
+// bricht bei jeder Erweiterung, ohne dass etwas kaputt waere.
+const fnAnfang = src.indexOf('function expeditionFundStufe(roll');
 check('2a: die Ziehung ist eine eigene Funktion', fnAnfang > 0);
 if (fnAnfang > 0 && Array.isArray(LEITER)){
   const fnEnde = src.indexOf('\n  }', fnAnfang);
@@ -104,8 +106,16 @@ if (fnAnfang > 0 && Array.isArray(LEITER)){
 // Die alte Formel darf nicht daneben stehenbleiben - sie saehe harmlos aus und waere eine zweite
 // Wahrheit, aus der niemand mehr liest.
 check('3a: die alte Fundformel ist weg', !src.includes('(250+Math.random()*450)*mult'));
-check('3b: die Fundaufloesung zieht aus der Leiter', src.includes('const fundStufe = expeditionFundStufe();'));
-check('3c: der Fundbetrag kommt aus der gezogenen Stufe', /const rawAmt = Math\.round\(fundStufe\.betrag \*/.test(src));
+check('3b: die Fundaufloesung zieht aus der Leiter', /const fundStufe = .*expeditionFundStufe\(/.test(src));
+// Und sie zieht OHNE die Spitze: Der Hort kommt allein vom Server, sonst gaebe es ihn auch ohne
+// die Meldung, die ihn zum Ereignis macht.
+check('3b2: sie laesst die Spitze aus (der Hort kommt vom Server)',
+  /expeditionFundStufe\(undefined, true\)/.test(src));
+check('3c: der Fundbetrag kommt aus der gezogenen Stufe', /Math\.round\(fundStufe\.betrag \*/.test(src));
+// Bei einer Server-Zusage ist DESSEN Betrag die Wahrheit - sonst stuende in der Meldung an alle
+// eine andere Zahl als im eigenen Bericht.
+check('3c2: eine Server-Zusage schlaegt den eigenen Wurf',
+  /const rawAmt = m\.hortZusage \? m\.hortZusage\.betrag/.test(src));
 // Die Obergrenze fuer die Vorschau ist ABGELEITET, nicht getippt. Bis heute stand dort die Zahl
 // 700 neben einer Formel, die 700 ergab - zwei Wahrheiten, die niemand zusammen anfasste.
 check('3d: die Obergrenze ist aus der Leiter abgeleitet',
@@ -150,12 +160,17 @@ if (Array.isArray(LEITER)){
 // Ein Cache, den man sich ERARBEITET (drei Fragmente sammeln, eine Peilung ansteuern), muss ueber
 // dem liegen, was derselbe Flug zufaellig gebracht haette. Sonst belohnt das Spiel die Muehe mit
 // weniger als das Nichtstun - und zwar lautlos, weil beide Zahlen weit auseinander im Code stehen.
-function summeAus(anker){
-  const zeile = (src.match(new RegExp(anker + '[^;]*;')) || [''])[0];
+// Der Anker muss EINDEUTIG sein. 'const cache = ' traf zuerst state.allianceDonationCache an
+// einer voellig anderen Stelle - die Summe war dann 0, und 6b haette jede Aenderung durchgelassen.
+// Gemessen beim ersten Lauf nach dem Einbau: genau dieser Fall.
+function summeAus(anker, name){
+  const treffer = [...src.matchAll(new RegExp(anker + '[^;]*;', 'g'))];
+  check('6-anker: "' + name + '" ist genau einmal auffindbar', treffer.length === 1, { treffer: treffer.length });
+  const zeile = (treffer[0] || [''])[0];
   return [...zeile.matchAll(/Math\.round\((\d+)\*mult\)/g)].reduce((s,m)=>s+parseInt(m[1],10), 0);
 }
-const jackpot = summeAus('const jackRes = ');
-const frachtsignal = summeAus('const cache = ');
+const jackpot = summeAus('const jackRes = \\{ erz: ', 'Schatzdepot-Jackpot');
+const frachtsignal = summeAus('const cache = \\{ erz: ', 'Frachtsignal-Cache');
 if (Array.isArray(LEITER)){
   const mittel = LEITER.reduce((s,x)=>s+x.p*x.betrag, 0);
   check('6a: der Schatzdepot-Jackpot ist besser als ein mittlerer Zufallsfund', jackpot > mittel,
