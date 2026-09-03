@@ -85,7 +85,7 @@ function backend(store, opt){
       if (req.method() === 'POST'){ try { (store.__berichte = store.__berichte || []).unshift(JSON.parse(req.postData()||'{}').report || {}); } catch(e){} return j({ ok:true }); }
       return j({ reports: store.__berichte || [] });
     }
-    if (p === 'notifications') return req.method() === 'POST' ? j({ ok:true }) : j({ notifications: [] });
+    if (p === 'notifications') return req.method() === 'POST' ? j({ ok:true }) : j({ notifications: opt.postfach || [] });
     if (/leaderboard|messages|ranking|wars|halloffame|bounty|friends|pending/.test(p)) return j(p.includes('pending') ? { reward:null } : []);
     return j({});
   };
@@ -267,6 +267,119 @@ async function anfechtungHinflug(t){
     check('5c: keine Seitenfehler', t4.errs.length === 0, t4.errs.slice(0, 2));
     await t4.ctx.close();
   }
+  // ---- 6) Die Vorwarnung beim Anflug, als PAAR --------------------------------------------------
+  /* Der Server schickt `anflug` NUR dem Besitzer (vorpostenFuerClient) - fuer alle anderen ist die
+     Liste leer. Geprueft wird deshalb beides an derselben Stelle: Beim eigenen Vorposten MUSS die
+     Warnung im Kartenmenue stehen, beim fremden darf sie es nicht. Eine der beiden Haelften allein
+     bewiese nichts: "steht da" waere auch mit einer Anzeige erfuellt, die immer warnt. */
+  {
+    const ANKUNFT = Date.now() + 15 * 60 * 1000;
+    const menueText = async t => {
+      await t.page.evaluate(() => { const n = document.querySelector('[data-map-vorposten]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true })); });
+      await t.page.waitForTimeout(500);
+      return t.page.evaluate(() => { const m = document.querySelector('.kmenu'); return m ? { offen: m.getBoundingClientRect().height > 0, text: (m.textContent||'').replace(/\s+/g,' '), warnung: !!m.querySelector('[data-vp-anflug]') } : { offen:false, text:'', warnung:false }; });
+    };
+
+    const tAn = await tab(browser, fixture(), { eigener: true, felder: { anflug: [{ tag: 'RIV', ankunftAt: ANKUNFT, schiffe: 900 }] } });
+    await tAn.page.waitForTimeout(2500);
+    await aufKarte(tAn);
+    const mAn = await menueText(tAn);
+    check('6a-anker: das Kartenmenue des eigenen Vorpostens ist offen', mAn.offen, { text: mAn.text.slice(0, 120) });
+    check('6a: der Besitzer sieht die Vorwarnung - mit Angreifer-Tag, Schiffszahl und Restzeit',
+      mAn.warnung && /Verband im Anflug/.test(mAn.text) && /RIV/.test(mAn.text) && /900/.test(mAn.text) && /Ankunft in/.test(mAn.text),
+      { warnung: mAn.warnung, auszug: mAn.text.slice(0, 220) });
+    check('6c: keine Seitenfehler', tAn.errs.length === 0, tAn.errs.slice(0, 2));
+    await tAn.ctx.close();
+
+    /* 6d: DIE POSTFACH-ZEILE. Der Vermerk im Kartenmenue sieht nur, wer hinsieht - die Meldung ist
+       das, was den Besitzer erreicht. Gemessen wird sie am GERENDERTEN Text, nicht am Vorhandensein
+       des Eintrags: Dieser Eintrag ist der erste in NOTIF_EVENT_INFO, der fmt() und fmtDuration()
+       benutzt. Waeren die dort nicht im Zugriff, faende test_pushkategorien (der nur die
+       Zeichenkette sucht) nichts, und im Spiel braeche die Zeile - genau die Sorte Fehler, die
+       niemandem auffaellt, weil nichts sichtbar kaputtgeht. */
+    const tPost = await tab(browser, fixture(), { eigener: true, postfach: [
+      { id:'n-anflug', type:'vorposten-anflug', time: Date.now() - 30000, ziel:'karte',
+        payload:{ angreiferName:'[RIV]', name:'Bastion', system: SYS, schiffe: 900, ankunftAt: ANKUNFT } }
+    ] });
+    await tPost.page.waitForTimeout(2500);
+    await tPost.page.evaluate(() => {
+      ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
+        .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; });
+      const b = document.getElementById('headerReportsBtn'); if (b) b.click();
+    });
+    await tPost.page.waitForTimeout(1500);
+    const zeile = await tPost.page.evaluate(() => {
+      const el = document.querySelector('[data-notif-go="karte"]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { text: (el.textContent||'').replace(/\s+/g,' ').trim(), sichtbar: el.offsetParent !== null && r.height > 0 };
+    });
+    check('6d-anker: die Postfach-Zeile ist da und sichtbar', !!zeile && zeile.sichtbar, zeile);
+    check('6d: sie nennt Angreifer, Schiffszahl und Restzeit - und ist NICHT der Rueckfall "Ereignis"',
+      !!zeile && /RIV/.test(zeile.text) && /900/.test(zeile.text) && /Ankunft in/.test(zeile.text) && !/^Ereignis/.test(zeile.text),
+      zeile && zeile.text.slice(0, 200));
+    check('6e: keine Seitenfehler beim Zeichnen der Zeile (fmt/fmtDuration sind dort im Zugriff)',
+      tPost.errs.length === 0, tPost.errs.slice(0, 2));
+    await tPost.ctx.close();
+
+    const tOhne2 = await tab(browser, fixture(), { felder: { anflug: [] } });
+    await tOhne2.page.waitForTimeout(2500);
+    await aufKarte(tOhne2);
+    const mOhne = await menueText(tOhne2);
+    check('6b-anker: auch das Menue des fremden Vorpostens ist offen', mOhne.offen, { text: mOhne.text.slice(0, 120) });
+    check('6b: beim fremden Vorposten steht KEINE Warnung - der Server schickt die Liste leer',
+      !mOhne.warnung && !/Verband im Anflug/.test(mOhne.text), { warnung: mOhne.warnung, auszug: mOhne.text.slice(0, 220) });
+    await tOhne2.ctx.close();
+  }
+
+  // ---- 7) Vorposten in der rechten Leiste (Wunsch Sascha, 03.09.2026) --------------------------
+  /* Ein Vorposten ist ein Standort, den man haelt - er gehoert neben die Kolonien, nicht nur auf
+     die Karte. Geprueft wird als PAAR: Beim EIGENEN steht er in der Leiste, beim FREMDEN nicht.
+     Ohne die zweite Haelfte waere "steht da" auch mit einer Liste erfuellt, die jeden Vorposten
+     der Galaxie fuehrt - und das waere eine ganz andere Aussage. */
+  {
+    const leiste = async t => t.page.evaluate(() => {
+      const sec = document.getElementById('fpVorpostenSection');
+      const list = document.getElementById('fpVorpostenList');
+      const zahl = document.getElementById('fpVorpostenCount');
+      return {
+        sichtbar: !!(sec && sec.style.display !== 'none'),
+        text: list ? (list.textContent||'').replace(/\s+/g,' ').trim() : '',
+        zahl: zahl ? (zahl.textContent||'').trim() : '',
+        knoepfe: list ? [...list.querySelectorAll('[data-fp-vorposten]')].map(b => b.getAttribute('data-fp-vorposten')) : []
+      };
+    });
+
+    const tEigen = await tab(browser, fixture(), { eigener: true, felder: { anflug: [{ tag: 'RIV', ankunftAt: Date.now() + 12*60*1000, schiffe: 900 }] } });
+    await tEigen.page.waitForTimeout(3000);
+    const lEigen = await leiste(tEigen);
+    check('7a: der eigene Vorposten steht in der rechten Leiste, mit Name und System',
+      lEigen.sichtbar && /Bastion/.test(lEigen.text) && /Chronos/.test(lEigen.text) && lEigen.knoepfe.includes(SYS),
+      lEigen);
+    check('7b: der Zaehler nennt Bestand und Grenze', /^\(1\/3\)$/.test(lEigen.zahl), { zahl: lEigen.zahl });
+    /* 7c: DER ANFLUG STEHT MIT DRIN. Das ist der Punkt der Leiste - man sieht die Warnung, ohne die
+       Karte zu oeffnen. Ohne diese Zeile waere die Vorwarnung wieder nur dort, wo man hinsehen
+       muss. */
+    check('7c: eine laufende Anflug-Warnung steht an der Zeile', /RIV/.test(lEigen.text) && /in /.test(lEigen.text), { text: lEigen.text });
+    check('7d: keine Seitenfehler', tEigen.errs.length === 0, tEigen.errs.slice(0, 2));
+    await tEigen.ctx.close();
+
+    const tFremd = await tab(browser, fixture(), {});
+    await tFremd.page.waitForTimeout(3000);
+    const lFremd = await leiste(tFremd);
+    check('7e: ein FREMDER Vorposten steht NICHT in der eigenen Leiste',
+      !lFremd.knoepfe.length && !/Stützpunkt/.test(lFremd.text), lFremd);
+    await tFremd.ctx.close();
+
+    /* 7f: Kennt der Server keine Vorposten (alter Stand, Notaus), bleibt der Abschnitt WEG - eine
+       Ueberschrift ueber einer leeren Liste waere ein Versprechen ohne Gegenstand. */
+    const tAus = await tab(browser, fixture(), { inaktiv: true });
+    await tAus.page.waitForTimeout(3000);
+    const lAus = await leiste(tAus);
+    check('7f: ohne Vorposten-Server bleibt der ganze Abschnitt verborgen', !lAus.sichtbar, lAus);
+    await tAus.ctx.close();
+  }
+
   await browser.close();
   ende();
 })();
