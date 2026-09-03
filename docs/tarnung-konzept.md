@@ -4,11 +4,16 @@ Auftrag Sascha: „ich würde gerne einen tarnwert noch einfügen … wichtig is
 vergessen werden in formeln anzeige wenn man schiffe baut module etc sowie es muss eine gegenwehr
 für getarnte flotten geben, logisch kleine schiffe besser zu tarnen, große beinahe unmöglich."
 
-Zwei Entscheidungen sind bereits gefallen:
+Sechs Entscheidungen sind gefallen. Die ersten zwei rahmen den Entwurf, die vier weiteren stehen
+ausformuliert in Abschnitt 9:
 
 - **Zwei Etappen.** Erst der *Bestand* (was ein Fremder über deine Flotte weiß), dann der *Anflug*
   (ob er einen Angriff kommen sieht). Der Tarnwert wird nur EINMAL eingeführt.
 - **Hart gegen große Rümpfe.** Ab Großkampfschiff praktisch unmöglich.
+- **Ein Angriff deckt auf** – Tarnung ist ein Einmal-Schutz.
+- **Tarnung kostet laufend Energie.**
+- **Das Reaktionsfenster bleibt unangetastet** – Tarnung ändert nur das *Was*, nie das *Wann*.
+- **Die Gegenwehr ist ein eigenes Sensorgebäude.**
 
 Dieses Dokument ist der Entwurf, nicht die Umsetzung. Alle Zahlen und Stellen darin sind am Code
 gemessen; wo eine Annahme sich als falsch erwiesen hat, steht das ausdrücklich dabei.
@@ -151,9 +156,22 @@ der Vorposten (`server.js:12433–12440`) – mit heute genau **einem** Abnehmer
 `resolveSpyMission`). Das ist die Zahl, an die sich eine Gegen-Tarnung hängen lässt, ohne eine völlig
 neue Größe zu erfinden.
 
-**Vorschlag: ein Sensorwert je Standort**, gebildet aus dem, was es schon gibt – Sensorphalanx-Stufe,
-`rscanner`, `a_scanner`, `nutzen.scan` der eigenen Vorposten. Kein neues Gebäude nötig; die
-Gegenwehr ist ein neuer Nutzen für vier vorhandene Investitionen.
+**Entschieden (Sascha, 03.09.2026): ein eigenes Sensorgebäude.** Nicht die Summe vorhandener
+Investitionen, sondern eine klar benannte Zahl mit eigenem Ausbaupfad. Der Vorteil ist die
+Verständlichkeit – der Spieler sieht ein Gebäude, eine Stufe, eine Reichweite, und weiß sofort,
+woran er dreht.
+
+Der Preis dafür ist bewusst in Kauf genommen und gehört in die Umsetzung:
+
+- Bestandsspieler müssen **neu investieren**, um ihren heutigen Stand zu halten. Die Tarnung darf
+  deshalb nicht am Tag ihrer Einführung voll wirken – sonst ist jeder, der noch nicht gebaut hat,
+  über Nacht blind. Etappe 1 braucht eine Anlaufzeit oder eine Grundstufe, die jeder geschenkt bekommt.
+- Ein Gebäude ist **neuer Inhalt**: eigenes gültiges Icon (gegen die eingebettete Tabler-Teilmenge
+  geprüft – `test_iconabdeckung.js`, Prüfung 13), vollständige Beschreibung, Baukosten, Energiebedarf,
+  Hilfe-Abschnitt.
+- `nutzen.scan` der Vorposten bleibt daneben bestehen und muss in den Sensorwert **einfließen**, sonst
+  hätten wir zwei Sensorzahlen nebeneinander – genau die Kopie-Familie, an der dieses Projekt
+  regelmäßig scheitert.
 
 **Sensor gegen Signatur als Verhältnis, nicht als Schwelle.** Eine Schwelle ist hart und
 frustrierend („ein Punkt zu wenig und ich sehe gar nichts"). Ein Verhältnis erlaubt die interessante
@@ -189,9 +207,10 @@ Der Kampfbericht liefert dem Verteidiger **schon heute die komplette Reichsflott
 (`fleet: attackerFleetSummary`, viermal: `server.js:4758/4763/4812/4819`) und dem Angreifer die volle
 Zielflotte. **Ein einziger Wegwerf-Angriff hebt jede Tarnung auf.**
 
-Das ist kein Fehler, sondern der eingebaute Preis: Tarnung schützt vor dem *ersten* Angriff, nicht
-vor dem zweiten. Wer sie brechen will, bezahlt mit einem Angriff. Ob das so bleiben soll, ist eine
-Entscheidung (siehe Abschnitt 8).
+Das ist kein Fehler, sondern der eingebaute Preis – und **so entschieden** (Abschnitt 9, Punkt 1):
+Tarnung schützt vor dem *ersten* Angriff, nicht vor dem zweiten. Wer sie brechen will, bezahlt mit
+einem Wegwerf-Angriff. Der Kampfbericht bleibt unverändert, und die Zusage „Nach dem Kampf siehst du
+ohnehin, was dort stand" bleibt damit wahr.
 
 ---
 
@@ -210,11 +229,13 @@ zahnlos. Drei mögliche Antworten, alle in Etappe 2 zu entscheiden:
 - Die Vorwarnzeit ist kurz genug, dass Umbauen, nicht Fliehen, die Antwort ist.
 - Eine Startsperre für die eigene Flotte, sobald ein Anflug erkannt ist.
 
-**Eine Regel, die dabei verletzt würde:** Der Vorposten-Hilfetext schreibt ausdrücklich fest, dass
-sich „das Reaktionsfenster eines Verteidigers nie verschiebt" (`:38597`) – im Code eingehalten, weil
-`vorpostenFlug()` die Angriffsmission nicht umschließt. Ein Tarnwert, der das Erkennungsfenster
-verkürzt, verletzt genau diese Zusage und braucht dafür eine ausdrückliche Entscheidung samt
-Textänderung.
+**Die Regel, die dabei auf dem Spiel stand – und gehalten wird:** Der Vorposten-Hilfetext schreibt
+ausdrücklich fest, dass sich „das Reaktionsfenster eines Verteidigers nie verschiebt" (`:38597`) – im
+Code eingehalten, weil `vorpostenFlug()` die Angriffsmission nicht umschließt. **Entschieden
+(Abschnitt 9, Punkt 3): Etappe 2 verkürzt das Fenster nicht.** Tarnung ändert ausschließlich, *was*
+der Verteidiger über einen Anflug erfährt, nie *wann*. Damit bleibt die Zusage wahr und kein
+Hilfetext muss geändert werden. Von den drei Antworten auf den Balance-Einwand darüber scheiden
+damit alle aus, die am Zeitpunkt drehen – bleibt die Frage, wie viel die Vorwarnung *nennt*.
 
 ---
 
@@ -296,17 +317,34 @@ Icon-Abdeckung erzwingt:
 
 ---
 
-## 9. Offene Entscheidungen
+## 9. Getroffene Entscheidungen (Sascha, 03.09.2026)
 
-1. **Hebt ein Angriff die Tarnung auf?** Heute liefert der Kampfbericht die komplette Flotte beider
-   Seiten. Bleibt das so, ist Tarnung ein Einmal-Schutz. Alternative: Der Bericht zeigt nur, was am
-   Kampf teilgenommen hat.
-2. **Was kostet Tarnung?** Ohne laufende Kosten ist sie immer an und damit keine Entscheidung.
-   Energie wäre der natürliche Kandidat – das Spiel hat einen Energiehaushalt.
-3. **Darf Etappe 2 das Reaktionsfenster verkürzen?** Das verletzt eine ausdrückliche Zusage im
-   Vorposten-Hilfetext.
-4. **Wird der Sensorwert eine neue Zahl oder die Summe vorhandener?** Der Entwurf schlägt die Summe
-   vor – kein neues Gebäude, dafür neuer Nutzen für vier vorhandene Investitionen.
+Alle vier offenen Punkte sind beantwortet. Sie sind ab hier Vorgabe, nicht Vorschlag.
+
+**1. Hebt ein Angriff die Tarnung auf? – Ja.**
+Der Kampfbericht bleibt, wie er ist: Er liefert beiden Seiten die komplette Flotte. Tarnung ist damit
+ausdrücklich ein **Einmal-Schutz** – sie schützt vor dem ersten Angriff, nicht vor dem zweiten. Wer
+sie brechen will, bezahlt mit einem Wegwerf-Angriff. Kein Eingriff in den Bericht nötig, und die
+Zusage „Nach dem Kampf siehst du ohnehin, was dort stand" bleibt wahr.
+
+**2. Was kostet Tarnung? – Laufende Energie.**
+Damit wird Tarnung zur Abwägung statt zum Dauerzustand: tarnen oder produzieren. Was daraus folgt und
+in der Umsetzung nicht vergessen werden darf:
+- Der Energiehaushalt bekommt einen neuen Verbraucher – **alle** Anzeigestellen der Energiebilanz
+  müssen ihn kennen, nicht nur die Flottenansicht.
+- Was passiert bei **Energiemangel**? Vorschlag: Die Tarnung fällt aus, mit sichtbarer Warnung, statt
+  die Produktion zu drosseln – ein stiller Ausfall wäre die schlimmste Variante, weil der Spieler
+  sich weiter für getarnt hält. Eine Sicherung, deren Ausfall wie Normalbetrieb aussieht, ist keine.
+- Die Kosten skalieren mit der Signatur: große Rümpfe zu tarnen ist nicht nur schwerer, sondern auch
+  teurer. Das verstärkt „große Schiffe beinahe unmöglich" über einen zweiten Kanal.
+
+**3. Darf Etappe 2 das Reaktionsfenster verkürzen? – Nein.**
+Die Zusage im Vorposten-Hilfetext (`:38597`) bleibt unangetastet und wahr. Tarnung ändert
+ausschließlich, **was** der Verteidiger über einen Anflug erfährt – nie, **wann** er ihn erfährt.
+Kein Hilfetext muss geändert werden, und ein bestehendes Versprechen wird nicht gebrochen.
+
+**4. Wird der Sensorwert eine neue Zahl oder die Summe vorhandener? – Ein eigenes Sensorgebäude.**
+Siehe Abschnitt 4, „Der mechanische Anker" – dort steht auch, was dieser Weg zusätzlich kostet.
 
 ---
 
