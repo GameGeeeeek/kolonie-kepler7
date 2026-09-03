@@ -568,3 +568,81 @@ Anker „`let inner = \`<defs>`" traf zuerst die Galaxie-Ebene (zwei Vorkommen);
 Sternen bis zur Sonne" umfasste 36 kB samt Wurmloch-Filter und ließ 0b aus dem falschen Grund
 fallen; und weder Warten noch Fenstergröße noch Tab-Wechsel lösen einen Neuaufbau aus
 (`__karteAufbauten` blieb dreimal bei 6) – erst der Systemwechsel tut es.
+
+## 8. Gebaut: Drei Reparaturen in jede Richtung (03.09.2026)
+
+Auftrag Sascha: „prüfe, was wir noch betreffend Sektorkarte machen können. prüfen jede Richtung."
+Zuerst eine **Bestandsaufnahme gegen dieses Konzept** (gemessen am Stand v8.646.0), dann die drei
+Befunde, die sich daraus als Bestandsreparatur ergaben.
+
+### Was von §2/§4 inzwischen steht
+
+| Etappe | Stand (03.09.2026) |
+|---|---|
+| **E1 Landmarken** | **geliefert** — #456 (drei Ebenen), #487 (Gegnerstärke im `npcMapMenu`), #494 (antippbare Abzeichenzeile) |
+| **E2 Statthalter** | **offen** — null Fundstellen. 52 der 67 Systeme tragen weiterhin keinen NPC, drei Regionen gar keinen |
+| **E3 Sprungnetz** | **faktisch ersetzt** durch B2 Vorposten (#531): Der Vorposten *ist* der Sprungknoten, mit Flugzeit-Nutzen im Umkreis. Der Backend-Kommentar führt ihn ausdrücklich als „E3-Rahmen (SPRUNGBAKEN_MAX = 3)" |
+| **E4 Passage** | **offen** — und der stärkste noch offene Befund: `activeWormhole` hat **acht** Fundstellen, **alle** im Anzeigepfad (Knoten zeichnen, eine Zeile im Systemkopf). Der Server würfelt das Wurmloch aus, die Karte malt einen Wirbel, und es tut nichts |
+| **E5 Sektorlage** | **offen** — null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
+
+Dazu ungeplant geliefert: Dominanz-Ring (§6), Licht und Schatten (§7), Wrackkonvois (#516),
+Vorposten (#531).
+
+### Zwei Messfragen aus §5 sind beantwortet
+
+**§5-2 (Flugzeitkette, „blockierend"): gemessen.** Die Papierrechnung aus den Werten von
+`missionDurationFor` selbst — die zehn gedeckelten Faktoren ergeben im Vollausbau **0,0147**, aus
+60 Minuten werden 53 Sekunden; `0,97^spaeher` zog das ohne Untergrenze weiter, bei 100 Spähern auf
+**0,0007** (2,5 Sekunden). Der im Konzept vorgeschlagene Boden von 0,25 wäre damit **keine
+Reparatur, sondern eine 17-fache Verlangsamung** jedes ausgebauten Kontos gewesen.
+
+Entscheidung Sascha aus drei vorgelegten Varianten: **nur der Späher-Faktor bekommt einen Deckel,
+kein Produkt-Boden.** `Math.max(0.5, Math.pow(0.97, …))` ist dieselbe Form und derselbe Wert wie
+bei seinen fünf Nachbarn (Prestige, Aufstieg, Fähigkeit, Navigator, Fusionsantrieb) und greift ab
+**23** Spähern — 0,97²² = 0,512, 0,97²³ = 0,496. Darunter ändert sich nichts.
+
+**§5-4 (Wisch-Schutz auf den oberen Ebenen): gemessen und behoben.** `galaxyMapDidDrag` schützte
+13 Klickstellen, **alle** im aufgeklappten System; Regionsübersicht und Sektoransicht gingen leer
+aus, obwohl Schwenken und Zoomen dort genauso aktiv sind — der Handler hängt am `svg`, nicht an
+einer Ebene. Am alten Stand am gerenderten Spiel belegt: Ein Wischen öffnet die Region bzw. das
+System. Nur der **Zeiger** bekommt den Schutz; die Tastatur zieht nicht.
+
+### Die dritte Richtung: die Tastatur kannte nur eine Ebene
+
+← / → wirkten nur bei offenem System. Die Begründung im Code lautete „in den Sektor-Ansichten gibt
+es kein nächstes System" — das stimmte, als sie geschrieben wurde, und war seit KB-4 überholt: Die
+Sektoransicht **hat** einen Nachbarsektor, erreichbar über die ‹ ›-Knöpfe **und** eine Wischgeste,
+nur nicht über die Tastatur. Am PC war sie damit die einzige der drei Ebenen ohne Tastenweg.
+
+Der **Zoom** bleibt bewusst dem offenen System vorbehalten (auf den oberen Ebenen hat er keinen
+Bezugspunkt), **↑/↓ bleiben frei** fürs Seiten-Scrollen — dieselbe Abwägung wie seit KB-14, jetzt
+zusätzlich auf der Sektorebene mitgeprüft.
+
+### Wächter
+
+`tests/test_flugzeit_deckel.js` prüft die **Regel** statt der einen Zeile: jede `mult *=`-Zeile der
+Kette gegen eine namentliche Liste nachweislich begrenzter Formen. Ein siebzehnter Faktor derselben
+Bauart fällt damit auf, ohne dass jemand an ihn gedacht haben muss.
+`tests/test_kartenrichtungen.js` misst am gerenderten Spiel, **jede Sperre mit ihrer
+Gegenrichtung** — derselbe Knoten öffnet beim Tipp und öffnet beim Wischen nicht.
+
+### Drei Befunde aus dem Bau der Messvorrichtung
+
+Sie stehen als Kommentar in den Tests, weil jeder beim nächsten Kartentest wieder zuschlägt:
+
+1. Der Deckel greift ab **23** Spähern, nicht ab 24. Der erste Entwurf behauptete 24 und fiel an
+   der eigenen Prüfung durch — die Zahl kam aus dem Kopf, nicht aus der Rechnung.
+2. Die **Bounding-Box-Mitte einer Region liegt außerhalb ihres Polygons** (Regionen sind
+   unregelmäßige Flächen). Der erste Testentwurf zielte daneben, und „nichts ging auf" sah aus wie
+   ein bestandener Wisch-Schutz — eine Prüfung, die aus dem falschen Grund grün ist.
+3. Im ausgeloggten Zustand liegt die **Login-Karte über dem Kartenkasten** (`elementFromPoint`
+   liefert `INPUT#loginPassword`) und hält den **Tastaturfokus**. Ohne `blur()` kommt kein
+   Tastendruck an, und beide Tastenprüfungen melden „wirkt nicht", obwohl der Code stimmt. Deshalb
+   arbeitet der Test mit synthetischen Ereignissen — derselbe Weg wie `tests/lib/karte.js`.
+
+### Was als Nächstes ansteht
+
+**E4 Passage** hat das beste Verhältnis von Aufwand zu Wirkung: Das Objekt steht schon auf der
+Karte und ist antippbar, ihm fehlt nur eine Wirkung. E2 und E5 bleiben eigene Etappen, E5
+zusätzlich mit Backend und Schalter.
+
