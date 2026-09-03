@@ -238,3 +238,91 @@ in dem Fall, für den sie gebaut war.
 
 Wer eine Scheibe an einem gesuchten Anker aufhängt, gibt bei nicht gefundenem Anker **leer**
 zurück und lässt die Prüfung daran scheitern.
+
+## Parallele Sitzungen: arbeiten dürfen alle, ausliefern darf einer (03.09.2026)
+
+Mehrere Coding-Sitzungen am selben Repo sind erwünscht. Das Problem ist nicht die Arbeit, sondern
+die **Auslieferung**: Ein Volllauf dauert gemessen 91 Minuten. Jeder fremde Merge, der in dieser
+Zeit `weltraum_kolonie.html` anfasst, entwertet ihn — der Lauf hat dann einen Stand geprüft, der
+nicht mehr ausgeliefert wird. Am 03.09.2026 musste derselbe Änderungssatz deshalb fünfmal geprüft
+werden und war am Ende trotzdem nicht draußen.
+
+Die Regel hat zwei Hälften, und beide sind nötig:
+
+**1. Der Zustand des Pull Requests ist die Ampel.**
+
+| Zustand | Bedeutung |
+|---|---|
+| Entwurf (Draft) | Ich arbeite noch. Andere dürfen jederzeit mergen. |
+| Bereit zur Prüfung (Ready for review) | Ich liefere gerade aus. Bis zum Merge mergt sonst niemand nach `main`. |
+
+Ein PR wird also erst aus dem Entwurf geholt, **wenn der ABSCHLIESSENDE Prüflauf startet** — nicht
+schon beim Öffnen, aber auch nicht erst danach.
+
+Die erste Fassung dieser Regel sagte „wenn der Volllauf grün ist und der Merge unmittelbar
+bevorsteht". Das ist am 03.09.2026 sofort schiefgegangen: Während des Laufs landeten v8.650.0 und
+v8.651.0 auf `main`, beide an der Spieldatei — der Lauf war entwertet, bevor die Ampel überhaupt auf
+Rot ging. Wer erst nach dem grünen Lauf sperrt, sperrt genau das Fenster nicht, in dem das Rennen
+stattfindet.
+
+Das kostet: Die Ampel steht jetzt für die Dauer des Laufs auf Rot statt nur für den Merge. Mit
+`pruflauf.js` sind das gemessen 37 Minuten, nicht 91 — deshalb ist der Preis tragbar, und deshalb
+gehören die beiden Teile dieser Regel zusammen.
+
+**2. Ein fremder Merge ist erst dann ein Problem, wenn er die Spieldatei anfasst.** Das ist messbar
+und wird gemessen, nicht vermutet:
+
+```bash
+git fetch origin main
+git diff --name-only HEAD...origin/main
+```
+
+Steht `weltraum_kolonie.html` nicht in der Liste, bleibt der eigene Lauf gültig: Der Merge hat nur
+Tests, Doku oder Backend-Dateien berührt. Dann reicht ein Merge von `origin/main` plus die Tests,
+die die geänderten Dateien betreffen (`## Betroffenheits-Sweep`). Nur wenn die Spieldatei dabei ist,
+muss der Volllauf wiederholt werden — und dann fortsetzbar, siehe unten.
+
+**3. Der Prüflauf läuft parallel und ist fortsetzbar.** `pruflauf.js` im Wurzelverzeichnis verteilt
+die Testdateien reihum auf mehrere gleichzeitige Stücke und hinterlässt je Stück eine Marke mit dem
+Exit-Code:
+
+```bash
+node pruflauf.js                    # alle Tests, 4 Stücke gleichzeitig
+node pruflauf.js --gleichzeitig 6   # mehr Stücke nebeneinander
+node pruflauf.js --fortsetzen       # fertige Stücke überspringen (nach einem Abbruch)
+```
+
+Warum das überhaupt geht: Gemessen an einem vollständigen Lauf brauchen 107 der 332 Tests 0 s (reine
+Quelltext-Tests), und die Zeit der übrigen steckt fast vollständig in Browser-Tests, die **warten**
+(`waitForTimeout`) statt zu rechnen. Solche Tests laufen nebeneinander fast gratis. Es wird nichts
+übersprungen und nichts abgeschwächt — jedes Stück ruft dasselbe `tests/run.js` mit einem Teil der
+Dateiliste auf.
+
+### Ein rotes Stück ist ein Verdacht, kein Urteil (03.09.2026, gemessen)
+
+Der erste echte Lauf brauchte 37 Minuten statt 91 — und meldete **zwei rote Tests, die einzeln grün
+sind**: `test_forschung_lagerwand` („die Forschung ist gestartet, statt blockiert zu werden" —
+`activeResearch` war schlicht noch `null`) und `test_fraktionsgebiet_karte` (CORS beim Laden von
+`version.txt`). Beides Lastsymptome von vier gleichzeitigen Browsern, keine Fehler im Spiel.
+
+Die erste Fassung dieses Abschnitts behauptete „gleiche Tests, gleicher Exit-Code". Das war falsch,
+und zwar in der gefährlichen Richtung: Wer einem falschen Rot glaubt, sucht einen Fehler, den es
+nicht gibt — oder schlimmer, hält ein echtes Rot beim nächsten Mal für dasselbe Rauschen.
+
+Statt das als Merksatz zu hinterlegen, **fährt das Skript rote Tests selbst noch einmal nach** —
+einzeln, nacheinander, ohne Last — und wertet nur diese Nachprüfung. Was dann noch rot ist, ist echt.
+(CLAUDE.md: wiederholbare Regeln automatisieren, nicht aufschreiben.)
+
+Zwei Dinge, die dabei zu beachten sind:
+
+- **Nicht durch eine Pipe aufrufen.** `node pruflauf.js | tail -25` liefert den Exit-Code von `tail`,
+  nicht den des Laufs — genau der Fehler, vor dem „der Exit-Code entscheidet" warnt. Beim ersten
+  Einsatz prompt passiert.
+- Die Stücke sind **nach Dateizahl** gleich groß, nicht nach Laufzeit: gemessen 1600 s, 1602 s,
+  1829 s und 2198 s. Der Gewinn ist deshalb Faktor 2,5 und nicht 4.
+
+Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln die langsamen Tests
+(`test_wiedergabe_*`, `test_admin_*`) in wenigen Stücken, und dann wartet alles auf das langsamste.
+
+Die Marken machen den Lauf gegen Abbrüche robust — ein Container-Neustart oder ein fremder Merge
+kostet dann ein Stück statt des ganzen Laufs.
