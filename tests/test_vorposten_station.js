@@ -28,9 +28,22 @@ check('0a: die Silhouette kennt alle drei Zweige und einen Rueckfall ohne Zweig'
   /function vorpostenSilhouette\(vp, x, y, r, farbe\)\{/.test(src)
   && /if \(zweig === 'werft'\)\{/.test(src) && /if \(zweig === 'handel'\)\{/.test(src) && /if \(zweig === 'festung'\)\{/.test(src)
   && /Neutraler Stationsring \(Zweig unbekannt\)/.test(src));
+/* 0b haelt seit dem 03.09.2026 die REGEL fest, nicht den Wortlaut. Vorher stand hier die
+   Zeichenkette „sichtV = rV * 2.0" - und die fiel, sobald der Faktor aus einer benannten Konstante
+   kam (VORPOSTEN_SICHT, eingefuehrt, weil der Kollisionsschieber weniger reservierte als die
+   Zeichnung braucht). Ein Test, der den Wortlaut pinnt, blockiert genau die Korrektur, die er
+   absichern soll - dieselbe Lehre wie bei 1a/1b weiter unten.
+   Gemessen wird jetzt: (1) die Radiusformel WAECHST wirklich mit der Stufe - dafuer wird sie aus
+   der Datei geholt und ausgewertet, nicht angeschaut; (2) der Schieber bekommt ein VIELFACHES von
+   rV, keine feste Zahl. */
+const radiusQuelle = (src.match(/function vorpostenRadius\(stufe\)\{[^}]*\}/) || [])[0];
+const radiusFn = radiusQuelle ? new Function('return ' + radiusQuelle.replace('function vorpostenRadius', 'function'))() : null;
+const radien = radiusFn ? [1,2,3,4,5,6,7,8].map(n => radiusFn(n)) : [];
 check('0b: der Radius waechst mit der Stufe und der Kollisionsschieber bekommt ihn mit',
-  /function vorpostenRadius\(stufe\)\{ return 11 \+ Math\.max\(0, Math\.min\(7, \(stufe\|\|1\) - 1\)\) \* 0\.85; \}/.test(src)
-  && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* 2\.0;/.test(src));
+  radien.length === 8
+  && radien.every((v, i) => i === 0 || v > radien[i-1])
+  && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* [^;]+;/.test(src),
+  { radien, schieber: (src.match(/const rV = vorpostenRadius\(vp\.stufe\), sichtV = [^;]+;/) || [])[0] });
 
 const now = Date.now();
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp: 20000*s, verteidigung: 2500*s, garnisonMax: 300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
