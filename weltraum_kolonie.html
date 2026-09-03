@@ -30854,7 +30854,20 @@ async function claimPendingRewards(){
   async function notifySpyTarget(targetId, deep){
     if (!useBackend() || !targetId) return;
     try {
-      await storageSet('spyping:'+targetId, JSON.stringify({ fromId: state.player.id, fromName: state.player.name || 'Ein Spieler', deep: !!deep, time: Date.now() }));
+      /* DAS DRITTE ARGUMENT IST DER GANZE PING (03.09.2026). Ohne es schickt storageSet
+         `?shared=false`, und der Server behandelt `spyping:` ausschliesslich im shared-Zweig
+         (server.js, `if (shared) {` ... `if (key.startsWith('spyping:'))`). Die Folge, gemessen:
+           - Das Ziel bekam NIE eine Warnung, obwohl die Einstellung "Spionage-Warnungen - wenn
+             dich jemand ausspaeht" sie verspricht (Vorgabe an), der Kommentar an der Aufrufstelle
+             sie behauptet und die Anzeige dafuer ('spy-detected') fertig gebaut daliegt.
+           - Der Ping landete stattdessen im PRIVATEN Speicher des Absenders
+             (db.private[userId]['spyping:<ziel>']) - ein Eintrag je geflogener Spionage, dauerhaft,
+             in der echten db.json. Der shared-Zweig speichert bewusst gar nichts.
+         Beide Haelften waren also fertig, nur nicht verbunden. Die Rechtepruefung laesst den
+         Schluessel durch: Alle check*KeyPermission sind praefix-gebunden und geben fuer
+         `spyping:` null zurueck; der eigene Block dahinter prueft dafuer selbst
+         (payload.fromId === req.userId, Ziel existiert, nicht man selbst). */
+      await storageSet('spyping:'+targetId, JSON.stringify({ fromId: state.player.id, fromName: state.player.name || 'Ein Spieler', deep: !!deep, time: Date.now() }), true);
     } catch(e){ /* Info-Ping, Fehler bewusst ignoriert - Aufklärung selbst war erfolgreich */ }
   }
   // Beschreibt die Wirkung eines erfolgreichen Störmanövers in Klartext (für Log/Toast beim Angreifer
