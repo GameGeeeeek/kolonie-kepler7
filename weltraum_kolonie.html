@@ -68629,8 +68629,20 @@ async function claimPendingRewards(){
     // bisher nicht übernommen und von applyStateDefaults auf 0 gesetzt). Sternensaat-Startpaket
     // ("nach jedem Reset") greift hier ebenfalls.
     const keepAscension = state.ascension;
+    /* Erstsiege gegen die Statthalter (E2) - AUCH auf diesem Weg. Prestige und Aufstieg nehmen
+       die Merkliste mit; dieser Vollreset baut den Zustand aus einem eigenen, kuerzeren Literal
+       neu auf, und applyStateDefaults() legt Fehlendes danach als leeres Array an. Da die Zeile
+       darueber die Sternenessenz ausdruecklich BEHAELT, waeren die 3 Essenz je Statthalter nach
+       jedem Vollreset erneut verdienbar - dieselbe Luecke wie bei den Forschungs-Meilensteinen,
+       nur ueber den dritten Ausgang. Gemeldet von der Codex-Pruefung an PR #554; mein eigener
+       Test zaehlte ZWEI Reset-Wege und es sind DREI (er prueft jetzt die Regel, nicht die Zahl).
+       Ausdruecklich NICHT mitgenommen werden hier die uebrigen Marken derselben Familie
+       (claimedBossKills, compendiumClaimed, codexClaimed, researchMilestones): Bei ihnen ist es
+       eine aeltere, groessere und eigene Frage - der Bestaetigungstext dieses Knopfes verspricht
+       ausdruecklich, dass NUR Sternenessenz und Meta-Baum bleiben. */
+    const keepStatthalterKills = (state.statthalterKills || []).slice();
     const resetStartLvl = (keepAscension && keepAscension.tree && keepAscension.tree.start) || 0;
-    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, defenseSabotage:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
+    state = { resources:{energie:10 + resetStartLvl*300, erz:10 + resetStartLvl*400, kristalle:resetStartLvl*400, deuterium:resetStartLvl*150, antimaterie:0, forschungspunkte:0}, buildings:{solar:0,mine:0,raffinerie:0,synth:0,fusionsreaktor:0,habitat:0,lager:0,turm:0,schild:0,laser:0,plasma:0,raketen:0,gauss:0,labor:0,festung:0}, research:{}, activeResearch:null, fleet:{ships:1,cruisers:0,destroyers:0,frachter:0,colonyShips:0,jaeger:0,schlachtschiff:0,spaeher:0,carrier:0,bomber:0,superschlachtschiff:0,recycler:0,waechter:0,missions:[]}, discovered:{}, planetBonuses:{}, colonies:{}, activeBasePlanet:'home', nextRaidTime:null, incomingRaid:null, pirateDebrisRaid:null, voidRift:null, battlePoints:0, npcKills:0, bossKills:0, xp:0, prestige:0, achievements:{}, levelRewardsClaimed:{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn, rareItems:{}, inventory:{}, fragments:{}, buffs:[], unlocked:{superschlachtschiff:false,festung:false}, mineDebuff:null, defenseSabotage:null, allianceResearch:{}, allianceContributed:{}, credits: 250 + resetStartLvl*100, ascension: keepAscension, statthalterKills: keepStatthalterKills, player:{id:keepId,name:keepName,allianceTag:keepTag,avatarKey:keepAvatar}, lastTick: Date.now() };
     // Füllt alle Felder auf, die diese verkürzte Reset-Liste nicht enthält (z.B. credits, skillTree,
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).

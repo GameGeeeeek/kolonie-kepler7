@@ -218,10 +218,40 @@ check('10: das Kartenmenue zeigt die Chronik und den offenen Erstsieg',
    beim Reset mitgeloescht wird, macht aus 24 Essenz eine je Durchlauf wiederholbare Quelle -
    genau die Luecke, die bei den Forschungs-Meilensteinen schon einmal 127 Essenz je Prestige
    ausgeschuettet hat (Kommentar im Prestige-Zweig). */
-const uebernahmen = (S.match(/statthalterKills: keepStatthalterKills/g) || []).length;
-check('11: statthalterKills wird bei BEIDEN Resets mitgenommen (Prestige und Aufstieg)',
-  uebernahmen === 2 && (S.match(/const keepStatthalterKills = /g) || []).length === 2,
-  { uebernahmen, hinweis: 'sonst waeren 3 Sternenessenz je Statthalter und Durchlauf wiederholbar' });
+/* GEPRUEFT WIRD DIE REGEL, NICHT DIE ANZAHL - und das ist hier keine Stilfrage, sondern der
+   gemessene Anlassfall: Der erste Entwurf verlangte "uebernahmen === 2" (Prestige und Aufstieg)
+   und war damit gruen, WAEHREND der dritte Ausgang die Merkliste verlor. Der Vollreset-Knopf
+   (resetBtn) baut den Zustand aus einem eigenen, kuerzeren Literal neu auf, behaelt dabei
+   ausdruecklich die Sternenessenz - und applyStateDefaults() legte die Merkliste danach als
+   leeres Array an. Dieselbe Essenz war nach jedem Vollreset erneut verdienbar (P1 der
+   Codex-Pruefung an PR #554).
+   Die Regel: JEDE Stelle, die den Zustand aus einem Objektliteral NEU AUFBAUT, muss die
+   Merkliste mittragen. Gemessen sind das drei; die Zahl steht hier nicht, sie wird gezaehlt -
+   ein vierter Ausgang faellt damit auf, ohne dass jemand an ihn gedacht haben muss. Der
+   Ladeweg (Object.assign mit dem geladenen Stand) ist bewusst KEIN Neuaufbau: Ein
+   gespeicherter Spielstand bringt die Merkliste selbst mit. */
+const NEUAUFBAU = [...S.matchAll(/^[ \t]*state = \{/gm)].map(m => m.index);
+check('11-vorab: die Stellen, die den Zustand neu aufbauen, wurden gefunden',
+  NEUAUFBAU.length >= 3, { gefunden: NEUAUFBAU.length });
+const ohneMarke = NEUAUFBAU.filter(i => {
+  /* Vom Literal-Anfang bis zu seinem Ende. Die Literale von Prestige und Aufstieg sind
+     mehrzeilig und enden mit "};" am Zeilenanfang, das Vollreset-Literal steht in EINER Zeile.
+     Gemessen wird bis zu dem der beiden Enden, das zuerst kommt. */
+  const rest = S.slice(i);
+  const endeBlock = rest.search(/\n[ \t]*\};/);
+  const endeZeile = rest.indexOf('};');
+  const kandidaten = [endeBlock, endeZeile].filter(x => x >= 0);
+  const bis = kandidaten.length ? Math.min(...kandidaten) + 2 : 4000;
+  return !/statthalterKills:/.test(rest.slice(0, bis));
+});
+check('11: JEDER Neuaufbau des Zustands traegt die Erstsieg-Merkliste mit',
+  ohneMarke.length === 0,
+  { ohneMarke: ohneMarke.map(i => 'Zeile ' + S.slice(0, i).split('\n').length),
+    gepruefteStellen: NEUAUFBAU.length,
+    hinweis: 'sonst sind 3 Sternenessenz je Statthalter nach jedem Reset erneut verdienbar' });
+check('11a: fuer jeden dieser Ausgaenge wird die Merkliste vorher gesichert',
+  (S.match(/const keepStatthalterKills = /g) || []).length === NEUAUFBAU.length,
+  { sicherungen: (S.match(/const keepStatthalterKills = /g) || []).length, ausgaenge: NEUAUFBAU.length });
 check('11b: der Erstsieg wird nur gebucht, wenn er noch offen ist',
   /if \(istStatthalter\(npc\) && statthalterErstsiegOffen\(npc\)\)\{/.test(S)
   && /state\.statthalterKills\.push\(npc\.id\);/.test(S), {});
