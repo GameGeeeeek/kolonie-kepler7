@@ -14481,12 +14481,182 @@
   // kein "Spielende". Der Dominanz-Wert speist sich aus allen Langzeit-Leistungen; jede erreichte
   // Stufe gibt eine einmalige Belohnung (Kredite + Kommandopunkte, steigend) und einen Rang-Titel.
   const DOMINANCE_TITLES = ['Rekrut','Pionier','Kommandant','Kriegsherr','Vizeadmiral','Admiral','Großadmiral','Imperator'];
-  // Nach Imperator (Spieler-Wunsch: "mal ein neuer Name ab Level 20" statt für immer derselben
-  // hochzählenden "Galaktische Legende N") - drei weitere Rang-Namen, je 12 Stufen lang (dieselbe
-  // Spanne, die "Galaktische Legende" bisher allein abdeckte), danach zählt der letzte Name endlos
-  // weiter hoch (es gibt bewusst kein Spielende, siehe dominanceThreshold).
-  const DOMINANCE_LEGEND_TIERS = ['Galaktische Legende','Sternenherrscher','Kosmischer Souverän'];
-  const DOMINANCE_LEGEND_SPAN = 12;
+  /* Ein EIGENER Name je Stufe (03.09.2026, Spieler-Reklamation ueber Sascha: Stufe 163 hiess
+     "Kosmischer Souveraen 131" - eine hochzaehlende Zahl, und "total langweilig"). Die Stufen 1-8
+     behalten ihre bekannten Dienstgrade, ab Stufe 9 traegt jede Stufe einen eigenen Titel.
+     Acht Themenbaender, deren Wucht bewusst waechst: von der Flotte ueber Sektoren, Nebel,
+     Sternenschmiede, Abgrund, Zeit und Urmaterie bis "jenseits aller Zaehlung".
+     Jeder Name ist hoechstens 26 Zeichen lang (er steht am Handy neben "Stufe N" in einer Zeile),
+     traegt keine Ziffer und keine roemische Zahl, kommt genau einmal vor und kollidiert mit keinem
+     Schiff, Gebaeude, keiner Forschung, keinem Modul und keiner Doktrin des Spiels.
+     tests/test_rangnamen.js prueft genau das - eine Namensliste, die von Hand gepflegt wird,
+     verliert sonst beim naechsten Anfassen still ihre Eindeutigkeit. */
+  const DOMINANCE_NAMES = [
+    // Stufe 9-70 - Aufstieg in der Flotte
+    'Flottenruf', 'Grenzwacht', 'Geleitschild', 'Kursanker',
+    'Signalstimme', 'Zeugmeister', 'Eidwacht', 'Kohortenherz',
+    'Legionsruf', 'Bannerwille', 'Wahrer der Wege', 'Schildmahnung',
+    'Herr der Werften', 'Zollsiegel', 'Speerwille', 'Kriegsstimme',
+    'Ringmarschall', 'Himmelsanker', 'Trabantenwacht', 'Mondstatthalter',
+    'Weltenschild', 'Legionszorn', 'Hafenvogt', 'Flottenkanzler',
+    'Wahrer der Ferne', 'Trümmerbann', 'Hüter der Achse', 'Kolonienherz',
+    'Sturmsiegel', 'Sonnenmarschall', 'Reichsstimme', 'Sektorenwille',
+    'Hüter der Schwelle', 'Nebelmahnung', 'Kometenbann', 'Großmarschall',
+    'Zorn der Tiefe', 'Wahrer des Abgrunds', 'Kometenbezwinger', 'Provinzherz',
+    'Weltenbann', 'Hochstatthalter', 'Sphärenhort', 'Sturmfürst',
+    'Hüter der Weite', 'Legatensiegel', 'Hochvogt', 'Gebieter der Bahnen',
+    'Geschwaderlenker', 'Weltengebot', 'Nebelfürst', 'Erzkanzler',
+    'Hort des Abgrunds', 'Erzstatthalter', 'Sternenzorn', 'Sonnenfürst',
+    'Großgebieter', 'Glutbändiger', 'Herr vieler Sonnen', 'Erzgebieter',
+    'Sternengewalt', 'Zwingherr der Systeme',
+    // Stufe 71-130 - Systeme und Sektoren
+    'Herrscher der Ströme', 'Kurshüter', 'Zollstimme', 'Konvoiherz',
+    'Schleusenruf', 'Lotsenwille', 'Frachtbann', 'Fahrtenvogt',
+    'Warenrichter', 'Pfadsiegel', 'Herr der Straßen', 'Waagemeister',
+    'Handelsherz', 'Vertragswacht', 'Zunge des Bundes', 'Erlasswille',
+    'Hort des Rechts', 'Ordnungsruf', 'Gerichtszorn', 'Rechtsvollstrecker',
+    'Marschall des Bundes', 'Grenzmahnung', 'Pakthüter', 'Kanzler der Bahnen',
+    'Sektorenwacht', 'Marktbezwinger', 'Sektorenherz', 'Zorn der Systeme',
+    'Bannsprecher', 'Straßensouverän', 'Vertragsanker', 'Handelsfürst',
+    'Weltenrichter', 'Flottenwille', 'Regent der Bahnen', 'Ordnungsstimme',
+    'Grenzfürst', 'Eidschild', 'Sprecher der Pfade', 'Ordensmeister',
+    'Flottenmahnung', 'Purpurträger', 'Sternenschild', 'Reichsverweser',
+    'Gebieter der Marken', 'Kronregent', 'Wahrer der Ordnung', 'Gestirnsbändiger',
+    'Systembann', 'Erzrichter', 'Hochtribun', 'Schlachtenlenker',
+    'Regent der Grenzmark', 'Gesetzeszorn', 'Souverän der Sektoren', 'Oberster Verweser',
+    'Herrscher der Bünde', 'Faust der Sphären', 'Zwingherr der Welten', 'Oberhaupt der Reiche',
+    // Stufe 131-190 - Die Weite und die Nebel
+    'Dunkelsouverän', 'Nebelbote', 'Wolkentreiber', 'Fernenwacht',
+    'Schattenlenker', 'Aschenruf', 'Dämmeranker', 'Wächter der Drift',
+    'Schleierherz', 'Nebelsiegel', 'Hüter der Stille', 'Schattenpilger',
+    'Ödnisschild', 'Frostmahnung', 'Der Erloschene', 'Schlundhüter',
+    'Dunkelherz', 'Wolkenzorn', 'Frostbann', 'Kalter Vollstrecker',
+    'Stimme der Weite', 'Schweigefaust', 'Nachtsiegel', 'Sternenwille',
+    'Ödnisfürst', 'Träger des Schweigens', 'Herr der Driften', 'Tiefenzorn',
+    'Schlundstimme', 'Gebieter der Nacht', 'Weitenhort', 'Fernentreiber',
+    'Abgrundbezwinger', 'Erbe der Stille', 'Aschenherr', 'Nebelherrscher',
+    'Tiefenfürst', 'Herr der Schatten', 'Zwingherr der Kälte', 'Leerenhort',
+    'Gebieter der Finsternis', 'Wille des Nichts', 'Künder des Vergessens', 'Statthalter des Endes',
+    'Bann der Verlorenen', 'Vogt der Ödnis', 'Anker der Ewigkeit', 'Stimme der Unendlichkeit',
+    'Gebieter der Leere', 'Bann der Finsternis', 'Marschall der Nacht', 'Herz des Abgrunds',
+    'Herold des Untergangs', 'Herrscher der Weiten', 'Fürst der Ewigkeit', 'Wandler der Unendlichkeit',
+    'Schwarzgrimm', 'Regent des Vergessens', 'Schleierbrecher', 'Wille jenseits der Sterne',
+    // Stufe 191-250 - Sternenschmiede
+    'Funkenwacht', 'Zundergroll', 'Glutwart', 'Hammerruf',
+    'Ambosseid', 'Lohenbürge', 'Loderwille', 'Schlackengroll',
+    'Schmiedeurteil', 'Flammensiegel', 'Tiegelhort', 'Schmelzruf',
+    'Hitzeherz', 'Aschenurteil', 'Gussgewalt', 'Brandstimme',
+    'Fackelzorn', 'Wille der Läuterung', 'Zündschwur', 'Glutfürst',
+    'Feuerkünder', 'Strahlenbann', 'Koronabürge', 'Plasmaherz',
+    'Fanalstimme', 'Herr des Brandes', 'Kernwille', 'Lohenmahnung',
+    'Fusionseid', 'Sonnenschmied', 'Flammenvollstrecker', 'Schmelzgewalt',
+    'Zunge der Flamme', 'Hitzesiegel', 'Lohenwacht', 'Herr der Weißglut',
+    'Aschenrichter', 'Sengender Wille', 'Fanalzorn', 'Fusionsfürst',
+    'Strahlengrimm', 'Zwingherr des Kerns', 'Plasmaeid', 'Lichtgebieter',
+    'Hüter der Gestirne', 'Brandbändiger', 'Fusionsgewalt', 'Urfeuerbann',
+    'Koronamacht', 'Weltenzorn', 'Gestirnschmied', 'Plasmagebieter',
+    'Der Unverlöschliche', 'Sonnenbändiger', 'Hammer der Sterne', 'Gestirnrichter',
+    'Träger des Urlichts', 'Weltenformer', 'Zünder aller Sonnen', 'Herr der Sternenschmiede',
+    // Stufe 251-310 - Leere und Abgrund
+    'Lotwart', 'Tiefenspäher', 'Senkenwacht', 'Rissleser',
+    'Lot der Stille', 'Dunkelanker', 'Sogmahnung', 'Kluftwahrer',
+    'Schachtwacht', 'Zeuge der Kälte', 'Frostmahner', 'Schwarzgroll',
+    'Druckwille', 'Schwerelot', 'Nachtschild', 'Strudelbann',
+    'Bürge des Nichts', 'Spaltzorn', 'Untiefenherz', 'Schweigewacht',
+    'Leerensiegel', 'Sogfürst', 'Rissbann', 'Nachtruf',
+    'Zunge der Schwärze', 'Schlundwille', 'Hüter des Nichts', 'Kältesiegel',
+    'Sturzherold', 'Dunkelzorn', 'Schattenmahnung', 'Herr der Stille',
+    'Strudelfaust', 'Schlundherz', 'Leerenzorn', 'Nachtgewalt',
+    'Grauenhort', 'Schlundgebieter', 'Rissgewalt', 'Schwarzsiegel',
+    'Wille im Sog', 'Finsterherz', 'Schweigefürst', 'Druckgewalt',
+    'Kluftrichter', 'Schattenvogt', 'Frostgebieter', 'Herr der Schwere',
+    'Stimme des Abgrunds', 'Der Unergründliche', 'Dunkelschwur', 'Faust der Finsternis',
+    'Urteil des Nichts', 'Sturzgebieter', 'Zunge der Leere', 'Letzter Wahrer',
+    'Der Schweigende', 'Abgrundgebieter', 'Erbe der Finsternis', 'Vollstrecker des Abgrunds',
+    // Stufe 311-370 - Zeit und Kausalitaet
+    'Stundenwacht', 'Pulsherold', 'Fristhüter', 'Zeigerherz',
+    'Pendelbann', 'Uhrenschild', 'Der Unaufhaltsame', 'Sanduhrsiegel',
+    'Fristvogt', 'Herz der Stunde', 'Nachhallwacht', 'Echostimme',
+    'Ursachenbändiger', 'Gezeitenruf', 'Wille des Vorher', 'Zorn des Nachher',
+    'Umkehrschild', 'Wiederkehrbann', 'Spurenhüter', 'Vorzeichenkünder',
+    'Kreislaufgrimm', 'Zwingherr der Knoten', 'Stimme des Einst', 'Ewigkeitsanker',
+    'Äonenherz', 'Vollender des Nimmermehr', 'Ursachenwacht', 'Wirkungsschild',
+    'Kettenrichter', 'Folgenschmied', 'Ursprungswille', 'Eid der Wende',
+    'Zeitrissmahnung', 'Nahtbrecher', 'Widerhallzorn', 'Rückkehrgebot',
+    'Bote der Vergänglichkeit', 'Fristenbrecher', 'Vogt der Vorzeit', 'Gezeitenfürst',
+    'Epochenanker', 'Ruf des Vergessens', 'Äonenrichter', 'Nachweltmahnung',
+    'Ewigkeitszorn', 'Vorweltsiegel', 'Hort des Immerdar', 'Wäger der Folgen',
+    'Kettenschmied', 'Stimme des Anbeginns', 'Wirkungsfürst', 'Gebieter der Stunden',
+    'Bann des Unabwendbaren', 'Schwur der Wiederkunft', 'Urgrundfürst', 'Vollstrecker der Wirkung',
+    'Ursachenbezwinger', 'Herr über Anfang und Ende', 'Ahn aller Ursachen', 'Erstbeweger',
+    // Stufe 371-430 - Urmaterie und Schoepfung
+    'Keimwacht', 'Saatruf', 'Funkenherz', 'Schwur der Urzeugung',
+    'Zellensiegel', 'Wurzelanker', 'Triebschild', 'Erwecker der Sporen',
+    'Stimme der Saat', 'Sprossenbann', 'Stifter der Vermehrung', 'Erstlingshort',
+    'Urstoffzwang', 'Stoffwille', 'Binder der Massen', 'Zunge der Materie',
+    'Kernwacht', 'Gussmeister', 'Tiegelwalter', 'Wahrer des Erstgusses',
+    'Herr der Form', 'Prägewille', 'Ader des Werdens', 'Hauch der Rohmasse',
+    'Wachstumsbann', 'Reifewacht', 'Erntegebot', 'Quellstimme',
+    'Hand des Gedeihens', 'Weltenpate', 'Sphärenschmied', 'Mehrer der Fülle',
+    'Stifter der Materie', 'Ursprungsherz', 'Gestaltgebot', 'Zunge des Nichts',
+    'Schöpfungsruf', 'Sternengießer', 'Bildner der Frühwelt', 'Hüter des Urgrunds',
+    'Wahrer der Frühglut', 'Nichtsbann', 'Gründer der Sphären', 'Gebieter des Gusses',
+    'Künder des Erstlichts', 'Auge des Anbeginns', 'Nichtsbezwinger', 'Kosmosschmied',
+    'Herr des Anfangs', 'Ahn des Alls', 'Schöpfungszorn', 'Hand des Werdens',
+    'Schmied des Alls', 'Richter des Werdens', 'Odem des Alls', 'Anfangsschwur',
+    'Wäger des Werdens', 'Vollender der Form', 'Gebieter des Anbeginns', 'Stifter des Seins',
+    // Stufe 431-500 - Jenseits aller Zaehlung
+    'Herold der Unzahl', 'Weitenanker', 'Ruf ohne Ufer', 'Hort des Ungezählten',
+    'Randlose Gewalt', 'Sphärenzorn', 'Bürge der Ferne', 'Weltenmahnung',
+    'Zeuge des Abgrunds', 'Künder der Tiefe', 'Bann der Weiten', 'Eid ohne Maß',
+    'Schild der Unendlichkeit', 'Herr der Unermesslichkeit', 'Hüter des Grenzenlosen', 'Puls der Äonen',
+    'Zeitloser Atem', 'Ewigkeitsruf', 'Lenker der Jahrtausende', 'Zorn der Äonen',
+    'Unvergänglicher Eid', 'Gelöbnis ohne Frist', 'Beuger der Stunden', 'Hüter der Ewigkeit',
+    'Äonensiegel', 'Unverjährte Macht', 'Erbe des Immerwährenden', 'Zähmer der Zeitalter',
+    'Vollstrecker der Dauer', 'Herr der Zeitlosigkeit', 'Ursprungsmahnung', 'Schöpfungsbann',
+    'Künder des Urknalls', 'Zunge des Ersten Lichts', 'Bürge der Wende', 'Schild des Urgrunds',
+    'Erzwinger der Umkehr', 'Richter des Verlöschens', 'Wille des Endes', 'Bändiger des Zerfalls',
+    'Schirmer des Restlichts', 'Herz des Werdens', 'Statthalter des Ursprungs', 'Gebieter der Schwelle',
+    'Vollender aller Kreise', 'Stummer Zwang', 'Stimme der Stille', 'Ungenannter Zorn',
+    'Schweigender Eid', 'Erbe des Nachhalls', 'Hand des Schweigens', 'Zeuge aller Namen',
+    'Lautloser Bann', 'Anker im Nichts', 'Fürst der Leere', 'Hüter des Unsagbaren',
+    'Atem des Abgrunds', 'Schatten aller Sonnen', 'Gebieter des Nichts', 'Meister des Verstummens',
+    'Ruf jenseits der Zeit', 'Machtwort des Seins', 'Atem vor dem Anfang', 'Herz der Ewigkeit',
+    'Erzvogt aller Bahnen', 'Zunge des Ungeschaffenen', 'Gewalt über das Werden', 'Unnennbare Majestät',
+    'Erstes und Letztes Siegel', 'Träger des Letzten Wortes'
+  ];
+  /* Jenseits von Stufe 500 (Schwelle rund 39 Millionen Dominanz - der hoechste Spieler steht heute
+     bei 5,79 Millionen auf Stufe 163) geht es weiter, ohne dass jemand von Hand nachtraegt: aus
+     zwei Wortlisten entstehen 45x45 Namen, die kollidierenden werden aussortiert. Bleiben 1.970
+     weitere Titel, also Stufen bis ueber 2.400 - und danach beginnt die Reihe von vorn statt eine
+     Zahl anzuhaengen. Die Streuung (Faktor 977, teilerfremd zur Laenge) sorgt dafuer, dass
+     aufeinanderfolgende Stufen nicht dieselbe Endung tragen; ohne sie hiesse Stufe 501 bis 545
+     45-mal hintereinander "...wart". */
+  const DOMINANCE_UEBERLAUF_VOR = [
+    'Funken', 'Aschen', 'Scherben', 'Splitter', 'Trümmer', 'Ruinen', 'Eisen', 'Stahl',
+    'Silber', 'Obsidian', 'Frost', 'Glut', 'Flammen', 'Sturm', 'Donner', 'Strahlen',
+    'Nebel', 'Dämmer', 'Nacht', 'Schatten', 'Wüsten', 'Trabanten', 'Kometen', 'Planeten',
+    'Sonnen', 'Sternen', 'Himmels', 'Flotten', 'Schwarm', 'Quanten', 'Photonen', 'Ionen',
+    'Neutronen', 'Fusions', 'Schwerkraft', 'Sphären', 'Tiefen', 'Fernen', 'Weiten', 'Welten',
+    'Zeiten', 'Äonen', 'Ewigkeits', 'Leeren', 'Abgrund'
+  ];
+  const DOMINANCE_UEBERLAUF_GRUND = [
+    'wart', 'wacht', 'wehr', 'anker', 'hort', 'hand', 'herz', 'ruf',
+    'stimme', 'künder', 'herold', 'sprecher', 'seher', 'deuter', 'zeuge', 'erbe',
+    'bewahrer', 'weber', 'lenker', 'reiter', 'schwur', 'siegel', 'mandat', 'legat',
+    'tribun', 'vogt', 'kanzler', 'regent', 'richter', 'urteil', 'mahnung', 'wille',
+    'krone', 'hoheit', 'faust', 'grimm', 'zorn', 'geißel', 'schrecken', 'spalter',
+    'bändiger', 'meister', 'marschall', 'gebieter', 'fürst'
+  ];
+  const DOMINANCE_UEBERLAUF = (() => {
+    const belegt = new Set(DOMINANCE_NAMES);
+    const roh = [];
+    for (const v of DOMINANCE_UEBERLAUF_VOR) for (const g of DOMINANCE_UEBERLAUF_GRUND){
+      const wort = v + g;
+      if (!belegt.has(wort)) roh.push(wort);
+    }
+    return roh.map((_, i) => roh[(i * 977) % roh.length]);
+  })();
   function dominanceScore(){
     return Math.round(
       computeScore()
@@ -14509,10 +14679,11 @@
   function dominanceTitle(lvl){
     if (lvl <= 0) return 'Neuling';
     if (lvl <= DOMINANCE_TITLES.length) return DOMINANCE_TITLES[lvl-1];
-    const legendLvl = lvl - DOMINANCE_TITLES.length; // 1-basiert innerhalb der Legenden-Ränge
-    const tierIndex = Math.min(DOMINANCE_LEGEND_TIERS.length - 1, Math.floor((legendLvl-1) / DOMINANCE_LEGEND_SPAN));
-    const numberInTier = legendLvl - tierIndex*DOMINANCE_LEGEND_SPAN;
-    return DOMINANCE_LEGEND_TIERS[tierIndex]+' '+numberInTier;
+    const i = lvl - DOMINANCE_TITLES.length - 1;        // 0-basiert in DOMINANCE_NAMES
+    if (i < DOMINANCE_NAMES.length) return DOMINANCE_NAMES[i];
+    // Jenseits der handgepflegten Liste: aus den zwei Wortlisten, nie eine angehaengte Zahl.
+    const u = DOMINANCE_UEBERLAUF;
+    return u.length ? u[(i - DOMINANCE_NAMES.length) % u.length] : DOMINANCE_NAMES[DOMINANCE_NAMES.length-1];
   }
   function dominanceRewardFor(lvl){ return { credits: 200 + lvl*100, commandPoints: 10 + lvl*5 }; }
   function claimDominanceReward(){
@@ -39396,7 +39567,7 @@ async function claimPendingRewards(){
       { title:'Galaktisches Kompendium', body:'Im <strong>Fortschritt-Tab</strong> bündelt das Kompendium deinen Sammel-Fortschritt über die ganze Galaxie in '+COMPENDIUM_CATS.length+' Kategorien, in der Reihenfolge, in der sie dort stehen: '+COMPENDIUM_CATS.map(c=>'<strong>'+c.name+'</strong>').join(', ')+'. Was jede einzelne zählt, steht als Zeile im Reiter selbst. <strong>Schiffsregister</strong>, <strong>Modulkabinett</strong> und <strong>Gebäudearchiv</strong> zählen den aktuellen <em>Besitz</em> – ein verlorenes Schiff oder ein verkauftes Modul lässt die Kategorie also wieder zurückfallen, solange du sie noch nicht eingelöst hast. Jede Kategorie zeigt einen Fortschrittsbalken; sobald du sie <strong>vollständig</strong> erschlossen hast, kannst du einmalig eine Belohnung abholen (Sternenessenz + Kredite). Die Belohnung gibt es pro Kategorie nur ein einziges Mal – der Marker bleibt auch über Prestige und Aufstieg erhalten.' },
       { title:'Boni-Bilanz: was deine Boni wirklich bringen', body:'Boni derselben Art werden nicht miteinander multipliziert, sondern <strong>zusammengezählt</strong> – sonst würden sich viele kleine Boni gegenseitig aufschaukeln. Ein Teil dieser Summen hat eine <strong>Obergrenze</strong>. Seit v8.468.0 ist das aber <strong>keine Klippe mehr</strong>: Über der Obergrenze läuft der Bonus <strong>weich aus</strong> statt abzubrechen – der erste Punkt darüber zählt noch voll, mit wachsendem Überschuss wird jeder weitere sanft weniger wert, aber keiner ist mehr wertlos. Der Überlauf ist auf ein Viertel der Obergrenze begrenzt, damit die Grenze ihre Aufgabe behält (kein Aufschaukeln, keine Bauzeit gegen null). Du musst also nicht mehr aufpassen, ob ein Fund „ins Leere" fällt – mehr ist immer besser, irgendwann nur kaum noch. <strong>Ausnahme:</strong> Angriff, Verteidigung und Überfall-Schutz folgen seit v8.477.0 derselben Regel – Spiel und Server rechnen dabei mit identischer Formel. Und seit v8.483.0 steht die Grenze nicht mehr fest: Der Aufstiegs-Zweig „Verschobene Grenzen" hebt jede Obergrenze um 3% je Stufe, der Überlauf darüber wächst mit, weil der Server sie mitrechnet; sie folgen im nächsten Schritt. Damit du das nicht raten musst, steht es an einer Stelle: der Abschnitt <strong>„Boni-Bilanz"</strong> im Fortschritt-Tab zeigt für jede Bonus-Gruppe, wie viel du gesammelt hast, wie viel davon tatsächlich ankommt, wo die Obergrenze liegt und wie viel Luft noch bleibt. Steht eine Gruppe an ihrer Grenze, sagt die Bilanz auch, wie viele Prozentpunkte gerade wirkungslos verpuffen. Deshalb wiederholen die einzelnen Modul- und Gebäudebeschreibungen die Grenzen nicht mehr – sie stünden sonst an zwanzig Stellen und wären beim nächsten Balance-Pass an neunzehn davon veraltet. Ortsgebundene Gruppen (Module eines Standorts) beziehen sich immer auf deinen gerade ausgewählten Standort; imperiumsweite zählen alle Standorte zusammen. <strong>Zeit-Effekte (Buffs) liegen außerhalb dieser Gruppen</strong> und wirken auch dann noch voll, wenn eine Gruppe längst an ihrer Grenze steht.' },
       { title:'Aktive Effekte (Buffs)', body:'Der Abschnitt <strong>„Aktive Effekte"</strong> im Fortschritt-Tab listet alle gerade laufenden Zeit-Boni mit Restlaufzeit. <strong>Woher sie kommen:</strong> <strong>Zufallsereignisse</strong> (die Pop-ups mit A/B-Entscheidung – die mit Abstand häufigste Quelle, im Schnitt alle paar Minuten; Vorsicht: die Option „Ignorieren" kann auch einen <em>negativen</em> Effekt bringen, z.B. Produktion x0,7), <strong>Sonderfunde auf Expeditionen</strong>, der <strong>Forschungs-Sprint</strong> (800 Forschungspunkte → +25% auf eine Ressource, 20 Min.), die <strong>Kredit-Shop-Booster</strong> (Markt-Tab) sowie die beiden Quantenchip-Verbrauchsgüter <strong>Quantensensoren</strong> (bessere Expeditions-Funde, 30 Min.) und <strong>Werft-Overdrive</strong> (-25% Schiffsbauzeit, 30 Min.). <strong>Booster-Items</strong> (Ressourcenschub, Schildüberladung, Antriebsmatrix) findest du auf Erkundungen und Expeditionen – die stehen erst im <strong>Inventar</strong> und werden zu einem Effekt, wenn du sie dort aktivierst. <strong>Stapeln:</strong> Effekte multiplizieren sich untereinander (zwei Angriffs-Effekte x1,2 und x1,4 ergeben zusammen x1,68) und liegen <em>außerhalb</em> des bei +100% gedeckelten Kampfbonus-Topfes – sie wirken also auch dann noch voll, wenn du diesen Deckel längst erreicht hast. Pro Art ist trotzdem nur eine Quelle gleichzeitig nachkaufbar: ein laufender Shop-Booster derselben Art lässt sich erst nach Ablauf erneut kaufen, ebenso Forschungs-Sprint, Quantensensoren und Werft-Overdrive. <strong>Wichtig fürs Timing – und hier gibt es zwei verschiedene Regeln:</strong> Bei Angriffen auf <strong>NPC-Ziele</strong> (NPC-Flotten, Piratennester, Weltboss, Piratenabfangen, Leerenriss, gegnerische Allianzbasis) wird die Angriffskraft <strong>beim Losschicken eingefroren</strong> – der Angriffs-Effekt muss also laufen, <em>wenn du startest</em>. Bei Angriffen auf <strong>andere Spieler</strong> rechnet der Server dagegen erst bei der Ankunft – dort muss der Effekt laufen, <em>wenn die Flotte eintrifft</em>. <strong>Verteidigungs-Effekte</strong> werden immer erst im Moment des Überfalls ausgewertet, also zählt dort ebenfalls die Ankunft. Reisezeit-Verkürzung, Quantensensoren und Werft-Overdrive gelten nur für Missionen bzw. Bauaufträge, die <em>während</em> des Fensters gestartet werden – dafür behalten die ihren Bonus auch, wenn das Fenster mitten im Flug abläuft.' },
-      { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang: Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator (Stufe 1-8), dann Galaktische Legende 1-12 (Stufe 9-20), Sternenherrscher 1-12 (Stufe 21-32), Kosmischer Souverän 1-12 (Stufe 33-44) und ab Stufe 45 zählt "Kosmischer Souverän" endlos weiter hoch. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
+      { title:'Galaktische Dominanz', body:'Endlose Langzeitziele im Fortschritt-Tab: Dein <strong>Dominanz-Wert</strong> wächst durch Punkte, eroberte Systeme, Kampfsiege, Expeditionen, Prestige, Erfolge und Fraktionsaufträge. Die Stufen-Schwellen wachsen unbegrenzt weiter – <strong>es gibt kein Spielende</strong>, nur den nächsten Rang. <strong>Jede Stufe hat einen eigenen Namen</strong> – keine hochzählende Zahl hinter einem Sammeltitel. Die Stufen 1-8 sind die bekannten Dienstgrade (Rekrut → Pionier → Kommandant → Kriegsherr → Vizeadmiral → Admiral → Großadmiral → Imperator), ab Stufe 9 trägt jede Stufe ihren eigenen Titel, und die Namen werden mit der Höhe schwerer: erst Flotte und Grenzwacht, dann Sektoren und Bünde, danach die Nebel und die Weite, die Sternenschmiede, der Abgrund, die Zeit selbst, die Urmaterie – und ganz oben, was jenseits aller Zählung liegt. Bis Stufe 500 ist jeder Name von Hand gesetzt; darüber setzt das Spiel weiter eigene Namen zusammen, damit auch dort nie eine Nummer erscheint. Jede Stufe gibt einmalig Kredite und Kommandopunkte (steigend mit der Stufe).' }
     ]},
     { key:'automatisierung', icon:'ti-refresh', title:'Automatisierung', entries:[
       { title:'Die drei Automatiken sind Unterstützern vorbehalten', body:'<strong>Automatische Verstärkung</strong>, <strong>Automatische Reparatur</strong> und die <strong>KI-Abfangautomatik</strong> stehen seit dem 05.08.2026 nur Spielern mit <strong>Unterstützer-Rang</strong> zur Verfügung. Alles dazu steht gebündelt im <strong>Fortschritt-Tab unter „Unterstützer"</strong>: welche Vorteile es gibt, ob sie bei dir gerade laufen und wie lange noch. Es gibt drei Wege dorthin. <strong>Kostenlos testen:</strong> Einmal je Konto lassen sich alle Vorteile <strong>fünf Tage</strong> lang ausprobieren - ein Knopf im selben Bereich, ohne Spende und ohne dass danach etwas weiterläuft. <strong>Ko-fi-Spende:</strong> Trage dort die E-Mail-Adresse ein, mit der gespendet wurde - der Rang gilt dann <strong>30 Tage ab der letzten Spende</strong> und verlängert sich mit jeder weiteren. <strong>Vergeben:</strong> Für Spenden außerhalb von Ko-fi kann der Betreiber den Rang direkt eintragen. Alle drei Schalter im Verteidigung-Tab bleiben sichtbar und erklären das an Ort und Stelle; ohne Freigabe tun sie nichts. <strong>Am Spielinhalt ändert das nichts:</strong> Jede der drei Automatiken nimmt einem nur Handarbeit ab, die man auch selbst erledigen kann (verlegen, reparieren, abfangen) - keine davon gibt Ressourcen, Kampfkraft oder Punkte, die es sonst nicht gäbe. Wer im Solo-Modus ohne Server spielt, hat kein Konto und damit weder Rang noch Testphase.' },
