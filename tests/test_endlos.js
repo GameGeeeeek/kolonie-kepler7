@@ -200,7 +200,27 @@ check('0: die echten Formeln wurden aus der Spieldatei geladen',
   check('6: unter Prestige 10 aendert sich nichts', mult(0)===1 && mult(9)===1 && mult(10)===1);
   check('6: darueber steigt es', mult(20) > 1, mult(20));
   check('6: und ist bei doppelter Staerke gedeckelt', mult(1000) === 2, mult(1000));
-  check('6: die Gegner nutzen sie', /npcEffectiveDefense\(npc\)\{[^}]*prestigeChallengeMult\(\)/.test(js));
+  /* DIE REGEL STATT DER SCHREIBWEISE. Hier stand bis zum 03.09.2026 ein Regex auf
+     `npcEffectiveDefense(npc){ … prestigeChallengeMult()` - also auf die EINZEILIGE Fassung mit
+     genau einem Parameter. Die Sektorlage (E5) gab der Funktion einen zweiten Parameter und einen
+     mehrzeiligen Rumpf, und diese Pruefung fiel, obwohl die Regel unveraendert galt: ein
+     Fehlalarm, der eine richtige Aenderung blockiert (Hausregel: Tests pruefen Regeln, nicht
+     zufaellige Momentaufnahmen).
+     Gemessen wird deshalb, was sie sichern soll - ein Gegner ist bei hohem Prestige haerter als
+     bei keinem -, und zwar an der AUSGEFUEHRTEN Funktion. Alles ausser prestigeChallengeMult ist
+     dabei neutral gestellt: Die Pruefung gehoert dem Endlos-Spiel, nicht der Weltlage. */
+  const npcDef = (prestige) => new Function('state', [
+    'const PRESTIGE_CHALLENGE_FROM = 10;',
+    'const galaxyCache = { npcEmpireStrength: 1 };',
+    'function npcScalingCount(){ return 0; }',
+    'function npcWeltFaktor(){ return 1; }',
+    fnAus('prestigeChallengeMult'),
+    fnAus('npcEffectiveDefense'),
+    'return npcEffectiveDefense({ id:"x", defense:1000, system:"kepler" });'
+  ].join('\n'))({ prestige, research:{}, ascension:{ tree:{} } });
+  check('6: die Gegner nutzen sie - bei Prestige 20 verteidigt derselbe Gegner staerker als bei 0',
+    npcDef(0) === 1000 && npcDef(20) > npcDef(0),
+    { prestige0: npcDef(0), prestige20: npcDef(20) });
   // Ohne mitskalierende Beute waere Prestigen eine Bestrafung - das ist der Kern dieser Aenderung.
   check('6: die Beute skaliert mit demselben Faktor',
     /const herausforderung = prestigeChallengeMult\(\);/.test(js)
