@@ -583,7 +583,7 @@ Befunde, die sich daraus als Bestandsreparatur ergaben.
 | **E2 Statthalter** | **geliefert** (§10) — null Fundstellen zum Zeitpunkt dieser Aufnahme. 52 der 67 Systeme trugen keinen NPC, drei Regionen gar keinen |
 | **E3 Sprungnetz** | **faktisch ersetzt** durch B2 Vorposten (#531): Der Vorposten *ist* der Sprungknoten, mit Flugzeit-Nutzen im Umkreis. Der Backend-Kommentar führt ihn ausdrücklich als „E3-Rahmen (SPRUNGBAKEN_MAX = 3)" |
 | **E4 Passage** | **geliefert** (§9) — und zum Zeitpunkt dieser Aufnahme der stärkste offene Befund: `activeWormhole` hatte **acht** Fundstellen, **alle** im Anzeigepfad (Knoten zeichnen, eine Zeile im Systemkopf). Der Server würfelte das Wurmloch aus, die Karte malte einen Wirbel, und es tat nichts |
-| **E5 Sektorlage** | **offen** — null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
+| **E5 Sektorlage** | **geliefert** (§11) — zum Zeitpunkt dieser Aufnahme null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
 
 Dazu ungeplant geliefert: Dominanz-Ring (§6), Licht und Schatten (§7), Wrackkonvois (#516),
 Vorposten (#531).
@@ -647,7 +647,7 @@ Karte und ist antippbar, ihm fehlt nur eine Wirkung. E2 und E5 bleiben eigene Et
 zusätzlich mit Backend und Schalter.
 
 *(Nachtrag 03.09.2026: E4 wurde noch am selben Tag gebaut — §9 —, E2 unmittelbar danach — §10.
-Offen bleibt allein **E5 Sektorlage**.)*
+E5 folgte unmittelbar danach — §11. Damit ist das Feld dieses Konzepts abgearbeitet.)*
 
 ---
 
@@ -779,3 +779,89 @@ Ein leeres `statthalter`-Array ließ die Regelprüfungen anfangs **trivial grün
 (`filter(...).length === 0`) — am alten Stand waren sie unbeteiligt statt rot. Die Acht steht
 seither in jeder dieser Bedingungen mit drin.
 
+
+---
+
+## 11. Gebaut: E5 — Die Sektorlage (03.09.2026)
+
+Umgesetzt in **kolonie-kepler7-backend#222** (Rechnung, Schalter aus) und dem Frontend-PR, der den
+Schalter umlegt. Damit ist das Feld dieses Konzepts abgearbeitet.
+
+### Der Befund, der die Form kippte
+
+Das Konzept schrieb, `NEST_STUFEN[*].punkte` existiere **ausschließlich** für diese Etappe. Das
+stimmte am 19.08.2026 und **seit Phase 4 nicht mehr**: `npcStaerkeZiel()` liest dasselbe Feld und
+hebt damit `npcEmpireStrength` galaxieweit an (`1,4 + 0,046 × Stufensumme`, Deckel 2,5).
+
+Ein absoluter Sektorfaktor obendrauf hätte dieselben Nester **zweimal** gezählt — der schlimmste
+Fall wäre von 2,50× auf **3,63×** gestiegen, und der Konzeptsatz „die Änderung kann kein
+Bestandskonto verschlechtern" wäre für jeden Sektor mit Nestern falsch gewesen.
+
+**Entscheidung Sascha aus drei vorgelegten Varianten: der Faktor misst den Abstand zum
+Galaxieschnitt, nicht den Bestand.**
+
+```
+druck[sek]   = Σ punkte(Nester im Sektor) + 2 je Festung
+ueber[sek]   = max(0, druck - Ø)
+npcMult[sek] = min(1,25 ; 1 + 0,02 · ueber)
+```
+
+Eine gleichmäßig belastete Galaxie ergibt in **jeder** Region genau 1,00 — exakt der heutige Stand.
+Erst eine **Ballung** wirkt. Die Steigung ist gegen die echten Deckel gerechnet (`NEST_MAX` 12,
+`FESTUNG_MAX_AKTIV` 6, höchster Gesamtdruck 72): Der Deckel greift, wenn eine Region rund das
+Doppelte ihres Anteils trägt. Details und Sabotage-Liste:
+`kolonie-kepler7-backend/docs/sektorlage.md`.
+
+### Drei Abweichungen vom Konzept, alle gemessen
+
+| Konzept | gebaut | Grund |
+|---|---|---|
+| `sektorLageTick` **vor** der `npcEmpireStrength`-Zeile | **nach** dem Festungs-Spawn | Der Druck soll den Bestand *dieses* Takts zählen; Festungen entstehen weiter unten. Die frühe Position war nötig, solange der Faktor in deren Zielwert einfloss — in der relativen Fassung tut er das nicht |
+| **vierte Textzeile** am Regionsknoten | **farbiger Rand** + Tooltip + `aria-label` | Der Knoten trägt schon Name, Systemzahl, Eigenschaft und Abzeichenzeile; die Entscheidung vom 29.08.2026 steht als Kommentar im Code, samt Messung (am Handy 6–9 px, die „N Systeme"-Zeile fällt dort bereits weg) |
+| Kampfbericht als Anzeigestelle | **nicht angefasst** | Der Bericht zeigt `defensePower` = den beim Start eingefrorenen Wert, der den Faktor bereits enthält. Er ist also nicht veraltet, nur unerklärt — und sein Renderer bedient sechs Kampfarten |
+
+### Der eingefrorene Wert — und was der erste Entwurf davon kostete
+
+Bis hierher fror der Missionsstart nur die **Flotte** ein, obwohl sein eigener Kommentar
+versprach, die Auflösung kämpfe gegen das, was die Vorschau gezeigt hat, „auch falls sich
+Skalierung oder globaler Schwierigkeitsgrad während des Flugs ändern". Die **Zahl** wurde bei
+Ankunft neu gerechnet. Mit einem Faktor, der sich alle 15 Minuten bewegt, während ein Flug länger
+dauert, wäre daraus ein sichtbarer Widerspruch geworden.
+
+**Der erste Entwurf fror deshalb die ganze Verteidigung ein — und das war falsch.** Die
+Codex-Prüfung am PR hat gezeigt, warum: `npcEffectiveLoot()` liest den Siegzähler bei der
+**Ankunft**, und `npcScaling` wächst nach jedem Sieg. Wer mehrere Flotten gleichzeitig auf
+denselben Gegner schickt — das Spiel erlaubt bis zu elf —, kämpfte damit jedes Mal gegen die
+Verteidigung vom Start, während die Beute mit jedem Sieg stieg. **Belohnung und Schwierigkeit
+waren entkoppelt**, und zwar durch diese Etappe.
+
+Eingefroren wird seither nur der **Welt-Anteil** (`npcWeltFaktor` = `npcEmpireStrength` ×
+Sektorfaktor) — genau das, was das Konzept verlangt hat: das, was sich unter dem Spieler bewegt,
+während seine Flotte fliegt. Der Siegzähler bleibt auf **beiden** Seiten live, Verteidigung und
+Beute hängen also wieder am selben Wert. Ältere, noch fliegende Missionen tragen das Feld nicht
+und rechnen wie bisher.
+
+Die Lehre ist allgemeiner als dieser Fall: **Wer eine Größe einfriert, friert damit auch jede
+Beziehung ein, in der sie steht.** Hier stand die Verteidigung in einer Waage mit der Beute, und
+die Waage kippte, weil nur eine Seite festgehalten wurde.
+
+### Wächter
+
+`tests/test_sektorlage_ui.js`, 16 Prüfungen. Die tragende ist **das Paar**: dieselbe
+Gegner-Verteidigung mit und ohne belastete Region, gemessen am Kartenmenü — 30 → 38, also genau
+×1,25. Ohne diese Messung belegte der Test nur, dass irgendwo „+25 %" geschrieben steht.
+Gegenprobe: 9 von 16 fallen am Stand davor; die sieben, die grün bleiben, sind die Anker und die
+**Neutralitäts**-Prüfungen (ohne `sektorLage` ändert sich nichts, keine Seitenfehler).
+
+Prüfung **0e** hält die Waage aus dem Abschnitt darüber fest, und zwar ausgeführt statt gelesen:
+Beide Funktionen werden geschnitten und mit demselben steigenden Zähler gefüttert — wächst die
+eine, muss die andere mitwachsen (gemessen 1000 → 1180 → 1360 → 1900 gegen
+1000 → 1150 → 1300 → 1750). Nimmt man der Verteidigung den Zähler weg, fällt genau diese Prüfung.
+
+Zwei Befunde aus dem Bau der Messvorrichtung, beide als Kommentar im Test:
+
+1. `kampfpunkte:` **enthält** `punkte:` — die Prüfung „die Frontend-Kopie trägt kein
+   `punkte`-Feld" fiel an ihrem eigenen Teilstring, obwohl der Code stimmte.
+2. Der Kartenreiter öffnet die **Regionsübersicht**; aus dem aufgeklappten System führt kein
+   einzelner Heimweg-Knopf dorthin zurück. Der erste Entwurf maß beide Kartenebenen im selben
+   Reiter wie das Kartenmenü und hatte vier rote Prüfungen bei richtigem Code.
