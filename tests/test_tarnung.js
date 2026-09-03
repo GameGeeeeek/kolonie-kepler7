@@ -49,6 +49,16 @@
 //        NUR 5e. 5g und 5h bleiben gruen, weil "blind" und "groesse" beide weiter vorkommen - 5e ist
 //        die einzige Pruefung, die die harte Schwelle ueberhaupt bemerkt. Ohne sie waere die
 //        Zwischenstufe des Entwurfs unbewacht.
+//
+// c) Gruppe 7 kam nach dem gegnerischen Gegenlesen des eigenen Diffs dazu (der Review-Bot war am
+//    Nutzungslimit). Drei weitere Sabotagen, alle gemessen:
+//      - Hysterese zurueckgebaut auf eine Schwelle -> FAIL 7c mit {laufend:true, nachAusfall:true}
+//        Das IST das Flattern, woertlich: derselbe Vorrat, beide Male an.
+//      - Schmutzpruefung entfernt                  -> FAIL 7f
+//      - Energiezustand aus der Kennung genommen   -> FAIL 7g
+//    Die dritte ist die feinste: Die Box zeichnete dann zwar seltener, aber die Zeile "Tarnung
+//    ausgefallen" waere festgefroren, waehrend sie laengst wieder laeuft - eine Anzeige-Luege, die
+//    durch die BEHEBUNG der ersten entstanden waere.
 const fs = require('fs');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
@@ -274,5 +284,46 @@ const hilfe = (() => {
 })();
 check('6h: der Hilfetext nennt dieselbe Grenze wie die Mechanik',
   !!hilfe && hilfe.includes('<strong>' + GRENZE + '</strong>'), GRENZE);
+
+// ---- 7: die zwei Befunde aus dem gegnerischen Gegenlesen ---------------------------------------
+// Beide gefunden, bevor sie jemand im Spiel gesehen hat - der Review-Bot war am Nutzungslimit, also
+// habe ich den eigenen Diff selbst gegnerisch gelesen. Beide sind ohne Wächter still rueckbaubar.
+
+// 7a-c: HYSTERESE. Mit einer einzigen Schwelle flattert der Zustand im Sekundentakt - und weil
+// jeder Wechsel meldet, waere die Vorkehrung "der Ausfall muss laut sein" zu zwei Meldungen pro
+// Sekunde geworden. Eine Warnung im Sekundentakt warnt nicht mehr; das ist derselbe Fehler wie eine
+// stille Warnung, nur mit umgekehrtem Vorzeichen.
+const aktivQuelle = fnAus('tarnungAktiv');
+check('7a: tarnungAktiv ist auffindbar', !!aktivQuelle);
+if (aktivQuelle){
+  const WIEDER = zahl('TARN_WIEDERANLAUF_SEKUNDEN');
+  check('7b: es gibt eine eigene Wiederanlauf-Schwelle', WIEDER > 1, WIEDER);
+  const bau = (energie, gewarnt) => new Function(
+    'state, getarnteKlassen, tarnEnergieProSek, TARN_ENERGIE_RESERVE, TARN_WIEDERANLAUF_SEKUNDEN',
+    aktivQuelle + '; return tarnungAktiv;'
+  )({ resources: { energie }, tarnungWarnung: gewarnt }, () => ['jaeger'], () => 1, 1, WIEDER);
+  // DER FLATTERFALL, ausgefuehrt: Vorrat knapp ueber der Reserve, Verbrauch 1/s.
+  // Laufend -> bleibt an. Nach dem Ausfall -> bleibt AUS, bis der Vorrat sie eine Minute traegt.
+  check('7c: nach einem Ausfall springt sie bei knapper Energie NICHT sofort wieder an',
+    bau(2, false)() === true && bau(2, true)() === false, { laufend: bau(2, false)(), nachAusfall: bau(2, true)() });
+  check('7d: mit Vorrat fuer den Wiederanlauf geht sie wieder an',
+    bau(WIEDER + 5, true)() === true, bau(WIEDER + 5, true)());
+}
+
+// 7e: SCHMUTZPRUEFUNG. render() laeuft im Sekundentakt, solange der Tab sichtbar ist. Ohne Kennung
+// baut die Box ihr DOM jede Sekunde neu und nimmt Fokus und Hover mit. Die Nachbarbox hat dafuer
+// lastFormationSig - beim ersten Anlauf hatte ich sie hier vergessen.
+const boxQuelle = fnAus('renderTarnungBox');
+check('7e: renderTarnungBox ist auffindbar', !!boxQuelle);
+check('7f: die Box zeichnet nur bei Aenderung neu',
+  !!boxQuelle && /if \(sig === lastTarnSig\) return;/.test(boxQuelle) && /lastTarnSig = sig;/.test(boxQuelle));
+// Die Kennung muss den Energiezustand enthalten - sonst friert "Tarnung ausgefallen" fest, waehrend
+// sie laengst wieder laeuft. Genau die Sorte Anzeige-Luege, die dieser Auftrag aufgeraeumt hat.
+check('7g: die Kennung enthaelt Bestand, Auswahl UND Energiezustand',
+  !!boxQuelle && /const sig = JSON\.stringify\(\[[^\]]*aktiv[^\]]*verbrauch/.test(boxQuelle),
+  boxQuelle ? (/const sig = .*/.exec(boxQuelle)||[''])[0].slice(0, 160) : null);
+// Und der Klick muss sie verwerfen, sonst zeichnet die Box das Umschalten nicht nach.
+check('7h: das Umschalten verwirft die Kennung',
+  !!boxQuelle && /lastTarnSig = null;/.test(boxQuelle));
 
 ende();

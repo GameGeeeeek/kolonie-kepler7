@@ -20156,10 +20156,27 @@
      Geprueft wird der Vorrat, nicht die Rate: Eine negative Rate ist erlaubt und normal, solange
      das Lager sie traegt - erst ein leeres Lager beendet die Tarnung. */
   const TARN_ENERGIE_RESERVE = 1;
+  /* WIEDERANLAUF MIT HYSTERESE - beim gegnerischen Gegenlesen des eigenen Diffs gefunden
+     (03.09.2026), bevor es jemand im Spiel gesehen hat.
+     Mit einer EINZIGEN Schwelle flattert der Zustand: Der Vorrat faellt unter die Reserve, die
+     Tarnung geht aus, der Verbrauch endet, der Vorrat steigt sofort wieder darueber, die Tarnung
+     geht an - im Sekundentakt. Und weil jeder Wechsel eine Meldung ausloest, waere ausgerechnet die
+     Vorkehrung "der Ausfall muss laut sein" zu zwei Meldungen pro Sekunde geworden. Eine Warnung,
+     die im Sekundentakt kommt, warnt nicht mehr, sie nervt - das ist derselbe Fehler wie eine
+     stille Warnung, nur mit umgekehrtem Vorzeichen.
+     Deshalb zwei Schwellen: Aus geht sie bei fast leerem Lager, AN erst wieder, wenn der Vorrat sie
+     eine Minute lang tragen wuerde. Das ist auch inhaltlich richtig - nach einem Zusammenbruch der
+     Versorgung faehrt man einen Verbraucher nicht bei der ersten Kilowattstunde wieder hoch.
+     Der Merker ist derselbe, den die Meldung ohnehin fuehrt: Ein zweiter Zustand fuer dieselbe
+     Frage waere die Kopie-Familie, an der dieses Projekt regelmaessig scheitert. */
+  const TARN_WIEDERANLAUF_SEKUNDEN = 60;
   function tarnungAktiv(){
     if (!getarnteKlassen().length) return false;
-    if (tarnEnergieProSek() <= 0) return true;
-    return (state.resources.energie || 0) > TARN_ENERGIE_RESERVE;
+    const verbrauch = tarnEnergieProSek();
+    if (verbrauch <= 0) return true;
+    const vorrat = state.resources.energie || 0;
+    if (state.tarnungWarnung) return vorrat >= verbrauch * TARN_WIEDERANLAUF_SEKUNDEN;
+    return vorrat > TARN_ENERGIE_RESERVE;
   }
   /* Der Ausfall muss LAUT sein, und er muss GENAU EINMAL laut sein.
      Einmal, weil eine Meldung, die jede Sekunde erneut aufpoppt, so schnell weggeklickt wird, dass
@@ -22966,6 +22983,13 @@
       .map(k => ({ key:k, anzahl:bestand[k], sig:shipSignatur(k), name:(SHIP_DEFS.find(d=>d.key===k)||{}).name || (k==='superschlachtschiff'?'Superschlachtschiff':k) }))
       .sort((a,b) => b.sig - a.sig || a.name.localeCompare(b.name));
   }
+  /* Die Schmutzpruefung ist hier PFLICHT und keine Feinoptimierung: render() laeuft im
+     Sekundentakt, solange der Tab sichtbar ist. Ohne sie baut diese Box ihr DOM jede Sekunde neu -
+     und nimmt dabei jedes Mal Fokus und Hover mit. Die Nachbarbox (renderDefenseFormationBox) hat
+     genau dafuer lastFormationSig; beim ersten Anlauf hatte ich sie hier vergessen.
+     In die Kennung gehoert ALLES, was die Box zeigt - auch der Bestand und der Energiezustand,
+     sonst friert die Zeile "Tarnung ausgefallen" fest, waehrend sie laengst wieder laeuft. */
+  let lastTarnSig = null;
   function renderTarnungBox(){
     const box = document.getElementById('tarnungBox');
     if (!box) return;
@@ -22974,6 +22998,9 @@
     const verbrauch = tarnEnergieProSek();
     const aktiv = tarnungAktiv();
     const gewaehlt = getarnteKlassen().length;
+    const sig = JSON.stringify([liste.map(e => e.key + ':' + e.anzahl), getarnteKlassen(), aktiv, Math.round(verbrauch*100)]);
+    if (sig === lastTarnSig) return;
+    lastTarnSig = sig;
     if (!liste.length){
       box.innerHTML = '<div class="bmeta">Noch keine Schiffe, die sich verbergen ließen.</div>';
       return;
@@ -23008,6 +23035,7 @@
         if (!tarnbar(k)) return;
         state.tarnung = state.tarnung || {};
         if (state.tarnung[k]) delete state.tarnung[k]; else state.tarnung[k] = true;
+        lastTarnSig = null;
         const name = (SHIP_DEFS.find(d=>d.key===k)||{}).name || k;
         log(state.tarnung[k] ? name+': wird ab sofort verborgen.' : name+': steht wieder offen.', 'ti-building-lighthouse');
         render(); save();
