@@ -3520,6 +3520,8 @@
         <div id="attackShieldBanner" style="display:none;"></div>
         <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-shield-lock" aria-hidden="true"></i>Aufstellung</div>
         <div id="defenseFormationBox"></div>
+        <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-building-lighthouse" aria-hidden="true"></i>Tarnung</div>
+        <div id="tarnungBox"></div>
         <div id="planetSwitcherDef"></div>
         <div id="raidScoutBox"></div>
         <div id="pirateDebrisRaidBox"></div>
@@ -5425,6 +5427,16 @@
     // bestehende Überfall-Vorwarnzeit-Mechanik erweitert (+120s je Stufe, gedeckelt bei +20 Min. -
     // siehe raidDetectionLead(), dort werden Forschung/Allianz/Pakte bereits additiv summiert).
     // Kleiner expliziter defVal (Sensor, keine Waffe) - CLAUDE.md-NaN-Fallstrick.
+    /* Signaturscanner (03.09.2026, Tarnwert Etappe 1): die Gegenwehr gegen getarnte Flotten.
+       Bewusst ein EIGENES Gebaeude statt der Summe vorhandener Investitionen (Entscheidung Sascha) -
+       eine Stufe, eine Zahl, ein Ausbaupfad, den man versteht.
+       Abgrenzung zur Quanten-Sensorphalanx direkt darunter: Die Phalanx misst ZEIT (wie frueh ein
+       NPC-Ueberfall gemeldet wird), der Signaturscanner misst SICHTBARKEIT (ob ein fremder Bestand
+       vollstaendig ist). Zwei verschiedene Fragen, deshalb zwei Gebaeude; sensorWert() liest nur
+       dieses hier plus den serverautoritativen Vorposten-Scanwert.
+       Verteidigungswert 0 und Angriffswert 0 sind ABSICHTLICH beide gesetzt, nicht weggelassen -
+       ein fehlendes defVal/atkVal erzeugt an mehreren Anzeigestellen NaN. */
+    { key:'signaturscanner', name:'Signaturscanner', icon:'ti-building-lighthouse', produces:null, baseRate:0, baseCost:{erz:2400, kristalle:1600, deuterium:900}, costMult:1.45, bg:'rgba(120,200,190,0.18)', fg:'#7ed0c2', effectDesc:'Erkennt getarnte Flotten (+90 Sensorwert je Stufe)', category:'defense', defVal:0, atkVal:0, buildTime:150, requires:['rscanner'] },
     { key:'sensorphalanx', name:'Quanten-Sensorphalanx', icon:'ti-map-pin', produces:null, baseRate:0, baseCost:{erz:3000, kristalle:2000, quantenchips:40}, costMult:1.4, bg:'rgba(133,183,235,0.18)', fg:'#a9cdf5', effectDesc:'Überfall-Vorwarnzeit (+120s je Stufe, max. +20 Min.) & Verteidigung', category:'defense', defVal:20, atkVal:0, buildTime:180, requires:['rquantenphysik'] },
     // Verbraucher für Hochenergiekristalle (Tier-2 Phase 5): reine Schild-Linie konsequent nach oben
     // verlängert (schild 30 -> ionenschild 45 -> voidbarriere 110 -> bunker 135 -> 220), atkVal 0 wie
@@ -5539,6 +5551,14 @@
        Bounding-Box ohne Breite kann keinen Gradient abbilden, der Strich wird dann gar nicht
        gezeichnet. Alles Waagerechte/Senkrechte hier ist deshalb <rect> oder volle Farbe. */
     nanoplattform: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="14" y="58" width="72" height="22" rx="3" fill="url(#gSteel)"/><polygon points="24,58 50,34 76,58" fill="url(#gSteel)"/><polygon points="50,34 76,58 50,58" fill="#000000" opacity="0.18"/></g><rect x="46" y="26" width="8" height="16" rx="2" fill="#d8d5c9"/><rect x="30" y="64" width="40" height="3" fill="#0f1219" opacity="0.55"/><circle cx="34" cy="72" r="3" fill="#d8d5c9" opacity="0.9"/><circle cx="50" cy="72" r="3" fill="#d8d5c9" opacity="0.9"/><circle cx="66" cy="72" r="3" fill="#d8d5c9" opacity="0.9"/></svg>`,
+    /* Signaturscanner (03.09.2026): schlanker Turm mit einer Ortungskeule und drei Echobogen,
+       die nach aussen blasser werden - das Bild der Staffelung, die die Mechanik ausmacht
+       (stark genug / knapp / blind). Bewusst KEIN Schuessel-Motiv wie bei der Sensorphalanx
+       daneben: Die Phalanx misst Zeit, dieser Turm misst Sichtbarkeit, und zwei Gebaeude mit
+       demselben Bild waeren genau der Fall, den test_iconabdeckung sonst einsammelt.
+       Waagerechtes/Senkrechtes ist <rect> oder volle Farbe - achsenparallele <line> mit
+       Farbverlauf werden nicht gezeichnet (v8.357.0). */
+    signaturscanner: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="42,84 58,84 55,40 45,40" fill="url(#gSteel)"/><rect x="34" y="82" width="32" height="6" rx="2" fill="url(#gSteel)"/></g><rect x="44" y="52" width="12" height="3" fill="#0f1219" opacity="0.5"/><rect x="44" y="64" width="12" height="3" fill="#0f1219" opacity="0.5"/><polygon points="50,38 74,20 78,30 54,44" fill="#7ed0c2"/><circle cx="50" cy="38" r="4.5" fill="#d8f2ec"/><path d="M62 54 Q72 42 70 28" fill="none" stroke="#7ed0c2" stroke-width="2.6" stroke-linecap="round" opacity="0.85"/><path d="M72 60 Q86 44 83 22" fill="none" stroke="#7ed0c2" stroke-width="2.2" stroke-linecap="round" opacity="0.5"/><path d="M82 66 Q99 46 95 16" fill="none" stroke="#7ed0c2" stroke-width="1.8" stroke-linecap="round" opacity="0.25"/></svg>`,
     sensorphalanx: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><rect x="40" y="56" width="20" height="26" rx="3" fill="url(#gSteel)"/><rect x="26" y="30" width="48" height="22" rx="4" fill="url(#gBlue)"/></g><rect x="31" y="35" width="6" height="12" fill="#0e1f30" opacity="0.6"/><rect x="41" y="35" width="6" height="12" fill="#0e1f30" opacity="0.6"/><rect x="51" y="35" width="6" height="12" fill="#0e1f30" opacity="0.6"/><rect x="61" y="35" width="6" height="12" fill="#0e1f30" opacity="0.6"/><path d="M50 26 Q66 16 78 22" fill="none" stroke="#a9cdf5" stroke-width="2.4" opacity="0.75"><animate attributeName="opacity" values="0.25;0.9;0.25" dur="2.4s" repeatCount="indefinite"/></path><path d="M50 26 Q34 16 22 22" fill="none" stroke="#a9cdf5" stroke-width="2.4" opacity="0.55"><animate attributeName="opacity" values="0.9;0.25;0.9" dur="2.4s" repeatCount="indefinite"/></path></svg>`,
     schildkuppel: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><path d="M16 78 V56 Q50 16 84 56 V78 Z" fill="url(#gGold)" opacity="0.32"/><path d="M16 78 V56 Q50 16 84 56 V78" fill="none" stroke="url(#gGold)" stroke-width="4"/></g><rect x="14" y="78" width="72" height="6" rx="2" fill="#6b5a33"/><path d="M28 72 Q50 40 72 72" fill="none" stroke="#f5cf7a" stroke-width="2" opacity="0.7"><animate attributeName="opacity" values="0.25;0.85;0.25" dur="2.6s" repeatCount="indefinite"/></path><circle cx="50" cy="58" r="4" fill="#f5cf7a"/></svg>`,
     fusionsbastion: `<svg viewBox="0 0 100 100" width="24" height="24"><g filter="url(#ig)"><polygon points="50,10 80,30 74,80 26,80 20,30" fill="url(#gAmber)"/><polygon points="50,10 80,30 50,44" fill="#ffffff" opacity="0.18"/><polygon points="50,10 20,30 50,44" fill="#000000" opacity="0.16"/></g><circle cx="50" cy="56" r="13" fill="none" stroke="#f0997b" stroke-width="3"/><ellipse cx="50" cy="56" rx="13" ry="5" fill="none" stroke="#f0997b" stroke-width="2" opacity="0.8"/><circle cx="50" cy="56" r="4" fill="#ffd9c2"><animate attributeName="r" values="3;5.5;3" dur="1.9s" repeatCount="indefinite"/></circle></svg>`,
@@ -7410,8 +7430,17 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.661.0';
+  const VERSION = '8.662.0';
   const PATCHNOTES = [
+    { version:'8.662.0', date:'03.09.2026', changes:[
+      '<strong>Du kannst deine Flotte jetzt tarnen – und dagegen gibt es Sensoren.</strong> Im Verteidigungs-Reiter hakst du einzelne <em>Schiffsklassen</em> an. Was du tarnst, verschwindet aus deinem öffentlichen Eintrag und aus deinen gemeldeten Flottenbewegungen: Ein fremder Späher sieht es nicht mehr. <strong>Dein Punktestand und deine Verteidigungsstärke bleiben sichtbar</strong>, und das ist keine Nachlässigkeit, sondern die Regel, auf der alles steht – verborgen wird, <em>was</em> du hast, nicht <em>wie viel</em>. Der Gegner sieht, dass da etwas ist, und weiß nicht, was. (Anders ginge es auch gar nicht ehrlich: Der Server rechnet den Punktestand aus deinem echten Spielstand nach. Eine Tarnung, die die Größe verbergen wollte, wäre eine Lüge mit einer Minute Halbwertszeit.)',
+      '<strong>Große Rümpfe gehen nicht – die Grenze stand schon auf der Werftkarte.</strong> Ab Signatur <strong>600</strong> lässt sich eine Klasse nicht mehr verbergen. Das ist keine neue Zahl, sondern genau die Lücke der Signaturskala: Zwischen 240 und 600 steht kein einziges Schiff, und seit gestern sagt dir jede Werftkarte vor dem Kauf, auf welcher Seite ein Schiff liegt. Diese Zusage wird hier eingelöst. In der Tarnungsliste erscheinen die schweren Klassen deshalb gesperrt, mit Begründung – wer sie gar nicht fände, hielte das für einen Fehler statt für die Regel.',
+      '<strong>Tarnung kostet laufend Energie</strong>, gestaffelt nach Signatur <em>und</em> Stückzahl: 500 getarnte Jäger kosten mehr als fünf, und ein Trägerschiff kostet je Stück das 24-fache eines Jägers. Damit ist Tarnung eine Abwägung statt eines Dauerzustands. <strong>Reicht die Energie nicht, fällt sie aus – mit einer deutlichen Meldung.</strong> Eine Sicherung, deren Ausfall wie Normalbetrieb aussieht, wäre keine: Wer sich weiter für verborgen hält, stellt seine Flotte falsch auf. Die Tarnung läuft danach erst wieder an, wenn dein Lager sie eine Minute lang tragen würde – sonst würde sie an der Schwelle im Sekundentakt an- und ausgehen, und die Warnung wäre zum Dauerpiepen geworden.',
+      '<strong>Neu: der Signaturscanner.</strong> Das Gegenstück, im Verteidigungs-Reiter zu bauen. Er kann verborgene Schiffe <em>nicht</em> hervorzaubern – die stehen gar nicht erst im fremden Eintrag. Er sagt dir etwas Wichtigeres: <strong>dass das Bild, das du siehst, unvollständig ist.</strong> Ohne ihn liest du einen getarnten Eintrag als vollständig, wählst deinen Konter danach und verlierst einen Kampf, den die Zahlen dir versprochen hatten. Drei Stufen statt einer harten Schwelle: zu schwach (du merkst nichts), knapp (»da bewegt sich etwas, aber wir sehen nicht was«) und stark genug (die Größenklasse des größten verborgenen Rumpfes wird benannt). Der Hinweis steht direkt unter der Konter-Zeile der Angriffs-Vorschau – eine Zahl und ihr Vorbehalt gehören nebeneinander. <strong>Stufe 1 hat jeder geschenkt bekommen</strong>, damit niemand über Nacht blind wurde.',
+      '<strong>Was Tarnung nicht tut.</strong> Ein Angriff hebt sie auf: Der Kampfbericht führt beiden Seiten weiterhin die vollständige Flotte. Tarnung schützt vor dem <em>ersten</em> Angriff, nicht vor dem zweiten – wer sie brechen will, bezahlt mit einem Wegwerf-Angriff. Und deine eigene Allianz sieht dich weiter: Die Flottenparade ist zum Absprechen da, eine Tarnung, die Verbündete blendet, macht das Spiel nicht spannender. Beides ist so entschieden, nicht vergessen. Die Hilfe hat dafür einen neuen Abschnitt „Tarnung &amp; Signatur", und der Aufklärungs-Satz bei den Konterrollen sagt jetzt dazu, dass ein Ziel sich tarnen kann.',
+      'Unter der Haube: Die Tarnung ist der <strong>erste laufende Energieverbraucher</strong> des Spiels. Die Rechnung, die alle Ressourcen gutschreibt, kannte bis dahin nur Zuwächse und hätte einen Abzug stillschweigend verschluckt – die Anzeige hätte den Verbrauch gezeigt, das Lager hätte ihn nie gespürt. Behoben, bevor es jemand merken konnte.',
+      'Wächter: <code>test_tarnung</code> hält mit 40 Prüfungen zusammen, was sonst auseinanderläuft – dass die Grenze an der leeren Stelle der Signaturskala hängt, dass der Verbrauch wirklich abgezogen wird, dass beide Meldekanäle gefiltert sind, dass Punktestand und Verteidigung <em>nicht</em> gefiltert werden, und dass der Ausfall genau einmal meldet. Dazu <code>test_pruflauf_urteil</code>: Der Prüflauf erklärte einen roten Test zum „Lastsymptom", obwohl der Fehler in Wahrheit zwischendurch behoben worden war. Er prüft jetzt nach, ob sich die Welt unter ihm verändert hat, bevor er so etwas behauptet.',
+    ] },
     { version:'8.661.0', date:'03.09.2026', changes:[
       '<strong>Einmal eingelöste Belohnungen bleiben auch nach dem kompletten Zurücksetzen eingelöst.</strong> Sternenessenz ist die einzige Währung, die jeden Neuanfang übersteht – deshalb nehmen Prestige und Aufstieg seit jeher mit, was du dafür schon abgeholt hast. Der <strong>Zurücksetzen-Knopf</strong> in den Einstellungen tat das bisher nicht: Er behielt deine Essenz, vergaß aber die Marken. Kompendium, Forschungs-Meilensteine, Kodex, Abgrund-Tiefenmarken und die Erstsiege gegen die Statthalter (zusammen 320 Essenz) waren damit ein zweites Mal verdienbar. Die Sammlungen selbst fängst du weiterhin neu an – nur bezahlt werden sie nicht noch einmal.',
       '<strong>Der Bestätigungstext dieses Knopfes sagt jetzt die Wahrheit.</strong> Er versprach „nur Sternenessenz und Meta-Baum bleiben erhalten" und stimmte schon länger nicht mehr. Er zählt jetzt auf, was wirklich bleibt – und nennt die eine Ausnahme dazu: Bei den Statthaltern sind die Erstsiege zugleich die Sammlung, die fängt also nicht neu an.'
@@ -7523,14 +7552,11 @@
       '<strong>Meldungen nennen den Grund des Servers, nicht einen geratenen.</strong> Die Anfechtung war die letzte Stelle, die den Servertext wegwarf und stattdessen „der Server war nicht erreichbar\u0022 schrieb – auch dann, wenn er sehr wohl geantwortet hatte.',
       'Wächter: <code>test_server_aufloesung</code> prüft für alle sechs Auftragsarten, dass die Mission beim Fragen noch im gespeicherten Stand steht, dass genau einmal gefragt wird, dass danach keine Geistermission zurückbleibt – und die beiden neuen Abschnitte 8 und 9, dass ein bereits eingereichter Anflug nicht erneut abgerechnet wird und die Erstattung nachgesehen statt angenommen wird. Die Server-Attrappe verhält sich dabei wie der echte Server und weist eine unauffindbare Mission ab; genau das taten die vorhandenen Attrappen nicht, weshalb kein Test die Lücke sehen konnte.',
     ] },
-    { version:'8.642.0', date:'02.09.2026', changes:[
-      '<strong>Ausgebaute Vorposten sind jetzt echte Raumstationen – auch auf der Karte.</strong> Bis Stufe 3 bleibt das Feldlager eine Palisade mit Fahne. Ab Stufe 4 zeichnet die Systemansicht deine Station, und jede Ausrichtung sieht anders aus: Die <strong>Werft</strong> hält einen Schiffsrumpf zwischen zwei Dockklammern, mit blinkendem Baulicht am Bug und Triebwerksglut am Heck. Der <strong>Handelsknoten</strong> ist ein Ring mit sechs angedockten Frachtcontainern, der sich langsam dreht. Der <strong>Festungsring</strong> trägt Panzerung, vier Geschütztürme und einen Schildkreis. Der Marker wächst mit jeder Stufe – eine Sternenfestung ist deutlich größer als ein Wehrring –, und die Landmarke auf der Karte wechselt vom Zelt zum Satelliten.'
-    ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1064;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1065;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -20083,6 +20109,163 @@
     }
     return hoechste;
   }
+  /* ====================== TARNUNG - Etappe 1: der Bestand (03.09.2026) ======================
+     Auftrag Sascha: "es muss eine gegenwehr fuer getarnte flotten geben". Deshalb kommt die
+     Gegenwehr (das Sensorgebaeude, siehe SENSOR_* weiter unten) in derselben Scheibe wie das
+     Verstecken - getrennt ausgeliefert gaebe es ein Fenster, in dem Tarnung unwidersprochen wirkt.
+
+     DIE TRAGENDE REGEL: Getarnt wird, WAS du hast - nicht, WIE VIEL du hast. Punktestand und
+     Verteidigungsstaerke bleiben wahr, denn der Server rechnet den Punktestand ohnehin aus dem
+     echten Spielstand nach (computeScoreServer) und ueberschreibt den eingereichten. Eine Tarnung,
+     die die Groesse verbirgt, waere also eine Luege, die der Server nach einer Minute widerlegt.
+     Der Gegner sieht, DASS da etwas ist, und weiss nicht, WAS.
+
+     TARNUNG_GRENZE ist die Einloesung von "grosse beinahe unmoeglich": Ab Signatur 600 laesst sich
+     eine Klasse gar nicht mehr verbergen. Die Zahl ist kein neuer Wert, sondern die Oberkante des
+     leeren Bereichs 241-599 aus der Signaturskala - und genau das steht seit v8.660.0 auf jeder
+     Werftkarte ("ab 600 ... nicht zu verbergen"). Diese Zusage wird hier eingeloest, nicht neu
+     erfunden; test_tarnung prueft, dass Grenze und leerer Bereich zusammenpassen. */
+  const TARNUNG_GRENZE = 600;
+  /* Der laufende Preis (Entscheidung Sascha: laufende Energie, nicht Einmalkosten). Er skaliert mit
+     der Signatur UND mit der Stueckzahl - 500 getarnte Jaeger kosten mehr als 5. Das verstaerkt
+     "grosse Rumpfe sind schwerer zu verbergen" ueber einen zweiten Kanal: Ein Traegerschiff (240)
+     kostet je Stueck das 24-fache eines Jaegers (10).
+     Der Faktor ist gegen die gemessene Energieproduktion geeicht: Eine Flotte aus 100 Schlachtschiffen
+     (Signatur 200) kostet damit 100*200*0.00004 = 0,8 Energie/s. */
+  const TARN_ENERGIE_JE_SIGNATUR = 0.00004;
+  function tarnbar(key){
+    const s = shipSignatur(key);
+    return s > 0 && s < TARNUNG_GRENZE;
+  }
+  /* Die angehakten Klassen, gefiltert auf die tatsaechlich tarnbaren. Der Filter steht HIER und
+     nicht nur in der Bedienoberflaeche: Ein alter Spielstand kann eine Klasse enthalten, die
+     spaeter ueber die Grenze gehoben wurde, und dann darf sie nicht stillschweigend weiter
+     verborgen bleiben. */
+  function getarnteKlassen(){
+    const t = state.tarnung || {};
+    return Object.keys(t).filter(k => t[k] && tarnbar(k));
+  }
+  function tarnEnergieProSek(){
+    const klassen = getarnteKlassen();
+    if (!klassen.length) return 0;
+    let summe = 0;
+    for (const f of allFleets()){
+      for (const k of klassen) summe += (f[k]||0) * shipSignatur(k);
+    }
+    return summe * TARN_ENERGIE_JE_SIGNATUR;
+  }
+  /* AUSFALL BEI ENERGIEMANGEL - und warum er laut sein muss.
+     "Eine Sicherung, deren Ausfall wie Normalbetrieb aussieht, ist keine." Faellt die Tarnung
+     still aus, haelt sich der Spieler weiter fuer verborgen und stellt seine Flotte entsprechend
+     auf - das ist schlimmer als gar keine Tarnung. Deshalb: Reicht die Energie nicht, ist die
+     Tarnung AUS (nicht "halb"), und tarnungMeldung() schlaegt sichtbar an.
+     Geprueft wird der Vorrat, nicht die Rate: Eine negative Rate ist erlaubt und normal, solange
+     das Lager sie traegt - erst ein leeres Lager beendet die Tarnung. */
+  const TARN_ENERGIE_RESERVE = 1;
+  /* WIEDERANLAUF MIT HYSTERESE - beim gegnerischen Gegenlesen des eigenen Diffs gefunden
+     (03.09.2026), bevor es jemand im Spiel gesehen hat.
+     Mit einer EINZIGEN Schwelle flattert der Zustand: Der Vorrat faellt unter die Reserve, die
+     Tarnung geht aus, der Verbrauch endet, der Vorrat steigt sofort wieder darueber, die Tarnung
+     geht an - im Sekundentakt. Und weil jeder Wechsel eine Meldung ausloest, waere ausgerechnet die
+     Vorkehrung "der Ausfall muss laut sein" zu zwei Meldungen pro Sekunde geworden. Eine Warnung,
+     die im Sekundentakt kommt, warnt nicht mehr, sie nervt - das ist derselbe Fehler wie eine
+     stille Warnung, nur mit umgekehrtem Vorzeichen.
+     Deshalb zwei Schwellen: Aus geht sie bei fast leerem Lager, AN erst wieder, wenn der Vorrat sie
+     eine Minute lang tragen wuerde. Das ist auch inhaltlich richtig - nach einem Zusammenbruch der
+     Versorgung faehrt man einen Verbraucher nicht bei der ersten Kilowattstunde wieder hoch.
+     Der Merker ist derselbe, den die Meldung ohnehin fuehrt: Ein zweiter Zustand fuer dieselbe
+     Frage waere die Kopie-Familie, an der dieses Projekt regelmaessig scheitert. */
+  const TARN_WIEDERANLAUF_SEKUNDEN = 60;
+  function tarnungAktiv(){
+    if (!getarnteKlassen().length) return false;
+    const verbrauch = tarnEnergieProSek();
+    if (verbrauch <= 0) return true;
+    const vorrat = state.resources.energie || 0;
+    if (state.tarnungWarnung) return vorrat >= verbrauch * TARN_WIEDERANLAUF_SEKUNDEN;
+    return vorrat > TARN_ENERGIE_RESERVE;
+  }
+  /* Der Ausfall muss LAUT sein, und er muss GENAU EINMAL laut sein.
+     Einmal, weil eine Meldung, die jede Sekunde erneut aufpoppt, so schnell weggeklickt wird, dass
+     sie nichts mehr meldet. Der Merker steht im Spielstand und nicht in einer Modulvariablen, damit
+     ein Neuladen der Seite die Warnung nicht erneut ausloest - und damit die Entwarnung beim
+     Wiederanlaufen ebenso genau einmal kommt. */
+  function tarnungPruefen(){
+    if (!getarnteKlassen().length){ state.tarnungWarnung = false; return; }
+    const aktiv = tarnungAktiv();
+    if (!aktiv && !state.tarnungWarnung){
+      state.tarnungWarnung = true;
+      log('Tarnung ausgefallen: Die Energie reicht nicht mehr. Deine Flotte steht wieder offen in allen Einträgen.', 'ti-alert-triangle', 'warn');
+    } else if (aktiv && state.tarnungWarnung){
+      state.tarnungWarnung = false;
+      log('Tarnung läuft wieder – die Energieversorgung trägt sie erneut.', 'ti-building-lighthouse');
+    }
+  }
+  /* Die hoechste Signatur unter den verborgenen Klassen. Diese Zahl - und NUR sie - reist im
+     oeffentlichen Bestenlisten-Eintrag mit. Sie verraet die Groessenklasse des groessten
+     verborgenen Rumpfes, nie die Zusammensetzung und nie die Stueckzahl. Ein fremder Sensor
+     vergleicht seinen Wert mit ihr; siehe sensorUrteil(). */
+  function tarnSignaturMax(){
+    let hoechste = 0;
+    for (const k of getarnteKlassen()){
+      const s = shipSignatur(k);
+      if (s > hoechste) hoechste = s;
+    }
+    return hoechste;
+  }
+
+  /* ====================== DIE GEGENWEHR: der Signaturscanner ======================
+     Entscheidung Sascha (03.09.2026): ein EIGENES Sensorgebaeude statt der Summe vorhandener
+     Investitionen. Der Vorteil ist Verstaendlichkeit - ein Gebaeude, eine Stufe, eine Zahl.
+
+     SENSOR_GRUNDSTUFE ist der Preis dieser Entscheidung, und er ist bewusst bezahlt: Bestandsspieler
+     haben das Gebaeude noch nicht und waeren am Tag der Auslieferung ueber Nacht blind. Jeder
+     bekommt deshalb Stufe 1 geschenkt (migrateState). Das ist keine Grosszuegigkeit, sondern die
+     Vermeidung einer stillen Verschlechterung: Wer heute jeden Bestand sieht, darf ihn morgen nicht
+     ohne eigenes Zutun verlieren.
+
+     Der Vorposten-Scanwert (nutzen.scan, serverautoritativ) fliesst MIT ein statt danebenzustehen -
+     sonst haetten wir zwei Sensorzahlen nebeneinander, und genau diese Kopie-Familien sind die
+     Fehlerklasse, an der dieses Projekt regelmaessig scheitert. */
+  const SENSOR_GRUNDSTUFE = 1;
+  const SENSOR_JE_STUFE = 90;
+  const SENSOR_JE_VORPOSTEN_SCAN = 60;
+  function sensorWert(){
+    let stufen = 0;
+    for (const b of allBuildingSets()) stufen += (b.signaturscanner || 0);
+    let vorposten = 0;
+    for (const v of meineVorposten()) vorposten += (v.nutzen && v.nutzen.scan) || 0;
+    return stufen * SENSOR_JE_STUFE + vorposten * SENSOR_JE_VORPOSTEN_SCAN;
+  }
+  /* SENSOR GEGEN SIGNATUR ALS VERHAELTNIS, NICHT ALS SCHWELLE.
+     Eine Schwelle ist hart und frustrierend ("ein Punkt zu wenig und ich sehe gar nichts"). Das
+     Verhaeltnis erlaubt die interessante Zwischenstufe: "Da bewegt sich etwas, aber wir sehen nicht
+     was."
+
+     Was der Sensor NICHT kann, und warum: Die verborgenen Klassen stehen gar nicht erst im
+     oeffentlichen Eintrag - er kann sie also nicht hervorzaubern. Sein Nutzen ist ein anderer und
+     der eigentliche Gewinn dieser Etappe: Er sagt dir, dass das Bild, das du siehst, UNVOLLSTAENDIG
+     ist. Ohne ihn liest du den Eintrag als vollstaendig, waehlst deinen Konter danach und verlierst
+     einen Kampf, den die Zahlen dir versprochen hatten.
+
+     Drei Stufen statt zweier, damit "knapp zu schwach" nicht dasselbe ist wie "nichts gebaut". */
+  function sensorUrteil(tarnSig, wert){
+    const sig = tarnSig || 0;
+    if (sig <= 0) return 'nichts';
+    const w = wert === undefined ? sensorWert() : wert;
+    if (w >= sig) return 'groesse';
+    if (w * 2 >= sig) return 'etwas';
+    return 'blind';
+  }
+  function sensorUrteilText(urteil, tarnSig){
+    if (urteil === 'groesse'){
+      const klasse = (tarnSig || 0) >= 200 ? 'Grosskampfschiff-Klasse'
+        : (tarnSig || 0) >= 60 ? 'mittlere Rumpfklasse' : 'kleine Rumpfklasse';
+      return 'Getarnte Verbände erkannt – Größenklasse: ' + klasse + '. Zusammensetzung und Stückzahl bleiben verborgen.';
+    }
+    if (urteil === 'etwas') return 'Ortung unvollständig: Da bewegt sich etwas, aber wir sehen nicht was. Dieser Bestand ist nicht vollständig.';
+    return '';
+  }
+
   // Die beiden estimate*-Funktionen bewerten die Flotte eines ANDEREN Spielers. Sie lesen ihre Zahlen
   // ausschließlich aus SHIP_DEFS - ohne eigene Forschung, eigene Module oder Werftmarken: Das alles
   // ist am fremden Konto nicht einsehbar, und was man nicht weiß, darf eine Schätzung nicht erfinden.
@@ -21678,6 +21861,20 @@
       const hh = currentHappyHour();
       if (hh) for (const k of Object.keys(rates)) if (hh.type.resources.includes(k)) rates[k] *= (1 + hh.type.pct);
     }
+    /* TARNUNG: der erste laufende VERBRAUCHER dieser Rechnung (03.09.2026). Er steht bewusst HIER
+       drin und nicht daneben - ratesPerSecond() hat 14 Aufrufer (Lagerfüllung, Gebäudekarte,
+       Auftragsvorschau, Pakt-Geschenk, Wochenbilanz, "reicht das für X?"-Rechner ...), und ein
+       Verbrauch, den nur die Flottenansicht kennt, wäre an dreizehn Stellen eine Lüge. Der
+       Kommentar am Kopf dieser Funktion sagt dasselbe für die Produktionsseite: EINE Stelle.
+
+       Er steht NACH dem Happy-Hour-Faktor, weil ein Vielfaches auf einen bereits abgezogenen
+       Verbrauch den Verbrauch mitvervielfachen würde - eine Happy Hour darf die Produktion erhöhen,
+       nicht die Tarnung verteuern.
+
+       Die Rate darf negativ werden; das ist kein Fehler, sondern die Aussage "du zahlst gerade
+       drauf". Erst ein leeres Lager beendet die Tarnung (tarnungAktiv()), und dieser Ausfall ist
+       laut - siehe tarnungPruefen(). */
+    if (tarnungAktiv()) rates.energie -= tarnEnergieProSek();
     return rates;
   }
   // Die UNGEDECKELTE Summe der additiven Produktions-Bonus-Gruppe. Ausgelagert (26.07.2026), damit
@@ -21775,6 +21972,16 @@
      soll weiter angespart werden koennen. */
   function applySoftCappedGain(resources, key, rawGain, cap){
     const current = resources[key]||0;
+    /* NEGATIVER BETRAG = VERBRAUCH (03.09.2026, mit der Tarnung dazugekommen).
+       Bis dahin kannte diese Rechnung nur Zuwaechse, und `rawGain <= 0` hiess schlicht "nichts zu
+       tun". Die Tarnung ist der erste laufende Verbraucher: ratesPerSecond() liefert fuer Energie
+       jetzt einen negativen Wert, und mit dem alten Zweig waere er STILL verschluckt worden - die
+       Anzeige haette den Verbrauch gezeigt, das Lager haette ihn nie gespuert. Genau die Sorte
+       Fehler, die niemand meldet, weil sie wie Grosszuegigkeit aussieht.
+       Der Verbrauch geht am Deckel und an baustelleAbzweigen() vorbei: Beide beantworten die Frage
+       "wohin mit dem Zuwachs?", die es hier nicht gibt. Boden bei 0 - ein negativer Vorrat waere an
+       jeder Anzeige- und Kaufstelle ein neuer Sonderfall. */
+    if (rawGain < 0){ resources[key] = Math.max(0, current + rawGain); return; }
     if (rawGain <= 0){ resources[key] = current; return; }
     rawGain = baustelleAbzweigen(key, rawGain);
     if (rawGain <= 0){ resources[key] = current; return; }
@@ -22764,6 +22971,83 @@
   }
   // Signatur-Cache-Muster (kein Live-Countdown in dieser Box).
   let lastFormationSig = null;
+  /* Die Tarnungs-Box (03.09.2026). Sie steht im Verteidigungs-Reiter unter der Aufstellung, weil
+     Tarnung genau das ist: eine Verteidigungsentscheidung, die vor dem Kampf getroffen wird.
+
+     Gezeigt werden nur Klassen, von denen der Spieler ueberhaupt welche BESITZT - eine Liste aus
+     45 Zeilen, von denen 40 auf 0 stehen, waere keine Auswahl, sondern eine Tapete. Nicht tarnbare
+     Klassen (Signatur ab 600) erscheinen trotzdem, aber gesperrt und mit Begruendung: Die Werftkarte
+     verspricht seit v8.660.0 "nicht zu verbergen", und wer hier gar nichts faende, hielte das fuer
+     einen Fehler statt fuer die Regel. */
+  function tarnungKlassenListe(){
+    const bestand = {};
+    for (const f of allFleets()) for (const k of Object.keys(f||{})){
+      const n = f[k];
+      if (typeof n === 'number' && n > 0 && shipSignatur(k) > 0) bestand[k] = (bestand[k]||0) + n;
+    }
+    return Object.keys(bestand)
+      .map(k => ({ key:k, anzahl:bestand[k], sig:shipSignatur(k), name:(SHIP_DEFS.find(d=>d.key===k)||{}).name || (k==='superschlachtschiff'?'Superschlachtschiff':k) }))
+      .sort((a,b) => b.sig - a.sig || a.name.localeCompare(b.name));
+  }
+  /* Die Schmutzpruefung ist hier PFLICHT und keine Feinoptimierung: render() laeuft im
+     Sekundentakt, solange der Tab sichtbar ist. Ohne sie baut diese Box ihr DOM jede Sekunde neu -
+     und nimmt dabei jedes Mal Fokus und Hover mit. Die Nachbarbox (renderDefenseFormationBox) hat
+     genau dafuer lastFormationSig; beim ersten Anlauf hatte ich sie hier vergessen.
+     In die Kennung gehoert ALLES, was die Box zeigt - auch der Bestand und der Energiezustand,
+     sonst friert die Zeile "Tarnung ausgefallen" fest, waehrend sie laengst wieder laeuft. */
+  let lastTarnSig = null;
+  function renderTarnungBox(){
+    const box = document.getElementById('tarnungBox');
+    if (!box) return;
+    const liste = tarnungKlassenListe();
+    const t = state.tarnung || {};
+    const verbrauch = tarnEnergieProSek();
+    const aktiv = tarnungAktiv();
+    const gewaehlt = getarnteKlassen().length;
+    const sig = JSON.stringify([liste.map(e => e.key + ':' + e.anzahl), getarnteKlassen(), aktiv, Math.round(verbrauch*100)]);
+    if (sig === lastTarnSig) return;
+    lastTarnSig = sig;
+    if (!liste.length){
+      box.innerHTML = '<div class="bmeta">Noch keine Schiffe, die sich verbergen ließen.</div>';
+      return;
+    }
+    const zeilen = liste.map(e => {
+      const kann = tarnbar(e.key);
+      const an = kann && !!t[e.key];
+      const rand = an ? 'border-color:#7ed0c2; background:rgba(126,208,194,0.10);' : '';
+      const hinweis = kann
+        ? `Signatur ${fmt(e.sig)} · ${fmt(e.anzahl)} Stück · ${(e.anzahl*e.sig*TARN_ENERGIE_JE_SIGNATUR).toFixed(2)} Energie/s`
+        : `Signatur ${fmt(e.sig)} – ab ${fmt(TARNUNG_GRENZE)} nicht zu verbergen`;
+      return `<div class="card-row" ${kann?`data-tarn="${e.key}" style="cursor:pointer; ${rand}"`:'style="opacity:0.55;"'}>
+        <div class="left">
+          <div class="bicon" style="background:rgba(126,208,194,${an?'0.22':'0.10'}); color:${an?'#7ed0c2':'#7d8199'};"><i class="ti ${kann?'ti-building-lighthouse':'ti-lock'}" aria-hidden="true"></i></div>
+          <div>
+            <div class="bname">${escapeHtml(e.name)}${an?' <span class="lvl-pill" style="background:rgba(126,208,194,0.25); color:#7ed0c2;">getarnt</span>':''}</div>
+            <div class="bmeta">${hinweis}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    const zustand = !gewaehlt
+      ? '<div class="bmeta" style="margin-top:6px;">Nichts getarnt – dein Bestand steht vollständig in den öffentlichen Einträgen.</div>'
+      : aktiv
+        ? `<div class="bmeta" style="margin-top:6px; color:#7ed0c2;"><strong>Tarnung läuft.</strong> ${gewaehlt} Klasse${gewaehlt===1?'':'n'} verborgen, laufende Kosten ${verbrauch.toFixed(2)} Energie/s. Punktestand und Verteidigungsstärke bleiben sichtbar – verborgen wird, <em>was</em> du hast, nicht <em>wie viel</em>.</div>`
+        : `<div class="bmeta" style="margin-top:6px; color:#e24b4a;"><strong>Tarnung ausgefallen:</strong> Die Energie reicht nicht für ${verbrauch.toFixed(2)}/s. Deine Flotte steht wieder offen in allen Einträgen.</div>`;
+    box.innerHTML = zeilen + zustand
+      + `<div class="bmeta" style="margin-top:4px;">Ein Angriff hebt die Tarnung auf: Der Kampfbericht zeigt beiden Seiten die vollständige Flotte. Tarnung schützt vor dem <strong>ersten</strong> Angriff, nicht vor dem zweiten. Verbündete deiner Allianz sehen deine Flotte weiterhin.</div>`;
+    box.querySelectorAll('[data-tarn]').forEach(el => {
+      el.onclick = () => {
+        const k = el.getAttribute('data-tarn');
+        if (!tarnbar(k)) return;
+        state.tarnung = state.tarnung || {};
+        if (state.tarnung[k]) delete state.tarnung[k]; else state.tarnung[k] = true;
+        lastTarnSig = null;
+        const name = (SHIP_DEFS.find(d=>d.key===k)||{}).name || k;
+        log(state.tarnung[k] ? name+': wird ab sofort verborgen.' : name+': steht wieder offen.', 'ti-building-lighthouse');
+        render(); save();
+      };
+    });
+  }
   function renderDefenseFormationBox(){
     const box = document.getElementById('defenseFormationBox');
     if (!box) return;
@@ -29008,6 +29292,20 @@ async function claimPendingRewards(){
     if (!Number.isFinite(state.signalDrought)) state.signalDrought = 0;
     if (!state.seenTabHints || typeof state.seenTabHints !== 'object') state.seenTabHints = {};
     if (!state.vorboten || typeof state.vorboten !== 'object') state.vorboten = {};
+    /* Tarnung (03.09.2026): die angehakten Schiffsklassen. Ein defekter Wert wuerde
+       getarnteKlassen() bei jedem Tick auf die Nase fallen lassen - Object.keys(null) wirft. */
+    if (!state.tarnung || typeof state.tarnung !== 'object') state.tarnung = {};
+    /* Die geschenkte Sensor-Grundstufe. Sie steht HIER und nicht in sensorWert(), damit Gebaeudekarte
+       und Sensorwert dasselbe sagen: Ein Wert, den die Formel heimlich anhebt, waere genau die Art
+       Anzeige-Luege, die dieses Projekt regelmaessig einsammelt - die Karte zeigte Stufe 0, die
+       Ortung rechnete mit 1. Das Geschenk ist einmalig und wird durch den Merker gehalten: Wer den
+       Scanner spaeter abreisst (heute nicht moeglich, aber der Merker macht die Absicht eindeutig),
+       bekommt ihn nicht stillschweigend wieder. */
+    if (!state.tarnungGeschenk){
+      state.tarnungGeschenk = true;
+      if (!state.buildings) state.buildings = {};
+      if (!((state.buildings.signaturscanner || 0) > 0)) state.buildings.signaturscanner = SENSOR_GRUNDSTUFE;
+    }
     // Asteroiden-Lebenszaehler (Konzept Phase 5): Tagesaufgaben und Erfolge lesen sie, die beiden
     // Buchungsstellen legen sie bei Bedarf selbst an - hier stehen sie trotzdem, damit das Feld in
     // JEDEM Spielstand dieselbe Form hat und die Tagesbeginn-Marke nicht gegen undefined rechnet.
@@ -30808,6 +31106,18 @@ async function claimPendingRewards(){
       if (Object.keys(zielFlotte).length && Math.abs(konter - 1) > 0.005){
         html += `<div class="bmeta"><i class="ti ti-adjustments" aria-hidden="true"></i> Konter ×${konter.toFixed(2)} – bereits eingerechnet, `
               + `gerechnet gegen die bekannte <em>Gesamtflotte</em> des Ziels. Am Standort selbst kann eine andere Zusammensetzung stehen.</div>`;
+      }
+      /* HIER beisst die Tarnung, und nur hier ist sie mehr als Kosmetik (03.09.2026): Der Konter
+         wird gegen die BEKANNTE Flotte gerechnet. Wer die falsche Zusammensetzung kennt, waehlt die
+         falsche Aufstellung und verliert einen Kampf, den die Zahlen ihm versprochen haben.
+         Die Warnung steht deshalb unmittelbar unter der Konter-Zeile, nicht irgendwo im Bericht -
+         eine Zahl und ihr Vorbehalt gehoeren nebeneinander. Ohne ausreichenden Signaturscanner
+         erscheint sie nicht: Ein zu schwacher Sensor merkt nicht, dass ihm etwas fehlt. */
+      const vorschauUrteil = sensorUrteil((it && it.entry && it.entry.tarnAktiv) ? (it.entry.tarnSig||0) : 0);
+      if (vorschauUrteil === 'groesse' || vorschauUrteil === 'etwas'){
+        html += `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> `
+              + `<strong>Dieses Bild ist unvollständig.</strong> ${escapeHtml(sensorUrteilText(vorschauUrteil, (it.entry.tarnSig)||0))} `
+              + `Der Konter oben rechnet gegen das, was du siehst – nicht gegen das, was dort steht.</div>`;
       }
     } else {
       html += `<div class="bmeta"><i class="ti ti-sword" aria-hidden="true"></i> Deine Reichsflotte bringt <strong>${fmt(kraft)}</strong> Angriffskraft mit. `
@@ -39837,7 +40147,7 @@ async function claimPendingRewards(){
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
       { title:'Schiffstypen', body:'Kampfschiffe (Jäger, Kreuzer, Zerstörer, Bomber, Schlachtschiff, Superschlachtschiff) haben Angriffskraft. Nutzschiffe (Kleiner Frachter, Großer Frachter, Bergungsfrachter, Kolonieschiff, Spähschiff, Spionagekreuzer, Forschungsschiff, Recycler) haben keine – die dienen Transport, Kolonisierung, Aufklärung, Expeditionen bzw. Trümmerfeld-Abbau. Der <strong>Recycler</strong> sammelt an dem Planeten, an dem er steht; zu einem fremden Trümmerfeld geschickt, wird daraus ein Auftrag mit Flottenslot und selbständiger Rückkehr. Drei Frachter-Typen mit unterschiedlichem Einsatzzweck: <strong>Kleiner Frachter</strong> (von Anfang an verfügbar, günstig, schnell, 300 Frachtraum) für häufige, flexible Kurzstrecken-Transporte, <strong>Großer Frachter</strong> (braucht Fusionsantrieb Stufe 5, teuer, langsam, 1.500 Frachtraum) für seltene, aber sehr lohnende Großeinsätze - nicht für zeitkritische Missionen geeignet - und <strong>Bergungsfrachter</strong> (braucht zusätzlich <em>Minentechnik</em>, 3.000 Frachtraum bei Geschwindigkeit 25) für den Asteroidenbergbau auf große Entfernung. Beim Bergungsfrachter zwei Dinge im Blick behalten: Eine Flotte fliegt immer im Tempo ihres <em>langsamsten</em> Schiffs, er verdoppelt die Flugzeit gegenüber dem Großen Frachter also fast - und er ist der einzige Frachter <strong>ohne</strong> passiven Lagerbeitrag, sein Rumpf ist reiner Frachtraum. Er lohnt sich dort, wo lange gegraben und selten geflogen wird. Kampfschiffe haben jetzt zusätzlich eine echte <strong>Verteidigungsspezialisierung</strong>, unabhängig von der Angriffskraft: Jäger/Bomber/Träger/Zerstörer sind offensiv ausgerichtet und dadurch fragiler in der Verteidigung, Wächter und Schlachtschiff (inkl. Superschlachtschiff) sind gepanzerte Verteidigungsspezialisten. Eine reine Angriffsflotte verteidigt sich also spürbar schlechter als eine gemischte oder auf Wächter/Schlachtschiffe setzende Flotte.' },
-      { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.<br><br><strong>Drei Klassen haben am 02.08.2026 die Rolle gewechselt.</strong> Die Verteilung war 5 Abfangjäger / 5 Bomber / <em>11 Großkampfschiffe</em> – und die elf waren ausgerechnet die schweren, spät verfügbaren Klassen. Weil der Konter nach dem <em>Anteil</em> an der Gegnerflotte wirkt, wurde damit jede Flotte, die schlicht das jeweils Beste baut, automatisch kapitallastig; im Endspiel fiel Schere-Stein-Papier auf Stein-gegen-Stein zusammen. Der <strong>Carrier</strong> (ein Träger, der leichte Jäger ins Gefecht bringt) und der <strong>Riftwächter</strong> (leichter, schneller Rumpf) zählen jetzt als Abfangjäger, das <strong>Enterschiff</strong> (greift große, träge Ziele an, um sie zu kapern) als Bomber. Neue Verteilung: 7 / 6 / 8. Weil die Konterrolle zugleich die <strong>Werftmarken-Familie</strong> bestimmt, ändern sich für diese drei Klassen auch die Zuwächse je Marke.' },
+      { title:'Konterrollen (Schere-Stein-Papier)', body:'Jedes Kampfschiff gehört zu einer von drei <strong>Konterrollen</strong>, die im Kreis stehen: <strong>Abfangjäger</strong> schlagen <strong>Bomber</strong>, Bomber schlagen <strong>Großkampfschiffe</strong>, Großkampfschiffe schlagen Abfangjäger. Die Rolle steht auf jeder Schiffskarte in der Werft (Tooltip erklärt, wogegen sie stark und schwach ist). Trifft deine Flotte auf viele Schiffe, die sie kontert, steigt die Angriffskraft um bis zu <strong>+25%</strong>; triffst du auf deine Gegenrolle, sinkt sie um bis zu <strong>-15%</strong>. Der Effekt richtet sich nach dem <em>Anteil</em> der jeweiligen Rolle an der Gegnerflotte – ein einzelnes Schiff kippt also nichts. Wirksam überall dort, wo die gegnerische Zusammensetzung bekannt ist: bei Angriffen auf <strong>Spieler</strong> (Aufklärung zeigt sie dir – <em>sofern das Ziel sie nicht tarnt</em>, siehe Tarnung &amp; Signatur), auf <strong>NPCs</strong> (steht in der Angriffsvorschau) und bei der Abwehr von Überfällen. Bei Piratennestern gilt stattdessen die dort ausgewiesene Schwachstelle. Im Kampfbericht steht, wie stark der Konter tatsächlich gewirkt hat.<br><br><strong>Drei Klassen haben am 02.08.2026 die Rolle gewechselt.</strong> Die Verteilung war 5 Abfangjäger / 5 Bomber / <em>11 Großkampfschiffe</em> – und die elf waren ausgerechnet die schweren, spät verfügbaren Klassen. Weil der Konter nach dem <em>Anteil</em> an der Gegnerflotte wirkt, wurde damit jede Flotte, die schlicht das jeweils Beste baut, automatisch kapitallastig; im Endspiel fiel Schere-Stein-Papier auf Stein-gegen-Stein zusammen. Der <strong>Carrier</strong> (ein Träger, der leichte Jäger ins Gefecht bringt) und der <strong>Riftwächter</strong> (leichter, schneller Rumpf) zählen jetzt als Abfangjäger, das <strong>Enterschiff</strong> (greift große, träge Ziele an, um sie zu kapern) als Bomber. Neue Verteilung: 7 / 6 / 8. Weil die Konterrolle zugleich die <strong>Werftmarken-Familie</strong> bestimmt, ändern sich für diese drei Klassen auch die Zuwächse je Marke.' },
       { title:'Kampfphasen', body:'Ein Kampf wird nicht mehr mit einem einzigen Wurf entschieden, sondern in <strong>drei Phasen</strong>: <strong>Anflug</strong>, <strong>Hauptgefecht</strong> und <strong>Rückzug</strong>. Wer zwei der drei Phasen gewinnt, gewinnt den Kampf. Der Clou ist die unterschiedliche Gewichtung: Im Anflug zählen die Konterrollen <strong>anderthalbfach</strong>, im Hauptgefecht normal, im Rückzug nur halb. Eine gut zusammengestellte Flotte entscheidet den Kampf also früh; wer gekontert wurde, kann sich im weiteren Verlauf noch fangen. <strong>Was sich dadurch ändert:</strong> Der Gesamt-Spielraum bleibt gleich (min. 5%, max. 95% Siegchance), aber der Stärkere gewinnt <em>verlässlicher</em> – bei doppelter Übermacht steigt die Siegchance von 67% auf 74%, bei dreifacher von 75% auf 84%. Weniger Zufall, mehr Vorbereitung. Der Kampfbericht zeigt jede Phase einzeln. <strong>Gegen andere Spieler</strong> ist der Spielraum bewusst enger: dort liegt die Siegchance immer zwischen <strong>10% und 90%</strong> – kein Angriff auf einen Mitspieler ist sicher, keiner chancenlos. Die Angriffs-Vorschau im Spielerprofil nennt genau diese Zahl – und seit dem 01.08.2026 auch der <strong>Spionagebericht</strong>, der dieselbe Lage vorher mit einer veralteten Formel und damit einer abweichenden Zahl bewertete. Sie bleibt aber eine Schätzung: Die <strong>Verteidigungs-Aufstellung</strong> des Ziels wird erst beim Eintreffen angewandt und ist vorher nicht einsehbar. Seit dem 02.08.2026 zeigt auch der <strong>Spieler-gegen-Spieler-Bericht</strong> jede Phase einzeln – er war bis dahin der einzige Kampfbericht, der nur das Endergebnis nannte, obwohl der Server die drei Phasen längst würfelte. Und seit dem 17.08.2026 würfelt auch die <strong>Überfall-Abwehr</strong> dieselben drei Phasen (NPC-Spielraum 5–95%) – sie war der letzte Kampf des Spiels, der noch mit einem einzigen Wurf entschieden wurde, und nutzte dabei sogar die engeren PvP-Grenzen. Überfall- und Späh-Bericht nennen die Phasenurteile und die Abwehrchance jetzt ebenfalls.' },
       /* Der Hilfetext haengt am selben Schalter wie die Regel. Ein Abschnitt, der einen
          Mindesteinsatz beschreibt, waehrend der Server ihn gar nicht anwendet, waere eine
@@ -39895,6 +40205,13 @@ async function claimPendingRewards(){
       { title:'Exklusive Event-Module', body:'Jedes der sechs Sammel-Events hat zusätzlich ein <strong>eigenes Schiffsklassen-Modul</strong>, das es AUSSCHLIESSLICH während der Eventlaufzeit gibt: „Kometenschild-Projektor" (Meteoritensturm), „Verstärkte Enterhaken" (Piratenüberfall), „Phasenfeld-Stabilisator" (Void-Anomalie), „Stabilisierter Riss-Kern" (Leerenriss-Welle), „Depeschen-Relais" (Fraktionskonflikt) und „Erzgreifer-Ausleger" (Goldrausch). Sie werden wie die Event-Teile auf erfolgreichen <strong>Expeditionen</strong> gefunden, aber seltener (2,5% statt 5%) – vom Bauteil brauchst du sechs, vom Modul reicht eines. Im normalen Modul-Fundpool tauchen sie nie auf: Läuft das Event aus, ist das Modul bis zur nächsten Kalenderrunde nicht mehr erhältlich. Dafür starten sie erst bei Seltenheit „Selten" (30% Episch, 10% Legendär). Jedes Modul wirkt auf die Schiffsklasse seines Event-Schiffs – fünf davon auf die neue Klasse <strong>„Event-Schiffe"</strong> (Enterschiff, Phantomschiff, Riftwächter, Gesandtenschiff, Schürfschiff), die bis dahin überhaupt keine Klassen-Module tragen konnte; das Meteoritensturm-Modul wirkt auf das Jäger-Geschwader, wo der Kometenjäger einsortiert ist. Wer alle sechs besitzt, schaltet den Erfolg <strong>„Zeitzeuge"</strong> frei.' }
     ]},
     { key:'kampf', icon:'ti-sword', title:'Kampf', entries:[
+      /* Der Hilfe-Abschnitt zur Tarnung. Er steht bewusst als ERSTER im Kampf-Kapitel und nicht bei
+         der Aufklaerung: Tarnung ist eine Entscheidung, die man VOR dem Kampf trifft, und der
+         Konter-Abschnitt weiter unten verweist auf ihn. Die Zahlen sind hier eingetippt und nicht
+         gerechnet, weil HELP_SECTIONS mehrere tausend Zeilen VOR den Tarn-Konstanten steht - ein
+         Zugriff darauf waere die temporale Todeszone, an der dieses Projekt schon einmal haengen
+         geblieben ist. test_tarnung.js vergleicht die Zahlen im Text mit den Konstanten. */
+      { title:'Tarnung & Signatur', body:'Jedes Schiff trägt eine <strong>Signatur</strong> – eine Zahl von 2 bis 1.000, die sagt, wie schwer sein Rumpf zu verbergen ist. Sie misst <em>Größe</em>, nicht Kampfkraft: Der Leerenjäger schießt härter als das Schlachtschiff und liegt trotzdem darunter, der unbewaffnete Bergungskran steht ganz oben. Die Zahl steht auf jeder Werftkarte und im Fuß der Flottenauswahl.<br><br><strong>Was Tarnung tut.</strong> Im Verteidigungs-Tab hakst du einzelne <strong>Schiffsklassen</strong> an. Getarnte Klassen verschwinden aus deinem öffentlichen Eintrag und aus deinen gemeldeten Flottenbewegungen – ein fremder Späher sieht sie nicht. Dein <strong>Punktestand und deine Verteidigungsstärke bleiben sichtbar</strong>, und das ist Absicht: Verborgen wird, <em>was</em> du hast, nicht <em>wie viel</em>. Der Gegner sieht, dass da etwas ist, und weiß nicht, was.<br><br><strong>Große Rümpfe gehen nicht.</strong> Ab Signatur <strong>600</strong> lässt sich eine Klasse nicht mehr verbergen. Zwischen 241 und 599 steht kein einziges Schiff – diese Lücke <em>ist</em> die Grenze, und die Werftkarte sagt dir vor dem Kauf, auf welcher Seite ein Schiff liegt.<br><br><strong>Was sie kostet.</strong> Laufende <strong>Energie</strong>, gestaffelt nach Signatur und Stückzahl. Reicht die Energie nicht, fällt die Tarnung aus – mit einer deutlichen Meldung, nie stillschweigend. Eine Sicherung, deren Ausfall wie Normalbetrieb aussieht, wäre keine.<br><br><strong>Was sie nicht tut.</strong> Ein Angriff hebt sie auf: Der Kampfbericht führt beiden Seiten die vollständige Flotte. Tarnung schützt vor dem <em>ersten</em> Angriff, nicht vor dem zweiten – wer sie brechen will, bezahlt mit einem Wegwerf-Angriff. Und deine eigene Allianz sieht dich weiterhin; die Flottenparade ist zum Absprechen da.<br><br><strong>Die Gegenwehr: der Signaturscanner.</strong> Das Gebäude im Verteidigungs-Tab. Es kann verborgene Schiffe nicht hervorzaubern – die stehen gar nicht erst im fremden Eintrag. Es sagt dir etwas Wichtigeres: dass das Bild, das du siehst, <strong>unvollständig</strong> ist. Ohne Scanner liest du einen getarnten Eintrag als vollständig, wählst deinen Konter danach und verlierst einen Kampf, den die Zahlen dir versprochen hatten. Drei Stufen: zu schwach (du merkst nichts), knapp (»da bewegt sich etwas, aber wir sehen nicht was«) und stark genug (die Größenklasse des größten verborgenen Rumpfes wird benannt). <strong>Stufe 1 hat jeder geschenkt bekommen</strong>, damit niemand über Nacht blind wurde.' },
       /* Zahlen aus GEFECHTSVORRAETE ABGELEITET, nicht eingetippt - die Tabelle steht weiter oben in
          der Datei, der Zugriff ist hier also sicher (Reihenfolge gemessen, Arbeitsregel 38). Damit
          kann dieser Text bei einer Balance-Aenderung nicht zur zweiten Anzeigestelle mit der alten
@@ -41206,7 +41523,21 @@ async function claimPendingRewards(){
         const spionierteFlotte = {};
         Object.keys(SHIP_SCORE_WEIGHTS).forEach(k => { if ((r.ships && r.ships[k]||0) > 0) spionierteFlotte[k] = r.ships[k]; });
         const shipLine = Object.keys(spionierteFlotte).length ? shipCountRowHtml(spionierteFlotte, true) : 'keine bekannten Schiffe';
-        body = '<strong>Flotte aufgedeckt:</strong> '+shipLine;
+        /* EHRLICHKEIT (03.09.2026, Tarnwert Etappe 1). "Flotte aufgedeckt" war jahrelang wahr und
+           waere mit der Tarnung zur Luege geworden - das ist die Fehlerklasse, an der dieses Projekt
+           regelmaessig scheitert: nicht die neue Mechanik, sondern der alte Satz daneben.
+           Die Ueberschrift richtet sich deshalb nach dem, was der eigene Signaturscanner erkannt
+           hat. Wer keinen ausreichenden hat ('blind'), liest weiterhin "aufgedeckt" - und das ist
+           kein Versaeumnis, sondern der Kern der Mechanik: Ein zu schwacher Sensor merkt nicht
+           einmal, dass ihm etwas fehlt. Genau dafuer baut man ihn aus. */
+        const spyTarnUrteil = sensorUrteil(r.ships && r.ships.tarnAktiv ? (r.ships.tarnSig||0) : 0);
+        body = (spyTarnUrteil === 'nichts' || spyTarnUrteil === 'blind')
+          ? '<strong>Flotte aufgedeckt:</strong> '+shipLine
+          : '<strong>Flotte – unvollständig erfasst:</strong> '+shipLine;
+        if (spyTarnUrteil === 'groesse' || spyTarnUrteil === 'etwas'){
+          body += '<br><i class="ti ti-building-lighthouse" aria-hidden="true" style="color:#7ed0c2;"></i> <span style="color:#7ed0c2;">'
+            + escapeHtml(sensorUrteilText(spyTarnUrteil, r.ships.tarnSig||0)) + '</span>';
+        }
         // Geschätzte Angriffspunkte der gegnerischen Flotte: Basiswerte je Schiffstyp, ohne die
         // unbekannte gegnerische Forschung. Seit 01.08.2026 über estimateEnemyFleetAtk() statt über
         // eine hier abgeschriebene Summe - die kannte nur neun Schiffstypen und ließ die elf
@@ -46796,6 +47127,21 @@ async function claimPendingRewards(){
         // sodass wiederholte Spionage keine verlässlichen exakten Werte liefert.
         const spyLvl = state.research.rspyshield||0;
         const fuzz = spyLvl>0 ? (v => { const range = Math.min(0.8, spyLvl*0.08); const factor = 1 + (Math.random()*2-1)*range; return Math.max(0, Math.round(v*factor)); }) : (v => v);
+        /* TARNUNG, Etappe 1 - die Wirkung (03.09.2026). Eine getarnte Klasse wird hier auf 0
+           geschrieben: Sie steht dann gar nicht erst im oeffentlichen Eintrag, und kein fremder
+           Sensor kann sie daraus hervorzaubern (der Eintrag ist fuer jedes eingeloggte Konto
+           lesbar - eine Verschluesselung waere Theater).
+           Die GROESSE bleibt dabei wahr: score und defensePower laufen unveraendert weiter, und der
+           Server rechnet den Punktestand ohnehin aus dem echten Spielstand nach und ueberschreibt
+           den eingereichten. Eine Tarnung, die die Groesse verbergen wollte, waere eine Luege, die
+           der Server binnen einer Minute widerlegt. Verborgen wird WAS, nicht WIE VIEL.
+           tarnAktiv/tarnSig sind der Gegenpart fuer die Gegenwehr: Sie sagen einem fremden
+           Signaturscanner, DASS dieses Bild unvollstaendig ist und wie gross der groesste
+           verborgene Rumpf ist - nie, welche Klassen es sind. Wer keinen Scanner hat, sieht auch
+           diese zwei Felder nicht (sensorUrteil()). */
+        const tarnAn = tarnungAktiv();
+        const tarnSet = tarnAn ? new Set(getarnteKlassen()) : new Set();
+        const tz = (key, roh) => tarnSet.has(key) ? 0 : fuzz(roh);
         await storageSet('leaderboard:'+state.player.id, JSON.stringify({
           id: state.player.id,
           name: state.player.name || 'Kommandant',
@@ -46826,20 +47172,22 @@ async function claimPendingRewards(){
           // jemand seit Montag nicht mehr eingeloggt war.
           abgrundWoche: (state.abgrund && state.abgrund.woche) ? { key: state.abgrund.woche.key, best: state.abgrund.woche.best||0 } : null,
           ascensionCount: (state.ascension&&state.ascension.count)||0,
-          ships: fuzz(allFleets().reduce((a,f)=>a+f.ships,0)),
-          cruisers: fuzz(allFleets().reduce((a,f)=>a+f.cruisers,0)),
-          destroyers: fuzz(allFleets().reduce((a,f)=>a+(f.destroyers||0),0)),
-          jaeger: fuzz(allFleets().reduce((a,f)=>a+(f.jaeger||0),0)),
-          bomber: fuzz(allFleets().reduce((a,f)=>a+(f.bomber||0),0)),
-          schlachtschiff: fuzz(allFleets().reduce((a,f)=>a+(f.schlachtschiff||0),0)),
-          carrier: fuzz(allFleets().reduce((a,f)=>a+(f.carrier||0),0)),
-          superschlachtschiff: fuzz(allFleets().reduce((a,f)=>a+(f.superschlachtschiff||0),0)),
-          frachter: fuzz(allFleets().reduce((a,f)=>a+(f.frachter||0),0)),
-          spaeher: fuzz(allFleets().reduce((a,f)=>a+(f.spaeher||0),0)),
-          colonyShips: fuzz(allFleets().reduce((a,f)=>a+(f.colonyShips||0),0)),
-          recycler: fuzz(allFleets().reduce((a,f)=>a+(f.recycler||0),0)),
-          forscher: fuzz(allFleets().reduce((a,f)=>a+(f.forscher||0),0)),
+          ships: tz('ships', allFleets().reduce((a,f)=>a+f.ships,0)),
+          cruisers: tz('cruisers', allFleets().reduce((a,f)=>a+f.cruisers,0)),
+          destroyers: tz('destroyers', allFleets().reduce((a,f)=>a+(f.destroyers||0),0)),
+          jaeger: tz('jaeger', allFleets().reduce((a,f)=>a+(f.jaeger||0),0)),
+          bomber: tz('bomber', allFleets().reduce((a,f)=>a+(f.bomber||0),0)),
+          schlachtschiff: tz('schlachtschiff', allFleets().reduce((a,f)=>a+(f.schlachtschiff||0),0)),
+          carrier: tz('carrier', allFleets().reduce((a,f)=>a+(f.carrier||0),0)),
+          superschlachtschiff: tz('superschlachtschiff', allFleets().reduce((a,f)=>a+(f.superschlachtschiff||0),0)),
+          frachter: tz('frachter', allFleets().reduce((a,f)=>a+(f.frachter||0),0)),
+          spaeher: tz('spaeher', allFleets().reduce((a,f)=>a+(f.spaeher||0),0)),
+          colonyShips: tz('colonyShips', allFleets().reduce((a,f)=>a+(f.colonyShips||0),0)),
+          recycler: tz('recycler', allFleets().reduce((a,f)=>a+(f.recycler||0),0)),
+          forscher: tz('forscher', allFleets().reduce((a,f)=>a+(f.forscher||0),0)),
           defensePower: fuzz(Math.round(defensePower())),
+          tarnAktiv: tarnAn,
+          tarnSig: tarnAn ? tarnSignaturMax() : 0,
           // Beute-Schätzung für die Tiefen-Aufklärung (Spionagekreuzer): verschleierte Summe UND
           // Einzelaufschlüsselung der erbeutbaren Ressourcen (Erz/Kristalle/Deuterium/Antimaterie).
           // Energie/Forschungspunkte zählen nicht, da sie bei einem Angriff nicht gestohlen werden.
@@ -54499,6 +54847,21 @@ async function claimPendingRewards(){
   // zusammen (siehe doSave() - wird bei jedem regulären Speichern mitveröffentlicht, wie die
   // Bestenliste). Volle Rohdaten werden veröffentlicht; wie viel davon ein BEOBACHTER tatsächlich
   // angezeigt bekommt, entscheidet dessen EIGENE Abhorchposten-Stufe (siehe renderAbhorchpostenBox).
+  /* Der zweite Kanal, und der undichtere von beiden: missions:<id> traegt die VOLLE
+     Zusammensetzung jeder laufenden Bewegung und hat serverseitig gar keine Rechtepruefung - jedes
+     eingeloggte Konto kann ihn lesen. Wer nur den Bestenlisten-Eintrag tarnt, hat nichts getarnt,
+     sobald die Flotte einmal fliegt.
+     Bewusst NICHT gefiltert werden dagegen die beiden Allianz-Kanaele (paradesnapshot, basedef):
+     Sie existieren, damit Verbuendete sich abstimmen koennen, und sind nur mit dem eigenen Tag
+     lesbar. Eine Tarnung, die auch die eigene Allianz blendet, macht das Spiel nicht spannender,
+     sondern die Absprache unmoeglich. Diese Auslassung ist eine Entscheidung, kein Vergessen. */
+  function tarnungFilter(comp){
+    if (!comp || !tarnungAktiv()) return comp;
+    const versteckt = new Set(getarnteKlassen());
+    const out = {};
+    for (const k of Object.keys(comp)) if (!versteckt.has(k)) out[k] = comp[k];
+    return out;
+  }
   function summarizeOwnMissionsForBroadcast(){
     const out = [];
     for (const { planet: originKey, fleet } of allFleetsWithPlanet()){
@@ -54513,7 +54876,7 @@ async function claimPendingRewards(){
           startTime: m.startTime || (m.endTime - 1000),
           endTime: m.endTime,
           fleetName: m.fleetName || 'Flotte',
-          composition: m.composition || (m.shipKey ? { [m.shipKey]: m.qty||0 } : null)
+          composition: tarnungFilter(m.composition || (m.shipKey ? { [m.shipKey]: m.qty||0 } : null))
         });
       }
     }
@@ -66283,6 +66646,7 @@ async function claimPendingRewards(){
     setBoxText(document.getElementById('heroDefense'), String(defensePower(state.activeBasePlanet)));
     setBoxText(document.getElementById('defenseCentralValue'), String(defensePower(state.activeBasePlanet)));
     renderDefenseFormationBox();
+    renderTarnungBox();
     const dsb = document.getElementById('defenseSabotageBanner');
     if (dsb){
       const ds = state.defenseSabotage && state.defenseSabotage.until > Date.now() ? state.defenseSabotage : null;
@@ -69482,6 +69846,9 @@ async function claimPendingRewards(){
       actualGains[r] = (state.resources[r]||0) - before;
     }
     if (tickAnteil > 0) processTier2Factories(tickAnteil);
+    // Nach der Verrechnung, nicht davor: Erst jetzt steht fest, ob die Energie diese Sekunde
+    // getragen hat. Vorher gefragt, meldete die Warnung den Ausfall eine Sekunde zu frueh.
+    tarnungPruefen();
     /* Konten aufloesen, deren Posten die Warteschlange verlassen hat. Bewusst als ABGLEICH im
        Takt und nicht als Aufruf an jeder Entfernungsstelle: Die Erkundung hat fuenfzehn Stellen
        gezaehlt, an denen Warteschlangen geleert oder gekuerzt werden - eine davon zu vergessen
