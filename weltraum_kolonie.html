@@ -9734,6 +9734,66 @@
     const sk = sysId ? sektorVonSystemId(sysId) : null;
     return 1 - ((sk && sk.mod && sk.mod.flug) || 0);
   }
+  /* ===== Die Sektorlage (E5, 03.09.2026) ======================================================
+     Der Server rechnet je Region einen Druck aus Nestern und Festungen und daraus einen
+     NPC-Faktor - RELATIV zum Galaxieschnitt, nicht absolut: Eine gleichmaessig belastete Galaxie
+     ergibt ueberall genau 1,00, erst eine Ballung wirkt. Der absolute Schwierigkeitsgrad bleibt
+     `npcEmpireStrength`. Begruendung und Zahlen: kolonie-kepler7-backend/docs/sektorlage.md.
+
+     DER CLIENT RECHNET NICHTS NACH. Die Frontend-Kopie NEST_STUFEN traegt bewusst KEIN
+     `punkte`-Feld, und das soll so bleiben - sonst gaebe es zwei Quellen fuer dieselbe Zahl, und
+     die zweite waere die, die niemand pflegt. Gelesen wird ausschliesslich, was der Server
+     schickt.
+
+     Ohne Server, mit altem Server oder bei ausgeschaltetem Schalter ist das Feld leer, und JEDE
+     dieser Funktionen liefert den Neutralwert. Der Solo-Betrieb aendert sich dadurch nicht. */
+  function sektorLageVon(sysId){
+    const sl = galaxyCache.sektorLage;
+    if (!sl || !sl.sektoren || !sysId) return null;
+    const sk = sektorVonSystemId(sysId);
+    return (sk && sl.sektoren[sk.key]) || null;
+  }
+  function sektorLageVonKey(key){
+    const sl = galaxyCache.sektorLage;
+    return (sl && sl.sektoren && key && sl.sektoren[key]) || null;
+  }
+  /* Neutralwert 1 - dieselbe Trennung wie bei sektorFlugMult: Ein Sektor ohne Lage darf die
+     Rechnung nicht veraendern, und ein Faktor unter 1 kaeme aus dieser Quelle nie (der Server
+     deckelt nach unten auf 1,00). Der Math.max hier ist trotzdem kein Schmuck: Er ist die
+     Zusage, dass ein fehlerhafter oder veralteter Serverstand das Spiel hoechstens NICHT
+     erleichtert - eine Erleichterung faellt niemandem auf, weil sie sich wie Glueck anfuehlt. */
+  function sektorNpcMult(sysId){
+    const e = sektorLageVon(sysId);
+    const m = e && typeof e.npcMult === 'number' ? e.npcMult : 1;
+    return Math.max(1, m);
+  }
+  const SEKTOR_LAGE_STUFEN = {
+    ruhig:    { name:'Ruhig',    farbe:'#7de3b5' },
+    unruhig:  { name:'Unruhig',  farbe:'#e0a548' },
+    belagert: { name:'Belagert', farbe:'#e24b4a' }
+  };
+  function sektorLageStufe(e){ return (e && SEKTOR_LAGE_STUFEN[e.stufe]) || SEKTOR_LAGE_STUFEN.ruhig; }
+  /* Eine Zeile, die BEIDE Karten-Ebenen und das Kartenmenue benutzen - der wiederkehrende Fehler
+     dieses Projekts ist nicht die kaputte Mechanik, sondern die zweite Anzeigestelle mit der
+     alten Annahme. Der Prozentwert wird aus demselben npcMult gerechnet, das auch die
+     Verteidigung multipliziert; er kann ihm also nicht widersprechen. */
+  function sektorLageText(e){
+    if (!e) return '';
+    const st = sektorLageStufe(e);
+    const proz = Math.round(((e.npcMult || 1) - 1) * 100);
+    return st.name + ' · Druck ' + fmt(Math.round(e.druck || 0))
+      + (proz > 0 ? ' · NPCs +' + proz + '%' : ' · NPCs unverändert');
+  }
+  function sektorLageLang(e){
+    if (!e) return '';
+    const proz = Math.round(((e.npcMult || 1) - 1) * 100);
+    return sektorLageStufe(e).name + ': ' + (e.nester || 0) + ' ' + ((e.nester === 1) ? 'Nest' : 'Nester')
+      + ' und ' + (e.festungen || 0) + ' ' + ((e.festungen === 1) ? 'Festung' : 'Festungen')
+      + ' ergeben Druck ' + fmt(Math.round(e.druck || 0)) + '. '
+      + (proz > 0
+          ? 'Das liegt über dem Durchschnitt der Galaxie – NPC-Gegner verteidigen hier ' + proz + '% stärker.'
+          : 'Das liegt nicht über dem Durchschnitt der Galaxie – NPC-Gegner verteidigen hier wie überall.');
+  }
   /* Die Passage (Konzept V4, 03.09.2026): Solange ein Wurmloch offen steht, fliegt man zu BEIDEN
      seiner Muendungen ein Viertel schneller. Bis hierher war das Wurmloch reine Zeichnung - acht
      Fundstellen, alle im Anzeigepfad, keine einzige Wirkung.
@@ -13250,7 +13310,7 @@
   // ===== Lebendige Galaxie (gemeinsamer Server-Zustand) =====
   // Wird periodisch vom Backend geholt (siehe setInterval unten). Rein clientseitiger Cache, NICHT
   // Teil von state (das ist geteilter, spielerübergreifender Zustand, kein Spielstand-Feld).
-  let galaxyCache = { npcEmpireStrength: 1, npcStaerkeZiel: null, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, news: [] };
+  let galaxyCache = { npcEmpireStrength: 1, npcStaerkeZiel: null, marketTrend: 1, activePirateFaction: null, unlockedAlienRaces: [], activeWar: null, collapsedSystems: {}, activeWormhole: null, sektorLage: null, news: [] };
   // ===== Handelsrouten =====
   // Drei Routentypen, alle binden Frachter (die dann nicht mehr für Kämpfe/Lagerkapazität zählen):
   //   'sell'      – verkauft periodisch eine Ressource automatisch am Markt (Kredite, braucht Server)
@@ -17808,7 +17868,10 @@
     const p = (state.prestige||0) - PRESTIGE_CHALLENGE_FROM;
     return p <= 0 ? 1 : Math.min(2, 1 + p*0.04);
   }
-  function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1) * prestigeChallengeMult()); }
+  /* Der Sektorfaktor reiht sich hier ein, NEBEN npcEmpireStrength - nicht darin: Jener sagt, wie
+     es der Galaxie geht, dieser, wie es DIESER Region geht. Beide sind serverseitig gerechnet;
+     der Client liest sie nur (siehe sektorNpcMult). */
+  function npcEffectiveDefense(npc){ return Math.round(npc.defense * (1 + npcScalingCount(npc.id)*0.18) * (galaxyCache.npcEmpireStrength||1) * sektorNpcMult(npc && npc.system) * prestigeChallengeMult()); }
   // Echte NPC-Flotten (16.07.2026, Feature-Wunsch): jeder NPC hat statt eines rein abstrakten
   // Verteidigungswerts eine konkrete Flottenzusammensetzung, deren Gesamt-Angriffskraft ungefähr
   // seiner effektiven Verteidigung entspricht. Deterministisch aus NPC-ID + Skalierungszähler
@@ -20666,6 +20729,10 @@
     if (!L.gewaehlt) return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Wähle mindestens ein Kampfschiff.</div>';
     const chFarbe = L.chance >= 60 ? '#5dcaa5' : (L.chance >= 30 ? '#fac775' : '#e24b4a');
     let html = `<div class="bmeta" style="margin-bottom:6px;"><i class="ti ti-target" aria-hidden="true"></i> Erfolgschance <strong style="color:${chFarbe};">~${L.chance}%</strong> · deine Angriffskraft <strong>${fmt(L.power)}</strong> gegen <strong>${fmt(L.effDefense)}</strong> Verteidigung${L.siege ? ' (nach ' + L.siege + ' Siegen skaliert)' : ''}</div>`;
+    // Die Sektorlage steckt in der Verteidigung daneben - eine Zahl ohne ihren Grund ist der
+    // Anlass dieser Etappe gewesen (npcEmpireStrength waechst seit jeher unsichtbar).
+    if (L.npc && sektorNpcMult(L.npc.system) > 1)
+      html += `<div class="bmeta" style="margin-bottom:6px; color:${sektorLageStufe(sektorLageVon(L.npc.system)).farbe};"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${escapeHtml(sektorLageText(sektorLageVon(L.npc.system)))} – darin enthalten</div>`;
     html += `<div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(L.npcFlotte)}</div>`;
     if (L.konterVerdikt && L.konter !== 1)
       html += `<div class="bmeta" style="color:${L.konterVerdikt.farbe};"><i class="ti ${L.konterVerdikt.icon}" aria-hidden="true"></i> ${L.konterVerdikt.text} (${L.konterVerdikt.pct>0?'+':''}${L.konterVerdikt.pct}% Angriffskraft, bereits eingerechnet)</div>`;
@@ -39710,7 +39777,10 @@ async function claimPendingRewards(){
           return 'Die Galaxie ist in <strong>' + SEKTOR_DEFS.length + ' Regionen</strong> geteilt, und <strong>' + mitEigenart + '</strong> davon haben eine eigene Eigenschaft. Sie wirkt <em>rückwirkend</em>: Jede Kolonie, die du dort schon hast, profitiert ab sofort – du musst nichts umziehen und verlierst nirgends etwas. Der <strong>Kepler-Kern</strong> bleibt bewusst neutral, weil dort jeder anfängt.<br><br>'
             + '<strong>Woran hängt was:</strong> Produktions- und Splitter-Boni hängen am <em>Standort</em> (der Sektor deiner Kolonie bzw. deines Startpunkts), der Expeditionsbonus am <em>Startpunkt der Expedition</em>, der Flugzeit-Bonus dagegen am <em>Ziel</em> – wer in die Meridian-Weiten fliegt, ist schneller da, egal woher er kommt. Ein Mond zählt zum Sektor seines Planeten.<br><br>'
             + '<ul>' + liste + '</ul>'
-            + 'Alle Boni fließen <strong>additiv</strong> in dieselben gedeckelten Gruppen wie Forschung, Module und Doktrinen – sie stapeln sich also nicht multiplikativ auf. Auf der Karte steht die Eigenschaft an jeder Region (Übersicht) und in der Kopfzeile der Sektoransicht; der Tooltip nennt sie ausführlich.';
+            + 'Alle Boni fließen <strong>additiv</strong> in dieselben gedeckelten Gruppen wie Forschung, Module und Doktrinen – sie stapeln sich also nicht multiplikativ auf. Auf der Karte steht die Eigenschaft an jeder Region (Übersicht) und in der Kopfzeile der Sektoransicht; der Tooltip nennt sie ausführlich.<br><br>'
+            + '<strong>Die Eigenschaft steht fest – die Lage nicht.</strong> Seit dem 03.09.2026 führt jede Region zusätzlich eine <strong>Sektorlage</strong>: <em>Ruhig</em>, <em>Unruhig</em> oder <em>Belagert</em>. Sie kommt vom Server, bewegt sich alle 15 Minuten von selbst und misst, wie viele <strong>Alien-Nester</strong> und <strong>Asteroidenfestungen</strong> dort stehen (ein Nest zählt nach seiner Stufe, eine Festung wie ein Nest der Stufe 2). Wo der Druck über dem <strong>Durchschnitt der Galaxie</strong> liegt, verteidigen NPC-Gegner stärker – bis zu <strong>25%</strong>. Wo er das nicht tut, ändert sich nichts.<br><br>'
+            + '<strong>Gemessen wird der Abstand, nicht der Bestand</strong>, und das ist der ganze Unterschied: Sind die Nester gleichmäßig über die Galaxie verteilt, steht <em>jede</em> Region auf „Ruhig" und niemand zahlt etwas – auch dann nicht, wenn insgesamt viele Nester stehen. Erst eine <strong>Ballung</strong> macht eine Region gefährlich. Wie schwer die Galaxie als Ganzes ist, sagt weiterhin die galaktische Gegnerstärke, die an derselben Nestzahl hängt; die Sektorlage sagt nur, <em>wo</em> es schlimmer ist als anderswo. Eine Region wird durch sie nie leichter als der Grundwert.<br><br>'
+            + 'Auf der Karte siehst du sie am <strong>farbigen Rand</strong> einer Region (Übersicht) und als eigene Zeile in der Kopfzeile der Sektoransicht; Angriffsvorschau und Kartenmenü eines Gegners nennen den Aufschlag, sobald er greift. Der Wert wird beim <strong>Start</strong> deiner Mission eingefroren – was die Vorschau zeigt, ist das, wogegen deine Flotte bei Ankunft kämpft, auch wenn sich die Lage währenddessen bewegt.';
         })() },
       { title:'Landmarken: was in einem System steht', body:'Die Karte zeigt an jedem System, was dort los ist - auf allen drei Ebenen. Ein <strong>🛡</strong> steht für eine <strong>Asteroidenfestung</strong> und nennt ihren Kernstand und die Abbau-Drosselung, ein <strong>👾</strong> für ein <strong>Alien-Nest</strong> mit Volk, Stufe und Schwäche - stehen mehrere im selben System, trägt das Abzeichen die Zahl und nennt die stärkste Stufe. Aus dem 👾 wird ein <strong>👑</strong>, sobald dort die Königin sitzt. Ein <strong>⛺</strong> zeigt einen <strong>Vorposten</strong> mit Besitzer, Kernstand und Garnison. Ein <strong>♻️</strong> zeigt einen <strong>Wrackkonvoi</strong> mit seinem Rumpfstand – er wandert und entkommt, siehe den eigenen Hilfe-Eintrag. Das <strong>🎯</strong> markiert <strong>Gegner</strong> mit ihrem Namen und ihrer Stufe. Ein <strong>🚩</strong> steht für den <strong>Statthalter</strong> der Region mit seiner Stufe, seiner Schwäche und deiner Siegbilanz gegen ihn - er hat ein eigenes Abzeichen und taucht deshalb nicht zusätzlich im 🎯 auf. Auf der Regionsübersicht werden diese Abzeichen zusammengefasst: Ein 🛡 an einer Region heißt, dass irgendwo darin eine Festung steht. <strong>Tippe die Abzeichenzeile an</strong>, und du bekommst jedes betroffene System namentlich mit seinem Hinweis - ein Tipp darauf bringt dich direkt hin. Am PC nennt sie der Tooltip zusätzlich beim Überfahren. Bis dahin musste man jedes der 67 Systeme einzeln aufklappen, um eine Festung überhaupt zu finden. Diese Abzeichen hängen an der Ebene <strong>Ereignisse</strong> und lassen sich dort abschalten - mit zwei Ausnahmen: die Allianzbasis (🏰) und der Statthalter (🚩) bleiben stehen. Beide sind keine wechselnde Lage, sondern eine feste Tatsache der Karte. <strong>Über das Suchfeld findest du sie bewusst nicht</strong> - es sucht Systeme und Planeten. Wo etwas los ist, verraten dir die Abzeichen auf der Karte. Das <strong>👽</strong> für ein gesichtetes Volk bleibt daneben stehen, schweigt aber in Systemen mit einem eigenen Nest-Abzeichen - dort wäre es dieselbe Aussage zweimal.' },
        { title:'Die Systemansicht lesen: Licht, Schatten, Ringe', body:'Im geöffneten System zeichnet die Karte, was du sonst nur aus Listen wüsstest. <strong>Jede Welt hat eine Tag- und eine Nachtseite</strong>: Der Schatten liegt immer auf der sonnenabgewandten Seite, die Sonne selbst trägt eine Korona mit langsam wandernden Strahlen. <strong>Die farbige Spur auf der Bahn</strong> hinter jedem Planeten nennt seinen Typ (grün erdähnlich, blau Wasserwelt, orange Gasriese, violett Kristallwelt, grau Asteroid) – auch bei noch unerforschten Welten, dort blasser. <strong>Ein Leuchtsaum in der Typfarbe</strong> bekommen nur erforschte Welten; unerforschte bleiben abgedunkelt mit gestricheltem Rand. <strong>Gasriesen tragen einen Ring</strong>, Monde sitzen auf einer feinen Bahn um ihren Planeten. Wer am Gerät Bewegung reduziert hat, sieht dieselbe Zeichnung ohne die wandernden Strahlen.' },
@@ -53406,7 +53476,9 @@ async function claimPendingRewards(){
         } else if (m.type === 'attack'){
           const npc = NPCS.find(n => n.id === m.targetId);
           if (!npc) continue;
-          const effDefense = npcEffectiveDefense(npc);
+          // Der beim Start eingefrorene Wert hat Vorrang; aeltere, noch fliegende Missionen
+          // tragen ihn nicht und rechnen wie bisher.
+          const effDefense = (typeof m.effDefense === 'number' && m.effDefense > 0) ? m.effDefense : npcEffectiveDefense(npc);
           const effLoot = npcEffectiveLoot(npc);
           let power = m.power || attackPower(fleet);
           // Konterrollen greifen jetzt auch gegen NPCs (25.07.2026). Bis dahin rief das Frontend
@@ -56829,9 +56901,19 @@ async function claimPendingRewards(){
       // Tooltip/aria-label - ein Bonus, den nur der Quelltext kennt, gibt es fuer den Spieler nicht.
       const eigenKurz = sektorEffektKurz(sk);
       const eigenLang = sektorEffektLang(sk);
-      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + mg.length + ' Systeme. ' + eigenLang) + '">'
-        + '<title>' + escapeHtml(sk.name + ' – ' + mg.length + ' Systeme – ' + eigenLang + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
-        + '<path d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="#39426b" stroke-width="1.4" stroke-linejoin="round"/>'
+      /* Die Sektorlage (E5) bekommt hier BEWUSST KEINE eigene Textzeile: Der Knoten traegt schon
+         Name, Systemzahl, Eigenschaft und Abzeichenzeile, und die Entscheidung vom 29.08.2026
+         steht zwei Zeilen weiter unten samt Messung (am Handy 6-9 px, die Systemzahl faellt dort
+         ohnehin weg). Sie faerbt deshalb den RAND der Region - eine Groesse, die schon da ist -
+         und steht vollstaendig im Tooltip und im aria-label. Ruhig bleibt die alte Randfarbe;
+         eine Region ohne Lage sieht damit exakt aus wie vorher. */
+      const lageU = sektorLageVonKey(sk.key);
+      const lageAktiv = !!(lageU && lageU.stufe && lageU.stufe !== 'ruhig');
+      const lageRand = lageAktiv ? sektorLageStufe(lageU).farbe : '#39426b';
+      const lageZusatz = lageU ? '\n' + sektorLageLang(lageU) : '';
+      inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + mg.length + ' Systeme. ' + eigenLang + (lageU ? ' ' + sektorLageLang(lageU) : '')) + '">'
+        + '<title>' + escapeHtml(sk.name + ' – ' + mg.length + ' Systeme – ' + eigenLang + lageZusatz + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
+        + '<path data-sektor-lage="' + (lageU ? lageU.stufe : '') + '" d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="' + lageRand + '" stroke-width="' + (lageAktiv ? 2.2 : 1.4) + '" stroke-linejoin="round"/>'
         /* Die Systempunkte tragen die Farbe ihrer dominierenden Macht (29.08.2026). Bewusst KEINE
            fuenfte Textzeile und keine Regions-Aggregation: Der Knoten hat schon Name, Systemzahl,
            Eigenschaft und Abzeichenzeile, und KB-21 hat gemessen, dass am Handy alle
@@ -57307,6 +57389,9 @@ async function claimPendingRewards(){
       + knopf('rechts', W - 34, '›', re.name)
       + '<text data-kb-titel="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="31" text-anchor="middle" style="font:600 14px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:4px;"><title>' + escapeHtml(sk.name + ' – ' + sektorEffektLang(sk)) + '</title>' + sk.name + '</text>'
       + '<text x="' + Math.round(W/2 + 22) + '" y="46" text-anchor="middle" style="font:9.5px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + mg.length + ' Systeme · Sektor ' + (idx+1) + ' von ' + SEKTOR_DEFS.length + '</text>'
+      + (sektorLageVonKey(sk.key)
+          ? '<text data-kb-lage="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="72" text-anchor="middle" style="font:600 10px ui-monospace,monospace; fill:' + sektorLageStufe(sektorLageVonKey(sk.key)).farbe + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + escapeHtml(sektorLageLang(sektorLageVonKey(sk.key))) + '</title>' + escapeHtml(sektorLageText(sektorLageVonKey(sk.key))) + '</text>'
+          : '')
       + '<text data-kb-eigenart="' + sk.key + '" x="' + Math.round(W/2 + 22) + '" y="59" text-anchor="middle" style="font:600 10px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;"><title>' + escapeHtml(sektorEffektLang(sk)) + '</title>' + escapeHtml(sektorEffektKurz(sk)) + '</text>';
     svg.innerHTML = '<defs>' + defs + '</defs>'
       + sterne
@@ -57973,6 +58058,9 @@ async function claimPendingRewards(){
     if (npc){
       const L = npcKampfLage(npc, {});
       infoHtml = `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Stufe ${npc.level} · <strong>${fmt(L.effDefense)}</strong> Verteidigung${L.siege ? ' (nach ' + L.siege + ' Siegen skaliert)' : ''}</div>`
+        + (sektorNpcMult(npc.system) > 1
+            ? `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${escapeHtml(sektorLageText(sektorLageVon(npc.system)))} – darin enthalten</div>`
+            : '')
         + `<div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Flotte: ${fleetIconRowHtml(L.npcFlotte)}</div>`;
       if (npc.weakness) infoHtml += `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: <strong>${weaknessName(npc.weakness)}</strong> (+25% Angriffskraft)</div>`;
       infoHtml += `<div class="bmeta"><i class="ti ti-diamond" aria-hidden="true"></i> Beute bei Sieg: ${rewardHtml(L.effLoot)}</div>`;
@@ -60657,7 +60745,13 @@ async function claimPendingRewards(){
     // In der Mission bleibt bewusst der ROHE Wert stehen - die Auflösung multipliziert den Konter
     // selbst und würde ihn sonst doppelt zählen.
     const powerAngezeigt = Math.round(power * counterMultiplier(attackFleet, npcFleetFrozen));
-    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFrozen });
+    /* Die VERTEIDIGUNG wird jetzt ebenfalls eingefroren (E5). Bis hierher fror der Start nur die
+       Flotte ein - der Kommentar darueber versprach aber schon, die Aufloesung kaempfe gegen das,
+       was die Vorschau gezeigt hat, 'auch falls sich Skalierung oder globaler Schwierigkeitsgrad
+       waehrend des Flugs aendern'. Die ZAHL wurde bei Ankunft trotzdem neu gerechnet. Mit der
+       Sektorlage kommt ein Faktor dazu, der sich alle 15 Minuten bewegt; ein Flug dauert laenger.
+       Ohne dieses Feld zeigte die Vorschau eine Verteidigung, die der Kampf nicht mehr benutzt. */
+    cf.missions.push({ id: nextMissionId(), type:'attack', targetId: npcId, startTime: Date.now(), endTime: Date.now() + dur*1000, power, fleetName, composition: attackFleet, npcFleet: npcFleetFrozen, effDefense: npcEffectiveDefense(npc) });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen '+npc.name+' gestartet (Angriffskraft '+powerAngezeigt+', Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
     render(); save();
   }
