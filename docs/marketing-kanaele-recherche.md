@@ -457,3 +457,65 @@ Folgen, und sie sind unterschiedlich schwer:
 
 Bandbreite ist der dritte, kleinere Punkt: Jeder Bot-Scan auf `/wp-admin` und Verwandtes zieht
 5,96 MB vom Pi. Das ist kein Notfall, aber es ist messbar und war vorher nicht bekannt.
+
+---
+
+## 14. Nachtrag 03.09.2026: die Herkunft wird gemessen
+
+Auftrag Sascha: „macht es sinn auf tiktok werbung zu schalten ?" — die Antwort war **nein**, und
+einer der drei Gründe war behebbar: **Es gab keine Kampagnen-Messung.** Gemessen an der
+Spieldatei, bevor etwas gebaut wurde:
+
+| gesucht | Treffer |
+|---|---|
+| `utm_source`, `utm_campaign` | **0** |
+| `document.referrer` | **0** |
+| `gtag(`, `ttq`, `fbq(`, `dataLayer` | **0** |
+
+Das `referrer`-Feld im Backend ist der **einladende Spieler** (Freundschaftssystem), nicht die
+Traffic-Quelle. Wer für Klicks zahlt und hinterher nicht sagen kann, wie viele davon ein Konto
+angelegt haben, spendet.
+
+**Ein eigener Suchlauf lief dabei in die Irre und gehört als Warnung mit:** Ein `grep` nach `ref=`
+meldete 40 Treffer und sah nach Kampagnen-Tracking aus — es war **`href=`**. Erst die Suche nach
+den vollständigen Bezeichnern (`utm_source`, `document.referrer`) hat die Null belegt.
+
+### Was jetzt gemessen wird
+
+Beim **ersten** Aufruf werden `utm_source`, `utm_medium`, `utm_campaign` und die **Domain** des
+Verweises festgehalten und bei der Registrierung mitgeschickt. Der Server legt sie am Konto ab;
+`GET /api/admin/herkunft` zeigt je Quelle den ganzen Trichter: **Konten → bestätigt → gespielt →
+in 14 Tagen aktiv**.
+
+Das ist die Zahl, die über eine Kampagne entscheidet. Eine Kopfzahl („120 Klicks über TikTok") tut
+es nicht: Eine Quelle mit vielen Konten und null aktiven Spielern ist teurer als eine mit halb so
+vielen, die sie behält.
+
+**Vier Entscheidungen, die den Wert der Messung tragen:**
+
+- **Die erste Quelle gewinnt, nicht die letzte.** Zwischen erstem Kontakt und Registrierung liegt
+  fast immer ein zweiter Besuch; würde überschrieben, stünde bei fast jedem Konto „unbekannt".
+- **Die Parameter fliegen aus der Adresszeile.** Nicht der Ordnung halber: Ein Spieler, der seinen
+  Link samt `?utm_source=tiktok` weitergibt, würde sonst **jeden** Folgebesucher als TikTok zählen —
+  die Messung wäre nach dem ersten Teilen wertlos.
+- **Nur der Hostname des Verweises**, nie die volle Adresse. Der Pfad einer fremden Seite kann
+  Suchbegriffe oder Konto-Kennungen tragen; für „welcher Kanal" reicht die Domain.
+- **Konten ohne Feld zählen als „(unbekannt)", nie als „direkt".** Jedes Konto von vor dieser
+  Änderung hat keines — sie als Direktzugriffe zu zählen wäre eine erfundene Zahl in genau der
+  Ansicht, die eine Kaufentscheidung tragen soll.
+
+### Was das für die Werbe-Frage bedeutet
+
+Die Messung beseitigt **einen** der drei Gründe. Die anderen beiden stehen unverändert:
+
+1. **Die Registrierungspflicht bleibt** der teuerste Punkt — bei bezahltem Verkehr besonders, weil
+   jeder Absprung an der E-Mail-Bestätigung bereits bezahlt ist.
+2. **13 Konten** (gemessen am 03.09.2026, am 21.08. waren es 11). Werbung verstärkt, was
+   funktioniert; sie repariert nichts.
+
+**Der Nutzen ist trotzdem nicht auf Werbung beschränkt** — im Gegenteil: Ab jetzt lässt sich
+sehen, welches der kostenlosen Verzeichnisse aus Abschnitt 4 wirklich Spieler bringt. Genau das war
+bisher die offene Frage („Was die Einträge wert sind" in `marketing-einreichungen.md`).
+
+Technische Einzelheiten und alle Testbefunde: Backend `docs/admin.md`, Abschnitt „Woher ein Konto
+kam"; Wächter `tests/test_herkunft.js` (Frontend) und `tests/test_herkunft_http.js` (Backend).
