@@ -208,6 +208,32 @@ const systemListe   = page => page.evaluate(() => [...document.querySelectorAll(
     { spielraum, scrollVor: scrollVorAb, scrollNach: nachAb.y,
       hinweis: spielraum <= 0 ? 'kein Spielraum - die Pruefung ist hier gegenstandslos' : '' });
 
+  /* ---- 4) Das Zieh-Merkmal haelt nicht laenger als der Klick, den es unterdruecken soll --------
+     DER BEFUND, der diese Pruefung erzwungen hat: galaxyMapDidDrag wurde urspruenglich NUR beim
+     naechsten mousedown zurueckgesetzt. Nach einem Ziehen blieb es stehen - und mit dem neuen
+     Wisch-Schutz war damit jeder folgende Klick blockiert, bis der Spieler neu aufsetzte.
+     Gemessen hat das test_kartenbedienung 5b: Nach dem Ziehen aus dessen Abschnitt 2 kam kein
+     Ereignis mehr durch, und der Radzoom aenderte nichts mehr. Seither gibt der mouseup das
+     Merkmal eine Aufgabe spaeter wieder frei.
+     Geprueft wird genau die Luecke: ein blanker click OHNE eigenes mousedown, nach einem
+     abgeschlossenen Ziehen - dieselbe Form, die tests/lib/karte.js fuer die ganze Suite benutzt. */
+  check('4-anker: die Uebersicht steht', await zurUebersicht(page), {});
+  await wischenAuf(page, '#galaxyMapSvg [data-sektor]');
+  await page.waitForTimeout(600);
+  const nachWisch4 = await sektorenOffen(page);
+  const nurKlick = await page.evaluate(() => {
+    const g = document.querySelector('#galaxyMapSvg [data-sektor]');
+    if (!g) return false;
+    g.dispatchEvent(new MouseEvent('click', { bubbles: true }));   // KEIN mousedown davor
+    return true;
+  });
+  await page.waitForTimeout(900);
+  const nachKlick4 = await sektorenOffen(page);
+  check('4: nach dem Loslassen ist der naechste Klick wieder frei',
+    nachWisch4 === false && nurKlick && nachKlick4 === true,
+    { nachWischen: nachWisch4, nachKlick: nachKlick4,
+      hinweis: 'bleibt das Merkmal stehen, ist die Karte nach jedem Ziehen bis zum naechsten Aufsetzen taub' });
+
   check('9: keine Skriptfehler im ganzen Lauf', fehler.length === 0, fehler.slice(0, 3));
   await ctx.close();
   await ende(async () => browser.close());

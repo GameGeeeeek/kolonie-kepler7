@@ -67461,7 +67461,15 @@ async function claimPendingRewards(){
       lastX=e.clientX; lastY=e.clientY;
       clampGalaxyViewBox(); galaxyNurAusschnitt();
     });
-    window.addEventListener('mouseup', () => { dragging=false; });
+    /* Das Zieh-Merkmal wird beim Loslassen wieder freigegeben - eine Aufgabe SPAETER, damit der
+       click, den der Browser unmittelbar nach diesem mouseup feuert, noch unterdrueckt wird.
+       Vorher wurde es NUR beim naechsten mousedown zurueckgesetzt und blieb dazwischen stehen:
+       Wer einmal gezogen hatte, dessen naechster Klick war blockiert, solange er nicht neu
+       aufsetzte. Im offenen System fiel das nie auf (dort folgt auf ein Ziehen immer ein neues
+       Druecken), auf den beiden oberen Ebenen mit ihrem neuen Wisch-Schutz waere es ein echter
+       Aussetzer geworden - gemessen an tests/test_kartenbedienung 5b, das nach dem Ziehen aus
+       Abschnitt 2 kein einziges Ereignis mehr durchbekam. */
+    window.addEventListener('mouseup', () => { dragging=false; setTimeout(() => { galaxyMapDidDrag = false; }, 0); });
     // Rollen zoomt nur noch mit Strg (bzw. Cmd). Vorher fing die Karte JEDES Rollereignis ab und
     // hielt damit eine 420 px hohe Sperre mitten in der Seite: Wer am Notebook mit zwei Fingern
     // scrollte und dabei über die Karte kam, zoomte statt zu scrollen und blieb hängen. Ein
