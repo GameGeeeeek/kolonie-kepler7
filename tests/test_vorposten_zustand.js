@@ -13,7 +13,7 @@
 // kern, abbauAb und garnisonAnzahl an JEDEN, projektLaeuft und anflug nur an den Besitzer.
 //
 // Gegenprobe: siehe Fuss der Datei.
-const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
@@ -61,21 +61,26 @@ function doc(over){
     anflug:[], meinLetzterSchlag:0, letzterKampf:null, kampfverlauf:[], naechsteStufe:null
   }, over || {});
 }
-function spielstand(){
+function spielstand(lagerStufe, wenigVorrat){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
   return JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true, seenTabHints:g, activeEvent:{ key:'__testruhe__', bis: now+9e8 },
-    resources:{ energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:9e4, forschungspunkte:3e4 },
-    buildings:{ solar:22, mine:20, labor:14, lager:60, werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, missions:[] },
+    /* `wenigVorrat` startet weit UNTER dem Lagerdeckel. Ohne das ist ein Zugang gar nicht messbar:
+       Das Spiel klemmt den Bestand beim Laden an den Deckel, und die Vorlage liegt dort schon -
+       gleich welche Lagerstufe (gemessen: 24.800 bei Stufe 60, 80.800 bei Stufe 200). */
+    resources: wenigVorrat
+      ? { energie:9e5, erz:100, kristalle:100, deuterium:100, antimaterie:9e4, forschungspunkte:3e4 }
+      : { energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:9e4, forschungspunkte:3e4 },
+    buildings:{ solar:22, mine:20, labor:14, lager:(lagerStufe === undefined ? 60 : lagerStufe), werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, missions:[] },
     colonies:{}, discovered:{}, activeBasePlanet:'home', player:{ id:ICH, name:'Ich' }, xp:9e5, credits:5e5, buffs:[],
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
 }
-async function lauf(browser, vp, belohnung){
+async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   let belohnungRaus = false;
-  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand() };
+  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand(lagerStufe, wenigVorrat) };
   await page.route('**/api/**', async r => {
     const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
@@ -126,7 +131,42 @@ async function lauf(browser, vp, belohnung){
       abbau: teile('[data-vp-abbau]').length,
       garnison: teile('[data-vp-garnison]').map(e => ({ voll: e.getAttribute('data-vp-garnison'),
         gefuellt: e.querySelectorAll('polygon[fill-opacity]').length, leer: e.querySelectorAll('polygon[stroke-width]').length })),
-      alarm: teile('[data-vp-alarm]').map(e => (e.querySelector('animate') || {}).getAttribute ? e.querySelector('animate').getAttribute('dur') : null)
+      alarm: teile('[data-vp-alarm]').map(e => (e.querySelector('animate') || {}).getAttribute ? e.querySelector('animate').getAttribute('dur') : null),
+      /* Die AUSDEHNUNG, gemessen am gezeichneten Bild: der weiteste Punkt irgendeines Bauteils vom
+         Mittelpunkt, als Vielfaches des Marker-Radius. Die Beschriftung bleibt aussen vor - sie ist
+         Text ueber dem Marker und wird vom Kollisionsschieber nicht behandelt. Der Radius kommt aus
+         dem unsichtbaren Trefferkreis (r = rV x 1,45), der Mittelpunkt aus seinem cx/cy. */
+      /* Die AUSDEHNUNG, gemessen am gezeichneten Bild: der weiteste Punkt irgendeines Bauteils vom
+         Mittelpunkt, als Vielfaches des Marker-Radius. Die Beschriftung bleibt aussen vor - sie ist
+         Text ueber dem Marker und wird vom Kollisionsschieber nicht behandelt.
+
+         GEMESSEN WIRD IM BILDSCHIRMRAUM (getBoundingClientRect), nicht mit getBBox: Das liefert die
+         Masse im EIGENEN Koordinatensystem, VOR dem transform der Gruppe - die Modulteile stehen
+         dort um (0,0), und der Vergleich mit dem Mittelpunkt ergab den Abstand zum SVG-Ursprung
+         (gemessener Faktor 20,4 statt 1,85; erster Entwurf, fiel prompt). */
+      ausdehnung: (() => {
+        const treffer = n.querySelector('circle[fill="transparent"]');
+        if (!treffer || !treffer.getBoundingClientRect) return null;
+        const tr = treffer.getBoundingClientRect();
+        const cx = tr.left + tr.width / 2, cy = tr.top + tr.height / 2;
+        const rV = (tr.width / 2) / 1.45;
+        if (!(rV > 0)) return null;
+        const liste = [];
+        for (const el of n.querySelectorAll('*')) {
+          if (el.tagName === 'title' || el.tagName === 'animate' || el.tagName === 'animateTransform') continue;
+          if (el.classList && el.classList.contains('planet-label')) continue;
+          const b = el.getBoundingClientRect();
+          if (!b || (!b.width && !b.height)) continue;
+          /* Gemessen wird die ACHSEN-Ausdehnung, nicht die Ecke der Box: Bei einem Kreis mit Radius
+             2,35 liegt die Ecke bei 2,35 x Wurzel(2) = 3,32 - dort ist aber keine Tinte. Die
+             Ecken-Messung meldete deshalb 3,12 fuer den Hof, der in Wahrheit auf 2,35 aufgeht.
+             Fast alles hier ist rund; fuer runde Formen ist die Achsen-Ausdehnung die wahre. */
+          const m = Math.max(Math.abs(b.left - cx), Math.abs(b.right - cx), Math.abs(b.top - cy), Math.abs(b.bottom - cy));
+          liste.push({ tag: el.tagName, attr: (el.getAttribute('data-vp-projekt') || el.getAttribute('data-vp-modul') || ''), f: Math.round(m / rV * 100) / 100 });
+        }
+        liste.sort((x, y) => y.f - x.f);
+        return { faktor: liste.length ? liste[0].f : 0, weiteste: liste.slice(0, 4) };
+      })()
     };
   });
   await page.evaluate(() => { const n = document.querySelector('[data-map-vorposten]'); if (n) n.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
@@ -271,21 +311,67 @@ async function lauf(browser, vp, belohnung){
      im Client still durch alle if-Ketten und ist ERSATZLOS weg - deshalb prueft
      test_vorposten_paritaet 3b, DASS es den Zweig gibt. Hier wird gemessen, dass er auch etwas
      tut: Der Ertrag muss im Spielstand ankommen und im Protokoll stehen. */
-  const MENGE = 777777;
+  /* GROSSES Lager und massvolle Lieferung: Seit der Ertrag durch gainResources geht (Lagerdeckel),
+     kann eine Lieferung ueber dem Deckel gar nicht mehr ankommen - der Standard-Spielstand liegt
+     dort ohnehin schon. Ein Test mit der alten, ungedeckelten Erwartung wuerde die Deckelung als
+     Fehler melden. Die Deckelung selbst misst 13a. */
+  const MENGE = 5000;
+  const ohneLager = await lauf(browser, doc({}), null, 200, true);
   const mitLager = await lauf(browser, doc({}), { type:'vorposten-lager', system:SYS, name:'Sternenwerft',
-    erz: MENGE, kristalle: 111111, deuterium: 22222, zeit: now });
-  const vorher = voll.gespeichert && voll.gespeichert.resources;
+    erz: MENGE, kristalle: 3000, deuterium: 2000, zeit: now }, 200, true);
+  const vorher = ohneLager.gespeichert && ohneLager.gespeichert.resources;
   const nachher = mitLager.gespeichert && mitLager.gespeichert.resources;
   check('11a: der Ertrag ist im gespeicherten Spielstand angekommen - gutgeschrieben UND gesichert',
     !!nachher && !!vorher && nachher.erz >= vorher.erz + MENGE,
     { erzNachher: nachher && nachher.erz, erzVorher: vorher && vorher.erz, gutschrift: MENGE });
   check('11b: ALLE drei Rohstoffe kommen an, nicht nur das Erz', (() => {
     if (!nachher || !vorher) return false;
-    return nachher.kristalle >= vorher.kristalle + 111111 && nachher.deuterium >= vorher.deuterium + 22222;
+    return nachher.kristalle >= vorher.kristalle + 3000 && nachher.deuterium >= vorher.deuterium + 2000;
   })(), { nachher: nachher && { erz: nachher.erz, kristalle: nachher.kristalle, deuterium: nachher.deuterium },
           vorher: vorher && { erz: vorher.erz, kristalle: vorher.kristalle, deuterium: vorher.deuterium } });
 
-  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, mitLager];
+  // ---- 12) Die Ausdehnung passt in den reservierten Platz ---------------------------------------
+  /* Befund des Review-Bots auf PR #562: Der Kollisionsschieber reservierte rV x 2,0, waehrend der
+     Alarmring auf 2,35 aufging und die Projektteile noch weiter hinaus - das Sprungtor nach oben,
+     der Tiefenhorchposten in der Diagonalen. Bestaetigt und behoben.
+     GEMESSEN WIRD AM BILD, nicht an einer Kopfrechnung: Bei genau der Nachrechnung ist mir ein
+     Teil durchgegangen, das der Bot nicht genannt hatte (fuenf Module desselben Typs stapelten
+     nach aussen auf 2,76). Ein Test, der die gezeichnete Ausdehnung misst, faengt auch das
+     naechste Bauteil, an das heute niemand denkt. */
+  const vollAus = await lauf(browser, doc({
+    module:['geschuetz:legendaer','geschuetz:selten','geschuetz:episch','geschuetz:gewoehnlich','geschuetz:ungewoehnlich'],
+    projekte:['dockring','sprungtor','tiefenhorchen','bollwerk','handelskammer'],
+    garnisonAnzahl: 3000, garnisonMax: 3000,
+    anflug:[{ tag:'XYZ', ankunftAt: now + 5 * 60000, schiffe: 40 }],
+    projektLaeuft:{ key:'sprungtor', fertigAb: now + 3600000 },
+    kern:{ lp: 8000, lpMax: 100000 } }));
+  /* Der reservierte Platz wird AUS DEM QUELLTEXT gelesen, nicht eingetippt: So prueft der Test die
+     Regel „das Bild passt in das, was reserviert ist" - und nicht eine Zahl, die beim naechsten
+     Umbau still auseinanderlaufen wuerde. */
+  const reserviert = Number((require('fs').readFileSync(SPIELDATEI, 'utf8')
+    .match(/const VORPOSTEN_SICHT = ([\d.]+);/) || [])[1]);
+  check('12-vorab: der reservierte Platz steht als EINE Konstante im Quelltext', reserviert > 0, { reserviert });
+  check('12a: mit ALLEM daran bleibt der Vorposten im reservierten Platz', (() => {
+    const a = vollAus.mess.ausdehnung;
+    return !!a && reserviert > 0 && a.faktor <= reserviert;
+  })(), { gemessen: vollAus.mess.ausdehnung, reserviert });
+
+  // ---- 13) Der Lagerdeckel gilt auch fuer das Vorposten-Lager -----------------------------------
+  /* Zweiter Befund des Review-Bots, ebenfalls bestaetigt: Der Zweig addierte direkt auf
+     state.resources und umging damit gainResources() - also den Lagerdeckel. Wer oft genug abholt,
+     haette kein Lager mehr gebraucht. Gemessen mit einem winzigen Lager und einer riesigen Lieferung. */
+  const klein = await lauf(browser, doc({}), { type:'vorposten-lager', system:SYS, name:'Sternenwerft',
+    erz: 99999999, kristalle: 99999999, deuterium: 99999999, zeit: now }, 1);
+  check('13a: eine Lieferung ueber dem Lagerdeckel wird gekappt, nicht durchgereicht', (() => {
+    const n = klein.gespeichert && klein.gespeichert.resources;
+    const v = voll.gespeichert && voll.gespeichert.resources;
+    // Das kleine Lager (Stufe 1) muss deutlich unter dem grossen (Stufe 60) bleiben - und weit
+    // unter der Liefermenge. Ohne Deckelung stuende dort die volle Summe.
+    return !!n && n.erz < 99999999 && n.erz < (v ? v.erz : 0) + 99999999;
+  })(), { mitKleinemLager: klein.gespeichert && klein.gespeichert.resources.erz, geliefert: 99999999 });
+  check('13b: und das Protokoll behauptet nicht, was nie ankam', klein.errs.length === 0, { errs: klein.errs.slice(0, 2) });
+
+  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, ohneLager, mitLager, vollAus, klein];
   check('8: keine Skriptfehler in irgendeinem Lauf', alleLaeufe.every(l => l.errs.length === 0),
     { fehler: alleLaeufe.flatMap(l => l.errs).slice(0, 3) });
 

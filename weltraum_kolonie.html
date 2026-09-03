@@ -9099,6 +9099,16 @@
      Die Rotation laeuft ueber `transform` auf einer eigenen Gruppe, nicht ueber einzelne Punkte -
      ein Dutzend animierter Elemente je Station kostet auf dem Telefon spuerbar Bilder. */
   function vorpostenRadius(stufe){ return 11 + Math.max(0, Math.min(7, (stufe||1) - 1)) * 0.85; }
+  /* WIE WEIT DER VORPOSTEN INSGESAMT REICHT, als Vielfaches seines Radius - der Kollisionsschieber
+     bekommt genau diesen Wert, damit kein Bauteil in einen Nachbarn ragt.
+
+     Befund des Review-Bots auf PR #562 (bestaetigt): Der Schieber reservierte weiter 2,0, waehrend
+     der neue Alarmring auf 2,35 aufgeht und die Projektteile noch weiter hinausgingen - das
+     Sprungtor auf 2,37 nach oben, der Tiefenhorchposten mit seinem Ausleger sogar auf 2,6 in der
+     Diagonalen. Beide Ausleger sind jetzt eingezogen, und der Wert steht an EINER Stelle.
+     Gemessen wird er zusaetzlich am gezeichneten Bild (test_vorposten_zustand 12a), damit ein
+     kuenftiges Teil, das weiter hinausgeht, nicht wieder still darueber hinauswaechst. */
+  const VORPOSTEN_SICHT = 2.45;
   function vorpostenIstStation(vp){ return (vp && (vp.stufe||1)) >= (vorpostenCache.zweigAb || 4); }
   /* DAS BODENLAGER, drei eigene Stufen (03.09.2026). Spieler-Urteil zur alten Zeichnung: "sieht
      billig und langweilig aus". Sie war fuer alle drei Bodenstufen DIESELBE Palisade; nur drei
@@ -9197,7 +9207,15 @@
   /* WO ein Modul sitzt, entscheidet sein TYP, nicht der Steckplatz: Eine Geschuetzbank haengt an
      jeder Station an derselben Stelle, zwei gleich ausgeruestete Stationen sehen gleich aus, und
      man liest die Ausruestung ab, ohne das Menue zu oeffnen. Steckt ein Typ mehrfach, wandert das
-     zweite Stueck eine Stufe weiter nach aussen (0 Grad ist rechts, 270 Grad oben). */
+     zweite Stueck FAECHERT IM WINKEL auf, abwechselnd nach beiden Seiten (0 Grad ist rechts,
+     270 Grad oben).
+
+     Vorher wanderte es nach AUSSEN - und genau daran waere der Kollisionsschieber wieder
+     vorbeigelaufen: Fuenf Stueck desselben Typs (die Hoechstzahl an Steckplaetzen) haetten bei
+     1,5 + 4 x 0,24 + 0,3 = 2,76 Radien gestanden, weiter als jedes andere Bauteil. Gefunden bei
+     der Nachrechnung zum Befund des Review-Bots, nicht vom Bot selbst. Aufgefaechert bleiben alle
+     Stuecke auf einem Ring bei 1,55 Radien; abwechselnd nach beiden Seiten, damit fuenf Stueck
+     symmetrisch um ihren Platz stehen und nicht in den Winkel des Nachbartyps laufen. */
   const VP_MODUL_WINKEL = { geschuetz: 270, kernpanzer: 315, raffinerie: 0, hangar: 90, sprungrechner: 180, horchposten: 225 };
   function vorpostenModulTeile(vp, x, y, r, farbe){
     const liste = (vp && Array.isArray(vp.module)) ? vp.module : [];
@@ -9210,7 +9228,9 @@
       const w = VP_MODUL_WINKEL[teil.key];
       if (typeof w !== 'number') return '';
       const wieder = (gezaehlt[teil.key] = (gezaehlt[teil.key] || 0) + 1) - 1;
-      const rad = w * Math.PI / 180, rr = r * (1.5 + 0.24 * wieder);
+      // 0 -> 0 Grad, 1 -> +14, 2 -> -14, 3 -> +28, 4 -> -28: symmetrisch um den Platz des Typs.
+      const faecher = wieder === 0 ? 0 : Math.ceil(wieder / 2) * 14 * (wieder % 2 ? 1 : -1);
+      const rad = (w + faecher) * Math.PI / 180, rr = r * 1.55;
       const cx = x + Math.cos(rad) * rr, cy = y + Math.sin(rad) * rr;
       const akzent = vpSeltenheitFarbe(teil.seltenheit);
       const s = r * 0.3;   // Grundmass eines Modulteils
@@ -9241,7 +9261,7 @@
         bild = `<line x1="${P(-s*0.55)}" y1="0" x2="${P(s*0.3)}" y2="0" stroke="${farbe}" stroke-width="1.3"/>`
           + `<path d="M ${P(s*0.3)} ${P(-s*0.62)} A ${P(s*0.62)} ${P(s*0.62)} 0 0 1 ${P(s*0.3)} ${P(s*0.62)}" fill="none" stroke="${akzent}" stroke-width="1.8"/>`;
       }
-      return `<g data-vp-modul="${escapeHtml(teil.key)}" data-vp-modul-seltenheit="${escapeHtml(teil.seltenheit)}" transform="translate(${P(cx)} ${P(cy)}) rotate(${w})">${bild}</g>`;
+      return `<g data-vp-modul="${escapeHtml(teil.key)}" data-vp-modul-seltenheit="${escapeHtml(teil.seltenheit)}" transform="translate(${P(cx)} ${P(cy)}) rotate(${w + faecher})">${bild}</g>`;
     }).join('');
   }
   /* Die FERTIGEN Projekte. Sie sind gross, dauerhaft und teuer bezahlt - deshalb bekommen sie
@@ -9274,7 +9294,7 @@
     }
     if (fertig.indexOf('tiefenhorchen') >= 0){
       // Eine weit ausgefahrene Lauschanlage - der Ausleger gehoert zum Bild, nicht nur die Schuessel.
-      const ax = x - r*1.05, ay = y + r*1.05, ex = x - r*1.85, ey = y + r*1.85;
+      const ax = x - r*0.9, ay = y + r*0.9, ex = x - r*1.35, ey = y + r*1.35;   // Ausleger eingezogen (Diagonale!)
       out += `<g data-vp-projekt="tiefenhorchen"><line x1="${P(ax)}" y1="${P(ay)}" x2="${P(ex)}" y2="${P(ey)}" stroke="${farbe}" stroke-width="1.5"/>`
         + `<path d="M ${P(ex - r*0.34)} ${P(ey - r*0.1)} A ${P(r*0.42)} ${P(r*0.42)} 0 1 0 ${P(ex + r*0.1)} ${P(ey + r*0.34)}" fill="none" stroke="${farbe}" stroke-width="2"/>`
         + `<circle cx="${P(ex)}" cy="${P(ey)}" r="${P(r*0.09)}" fill="${farbe}"/></g>`;
@@ -9283,7 +9303,7 @@
       /* Das Sprungtor ist das teuerste Bauwerk des Systems und bekommt das auffaelligste Bild:
          ein offenstehender Torus ueber der Station, dessen Inneres schimmert. Es ist bewusst das
          EINZIGE Teil mit einer Fuellung, damit es aus jeder Entfernung als Erstes auffaellt. */
-      const tx = x, ty = y - r*1.95, rx = r*0.98, ry = r*0.42;
+      const tx = x, ty = y - r*1.72, rx = r*0.92, ry = r*0.40;   // eingezogen, damit es in die Reservierung passt
       out += `<g data-vp-projekt="sprungtor">`
         + `<line x1="${P(x)}" y1="${P(y - r*0.9)}" x2="${P(tx)}" y2="${P(ty + ry*0.6)}" stroke="${farbe}" stroke-width="1.5"/>`
         + `<ellipse cx="${P(tx)}" cy="${P(ty)}" rx="${P(rx*0.72)}" ry="${P(ry*0.72)}" fill="${farbe}" fill-opacity="0.28">`
@@ -27321,16 +27341,31 @@ async function claimPendingRewards(){
            ohne Zweig faellt still durch und ist ersatzlos weg (test_vorposten_paritaet 3b). */
         if (r.type === 'vorposten-lager'){
           const sysNameL = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          /* DER ERTRAG GEHT DURCH gainResources, nicht direkt in state.resources (Befund des
+             Review-Bots auf PR #562, bestaetigt). Dort haengt der Lagerdeckel - und der Kommentar
+             an jener Funktion sagt genau diesen Fall voraus: „Jede kuenftige Quelle (Ereignis,
+             Geschenk, Belohnung) klemmt dadurch automatisch am selben Deckel, ohne dass jemand
+             daran denken muss." Eine direkte Addition haette den Lagerausbau ausgehebelt: Wer oft
+             genug abholt, braucht kein Lager mehr.
+             GEMELDET WIRD, WAS ANKOMMT, nicht was geschickt wurde - sonst behauptet das Protokoll
+             einen Ertrag, den der Spieler nie bekommen hat. */
           const teileL = [];
+          const vorherL = {};
+          const gaben = {};
           for (const k of ['erz','kristalle','deuterium']){
             const menge = Math.max(0, Math.round(Number(r[k]) || 0));
-            if (menge){
-              state.resources[k] = (state.resources[k] || 0) + menge;
-              teileL.push(fmt(menge) + ' ' + resDefFor(k).label);
-            }
+            if (menge){ vorherL[k] = state.resources[k] || 0; gaben[k] = menge; }
+          }
+          if (Object.keys(gaben).length) gainResources(gaben);
+          let verfielL = false;
+          for (const k of Object.keys(gaben)){
+            const bekommen = Math.max(0, Math.round((state.resources[k] || 0) - vorherL[k]));
+            if (bekommen > 0) teileL.push(fmt(bekommen) + ' ' + resDefFor(k).label);
+            if (bekommen < gaben[k]) verfielL = true;
           }
           log('Das Lager deines ' + (r.name||'Vorposten') + ' bei ' + sysNameL + ' ist eingetroffen'
-            + (teileL.length ? ': ' + teileL.join(', ') : ' – es war leer') + '.', 'ti-truck', 'ok');
+            + (teileL.length ? ': ' + teileL.join(', ') : ' – es war leer')
+            + (verfielL ? ' – dein Lager war voll, der Rest ist verfallen' : '') + '.', 'ti-truck', 'ok');
           ladeVorposten();
           save();
           continue;
@@ -59384,7 +59419,7 @@ async function claimPendingRewards(){
       if (vp){
         // Der Radius waechst mit der Stufe (siehe vorpostenSilhouette); der Kollisionsschieber
         // bekommt den GEWACHSENEN Sichtradius, sonst schiebt eine Sternenfestung in die Bahn.
-        const rV = vorpostenRadius(vp.stufe), sichtV = rV * 2.0;   // der pulsende Hof laeuft bis r x 2,0 (Nest-Lehre)
+        const rV = vorpostenRadius(vp.stufe), sichtV = rV * VORPOSTEN_SICHT;   // deckt Hof, Alarmring UND die Projektteile
         const posV = kbMarkerFrei(vorpostenMarkerXY(), sysPlanets, activeSunType.r, sichtV, platzierteMarker);
         platzierteMarker.push({ x: posV.x, y: posV.y, r: sichtV });
         const farbeV = vp.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD;
@@ -59400,8 +59435,8 @@ async function claimPendingRewards(){
         const restV = anflugV.length ? Math.max(0, Math.min(...anflugV.map(a => (a.ankunftAt || 0) - Date.now()))) : 0;
         const alarmDauer = anflugV.length ? Math.max(0.7, Math.min(2.4, restV / (60 * 60 * 1000) * 1.6)) : 0;
         const alarmV = anflugV.length
-          ? `<circle cx="${posV.x.toFixed(1)}" cy="${posV.y.toFixed(1)}" r="${(rV*2.15).toFixed(1)}" fill="none" stroke="#f0997b" stroke-width="1.8" stroke-opacity="0.85" pointer-events="none" data-vp-alarm="1">`
-            + `<animate attributeName="r" values="${(rV*1.75).toFixed(1)};${(rV*2.35).toFixed(1)};${(rV*1.75).toFixed(1)}" dur="${alarmDauer.toFixed(2)}s" repeatCount="indefinite"/>`
+          ? `<circle cx="${posV.x.toFixed(1)}" cy="${posV.y.toFixed(1)}" r="${(rV*2.1).toFixed(1)}" fill="none" stroke="#f0997b" stroke-width="1.8" stroke-opacity="0.85" pointer-events="none" data-vp-alarm="1">`
+            + `<animate attributeName="r" values="${(rV*1.75).toFixed(1)};${(rV*(VORPOSTEN_SICHT-0.1)).toFixed(1)};${(rV*1.75).toFixed(1)}" dur="${alarmDauer.toFixed(2)}s" repeatCount="indefinite"/>`
             + `<animate attributeName="stroke-opacity" values="0.9;0.15;0.9" dur="${alarmDauer.toFixed(2)}s" repeatCount="indefinite"/></circle>`
           : '';
         inner += `
