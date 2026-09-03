@@ -125,20 +125,28 @@ function backend(store){ return async r => {
   check('6) der Spielerangriff nimmt den gewählten Standort, nicht die Benutzerkennung',
     !!raub && raub.hatZiel && raub.ziel.indexOf('u_fremd') < 0 && /rhea/.test(raub.ziel), raub);
 
-  // Und der Klick tut wirklich etwas: Angriff auf raider1 -> dessen System kepler, NPC blinkt.
-  const wirkung = await page.evaluate(async () => {
+  /* Und der Klick tut wirklich etwas: Angriff auf raider1 -> dessen System kepler, NPC blinkt.
+     GEWARTET WIRD AUF DIE MARKE, NICHT AUF DIE UHR. Der erste Entwurf schlief feste 900 ms und
+     fiel im Sammellauf mit `blinkt:false` - vier gleichzeitige Browser, das Neuzeichnen der Karte
+     war noch nicht durch, als die Frist von 260 ms in springeZuKartenziel ablief. Einzeln lief er
+     gruen; ein Waechter, der unter Last kippt, ist als Waechter aber wertlos, und laenger schlafen
+     waere nur eine groessere Zahl im selben Fehler. waitForFunction wartet so lange wie noetig und
+     hoechstens 6 s - kommt die Marke dann nicht, ist es ein echter Fehler und keine Last. */
+  await page.evaluate(() => {
     const l = document.getElementById('fleetPositionList');
     const el = [...l.querySelectorAll('[data-fp-mziel]')].find(x => /Marodeure|Vorhut/i.test(x.textContent));
-    if (!el) return { fehler: 'Angriffszeile nicht gefunden' };
-    el.click();
-    await new Promise(r => setTimeout(r, 900));
+    if (el) el.click();
+  });
+  const blinktRechtzeitig = await page.waitForFunction(() => !!document.querySelector('.fundort-blink'),
+    null, { timeout: 6000 }).then(() => true).catch(() => false);
+  const wirkung = await page.evaluate(() => {
     const reiter = document.querySelector('.tab-btn[data-tab="karte"]');
     return {
       karteOffen: !!(reiter && reiter.classList.contains('active')),
-      npcDa: !!document.querySelector('[data-map-npc]'),
-      blinkt: !!document.querySelector('.fundort-blink')
+      npcDa: !!document.querySelector('[data-map-npc]')
     };
   });
+  wirkung.blinkt = blinktRechtzeitig;
   check('7) ein Klick öffnet die Karte am Ziel und hebt es hervor',
     wirkung.karteOffen && wirkung.npcDa && wirkung.blinkt, wirkung);
 
