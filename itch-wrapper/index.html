@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kolonie Kepler-7</title>
+<!--
+  ITCH.IO-WRAPPER - warum diese Seite KEIN iframe auf das Spiel ist (21.08.2026)
+
+  Der naheliegende Wrapper waere ein iframe auf gamegeeeeek.de. Technisch ginge das: An der
+  Produktion gemessen liefert die Seite weder X-Frame-Options noch frame-ancestors, das Einbetten
+  ist also nicht gesperrt. Es waere trotzdem falsch, und zwar aus zwei gemessenen Gruenden:
+
+  1. Das Sitzungs-Cookie ist SameSite=Lax (gemessen an POST /api/logout:
+     "kepler7_sid=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure"). In einem Fremd-iframe
+     schickt der Browser so ein Cookie nicht mit - niemand koennte sich anmelden, und damit waeren
+     Allianzen, Markt, Bestenliste und PvP tot.
+  2. itch.io liefert Spiele ueber hwcdn.net aus, also als Drittanbieter-Kontext. Wer
+     Drittanbieter-Cookies blockiert - in Chrome zunehmend die Voreinstellung -, bekommt dort auch
+     kein localStorage. Dann speichert nicht einmal der Solo-Modus.
+
+  Ein eingebettetes Spiel, das weder anmelden noch speichern kann, wirkt kaputt. Ein Eintrag, der
+  diesen Eindruck hinterlaesst, ist schlechter als gar keiner.
+
+  Diese Seite sagt deshalb offen, was sie ist: eine Visitenkarte mit einem Knopf, der das Spiel im
+  eigenen Fenster oeffnet. Kein Ladebalken, der nie faellt, keine Anmeldemaske, die nicht
+  funktioniert.
+-->
+<style>
+:root{
+  --grund:#0B1020; --flaeche:#141C2E; --linie:#28324A;
+  --tinte:#E6EAF2; --tinte-weich:#9AA6BE;
+  --akzent:#F09849; --akzent-tief:#B45309; --gruen:#5DD48D;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--grund); color:var(--tinte);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  display:flex; align-items:center; justify-content:center; padding:24px;
+  overflow:auto;
+}
+.sterne{position:fixed; inset:0; z-index:0; pointer-events:none;}
+.karte{
+  position:relative; z-index:1; max-width:660px; width:100%;
+  background:linear-gradient(170deg, rgba(20,28,46,.96), rgba(11,16,32,.96));
+  border:1px solid var(--linie); border-radius:6px; padding:34px 34px 28px;
+  box-shadow:0 24px 60px -24px rgba(0,0,0,.8);
+}
+.marke{
+  font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--akzent); margin:0 0 12px; font-weight:600;
+}
+h1{
+  font-size:clamp(26px,5vw,36px); line-height:1.1; margin:0 0 12px;
+  letter-spacing:-.02em; font-weight:600;
+}
+.unter{color:var(--tinte-weich); font-size:15.5px; line-height:1.6; margin:0 0 22px; max-width:52ch;}
+.merkmale{
+  display:flex; flex-wrap:wrap; gap:8px; margin:0 0 26px; padding:0; list-style:none;
+}
+.merkmale li{
+  font-size:12.5px; color:var(--tinte-weich);
+  border:1px solid var(--linie); border-radius:99px; padding:4px 12px;
+  background:rgba(255,255,255,.02);
+}
+.merkmale li.frei{color:var(--gruen); border-color:rgba(93,212,141,.4);}
+.knopf{
+  display:inline-flex; align-items:center; gap:10px;
+  background:var(--akzent); color:#1A1005; text-decoration:none;
+  font-size:16.5px; font-weight:600; padding:14px 26px; border-radius:4px;
+  border:none; cursor:pointer; transition:transform .12s ease, background .12s ease;
+  font-family:inherit;
+}
+.knopf:hover{background:#FFB067; transform:translateY(-1px);}
+.knopf:focus-visible{outline:3px solid var(--gruen); outline-offset:3px;}
+.hinweis{
+  margin:16px 0 0; font-size:13px; color:var(--tinte-weich); line-height:1.55;
+}
+.adresse{
+  margin:18px 0 0; padding:12px 14px; background:rgba(0,0,0,.3);
+  border:1px solid var(--linie); border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px;
+  color:var(--tinte); user-select:all; word-break:break-all;
+}
+.adresse .etikett{
+  display:block; font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--tinte-weich); margin-bottom:5px;
+  font-family:system-ui,sans-serif;
+  /* word-break:break-all steht am Elternteil, damit die lange URL umbrechen KANN. Das
+     Etikett erbt es und zerlegte am Handy "ADRESSE" zu "ADR ESSE" - nur im gerenderten
+     Bild zu sehen, im Quelltext unauffällig. Umbrüche gehören hier zwischen die Wörter. */
+  word-break:normal; overflow-wrap:break-word;
+}
+@media (max-width:520px){ .karte{padding:26px 22px 22px;} }
+/* Ab 820 px steht die Karte LINKS statt mittig - sonst laege sie auf dem Planeten, und der
+   waere ein Hintergrund, den man nicht sieht. Darunter (Handy, schmale Einbettung) bleibt
+   sie mittig: Dort ist fuer ein Nebeneinander kein Platz, und der Planet rutscht ueber
+   seine Anteile ohnehin fast vollstaendig aus dem Bild. */
+@media (min-width:820px){
+  body{ justify-content:flex-start; padding-left:5%; }
+  .karte{ max-width:560px; }
+}
+
+</style>
+</head>
+<body>
+<canvas class="sterne" id="sterne" aria-hidden="true"></canvas>
+
+<main class="karte">
+  <p class="marke">Weltraum-Aufbauspiel · Browser · Deutsch</p>
+  <h1>Kolonie Kepler-7</h1>
+  <p class="unter">
+    Baue deine Kolonie aus, erforsche Technologien, stelle eine Flotte auf und teile dir mit allen
+    Spielern eine Galaxie. Die Produktion läuft weiter, auch wenn du zu bist.
+  </p>
+
+  <ul class="merkmale">
+    <li class="frei">Kostenlos</li>
+    <li class="frei">Kein Pay-to-Win</li>
+    <li>Kein Download</li>
+    <li>Idle-Fortschritt</li>
+    <li>Allianzen &amp; PvP</li>
+    <li>Weltbosse</li>
+  </ul>
+
+  <a class="knopf" id="starten" href="https://www.gamegeeeeek.de/" target="_blank" rel="noopener">
+    Im eigenen Fenster spielen
+    <span aria-hidden="true">→</span>
+  </a>
+
+  <p class="hinweis" id="warum">
+    Kolonie Kepler-7 läuft auf einem eigenen Server – Allianzen, Markt und Bestenliste brauchen eine
+    Anmeldung, und die funktioniert in einem eingebetteten Fenster nicht zuverlässig. Deshalb öffnet
+    der Knopf das Spiel in einem eigenen Tab.
+  </p>
+
+  <p class="adresse">
+    <span class="etikett">Falls der Knopf nicht reagiert, Adresse aufrufen:</span>
+    https://www.gamegeeeeek.de/
+  </p>
+</main>
+
+<script src="kulisse.js"></script>
+<script>
+// Kulisse: Sternenfeld, Nebel, Planet und laufende Verbaende - dieselbe EINE Quelle wie
+// Cover, Banner, Hintergrund und Embed-BG (kulisse.js). Vorher trug diese Datei ihr eigenes
+// Sternenfeld, also die fuenfte fast gleiche Kopie derselben zwanzig Zeilen.
+//
+// bewegt:true gibt es NUR hier: Die vier Standbilder werden einmal gerendert und
+// abgespeichert - eine Animationsschleife waere dort Rechenzeit fuer nichts. Diese Seite
+// dagegen laeuft im Browser des Spielers, und der Planet mit den kreisenden Verbaenden ist
+// das, was aus einer Textkarte eine Startkarte macht.
+// prefers-reduced-motion schaltet die Bewegung ab, ohne dass das Bild verschwindet.
+(function () {
+  var c = document.getElementById('sterne');
+  function neu() {
+    Kulisse.zeichne(c, {
+      breite: innerWidth, hoehe: innerHeight,
+      bewegt: true,
+      sternFlaeche: 2600, sternMax: 460,
+      // Der Planet steht rechts unten und ragt aus dem Bild. Auf einem schmalen Hochformat
+      // rutscht er dabei weit genug hinaus, dass die Karte nicht auf ihm liegt - deshalb
+      // Anteile statt fester Punkte.
+      planet: { fx: .93, fy: 1.04, fr: .60 },
+      orbits: [
+        { rx: 1.22, ry: 1.18, dreh: -16, punkte: 3, start: 1.1, tempo: .11, a: .26 },
+        { rx: 1.55, ry: 1.49, dreh: -16, punkte: 2, start: 3.7, tempo: -.08, a: .17, punktR: 2.1 },
+        { rx: 1.92, ry: 1.84, dreh: -16, punkte: 1, start: 5.5, tempo: .06, a: .11, punktR: 1.9 }
+      ]
+    });
+  }
+  neu();
+  // Ein Grossenwechsel wird ENTPRELLT: itch.io stellt die Einbettung beim Wechsel in den
+  // Vollbildmodus in mehreren Schritten um, und jeder Neuaufbau wuerfelt das Sternenfeld neu.
+  var t = null;
+  addEventListener('resize', function () { clearTimeout(t); t = setTimeout(neu, 160); });
+})();
+
+// Ein sandboxed iframe OHNE allow-popups blockiert target="_blank" stillschweigend - der Spieler
+// klickt und nichts passiert. Deshalb: Klick abfangen, Erfolg prüfen, und wenn nichts aufging,
+// die Adresse gross und kopierbar anbieten statt den Klick ins Leere laufen zu lassen.
+// HIER STAND EINMAL EIN window.open-ABFANG - er ist bewusst ENTFERNT (21.08.2026).
+//
+// Der Entwurf rief window.open(ziel, '_blank', 'noopener') auf und wollte am Rueckgabewert
+// erkennen, ob der Tab aufging; bei null erschien eine Warnung. Gemessen in Chromium:
+//
+//   window.open(u, '_blank', 'noopener')  ->  null        (auch bei ERFOLG)
+//   window.open(u, '_blank')              ->  Fensterobjekt
+//
+// Das ist kein Fehler des Browsers, sondern die Spezifikation: Mit noopener wird die
+// Opener-Beziehung gekappt, es gibt also nichts zurueckzugeben. Folge: Die Erfolgs-
+// verzweigung war TOTER CODE, und die Warnung "Dieses Fenster darf keine neuen Tabs
+// oeffnen" erschien bei JEDEM Klick - auch wenn der Tab einwandfrei aufging. Eine
+// Anzeigeflaeche, die immer etwas Unwahres behauptet.
+//
+// Zweitens lief e.preventDefault() dadurch nie, also feuerten JS-Aufruf UND nativer Link
+// nebeneinander: zwei Oeffnungsversuche fuer einen Klick.
+//
+// Drittens ist der nackte Link ohnehin der zuverlaessigere Weg - Pop-up-Blocker sperren
+// script-initiiertes window.open, nicht die vom Nutzer geklickte Verknuepfung.
+//
+// Der Auffangweg fuer den Fall, dass gar nichts passiert (itch.io bettet Spiele in ein
+// sandboxed iframe ein; ohne allow-popups wird auch ein target="_blank"-Link still
+// verworfen), braucht keine Erkennung: Die Adresse steht dauerhaft sichtbar darunter,
+// traegt user-select:all und ist mit einem Klick markiert. Ein Satz, der immer stimmt,
+// ist besser als eine Erkennung, die sich irren kann.
+</script>
+</body>
+</html>

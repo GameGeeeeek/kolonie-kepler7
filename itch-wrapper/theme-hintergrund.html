@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Kolonie Kepler-7 – Seitenhintergrund</title>
+<!--
+  SEITENHINTERGRUND fuer itch.io. Gerendert auf 1600x1000.
+
+  ZU DEN MASSEN: itch.io nennt auch hier KEINE Pixelmasse (itch.io/docs/creators/design,
+  geprueft 21.08.2026); die Doku sagt nur, der Hintergrund solle "more subtle" sein und
+  erwaehnt einen "vertically-repeating background". Er WIEDERHOLT sich also - und daraus
+  folgt die einzige harte Anforderung: ER MUSS NAHTLOS SEIN.
+
+  Hier stand frueher, Nebel liessen sich grundsaetzlich nicht kacheln und der Grund muesse
+  deshalb eine flache Farbe bleiben. Das galt nur fuer einen Verlauf ueber die GANZE Flaeche.
+  Ein radialer Fleck, der am Rand umgeschlagen wird, kachelt sehr wohl - kulisse.js malt
+  jeden Nebelfleck und jeden Stern zusaetzlich um +/-Breite und +/-Hoehe versetzt, die Summe
+  ist damit periodisch. theme-bauen.js MISST das nach und bricht bei sichtbarer Naht ab.
+
+  KEIN Planet: Ein Koerper, der ueber die Kante ragt, taucht auf der Gegenseite wieder auf.
+  Ein halber Planet am oberen Bildrand ist kein Stilmittel, sondern ein Fehler.
+
+  Er bleibt bewusst ZURUECKHALTEND: Der Seitenhintergrund liegt hinter dem Text der
+  Spielseite. Was dort um Aufmerksamkeit kaempft, macht die Beschreibung schlechter lesbar -
+  und die Beschreibung ist das, was den Spieler zum Klicken bringt, nicht die Tapete.
+
+  Rendern:  node itch-wrapper/theme-bauen.js
+-->
+<style>
+  html,body{margin:0;padding:0;width:1600px;height:1000px;overflow:hidden;background:#0B1020;}
+  canvas{position:absolute;inset:0;}
+</style>
+</head>
+<body>
+<canvas id="sterne"></canvas>
+<script src="kulisse.js"></script>
+<script>
+Kulisse.zeichne(document.getElementById('sterne'), {
+  breite: 1600, hoehe: 1000,
+  kacheln: true,
+  // KEIN Nebel, und das ist gemessen statt entschieden: Mit den zwei Flecken wog die Datei
+  // 633 kB, ohne sie 14 kB - das 44-fache fuer etwas, das bei 5-7 % Deckkraft hinter Text
+  // kaum zu sehen ist. Schlimmer noch, im gerenderten Bild BANDET der weiche Verlauf auf
+  // dem dunklen Grund sichtbar (8-Bit-Stufen). Der Nebel bleibt dort, wo er neben einem
+  // Planeten wirklich etwas tut: Banner, Embed, Cover.
+  nebel: false,
+  // Duenner gestreut als auf Cover und Banner: Die Flaeche ist zehnmal so gross und liegt
+  // hinter Text - dieselbe Dichte waere ein Rauschteppich.
+  sternFlaeche: 9000, sternMax: 260, sternAlpha: .26, sternAlphaMin: .10,
+  // Halbe Deckkraft der Standardflecken, aus demselben Grund.
+  nebelFlecken: [
+    { fx: .22, fy: .28, fr: .42, farbe: '90,130,220', a: .075 },
+    { fx: .74, fy: .70, fr: .46, farbe: '240,152,73', a: .05 }
+  ]
+});
+</script>
+</body>
+</html>
