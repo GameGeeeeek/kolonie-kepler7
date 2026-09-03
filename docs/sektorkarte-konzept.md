@@ -580,10 +580,10 @@ Befunde, die sich daraus als Bestandsreparatur ergaben.
 | Etappe | Stand (03.09.2026) |
 |---|---|
 | **E1 Landmarken** | **geliefert** — #456 (drei Ebenen), #487 (Gegnerstärke im `npcMapMenu`), #494 (antippbare Abzeichenzeile) |
-| **E2 Statthalter** | **offen** — null Fundstellen. 52 der 67 Systeme tragen weiterhin keinen NPC, drei Regionen gar keinen |
+| **E2 Statthalter** | **geliefert** (§10) — null Fundstellen zum Zeitpunkt dieser Aufnahme. 52 der 67 Systeme trugen keinen NPC, drei Regionen gar keinen |
 | **E3 Sprungnetz** | **faktisch ersetzt** durch B2 Vorposten (#531): Der Vorposten *ist* der Sprungknoten, mit Flugzeit-Nutzen im Umkreis. Der Backend-Kommentar führt ihn ausdrücklich als „E3-Rahmen (SPRUNGBAKEN_MAX = 3)" |
-| **E4 Passage** | **offen** — und der stärkste noch offene Befund: `activeWormhole` hat **acht** Fundstellen, **alle** im Anzeigepfad (Knoten zeichnen, eine Zeile im Systemkopf). Der Server würfelt das Wurmloch aus, die Karte malt einen Wirbel, und es tut nichts |
-| **E5 Sektorlage** | **offen** — null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
+| **E4 Passage** | **geliefert** (§9) — und zum Zeitpunkt dieser Aufnahme der stärkste offene Befund: `activeWormhole` hatte **acht** Fundstellen, **alle** im Anzeigepfad (Knoten zeichnen, eine Zeile im Systemkopf). Der Server würfelte das Wurmloch aus, die Karte malte einen Wirbel, und es tat nichts |
+| **E5 Sektorlage** | **geliefert** (§11) — zum Zeitpunkt dieser Aufnahme null Fundstellen; einzige Etappe mit Backend-Autorität und Schalter |
 
 Dazu ungeplant geliefert: Dominanz-Ring (§6), Licht und Schatten (§7), Wrackkonvois (#516),
 Vorposten (#531).
@@ -646,3 +646,222 @@ Sie stehen als Kommentar in den Tests, weil jeder beim nächsten Kartentest wied
 Karte und ist antippbar, ihm fehlt nur eine Wirkung. E2 und E5 bleiben eigene Etappen, E5
 zusätzlich mit Backend und Schalter.
 
+*(Nachtrag 03.09.2026: E4 wurde noch am selben Tag gebaut — §9 —, E2 unmittelbar danach — §10.
+E5 folgte unmittelbar danach — §11. Damit ist das Feld dieses Konzepts abgearbeitet.)*
+
+---
+
+## 9. Gebaut: E4 — Die Passage (03.09.2026)
+
+Umgesetzt in **kolonie-kepler7-backend#214** und **v8.650.0**.
+
+### Warum das erst jetzt ging
+
+Das Wurmloch war acht Fundstellen lang reine Zeichnung. Der naheliegende Nutzen — ein Rabatt auf
+Flüge zu beiden Mündungen — war vorher **keine Ortsentscheidung**: Das Backend setzte `from` fest
+auf `'kepler'`, und das Wurmloch steht gemessen **74 % der Zeit** offen (12 h Lebensdauer, danach
+6 % Chance je 15-Minuten-Takt). Ein beidseitiger Rabatt wäre damit drei Viertel der Zeit ein
+Dauerrabatt auf Flüge in die eigene Heimat gewesen.
+
+**Zuerst das Backend** (#214): Beide Enden werden gezogen, aus den nicht kollabierten Systemen,
+ohne Selbstverbindung (`if (j >= i) j++` über eine um eins verkürzte Ziehung — kein
+Wiederholungswurf, der theoretisch nie endet). Erst danach das Frontend, in dieser Reihenfolge und
+nicht umgekehrt: Das Frontend liest ein Feld, das der Server liefert.
+
+### Die Wirkung
+
+`wurmlochFlugMult(sysId)` reiht sich als 16. Faktor in `missionDurationFor` ein, direkt neben
+`sektorFlugMult` und `allianceBaseFlightMult` — beide hängen ebenfalls am Zielsystem und lassen
+Missionsarten ohne echtes Ziel unberührt. Wer eine der beiden Mündungen anfliegt, fliegt
+**25 % schneller** (gemessen an der Anzeigestelle: 264 s statt 352 s).
+
+**Die Frist wird tolerant gelesen.** `wurmlochOffen()` verwirft ein Wurmloch nur, wenn `expiresAt`
+gesetzt UND abgelaufen ist. Die strenge Fassung (`expiresAt > jetzt`) machte jedes Wurmloch
+**ohne** Frist stumm — ein älterer Serverstand oder ein Admin-Eingriff hätte den Wirbel gezeichnet
+und den Rabatt verschwiegen. `tests/test_kartenbeschriftung.js` hat genau das gefangen.
+
+### Anzeigestellen
+
+Antippbar (`[data-map-wurmloch]` → `switchToSystem`), Abzeichentitel („Flüge zu beiden Enden dauern
+25 % weniger"), Meta-Zeile im Systemkopf, Signatur-Anteil, Hilfetext. Die Wirkung steht im Titel,
+**bewusst ohne Restzeit**: eine sekundengenaue Angabe erzwänge den Neuaufbau der ganzen Karte je
+Tick.
+
+### Wächter
+
+`tests/test_wurmloch_passage.js` (16 Prüfungen) misst am gerenderten Spiel, nicht an der Funktion:
+`missionDurationFor` lebt in der IIFE und ist über `page.evaluate` **nicht** erreichbar — der erste
+Entwurf rief sie dort auf, bekam `null` und war in zwei Prüfungen aus dem falschen Grund grün.
+Gemessen wird deshalb die Dauer, die im Erkundungs-Kopf steht. Abschnitt 6 hält ausdrücklich fest,
+dass ein Wurmloch **ohne** Frist wirkt. Im Backend hält `tests/test_wurmloch.js` (10 Prüfungen,
+3.000 Ziehungen) fest, dass beide Enden zufällig und nie gleich sind.
+
+---
+
+## 10. Gebaut: E2 — Die acht Statthalter (03.09.2026)
+
+### Der gemessene Anlass
+
+Die 18 Gegner der `NPCS`-Tabelle saßen in nur **vier** der acht Regionen, **zehn davon allein im
+Kepler-Kern**. Obsidian-Saum, Meridian-Weiten und Ilyra-Tiefen hatten **keinen einzigen** Gegner,
+Wispern-Drift, Pulsar-Felder und Randmarken je genau einen. Wer dorthin reiste, fand Planeten und
+sonst nichts. Von den **69** Systemen (das Konzept vom 19.08.2026 sagte 67) trugen **54** keinen
+NPC.
+
+### Zwei Regeln statt acht Geschmacksentscheidungen
+
+| | Regel | gemessen |
+|---|---|---|
+| **Ort** | je Region das **freie, sichtbare** System am nächsten zum Regionszentrum (`SEKTOR_DEFS` cx/cy) | „frei" = dort steht kein anderer NPC; `hidden:true` (zenith, tiefsee) scheidet aus — ein Statthalter, den man erst entdecken muss, ist keine Landmarke seiner Region |
+| **Stärke** | wächst mit dem **Abstand des Regionszentrums zum Kepler-Kern** | kepler 0 · pulsar 153 · wispern 201 · ilyra 241 · solmark 246 · rand 251 · meridian 371 · obsidian 378 |
+
+Beides rechnet `tests/test_statthalter.js` aus denselben Tabellen nach. Eine Prüfung, die nur
+„`statt_kepler` steht in `sysn_xenax`" abhakt, wäre beim nächsten neuen Sternsystem still falsch.
+
+Die acht Verteidigungswerte (**260 / 700 / 1.150 / 1.900 / 3.000 / 4.400 / 6.500 / 10.500**) liegen
+in den **Lücken** der vorhandenen Leiter (30 … 20.000), keiner darüber; Stufe, Flugdauer und Beute
+sind zwischen denselben zwei Nachbarn interpoliert. Bewusst **ohne** `voidShards` und **ohne**
+`requiresResearch`: Die Leeren-Gegner bleiben die einzige verlässliche Splitter-Quelle, und die
+Statthalter sind eine zweite, parallele Leiter — kein weiterer Leeren-Zweig.
+
+### Der Fund beim Bau: eine Schwäche, die niemand auswertet
+
+`npcWeaknessAusgenutzt` ist eine **if-Kette über sieben Schlüssel** und gibt für jeden achten still
+`false` zurück — das Kartenmenü zeigt die Schwachstelle trotzdem an. Eine Anzeige ohne Wirkung, und
+zwar unbemerkbar. Der ursprüngliche Konzeptsatz „fürchtet eine andere Schiffsklasse als alle
+anderen" ist deshalb enger gefasst: **anders als alle übrigen Gegner der eigenen Region**, mit
+Schlüsseln aus den vorhandenen sieben. Bei acht Statthaltern wiederholt sich genau einer (`cruiser`,
+Stufe 8 und 18). `test_statthalter.js` Abschnitt 3 prüft die Regel für **alle** Gegner, nicht nur
+die acht — ein neunter Schlüssel fällt dort auf, ohne dass jemand an ihn gedacht haben muss.
+
+### Die Chronik und der Erstsieg
+
+`chronik` ist ein **Array aus vier Fassungen**, keine Funktion je Eintrag (das Konzept schlug eine
+Funktion vor): Die Regel „0 / 1–2 / 3–9 / 10+ Siege" steht dadurch einmal in `statthalterChronik`
+statt achtmal. Der Erstsieg zahlt einmalig **3 Sternenessenz + 40 Kampfpunkte**, gemerkt in
+`state.statthalterKills`.
+
+**Warum der Marker beide Resets überlebt, der Siegzähler aber nicht:** Sternenessenz ist die einzige
+Währung, die Prestige und Aufstieg übersteht. Ein mitgelöschter Marker machte aus 24 Essenz eine je
+Durchlauf wiederholbare Quelle — genau die Lücke, die bei den Forschungs-Meilensteinen schon einmal
+127 Essenz je Prestige ausgeschüttet hat. `npcScaling` wird dagegen bewusst zurückgesetzt: Nach
+einem Prestige beginnt die Chronik von vorn, bezahlt wird sie nicht noch einmal.
+
+**Autorität: keine, mit einer benannten Ausnahme.** NPC-Kämpfe rechnet der Client vollständig; der
+Server kennt `NPCS` nicht. Die 320 Kampfpunkte über alle acht gehen mit Faktor 3 in den
+serverseitig nachgerechneten Punktestand (`server.js:3611` — das Konzept nannte 2773) und haben in
+`SAVE_SANITY_LIMITS` **keine** Obergrenze. Einmalig und klein, aber ein Ranglisten-Eingriff.
+
+### Anzeigestellen
+
+Neues Abzeichen **🚩** in `karteSystemBadges`, **ohne Ebenen-Gate** — wie das 🏰 und als einziges
+sonst: Festung, Nest, Konvoi und Vorposten kommen und gehen, ein Statthalter steht fest in der
+Tabelle. Er fällt dafür aus dem 🎯 heraus; zwei Abzeichen für denselben Gegner am selben Ort sind
+genau der Fall, den das 👽 gegenüber dem 👾 schon einmal gelöst hat. Dazu ein eigener Chip in der
+Detailtafel, Chronik und offener Erstsieg im `npcMapMenu`, eine **eigene** Kompendium-Kategorie
+`statthalter` (0/8) und zwei Hilfe-Einträge.
+
+**Zwei Abweichungen vom Konzept, beide belegt.** (1) `npcMapMenu` hat sein `infoHtml` bereits seit
+E1b — es musste nur ergänzt werden. (2) `performSectorSearch` wird **nicht** angefasst: Die Suche
+zeigt seit dem 22.08.2026 bewusst nur Systeme und Planeten, keine Gegner (Entscheidung Sascha, im
+Code als solche kommentiert). Das Konzept ist älter als diese Entscheidung; `test_statthalter.js`
+Prüfung 15 hält den Zustand fest, damit ihn niemand als Versehen „repariert".
+
+### Wächter
+
+`tests/test_statthalter.js`, 33 Prüfungen. Gegenprobe in beide Richtungen: am Stand vor dieser
+Etappe fallen **23** davon; die acht, die grün bleiben, sind die Bestandsregeln (Schwächen-Kette,
+Trophäensaal bei 3, suchfreie Karte). Dazu drei gezielte Sabotagen, jede mit genau **einer**
+Fehlmeldung: Statthalter in ein anderes freies System der Region → Prüfung 2; zwei
+Verteidigungswerte getauscht → Prüfung 3; unbekannter `weakness`-Schlüssel → Prüfung 5.
+
+Ein leeres `statthalter`-Array ließ die Regelprüfungen anfangs **trivial grün** werden
+(`filter(...).length === 0`) — am alten Stand waren sie unbeteiligt statt rot. Die Acht steht
+seither in jeder dieser Bedingungen mit drin.
+
+
+---
+
+## 11. Gebaut: E5 — Die Sektorlage (03.09.2026)
+
+Umgesetzt in **kolonie-kepler7-backend#222** (Rechnung, Schalter aus) und dem Frontend-PR, der den
+Schalter umlegt. Damit ist das Feld dieses Konzepts abgearbeitet.
+
+### Der Befund, der die Form kippte
+
+Das Konzept schrieb, `NEST_STUFEN[*].punkte` existiere **ausschließlich** für diese Etappe. Das
+stimmte am 19.08.2026 und **seit Phase 4 nicht mehr**: `npcStaerkeZiel()` liest dasselbe Feld und
+hebt damit `npcEmpireStrength` galaxieweit an (`1,4 + 0,046 × Stufensumme`, Deckel 2,5).
+
+Ein absoluter Sektorfaktor obendrauf hätte dieselben Nester **zweimal** gezählt — der schlimmste
+Fall wäre von 2,50× auf **3,63×** gestiegen, und der Konzeptsatz „die Änderung kann kein
+Bestandskonto verschlechtern" wäre für jeden Sektor mit Nestern falsch gewesen.
+
+**Entscheidung Sascha aus drei vorgelegten Varianten: der Faktor misst den Abstand zum
+Galaxieschnitt, nicht den Bestand.**
+
+```
+druck[sek]   = Σ punkte(Nester im Sektor) + 2 je Festung
+ueber[sek]   = max(0, druck - Ø)
+npcMult[sek] = min(1,25 ; 1 + 0,02 · ueber)
+```
+
+Eine gleichmäßig belastete Galaxie ergibt in **jeder** Region genau 1,00 — exakt der heutige Stand.
+Erst eine **Ballung** wirkt. Die Steigung ist gegen die echten Deckel gerechnet (`NEST_MAX` 12,
+`FESTUNG_MAX_AKTIV` 6, höchster Gesamtdruck 72): Der Deckel greift, wenn eine Region rund das
+Doppelte ihres Anteils trägt. Details und Sabotage-Liste:
+`kolonie-kepler7-backend/docs/sektorlage.md`.
+
+### Drei Abweichungen vom Konzept, alle gemessen
+
+| Konzept | gebaut | Grund |
+|---|---|---|
+| `sektorLageTick` **vor** der `npcEmpireStrength`-Zeile | **nach** dem Festungs-Spawn | Der Druck soll den Bestand *dieses* Takts zählen; Festungen entstehen weiter unten. Die frühe Position war nötig, solange der Faktor in deren Zielwert einfloss — in der relativen Fassung tut er das nicht |
+| **vierte Textzeile** am Regionsknoten | **farbiger Rand** + Tooltip + `aria-label` | Der Knoten trägt schon Name, Systemzahl, Eigenschaft und Abzeichenzeile; die Entscheidung vom 29.08.2026 steht als Kommentar im Code, samt Messung (am Handy 6–9 px, die „N Systeme"-Zeile fällt dort bereits weg) |
+| Kampfbericht als Anzeigestelle | **nicht angefasst** | Der Bericht zeigt `defensePower` = den beim Start eingefrorenen Wert, der den Faktor bereits enthält. Er ist also nicht veraltet, nur unerklärt — und sein Renderer bedient sechs Kampfarten |
+
+### Der eingefrorene Wert — und was der erste Entwurf davon kostete
+
+Bis hierher fror der Missionsstart nur die **Flotte** ein, obwohl sein eigener Kommentar
+versprach, die Auflösung kämpfe gegen das, was die Vorschau gezeigt hat, „auch falls sich
+Skalierung oder globaler Schwierigkeitsgrad während des Flugs ändern". Die **Zahl** wurde bei
+Ankunft neu gerechnet. Mit einem Faktor, der sich alle 15 Minuten bewegt, während ein Flug länger
+dauert, wäre daraus ein sichtbarer Widerspruch geworden.
+
+**Der erste Entwurf fror deshalb die ganze Verteidigung ein — und das war falsch.** Die
+Codex-Prüfung am PR hat gezeigt, warum: `npcEffectiveLoot()` liest den Siegzähler bei der
+**Ankunft**, und `npcScaling` wächst nach jedem Sieg. Wer mehrere Flotten gleichzeitig auf
+denselben Gegner schickt — das Spiel erlaubt bis zu elf —, kämpfte damit jedes Mal gegen die
+Verteidigung vom Start, während die Beute mit jedem Sieg stieg. **Belohnung und Schwierigkeit
+waren entkoppelt**, und zwar durch diese Etappe.
+
+Eingefroren wird seither nur der **Welt-Anteil** (`npcWeltFaktor` = `npcEmpireStrength` ×
+Sektorfaktor) — genau das, was das Konzept verlangt hat: das, was sich unter dem Spieler bewegt,
+während seine Flotte fliegt. Der Siegzähler bleibt auf **beiden** Seiten live, Verteidigung und
+Beute hängen also wieder am selben Wert. Ältere, noch fliegende Missionen tragen das Feld nicht
+und rechnen wie bisher.
+
+Die Lehre ist allgemeiner als dieser Fall: **Wer eine Größe einfriert, friert damit auch jede
+Beziehung ein, in der sie steht.** Hier stand die Verteidigung in einer Waage mit der Beute, und
+die Waage kippte, weil nur eine Seite festgehalten wurde.
+
+### Wächter
+
+`tests/test_sektorlage_ui.js`, 16 Prüfungen. Die tragende ist **das Paar**: dieselbe
+Gegner-Verteidigung mit und ohne belastete Region, gemessen am Kartenmenü — 30 → 38, also genau
+×1,25. Ohne diese Messung belegte der Test nur, dass irgendwo „+25 %" geschrieben steht.
+Gegenprobe: 9 von 16 fallen am Stand davor; die sieben, die grün bleiben, sind die Anker und die
+**Neutralitäts**-Prüfungen (ohne `sektorLage` ändert sich nichts, keine Seitenfehler).
+
+Prüfung **0e** hält die Waage aus dem Abschnitt darüber fest, und zwar ausgeführt statt gelesen:
+Beide Funktionen werden geschnitten und mit demselben steigenden Zähler gefüttert — wächst die
+eine, muss die andere mitwachsen (gemessen 1000 → 1180 → 1360 → 1900 gegen
+1000 → 1150 → 1300 → 1750). Nimmt man der Verteidigung den Zähler weg, fällt genau diese Prüfung.
+
+Zwei Befunde aus dem Bau der Messvorrichtung, beide als Kommentar im Test:
+
+1. `kampfpunkte:` **enthält** `punkte:` — die Prüfung „die Frontend-Kopie trägt kein
+   `punkte`-Feld" fiel an ihrem eigenen Teilstring, obwohl der Code stimmte.
+2. Der Kartenreiter öffnet die **Regionsübersicht**; aus dem aufgeklappten System führt kein
+   einzelner Heimweg-Knopf dorthin zurück. Der erste Entwurf maß beide Kartenebenen im selben
+   Reiter wie das Kartenmenü und hatte vier rote Prüfungen bei richtigem Code.

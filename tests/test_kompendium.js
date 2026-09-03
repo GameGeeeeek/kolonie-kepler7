@@ -6,7 +6,8 @@
 // heimlich einen neuen Zaehler braeuchte, wuerde bei Altstaenden dauerhaft auf 0 stehen.
 //
 // Geprueft wird:
-//   1) zehn Kategorien, jede mit Icon (Whitelist), Beschreibung, Belohnung, have() und total()
+//   1) genau die namentlich erwarteten Kategorien, jede mit Icon (Whitelist), Beschreibung,
+//      Belohnung, have() und total() - die Liste steht unten, keine Zahl hier oben
 //   2) have()/total() laufen ohne Absturz auf einem LEEREN und auf einem VOLLEN Zustand
 //   3) leer ergibt 0, voll ergibt total() - die Kategorie ist also ueberhaupt erfuellbar
 //   4) keine Kategorie braucht ein Zustandsfeld, das es nicht gibt
@@ -70,6 +71,20 @@ check('Unikat-Anzahl gelesen', UNIKAT_ANZAHL >= 2, UNIKAT_ANZAHL);
 DEFS.UNIKATE = new Array(UNIKAT_ANZAHL).fill(0).map((_, i) => ({ key:'uni'+i, name:'Unikat '+i, fundort:'Ort '+i }));
 // besitztModulTyp kommt als ECHTE Funktion aus der Spieldatei - genau ihre Vier-Quellen-Regel
 // ("Inventar UND eingebaut, beide Modulsysteme") ist das, was hier gedeckt sein soll.
+/* Statthalter (E2). Die Kategorie zaehlt die ERSTSIEG-Merkliste, nicht npcScaling - der
+   Siegzaehler wird beim Prestige genullt, die Sammlung soll nicht mit ihm zurueckrutschen.
+   Die acht Ids kommen aus der Spieldatei, nicht getippt: sonst zaehlte die Attrappe in einem
+   anderen Namensraum als total(), und ein neunter Statthalter fiele hier nicht auf. */
+const STATTHALTER_IDS = [...src.matchAll(/id:'(statt_[a-z]+)',/g)].map(m => m[1]);
+check('Statthalter-Ids gelesen', STATTHALTER_IDS.length >= 8, STATTHALTER_IDS.length);
+DEFS.NPCS = STATTHALTER_IDS.map(id => ({ id: id, statthalter: id.replace('statt_', '') }));
+/* Die drei Helfer kommen als ECHTE Funktionen aus der Spieldatei - dieselbe Regel wie bei
+   besitztModulTyp darunter: Eine nachgebaute Attrappe wuerde am Ende die Attrappe pruefen. */
+const helferQuelle = ['function istStatthalter(npc){', 'function statthalterAlle(){', 'function statthalterErstsiege(){']
+  .map(anfang => { const i = src.indexOf(anfang); return i < 0 ? '' : src.slice(i, src.indexOf('\n  }', i) + 4); }).join('\n');
+check('Statthalter-Helfer aus der Spieldatei gelesen',
+  /statthalterAlle/.test(helferQuelle) && /statthalterErstsiege/.test(helferQuelle), helferQuelle.length);
+
 const iBmt = src.indexOf('function besitztModulTyp(s, typKey){');
 const bmtQuelle = iBmt > 0 ? src.slice(iBmt, src.indexOf('\n  }', iBmt) + 4) : '';
 check('besitztModulTyp aus der Spieldatei gelesen', bmtQuelle.length > 80);
@@ -90,23 +105,23 @@ function baue(state){
   new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
     'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
-    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs', 'FESTUNG_STUFEN', 'ALIEN_VOELKER',
-    bmtQuelle + '\n' + block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
+    'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs', 'FESTUNG_STUFEN', 'ALIEN_VOELKER', 'NPCS',
+    bmtQuelle + '\n' + helferQuelle + '\n' + block + ';ctx.CATS=COMPENDIUM_CATS;')(ctx, state, DEFS.PLANETS, DEFS.STAR_SYSTEMS, DEFS.ACHIEVEMENTS,
     DEFS.SHIP_DEFS, DEFS.MODULE_DEFS, DEFS.BUILDING_DEFS, DEFS.FACTION_DIPLOMACY, allFleets, allBuildingSets,
     BASE_PLANET_COUNT, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_IDS, baseStarSystems,
-    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN, unikatDefs, DEFS.FESTUNG_STUFEN, DEFS.ALIEN_VOELKER);
+    DEFS.ABGRUND_RELIKTE, DEFS.ABGRUND_KONSTELLATIONEN, unikatDefs, DEFS.FESTUNG_STUFEN, DEFS.ALIEN_VOELKER, DEFS.NPCS);
   return ctx.CATS;
 }
 
 // ---------------------------------------------------------------- 1) Form
-const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{}, abgrund:{ relikte:{}, konstGesehen:{} } };
+const leerState = { discovered:{}, npcScaling:{}, factionRep:{}, achievements:{}, fleet:{}, buildings:{}, colonies:{}, modules:{}, equippedModules:{}, abgrund:{ relikte:{}, konstGesehen:{} }, statthalterKills:[] };
 const cats = baue(leerState);
 /* Namentlich statt gezaehlt (Arbeitsregel 33): Eine blanke Zahl sagt beim Fehlschlag nicht, WELCHE
    Kategorie dazugekommen oder verschwunden ist - und beides ist ein Befund. Verschwindet eine,
    verlieren Spieler eine abgeschlossene Sammlung; kommt eine dazu, ohne dass es jemand wollte,
    faellt es hier auf. */
 const ERWARTETE_KATEGORIEN = ['planets','systems','bosses','factions','achievements','ships','modules',
-  'buildings','relikte','konstellationen','unikate','festungen','voelker'];
+  'buildings','relikte','konstellationen','unikate','festungen','voelker','statthalter'];
 {
   const ist = cats.map(c => c.key).sort();
   const soll = ERWARTETE_KATEGORIEN.slice().sort();
@@ -162,6 +177,8 @@ DEFS.UNIKATE.forEach((u, i) => {
    sonst von Hand nachgezogen werden, und die Luecke fiele erst beim naechsten Fehlschlag auf. */
 Object.keys(DEFS.FESTUNG_STUFEN).forEach(k => { vollState.festungTypen[k] = true; });
 Object.keys(DEFS.ALIEN_VOELKER).forEach(v => { vollState.nestVoelker[v] = true; });
+// Statthalter: die Erstsieg-Merkliste, wieder aus den Attrappen statt aus einer getippten 8.
+vollState.statthalterKills = DEFS.NPCS.map(n => n.id);
 fehler = [];
 const vollCats = baue(vollState);
 const vollWerte = vollCats.map(c => { try { return { key:c.key, have:c.have(), total:c.total() }; } catch(e){ fehler.push(c.key+': '+e.message); return null; } });
