@@ -256,9 +256,18 @@ Die Regel hat zwei Hälften, und beide sind nötig:
 | Entwurf (Draft) | Ich arbeite noch. Andere dürfen jederzeit mergen. |
 | Bereit zur Prüfung (Ready for review) | Ich liefere gerade aus. Bis zum Merge mergt sonst niemand nach `main`. |
 
-Ein PR wird also erst aus dem Entwurf geholt, **wenn der Volllauf grün ist und der Merge unmittelbar
-bevorsteht** — nicht schon beim Öffnen. Die Ampel steht damit nur für die wenigen Minuten auf Rot,
-die der Merge wirklich braucht, statt für die anderthalb Stunden des Prüflaufs.
+Ein PR wird also erst aus dem Entwurf geholt, **wenn der ABSCHLIESSENDE Prüflauf startet** — nicht
+schon beim Öffnen, aber auch nicht erst danach.
+
+Die erste Fassung dieser Regel sagte „wenn der Volllauf grün ist und der Merge unmittelbar
+bevorsteht". Das ist am 03.09.2026 sofort schiefgegangen: Während des Laufs landeten v8.650.0 und
+v8.651.0 auf `main`, beide an der Spieldatei — der Lauf war entwertet, bevor die Ampel überhaupt auf
+Rot ging. Wer erst nach dem grünen Lauf sperrt, sperrt genau das Fenster nicht, in dem das Rennen
+stattfindet.
+
+Das kostet: Die Ampel steht jetzt für die Dauer des Laufs auf Rot statt nur für den Merge. Mit
+`pruflauf.js` sind das gemessen 37 Minuten, nicht 91 — deshalb ist der Preis tragbar, und deshalb
+gehören die beiden Teile dieser Regel zusammen.
 
 **2. Ein fremder Merge ist erst dann ein Problem, wenn er die Spieldatei anfasst.** Das ist messbar
 und wird gemessen, nicht vermutet:
@@ -287,7 +296,30 @@ Warum das überhaupt geht: Gemessen an einem vollständigen Lauf brauchen 107 de
 Quelltext-Tests), und die Zeit der übrigen steckt fast vollständig in Browser-Tests, die **warten**
 (`waitForTimeout`) statt zu rechnen. Solche Tests laufen nebeneinander fast gratis. Es wird nichts
 übersprungen und nichts abgeschwächt — jedes Stück ruft dasselbe `tests/run.js` mit einem Teil der
-Dateiliste auf, und der Gesamt-Exit-Code ist nur dann 0, wenn jedes Stück 0 geliefert hat.
+Dateiliste auf.
+
+### Ein rotes Stück ist ein Verdacht, kein Urteil (03.09.2026, gemessen)
+
+Der erste echte Lauf brauchte 37 Minuten statt 91 — und meldete **zwei rote Tests, die einzeln grün
+sind**: `test_forschung_lagerwand` („die Forschung ist gestartet, statt blockiert zu werden" —
+`activeResearch` war schlicht noch `null`) und `test_fraktionsgebiet_karte` (CORS beim Laden von
+`version.txt`). Beides Lastsymptome von vier gleichzeitigen Browsern, keine Fehler im Spiel.
+
+Die erste Fassung dieses Abschnitts behauptete „gleiche Tests, gleicher Exit-Code". Das war falsch,
+und zwar in der gefährlichen Richtung: Wer einem falschen Rot glaubt, sucht einen Fehler, den es
+nicht gibt — oder schlimmer, hält ein echtes Rot beim nächsten Mal für dasselbe Rauschen.
+
+Statt das als Merksatz zu hinterlegen, **fährt das Skript rote Tests selbst noch einmal nach** —
+einzeln, nacheinander, ohne Last — und wertet nur diese Nachprüfung. Was dann noch rot ist, ist echt.
+(CLAUDE.md: wiederholbare Regeln automatisieren, nicht aufschreiben.)
+
+Zwei Dinge, die dabei zu beachten sind:
+
+- **Nicht durch eine Pipe aufrufen.** `node pruflauf.js | tail -25` liefert den Exit-Code von `tail`,
+  nicht den des Laufs — genau der Fehler, vor dem „der Exit-Code entscheidet" warnt. Beim ersten
+  Einsatz prompt passiert.
+- Die Stücke sind **nach Dateizahl** gleich groß, nicht nach Laufzeit: gemessen 1600 s, 1602 s,
+  1829 s und 2198 s. Der Gewinn ist deshalb Faktor 2,5 und nicht 4.
 
 Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln die langsamen Tests
 (`test_wiedergabe_*`, `test_admin_*`) in wenigen Stücken, und dann wartet alles auf das langsamste.

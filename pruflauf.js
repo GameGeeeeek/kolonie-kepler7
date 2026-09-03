@@ -122,11 +122,35 @@ function starte(i) {
 
   console.log('\n=== Ergebnis ===');
   console.log(pruefungen + ' Prüfungen, ' + fehlgeschlagen + ' fehlgeschlagen');
-  if (roteZeilen.length) {
-    console.log('\nRote Tests:');
-    for (const z of roteZeilen) console.log('  ' + z);
+
+  /* NACHPRUEFUNG - der wichtigste Teil dieses Skripts.
+     Gemessen am ersten echten Lauf (03.09.2026): Zwei Tests fielen gleichzeitig, die EINZELN gruen
+     sind - test_forschung_lagerwand ("die Forschung ist gestartet, statt blockiert zu werden",
+     activeResearch war schlicht noch null) und test_fraktionsgebiet_karte (CORS beim Laden von
+     version.txt). Beides Lastsymptome von vier gleichzeitigen Browsern, keine Fehler im Spiel.
+     Damit ist ein rotes Stueck hier ein VERDACHT, kein Urteil. Statt das als Merksatz in die
+     Dokumentation zu schreiben, faehrt das Skript die roten Tests selbst noch einmal - einzeln,
+     nacheinander, ohne Last. Was dann noch rot ist, ist echt. */
+  const verdaechtig = [...new Set(roteZeilen.map(z => (z.match(/^FAIL (\S+)/) || [])[1]).filter(Boolean))];
+  const echtRot = [];
+  if (verdaechtig.length) {
+    console.log('\n' + verdaechtig.length + ' rote Datei(en) - jetzt einzeln nachgefahren, ohne Last:');
+    for (const datei of verdaechtig) {
+      const code = await new Promise(f => {
+        const k = spawn(process.execPath, [path.join(WURZEL, 'tests', 'run.js'), datei],
+          { cwd: WURZEL, stdio: 'ignore' });
+        k.on('exit', c => f(c === null ? 1 : c));
+      });
+      if (code === 0) console.log('  ' + datei + ': einzeln GRUEN - war ein Lastsymptom der Gleichzeitigkeit.');
+      else { console.log('  ' + datei + ': einzeln ROT - echter Fehler.'); echtRot.push(datei); }
+    }
     console.log('\nDie Protokolle der Stücke liegen unter ' + ABLAGE + '.');
   }
   console.log('Dauer: ' + Math.round((Date.now() - start) / 1000) + 's');
-  process.exit(rot.length ? 1 : 0);
+  /* Der Exit-Code entscheidet - und er richtet sich nach der NACHPRUEFUNG, nicht nach den Stuecken.
+     Waere es umgekehrt, muesste jeder Aufrufer die Ausgabe lesen, und genau das verbietet CLAUDE.md.
+     ACHTUNG BEIM AUFRUF: `node pruflauf.js | tail` verwirft diesen Code (die Pipe liefert den von
+     tail). Ohne Pipe aufrufen oder $PIPESTATUS lesen. */
+  if (verdaechtig.length && !echtRot.length) console.log('Alle roten Tests waren Lastsymptome - der Lauf ist gruen.');
+  process.exit(echtRot.length ? 1 : (rot.length && !verdaechtig.length ? 1 : 0));
 })();
