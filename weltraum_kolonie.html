@@ -7335,7 +7335,7 @@
       +`<path d="M0,25 Q100,-8 200,28 T400,18" stroke="#9ff5df" stroke-width="2.5" fill="none" opacity="0.4"/><path d="M0,45 Q100,15 200,48 T400,40" stroke="#c9fff2" stroke-width="1.5" fill="none" opacity="0.3"/>`) },
     { key:'bronze', css:svgBg(bannerGradDefs([[0,'#c9973f'],[100,'#7a5a18']])
       +bannerStars(10,88,'#fff')+bannerAsteroid(95,82,20,'#8a6530')+bannerAsteroid(150,48,14,'#6b4d24')+bannerAsteroid(325,90,26,'#7a5a25')+bannerAsteroid(250,35,10,'#8a6530')) },
-    { key:'stahl', css:svgBg(bannerGradDefs([[0,'#9296ac'],[100,'#4f5d70']])
+    { key:'werftraster', css:svgBg(bannerGradDefs([[0,'#9296ac'],[100,'#4f5d70']])
       +Array.from({length:6}).map((_,i)=>`<line x1="0" y1="${i*28}" x2="400" y2="${i*28}" stroke="#c7cbe0" stroke-width="1" opacity="0.1"/>`).join('')
       +Array.from({length:14}).map((_,i)=>`<line x1="${i*30}" y1="0" x2="${i*30}" y2="140" stroke="#c7cbe0" stroke-width="1" opacity="0.1"/>`).join('')
       +bannerShip(150,72,1.9,'#2c333d',0)+bannerShip(270,48,1.4,'#2c333d',0)+bannerStars(8,99,'#fff')) },
@@ -15999,7 +15999,14 @@
       { key:'material',   kind:'have', zaehler:()=>Object.keys(((state.expeditionCodex||{}).rares)||{}).length, basis:2, rep:20, credits:400, text:t=>'Berge '+t+' verschiedene seltene Materialien' },
       { key:'fragmente',  kind:'deliver', res:null, feld:'moduleFragments', basis:10, rep:14, credits:0, text:t=>'Übergib '+t+' Modulfragmente an die Leerenforscher' },
       { key:'antimaterie',kind:'deliver', res:'antimaterie', basis:120, rep:16, credits:300, text:t=>'Liefere '+fmt(t)+' Antimaterie' },
-      { key:'systeme',    kind:'have', zaehler:()=>Object.keys(state.discoveredSystems||{}).length, basis:4, rep:12, credits:220, text:t=>'Erkunde '+t+' Sternsysteme' },
+      /* basis 1 statt 4, plus eine Obergrenze aus den DATEN (03.09.2026). Der Zaehler liest
+         state.discoveredSystems, und dort landen ausschliesslich Systeme mit hidden:true - davon
+         gibt es genau zwei (zenith, tiefsee). Das Ziel begann bei 4 und stieg ueber die Stufen auf
+         10 und 20: strukturell unerfuellbar, und der Auftragsplatz blieb bis zum Ablauf blockiert,
+         weil ensureFactionQuests() einen Auftrag erst dann ersetzt. maxZiel wird GERECHNET statt
+         eingetippt - kommt je ein drittes verstecktes System dazu, waechst das Ziel von selbst mit. */
+      { key:'systeme',    kind:'have', zaehler:()=>Object.keys(state.discoveredSystems||{}).length, basis:1,
+        maxZiel:()=>STAR_SYSTEMS.filter(x=>x.hidden).length, rep:12, credits:220, text:t=>'Erkunde '+t+' verborgene Sternsysteme' },
       { key:'tiefe',      kind:'have', zaehler:()=>((state.abgrund||{}).best)||0, basis:8, rep:20, credits:420, text:t=>'Erreiche im Abgrund die Rekordtiefe '+t,
         available:()=>abgrundFreigeschaltet() },
       { key:'sternbild',  kind:'have', zaehler:()=>Object.keys(((state.abgrund||{}).konstGesehen)||{}).length, basis:2, rep:18, credits:360, text:t=>'Beobachte '+t+' verschiedene Konstellationen der Tiefe',
@@ -16039,7 +16046,9 @@
     const tier = r < 0.55 ? QUEST_TIERS[0] : (r < goldSchwelle ? QUEST_TIERS[1] : QUEST_TIERS[2]);
     return {
       tpl: t.key, tier: tier.key, faction: fid,
-      target: Math.max(1, Math.round(t.basis * tier.mult)),
+      // maxZiel deckelt das Stufenziel dort, wo es baulich gar nicht erreichbar waere (siehe die
+      // Vorlage 'systeme'). Ohne Angabe bleibt alles wie vorher.
+      target: Math.max(1, Math.min(t.maxZiel ? (t.maxZiel()||1) : Infinity, Math.round(t.basis * tier.mult))),
       rewardRep: Math.max(1, Math.round(t.rep * tier.repMult)),
       rewardCredits: Math.round(t.credits * tier.creditMult),
       rewardFragments: tier.key === 'gold' ? QUEST_GOLD_FRAGMENTS : 0,
@@ -20987,6 +20996,8 @@
     if (hasRoleAnywhere('science')) labMult *= 0.90; // Forschungs-Welt: -10% Forschungszeit (imperiumsweit, nicht stapelbar)
     labMult *= (1 - officerBonus('wissenschaftler'));
     labMult *= allianceBaseResearchTimeMult();
+    // Zeitdilatation - siehe die ausfuehrliche Begruendung in effectiveBuildTimeEach().
+    labMult *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     labMult *= Math.max(0.5, 1 - prestigePerkCount('research')*0.03); // Prestige-Perk "Chefwissenschaftler"
     labMult *= Math.max(0.4, 1 - prestigePerkCount('blitzforscher')*0.08); // Perk mit Preis: schneller forschen ...
     labMult *= (1 - deckelWeich(moduleBonusTotal('research'), 0.4)); // imperiumsweites Forschungsmodul
@@ -30037,12 +30048,20 @@ async function claimPendingRewards(){
     log('Ein Händlerschiff ist im Orbit aufgetaucht.', 'ti-truck');
     render(); save();
   }
+  /* Der Aufschlag des Schwarzmarkts, EINMAL. Vorher stand er nur in acceptTrade(), und die
+     Angebotskarte zeigte den rohen Wert - die namentlich zuerst genannte Wirkung des
+     Haendler-Offiziers war damit an ihrem eigenen Schauplatz unsichtbar. Zwei Kopien waeren hier
+     genau der Fehler, den dieses Projekt regelmaessig macht; deshalb eine Funktion, die beide
+     Seiten lesen. */
+  function schwarzmarktMult(){
+    return (1 + 0.20*allianceTechFrac('a_trade')) * (1 + officerBonus('haendler'));
+  }
   function acceptTrade(){
     if (!state.trader) return;
     const t = state.trader;
     if ((state.resources[t.give]||0) < t.giveAmt){ log('Nicht genug Ressourcen für diesen Handel.', 'ti-alert-triangle'); return; }
     state.resources[t.give] -= t.giveAmt;
-    const tradeMult = (1 + 0.20*allianceTechFrac('a_trade')) * (1 + officerBonus('haendler'));
+    const tradeMult = schwarzmarktMult();
     gainResources({ [t.get]: Math.round(t.getAmt*tradeMult) });
     state.trader = null;
     log('Handel abgeschlossen.', 'ti-truck');
@@ -30198,6 +30217,12 @@ async function claimPendingRewards(){
     if (state.allianceResearch) e *= (1 - 0.20*allianceTechFrac('ep_werft')); // Allianz-Flottenwerft
     if (kind === 'ship') e *= (1 - 0.12*allianzForschungFrac('ra_werftnorm')); // Allianzforschung "Werftnormung" - nur Schiffe
     if (state.allianceResearch && state.allianceResearch['wp_sternenwerft']) e *= 0.90; // Weltprojekt "Gigantische Sternenwerft"
+    /* Aufstiegsknoten "Zeitdilatation" (03.09.2026): Sein Text verspricht seit jeher "-2% Bau-,
+       Forschungs- und Flugzeit je Stufe" - gelesen wurde er aber nur von der Flugzeit
+       (missionDurationFor). Zwei der drei versprochenen Wirkungen fehlten, bezahlt mit
+       Sternenessenz, der einzigen Waehrung, die jeden Reset ueberlebt. Derselbe halbe-Zeit-Deckel
+       wie in der Flugzeit, damit die drei Kanaele nicht unterschiedlich begrenzt sind. */
+    e *= Math.max(0.5, 1 - ascBonus('speed')*0.02);
     return e;
   }
   function queueConstruction(kind, planetKey, key, qty, buildTimeEach, label, icon, cost){
@@ -39984,7 +40009,15 @@ async function claimPendingRewards(){
       { title:'Modulbörse (Handel mit anderen Spielern)', body:'Im Markt-Tab gibt es die <strong>Modulbörse</strong>: Module lassen sich direkt zwischen Spielern handeln. Zum Anbieten drückst du im Offiziere-Tab an einem Modul im Inventar den Knopf <strong>„Börse"</strong> und nennst deinen Preis (1.000 bis 5.000.000 Kredite). <strong>Wichtig – Treuhand:</strong> Das eingestellte Modul verlässt sofort dein Inventar und liegt bis zum Verkauf oder Zurückziehen bei der Börse. Dadurch kann dasselbe Modul niemals zweimal verkauft werden, und es entsteht auch keines aus dem Nichts. Du kannst höchstens <strong>5 Angebote gleichzeitig</strong> laufen haben und jedes jederzeit zurückziehen – das Modul kommt dann unverändert zurück. Beim Verkauf behält die Börse <strong>5% Gebühr</strong> ein; der Rest wird dir beim nächsten Laden des Spiels gutgeschrieben, auch wenn du während des Verkaufs offline warst. Dein eigenes Angebot kannst du nicht selbst kaufen. Jedes Angebot zeigt die volle Güte des Moduls – <strong>Hauptwert-Wurf und Substats</strong> stehen in denselben Güte-Farben an der Karte wie im eigenen Inventar, du kaufst also nie die Katze im Sack. Die Börse braucht eine Serververbindung.' }
     ]},
     { key:'offiziere', icon:'ti-user-circle', title:'Offiziere', entries:[
-      { title:'Was Offiziere sind', body:'Vier Offiziere, die alle gleichzeitig aktiv sind: <strong>Ingenieur</strong> (−2% Bauzeit pro Stufe, gilt für Gebäude UND Schiffe), <strong>Admiral</strong> (+2% Angriffskraft, +1% Verteidigung pro Stufe), <strong>Wissenschaftler</strong> (−2% Forschungsdauer), <strong>Händler</strong> (+2% Ertrag pro Stufe, gilt für den Schwarzmarkt-Händler UND Kredit-/Verkaufs-Handelsrouten). Jeder geht von Stufe 0 (nicht angeheuert) bis 10.' },
+      /* GERECHNET statt getippt (03.09.2026). Hier stand eine handgeschriebene Zweitkopie, die noch
+         von "Vier Offiziere" sprach - Navigator, Quartiermeister und Aufklaerer kamen am 21.07.2026
+         dazu und tauchten in der Hilfe nie auf. Drei von sieben Zielen fuer Kommandopunkte waren
+         damit unsichtbar, obwohl alle drei nachweislich wirken. Das Feld `effect` in OFFICERS trug
+         den richtigen Text die ganze Zeit und hatte bis dahin keinen einzigen Leser; jetzt ist es
+         die Quelle. Ein achter Offizier steht damit von selbst in der Hilfe. */
+      { title:'Was Offiziere sind', body: OFFICERS.length + ' Offiziere, die alle gleichzeitig aktiv sind: '
+        + OFFICERS.map(o => '<strong>' + o.name + '</strong> (' + o.effect + ')').join(', ')
+        + '. Jeder geht von Stufe 0 (nicht angeheuert) bis ' + OFFICER_MAX_LEVEL + '.' },
       { title:'Kommandopunkte', body:'Anheuern und Befördern kostet <strong>Kommandopunkte</strong>, eine eigene Währung, die du fürs Kämpfen verdienst – parallel zu den Kampfpunkten, im gleichen Maß. Wichtig: Kommandopunkte auszugeben senkt <strong>nicht</strong> deinen Punktestand (anders als es wäre, wenn man Kampfpunkte direkt ausgäbe). Die Kosten steigen pro Stufe (Stufe 1 kostet 20, jede weitere rund 60% mehr). Offiziere, Kommandopunkte und beide Modul-Inventare bleiben über einen Prestige-Reset erhalten (nicht über einen Aufstieg).' },
       { title:'Spezialisierung ab Stufe 5', body:'Sobald ein Offizier Stufe 5 erreicht, lässt sich <strong>einmalig und dauerhaft</strong> (kein späterer Wechsel) zwischen zwei Ausrichtungen wählen: <strong>Wirkung</strong> (die Stufen 6-10 wirken 50% stärker) oder <strong>Sparsamkeit</strong> (die Stufen 6-10 kosten 25% weniger Kommandopunkte). Gilt einheitlich für alle vier Offiziere.' },
       { title:'Standort-Module', body:'Ausrüstbare Module mit ' + Object.keys(MODULE_RARITY).length + ' Seltenheitsstufen (' + Object.values(MODULE_RARITY).map(r => r.label + (r.mult > 1 ? ' +' + Math.round((r.mult-1)*100) + '%' : '')).join(', ') + ' Wirkung). '+MODULE_DEFS.length+' Typen, darunter: Panzerung (Verteidigung), Waffen (Angriff), Bergbau (Produktion), Werft (Bauzeit), Schild (verringert Ressourcenverlust bei Überfällen – bei Spieler-Überfällen zählt der Durchschnitt aller Standorte), Lager (Lagerkapazität), Abwehr (Gegenschlag bei abgewehrten Überfällen), Forschung (Forschungszeit, imperiumsweit), Sonde (Expeditions-Ausbeute, imperiumsweit), Treibstoffdepot (Missionen von diesem Standort kosten weniger Treibstoff), Eskorten-Leitsystem (Expeditionen von hier treffen seltener auf feindliche Flotten), Handelsleitstand (Handelsrouten-Ertrag, imperiumsweit) sowie neu: <strong>Kommandomodul</strong> (erhöht die gesamte Erfahrungspunkte-Ausbeute, imperiumsweit – schnellere Level-Aufstiege). Module wirken <strong>pro Standort</strong> – jeder Planet hat eigene Slots (bis zu 4, mit der Forschung <strong>Slot-Miniaturisierung</strong> bis zu 5, einzeln mit Kommandopunkten aufrüstbar). <strong>Je Typ nur EIN Modul gleichzeitig:</strong> Du kannst an einem Standort nicht zweimal Panzerung einbauen – auch nicht in unterschiedlichen Seltenheitsstufen. Wer Slots füllen will, muss also <strong>verschiedene</strong> Typen kombinieren, statt den stärksten Bonus einfach zu stapeln. Genau deshalb lohnen sich die benannten Set-Boni weiter unten: Sie belohnen ausgerechnet die Vielfalt, die diese Regel erzwingt. <strong>Set-Bonus:</strong> 3+ ausgerüstete Module DERSELBEN Seltenheit an einem Standort geben +10% auf alle Modul-Boni dort. <strong>Benannte Set-Boni:</strong> gezielte TYP-Kombinationen an einem Standort schalten zusätzlich thematische Sets frei – <strong>Festungs-Doktrin</strong> (Panzerung + Abwehr → je +15% Verteidigung & Gegenschlag), <strong>Industriekomplex</strong> (Bergbau + Werft + Lager → je +12% Produktion, Bauzeit & Lager), <strong>Logistiknetz</strong> (Handelsleitstand + Treibstoffdepot + Eskorten-Leitsystem → je +10% Handel, Treibstoff & Expeditions-Sicherheit) und <strong>Forschungszentrum</strong> (Forschung + Sonde → je +10% Forschung & Expedition). Aktive Sets stehen grün am Standort, fast-vollständige zeigen das noch fehlende Modul. <strong>Boss-Sets:</strong> Jeder der fünf Allianz-Raid-Bosse steht für ein eigenes Vier-Teile-Set (Fresserherz, Panzerschale, Schwarmgeflecht, Phasengitter, Glutkern) – schon 2 Teile desselben Sets an einem Standort schalten die erste Bonusstufe frei, 3 die zweite, alle 4 die volle Wirkung (Stufen zählen zusammen; die Standort-Ansicht zeigt den Fortschritt, z.B. „2/4"). Boss-Teile fallen bei einer Raid-Welle und an schweren PvE-Zielen (Asteroidenfestung, Alien-Nest, Weltboss), in keinem anderen Fundtopf – und <strong>ab Bossstufe 10</strong> kann ein erbeutetes Raid-Teil statt legendär <strong>mythisch</strong> ausfallen, mit von Stufe zu Stufe steigender Chance bis 12% – sie lassen sich aber normal aufwerten, verschmelzen und zerlegen. <strong>Standort-Sockel:</strong> jeder Standort hat zwei Sockel-Plätze für selbst gewählte Chips (15 Fragmente <em>oder</em> 60.000 Kredite je Chip, je +2% auf einen frei wählbaren Effekt: Produktion, Bauzeit, Lager, Verteidigung, Gegenschlag, Treibstoff oder Expeditions-Sicherheit) – gedeckelt und jederzeit entfernbar. <strong>Ausrüstungs-Vorlagen:</strong> pro Standort drei speicherbare Profile mit 1-Klick-Wechsel; jedes Profil erhält beim Speichern automatisch einen sprechenden Namen aus seiner Modul-Zusammensetzung (z.B. „Verteidigung"/„Wirtschaft"/„Forschung"). Unter jeder gespeicherten Vorlage steht eine <strong>Wechselvorschau</strong>: welche Boni sich beim Anwenden je Effekt ändern würden („vorher → nachher", grün = mehr, orange = weniger, die größten Änderungen zuerst) – gerechnet mit derselben Bonus-Funktion wie das Spiel, inklusive Sets und Sockeln; inzwischen verschmolzene oder zerlegte Module weist sie als „nicht mehr im Besitz" aus. Fundquellen: Expeditionen, treibende Sonden, Kredit-Shop (bis Legendär); <strong>Mythisch</strong> nur über die Mythische Modulschmiede (Apex-Ressourcen), hochstufige Allianzmissionen und den Allianz-Raid ab Bossstufe 10. <strong>Modul-Schmelze:</strong> 3 gleiche Module verschmelzen zur nächsthöheren Seltenheit (Level und Substats bleiben dabei erhalten); fehlt nur noch eines, zeigt die Inventar-Karte „2/3 zum Verschmelzen". Der Sprung <em>nach</em> Mythisch bleibt der Schmiede, den Allianzmissionen und dem hochstufigen Raid vorbehalten – aber <strong>3 Mythische verschmelzen zu einem Exotischen</strong>, der einzigen Quelle der höchsten Stufe. Überzählige Module zerlegst du zu <strong>Modulfragmenten</strong> (Gewöhnlich 1, Ungewöhnlich 2, Selten 3, Episch 8, Legendär 20, Mythisch 50, Exotisch 120) und fertigst daraus gezielt dein Wunschmodul (4/7/12/32/80 Fragmente je nach Seltenheit; Exotisch ist nicht fertigbar). <strong>Schnell-verschrotten:</strong> über dem Inventar zerlegst du mit einem Klick alle nicht-ausgerüsteten Module einer ganzen Seltenheit auf einmal – oder mit „Duplikate" alle Mehrfach-Exemplare (je Typ bleibt 1 erhalten). Jede Massen-Aktion muss zur Sicherheit zweimal geklickt werden; ausgerüstete Module sind nie betroffen. <strong>Sehr große Inventare:</strong> Gezeichnet werden höchstens die ' + MODUL_INVENTAR_MAX_KARTEN + ' seltensten Einträge – eine Liste mit Tausenden Karten würde das Spiel bei jeder Aktualisierung ausbremsen. Unter der Liste steht dann, wie viele weitere vorhanden sind; sie zählen unverändert zum Verschmelzen, und die Schnell-verschrotten-Knöpfe greifen auf den gesamten Bestand zu. <strong>Modul-Schloss:</strong> Das Schloss-Symbol an jeder Inventar-Karte sperrt ein Modul gegen Zerlegen, Schnell-Verschrotten, Kredit-Verkauf, Börse <em>und</em> das stille Verheizen als Schmelz-Futter – gesperrte Stapel zählen nicht als Verschmelz-Geschwister, der 3→1-Knopf rechnet automatisch ohne sie. Aufwerten und Neuwürfeln bleiben möglich; das Schloss wandert dabei auf den neuen Stand mit. Gilt in beiden Modulsystemen, ein Klick entsperrt jederzeit. <strong>Modul-Level:</strong> Jedes Modul lässt sich zusätzlich mit Fragmenten von Stufe 1 bis 10 aufwerten – jede Stufe +10% auf den eigenen Modul-Bonus (Level 10 = fast doppelte Wirkung). Kosten je Stufe: Zerlege-Wert der Seltenheit × aktueller Stufe. <strong>Durchbruch:</strong> Bei den Stufen 4, 7 und 10 gewinnt das Modul einen zusätzlichen, zufällig gewürfelten Zweitwert – höchstens bis zur Zweitwert-Obergrenze seiner Seltenheit; ist sie schon erreicht, wird stattdessen der schwächste Zweitwert um 0,2 Prozentpunkte verstärkt (nie über die Bestmarke von +2,5% hinaus). Ein Durchbruch erreicht also nur, was ein perfekter Fund auch könnte – Aufwerten ist ein zweiter Weg zum Spitzen-Build, kein Weg darüber hinaus. Gewöhnliche Module (ohne Zweitwerte) haben keinen Durchbruch; Angriffskraft würfelt nie mit. Aufwerten geht sowohl im Inventar als auch <strong>direkt am eingebauten Modul</strong> – es bleibt dabei im Slot, du musst es nicht erst abnehmen. <strong>Substats:</strong> Gefundene Module ab Ungewöhnlich haben zufällige Zweit-Boni auf andere Bereiche (z.B. ein Bergbaumodul mit Bonus-Tempo/-Lager) – Ungewöhnlich und Selten bis 1, Episch 1, Legendär 1–2, Mythisch 2, Exotisch 2–3. <strong>Hauptwert-Streuung:</strong> Jedes <em>gefundene</em> Modul würfelt zusätzlich seinen Hauptwert zwischen <strong>90% und 110%</strong> des Normwerts – der Wurf steht an der Karte in den Güte-Farben. Gefertigte Module liegen immer exakt bei 100%, Module aus der Zeit vor der Streuung ebenfalls – beide lassen sich aber neu schmieden (siehe unten). Die <strong>Schmelze</strong> verlangt seither nur noch denselben Typ in derselben Seltenheit und Stufe (Zweitwerte und Wurf dürfen abweichen), verbraucht zuerst das angeklickte Modul und übernimmt den <strong>besten Hauptwert-Wurf der drei</strong>; der Substat-Reroll lässt den Hauptwert unangetastet. Dafür gibt es das <strong>Hauptwert-Neuschmieden</strong>: Der Knopf „Wurf" am Inventar-Modul würfelt <em>ausschließlich</em> den Hauptwert neu (90–110%; Substats und Stufe bleiben; 5× Fragment-Wert der Seltenheit, also teurer als der Substat-Reroll) – und das Ergebnis ersetzt den alten Wurf, auch wenn es schlechter ausfällt. Gilt für beide Modulsysteme. Sie wirken zusätzlich zum Hauptbonus, überstehen das Aufwerten und lassen sich mit „Reroll" (Fragmente) neu würfeln – oder ab 2 Zweitwerten gezielt mit <strong>Reroll+</strong>: die beste Zeile bleibt erhalten, nur die übrigen werden neu gewürfelt, die Anzahl bleibt stehen (mehr Zeilen kann nur der normale Reroll bringen). Reroll+ kostet das Dreifache des normalen Rerolls; der gesperrte Effekt kann beim Nachwürfeln nicht doppelt fallen. <strong>Jeder Zweit-Bonus würfelt zwischen +1,0 % und +2,5 %</strong> – seit dem 05.08.2026 steht neben dem Wert, wie gut der Wurf ausgefallen ist (<em>Spitzenwurf</em>, <em>guter Wurf</em>, <em>mittel</em>, <em>schwach</em>) und dahinter die Gesamtgüte des Moduls in Prozent. Vorher stand dort nur die nackte Zahl, und man konnte nicht beurteilen, ob sich das Neu-Würfeln überhaupt lohnt – die Einordnung beantwortet genau diese Frage. <strong>Modul-Wissenschaft (Forschung):</strong> Der Zweig <strong>Modultechnik</strong> (ab Effiziente Baupläne 5) steigert die Wirkung ALLER Standort-/imperiumsweiten Module um +2% je Stufe (bis +30% bei Stufe 15, nicht auf den PvP-Überfall-Schutz); <strong>Slot-Miniaturisierung</strong> (ab Modultechnik 5) gibt jedem Standort einen fünften Slot. Verwaltung im Offiziere-Tab.' },
@@ -49080,8 +49113,15 @@ async function claimPendingRewards(){
     const a = state.abgrund || {};
     return !!a.ruf && tiefe === (a.tiefe||1);
   }
-  function abgrundWaechterDef(tiefe){
-    if (!abgrundIstWaechter(tiefe) && !abgrundRufAktiv(tiefe)) return null;
+  /* rufErzwungen (03.09.2026): Bei der RUECKKEHR eines Tauchgangs wird der Sektor deterministisch
+     neu gebaut - aber der Waechterruf ist beim Abtauchen laengst verbraucht (a.ruf = false), und
+     abgrundRufAktiv() liest den LEBENDEN Zustand. Der gerufene Waechter war damit bei der
+     Abrechnung spurlos weg: ein legendaerer Gegenstand, den es nur im Abgrund gibt, meldete
+     zweimal Vollzug und bewirkte nichts. Die Mission merkt sich ihr `ruf`; wer den Sektor
+     nachbaut, gibt es hier wieder herein. Ohne Argument bleibt alles wie vorher (Vorschau und
+     Abtauchen lesen weiterhin den lebenden Zustand - dort ist er noch richtig). */
+  function abgrundWaechterDef(tiefe, rufErzwungen){
+    if (!abgrundIstWaechter(tiefe) && !(rufErzwungen === undefined ? abgrundRufAktiv(tiefe) : rufErzwungen)) return null;
     const i = Math.floor(tiefe / ABGRUND_WAECHTER_ALLE) - 1;
     // Über die Liste hinaus zyklisch weiter, mit römischer Wiederkehr im Namen - der Abstieg endet
     // nie, die Namensliste schon.
@@ -49764,7 +49804,7 @@ async function claimPendingRewards(){
     for (let t = ABGRUND_WAECHTER_ALLE; t <= bis; t += ABGRUND_WAECHTER_ALLE) liste.push(t);
     return liste;
   }
-  function abgrundSektor(tiefe){
+  function abgrundSektor(tiefe, rufErzwungen){
     const t = Math.max(1, Math.floor(tiefe) || 1);
     const rng = abgrundRng(t * 7919 + 104729);
     const a = ABGRUND_SILBEN_A[Math.floor(rng()*ABGRUND_SILBEN_A.length)];
@@ -49788,7 +49828,7 @@ async function claimPendingRewards(){
       const grenze = ABGRUND_GRENZEN[f];
       mods[f] = Math.max(grenze[0], Math.min(grenze[1], mods[f]));
     }
-    const waechter = abgrundWaechterDef(t);
+    const waechter = abgrundWaechterDef(t, rufErzwungen);
     const defense = Math.max(1, Math.round(ABGRUND_BASIS_STAERKE * Math.pow(ABGRUND_STAERKE_MULT, t-1) * mods.def * (waechter ? ABGRUND_WAECHTER_STAERKE : 1)));
     // Hier stand bis v8.343.0 ein zweites `dauer`-Feld mit der ROHEN Formel (240 + t*20) * mods.dur.
     // Es wurde nirgends gelesen – und war schon vor dieser Version falsch: Lotsenboot, Ankerwerfer
@@ -53207,7 +53247,7 @@ async function claimPendingRewards(){
           // Der Nullkiel haengt an der Flotte, die MITGEFLOGEN ist (m.composition) - nicht an der,
           // die jetzt zu Hause steht. Sonst koennte ein zwischenzeitlicher Verkauf den Sektor
           // rueckwirkend haerter machen.
-          const sektor = abgrundSektorMitBann(abgrundSektor(tiefe), m.bann || null, !!m.spule, nullkielAktiv(m.composition || fleet));
+          const sektor = abgrundSektorMitBann(abgrundSektor(tiefe, !!m.ruf), m.bann || null, !!m.spule, nullkielAktiv(m.composition || fleet));
           const rohkraft = m.power || attackPower(fleet);
           const kraft = abgrundKampfkraft(rohkraft, sektor, m.composition || fleet);
           const phasen = resolveBattlePhases(kraft, sektor.defense, 1);
@@ -62947,6 +62987,21 @@ async function claimPendingRewards(){
         const savedNow = fmtDuration(Math.round(REF_DUR*(1-labMultNow)));
         const savedNext = fmtDuration(Math.round(REF_DUR*(1-labMultNext)));
         prodLine = `Forschungszeit (alle Planeten zusammen): -${Math.round((1-labMultNow)*100)}% - spart bei 10 Min. Forschung ${savedNow} → <span style="color:#5dcaa5;">-${Math.round((1-labMultNext)*100)}% (${savedNext})</span> nach Ausbau · +${fmt(curFp)} Forschungspunkte/s → <span style="color:#5dcaa5;">+${fmt(nextFp)} Forschungspunkte/s</span> · Ausbau bis Stufe ${def.maxLevel}`;
+      } else if (def.key==='sensorphalanx'){
+        /* 03.09.2026: Ohne diesen Zweig faengt die generische defense-Zeile weiter unten das
+           Gebaeude ab und zeigt ausschliesslich "Angriff 0 · Verteidigung 20" - die Hauptwirkung
+           stand dann nur noch auf der GESPERRTEN Karte (defenseLockedPreview haengt effectDesc an)
+           und verschwand ausgerechnet in dem Moment, in dem der Spieler sie freischaltet. Er sah
+           danach einen Verteidigungswert von 20 neben Nachbarn mit 220 bis 420 und hielt die Anlage
+           fuer einen Fehlkauf. Abhorchposten und Mondschildgenerator haben fuer genau dieses Problem
+           schon eigene Zweige - die Sensorphalanx war als dritte Anlage mit einer Wirkung ausserhalb
+           von Angriff/Verteidigung uebersehen worden.
+           Die Zahlen kommen aus derselben Rechnung wie raidDetectionLead(): 120 s je Stufe,
+           imperiumsweit summiert, gedeckelt bei 1200 s. */
+        const phNow = allBuildingSets().reduce((a,b)=>a+(b.sensorphalanx||0),0);
+        const phNext = phNow - lvl + (lvl+qty);
+        const alsMin = v => Math.round(Math.min(1200, v*120)/60);
+        prodLine = `Überfall-Vorwarnzeit (imperiumsweit): +${alsMin(phNow)} Min. → <span style="color:#5dcaa5;">+${alsMin(phNext)} Min.</span> nach Ausbau (Deckel: +20 Min.) · Verteidigung ${lvl*(def.defVal||0)} → ${(lvl+qty)*(def.defVal||0)}`;
       } else if (def.key==='abhorchposten'){
         // Angriff/Verteidigung sind bei diesem Gebäude immer 0 (siehe BUILDING_DEFS) - die generische
         // Verteidigungs-Zeile wäre hier bedeutungslos. Zeigt stattdessen die tatsächliche Wirkung:
@@ -63010,13 +63065,16 @@ async function claimPendingRewards(){
       } else if (def.key==='kryolager'){
         prodLine = `Basis-Lagerkapazität: +${fmt(lvl*2000)} → <span style="color:#5dcaa5;">+${fmt((lvl+qty)*2000)}</span> nach Ausbau`;
       } else if (def.key==='werftkern'){
-        const wkNow = allBuildingSets().reduce((a,b)=>a+(b.werftkern||0),0);
+        // 03.09.2026, zweite Korrektur an derselben Karte: Sie summierte nur den Werftkern, obwohl
+        // sich Werftkern UND Quanten-Assemblierwerft EINEN Deckel teilen (effectiveBuildTimeEach
+        // rechnet `(b.werftkern||0)+(b.quantenwerft||0)`), und sie deckelte hart bei 20%, waehrend
+        // gerechnet mit deckelWeich(...) wird - der laeuft oberhalb von 20% noch bis knapp 25%
+        // weiter. Beide Abweichungen gingen in dieselbe Richtung: Die Karte versprach beim Ausbau
+        // einen Zuwachs, den es so nicht gab. Jetzt liest sie dieselbe Formel wie die Rechnung.
+        const wkNow = allBuildingSets().reduce((a,b)=>a+(b.werftkern||0)+(b.quantenwerft||0),0);
         const wkNext = wkNow - lvl + (lvl+qty);
-        // Deckel stand hier bis 01.08.2026 auf 15%, gerechnet wird seit jeher mit 20% (siehe
-        // effectiveBuildTimeEach und die Boni-Bilanz). Die Karte hat den eigenen Effekt um ein
-        // Viertel zu klein ausgewiesen - genau die zweite Anzeigestelle, die die alte Annahme behielt.
-        const curPct2 = Math.min(20, wkNow*1.5);
-        const nextPct2 = Math.min(20, wkNext*1.5);
+        const curPct2 = deckelWeich(wkNow*0.015, 0.20)*100;
+        const nextPct2 = deckelWeich(wkNext*0.015, 0.20)*100;
         prodLine = `Schiffsbauzeit (imperiumsweit): -${curPct2.toFixed(1)}% → <span style="color:#5dcaa5;">-${nextPct2.toFixed(1)}%</span> nach Ausbau (Deckel: -20%)`;
       } else if (def.key==='autonomiekern'){
         const akNow = autonomieKernLevelTotal();
@@ -64310,8 +64368,8 @@ async function claimPendingRewards(){
       else if (def.key==='hyperjaeger') meta = `Angriffspunkte 30 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · <span style="color:#5dcaa5;">kein Trägerhangar nötig</span> (zählt direkt zum Kampf, anders als der normale Jäger) · Tier-2, Hyperraumantrieb${awayNote('hyperjaeger')}`;
       else if (def.key==='hyperbomber') meta = `Angriffspunkte 130 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · <span style="color:#5dcaa5;">kein Trägerhangar nötig</span> (zählt direkt zum Kampf, anders als der normale Bomber) · Tier-2, Hyperraumantrieb${awayNote('hyperbomber')}`;
       else if (def.key==='leerenjaeger') meta = `Angriffspunkte 140 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Leere-Endgame-Klasse${awayNote('leerenjaeger')}`;
-      else if (def.key==='kometenjaeger') meta = `Angriffspunkte 18 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · schnellster Kampfschiff-Typ (Geschwindigkeit ${def.speed}) · exklusives Event-Schiff "Meteoritensturm"${awayNote('kometenjaeger')}`;
-      else if (def.key==='enterschiff') meta = `Angriffspunkte 25 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · zäheste Angreiferklasse (hoher Schild) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.enterschiff*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('enterschiff','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.enterschiff}) · exklusives Event-Schiff "Piratenüberfall"${awayNote('enterschiff')}`;
+      else if (def.key==='kometenjaeger') meta = `Angriffspunkte 18 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · sehr schnell (Geschwindigkeit ${def.speed}; nur der Hyperjäger ist schneller) · exklusives Event-Schiff "Meteoritensturm"${awayNote('kometenjaeger')}`;
+      else if (def.key==='enterschiff') meta = `Angriffspunkte 25 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · zäh für seine Größe (hoher Schild bei kurzem Rumpf) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.enterschiff*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('enterschiff','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.enterschiff}) · exklusives Event-Schiff "Piratenüberfall"${awayNote('enterschiff')}`;
       else if (def.key==='phantomschiff') meta = `Angriffspunkte 35 · Schild ${def.shield} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Glaskanone (viel Angriff, wenig Schild) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.phantomschiff*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('phantomschiff','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.phantomschiff}) · exklusives Event-Schiff "Void-Anomalie"${awayNote('phantomschiff')}`;
       else if (def.key==='riftwaechter') meta = `Angriffspunkte 20 · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · nutzt dieselbe Schwachstelle wie der Leerenjäger gegen Leere-Gegner (+25% Angriffskraft) · Frachtraum ${fmt(Math.round(CARGO_PER_SHIP.riftwaechter*(1+shipModuleBonusFor('eventflotte','cargo'))*(1+shipMarkBonus('riftwaechter','cargo'))))} je Schiff (Basis ${CARGO_PER_SHIP.riftwaechter}) · exklusives Event-Schiff "Leerenriss-Welle"${awayNote('riftwaechter')}`;
       else if (def.key==='gesandtenschiff') meta = `Kein Angriffswert - reines Utility-Schiff · +15% auf allen Ruf-Zuwachs bei NPC-Fraktionen, solange mind. eins in der Flotte steht · passiv, keine Missionen nötig · exklusives Event-Schiff "Fraktionskonflikt"`;
@@ -64330,7 +64388,7 @@ async function claimPendingRewards(){
         const bMult = (1 + shipModuleBonusFor('frachter','cargo')) * (1 + shipMarkBonus('bergungsfrachter','cargo'));
         meta = `Frachtraum aktuell ${fmt(Math.round(CARGO_PER_SHIP.bergungsfrachter*bMult))} je Schiff (Basis ${fmt(CARGO_PER_SHIP.bergungsfrachter)}, doppelt so viel wie der Große) · <strong>kein</strong> Lagerbeitrag im Gegensatz zu den beiden anderen Frachtern – sein Rumpf ist Frachtraum, kein Lager · Geschwindigkeit ${def.speed}: die ganze Flotte fliegt im Tempo ihres langsamsten Schiffs, er lohnt sich also dort, wo die Abbauzeit die Flugzeit überwiegt · Cargo-Module und der Laderaum-Markenzweig erhöhen den Frachtraum`;
       }
-      else if (def.key==='spaeher') meta = '-3% Missionsdauer je Schiff (stapelt) · passiv, keine Missionen nötig';
+      else if (def.key==='spaeher') meta = '-3% Missionsdauer je Schiff (stapelt bis -50%, also ab 23 Spähern in derselben Flotte ohne weitere Wirkung) · passiv, keine Missionen nötig';
       else if (def.key==='spionageschiff') meta = 'Schnellster Spionage-Kundschafter (Geschwindigkeit 320, deutlich vor dem Spähschiff) · zählt zusammen mit Spähschiffen zum Spionage-Slot-Pool';
       else if (def.key==='colonyShips') meta = 'Wird bei Kolonisierung verbraucht (1 Stück pro Kolonie)';
       else if (def.key==='recycler') meta = '+8 Ressourcen/s Trümmerfeld-Sammlung am stationierten Planeten · an ein fremdes Feld geschickt: belegt einen Flottenslot und kehrt nach dem Abbau selbständig zurück';
@@ -67606,7 +67664,7 @@ async function claimPendingRewards(){
               <div class="bicon" style="background:rgba(93,202,165,0.2); color:#5dcaa5;"><i class="ti ti-truck" aria-hidden="true"></i></div>
               <div>
                 <div class="bname">Handelsangebot</div>
-                <div class="bmeta">Gib ${costHtml({[t.give]:t.giveAmt})} · Erhalte ${costHtml({[t.get]:t.getAmt})}</div>
+                <div class="bmeta">Gib ${costHtml({[t.give]:t.giveAmt})} · Erhalte ${costHtml({[t.get]:Math.round(t.getAmt*schwarzmarktMult())})}${schwarzmarktMult()>1?` <span style="color:#5dcaa5;">(+${Math.round((schwarzmarktMult()-1)*100)}% durch Händler und Allianz)</span>`:''}</div>
               </div>
             </div>
             <button class="buy ${ok?'affordable':''}" id="acceptTradeBtn" ${ok?'':'disabled'}>Handeln</button>
