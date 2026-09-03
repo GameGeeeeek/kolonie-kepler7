@@ -55,8 +55,20 @@ function baue(opts){
     // undefined laufen. Vorgabe ist ein Konto, das den Abgrund kennt, aber noch nichts erreicht hat.
     abgrund:{ best:0, tauchgaenge:0, bergung:0, relikte:{}, konstGesehen:{} }
   }, opts.state || {});
+  // STAR_SYSTEMS (03.09.2026): Die Vorlage 'systeme' deckelt ihr Ziel seit heute an der Zahl der
+  // VERSTECKTEN Systeme - vorher stand dort eine 4, obwohl der Zaehler baulich nie ueber 2 kommen
+  // kann, und der Auftragsplatz blieb bis zum Ablauf blockiert. Der Deckel wird GERECHNET, nicht
+  // eingetippt, damit ein drittes verstecktes System ihn von selbst mitwachsen laesst - und genau
+  // deshalb braucht der Pruefaufbau hier die echten Systeme. Sie werden aus der Spieldatei gelesen
+  // statt gestellt: Eine erfundene Zahl wuerde die Eigenschaft messen, die ich mir gewuenscht habe,
+  // statt der, die das Spiel hat.
+  const sysVon = src.indexOf('const STAR_SYSTEMS');
+  const sysBis = src.indexOf('\n  ];', sysVon);
+  const versteckte = sysVon < 0 || sysBis < 0 ? 0
+    : (src.slice(sysVon, sysBis).match(/hidden:\s*true/g) || []).length;
+  const STAR_SYSTEMS_STUB = Array.from({ length: versteckte }, (_, i) => ({ id: 'verborgen' + i, hidden: true }));
   new Function('ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS', 'factionRankOf',
-    'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS', 'abgrundFreigeschaltet',
+    'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS', 'abgrundFreigeschaltet', 'STAR_SYSTEMS',
     block + ';ctx.TIERS=QUEST_TIERS;ctx.POOLS=FACTION_QUEST_POOLS;ctx.gen=generateFactionQuest;' +
     'ctx.tierOf=questTierOf;ctx.tplOf=questTemplateOf;ctx.GOLDFRAG=QUEST_GOLD_FRAGMENTS;'
   )(ctx, state, (n)=>String(n), () => opts.backend !== false,
@@ -66,7 +78,7 @@ function baue(opts){
     () => ({ nr: opts.rang || 1 }), 8, 5, 0.5,
     // abgrundFreigeschaltet: Vorgabe true, damit die Tiefenauftraege im Pool sind und mitgemessen
     // werden. opts.abgrund === false schaltet sie ab - so laesst sich auch das Gegenteil pruefen.
-    () => opts.abgrund !== false);
+    () => opts.abgrund !== false, STAR_SYSTEMS_STUB);
   return { ctx, state };
 }
 

@@ -651,8 +651,17 @@ check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkeh
   /a\.gegenmassnahmen -= 1;/.test(js) && /composition: flotte, fleetName: sektor\.name, bann,/.test(js));
 // Seit v8.339.0 kommt als vierter Parameter der Nullkiel dazu - er haengt an der MITGEFLOGENEN
 // Flotte, damit ein zwischenzeitlicher Verkauf den Sektor nicht rueckwirkend haerter macht.
-check('11: der Bann kommt bei der Aufloesung aus der MISSION',
-  /abgrundSektorMitBann\(abgrundSektor\(tiefe\), m\.bann \|\| null, !!m\.spule, nullkielAktiv\(m\.composition \|\| fleet\)\)/.test(js));
+// EIGENSCHAFT statt Schreibweise (03.09.2026): Derselbe Aufruf stand woertlich in drei Tests
+// (hier, test_abgrund_gegenstaende 3 und dort auch schon einmal). Als der Waechterruf als vierter
+// mitgereister Wert dazukam, fielen alle drei - obwohl die Aenderung genau das verstaerkt, was sie
+// pruefen wollen. Geprueft wird deshalb: In der Zeile, die den Sektor bei der RUECKKEHR nachbaut
+// (erkennbar an `m.`, nicht an ihrer Reihenfolge), kommt jeder Wert aus der Mission.
+{
+  const zeile = (js.match(/abgrundSektorMitBann\([^\n]*/g) || []).filter(z => z.indexOf('m.') >= 0)[0] || '';
+  check('11: die Aufloesung baut den Sektor aus der Mission nach', zeile.length > 40, zeile.slice(0, 140));
+  const fehlend = ['m.bann', 'm.spule', 'm.composition'].filter(x => zeile.indexOf(x) < 0);
+  check('11: der Bann kommt bei der Aufloesung aus der MISSION', fehlend.length === 0, { fehlend });
+}
 // Vorschau und Kampf muessen denselben Bann anwenden.
 {
   const boxQ = fnAus('renderAbgrundBox');
