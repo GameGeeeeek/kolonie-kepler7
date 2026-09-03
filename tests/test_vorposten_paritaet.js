@@ -64,7 +64,18 @@ const ohneZweig = srvTypen.filter(t => !new RegExp("r\\.type === '" + t + "'").t
 check('3a: die bekannten Belohnungstypen werden im Server ueberhaupt gefunden',
   srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust') && srvTypen.includes('vorposten-abbau'), srvTypen);
 check('3b: fuer jeden davon hat claimPendingRewards einen Zweig', claimVon > 0 && ohneZweig.length === 0, { ohneZweig });
-const zweigSave = srvTypen.every(t => { const i = claimBlock.indexOf("r.type === '" + t + "'"); const b = claimBlock.slice(i, claimBlock.indexOf('continue;', i)); return /\bsave\(\);/.test(b); });
+/* Der Zweig reicht bis zum NAECHSTEN Zweig, nicht bis zum ersten `continue;`. GEMESSEN am
+   03.09.2026: Der neue Zweig 'vorposten-abbau' hatte ein `continue` INNERHALB einer Schleife -
+   der Schnitt endete dort, das save() dahinter lag ausserhalb, und 3c fiel an einem Zweig, der
+   save() sehr wohl ruft. Eine Heuristik, die am ersten `continue` schneidet, misst nicht den
+   Zweig, sondern seine erste Schleife. */
+const zweigSave = srvTypen.every(t => {
+  const i = claimBlock.indexOf("r.type === '" + t + "'");
+  if (i < 0) return false;
+  const naechster = claimBlock.indexOf("if (r.type === '", i + 10);
+  const b = claimBlock.slice(i, naechster > 0 ? naechster : i + 4000);
+  return /\bsave\(\);/.test(b);
+});
 check('3c: und jeder Zweig ruft save() (Regel 73)', zweigSave);
 
 // ---- 4) Missionsfamilie ---------------------------------------------------------------------------
