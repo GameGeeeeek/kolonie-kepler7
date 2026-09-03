@@ -816,6 +816,33 @@ Server-Tabellen. Gegenprobe gemessen: `ti-atom-2` des Sprungtors testweise auf `
 Wächter: `tests/test_vorposten_projekte_ui.js` (17). Gegenprobe gegen v8.646.0: 13 rot, 4 grün
 (die vier messen die Backend-Icons und den Bootvorgang, nicht diese Änderung), Prüflisten identisch.
 
+## Vorposten in der rechten Leiste (03.09.2026)
+
+Wunsch Sascha: „vorposten sollen rechts am bildschirmrand sein, unter kolonie". Das Seitenmenü
+führte Flottenposition, Kolonien, Bestenliste und Allianz-Spenden – ein Vorposten ist genauso ein
+Standort, den man hält, und gehört dorthin.
+
+**Kein Basiswechsel.** Ein Vorposten hat keine Gebäude und keine Produktionsansicht;
+`activeBasePlanet` darf nicht auf ihn zeigen, sonst stünde der Basis-Tab vor einem Standort, den es
+dort nicht gibt. Der Klick springt stattdessen zur Karte und lässt den Marker kurz blinken –
+derselbe Weg wie beim Asteroiden (`springeZuVorposten`).
+
+**Eigene Signatur, nicht `switcherChanged`.** Die Kolonien-Signatur kennt weder Stufe noch Kernstand
+noch Anflug eines Vorpostens. Hinge die Liste daran, bliebe eine eintreffende **Anflug-Warnung**
+unsichtbar, bis der Spieler zufällig eine Kolonie wechselt – also genau dann nicht da, wenn sie
+gebraucht wird.
+
+**Der Anflug steht an der Zeile.** Das ist der eigentliche Gewinn: Die Warnung ist sichtbar, ohne
+die Karte zu öffnen.
+
+**Ohne Vorposten-Server bleibt der Abschnitt weg** (alter Stand, Notaus) – eine Überschrift über
+einer leeren Liste wäre ein Versprechen ohne Gegenstand.
+
+Test: `tests/test_vorposten_ui.js` Abschnitt 7, als Paar. Gegenprobe gemessen: Abschnitt nie zeigen
+→ 7a/7b/7c fallen (7e und 7f bleiben grün, sie erwarten Abwesenheit); alle statt nur eigene listen
+→ 7e fällt allein.
+
+
 ## Aufgeben ist ein Abbau über 24 Stunden (03.09.2026)
 
 Auftrag Sascha: „vorposten sollen auch aufgebar sein allerdings müssen die abgebaut werden dauert

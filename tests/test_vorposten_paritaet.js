@@ -53,12 +53,16 @@ const srvTypen = [...new Set([...SRV.matchAll(/type: 'vorposten(-[a-z]+)?'/g)].m
 const claimVon = JS.indexOf('async function claimPendingRewards(');
 const claimBlock = JS.slice(claimVon, claimVon + 80000);
 const ohneZweig = srvTypen.filter(t => !new RegExp("r\\.type === '" + t + "'").test(claimBlock));
-/* Bis zum 03.09.2026 stand hier "genau ZWEI" - eine Momentaufnahme (Regel 3), die bei jedem
-   legitimen neuen Typ fiel, obwohl die Paritaet stimmte. Die REGEL steht in 3b: Jeder Typ des
-   Servers braucht einen Zweig im Spiel. 3a sichert nur noch, dass ueberhaupt etwas gefunden wurde
-   und die bekannten Kerntypen dabei sind - sonst misst 3b nichts. */
-check('3a-vorab: die Belohnungstypen des Servers wurden gelesen (sonst misst 3b nichts)',
-  srvTypen.length >= 2 && srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust'), srvTypen);
+/* 3a ist der Stummheitsschutz fuer 3b und 3c, nicht ihre Zaehlung (umgestellt 03.09.2026).
+   Findet der Regex oben nichts, ist srvTypen leer - dann ist auch ohneZweig leer, und 3b/3c melden
+   OK, ohne irgendetwas geprueft zu haben. Deshalb muessen die bekannten Typen NAMENTLICH auftauchen.
+   Die frueher zusaetzlich geforderte Gesamtzahl ("genau zwei") ist entfallen: Sie schuetzte nichts,
+   was 3b nicht besser prueft - ein neuer Typ ohne Frontend-Zweig faellt dort und mit Namen -, und
+   verlangte bei jedem neuen Typ eine Pflege, die keine Aussage traegt. Genau das ist am 03.09.2026
+   passiert: 'vorposten-abbau' kam im Backend dazu, 3b nannte die Luecke praezise, und 3a meldete
+   nur, dass es jetzt drei statt zwei sind. */
+check('3a: die bekannten Belohnungstypen werden im Server ueberhaupt gefunden',
+  srvTypen.includes('vorposten') && srvTypen.includes('vorposten-verlust') && srvTypen.includes('vorposten-abbau'), srvTypen);
 check('3b: fuer jeden davon hat claimPendingRewards einen Zweig', claimVon > 0 && ohneZweig.length === 0, { ohneZweig });
 /* Der Zweig reicht bis zum NAECHSTEN Zweig, nicht bis zum ersten `continue;`. GEMESSEN am
    03.09.2026: Der neue Zweig 'vorposten-abbau' hatte ein `continue` INNERHALB einer Schleife -

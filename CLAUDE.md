@@ -58,6 +58,32 @@ Für schnelle Zwischenprüfungen:
 node tests/run.js --nur-pflicht
 ```
 
+Der volle Lauf dauert rund 91 Minuten. Wenn das zu lang ist oder ein Abbruch droht (Container-Neustart,
+fremder Merge), läuft er gestückelt und gleichzeitig — gemessen 37 Minuten statt 91:
+
+```bash
+node pruflauf.js                 # alle Tests, 4 Stücke gleichzeitig
+node pruflauf.js --fortsetzen    # fertige Stücke überspringen
+```
+
+**Ein rotes Stück ist dort ein Verdacht, kein Urteil.** Vier gleichzeitige Browser erzeugen Last, und
+zeitkritische Tests kippen daran (gemessen am 03.09.2026: zwei Tests fielen, beide einzeln grün).
+Das Skript fährt rote Tests deshalb selbst noch einmal einzeln nach und wertet nur das Ergebnis
+dieser Nachprüfung. Nicht durch eine Pipe aufrufen — `| tail` verwirft den Exit-Code.
+
+## Mehrere Sitzungen gleichzeitig
+
+Arbeiten dürfen alle Sitzungen parallel. **Ausliefern darf nur eine zur Zeit.** Der Zustand des Pull
+Requests ist die Ampel: Entwurf heißt „ich arbeite noch, mergt ruhig", bereit zur Prüfung heißt
+„ich liefere gerade aus". Ein PR wird deshalb aus dem Entwurf geholt, **wenn der abschließende
+Prüflauf startet** — wer erst danach sperrt, sperrt das Fenster nicht, in dem das Rennen
+stattfindet (gemessen am 03.09.2026).
+
+Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die Spieldatei anfasst — das wird gemessen
+(`git diff --name-only HEAD...origin/main`), nicht vermutet.
+
+Details: `docs/TESTING.md`.
+
 Wichtig:
 - Der Exit-Code entscheidet, nicht ein `grep` über Teile der Testausgabe.
 - Ein neuer Test braucht eine Gegenprobe: am neuen Stand grün und an einem gezielt alten/kaputten Stand rot.
