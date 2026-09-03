@@ -332,6 +332,54 @@ async function anfechtungHinflug(t){
     await tOhne2.ctx.close();
   }
 
+  // ---- 7) Vorposten in der rechten Leiste (Wunsch Sascha, 03.09.2026) --------------------------
+  /* Ein Vorposten ist ein Standort, den man haelt - er gehoert neben die Kolonien, nicht nur auf
+     die Karte. Geprueft wird als PAAR: Beim EIGENEN steht er in der Leiste, beim FREMDEN nicht.
+     Ohne die zweite Haelfte waere "steht da" auch mit einer Liste erfuellt, die jeden Vorposten
+     der Galaxie fuehrt - und das waere eine ganz andere Aussage. */
+  {
+    const leiste = async t => t.page.evaluate(() => {
+      const sec = document.getElementById('fpVorpostenSection');
+      const list = document.getElementById('fpVorpostenList');
+      const zahl = document.getElementById('fpVorpostenCount');
+      return {
+        sichtbar: !!(sec && sec.style.display !== 'none'),
+        text: list ? (list.textContent||'').replace(/\s+/g,' ').trim() : '',
+        zahl: zahl ? (zahl.textContent||'').trim() : '',
+        knoepfe: list ? [...list.querySelectorAll('[data-fp-vorposten]')].map(b => b.getAttribute('data-fp-vorposten')) : []
+      };
+    });
+
+    const tEigen = await tab(browser, fixture(), { eigener: true, felder: { anflug: [{ tag: 'RIV', ankunftAt: Date.now() + 12*60*1000, schiffe: 900 }] } });
+    await tEigen.page.waitForTimeout(3000);
+    const lEigen = await leiste(tEigen);
+    check('7a: der eigene Vorposten steht in der rechten Leiste, mit Name und System',
+      lEigen.sichtbar && /Bastion/.test(lEigen.text) && /Chronos/.test(lEigen.text) && lEigen.knoepfe.includes(SYS),
+      lEigen);
+    check('7b: der Zaehler nennt Bestand und Grenze', /^\(1\/3\)$/.test(lEigen.zahl), { zahl: lEigen.zahl });
+    /* 7c: DER ANFLUG STEHT MIT DRIN. Das ist der Punkt der Leiste - man sieht die Warnung, ohne die
+       Karte zu oeffnen. Ohne diese Zeile waere die Vorwarnung wieder nur dort, wo man hinsehen
+       muss. */
+    check('7c: eine laufende Anflug-Warnung steht an der Zeile', /RIV/.test(lEigen.text) && /in /.test(lEigen.text), { text: lEigen.text });
+    check('7d: keine Seitenfehler', tEigen.errs.length === 0, tEigen.errs.slice(0, 2));
+    await tEigen.ctx.close();
+
+    const tFremd = await tab(browser, fixture(), {});
+    await tFremd.page.waitForTimeout(3000);
+    const lFremd = await leiste(tFremd);
+    check('7e: ein FREMDER Vorposten steht NICHT in der eigenen Leiste',
+      !lFremd.knoepfe.length && !/Stützpunkt/.test(lFremd.text), lFremd);
+    await tFremd.ctx.close();
+
+    /* 7f: Kennt der Server keine Vorposten (alter Stand, Notaus), bleibt der Abschnitt WEG - eine
+       Ueberschrift ueber einer leeren Liste waere ein Versprechen ohne Gegenstand. */
+    const tAus = await tab(browser, fixture(), { inaktiv: true });
+    await tAus.page.waitForTimeout(3000);
+    const lAus = await leiste(tAus);
+    check('7f: ohne Vorposten-Server bleibt der ganze Abschnitt verborgen', !lAus.sichtbar, lAus);
+    await tAus.ctx.close();
+  }
+
   await browser.close();
   ende();
 })();

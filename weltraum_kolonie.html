@@ -2600,6 +2600,10 @@
       <div class="fp-title"><i class="ti ti-planet" aria-hidden="true"></i>Kolonien <span id="fpColonyCount"></span></div>
       <div id="fpColonyList"></div>
     </div>
+    <div class="fp-section" id="fpVorpostenSection" style="display:none;">
+      <div class="fp-title"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten <span id="fpVorpostenCount"></span></div>
+      <div id="fpVorpostenList"></div>
+    </div>
     <div class="fp-section">
       <div class="fp-title"><i class="ti ti-trophy" aria-hidden="true"></i>Bestenliste</div>
       <div id="fpLeaderboard"></div>
@@ -40493,6 +40497,21 @@ async function claimPendingRewards(){
     if (f.phase === 'voll') return 'voll beladen (' + fmt(f.ladung) + ') – auf dem Rückflug';
     return fmt(f.gefoerdert) + ' von ' + fmt(f.ladung) + ' gefördert (' + Math.round(f.anteil*100) + '%)';
   }
+  /* Sprung zum eigenen Vorposten (03.09.2026). Bewusst KEIN Basiswechsel: Ein Vorposten hat keine
+     Gebaeude und keine Produktionsansicht, `activeBasePlanet` darf nicht auf ihn zeigen - sonst
+     stuende der Basis-Tab vor einem Standort, den es dort nicht gibt. Der Klick tut dasselbe wie
+     beim Asteroiden: Karte auf, System auf, Marker kurz blinken. */
+  function springeZuVorposten(system){
+    if (!system) return false;
+    switchTab('karte');
+    galaxyOeffne(system);
+    render();
+    setTimeout(() => {
+      const el = document.querySelector('[data-map-vorposten]');
+      if (el) el.classList.add('fundort-blink');
+    }, 260);
+    return true;
+  }
   function springeZuAsteroid(system, platz){
     if (!system) return false;
     switchTab('karte');
@@ -60782,6 +60801,9 @@ async function claimPendingRewards(){
       fillColor: isFull ? '#e0a548' : d.color };
   }
   // Signatur-Cache für die Planeten-Umschalter (Def/Flotte/Expedition) + fpColonyList - siehe render().
+  // Die Vorposten-Liste der rechten Leiste hat ihre EIGENE Signatur (Stufe, Kern, Anflug) - die
+  // Kolonien-Signatur kennt davon nichts und wuerde eine neue Anflug-Warnung verschlucken.
+  let lastVorpostenSig = null;
   let lastSwitcherSig = null;
   const resValAnimFrames = new WeakMap();
   const prefersReducedMotionMq = (typeof window!=='undefined' && window.matchMedia) ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -61393,6 +61415,48 @@ async function claimPendingRewards(){
         state.activeBasePlanet = btn.getAttribute('data-fp-colony-switch');
         render(); save();
       });
+    }
+    /* VORPOSTEN IN DER RECHTEN LEISTE (Wunsch Sascha, 03.09.2026): Sie sind Standorte, die man
+       haelt - sie gehoeren neben die Kolonien und nicht nur auf die Karte.
+
+       EIGENE SIGNATUR, nicht switcherChanged: Die Kolonien-Signatur kennt weder Stufe noch Anflug
+       eines Vorpostens. Haengte diese Liste daran, bliebe eine eintreffende Anflug-Warnung
+       unsichtbar, bis der Spieler zufaellig eine Kolonie wechselt - also genau dann nicht da, wenn
+       sie gebraucht wird. Der ANFLUG steht bewusst mit drin: Diese Leiste ist die Stelle, an der
+       man ihn sieht, OHNE die Karte zu oeffnen.
+
+       Der Abschnitt bleibt versteckt, solange der Server keine Vorposten fuehrt (alter Stand,
+       Notaus) - ein leerer Kasten mit Ueberschrift waere ein Versprechen ohne Gegenstand. */
+    const fpVpSection = document.getElementById('fpVorpostenSection');
+    const fpVpList = document.getElementById('fpVorpostenList');
+    if (fpVpSection && fpVpList){
+      const vpAktiv = !!(vorpostenCache && vorpostenCache.aktiv);
+      fpVpSection.style.display = vpAktiv ? '' : 'none';
+      if (vpAktiv){
+        const meine = meineVorposten();
+        const jetztVp = Date.now();
+        const vpSig = meine.map(v => v.sys + ':' + (v.stufe||1) + ':' + ((v.anflug||[]).length) + ':' + Math.round(((v.kern||{}).lp||0)/1000)).join('|')
+          + '@' + (vorpostenCache.maxJeKonto || 3);
+        if (vpSig !== lastVorpostenSig){
+          setBoxText(document.getElementById('fpVorpostenCount'), '(' + meine.length + '/' + (vorpostenCache.maxJeKonto || 3) + ')');
+          fpVpList.innerHTML = meine.length ? meine.map(v => {
+            const sysN = (STAR_SYSTEMS.find(x => x.id === v.sys) || { name: v.sys }).name;
+            const anf = Array.isArray(v.anflug) ? v.anflug : [];
+            const naechste = anf.length ? anf.reduce((a, b) => (a.ankunftAt <= b.ankunftAt ? a : b)) : null;
+            const rest = naechste ? naechste.ankunftAt - jetztVp : 0;
+            const warn = naechste
+              ? `<div style="font-size:9.5px; color:#f0997b; margin-top:2px;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${escapeHtml(naechste.tag||'?')}${rest > 0 ? ' in ' + fmtDuration(rest/1000) : ' – da'}</div>`
+              : '';
+            return `<button class="fp-colony-btn" data-fp-vorposten="${escapeHtml(String(v.sys))}" style="flex-direction:column; align-items:flex-start;${naechste ? ' border-color:rgba(240,153,123,0.55);' : ''}" title="${escapeHtml((v.name||'Vorposten') + ' bei ' + sysN)} – zur Karte springen"><span><i class="ti ti-building-community" aria-hidden="true"></i>${escapeHtml(v.name||'Vorposten')} · ${escapeHtml(sysN)}</span>${warn}</button>`;
+          }).join('') : '<div class="bmeta" style="font-size:10.5px;">Noch keine Vorposten.</div>';
+          fpVpList.querySelectorAll('[data-fp-vorposten]').forEach(btn => btn.onclick = () => {
+            springeZuVorposten(btn.getAttribute('data-fp-vorposten'));
+          });
+          lastVorpostenSig = vpSig;
+        }
+      } else if (lastVorpostenSig !== null) {
+        lastVorpostenSig = null;   // beim Zurueckschalten neu bauen, nicht die alte Liste behalten
+      }
     }
     // Signatur erst NACH den (evtl. übersprungenen) Umschalter-/fpColonyList-Rebuilds merken.
     lastSwitcherSig = switcherSig;
