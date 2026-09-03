@@ -283,7 +283,11 @@ async function laufe(browser, store, viewport, mobil, systeme) {
      Schiebers statt der Positionen. Verteilt auf zwei Systeme ist jede Lage die, die im Spiel
      wirklich vorkommt. */
   BASIS_SYS = ziele[1] || ziele[0];
-  WURMLOCH_FIXTURE = { from: BASIS_SYS, to: ziele[0], until: now + 6 * 3600000 };
+  /* expiresAt statt until: So heisst das Feld im Server (galaxyTick) - die Fixture bildete hier
+     bis zum 03.09.2026 eine Form nach, die es gar nicht gibt. Folgenlos war das nur, solange das
+     Frontend ausschliesslich from/to las; seit wurmlochFlugMult die Ablaufzeit auswertet, waere
+     das Wurmloch dieser Fixture dauerhaft abgelaufen und damit stumm. */
+  WURMLOCH_FIXTURE = { from: BASIS_SYS, to: ziele[0], expiresAt: now + 6 * 3600000 };
   store['kepler7-save-v3'] = JSON.stringify(Object.assign(JSON.parse(store['kepler7-save-v3']), {
     player: { id: 'u', name: 'A', allianceTag: 'KB' },
     allianceBase: { tag: 'KB', sector: BASIS_SYS, foundedAt: now - 86400000, readyAtByLevel: {} }
