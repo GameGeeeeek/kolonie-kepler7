@@ -773,3 +773,45 @@ Prüfung ab (`fenster.raus[0].label` auf einem leeren Array). Die Prüflisten wa
 verschieden, und für die zehn Prüfungen dahinter belegte die Gegenprobe nichts. Ein Test, der am
 kaputten Stand abstürzt statt zu fallen, misst dort gar nichts — jede Auswertung eines erwarteten
 Elements gehört null-sicher geschrieben.
+
+## Etappe 4: Projekte an der Station (03.09.2026)
+
+Auftrag Sascha: „dass man von dort aus Projekte starten kann, dass man von dort aus vielleicht auch
+eine Art Überraumtor bauen kann."
+
+Der Katalog kommt vom Server (`projektDefs` aus `GET /api/vorposten`) — das Spiel hält **keine
+eigene Projekttabelle**, dieselbe Entscheidung wie bei den Modulen.
+
+- Das **Kartenmenü** zeigt den Eintrag **immer**, auch wenn heute noch nichts geht. Ein Eintrag, der
+  erst ab Stufe 5 auftaucht, verschwiege, dass es das Sprungtor überhaupt gibt. Er nennt, was läuft
+  („noch 6 h 12 min"), sonst die Zahl der fertigen Vorhaben.
+- Das **Fenster** hat drei Abschnitte: *Im Bau*, *Fertig*, *Möglich*. Unter „Möglich" steht auch,
+  was **nicht** geht — mit dem Grund am Eintrag („Braucht Stufe 7.", „Baut nur Handelsknoten.")
+  statt einer stummen Ausgrauung (Lehre vom Bau-Knopf, PROJECT_MEMORY Nr. 18).
+- **Bezahlt wird nach der Zusage des Servers.** Andersherum wären die Rohstoffe weg, wenn der Server
+  ablehnt — dieselbe Reihenfolge wie beim Modul-Ausbau.
+
+### Der Flugzeit-Deckel ist keine Frontend-Zahl mehr
+
+`vorpostenFlugMult` deckelte den Flugzeit-Bonus hart auf `0.5`. Das war eine Kopie-Familie mit dem
+Backend — und ausgerechnet die Zahl, die das **Sprungtor** verschiebt: Ein Tor, das nur weitere
+Prozentpunkte gäbe, täte nichts, weil eine hohe Stufe mit Modulen schon am Deckel liegt. Der Deckel
+kommt jetzt als `nutzen.flugDeckel` vom Server; `VORPOSTEN_FLUG_DECKEL = 0.5` ist nur noch der
+Rückfall für einen Vorposten aus einem älteren Serverstand.
+
+Deshalb steht das Tor in der Anzeige als **Grenze**, nicht als Anteil: „Flugzeit-Grenze 75 % statt
+50 %", nicht „+75 % kürzere Anflüge" — Letzteres wäre eine Falschangabe.
+
+### Ein Wächter für eine Lücke, die niemand sehen konnte
+
+`check-icons.js` liest **nur die Spieldatei**. Die Icons der Server-Tabellen (`VP_PROJEKT_DEFS`,
+`VP_MODUL_DEFS`) laufen daran vorbei: Ein Projekt mit einem Icon außerhalb der 72er-Whitelist
+zeichnete im Spiel ein leeres Kästchen, und **kein Prüflauf sähe es**. Genau diese Fehlerklasse hat
+v8.77.1 schon einmal getroffen (`ti-gift`).
+
+`tests/test_vorposten_projekte_ui.js` 0e hält die Whitelist aus der Spieldatei gegen beide
+Server-Tabellen. Gegenprobe gemessen: `ti-atom-2` des Sprungtors testweise auf `ti-gift` gesetzt →
+0e fällt und nennt `["gift"]`; ohne Nachbar-Repo überspringt sich die Prüfung sichtbar.
+
+Wächter: `tests/test_vorposten_projekte_ui.js` (17). Gegenprobe gegen v8.646.0: 13 rot, 4 grün
+(die vier messen die Backend-Icons und den Bootvorgang, nicht diese Änderung), Prüflisten identisch.
