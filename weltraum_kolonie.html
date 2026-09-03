@@ -57302,6 +57302,59 @@ async function claimPendingRewards(){
   function asteroidMarkerR(groesseKey){
     return ({ splitter:4.5, brocken:6, kern:7.5, koloss:9.5 })[groesseKey] || 5;
   }
+  /* Trefferflaeche der Guertel-Vorkommen (KB-22, Spieler-Report "Asteroiden sind ueberhaupt nicht
+     anklickbar", 03.09.2026).
+
+     GEMESSEN, bevor etwas geaendert wurde: Der Klick-Weg ist voellig in Ordnung - Handler gebunden,
+     galaxyMapDidDrag false, asteroidAn() findet das Vorkommen, und bei pixelgenauem Tippen oeffnet
+     sich das Menue (div.kmenu, "ASTEROID · SPLITTER"). Das Ziel ist nur zu KLEIN. Kuerzeste Seite
+     der <g>-Gruppe im geoeffneten Guertelsystem:
+        Handy 390x844:  Asteroid  8 px | Planet 20-37 px | NPC  45 px
+        PC  1400x900:   Asteroid 19 px | Planet 48-85 px | NPC 110 px
+     Der Asteroid ist damit das kleinste Klickziel der ganzen Karte, waehrend ein Fingerkontakt rund
+     40 px misst. "Nicht anklickbar" beschreibt genau das, was dabei herauskommt.
+
+     WARUM EIN <rect> UND KEIN <circle>: Die Beschriftungs-Entflechtung nimmt den GROESSTEN Kreis
+     einer Gruppe als Bezugskoerper (Zeile ~57390: `kreise.reduce(...)`), und test_kartenbeschriftung
+     sowie test_urmaterie_karte greifen ebenso auf `circle` zu. Ein transparenter Kreis waere dort
+     ueberall der neue Groesste und wuerde stillschweigend die Bezugsgroesse verfaelschen. Auf `rect`
+     greift im ganzen Repo kein einziger Selektor zu - gemessen, nicht vermutet.
+
+     WARUM AUS DEM MASSSTAB GERECHNET: Eine eingetippte Einheitenzahl waere beim naechsten Zoom
+     wieder falsch, denn SVG-Nutzerkoordinaten wachsen mit dem Ausschnitt. Dieselbe Antwort wie bei
+     den Uebersichts-Beschriftungen in KB-21.
+
+     DER DECKEL IST PFLICHT: Die zehn Plaetze sitzen auf einer Ellipse und stehen an deren schmalen
+     Enden dichter beieinander als an den breiten. Ohne Deckel griffe ein Trefferfeld dem Nachbarn
+     den Klick ab - der Spieler traefe dann zuverlaessig den falschen Brocken, was schlimmer waere
+     als der heutige Zustand. Deshalb wird der engste Nachbarabstand ueber alle zehn Plaetze
+     ausgerechnet, nicht angenommen. Untergrenze ist immer der sichtbare Marker: lieber kein
+     Zugewinn als ein gestohlener Klick.
+
+     PEILUNGEN (die 'p'-Vorkommen ausserhalb der Bahn) bleiben in dieser Etappe bewusst unberuehrt.
+     Sie sitzen auf einem Hash-Winkel auf der 1,28-fachen Ellipse, ihr Abstand zur Guertelbahn ist
+     an den Polen deutlich kleiner - sie brauchen einen eigenen, eigens gemessenen Deckel. */
+  const KB_TAP_PX = 44;          // Zielgroesse der Trefferflaeche in Bildschirmpixeln
+  const KB_TREFFER_LUFT = 1.5;   // Systemeinheiten Abstand, damit zwei Felder sich nie beruehren
+  function kbTrefferEinheiten(){
+    const svg = document.getElementById('galaxyMapSvg');
+    const r = svg && svg.getBoundingClientRect();
+    const pxJeEinheit = (r && r.width > 1 && galaxyMapViewBox.w > 0) ? r.width / galaxyMapViewBox.w : 0;
+    return pxJeEinheit > 0 ? KB_TAP_PX / pxJeEinheit : KB_TAP_PX;
+  }
+  function kbGuertelEngsterAbstand(){
+    let min = Infinity;
+    for (let i = 0; i < PLAETZE_JE_GUERTEL; i++){
+      const a = asteroidPlatzXY(i), b = asteroidPlatzXY((i + 1) % PLAETZE_JE_GUERTEL);
+      min = Math.min(min, Math.hypot(a.x - b.x, a.y - b.y));
+    }
+    return min;
+  }
+  // Halbe Kantenlaenge des quadratischen Trefferfeldes, in Systemeinheiten.
+  function asteroidTrefferHalb(groesseKey){
+    const deckel = kbGuertelEngsterAbstand() / 2 - KB_TREFFER_LUFT;
+    return Math.max(asteroidMarkerR(groesseKey), Math.min(kbTrefferEinheiten() / 2, deckel));
+  }
   // Mindestabstand und Schrittweite des Kollisionsschiebers hängen an der Bahn-Geometrie (KB-13):
   // 34 bzw. 12 waren auf die alte Streifen-Geometrie mit 43 Einheiten Bahnabstand gemünzt. Am Handy
   // liegen die Bahnen 18 Einheiten auseinander - mit 34 fände der Schieber nie eine freie Stelle und
@@ -57997,6 +58050,7 @@ async function claimPendingRewards(){
       for (const a of asteroidenImSystem(activeSystem)){
         const pos = asteroidPlatzXY(a.platz);
         const g = asteroidGroesse(a.groesse), so = asteroidSorte(a.sorte);
+        const tHalb = asteroidTrefferHalb(a.groesse);
         const r = asteroidMarkerR(a.groesse);
         const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
         const ecken = [[-1,-0.35],[-0.45,-1],[0.55,-0.85],[1,0.1],[0.45,0.95],[-0.5,0.9]]
@@ -58030,6 +58084,7 @@ async function claimPendingRewards(){
         inner += `
           <g class="planet-node" data-map-asteroid="${a.platz}" style="cursor:pointer;">
             <title>${escapeHtml(asteroidName(a) + halterTitel)} – Vorrat ${fmt(a.vorrat)} (antippen für das Menü)</title>
+            <rect class="kb-treffer" x="${(pos.x - tHalb).toFixed(1)}" y="${(pos.y - tHalb).toFixed(1)}" width="${(tHalb*2).toFixed(1)}" height="${(tHalb*2).toFixed(1)}" fill="transparent"/>
             ${ring}
             <polygon points="${ecken}" fill="${istUrmaterie ? '#8a5f1c' : g.farbe}" stroke="${istUrmaterie ? '#ffe6ab' : '#0a0d1a'}" stroke-width="1.2"/>
             <circle cx="${x}" cy="${y}" r="${(r*0.32).toFixed(1)}" fill="${istUrmaterie ? '#ffe6ab' : (so.res.antimaterie ? '#f3aec6' : '#0a0d1a')}" opacity="${istUrmaterie ? 0.95 : (so.res.antimaterie ? 0.95 : 0.35)}"/>
