@@ -14,7 +14,17 @@
 //
 // Zwei der bestehenden Meldungen waren zu duenn und wurden geschaerft: "Voraussetzung nicht
 // erfuellt" und "Nicht genug Ressourcen" nennen jetzt, WAS genau fehlt.
-const { starteBrowser, SPIEL_URL, ruhigeUhren, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
+//
+// PRUEFUNG 4 KAM AUS EINEM ECHTEN FEHLER (Codex-Befund am PR, 03.09.2026): Eine Voraussetzung steht
+// in ZWEI Formen in RESEARCH_DEFS - als blosser Schluessel ('rminentechnik' = Stufe 1) und als
+// {key, level}. Die erste Fassung der Meldung las req.key/req.level unbedingt und liess damit jede
+// Voraussetzung in Zeichenketten-Form unter den Tisch fallen: Der Spieler bekam wieder nur den
+// generischen Satz. Pruefungen 1-3 waren gruen, weil sie den ERSTEN gesperrten Knopf klicken, und
+// der scheitert an den Kosten - der Voraussetzungs-Zweig wurde nie betreten. Pruefung 4 klickt
+// deshalb gezielt eine Forschung, deren Voraussetzung in Zeichenketten-Form steht. Die betroffenen
+// Schluessel werden aus der Spieldatei GELESEN, nicht eingetippt (Regel statt Momentaufnahme).
+const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
+const fs = require('fs');
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 
@@ -89,6 +99,33 @@ function backend(store){ return async r => {
   check('3) und nennt Menge und Namen, nicht nur "nicht genug"',
     /Dafür fehlt noch: [^\n]*\d[^\n]*[A-Za-zÄÖÜäöü]/.test(log),
     (log.match(/Dafür fehlt noch: [^\n]*/) || ['(keine Zeile)'])[0]);
+
+  // 4) Beide Datenformen einer Voraussetzung werden gelesen. In RESEARCH_DEFS steht sie mal als
+  //    blosser Schluessel, mal als {key, level}; wer nur die zweite Form kennt, schweigt bei der
+  //    ersten. Die betroffenen Forschungen werden aus der Datei gemessen, nicht eingetippt.
+  const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+  const defs = quelle.slice(quelle.indexOf('const RESEARCH_DEFS = ['), quelle.indexOf('function findeForschung'));
+  const mitTextForm = [...defs.matchAll(/key:'(r[a-z0-9]+)'[^\n]*requires:\['([a-z0-9]+)'/g)]
+    .map(m => ({ key: m[1], braucht: m[2] }));
+  check('4-anker: RESEARCH_DEFS enthält Voraussetzungen in Zeichenketten-Form',
+    mitTextForm.length > 0, mitTextForm);
+
+  if (mitTextForm.length){
+    const ziel = mitTextForm[0];
+    const brauchtName = (quelle.match(new RegExp("key:'" + ziel.braucht + "', name:'([^']+)'")) || [])[1] || null;
+    const geklickt = await page.evaluate(k => {
+      const el = document.querySelector('#tab-forschung [data-research="' + k + '"]');
+      if (!el) return false;
+      el.scrollIntoView({ block: 'center' }); el.click(); return true;
+    }, ziel.key);
+    await page.waitForTimeout(700);
+    const log4 = (await logZeilen(page)).join('\n');
+    check('4-anker: der Knopf der Zeichenketten-Forschung ist da und klickbar', geklickt, ziel);
+    check('4) auch eine Voraussetzung in Zeichenketten-Form wird beim Namen genannt',
+      !!brauchtName && log4.includes(brauchtName),
+      { forschung: ziel.key, erwarteterName: brauchtName,
+        zeile: (log4.match(/Dafür fehlt noch: [^\n]*/g) || ['(keine Zeile)']).slice(-1)[0] });
+  }
 
   await ctx.close();
   await ende(async () => browser.close());

@@ -21243,10 +21243,16 @@
     }
   }
 
+  /* Eine Voraussetzung steht in ZWEI Formen in den Tabellen: als blosser Schluessel ('rminentechnik',
+     gemeint ist Stufe 1) und als {key, level}. Beide Leser gehen ueber diesen Normalisierer, damit sie
+     die Datenform nicht unterschiedlich verstehen koennen - genau das war der Fehler in SP-1: die
+     Sperrgrund-Meldung las req.key/req.level unbedingt und liess damit jede Voraussetzung in
+     Zeichenketten-Form stillschweigend unter den Tisch fallen (03.09.2026). */
+  function techVoraussetzung(req){ return typeof req === 'string' ? { key: req, level: 1 } : req; }
   function techUnlocked(r){
     return (r.requires||[]).every(req => {
-      if (typeof req === 'string') return (state.research[req]||0) >= 1;
-      return (state.research[req.key]||0) >= req.level;
+      const v = techVoraussetzung(req);
+      return (state.research[v.key]||0) >= v.level;
     });
   }
   function techUnlockedGeneric(requires){ return (requires||[]).every(k => (state.research[k]||0) >= 1); }
@@ -28389,8 +28395,9 @@ async function claimPendingRewards(){
          ist seit dem Wegfall des disabled-Riegels die einzige Auskunft, die der Spieler bekommt,
          wenn er auf einen gesperrten Knopf tippt - "Voraussetzung nicht erfuellt" zwingt ihn dann
          zum Suchen, statt die Frage zu beantworten. Dieselbe Liste, die die Karte schon zeigt. */
-      const fehlt = (r.requires||[]).filter(req => (state.research[req.key]||0) < req.level)
-        .map(req => (findeForschung(req.key)||{name:req.key}).name + ' Stufe ' + req.level).join(', ');
+      const fehlt = (r.requires||[]).map(techVoraussetzung)
+        .filter(v => (state.research[v.key]||0) < v.level)
+        .map(v => (findeForschung(v.key)||{name:v.key}).name + ' Stufe ' + v.level).join(', ');
       log(fehlt ? 'Dafür fehlt noch: ' + fehlt + '.' : 'Diese Forschung ist noch nicht freigeschaltet.',
           'ti-alert-triangle'); return;
     }
