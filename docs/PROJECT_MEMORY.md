@@ -243,3 +243,74 @@ Nur eine neue Regel aufnehmen, wenn sie:
 4. kurz formulierbar ist.
 
 Lange Vorfallchronologien gehören in PR-/Commit-Historie oder eine fachlich passende Dokumentation, nicht hierher.
+
+## Ein neuer Name gehört gegen den Bestand geprüft — Dateien UND Begriffe (03.09.2026)
+
+Beim Bau der Besucherquellen-Messung wurde ein Test `tests/test_herkunft.js` angelegt. **Diese
+Datei gab es bereits** — als 311-Zeilen-Wächter des Item-Herkunfts-Schlosses (v8.332.0), also
+genau der Regel, die exklusive Beute aus den normalen Fundtöpfen heraushält. Der neue Test hat sie
+überschrieben.
+
+**Der Hinweis lag vor und wurde übersehen:** `git status` zeigte die Datei als `M` (modified), nicht
+als `??` (neu). Bei einer Datei, die man gerade erst angelegt zu haben glaubt, ist `M` ein Alarm.
+
+**Gefunden hat es erst der volle Prüflauf** — an einem fallenden `test_abgrundbilanz.js`, das den
+überschriebenen Test seinerseits mitprüft (ein Test, der einen anderen Test bewacht). Ohne diese
+zweite Ebene wäre der Verlust erst aufgefallen, wenn die Beute-Regel wieder gebrochen wäre.
+
+**Der Begriff war ebenso vergeben, nicht nur der Dateiname:** `HERKUNFT_ABGRUND`, `HERKUNFT_BOSS`,
+`HERKUNFT_UNIKAT`, `HERKUNFT_NORMAL`, `HERKUNFT_KONVOI` — 129 Fundstellen im Frontend, dazu
+`HERKUNFT_BOSS` im Backend. Ein `HERKUNFT_SPEICHER` für etwas völlig anderes reiht sich dort ein
+und wird beim nächsten Lesen verwechselt.
+
+**Vorgehen bei jedem neuen Namen** — Datei, Konstante, Funktion, Feld, API-Pfad:
+
+```bash
+ls tests/<name>.js                       # existiert die Datei schon?
+grep -c "<BEGRIFF>" weltraum_kolonie.html ../kolonie-kepler7-backend/server.js
+```
+
+Ist die Zahl größer als 0, gehört der Begriff jemand anderem. Das ist dieselbe Familie wie die
+Regel „ein Schlüssel kann in mehreren Tabellen vorkommen", nur eine Ebene höher: nicht zwei
+Tabellen mit demselben Schlüssel, sondern zwei **Bedeutungen** desselben Wortes.
+
+**Und beim Aufräumen die fremde Seite schützen:** Der Ersetzer lief mit gemessener Trefferzahl je
+Muster (`count != erwartet` → Abbruch, nichts geschrieben). Er hat einmal angeschlagen und dabei
+verhindert, dass `HERKUNFT_BOSS` mit umbenannt wird — die Wache war hier nicht Formsache, sondern
+der Grund, warum die Item-Begriffe unangetastet blieben (nachgezählt: 31× `HERKUNFT_ABGRUND` vorher
+wie nachher).
+
+## Ein Lauscher mit `capture:true` am `window` sieht auch die eigenen Ereignisse (03.09.2026)
+
+Das Kartenmenü ließ sich nicht scrollen. Es hatte seit E1b-2 einen Höhendeckel
+(`max-height`/`overflow-y:auto`), die Bildlaufleiste stand sichtbar daneben — und der erste
+Radschlag darin schloss es. Gemessen am Handyformat 390×844: `scrollHeight` 590 gegen
+`clientHeight` 420, also **170 px unerreichbarer Inhalt**, darunter „Vorposten aufgeben".
+
+Die Ursache war eine Zeile, die zwei Dinge auf einmal tat:
+
+```js
+window.addEventListener('scroll', closeKarteMenu, true);
+```
+
+Gemeint war das Scrollen **der Seite** — das Menü ist `position:fixed` und stünde danach neben
+seinem Marker. Getroffen hat es jedes Scrollen der ganzen Seite, auch das **im Menü selbst**.
+Scroll-Ereignisse steigen nicht auf, aber die **Einfangphase** läuft durch `window`, und genau
+dort hängt `capture:true`.
+
+**Die übertragbare Regel:** Ein Lauscher mit `capture:true` am `window` oder `document` hört
+jedes gleichnamige Ereignis der Seite — auch die aus dem eigenen Aufbau. Wer einen schreibt,
+muss sagen, **wessen** Ereignis er meint (`e.target` prüfen), sonst wächst der Fehler erst
+später ein: Solange die Menüs zwei bis fünf Einträge hatten, war die Zeile folgenlos. Erst der
+Höhendeckel und ein gewachsenes Menü machten aus ihr eine Sperre. **Eine Zeile, die heute
+richtig aussieht, weil der Fall noch nicht eintritt, ist nicht richtig — sie ist unbenutzt.**
+
+**Der zweite Halbfehler wäre das Weiterscrollen der Seite am Listenende gewesen** (Scroll-Chaining):
+Das schließt das Menü dann völlig zu Recht, und der Spieler sähe dasselbe „geht nicht" eine Zeile
+später wieder. Deshalb gehört `overscroll-behavior:contain` zu dieser Reparatur dazu, nicht in
+einen Folgeauftrag.
+
+**Was die Gegenprobe hier tragen musste:** „schließt nicht mehr beim Scrollen" wäre auch grün,
+wenn die Reparatur das Schließen ganz abgeschaltet hätte. Die beiden Gegenstücke — Seitenscroll
+und ein fremder Scrollkasten schließen weiterhin — laufen deshalb im **selben** Durchgang mit,
+nicht als Nachgedanke (`tests/test_kartenmenue_scrollen.js` 5 und 6).
