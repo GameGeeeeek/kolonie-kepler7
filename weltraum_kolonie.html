@@ -10740,6 +10740,21 @@
     const schiffe = daten.garnison || {};
     const anzahl = Object.values(schiffe).reduce((a, b) => a + (typeof b === 'number' && b > 0 ? b : 0), 0);
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
+    /* Zwei Antworten, ein Endpunkt: Solange VORPOSTEN_ABBAU_AKTIV im Server aus ist, verschwindet der
+       Vorposten sofort und `garnison` kommt mit der Antwort. Ist der Schalter an, antwortet der Server
+       mit `abbau:true` und einer Frist - dann fliegt HIER noch nichts nach Hause, und es waere eine
+       Luege, das zu melden: Die Garnison kommt erst mit der Belohnung 'vorposten-abbau', wenn die
+       Frist abgelaufen ist. Ohne diese Weiche haette das Frontend am Tag des Umlegens still das
+       Falsche behauptet - und ein Rueckflug ohne Schiffe waere die Sorte Fehler, die niemand meldet. */
+    if (daten.abbau){
+      const restMin = Math.max(1, Math.round((((daten.abbauAb || 0) - Date.now()) || (daten.dauerMs || 0)) / 60000));
+      log('Der Abbau des Vorpostens in ' + sysN + ' hat begonnen – er dauert ' + fmtDuration(restMin * 60)
+        + '. Die Garnison und die eingebauten Module kommen erst zurück, wenn er fertig ist; die Baukosten werden nicht erstattet.',
+        'ti-building-community', 'wichtig');
+      await ladeVorposten();
+      render(); save();
+      return;
+    }
     if (anzahl > 0){
       const zielFlotte = currentFleet();
       const flug = missionDurationFor(asteroidFlugBasis(sysId), schiffe, ATTACK_SHIP_KEYS, sysId);
@@ -26445,6 +26460,39 @@ async function claimPendingRewards(){
           log('Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameV + ' wurde von ' + (r.angreiferName||'einem Spieler') + ' geschleift' + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – die Garnison ist verloren' : '') + '.', 'ti-alert-triangle', 'warn');
           pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{} });
           playSound('lose');
+          ladeVorposten();
+          save();
+          continue;
+        }
+        /* Abbau (B2): Der Server traegt einen aufgegebenen Vorposten ueber 24 Stunden ab und schickt
+           die Garnison danach als EIGENEN Belohnungstyp - er darf keinen fremden Spielstand
+           schreiben, und der Besitzer ist beim Ablauf der Frist ueblicherweise gar nicht da. Den
+           Rueckflug legt deshalb der Client an, mit derselben Missionsform wie nach
+           /vorposten/aufgeben (Typ 'vorposten-rueckruf', einwegig, halbe Flugzeit).
+           Die MODULE hat der Server bereits dem Konto gutgeschrieben (user.vpModule) - ladeVorposten()
+           holt den neuen Bestand, damit die Steckplatz-Ansicht ihn zeigt; hier wird nichts addiert,
+           sonst stuende derselbe Fund zweimal im Bestand.
+           Ohne diesen Zweig faellt der Abholvorgang auf die generische "+500 Kredite"-Notloesung
+           zurueck und die ganze Garnison waere weg - genau der Rueckfall, den
+           tests/test_vorposten_paritaet.js Abschnitt 3 verhindert. */
+        if (r.type === 'vorposten-abbau'){
+          const sysNameV = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
+          const schiffeV = r.garnison || {};
+          const anzahlV = Object.values(schiffeV).reduce((a, b) => a + (typeof b === 'number' && b > 0 ? b : 0), 0);
+          if (anzahlV > 0){
+            const zielFlotteV = currentFleet();
+            const flugV = missionDurationFor(asteroidFlugBasis(r.system), schiffeV, ATTACK_SHIP_KEYS, r.system);
+            const jetztV = Date.now();
+            zielFlotteV.missions.push({ id: nextMissionId(), type:'vorposten-rueckruf', targetId: r.system, system: r.system,
+              startTime: jetztV, endTime: jetztV + (flugV/2)*1000, fleetName: 'Garnison ' + sysNameV, schiffe: schiffeV });
+          }
+          const modulZahlV = Array.isArray(r.module) ? r.module.length : 0;
+          log('Der Abbau deines ' + (r.name||'Vorpostens') + ' bei ' + sysNameV + ' ist abgeschlossen'
+            + (anzahlV > 0 ? ' – die Garnison (' + anzahlV + ' Schiffe) fliegt nach Hause' : '')
+            + (modulZahlV > 0 ? ', ' + modulZahlV + (modulZahlV === 1 ? ' Modul liegt' : ' Module liegen') + ' wieder im Bestand' : '')
+            + '.', 'ti-building-community', 'wichtig');
+          pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:r.system, systemName:sysNameV,
+            grund:'Der Abbau ist abgeschlossen – der Vorposten steht nicht mehr.' });
           ladeVorposten();
           save();
           continue;
