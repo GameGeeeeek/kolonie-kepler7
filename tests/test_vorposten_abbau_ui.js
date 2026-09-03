@@ -30,7 +30,12 @@ check('0b: der Abbruch geht an einen eigenen Endpunkt',
 /* Beim Abbau bleibt die Garnison am Vorposten - sie verteidigt weiter. Legte das Spiel trotzdem
    eine Rueckflug-Mission an, fehlten die Schiffe zu Hause UND am Vorposten. */
 check('0c: beim Abbau wird KEIN Rueckflug angelegt (die Garnison bleibt und verteidigt)',
-  /const schiffe = \(daten && daten\.abbau\) \? \{\} : \(daten\.garnison \|\| \{\}\);/.test(src));
+  /const schiffe = \(daten && daten\.abbau\) \? \{\} : \(\(daten && daten\.garnison\) \|\| \{\}\);/.test(src));
+/* Altbestand, beim Gegenlesen gefunden: Antwortet der Server mit ok, ist der Rumpf aber kein
+   gueltiges JSON, ist `daten` null - der Zugriff warf, und der Wurf uebersprang ladeVorposten()
+   und save(). Der Vorposten waere im Spiel stehen geblieben, obwohl der Server ihn abgeraeumt hat. */
+check('0c2: und der Zugriff auf die Antwort ist null-sicher (ok, aber kein gueltiges JSON)',
+  !/\(daten\.garnison \|\| \{\}\)/.test(src));
 /* Der Server schickt die Garnison beim fertigen Abbau ueber die Warteschlange - ohne diesen
    Zweig kaeme sie im Spiel nie an (CLAUDE.md: der Frontend-Zweig gehoert in denselben Auftrag). */
 check('0d: der Belohnungszweig fuer den fertigen Abbau existiert und bucht die Schiffe',

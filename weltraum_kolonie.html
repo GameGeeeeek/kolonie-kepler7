@@ -10738,7 +10738,10 @@
     } catch(e){ log('Der Server war nicht erreichbar.', 'ti-alert-triangle'); return; }
     // Beim ABBAU bleibt die Garnison stehen (sie verteidigt weiter) - der Server schickt sie
     // deshalb gar nicht mit. Kein Rueckflug, kein "0 Schiffe kehren zurueck".
-    const schiffe = (daten && daten.abbau) ? {} : (daten.garnison || {});
+    // NULL-SICHER: `daten` ist null, wenn der Server mit ok antwortet, der Rumpf aber kein
+    // gueltiges JSON ist. Der Wurf uebersprang bisher ladeVorposten() und save() - der Vorposten
+    // waere im Spiel stehen geblieben, obwohl der Server ihn abgeraeumt hat. Altbestand.
+    const schiffe = (daten && daten.abbau) ? {} : ((daten && daten.garnison) || {});
     const anzahl = Object.values(schiffe).reduce((a, b) => a + (typeof b === 'number' && b > 0 ? b : 0), 0);
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
     if (anzahl > 0){
