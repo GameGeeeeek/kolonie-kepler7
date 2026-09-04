@@ -28,7 +28,7 @@ const fs = require('fs');
    stand der Pfad hier fest - eine Gegenprobe mit KEPLER_SPIELDATEI las dann die ECHTE Datei und
    war aus dem falschen Grund gruen, also genau die Falle aus der Korrektur zu CLAUDE.md-Regel 14.
    Dasselbe gilt fuer weitere Tests im Repo; dieser ist der zweite behobene. */
-const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, warteBis } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -86,7 +86,7 @@ const save = (queue, forschung, vorrat, lagerStufe, produziert) => JSON.stringif
   player:{id:'u',name:'A',avatarKey:null}, xp:9e6, credits:9e6,
   buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} });
 
-async function lauf(browser, queue, forschung, vorrat, lagerStufe, produziert){
+async function lauf(browser, queue, forschung, vorrat, lagerStufe, produziert, bedingung){
   const store = { 'kepler7-save-v3': save(queue, forschung, vorrat, lagerStufe, produziert) };
   const ctx = await browser.newContext({ viewport:{width:1400,height:1000} });
   const page = await ctx.newPage(); const errs=[];
@@ -105,8 +105,22 @@ async function lauf(browser, queue, forschung, vorrat, lagerStufe, produziert){
   });
   // Der gespeicherte Stand ist die Wahrheit über activeResearch/researchQueue - das state-Objekt
   // selbst liegt nicht auf window.
-  let stand = null;
-  try { stand = JSON.parse(store['kepler7-save-v3']); } catch(e){}
+  const lies = () => { try { return JSON.parse(store['kepler7-save-v3']); } catch(e){ return null; } };
+  /* Wo der Aufrufer sagt, WORAUF er wartet, wird darauf gewartet statt auf die 1500 ms oben.
+     Gemessen unter echter Last: Ohne das erwischt der Test den Stand mitten in der Bewegung -
+     `rsolar` schon aus der Warteschlange genommen, `activeResearch` noch nicht gesetzt.
+
+     DIE FRIST IST NICHT GERATEN: Das Spiel speichert per `setInterval(save, 10000)`, also alle
+     10 s. Die festen Wartezeiten oben summieren sich auf 9500 ms und liegen damit KNAPP VOR dem
+     ersten Autosave - genau die Kante. 15 s decken ein volles Speicherintervall samt Anlauf ab.
+     Ein erster Versuch mit 8 s war kuerzer als das Intervall selbst und fiel unter Last erneut;
+     gekostet wird die Frist ohnehin nur, wenn die Bedingung ausbleibt - sonst kehrt warteBis
+     sofort zurueck.
+
+     Die Gegenprobe unten gibt bewusst KEINE Bedingung mit: Sie behauptet, dass NICHTS startet, und
+     darauf kann man nicht warten - dort bleibt die feste Wartezeit die ehrlichere Messung. */
+  let stand = bedingung ? await warteBis(() => { const t = lies(); return bedingung(t) ? t : null; }, 15000) : null;
+  if (!stand) stand = lies();
   await ctx.close();
   return { d, stand, errs };
 }
@@ -122,7 +136,7 @@ async function lauf(browser, queue, forschung, vorrat, lagerStufe, produziert){
 
   // --- 1) Die Sackgasse steht VORNE, dahinter eine billige, bezahlbare Forschung.
   {
-    const { d, stand, errs } = await lauf(browser, ['rewig_lager','rsolar'], basis, 5e5, 30);
+    const { d, stand, errs } = await lauf(browser, ['rewig_lager','rsolar'], basis, 5e5, 30, undefined, st => st && st.activeResearch);
     check('2: keine JS-Fehler', errs.length === 0, errs.slice(0,2));
     const laeuft = stand && stand.activeResearch;
     check('2: die dahinter stehende Forschung ist gestartet, statt blockiert zu werden',
