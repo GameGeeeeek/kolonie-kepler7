@@ -1151,3 +1151,27 @@ ein Zitat, fiel der Anker an einem völlig richtigen Schnitt (gemessen: die Prob
 der Datei, einmal im Patchnote und einmal im Hilfetext, den es zitiert). Der Anker **sucht** jetzt
 vom Mittelpunkt aus, bis er eine Probe findet, die genau einmal vorkommt; findet er keine, fällt er.
 Die Gegenprobe (`S_LEBEND = S`, also ein fehlgeschlagener Schnitt) fällt weiterhin.
+
+## Zwei Sperren, die niemand gemeldet hat (04.09.2026)
+
+Eine Sondierung über die noch offenen Etappen fand zwei Fehler, die zu diesem Zeitpunkt **live**
+waren. Beide sind behoben; sie stehen hier, weil beide erklären, wo bei Vorposten noch mehr davon
+liegen kann.
+
+**Stufe 8 und alle Endprojekte waren gesperrt.** Die Kostentabellen des Servers nannten
+`singularitaetskerne` (Mehrzahl), der Spielstand kennt `singularitaetskern` (Einzahl). Für einen
+unbekannten Schlüssel gibt `costAmountAvailable()` `0` zurück, `canAfford()` also `false` — für
+jeden Spieler, unabhängig vom Vorrat. Das Sprungtor wurde seit Etappe 4 angeboten, beschrieben und
+ließ sich nie starten. Backend-Seite behoben (PR #234), seither live.
+
+**Der Abbau gab die Garnison nicht zurück.** Im `vorposten-abbau`-Zweig von
+`claimPendingRewards()` stand ein Index-Zugriff auf `SHIP_DEFS` mit einem Schiffsschlüssel;
+`SHIP_DEFS` ist aber ein Array. Die Bedingung war immer falsch, die Schiffe fielen ersatzlos aus —
+und die Belohnung wurde trotzdem aus der Warteschlange geräumt. Da der Abbau 24 Stunden dauert und
+seit Etappe „Vorposten aufgeben" live ist, hat das jeden getroffen, der eine Station aufgegeben hat.
+
+Beide Wächter stehen in `tests/test_vorposten_paritaet.js`: Abschnitt 8 hält jeden
+Rohstoffschlüssel der drei Kostenquellen (`VORPOSTEN_STUFEN[].kosten`, `VP_PROJEKT_DEFS[].kosten`,
+`VORPOSTEN_BAUKOSTEN`) gegen die Rohstoff-Definitionen des Spiels; Abschnitt 9 verbietet den
+Index-Zugriff auf die sechs `*_DEFS`-Listen dateiweit. Beide lesen ihren gültigen Vorrat aus dem
+Code, statt ihn zu tippen — eine neue Tier-2-Ressource erweitert ihn von selbst, ein Tippfehler nicht.

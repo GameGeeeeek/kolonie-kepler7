@@ -7434,8 +7434,14 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.674.0';
+  const VERSION = '8.675.0';
   const PATCHNOTES = [
+  { version:'8.675.0', date:'04.09.2026', changes:[
+    '<strong>Zwei stille Sperren sind weg \u2013 beide haben Spieler bisher etwas gekostet, ohne dass irgendwo eine Fehlermeldung stand.</strong>',
+    '<strong>Der Abbau eines Vorpostens gibt die Garnison jetzt wirklich zur\u00fcck.</strong> Bisher landete sie nicht auf deinem Standort, und die Meldung am Ende lie\u00df den Halbsatz dar\u00fcber einfach weg \u2013 die Schiffe waren ersatzlos verloren. Die Ursache war ein Griff ins Leere: Der Code suchte den Schiffstyp in einer Liste, als w\u00e4re sie ein Verzeichnis, und fand nie etwas. Wer seit dem 24-Stunden-Abbau eine Station aufgegeben hat, war betroffen.',
+    '<strong>Die Orbitalfeste (Stufe 8) und alle drei Endprojekte lassen sich wieder bauen.</strong> Der Server schrieb in ihren Kosten <em>Singularit\u00e4tskerne</em> in der Mehrzahl, das Spiel kennt den Rohstoff aber in der Einzahl \u2013 also z\u00e4hlte es deinen Vorrat als <em>null</em> und meldete dauerhaft „zu teuer", egal wie viele du hattest. Betroffen waren damit auch Sternendock, Sternenmarkt und Sperrfeuerleitstand \u2013 und das <strong>Sprungtor</strong>, das seit seiner Einf\u00fchrung angeboten wurde und sich nie starten lie\u00df. Diese H\u00e4lfte ist bereits live.',
+    '<strong>Zwei neue W\u00e4chter, damit genau das nicht wiederkommt.</strong> Der eine h\u00e4lt jeden Rohstoffnamen in den Vorposten-Kosten gegen die Rohstoffe des Spiels; der andere verbietet den Griff ins Leere in der ganzen Spieldatei. Beide lesen, was es gibt, statt es abzutippen \u2013 ein neuer Rohstoff erweitert sie von selbst, ein Tippfehler nicht.'
+  ] },
   { version:'8.674.0', date:'04.09.2026', changes:[
     '<strong>Das Logbuch des Kommandanten.</strong> Zu jedem Angriff auf ein NPC-Ziel erscheint im Kampfbericht nach ein bis zwei Minuten ein kurzer Erzähltext – geschrieben von einer KI auf dem eigenen Server des Spiels, nicht bei einem Anbieter im Internet. <strong>Der Text entscheidet nichts:</strong> Ausgang, Verluste und Beute kommen aus dem Spiel und stehen daneben in Zahlen, das Logbuch erzählt nur. Der Server prüft jeden Text gegen die Kampfdaten; erfundene Zahlen oder Schiffe fliegen raus, dann bleibt die Sektion einfach weg. Es gibt eine kleine Tagesgrenze je Konto, und die Maschine schreibt einen Text nach dem anderen.',
     '<strong>Was dahinter steckt, in einem Satz:</strong> Das Spiel schickt nur fünf Felder (Gegner, Stufe, Ausgang, eigene und verlorene Schiffstypen) und die Berichts-ID, der Server hängt den fertigen Text an den Bericht. Er ist deshalb auf jedem Gerät da, ohne dass das Spiel nachfragen muss. Fehlt er einmal, ist der Bericht trotzdem vollständig. Wächter: <code>tests/test_kampfbericht_logbuch.js</code> mit 16 Prüfungen, im Backend <code>test_kampftext_http.js</code> mit 75.',
@@ -7553,17 +7559,11 @@
       '<strong>Wo einer sitzt und wie stark er ist, folgt zwei festen Regeln.</strong> Er steht im Sternsystem, das dem Mittelpunkt seiner Region am nächsten liegt und noch keinen anderen Gegner beherbergt – und seine Stärke wächst mit der Entfernung seiner Region vom Kepler-Kern. Der schwächste (Verteidigung 260) ist deshalb früh erreichbar, der stärkste (10.500) steht am äußersten Ostrand. Alle acht liegen in den Lücken der bekannten Gegner-Leiter, keiner darüber, und jeder fürchtet eine andere Schiffsklasse als die übrigen Gegner seiner Region.',
       '<strong>Der erste Sieg über einen Statthalter zahlt einmalig 3 Sternenessenz und 40 Kampfpunkte.</strong> Je Statthalter genau einmal, und die Marke überlebt Prestige, Aufstieg und den kompletten Zurücksetzen-Knopf – die Prämie ist nicht wiederholbar. Der Siegzähler selbst beginnt nach einem Prestige dagegen wieder bei null, seine Chronik also auch. Alle acht zusammen füllen die neue Kompendium-Kategorie <strong>Statthalter der Regionen</strong>.'
     ]},
-    { version:'8.655.0', date:'03.09.2026', changes:[
-      '<strong>Vier Schiffsklassen zählten im Angriff überhaupt nicht mit – das ist behoben.</strong> Auf einen Spieler-Report mit Bildschirmfoto hin nachgemessen: <em>Kausalitätsbrecher</em> (340 Angriff), <em>Sternenbanner</em> (240), <em>Bundeskreuzer</em> (110) und <em>Paktkorvette</em> (40) standen in jeder Tabelle, die das Spiel dir zeigt – und fehlten ausgerechnet in der Summe, mit der der Server den Kampf entscheidet. In der <em>Verteidigung</em> zählten sie dabei voll mit. Wer sie gebaut hat, wurde davon offensiv schwächer, ohne dass irgendetwas es ihm gesagt hätte. Betroffen war alles, was der Server rechnet: Spielerkämpfe, Alien-Nester, Asteroidenfestungen, Anfechtungen, der Allianz-Verband und die Vorposten-Garnison. Wer diese Schiffe fliegt, wird ab sofort spürbar stärker – das ist die Korrektur, keine Aufwertung.',
-      '<strong>Der Kausalitätsbrecher bekommt endlich eine Konterrolle: Bomber.</strong> Er stand als einziges Kampfschiff des Spiels außerhalb von Schere-Stein-Papier – er konterte nichts, wurde von nichts gekontert, und die Flottenbalance sah seine 340 Angriff überhaupt nicht. Nebenbei landete er dadurch in der Werftmarken-Familie „Zivilschiffe", also mit einem Laderaum-Zuwachs an einem Schiff ohne Frachtraum. Als Bomber wächst er jetzt mit <strong>+4,0% Angriff je Marke statt +3,0%</strong>. Warum Bomber und nicht Großkampfschiff, obwohl der Rumpf danach aussieht: Großkampfschiff war mit zehn Klassen bereits die vollste Rolle, und ein elftes hätte die Verteilung gekippt – genau der Zustand, in dem der Konter im Endspiel auf „Stein gegen Stein" zusammenfällt. Jetzt stehen 8 Abfangjäger, 8 Bomber und 10 Großkampfschiffe nebeneinander: der ausgeglichenste Stand seit dem Umbau im August.',
-      '<strong>Jede Dominanz-Stufe hat jetzt ihren eigenen Namen.</strong> Auf eine Spieler-Reklamation hin – Stufe 163 hieß „Kosmischer Souverän 131", ein Sammeltitel mit hochzählender Zahl. Die Stufen 1–8 bleiben die bekannten Dienstgrade; ab Stufe 9 trägt <em>jede</em> Stufe ihren eigenen Titel, und die Namen werden mit der Höhe schwerer: erst Flotte und Grenzwacht, dann Sektoren und Bünde, danach die Nebel und die Weite, die Sternenschmiede, der Abgrund, die Zeit selbst, die Urmaterie – und ganz oben, was jenseits aller Zählung liegt. Aus Stufe 163 wird der <em>Abgrundbezwinger</em>, aus Stufe 500 der <em>Träger des Letzten Wortes</em>. Und darüber hinaus? Setzt das Spiel weiter eigene Namen zusammen. Eine Nummer hinter dem Titel gibt es nie wieder.',
-      'Wächter: <code>test_rangnamen</code> hält fest, dass jede der 500 Stufen einen eigenen, höchstens 26 Zeichen langen Titel ohne Ziffer trägt – und dass auch Stufe 3.000 noch einen Namen bekommt statt einer Zahl. <code>test_angriffssumme</code> prüft ab jetzt nicht mehr nur die Wertetabelle des Servers, sondern die Summe, die den Kampf wirklich entscheidet, und dazu für jede Angriffsklasse die Konterrolle auf beiden Seiten. Der alte Wächter stand vor der falschen Tür – deshalb ist die Lücke oben zehn Monate lang niemandem aufgefallen.',
-    ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1077;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1078;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -28249,11 +28249,29 @@ async function claimPendingRewards(){
           // Positive Bedingung statt `continue`: In einem Belohnungszweig ist jedes `continue` vor
           // dem save() eine Falle - fuer den Leser wie fuer den Waechter, der den Zweig bis zu
           // seinem Ende liest (test_vorposten_paritaet 3c).
+          /* SHIP_DEFS IST EIN ARRAY, KEIN REGISTER (Messung 04.09.2026). Hier stand ein
+             Index-Zugriff auf SHIP_DEFS mit einem Schiffsschluessel - das ergibt IMMER undefined,
+             die Bedingung war also immer falsch. Folge im laufenden Spiel: Wer seinen Vorposten
+             abbaut, bekommt die Garnison NICHT zurueck, und die Meldung laesst den Halbsatz
+             darueber stillschweigend weg. Die Belohnung wird trotzdem aus der Warteschlange
+             geraeumt - die Schiffe waren ersatzlos weg.
+             Es waren die EINZIGEN zwei solchen Zugriffe in der ganzen Datei; ueberall sonst steht
+             SHIP_DEFS.find(d => d.key === k) (so auch shipDefOrSuper). Der Waechter dagegen steht
+             in tests/test_vorposten_paritaet.js, Abschnitt 9 - er sucht den Index-Zugriff als
+             Zeichenkette und wuerde deshalb auch an diesem Kommentar anschlagen; darum ist er
+             hier bewusst umschrieben. */
           for (const [k, n] of Object.entries(r.garnison || {})){
             const anz = Math.max(0, Math.round(Number(n) || 0));
-            if (anz && SHIP_DEFS[k]){
+            // shipDefOrSuper, NICHT SHIP_DEFS.find: Das Superschlachtschiff ist das einzige
+            // Angriffsschiff ohne SHIP_DEFS-Eintrag (es steht in ATTACK_SHIP_KEYS und ist damit in
+            // der Garnisonswahl anklickbar - vorpostenGarnisonSenden reicht ATTACK_SHIP_KEYS als
+            // `keys` durch). Mit .find waere ausgerechnet das teuerste Schiff des Spiels weiterhin
+            // beim Abbau verfallen, waehrend alle anderen zurueckkehren - derselbe Fehler eine
+            // Etage tiefer. Gefunden in der Durchsicht von PR #579 (04.09.2026).
+            const defA = shipDefOrSuper(k);
+            if (anz && defA){
               flotteA[k] = (flotteA[k] || 0) + anz;
-              zurueck.push(anz + '\u00d7 ' + (SHIP_DEFS[k].name || k));
+              zurueck.push(anz + '\u00d7 ' + (defA.name || k));
             }
           }
           // Die Module hat der SERVER schon in den Bestand gelegt (vpModulGeben) - hier werden sie

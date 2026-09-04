@@ -542,3 +542,23 @@ grep -ln "<bezeichner1>\|<bezeichner2>" tests/*.js
 Dazu kommen die Tests des **eigenen** Bereichs, wenn der fremde Merge ihn mit anfasst. Was gelaufen
 ist und was nicht, gehört ausdrücklich in den PR-Text — ein Teillauf, der sich als voller ausgibt,
 ist schlimmer als keiner.
+
+## Ein Wächter, der seine eigene Erklärung mitliest, misst nichts (04.09.2026)
+
+Der neue Abschnitt 9 in `tests/test_vorposten_paritaet.js` prüft, dass der Abbau-Zweig die Garnison
+über `SHIP_DEFS.find(...)` auflöst und nicht über einen Index-Zugriff. Die Gegenprobe — den echten
+Fehler wieder einbauen — blieb beim ersten Versuch **grün**.
+
+Der Grund: Über der reparierten Stelle steht ein Kommentar, der die richtige Form im Fließtext
+nennt. Der Test schnitt den Zweig als Zeichenkette aus, und der Kommentar reiste mit. Die Prüfung
+fand ihre Zusicherung also in ihrer eigenen Begründung, nicht im Code.
+
+Seitdem misst 9a den Ausschnitt **ohne Kommentare**. Zwei übertragbare Regeln:
+
+- **Ein Test, der Quelltext als Zeichenkette liest, muss Kommentar von Code trennen** — sonst prüft
+  er, ob jemand die richtige Lösung *aufgeschrieben* hat, nicht ob sie *dasteht*.
+- Die Umkehrung gilt genauso: Ein Wächter, der eine verbotene Form als Zeichenkette sucht (9b),
+  schlägt auch an einem Kommentar an, der sie zitiert. Dann wird der **Kommentar umschrieben**,
+  nicht der Wächter aufgeweicht — und an der Stelle steht, warum er so klingt, wie er klingt.
+
+Gefunden hat es nur die Gegenprobe. Ohne sie wäre ein Test entstanden, der auf ewig grün ist.
