@@ -1,4 +1,10 @@
-# Tarnwert – Konzept (Entwurf, 03.09.2026)
+# Tarnwert – Konzept (03.09.2026)
+
+> **Stand: Etappe 1 ist gebaut** (v8.660.0 die Signatur, danach das Verstecken und der
+> Signaturscanner). Was unten als Entwurf steht, ist damit für Etappe 1 Umsetzung; Etappe 2 (der
+> Anflug) ist weiterhin Entwurf. Abschnitt 11 am Ende hält fest, was beim Bauen anders kam als
+> geplant – das ist der Teil, der beim nächsten Mal Zeit spart.
+
 
 Auftrag Sascha: „ich würde gerne einen tarnwert noch einfügen … wichtig ist er darf nirgends
 vergessen werden in formeln anzeige wenn man schiffe baut module etc sowie es muss eine gegenwehr
@@ -359,3 +365,51 @@ Zwei Fehler, die nichts mit Tarnung zu tun haben, aber dabei aufgefallen sind:
 - **`notifySpyTarget` feuert nie.** Es schreibt den Spionage-Ping mit `shared=false`, der Server
   behandelt `spyping` aber nur im shared-Zweig. Die einzige existierende Gegenwehr-Meldung des Spiels
   kommt nie an – und ein Hilfetext verspricht sie trotzdem.
+
+---
+
+## 11. Was beim Bauen von Etappe 1 anders kam (03.09.2026)
+
+Vier Punkte, an denen die Umsetzung vom Entwurf abweicht oder ihn schärft.
+
+**1. Der Sensor kann verborgene Schiffe nicht hervorzaubern – und das ist sein eigentlicher Wert.**
+Der Entwurf ließ offen, was ein starker Scanner sieht. Beim Bauen wurde klar, dass er die Klassen
+gar nicht sehen *kann*: Der Bestenlisten-Eintrag ist für jedes eingeloggte Konto lesbar, eine
+Verschlüsselung wäre Theater, und die verborgenen Klassen stehen deshalb schlicht nicht drin. Sein
+Nutzen ist ein anderer und der bessere: **Er sagt dir, dass das Bild unvollständig ist.** Ohne ihn
+liest du den Eintrag als vollständig, wählst den Konter danach und verlierst einen Kampf, den die
+Zahlen dir versprochen hatten. Die Warnung steht deshalb unmittelbar unter der Konter-Zeile der
+Angriffs-Vorschau – eine Zahl und ihr Vorbehalt gehören nebeneinander.
+
+**2. Die Falle war nicht die Tarnung, sondern der Energiehaushalt.**
+`applySoftCappedGain()` beantwortete einen negativen Betrag mit „nichts zu tun". Das war richtig,
+solange es keinen laufenden Verbraucher gab – die Tarnung ist der erste. Ohne eigenen
+Verbrauchszweig hätte die Anzeige den Verbrauch gezeigt und das Lager ihn nie gespürt: ein stiller
+Fehler, den niemand meldet, weil er wie Großzügigkeit aussieht. **Übertragbar: Wer die erste Instanz
+einer neuen Art von Wert einführt, muss prüfen, ob die bestehende Rechnung diese Art überhaupt
+kennt.** Ein Vorzeichen ist eine solche Art.
+
+**3. Die Grenze musste nicht erfunden werden.**
+`TARNUNG_GRENZE = 600` ist keine neue Zahl, sondern die Oberkante des leeren Signaturbereichs
+241–599 – und genau das, was seit v8.660.0 auf jeder Werftkarte steht. Die Zusage kam vor der
+Mechanik, die Mechanik löst sie ein. `test_tarnung.js` (1b/1c) hält beide zusammen und prüft
+zusätzlich, dass die Grenze *in* der Lücke liegt und nicht knapp über dem letzten Schiff – sonst
+wäre sie wieder eine Rampe.
+
+**4. Die Ehrlichkeitsprüfung muss in beide Richtungen laufen.**
+Von den im Entwurf gezählten Zusagen wurde beim Nachmessen genau **eine** zur Lüge
+(„Aufklärung zeigt sie dir" bei den Konterrollen). „Nach dem Kampf siehst du ohnehin, was dort
+stand" und „Erfunden wird nichts" blieben wahr – die erste wegen der Einmal-Schutz-Entscheidung, die
+zweite wird durch den unvollständig-Fall im Spionagebericht sogar eingelöst. Der Test prüft deshalb
+beides: dass die eine Zusage den Vorbehalt trägt (6c) **und** dass die andere unverändert stehen
+bleibt (6d). Eine Ehrlichkeitsprüfung, die nur streicht, reißt wahre Zusagen mit weg.
+
+**Bewusst nicht getarnt:** die beiden Allianz-Kanäle (`paradesnapshot`, `basedef`). Sie existieren
+für die Absprache unter Verbündeten und sind nur mit dem eigenen Tag lesbar. Eine Tarnung, die auch
+die eigene Allianz blendet, macht das Spiel nicht spannender, sondern die Absprache unmöglich. Das
+ist eine Entscheidung, kein Vergessen – und sie steht als Kommentar an `tarnungFilter()`.
+
+**Offen für Etappe 2:** der Anflug, `SHIP_SIGNATUR` als Backend-Spiegel (heute liest serverseitig
+nichts die Signatur, deshalb wäre der Spiegel toter Code), und die im Entwurf genannte Wirkung auf
+`executeRaid()` – solange Entdeckung keine Kampfwirkung hat, bleibt Tarnung eine Informations- und
+keine Kampfmechanik.
