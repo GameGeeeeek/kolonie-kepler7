@@ -13310,6 +13310,19 @@
   const STATTHALTER_CHRONIK_STUFEN = [0, 1, 3, 10];
   const STATTHALTER_ERSTSIEG_ESSENZ = 3, STATTHALTER_ERSTSIEG_KP = 40;
   function istStatthalter(npc){ return !!(npc && npc.statthalter); }
+  /* Drei Gegner sind hinter einer Forschung gesperrt (void1/2/3 hinter `rleere`). Die Regel dafuer
+     stand bis zum 03.09.2026 VIERMAL ausgeschrieben da - dreimal bejahend in den Listen, einmal
+     verneint im Angriffs-Riegel -, und die FUENFTE Stelle hatte sie vergessen: Das 🎯-Abzeichen der
+     Sektorkarte zaehlte gesperrte Gegner mit. Weil in allen drei Systemen AUSSERDEM ein freier
+     Gegner steht, war die Folge nicht bloss ein Name zu viel, sondern eine falsche Anzahl und ein
+     falscher "staerkster" - nyra meldete "2 Gegner, staerkster: Das Herz der Leere (Stufe 40)",
+     wahr war fuer diesen Spieler "Nyra, die Verschlingerin - Stufe 25".
+     Seither steht die Regel hier und nur hier: Wer einen neuen Gegner sperrt, muss nichts
+     nachziehen. tests/test_npc_freigabe.js misst beides getrennt - ob die Regel stimmt, und ob
+     das Abzeichen sie anwendet. */
+  function npcFreigeschaltet(npc){
+    return !npc.requiresResearch || (state.research[npc.requiresResearch]||0) >= 1;
+  }
   function statthalterAlle(){ return NPCS.filter(istStatthalter); }
   function statthalterIn(sysId){ return NPCS.find(n => n.statthalter && n.system === sysId) || null; }
   function statthalterChronik(npc){
@@ -57781,7 +57794,7 @@ async function claimPendingRewards(){
       }
       /* 🎯 statt ⚔️ - das Schwerter-Zeichen ist an den Fraktionskrieg vergeben (siehe oben), und
          zwei Bedeutungen fuer dasselbe Symbol sind die zweite Anzeigestelle in Reinform. */
-      const npcsHier = NPCS.filter(n => n.system === sysId && !n.statthalter);
+      const npcsHier = NPCS.filter(n => n.system === sysId && !n.statthalter && npcFreigeschaltet(n));
       if (npcsHier.length){
         const staerkster = npcsHier.reduce((a,b) => (b.level||0) > (a.level||0) ? b : a, npcsHier[0]);
         badges.push({ icon:'🎯',
@@ -59352,7 +59365,7 @@ async function claimPendingRewards(){
         }
         const gebiet = factionOwning(activeSystem);
         if (gebiet) chips.push([gebiet.color || '#c3bef5', 'Territorium: ' + gebiet.name]);
-        const npcsHier = NPCS.filter(n => n.system === activeSystem && (!n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1));
+        const npcsHier = NPCS.filter(n => n.system === activeSystem && npcFreigeschaltet(n));
         for (const n of npcsHier){
           if (n.statthalter){
             const sg = npcScalingCount(n.id);
@@ -60002,7 +60015,7 @@ async function claimPendingRewards(){
         </g>
       `;
     }
-    for (const npc of NPCS.filter(n=>n.system===activeSystem && (!n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1))){
+    for (const npc of NPCS.filter(n=>n.system===activeSystem && npcFreigeschaltet(n))){
       const coord = kbMarkerFrei(npcMarkerXY(), sysPlanets, activeSunType.r, npc.boss ? 19 : 11, platzierteMarker);
       platzierteMarker.push({ x: coord.x, y: coord.y, r: npc.boss ? 19 : 11 });
       const npcColor = npc.boss ? '#f3aec6' : '#791f1f';
@@ -61302,7 +61315,7 @@ async function claimPendingRewards(){
     const combatShips = combatFleetCount(cf);
     if (slotsUsed >= combatShips){ log('Alle Kampfschiffe dort sind bereits im Einsatz.', 'ti-alert-triangle'); return; }
     const npc = NPCS.find(n => n.id === npcId);
-    if (npc.requiresResearch && (state.research[npc.requiresResearch]||0) < 1){ log('Dieser Gegner ist erst mit der Forschung '+((RESEARCH_DEFS.find(r=>r.key===npc.requiresResearch)||{}).name||npc.requiresResearch)+' erreichbar.', 'ti-lock'); return; }
+    if (!npcFreigeschaltet(npc)){ log('Dieser Gegner ist erst mit der Forschung '+((RESEARCH_DEFS.find(r=>r.key===npc.requiresResearch)||{}).name||npc.requiresResearch)+' erreichbar.', 'ti-lock'); return; }
     const dur = missionDurationFor(npc.duration, attackFleet, ATTACK_SHIP_KEYS, npc.system);
     const fuel = missionFuelCostSplit(dur, attackFleet);
     if (!canAfford(fuel)){ log('Nicht genug Treibstoff für diese Mission: benötigt '+fuelCostText(fuel)+'.', 'ti-alert-triangle'); return; }
@@ -66622,7 +66635,7 @@ async function claimPendingRewards(){
         sperre: fwahlMindestensEins, start: () => sendPirateLairMission() });
     }
     renderAbgrundBox(cf);
-    setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => !n.requiresResearch || (state.research[n.requiresResearch]||0) >= 1).map(n => {
+    setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => npcFreigeschaltet(n)).map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
       const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss').length < combatShipsN;
