@@ -73,6 +73,12 @@ dieser Nachprüfung. Nicht durch eine Pipe aufrufen — `| tail` verwirft den Ex
 
 ## Mehrere Sitzungen gleichzeitig
 
+**Zuerst nach BEREICH trennen, nicht nach Zeitfenster** (Entscheidung Sascha, 04.09.2026, nachdem
+an einem Tag drei volle Prüfläufe zu je ~45 Minuten von fremden Merges entwertet wurden — zweimal
+davon trotz gesetzter Ampel). Vor dem Start festlegen, wer welchen Bereich der Spieldatei hat (etwa
+Vorposten hier, KI-Kampfberichte dort). Dann kollidieren nur noch `VERSION` und `PATCHNOTES`, und
+das kostet Minuten statt Stunden. Die Ampel unten bleibt die zweite Sicherung, nicht die erste.
+
 Arbeiten dürfen alle Sitzungen parallel. **Ausliefern darf nur eine zur Zeit.** Der Zustand des Pull
 Requests ist die Ampel: Entwurf heißt „ich arbeite noch, mergt ruhig", bereit zur Prüfung heißt
 „ich liefere gerade aus". Ein PR wird deshalb aus dem Entwurf geholt, **wenn der abschließende
