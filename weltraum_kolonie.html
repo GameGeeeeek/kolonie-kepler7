@@ -21109,22 +21109,44 @@
     return fleet;
   }
 
-  function shipRequirementsMet(def){
-    // Tiefenflotte (v8.337.0): freigeschaltet ueber die REKORDTIEFE statt ueber Forschung. Steht
-    // hier und nicht als eigene Pruefung daneben, damit es keine zweite Stelle gibt, die "darf ich
-    // dieses Schiff bauen" beantwortet - Bauknopf, Baukorb und Warteschlange fragen alle hierher.
-    if (typeof def.tiefe === 'number' && ((state.abgrund||{}).best||0) < def.tiefe) return false;
-    // Allianzflotte (05.08.2026): zwei zusaetzliche Tore, beide nur hier. Bereits GEBAUTE Schiffe
-    // sind davon nicht betroffen - diese Funktion beantwortet ausschliesslich "darf ich NEUE bauen".
+  /* Der Sperrgrund als fertiger Satz, oder null wenn nichts im Weg steht (SP-2, 04.09.2026).
+     Muster wie vorpostenBauGrund(): Der Knopf ist nicht mehr gesperrt, der Klick nennt den Grund -
+     am Handy die einzige moegliche Auskunft, weil es dort kein Hover gibt.
+     shipRequirementsMet() leitet sich DARAUS ab statt danebenzustehen: Wer den Grund kennt,
+     beantwortet auch die Ja/Nein-Frage. Zwei getrennte Fassungen waeren genau der Fehler, den
+     SP-1 einen Tag vorher gekostet hat - dort verstanden Riegel und Meldung die Datenform
+     unterschiedlich, und die Meldung schwieg bei zwei Dritteln aller Faelle.
+     Tiefenflotte (v8.337.0): ueber die REKORDTIEFE freigeschaltet, nicht ueber Forschung.
+     Allianzflotte (05.08.2026): zwei zusaetzliche Tore. Bereits GEBAUTE Schiffe sind von beidem
+     nicht betroffen - hier steht ausschliesslich "darf ich NEUE bauen". */
+  function schiffSperrGrund(def){
+    if (!def) return 'Unbekanntes Schiff.';
+    if (typeof def.tiefe === 'number' && ((state.abgrund||{}).best||0) < def.tiefe)
+      return def.name + ' braucht Tiefe ' + def.tiefe + ' im Abgrund - deine Bestmarke ist '
+             + ((state.abgrund||{}).best||0) + '.';
     if (def.allianzSchiff){
-      if (!inAllianz()) return false;
-      if (allianceTechLevel('ab_werft') < (def.allianzWerft||0)) return false;
+      if (!inAllianz())
+        return def.name + ' ist ein Allianzschiff - tritt einer Allianz bei oder gründe eine (Allianz-Tab).';
+      const noetig = def.allianzWerft || 0;
+      if (allianceTechLevel('ab_werft') < noetig)
+        return 'Dafür fehlt noch: ' + ((findAllianceStructure('ab_werft')||{}).name || 'Gemeinsame Flottenwerft')
+             + ' Stufe ' + noetig + ' (aktuell ' + allianceTechLevel('ab_werft') + ').';
     }
-    return (def.requires||[]).every(req => {
-      if (typeof req === 'string') return (state.research[req]||0) >= 1;
-      return (state.research[req.key]||0) >= req.level;
-    });
+    /* Erst billig pruefen OB etwas fehlt, dann erst den Satz bauen: Diese Funktion laeuft bei
+       jedem Rendern ueber alle Schiffe, der Sperrfall ist der seltene. */
+    const vor = def.requires || [];
+    let fehltEtwas = false;
+    for (let i = 0; i < vor.length; i++){
+      const v = techVoraussetzung(vor[i]);
+      if ((state.research[v.key]||0) < v.level){ fehltEtwas = true; break; }
+    }
+    if (!fehltEtwas) return null;
+    const fehlt = vor.map(techVoraussetzung)
+      .filter(v => (state.research[v.key]||0) < v.level)
+      .map(v => (findeForschung(v.key)||{name:v.key}).name + ' Stufe ' + v.level).join(', ');
+    return 'Dafür fehlt noch: ' + fehlt + '.';
   }
+  function shipRequirementsMet(def){ return !schiffSperrGrund(def); }
   // Kredite liegen NICHT in state.resources, sondern in state.credits - ein Kostenposten 'credits'
   // wurde deshalb bis v8.298.26 als "0 vorhanden" gelesen und machte den Posten UNBEZAHLBAR (Spieler-
   // Report 26.07.2026: das Botschaftsviertel mit 400 Kredit-Anteil liess sich nie bauen). Der
@@ -65064,7 +65086,7 @@ async function claimPendingRewards(){
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-            <button class="buy ${(unlocked&&ok&&!atOwnedCap)?'affordable':''}" data-buyship="${def.key}" ${(unlocked&&ok&&!atOwnedCap)?'':'disabled'}><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Bauen (+${shipQty})</button>
+            <button class="buy ${(unlocked&&ok&&!atOwnedCap)?'affordable':''}" data-buyship="${def.key}"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>${(unlocked&&!atOwnedCap&&!ok)?'Einreihen':'Bauen'} (+${shipQty})</button>
             ${count>0 ? `<button data-scrapship="${def.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>Verschrotten (-${Math.min(shipQty,count)})</button>` : ''}
           </div>
         </div>
@@ -68746,7 +68768,11 @@ async function claimPendingRewards(){
     document.querySelectorAll('[data-buyship]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-buyship');
       const def = SHIP_DEFS.find(d=>d.key===key);
-      if (!def || !shipRequirementsMet(def)) return;
+      if (!def) return;
+      // Frueher ein stiller `return`: Der Knopf war gesperrt, also kam der Klick ohnehin nie an.
+      // Ohne Riegel waere genau das der Zweig, der den Spieler ohne jede Antwort stehen laesst.
+      const sperrGrund = schiffSperrGrund(def);
+      if (sperrGrund){ log(sperrGrund, 'ti-alert-triangle'); return; }
       if (def.unlockItems && !state.unlocked[key]){ log(def.name+' muss zuerst freigeschaltet werden.', 'ti-alert-triangle'); return; }
       if (def.unlockEventParts && !state.unlocked[key] && !schiffPerForschungFrei(def)){ log(def.name+' muss zuerst zusammengebaut werden.', 'ti-alert-triangle'); return; }
       if (shipQueueCount() >= SHIP_QUEUE_MAX){ log('Flotten-Warteschlange ist voll (max. '+SHIP_QUEUE_MAX+' Aufträge gleichzeitig).', 'ti-alert-triangle'); return; }
