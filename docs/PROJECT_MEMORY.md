@@ -428,3 +428,31 @@ eine Verschmelzung, die nur zufällig stimmt.
 
 Die Prüfung dagegen misst deshalb nicht nur die neuen Werte, sondern dass der Raid-Block die
 Verbandsliste **nirgends** mehr liest — ein einziger übersehener Verweis würde reichen.
+
+## Zwei stille Sperren, beide unsichtbar von außen (04.09.2026)
+
+An einem Tag zwei echte Fehler im laufenden Spiel gefunden — beide seit Wochen live, beide ohne
+jede Spur: kein Fehler, kein Log, kein roter Test. Sie gehören derselben Familie an.
+
+**1. Ein falsch geschriebener Rohstoffschlüssel sperrt, statt zu meckern.** Das Backend schrieb in
+den Vorposten-Kosten `singularitaetskerne` (Mehrzahl); im Spielstand heißt der Schlüssel
+`singularitaetskern` (Einzahl) — nur das *Label* lautet „Singularitätskerne". `costAmountAvailable()`
+liefert für einen unbekannten Schlüssel `0`, `canAfford()` also dauerhaft `false`. Folge: Stufe 8
+und alle drei Endprojekte waren für jeden Spieler gesperrt, das Sprungtor seit Etappe 4 angeboten
+und nie baubar.
+
+**2. Eine Liste mit einem Schlüssel indiziert ist immer `undefined`.** `SHIP_DEFS` ist ein Array;
+im Abbau-Zweig stand ein Index-Zugriff mit einem Schiffsschlüssel. Die Bedingung war damit immer
+falsch: Wer seinen Vorposten abbaute, bekam die Garnison **nicht** zurück — und die Belohnung wurde
+trotzdem aus der Warteschlange geräumt, die Schiffe waren ersatzlos weg. Es waren die einzigen zwei
+solchen Zugriffe der ganzen Datei.
+
+**Das Gemeinsame: ein falscher Name wird nicht zu einem Fehler, sondern zu einem `0` oder einem
+`undefined` — und das sieht aus wie „geht halt nicht".** Genau die Sorte Fehler, die eine
+Sicherheitsprüfung nie meldet und ein Test nur dann findet, wenn er die *Namen* gegeneinander hält
+statt der Werte. Beide Wächter dazu stehen in `tests/test_vorposten_paritaet.js` (Abschnitte 8
+und 9) und lesen ihren gültigen Vorrat aus dem Code, statt ihn zu tippen.
+
+**Wo sonst noch suchen:** Überall, wo ein Name aus einer Tabelle als Schlüssel in eine *andere*
+Datenstruktur greift, ohne dass jemand das Ergebnis auf `undefined` prüft. Ein `|| 0`, ein `||
+false` und ein `if (x[k])` sind dort keine Robustheit, sondern die Tarnung.
