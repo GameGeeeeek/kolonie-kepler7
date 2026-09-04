@@ -1,16 +1,18 @@
 // Ab der Wahlstufe ist der Vorposten eine RAUMSTATION - und sieht auch so aus (02.09.2026).
 //
 // Auftrag Sascha (Etappe 2): "wenn zur Raumstation ausgebaut wird, dass die Raumstation optisch
-// auch richtig geil aussieht". Bis Stufe 3 bleibt die Palisade mit Fahne (ein Feldlager soll wie
-// eines aussehen), ab der Wahlstufe zeichnet vorpostenSilhouette() je Zweig eine eigene Station:
+// auch richtig geil aussieht". SEIT GR-6 (04.09.2026, Nachfrage "wann sieht der stuetzpunkt
+// endlich so aus wie wir besprochen haben") gilt das auf JEDER Stufe: Das Bodenlager der Stufen
+// 1 bis 3 ist entfallen, weil der "Stuetzpunkt" Stufe 2 ist und der Spieler dort Zelte sah.
+// vorpostenSilhouette() zeichnet je Zweig eine eigene Station:
 // Werft (Dockklammern mit Rumpf im Bau), Handelsknoten (Ring mit Containern), Festungsring
 // (gepanzerter Ring mit Tuermen). Der Radius waechst mit der Stufe.
 //
 // GEPRUEFT wird die ZEICHNUNG im echten Kartenaufbau, nicht nur ihr Vorhandensein im Quelltext:
-//   1a-1c Bodenlager (Stufe 2): Palisade und Fahne da, KEINE Station.
+//   1a-1c Schon Stufe 2 traegt eine gerenderte Station, und vom Bodenlager ist nichts mehr da.
 //   2a-2d Station je Zweig: die zweigtypischen Formen sind da, die der anderen Zweige nicht.
 //   3a    Der Marker waechst mit der Stufe (gemessene Bounding-Box, Stufe 2 gegen Stufe 8).
-//   3b    Die Landmarke wechselt von ⛺ auf 🛰.
+//   3b    Die Landmarke ist immer 🛰.
 //   4a    Kein Marker liegt ausserhalb der Zeichenflaeche (der Kollisionsschieber bekommt den
 //         gewachsenen Sichtradius - eine Sternenfestung darf nicht aus dem Bild geschoben werden).
 //
@@ -28,6 +30,20 @@ check('0a: die Silhouette kennt alle drei Zweige und einen Rueckfall ohne Zweig'
   /function vorpostenSilhouette\(vp, x, y, r, farbe\)\{/.test(src)
   && /if \(zweig === 'werft'\)\{/.test(src) && /if \(zweig === 'handel'\)\{/.test(src) && /if \(zweig === 'festung'\)\{/.test(src)
   && /Neutraler Stationsring \(Zweig unbekannt\)/.test(src));
+/* WAECHTER FUER DIE HILFE (Befund der Durchsicht, 04.09.2026). Die Zeichnung wurde bei GR-6
+   gezogen, der Hilfetext nicht: Der Landmarken-Eintrag erklaerte den Vorposten weiter mit dem
+   Zelt, das es auf keiner Kartenebene mehr gibt. Drei der fuenf Blickwinkel fanden das
+   unabhaengig voneinander, und beide Skeptiker liessen es stehen - eine Legende, die auf ein
+   Zeichen zeigt, das nirgends steht, ist eine Falschaussage an den Spieler.
+   Dass so ein Eintrag pruefbar ist, macht test_statthalter 13b seit jeher vor; fuer den
+   Vorposten fehlte der Waechter, deshalb blieb das Zelt unbemerkt stehen. Geprueft wird die
+   REGEL: Das Zeichen im Hilfetext ist dasselbe, das karteSystemBadges tatsaechlich setzt. */
+check('0c: die Hilfe nennt fuer den Vorposten das Zeichen, das die Karte auch setzt',
+  /Ein <strong>🛰<\/strong> zeigt einen <strong>Vorposten<\/strong>/.test(src)
+  && /badges\.push\(\{ icon: '🛰'/.test(src)
+  && !/⛺/.test(src), { zeltNochDa: /⛺/.test(src) });
+check('0d: und die Hilfe behauptet nicht mehr drei Stufen, wo die Leiter acht hat',
+  !/<strong>Drei Stufen<\/strong>/.test(src) && /<strong>Acht Stufen<\/strong>/.test(src));
 check('0b: der Radius waechst mit der Stufe und der Kollisionsschieber bekommt ihn mit',
   /function vorpostenRadius\(stufe\)\{ return 11 \+ Math\.max\(0, Math\.min\(7, \(stufe\|\|1\) - 1\)\) \* 0\.85; \}/.test(src)
   && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* 2\.0;/.test(src));
@@ -101,22 +117,32 @@ async function lauf(browser, vp){
 (async () => {
   const browser = await starteBrowser();
 
-  // ---- 1) Bodenlager ----------------------------------------------------------------------------
+  // ---- 1) Auch die kleinste Stufe ist eine Station -----------------------------------------------
   const a = await lauf(browser, doc(2, null, 'Stützpunkt'));
   check('1-vorab: Boot ohne Skriptfehler, der Vorposten steht auf der Karte', a.errs.length === 0 && a.mark.da === true, { errs: a.errs.slice(0,2), da: a.mark.da });
-  /* 1a/1b halten seit dem 03.09.2026 die REGEL fest, nicht die Form. Vorher stand hier
-     "Zinnen-Polygon mit NEUN Punkten" und "Mast mit stroke-width 1.4" - eine Momentaufnahme
-     genau der Zeichnung, die der Spieler dann "billig und langweilig" nannte. Ein solcher Test
-     blockiert den Neuentwurf, den er eigentlich absichern soll (Regel 3). Gemessen wird jetzt,
-     dass das Bodenlager ueberhaupt gezeichnet ist und die Fahne dazugehoert - WIE, ist frei. */
-  check('1a: bis zur Wahlstufe steht ein Bodenlager (gefuellte Formen, kein blosser Punkt)',
-    ((a.mark.html || '').match(/<polygon /g) || []).length >= 2 && /fill="rgba\(10,13,26/.test(a.mark.html || ''),
-    (a.mark.html||'').slice(0, 120));
-  check('1b: mit Mast und Fahne', /<line [^>]*stroke-width="1\.3"/.test(a.mark.html || '')
-    && /(<polygon points="[^"]*" fill="#|<rect [^>]*fill="#)/.test(a.mark.html || ''));
-  check('1c: KEINE Stationsteile (weder Container noch Dockklammern noch Aufbauten)',
-    !/rotate\(\d+ /.test(a.mark.html || '') && !/stroke-width="2\.1"/.test(a.mark.html || '')
-    && !/stroke-dasharray="4,3"/.test(a.mark.html || ''), (a.mark.html||'').length);
+  /* DIE REGEL HAT SICH GEDREHT (GR-6, 04.09.2026). Hier stand bis eben "bis zur Wahlstufe steht
+     ein Bodenlager" - und genau das war der Fehlerbericht: Der "Stuetzpunkt" ist Stufe 2, der
+     Spieler sah dort Zelte statt der besprochenen Raumstation und haette zweimal ausbauen
+     muessen, ehe ueberhaupt eine erscheint. Das Bodenlager ist entfallen; gemessen wird jetzt
+     das Gegenteil, und zwar an der Stufe, die den Bericht ausgeloest hat. */
+  check('1a: schon auf Stufe 2 steht eine gerenderte Station, kein Bodenlager',
+    /data-vp-bild="1"/.test(a.mark.html || '') && (a.mark.html||'').length > 5000,
+    { hatBild: /data-vp-bild="1"/.test(a.mark.html || ''), laenge: (a.mark.html||'').length });
+  /* Der Rueckfall-Riegel: Palisade, Mast und Fahne duerfen nicht wiederkommen. Ohne diese
+     Pruefung waere 1a auch dann gruen, wenn jemand das Bodenlager NEBEN die Station zeichnet. */
+  check('1b: und keine Spur des alten Bodenlagers mehr daneben',
+    ((a.mark.html || '').match(/<polygon /g) || []).length === 0
+    && !/<line [^>]*stroke-width="1\.3"/.test(a.mark.html || ''),
+    { polygone: ((a.mark.html || '').match(/<polygon /g) || []).length });
+  /* 1c HIESS "das Bild der Stufe 2 ist ein anderes als das der Wahlstufe" und pruefte in
+     Wahrheit nur, ob ueberhaupt ein Bild da ist - sie verglich nichts. Zwei Blickwinkel der
+     Durchsicht fanden das unabhaengig. Der Vergleich braucht BEIDE Bilder; die liegen erst in
+     Abschnitt 5 vor, und dort steht er jetzt (5d). Hier bleibt nur, was an dieser Stelle
+     messbar ist: dass das Bild der Stufe 2 ueberhaupt gelesen werden kann - der Anker, ohne
+     den 5d nichts zu vergleichen haette. */
+  const bildS2 = (String(a.mark.html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null;
+  check('1c-anker: das Bild der Stufe 2 laesst sich auslesen (sonst misst 5d nichts)',
+    !!bildS2 && bildS2.length > 2000, { laenge: bildS2 ? bildS2.length : 0 });
   const kleinHof = a.mark.hofR;   // rV * 1,7 - der pulsende Hof ist die einzige Groesse, die NUR am Radius haengt
   check('1d-anker: der Hof-Kreis ist messbar (sonst misst 3a nichts)', kleinHof > 0, kleinHof);
   await a.ctx.close();
@@ -147,7 +173,11 @@ async function lauf(browser, vp){
   // DIE EIGENTLICHE REGEL: drei Zweige, drei UNTERSCHIEDLICHE Stationen.
   check('2d: die drei Zweige sehen verschieden aus (kein geteiltes Bild)',
     !!bildW && !!bildH && !!bildF && bildW !== bildH && bildH !== bildF && bildW !== bildF,
-    { werft: (bildW||'').slice(-24), handel: (bildH||'').slice(-24), festung: (bildF||'').slice(-24) });
+    /* Der Beleg zeigte die letzten 24 Zeichen der base64-Daten - daran ist im Fehlschlag nichts
+       abzulesen. Die Laengen sagen wenigstens, ob ueberhaupt drei verschiedene Bilder entstanden
+       oder eines dreimal geliefert wurde (Befund der Durchsicht). */
+    { laengen: [ (bildW||'').length, (bildH||'').length, (bildF||'').length ],
+      paarweiseGleich: [ bildW===bildH, bildH===bildF, bildW===bildF ] });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
@@ -156,8 +186,10 @@ async function lauf(browser, vp){
     const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click();
     return null;
   });
-  check('3b: die Landmarke wechselt ab der Wahlstufe von ⛺ auf 🛰',
-    /vorpostenIstStation\(vpHier\) \? '🛰' : '⛺'/.test(src));
+  /* Bis GR-6 wechselte die Landmarke ab der Wahlstufe von ⛺ auf 🛰. Seit der Vorposten auf
+     JEDER Stufe eine Station ist, waere das Zelt eine Falschaussage - es gibt keins mehr. */
+  check('3b: die Landmarke ist immer das Satelliten-Zeichen, das Zelt ist weg',
+    /badges\.push\(\{ icon: '🛰'/.test(src) && !/'🛰' : '⛺'/.test(src));
   check('4a: der Marker liegt vollstaendig in der sichtbaren Karte (der Schieber kennt den gewachsenen Radius)',
     f.mark.links >= f.mark.svgL - 2 && f.mark.oben >= f.mark.svgT - 2 && f.mark.rechts <= f.mark.svgR + 2 && f.mark.unten <= f.mark.svgB + 2,
     { marker: [Math.round(f.mark.links), Math.round(f.mark.oben), Math.round(f.mark.rechts), Math.round(f.mark.unten)],
@@ -187,6 +219,15 @@ async function lauf(browser, vp){
   check('5b: der Ausbau LEGT ZU - das Bild der Stufe 8 traegt mehr als das der Stufe 4',
     bildLaengen[7] > bildLaengen[3] * 1.15,
     { stufe4: bildLaengen[3], stufe8: bildLaengen[7], reihe: bildLaengen.slice(3) });
+  /* DER VERGLEICH, den 1c behauptete und nicht leistete: Die Stufe unter der Zweigwahl und die
+     Wahlstufe selbst muessen unterschiedliche Bilder tragen. Genau an diesem Uebergang kommt der
+     Habitatring dazu - waere er unsichtbar, waere die Leiter fuer den Spieler nicht ablesbar,
+     und das war der Kern des Fehlerberichts, der zu GR-6 gefuehrt hat. */
+  const bildUnter = formen[1] ? formen[1].bild : null;      // Stufe 2, unter der Wahlstufe
+  const bildWahl  = formen[3] ? formen[3].bild : null;      // Stufe 4, die Wahlstufe
+  check('5d: die Stufe unter der Zweigwahl sieht anders aus als die Wahlstufe selbst',
+    !!bildUnter && !!bildWahl && bildUnter !== bildWahl,
+    { unter: bildUnter ? bildUnter.length : 0, wahl: bildWahl ? bildWahl.length : 0 });
   check('5c: und zwar durchgehend - keine Stufe faellt gegen die vorige zurueck',
     bildLaengen.slice(4).every((v, i) => v >= bildLaengen[3 + i]), bildLaengen.slice(3));
 
@@ -196,9 +237,17 @@ async function lauf(browser, vp){
   await browser.close();
   ende();
 })().catch(e => { console.log('FAIL - Ausnahme: ' + (e && e.stack || e)); process.exit(1); });
-// Gegenprobe gemessen 02.09.2026 (KEPLER_SPIELDATEI = v8.641.0 ohne diese Aenderung): rot 0a 0b 2a 2b 2c 2d 3a 3b (8),
-// gruen bleiben 1-vorab 1a 1b 1c 1d-anker 4a 4b (7) - das Bodenlager sieht dort ja schon richtig aus, und ein
-// fester Radius liegt erst recht im Bild. Prueflisten identisch (15).
+// Gegenprobe GR-6 GEMESSEN 04.09.2026 (KEPLER_SPIELDATEI = v8.668.0, der Stand mit Bodenlager):
+// rot 1a 1b 1c 3b (4), gruen bleiben 15. Auf Stufe 2 steht dort das Bodenlager statt der Station
+// (1a), Palisade und Fahnenmast sind da (1b), es gibt folglich gar kein Stufenbild zu vergleichen
+// (1c), und die Landmarke traegt noch das Zelt (3b). Alles ab der Wahlstufe bleibt gruen - die
+// Station war dort schon richtig gezeichnet, nur eben erst ab Stufe 4.
+//
+// Die erste Notiz hier sagte "rot 1a 1b 3b (3)" - 1c war vergessen. Eine Vorhersage, die um eine
+// Pruefung danebenliegt, ist keine: Sie haette einen echten Ausfall von 1c als "erwartet"
+// durchgewinkt. Deshalb steht hier die GEMESSENE Liste, nicht die geschaetzte.
+//
+// Aeltere Gegenprobe (02.09.2026, KEPLER_SPIELDATEI = v8.641.0): rot 0a 0b 2a 2b 2c 2d 3a 3b (8).
 //
 // WICHTIG, teuer gelernt: 3a mass im ersten Entwurf die BOUNDING-BOX des Markers - die enthaelt das <text> mit
 // dem Namen, und "Sternenfestung" ist laenger als "Stuetzpunkt". Die Pruefung war damit am alten Stand (fester
