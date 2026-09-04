@@ -1175,3 +1175,40 @@ Rohstoffschlüssel der drei Kostenquellen (`VORPOSTEN_STUFEN[].kosten`, `VP_PROJ
 `VORPOSTEN_BAUKOSTEN`) gegen die Rohstoff-Definitionen des Spiels; Abschnitt 9 verbietet den
 Index-Zugriff auf die sechs `*_DEFS`-Listen dateiweit. Beide lesen ihren gültigen Vorrat aus dem
 Code, statt ihn zu tippen — eine neue Tier-2-Ressource erweitert ihn von selbst, ein Tippfehler nicht.
+
+## Etappe V2 im Spiel: Der Werftrabatt wird sichtbar und wirksam (04.09.2026)
+
+Das Backend hat den Kanal am 03.09.2026 gebaut und hinter `VP_WERFT_AKTIV` geparkt, mit einer
+ausdrücklichen Bedingung im Quelltext: *„bis das Frontend den Kanal liest — ein gemeldeter Nutzen,
+der nirgends wirkt, wäre eine Lüge."* Hier ist die andere Hälfte.
+
+**Die Falle des Namens.** „Werftrabatt" klingt nach *günstiger*, gemeint ist *schneller*. Der Kanal
+`werft` ist ein Anteil ersparter **Schiffsbauzeit**, kein Kostenrabatt. Wer ihn auf die Kosten legt,
+baut etwas anderes als das Konzept — und niemand merkt es, weil beides plausibel aussieht. Prüfung
+`0d` im Wächter hält deshalb fest, dass der Anteil an keiner Kostenrechnung hängt.
+
+**Wo er wirkt.** `vorpostenWerftBonus()` summiert `nutzen.werft` über alle eigenen Vorposten,
+deckelt mit dem **vom Server gemeldeten** `werftDeckel` und wird im **Schiffs**-Zweig von
+`effectiveBuildTimeEach()` multipliziert. Gebäude bleiben unberührt, obwohl sie dieselbe Funktion
+durchlaufen — der Kanal heißt „Werft" und meint die Werft. Global, nicht je System: Schiffe
+entstehen zu Hause, nicht am Vorposten; der Anteil summiert sich deshalb wie `prod`, statt am
+Zielsystem zu hängen wie `flug`.
+
+**Wo er zu sehen ist.** Drei Stellen, und die zweite war eine echte Lücke:
+
+1. Nutzen-Zeile der Station — nur, wenn der Anteil größer als null ist.
+2. **Die Zweigwahl.** Sie nannte Flugzeit, Produktion und Aufklärung — ausgerechnet der Kanal, nach
+   dem der Zweig *heißt*, fehlte. Wer die Werft wählte, wählte nach Flugzeit und einem dünneren
+   Kern.
+3. Eine eigene Zeile im Werft-Tab. Die Bauzeit je Schiff war schon überall richtig, sobald der
+   Rabatt in `effectiveBuildTimeEach` hängt — was fehlte, ist die **Ursache**. Kürzere Zahlen ohne
+   erkennbaren Grund kommen später als „stimmt die Zahl überhaupt?" zurück.
+
+**Zwei stehengebliebene Hilfetexte** sind bei der Gelegenheit korrigiert worden, beide am Code
+gemessen: Der Produktionsdeckel steht auf **25 %**, die Hilfe sagte 10 %. Und „Aufgeben erstattet
+nichts" stimmt seit dem 24-Stunden-Abbau nicht mehr — Garnison und Module kommen zurück.
+
+Wächter: `tests/test_vorposten_werft_ui.js` (16 Prüfungen, sechs Gegenproben gemessen). Die
+lehrreichste ist `C`: Tippt man den Deckel hart ein, statt ihn vom Server zu lesen, fällt **nur**
+die Quelltextprüfung `0b` — die Wirkungsprüfung kann diesen Fehler bauartbedingt nicht sehen und
+würde ihn erst bemerken, wenn Sascha den Deckel im Backend ändert, und dann im laufenden Spiel.
