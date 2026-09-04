@@ -20,8 +20,8 @@
 //      Abruf), wird die Box neu geschrieben. Ohne kiText in der Signatur bliebe sie stehen.
 //   3  Die Bestellung: Nach einem aufgeloesten NPC-Angriff bestellt der Client GENAU die fuenf
 //      Felder plus die Berichts-ID vom Server - nie den ganzen Bericht, nicht ohne ID (aelterer
-//      Server), nicht wenn das Speichern scheiterte, nicht fuer eine andere Berichtsart - und ein
-//      503 bleibt still (kein Seitenfehler, keine Meldung).
+//      Server), nicht wenn das Speichern scheiterte, nicht fuer eine andere Berichtsart, nicht fuer
+//      Weltboss/Abgrund/keinKampf (derselbe Typ, nicht E1) - und ein 503 bleibt still.
 //
 // GEGENPROBE (in beide Richtungen ausgefuehrt am 04.09.2026, Pruefnamen per diff, Kopien ueber
 // KEPLER_SPIELDATEI - die echte Spieldatei bleibt unangetastet):
@@ -32,6 +32,7 @@
 //   * Wird der GANZE Bericht bestellt statt der fuenf Felder, fallen genau 3b und 3c.
 //   * Ohne escapeHtml im Logbuch faellt genau 1c - und window.__logbuchXss waere gesetzt.
 //   * Bestellt pushReport fuer JEDE Berichtsart, faellt genau 3e (die Expedition bestellt mit).
+//   * Prueft kampftextBerechtigt nur den Typ (ohne keinKampf/weltboss/abgrund), fallen genau 3i und 3j.
 //   Befund beim Bau: Eine faellige ERKUNDUNG schreibt keinen Bericht (nur ein Fund tut das) - die
 //   Vorpruefung 3e-vorab hat das gemeldet, sonst waere 3e vacuous gruen gewesen.
 const { starteBrowser, SPIEL_URL, pruefer, ruhigeUhren, devices } = require('./lib/umgebung');
@@ -57,17 +58,17 @@ function bericht(id, extra){
 
 // Grundspielstand wie in test_abgrund_ui.js; `missionen` sind die faelligen Missionen, die das Spiel
 // beim Laden aufloest.
-const basisStand = missionen => JSON.stringify(Object.assign({
+const basisStand = (missionen, extra) => JSON.stringify(Object.assign({
   ...ruhigeUhren(),
   tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
   buildings:{solar:20,mine:18,lager:20,werft:12,labor:12},
   research:{}, colonies:{}, activeBasePlanet:'home',
   player:{id:'u',name:'A',avatarKey:null},
-  fleet:{ jaeger:4000, cruiser:200, frachter:200, ships:5, missions: missionen || [] },
+  fleet:{ jaeger:4000, cruiser:200, schlachtschiff:400, frachter:200, kessel:5, lotsenboot:3, ships:5, missions: missionen || [] },
   battleStats:{wins:9,losses:2}, xp:20000, credits:50000, buffs:[], lastTick:Date.now(),
   colonyNames:{}
-}));
+}, extra || {}));
 // Eine FAELLIGE Angriffsmission gegen den ersten NPC (Void-Marodeure, Verteidigung 30) - so gebaut,
 // wie das Spiel sie selbst anlegt (Z. 62392: id, type, targetId, startTime, endTime, power,
 // fleetName, composition). Mit 4000 Jaegern ist der Sieg sicher; Math.random ist ohnehin festgesetzt.
@@ -77,6 +78,14 @@ const angriff = () => ({ id:'t1', type:'attack', targetId:'raider1', startTime: 
 // Aufloesung rufen pushReport) - eine Erkundung dagegen nur bei einem Fund, gemessen: kein Bericht.
 const expedition = () => ({ id:'x1', type:'expedition', startTime: Date.now()-600000, endTime: Date.now()-2000,
   fleetName:'Weitflug', composition:{ jaeger: 10 }, escortPower: 100, encounterChance: 0 });
+// Zwei Berichte, die DENSELBEN Typ npc-attack tragen, aber keinen Text bekommen duerfen (Befund des
+// Review-Bots am PR #577): der Weltboss ohne Serverantwort (keinKampf) und der Abgrund-Tauchgang
+// (abgrund:true, Fixture aus test_abgrund_ui.js Abschnitt 5). Weltboss und Abgrund gehoeren nicht
+// zur Etappe E1; sie wuerden nur das Tageskontingent verbrauchen.
+const weltboss = () => ({ id:'w1', type:'worldboss', bossLevel: 1, startTime: Date.now()-600000, endTime: Date.now()-2000,
+  fleetName:'Probe', composition:{ jaeger: 400 }, power: 200000 });
+const abgrund = () => ({ id:'a1', type:'abgrund', targetId: 1, startTime: Date.now()-600000, endTime: Date.now()-2000,
+  fleetName:'Probe', composition:{ jaeger: 4000, schlachtschiff: 400, frachter: 200 }, power: 200000 });
 
 // Die Backend-Attrappe: haelt den Spielstand (storage) und die Berichte, schreibt jede Anfrage mit
 // (Methode, Pfad, Rumpf) - daran haengt Abschnitt 3 - und antwortet auf die zwei Kampftext-Wege so,
@@ -113,8 +122,8 @@ function backend(stand, berichte){
   return { route, aufrufe, antworten, berichte };
 }
 
-async function seiteMit(browser, berichte, missionen, vorAntworten){
-  const be = backend(basisStand(missionen), berichte);
+async function seiteMit(browser, berichte, missionen, vorAntworten, extraStand){
+  const be = backend(basisStand(missionen, extraStand), berichte);
   if (vorAntworten) Object.assign(be.antworten, vorAntworten);
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{ width:1100, height:1600 } }));
   const page = await ctx.newPage();
@@ -229,6 +238,28 @@ const aktualisieren = async page => {
     await warte(700);
     check('3g: scheitert das Speichern des Berichts, wird nichts bestellt',
       berichtePost(be).length > 0 && bestellungen(be).length === 0, { berichte: berichtePost(be).length, bestellungen: bestellungen(be).length });
+    await ctx.close();
+  }
+  {
+    // Weltboss ohne Serverantwort: ein npc-attack-Bericht MIT keinKampf - kein Text zu erzaehlen.
+    const { ctx, be } = await seiteMit(browser, [], [weltboss()]);
+    await warteBis(() => berichtePost(be).length > 0, 8000);
+    await warte(700);
+    const berichte = berichtePost(be).map(a => a.rumpf && a.rumpf.report).filter(Boolean);
+    check('3i-vorab: der Weltboss ohne Serverantwort erzeugt einen npc-attack-Bericht ohne Kampf',
+      berichte.some(r => r.type === 'npc-attack' && r.keinKampf === true), { typen: berichte.map(r => r.type + (r.keinKampf ? '/keinKampf' : '')) });
+    check('3i: fuer einen Bericht OHNE Kampf wird nichts bestellt', bestellungen(be).length === 0, { bestellungen: bestellungen(be).length });
+    await ctx.close();
+  }
+  {
+    // Abgrund-Tauchgang: ein npc-attack-Bericht mit abgrund:true - nicht Teil der Etappe E1.
+    const { ctx, be } = await seiteMit(browser, [], [abgrund()], null, { research: { rsingularitaet: 1 } });
+    await warteBis(() => berichtePost(be).length > 0, 10000);
+    await warte(700);
+    const berichte = berichtePost(be).map(a => a.rumpf && a.rumpf.report).filter(Boolean);
+    check('3j-vorab: der Tauchgang erzeugt einen npc-attack-Bericht mit abgrund',
+      berichte.some(r => r.type === 'npc-attack' && r.abgrund === true), { typen: berichte.map(r => r.type + (r.abgrund ? '/abgrund' : '')) });
+    check('3j: fuer den Abgrund wird nichts bestellt (E1 ist der gewoehnliche NPC-Angriff)', bestellungen(be).length === 0, { bestellungen: bestellungen(be).length });
     await ctx.close();
   }
   {
