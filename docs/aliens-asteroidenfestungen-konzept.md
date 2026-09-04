@@ -1615,3 +1615,45 @@ Jetzt, für Konvoi, Nest und Festung gleich:
 Wächter: `tests/test_pve_abklingsperre.js` (17; Quelltext + Browser mit drei Konvois: Abklingzeit,
 Kolonie-Verband unterwegs, Gegenrichtung). Gegenprobe gegen v8.631.0: 9 rot, 8 grün, identische
 Prüflisten.
+
+## Der Verband direkt aus dem Festungsmenü (04.09.2026)
+
+Auftrag Sascha: „füge hier hinzu das man unter festung angreifen auch allianz raid starten kann mit
+einstellbarer sammelphase 15 minuten 30 minuten 45 und 60 mit nachricht an allianz".
+
+Bis dahin führte genau **ein** Weg zu einem koordinierten Angriff: Allianz-Tab → Zielart wählen →
+Ziel aus einer Liste heraussuchen. Wer die Festung auf der Karte vor sich hatte, musste sie dort ein
+zweites Mal finden — und die Liste nennt sie nach Stufe und System, nicht nach dem, was man gerade
+angetippt hat. Im Kartenmenü stand dafür nur ein **Hinweis** auf den Allianz-Tab; der ist jetzt der
+Eintrag selbst.
+
+**Der neue Weg.** Unter „Festung angreifen" steht „Allianz-Verband ausrufen". Der Klick öffnet ein
+Overlay, das das Ziel als **gegeben** nimmt (es steht ja unter dem Finger) und nur noch fragt, was
+der Server zusätzlich wissen will: Sammelphase (15/30/45/60 Min., vorausgewählt 30), Nachricht an
+die Allianz und die Zielwahl des Verbands (Kern, Schildkuppel, Geschütztürme — dieselben drei wie
+beim Einzelschlag). Das Overlay benutzt die vorhandene Schicht der Flottenwahl (`.fwahl-overlay`),
+keine zweite CSS-Familie für dieselbe Sache, und ist bewusst allgemein gehalten:
+`start(sekunden, nachricht, zusatz)` plus `zusatzHtml`/`zusatzLesen`. Nest, Vorposten und Konvoi
+bekommen denselben Einstieg, sobald sie dran sind.
+
+**Die Sperrgründe stehen vorher da**, in derselben Bauart wie beim Einzelschlag darüber:
+Server-Modus, eigene Allianz, Rang (Admin/Offizier), kein bereits laufender Verband — und beim
+letzten nennt der Grund das Ziel des laufenden. Das ist **keine** zweite Rechteprüfung (die wäre im
+Client ohnehin keine); der Server lehnt jeden Fall selbst ab. Es geht allein darum, den Spieler
+nicht in eine Ablehnung laufen zu lassen.
+
+**Zwei Kopie-Familien wurden dabei nachgezogen:** die Sammelzeiten (siehe `PROJECT_MEMORY.md`, „Eine
+Konstante im Frontend, zwei im Backend") und der Meldungstext `alliance-muster`. Der las
+`[<targetTag>]`, und der ist bei Festung, Nest und Vorposten **null** — wer einen Verband gegen eine
+Festung ausrief, verschickte an seine ganze Allianz „greift [?] an". Er trägt jetzt das vom Server
+beschriebene Ziel und die Nachricht des Ausrufers. **Beide Felder werden maskiert:** Dieser Text
+geht per `innerHTML` in die Meldungsliste, und die Nachricht ist die einzige freie Spielereingabe an
+dieser Stelle.
+
+**Wächter:** `tests/test_festung_verbandsruf.js` (16 Prüfungen). Drei Gegenproben mit gemessenen
+Pflichtlisten und per `diff` identischen Prüflisten: `listen` → 0b, 0c; `eintrag` → 1a, 1b, 2a, 3a,
+3b, 3c, 4a, 4b; `ziel` → 4b. Der Aufruf wird **am Request** gemessen, nicht am Markup.
+
+**Auslieferungsreihenfolge: Backend zuerst.** Das Frontend darf 15 und 45 Minuten erst anbieten,
+wenn der Server sie annimmt. Kein Schalter nötig — 30 und 60 bleiben in beiden Listen gültig, es
+gibt also keinen Zwischenzustand, in dem ein Client etwas Unmögliches schickt.
