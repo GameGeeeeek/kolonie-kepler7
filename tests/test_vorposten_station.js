@@ -30,6 +30,20 @@ check('0a: die Silhouette kennt alle drei Zweige und einen Rueckfall ohne Zweig'
   /function vorpostenSilhouette\(vp, x, y, r, farbe\)\{/.test(src)
   && /if \(zweig === 'werft'\)\{/.test(src) && /if \(zweig === 'handel'\)\{/.test(src) && /if \(zweig === 'festung'\)\{/.test(src)
   && /Neutraler Stationsring \(Zweig unbekannt\)/.test(src));
+/* WAECHTER FUER DIE HILFE (Befund der Durchsicht, 04.09.2026). Die Zeichnung wurde bei GR-6
+   gezogen, der Hilfetext nicht: Der Landmarken-Eintrag erklaerte den Vorposten weiter mit dem
+   Zelt, das es auf keiner Kartenebene mehr gibt. Drei der fuenf Blickwinkel fanden das
+   unabhaengig voneinander, und beide Skeptiker liessen es stehen - eine Legende, die auf ein
+   Zeichen zeigt, das nirgends steht, ist eine Falschaussage an den Spieler.
+   Dass so ein Eintrag pruefbar ist, macht test_statthalter 13b seit jeher vor; fuer den
+   Vorposten fehlte der Waechter, deshalb blieb das Zelt unbemerkt stehen. Geprueft wird die
+   REGEL: Das Zeichen im Hilfetext ist dasselbe, das karteSystemBadges tatsaechlich setzt. */
+check('0c: die Hilfe nennt fuer den Vorposten das Zeichen, das die Karte auch setzt',
+  /Ein <strong>🛰<\/strong> zeigt einen <strong>Vorposten<\/strong>/.test(src)
+  && /badges\.push\(\{ icon: '🛰'/.test(src)
+  && !/⛺/.test(src), { zeltNochDa: /⛺/.test(src) });
+check('0d: und die Hilfe behauptet nicht mehr drei Stufen, wo die Leiter acht hat',
+  !/<strong>Drei Stufen<\/strong>/.test(src) && /<strong>Acht Stufen<\/strong>/.test(src));
 check('0b: der Radius waechst mit der Stufe und der Kollisionsschieber bekommt ihn mit',
   /function vorpostenRadius\(stufe\)\{ return 11 \+ Math\.max\(0, Math\.min\(7, \(stufe\|\|1\) - 1\)\) \* 0\.85; \}/.test(src)
   && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* 2\.0;/.test(src));
@@ -120,11 +134,15 @@ async function lauf(browser, vp){
     ((a.mark.html || '').match(/<polygon /g) || []).length === 0
     && !/<line [^>]*stroke-width="1\.3"/.test(a.mark.html || ''),
     { polygone: ((a.mark.html || '').match(/<polygon /g) || []).length });
-  /* Die Stufe muss ABLESBAR sein: Das Bild der Stufe 2 darf nicht dasselbe sein wie das der
-     Wahlstufe, sonst waere die Leiter unsichtbar geworden. */
+  /* 1c HIESS "das Bild der Stufe 2 ist ein anderes als das der Wahlstufe" und pruefte in
+     Wahrheit nur, ob ueberhaupt ein Bild da ist - sie verglich nichts. Zwei Blickwinkel der
+     Durchsicht fanden das unabhaengig. Der Vergleich braucht BEIDE Bilder; die liegen erst in
+     Abschnitt 5 vor, und dort steht er jetzt (5d). Hier bleibt nur, was an dieser Stelle
+     messbar ist: dass das Bild der Stufe 2 ueberhaupt gelesen werden kann - der Anker, ohne
+     den 5d nichts zu vergleichen haette. */
   const bildS2 = (String(a.mark.html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null;
-  check('1c: das Bild der Stufe 2 ist ein anderes als das der Wahlstufe',
-    !!bildS2, { hatBild: !!bildS2 });
+  check('1c-anker: das Bild der Stufe 2 laesst sich auslesen (sonst misst 5d nichts)',
+    !!bildS2 && bildS2.length > 2000, { laenge: bildS2 ? bildS2.length : 0 });
   const kleinHof = a.mark.hofR;   // rV * 1,7 - der pulsende Hof ist die einzige Groesse, die NUR am Radius haengt
   check('1d-anker: der Hof-Kreis ist messbar (sonst misst 3a nichts)', kleinHof > 0, kleinHof);
   await a.ctx.close();
@@ -155,7 +173,11 @@ async function lauf(browser, vp){
   // DIE EIGENTLICHE REGEL: drei Zweige, drei UNTERSCHIEDLICHE Stationen.
   check('2d: die drei Zweige sehen verschieden aus (kein geteiltes Bild)',
     !!bildW && !!bildH && !!bildF && bildW !== bildH && bildH !== bildF && bildW !== bildF,
-    { werft: (bildW||'').slice(-24), handel: (bildH||'').slice(-24), festung: (bildF||'').slice(-24) });
+    /* Der Beleg zeigte die letzten 24 Zeichen der base64-Daten - daran ist im Fehlschlag nichts
+       abzulesen. Die Laengen sagen wenigstens, ob ueberhaupt drei verschiedene Bilder entstanden
+       oder eines dreimal geliefert wurde (Befund der Durchsicht). */
+    { laengen: [ (bildW||'').length, (bildH||'').length, (bildF||'').length ],
+      paarweiseGleich: [ bildW===bildH, bildH===bildF, bildW===bildF ] });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
@@ -197,6 +219,15 @@ async function lauf(browser, vp){
   check('5b: der Ausbau LEGT ZU - das Bild der Stufe 8 traegt mehr als das der Stufe 4',
     bildLaengen[7] > bildLaengen[3] * 1.15,
     { stufe4: bildLaengen[3], stufe8: bildLaengen[7], reihe: bildLaengen.slice(3) });
+  /* DER VERGLEICH, den 1c behauptete und nicht leistete: Die Stufe unter der Zweigwahl und die
+     Wahlstufe selbst muessen unterschiedliche Bilder tragen. Genau an diesem Uebergang kommt der
+     Habitatring dazu - waere er unsichtbar, waere die Leiter fuer den Spieler nicht ablesbar,
+     und das war der Kern des Fehlerberichts, der zu GR-6 gefuehrt hat. */
+  const bildUnter = formen[1] ? formen[1].bild : null;      // Stufe 2, unter der Wahlstufe
+  const bildWahl  = formen[3] ? formen[3].bild : null;      // Stufe 4, die Wahlstufe
+  check('5d: die Stufe unter der Zweigwahl sieht anders aus als die Wahlstufe selbst',
+    !!bildUnter && !!bildWahl && bildUnter !== bildWahl,
+    { unter: bildUnter ? bildUnter.length : 0, wahl: bildWahl ? bildWahl.length : 0 });
   check('5c: und zwar durchgehend - keine Stufe faellt gegen die vorige zurueck',
     bildLaengen.slice(4).every((v, i) => v >= bildLaengen[3 + i]), bildLaengen.slice(3));
 

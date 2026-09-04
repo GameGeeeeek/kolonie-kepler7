@@ -685,6 +685,10 @@ identische Prüflisten.
 
 ## Etappe 2: die Raumstation, gezeichnet (02.09.2026)
 
+> **Überholt seit GR-6 (04.09.2026).** Das Bodenlager und die vier SVG-Silhouetten gibt es nicht
+> mehr; der Vorposten ist auf jeder Stufe eine gerenderte Station. Der Abschnitt bleibt als
+> Entwurfsgeschichte stehen – was heute gilt, steht am Ende der Datei.
+
 Bis Stufe 3 bleibt der Vorposten eine **Palisade mit Fahne** – ein Feldlager soll wie eines
 aussehen. Ab der Wahlstufe zeichnet `vorpostenSilhouette()` eine **Station im Orbit**, je Zweig
 eine eigene Form:
@@ -882,3 +886,51 @@ genau der Konstante, die im Backend steht.
 Wächter: `tests/test_vorposten_abbau_ui.js` (20). Gegenprobe gegen v8.649.0: 12 rot, 8 grün,
 Prüflisten identisch. Die acht grünen messen den Bootvorgang und den Übergangszustand — dort
 verhält sich der alte Stand richtigerweise wie ein Server ohne Abbau.
+
+## GR-6: eine Station auf jeder Stufe (04.09.2026)
+
+**Der Anlass war eine Frage des Spielers:** „wann sieht der stützpunkt endlich so aus wie wir
+besprochen haben?" Gemessen: Der „Stützpunkt" ist Stufe 2, die Kapsel aus GR-5 begann aber erst
+auf der Zweigwahlstufe. Wer einen Vorposten baute, hätte zweimal ausbauen müssen – zweimal zwölf
+Stunden Abstand –, ehe überhaupt eine Station erscheint. Der Entwurf war für acht Stufen
+geschrieben; eingebaut war er auf der halben Leiter.
+
+Zweiter Befund, am gerenderten Bild abgelesen: Auch ab der Wahlstufe war es nicht das Besprochene.
+Die Kapsel war auf ganzer Länge gleich dick und las sich als Pille; die Fenster waren
+Staubkörner, und zwischen erster und letzter Stufe veränderte sich kaum etwas Sichtbares.
+
+**Die Station.** Ein senkrecht stehender Kern, um den ein Habitatring in der Ebene läuft. Beides
+ist derselbe Körper – der Ring hängt an Speichen aus demselben Material, nichts steht ab. Das
+Wachstum ist eine Baugeschichte statt einer Größenskala: gedrungene Kerntrommel mit
+Kommandokuppel (1), sie streckt sich (2), Panelnähte und erstes Fensterband (3), der Ring kommt
+(4), er löst sich vom Kern (5), Fensterbänder und leuchtende Kuppel (6), zweiter äußerer Ring
+(7), Andocklichter (8). Die Station streckt sich dabei von rund zwei auf vier Radien Höhe, und
+ihre Gliederung wächst mit: ein festes Profil hatte bei kleiner Größe zu viele Absätze auf zu
+wenig Pixeln und ergab einen Wurm statt eines Bauwerks.
+
+Alle Schwellen hängen an der Leiter des Servers (`zweigAb`, `maxStufe`), nicht an eingetippten
+Zahlen – eine neunte Stufe verschiebt sie von selbst mit.
+
+**Entfallen:** `vorpostenLager()` und `vorpostenIstStation()`. Die Landmarke auf der Karte trägt
+damit immer 🛰; das Zelt wäre eine Falschaussage.
+
+**Drei Fehler, die erst die Messung sichtbar machte** – sie stehen hier, weil jeder von ihnen
+beim nächsten Umbau derselben Zeichnung wiederkommen kann:
+
+1. `vpStufenBereich()` wurde beim Ersetzen der alten Zeichenfunktion mitgelöscht. `node --check`
+   blieb grün, weil es ein Laufzeitfehler ist – das Bild wäre live schlicht ausgeblieben.
+   Gefunden hat es die Sichtprüfung im Browser, unabhängig davon der Bestandstest.
+2. Der Ausbau von der Wahl- zur Endstufe legte zu wenig zu (`test_vorposten_station` 5b). Zwei
+   Anläufe an der falschen Stelle – zweiter Ring verstärkt, Speichen ergänzt – bewegten die
+   Messung kaum. Die Ursache war ein **großflächiger Halo**: Er kostete neun Zehntel der
+   PNG-Größe (123 kB gegen 17 kB der alten Zeichnung) und ließ den echten Zuwachs darin
+   untergehen. Sichtbar wurde das erst, als belegte Fläche und Dateigröße nebeneinander gemessen
+   wurden: +153 % gegen +11 %. Mit engem Lichtsaum: 57 kB und +46 %.
+3. Die Suche nach betroffenen Tests griff nach **Funktionsnamen**, nicht nach dem geänderten
+   **Zeichen** – `test_vorposten_ui` prüfte die ⛺-Landmarke und fiel erst im Prüflauf auf. Bei
+   einer Symboländerung gehört das Symbol selbst ins Suchmuster.
+
+**Offen, weil es dem Backend gehört:** Die Stufennamen 1–3 heißen weiterhin Feldlager,
+Stützpunkt und Bastion (`VORPOSTEN_STUFEN` in `kolonie-kepler7-backend/server.js`). Das ist
+Bodenvokabular unter einer Raumstation. Eine Umbenennung ist eine spielersichtbare Änderung und
+gehört nach der Hausregel zuerst ins Backend, dann ins Frontend – also in eine eigene Etappe.

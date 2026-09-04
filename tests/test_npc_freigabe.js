@@ -93,7 +93,7 @@ function badgesFuer(npcs, forschung){
     function nestSchwaecheName(){ return ''; }
     function konvoiImSystem(){ return []; }
     function vorpostenAn(){ return null; }
-    function vorpostenIstStation(){ return false; }
+    // vorpostenIstStation() gab es bis GR-6; die Attrappe ist mit ihr entfallen.
     function vorpostenScanStufe(){ return 0; }
     function signalTypeOf(){ return null; }
     function fmt(n){ return String(n); }
