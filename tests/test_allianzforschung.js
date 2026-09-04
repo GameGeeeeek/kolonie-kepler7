@@ -11,7 +11,7 @@
 //
 // Der Punkt bei (b) ist die GEGENPROBE zur Werftstufe: Ohne sie wäre der Test auch dann grün, wenn
 // `allianzWerft` gar nicht geprüft würde - die Forschung allein hätte dann schon alles geöffnet.
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, logMitschnitt, logZeilen } = require('./lib/umgebung');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -44,6 +44,7 @@ async function lade(browser, tag, forschung, werft){
   page.on('console', m => { if (m.type()==='error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });
   await page.route('**/api/**', backend({ 'kepler7-save-v3': save(tag, forschung, werft) }));
   await page.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
+  await logMitschnitt(page);
   await page.goto(SPIEL_URL); await page.waitForTimeout(4200);
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id); if(o)o.style.display='none';}));
   return { page, ctx, errs };
@@ -116,7 +117,31 @@ const kampfbonus = page => page.evaluate(async () => {
     const bm = await baum(page);
     check('a: der Allianzforschungs-Kasten existiert', !!(bm && bm.vorhanden), bm && bm.karten);
     check('a: ohne Allianz steht dort, dass es an der Allianz liegt', !!bm && /nur erforschen.*in einer Allianz|Allianzforschung gesperrt/.test(bm.text));
-    check('a: und KEIN Erforschen-Knopf ist bedienbar', !!bm && bm.knoepfe.length > 0 && bm.knoepfe.every(k => k.aus), bm && bm.knoepfe);
+    /* Seit SP-1 (03.09.2026) ist der Riegel `disabled` bewusst WEG: Ein gesperrter Forschungsknopf
+       ist klickbar und der Klick nennt den Grund - am Handy die einzige Auskunft, die es gibt.
+       Diese Pruefung mass frueher die Optik des Riegels ("kein Knopf ist bedienbar") und fiel
+       deshalb. Sie misst jetzt die REGEL, die dahinter schuetzenswert ist: Ohne Allianz laesst
+       sich keine Allianzforschung STARTEN. Das ist strikt staerker als vorher - der alte Test
+       waere auch dann gruen gewesen, wenn ein Klick am Riegel vorbei etwas ausgeloest haette. */
+    check('a: die Erforschen-Knöpfe sind da und klickbar (SP-1: der Riegel ist bewusst weg)',
+      !!bm && bm.knoepfe.length > 0 && bm.knoepfe.every(k => !k.aus), bm && bm.knoepfe);
+    const geklickt = await page.evaluate(() => {
+      const box = document.getElementById('allianceResearch');
+      const el = box && box.querySelector('[data-research]');
+      if (!el) return null;
+      el.click(); return el.getAttribute('data-research');
+    });
+    await page.waitForTimeout(700);
+    /* Gemessen wird der Ereignisverlauf, nicht ein DOM-Endzustand: startResearch meldet bei Erfolg
+       "<Name> (Stufe n) wird erforscht"; bleibt diese Meldung aus und kommt stattdessen der
+       Allianz-Grund, ist der Klick nachweislich am Riegel haengengeblieben. */
+    const meldungen = (await logZeilen(page)).join('\n');
+    check('a: ein Klick ohne Allianz startet dennoch KEINE Allianzforschung',
+      !!geklickt && !/wird erforscht/.test(meldungen),
+      { geklickt, startmeldung: (meldungen.match(/[^\n]*wird erforscht[^\n]*/) || ['(keine)'])[0] });
+    check('a: und der Klick nennt die fehlende Allianz als Grund',
+      /Allianzforschung braucht eine Allianz/.test(meldungen),
+      meldungen.split('\n').filter(z => /Allianz/i.test(z)).slice(-2));
     const w = await werftZeilen(page);
     check('a: alle drei Schiffe gelten als nicht baubar',
       JSON.stringify(w.__frei) === JSON.stringify(['Paktkorvette=false','Bundeskreuzer=false','Sternenbanner=false']), w.__frei);
