@@ -91,6 +91,9 @@ Wichtig:
 - Selektoren in Tests auf den tatsächlich geprüften Container begrenzen.
 - Such-/Slice-Anker vor Benutzung explizit auf Existenz prüfen.
 - Nach Konflikten in Testdateien niemals pauschal eine Seite übernehmen; prüfen, dass keine Prüfungen verloren gingen.
+- Vor jedem Merge eine adversarische Durchsicht des eigenen Änderungssatzes (`/code-review <ziel> high`).
+  Der grüne Lauf beweist nur, dass nichts Bekanntes gebrochen ist. Befunde werden geprüft, nicht
+  geglaubt — und jeder bestätigte bekommt einen Wächter mit Gegenprobe.
 
 Mehr: `docs/TESTING.md` und `tests/README.md`.
 
