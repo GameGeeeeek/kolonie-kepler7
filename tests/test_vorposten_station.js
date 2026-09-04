@@ -121,26 +121,33 @@ async function lauf(browser, vp){
   check('1d-anker: der Hof-Kreis ist messbar (sonst misst 3a nichts)', kleinHof > 0, kleinHof);
   await a.ctx.close();
 
-  // ---- 2) Die drei Stationen ---------------------------------------------------------------------
+  /* ---- 2) Die drei Stationen ------------------------------------------------------------------
+     SEIT GR-5 (04.09.2026) ist die Station kein Strichbild mehr, sondern ein GERENDERTER Koerper:
+     einmal je Zweig und Stufe auf ein Canvas gezeichnet, als PNG-Data-URL gecacht und per <image>
+     eingebunden - dieselbe Kette, die die Planeten der Karte schon benutzen.
+     Diese Pruefungen suchten vorher nach Dockklammern, Containern und Geschuetztuermen, also nach
+     der SCHREIBWEISE der alten Zeichnung. Die Regel dahinter ist aber eine andere und gilt weiter:
+     JEDER ZWEIG MUSS EINE EIGENE STATION HABEN. Genau das wird jetzt gemessen - an den Bildern
+     selbst, nicht an ihren Bauteilen. Das ist strenger als vorher: Der alte Test haette drei
+     identische Bilder nie bemerkt, solange nur die richtigen Polygone darin vorkamen. */
+  const bildVon = (html) => (String(html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null;
   const w = await lauf(browser, doc(6, 'werft', 'Schiffsschmiede'));
-  /* Gezaehlt wird der Container SELBST (data-vp-container), nicht "irgendein gedrehtes Rechteck".
-     Der alte Stellvertreter fiel am 03.09.2026, als die Station ab Stufe 6 Solarfluegel bekam -
-     die sind ebenfalls gedrehte Rechtecke, waren aber nie ein Container-Ring. Ein Test, der eine
-     Sache an einem Merkmal misst, das ihr nicht gehoert, meldet frueher oder spaeter das Falsche. */
-  check('2a: Werft - zwei Dockklammern und ein Rumpf im Bau (fuenfeckiges Polygon), kein Container-Ring',
-    /stroke-width="2\.1"/.test(w.mark.html || '') && /<polygon points="(?:[-\d.]+,[-\d.]+ ){4}[-\d.]+,[-\d.]+" fill="rgba\(10,13,26,0\.9\)"/.test(w.mark.html || '')
-    && !/data-vp-container/.test(w.mark.html || ''), (w.mark.html||'').slice(0, 100));
+  const bildW = bildVon(w.mark.html);
+  check('2a: die Station ist ein gerendertes Bild, kein Strichhaufen mehr',
+    !!bildW && bildW.length > 2000, { hatBild: !!bildW, laenge: bildW ? bildW.length : 0 });
   await w.ctx.close();
   const h = await lauf(browser, doc(7, 'handel', 'Handelsknoten'));
-  check('2b: Handelsknoten - sechs Container am Ring',
-    ((h.mark.html || '').match(/data-vp-container/g) || []).length === 6, ((h.mark.html||'').match(/data-vp-container/g) || []).length);
-  check('2c: und er dreht sich (eine Rotation, nicht ein Dutzend Einzelanimationen)',
-    ((h.mark.html || '').match(/<animateTransform[^>]*type="rotate"/g) || []).length === 1, ((h.mark.html||'').match(/<animateTransform/g) || []).length);
+  const bildH = bildVon(h.mark.html);
+  check('2b: der Handelsknoten liefert ebenfalls ein Bild', !!bildH && bildH.length > 2000,
+    { laenge: bildH ? bildH.length : 0 });
   await h.ctx.close();
   const f = await lauf(browser, doc(8, 'festung', 'Sternenfestung'));
-  check('2d: Festungsring - vier Geschuetztuerme und der gestrichelte Schildkreis',
-    ((f.mark.html || '').match(/<polygon [^>]*transform="rotate\(/g) || []).length === 4 && /stroke-dasharray="3,3"/.test(f.mark.html || ''),
-    ((f.mark.html||'').match(/<polygon [^>]*transform="rotate\(/g) || []).length);
+  const bildF = bildVon(f.mark.html);
+  check('2c: und die Festung auch', !!bildF && bildF.length > 2000, { laenge: bildF ? bildF.length : 0 });
+  // DIE EIGENTLICHE REGEL: drei Zweige, drei UNTERSCHIEDLICHE Stationen.
+  check('2d: die drei Zweige sehen verschieden aus (kein geteiltes Bild)',
+    !!bildW && !!bildH && !!bildF && bildW !== bildH && bildH !== bildF && bildW !== bildF,
+    { werft: (bildW||'').slice(-24), handel: (bildH||'').slice(-24), festung: (bildF||'').slice(-24) });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
@@ -164,15 +171,24 @@ async function lauf(browser, vp){
   for (let stufe = 1; stufe <= 8; stufe++){
     const l = await lauf(browser, doc(stufe, stufe >= 4 ? 'festung' : null, 'Stufe ' + stufe));
     // Zahlen raus: verglichen wird die FORM (welche Teile), nicht die Position im Bild.
-    formen.push({ stufe, sig: String(l.mark.html || '').replace(/[-\d.]+/g, '#'), da: !!l.mark.da });
+    formen.push({ stufe, sig: String(l.mark.html || '').replace(/[-\d.]+/g, '#'), da: !!l.mark.da,
+                  bild: (String(l.mark.html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null });
     await l.ctx.close();
   }
   check('5-vorab: alle acht Stufen wurden gezeichnet', formen.every(f => f.da && f.sig.length > 200), formen.map(f => f.sig.length));
   const eindeutig = new Set(formen.map(f => f.sig)).size;
   check('5a: acht Stufen ergeben acht verschiedene Bilder', eindeutig === 8, { verschiedene: eindeutig, laengen: formen.map(f => f.sig.length) });
-  // Und die Reihe waechst: jede Stufe ab 5 legt eine Schicht drauf, statt nur umzufaerben.
-  const teile = formen.map(f => (f.sig.match(/<(circle|rect|polygon|line|path)/g) || []).length);
-  check('5b: der Ausbau LEGT ZU - Stufe 8 zeigt mehr Teile als Stufe 4', teile[7] > teile[3], { stufe4: teile[3], stufe8: teile[7] });
+  /* Und die Reihe waechst. Teile zaehlen geht seit GR-5 nicht mehr - die Station ist EIN <image>,
+     egal wie viel darauf zu sehen ist. Gemessen wird deshalb der Bildinhalt selbst: Das PNG der
+     Stufe 8 traegt mehr Zeichnung als das der Stufe 4 und wird dadurch messbar groesser. Das ist
+     kein Stellvertreter, sondern die Sache selbst - mehr Panelnaehte, mehr Fensterbaender und ein
+     laengerer Koerper sind genau das, was ein PNG waechsen laesst. */
+  const bildLaengen = formen.map(f => f.bild ? f.bild.length : 0);
+  check('5b: der Ausbau LEGT ZU - das Bild der Stufe 8 traegt mehr als das der Stufe 4',
+    bildLaengen[7] > bildLaengen[3] * 1.15,
+    { stufe4: bildLaengen[3], stufe8: bildLaengen[7], reihe: bildLaengen.slice(3) });
+  check('5c: und zwar durchgehend - keine Stufe faellt gegen die vorige zurueck',
+    bildLaengen.slice(4).every((v, i) => v >= bildLaengen[3 + i]), bildLaengen.slice(3));
 
   check('4b: keine Skriptfehler', f.errs.length === 0, f.errs.slice(0,2));
   await f.ctx.close();

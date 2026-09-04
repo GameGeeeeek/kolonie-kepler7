@@ -9200,8 +9200,205 @@
     }
     return out;
   }
+  /* ===== DIE KAPSEL: der Vorposten als gezeichneter Koerper (GR-5, 04.09.2026) =====
+     Spieler-Urteil zur Strichfassung: "sehr langweilig gezeichnet, mehr wie ein Icon". Der
+     Befund dahinter war messbar - die Planeten der Karte sind prozedural GERENDERT
+     (buildPlanetTexture: fBm-Rauschen, Farbrampen, als Bild in die Karte gelegt), der Vorposten
+     daneben bestand aus einfarbigen SVG-Strichen. Das ist der ganze Unterschied, und er ist
+     behebbar, ohne ein neues Verfahren zu erfinden: Dieselbe Kette wie bei den Planeten -
+     einmal je Kombination auf ein Canvas zeichnen, als PNG-Data-URL cachen, per <image>
+     einbinden.
+     Die Form entsteht NICHT aus zusammengesetzten Bauteilen (Ausleger, Masten, Antennen), das
+     las sich zusammengesteckt. Sie wird aus einem PROFIL gedreht wie auf einer Drehbank: profil(z)
+     gibt an, wie breit der Koerper auf der Hoehe z ist, gezeichnet wird ein dichter Stapel
+     waagerechter Ellipsen. Jede bekommt ihre Helligkeit aus der NEIGUNG der Mantelflaeche an
+     dieser Stelle - deshalb woelbt sich der Koerper sichtbar, statt flach zu wirken.
+     Alle Details liegen IN der Oberflaeche: Panelnaehte, Fensterbaender auf der Woelbung,
+     bündige Luken. Nichts steht ab. */
+  /* 256 statt 160: Bei 160 px wurden Panelnaehte und Fensterbaender zu Matsch, das Bild las
+     sich als dunkler Klumpen zwischen zwei Reifen (im Bild geprueft). Gerechnet wird je
+     Kombination nur EINMAL, und ein Spieler sieht selten mehr als ein bis drei Vorposten. */
+  const VP_BILD = 256;                     // Kantenlaenge der gerenderten Kachel
+  const VP_BILD_CACHE = {};                // je "zweig:stufe" eine Data-URL, wie PLANET_TEXTURE_DATAURL_CACHE
+  const VP_ZWEIG_TON = {
+    werft:   { hell:[214,230,250], mitte:[104,124,158], band:'#8fd8ff' },
+    handel:  { hell:[246,234,206], mitte:[150,132,96],  band:'#f0b94f' },
+    festung: { hell:[236,216,214], mitte:[142,110,106], band:'#e2685c' },
+    null:    { hell:[222,234,242], mitte:[104,136,130], band:'#5dcaa5' }
+  };
+  function vpLicht(nx, ny, nz){
+    const d = nx*-0.52 + ny*-0.66 + nz*0.54;
+    const gegen = nx*0.45 + ny*0.35 - nz*0.2;
+    return Math.max(0, d)*0.86 + Math.max(0, gegen)*0.16 + 0.10;
+  }
+  function vpMisch(a, b, t){
+    return 'rgb(' + Math.round(a[0]+(b[0]-a[0])*t) + ',' + Math.round(a[1]+(b[1]-a[1])*t) + ',' + Math.round(a[2]+(b[2]-a[2])*t) + ')';
+  }
+  /* Der Drehkoerper. profil(z) fuer z von 0 (unten) bis 1 (oben) liefert den Radius als Anteil. */
+  function vpDrehkoerper(c, cx, cy, R, hoehe, profil, ton, kipp){
+    const dunkel = [15,20,33];
+    const n = Math.max(70, Math.round(hoehe*1.7));
+    const yOben = cy - hoehe/2;
+    for (let i = n; i >= 0; i--){
+      const z = i/n, rz = profil(z)*R;
+      if (rz <= 0.2) continue;
+      const y = yOben + (1-z)*hoehe;
+      const dz = 0.012;
+      const dr = (profil(Math.min(1,z+dz)) - profil(Math.max(0,z-dz)))*R/(2*dz*hoehe);
+      const nl = Math.hypot(1, dr) || 1, ny = dr/nl, nxz = 1/nl;
+      const fL = vpLicht(-nxz*0.92, ny-0.18, nxz*0.38);
+      const fR = vpLicht( nxz*0.92, ny-0.18, nxz*0.38);
+      const g = c.createLinearGradient(cx-rz, y, cx+rz, y);
+      g.addColorStop(0.00, vpMisch(dunkel, ton.mitte, Math.min(1, fL*1.5)));
+      g.addColorStop(0.26, vpMisch(ton.mitte, ton.hell, Math.min(1, fL*1.25)));
+      g.addColorStop(0.60, vpMisch(dunkel, ton.mitte, Math.max(0, fR*1.35)));
+      g.addColorStop(1.00, vpMisch(dunkel, ton.mitte, Math.max(0, fR*0.45)));
+      c.fillStyle = g;
+      c.beginPath(); c.ellipse(cx, y, rz, rz*kipp, 0, 0, Math.PI*2); c.fill();
+    }
+  }
+  /* Ein Ring als echte Roehre: dichte Folge beleuchteter Querschnitte, halbweise gezeichnet,
+     damit der Koerper dazwischenliegen kann. */
+  function vpRing(c, cx, cy, R, rohr, kipp, vorne, ton, bandFarbe){
+    const dunkel = [15,20,33];
+    const schritte = Math.max(110, Math.round(R*2.4));
+    const basis = vorne ? 0 : Math.PI;
+    for (let i = 0; i <= schritte; i++){
+      const t = basis + (i/schritte)*Math.PI;
+      const st = Math.sin(t), ct = Math.cos(t);
+      const px = cx + ct*R, py = cy + st*R*kipp;
+      const nl = Math.hypot(ct, st*kipp, -st*(1-kipp)) || 1;
+      const f = vpLicht(ct/nl, st*kipp/nl, -st*(1-kipp)/nl);
+      const rr = rohr*(vorne ? 1 : 0.88);
+      const g = c.createLinearGradient(px-rr, py-rr, px+rr*0.6, py+rr);
+      g.addColorStop(0, vpMisch(ton.mitte, ton.hell, Math.min(1, f*1.25)));
+      g.addColorStop(0.45, vpMisch(dunkel, ton.mitte, Math.max(0, f*1.1)));
+      g.addColorStop(1, vpMisch(dunkel, ton.mitte, Math.max(0, f*0.4)));
+      c.fillStyle = g;
+      c.beginPath(); c.ellipse(px, py, rr*1.06, rr, 0, 0, Math.PI*2); c.fill();
+    }
+    // Panelfugen quer zur Roehre
+    const felder = Math.max(12, Math.round(R/6));
+    for (let p = 0; p <= felder; p++){
+      const tp = basis + (p/felder)*Math.PI;
+      const sp = Math.sin(tp), cp = Math.cos(tp);
+      c.save();
+      c.translate(cx + cp*R, cy + sp*R*kipp);
+      c.rotate(Math.atan2(cp*kipp, -sp) + Math.PI/2);
+      c.globalAlpha = vorne ? 0.40 : 0.16;
+      c.strokeStyle = 'rgba(0,0,0,0.85)'; c.lineWidth = Math.max(0.6, rohr*0.10);
+      c.beginPath(); c.moveTo(0, -rohr*0.92); c.lineTo(0, rohr*0.92); c.stroke();
+      c.restore();
+    }
+    c.globalAlpha = 1;
+    // Fensterband auf der Aussenflanke
+    if (bandFarbe){
+      for (let k = 0; k <= schritte; k++){
+        if (((k*5) % 8) <= 1) continue;
+        const t2 = basis + (k/schritte)*Math.PI;
+        const bx = cx + Math.cos(t2)*R, by = cy + Math.sin(t2)*R*kipp - rohr*0.28;
+        c.globalAlpha = vorne ? 0.85 : 0.26;
+        c.strokeStyle = bandFarbe; c.lineWidth = rohr*0.16;
+        c.beginPath(); c.moveTo(bx - R*0.005, by); c.lineTo(bx + R*0.005, by); c.stroke();
+      }
+      c.globalAlpha = 1;
+    }
+  }
+  /* Fensterband auf dem Mantel des Drehkoerpers - folgt der Woelbung, weil es aus demselben
+     Profil kommt. */
+  function vpMantelFenster(c, cx, cy, R, hoehe, profil, z, kipp, farbe){
+    const rz = profil(z)*R;
+    if (rz <= 1) return;
+    const y = cy - hoehe/2 + (1-z)*hoehe;
+    const n = Math.max(8, Math.round(rz/3));
+    for (let i = 0; i < n; i++){
+      if (((i*5) % 7) < 2) continue;
+      const w = 0.10 + (i/(n-1))*(Math.PI-0.20);
+      const px = cx - Math.cos(w)*rz, py = y + Math.sin(w)*rz*kipp;
+      const f = 0.55 + 0.45*Math.sin(w);
+      /* Deutlich groesser als im ersten Anlauf: Bei R rund 33 px waren die Fenster 1,3 px breit
+         und nur noch als vereinzelte Punkte zu sehen - kein Band mehr (im Bild geprueft). */
+      c.globalAlpha = f;      c.fillStyle = farbe;
+      c.fillRect(px - R*0.042, py - R*0.050, R*0.084, R*0.100);
+      c.globalAlpha = f*0.32;
+      c.fillRect(px - R*0.064, py - R*0.072, R*0.128, R*0.144);
+    }
+    c.globalAlpha = 1;
+  }
+  /* Die Kapsel selbst. Stufe 4 bis 8 (darunter zeigt die Karte das Bodenlager); sie wird
+     LAENGER und DICKER, statt Anbauten zu bekommen, und bekommt nacheinander Baender, Fenster
+     und Panelnaehte. Der Zweig steckt im Farbton und in der Zahl der Baender - die drei
+     Stationen bleiben damit unterscheidbar, ohne dass etwas absteht. */
+  function vpZeichneKapsel(c, S, zweig, stufe){
+    const ton = VP_ZWEIG_TON[zweig] || VP_ZWEIG_TON.null;
+    const st = Math.max(4, Math.min(8, stufe||4));
+    const w = st - 4;                                  // 0 bis 4
+    const cx = S/2, cy = S/2;
+    /* Schlanker als im ersten Anlauf: Bei 1,8:1 sah die Kapsel aus wie eine Dose, und die
+       Ringe verdeckten mehr Koerper, als sie umfassten. */
+    const laenge = S*(0.40 + w*0.075);
+    const R = S*(0.082 + w*0.0115);
+    const kipp = 0.30;
+    const enden = 0.16;
+    const profil = (z) => {
+      if (z < enden) return Math.sqrt(Math.max(0, 1 - Math.pow((enden-z)/enden, 2)));
+      if (z > 1-enden) return Math.sqrt(Math.max(0, 1 - Math.pow((z-(1-enden))/enden, 2)));
+      return 1;
+    };
+    c.save();
+    c.translate(cx, cy); c.rotate(Math.PI/2 - 0.20); c.translate(-cx, -cy);
+    const Rr = R*(1.30 + w*0.055), rohr = S*(0.0085 + w*0.0018);
+    // Handel traegt drei Baender, Werft zwei, Festung eines breites - der Zweig bleibt lesbar
+    const baender = zweig === 'handel' ? [-0.20, 0.06, 0.30] : (zweig === 'festung' ? [0.02] : [-0.16, 0.22]);
+    const sichtbar = baender.slice(0, Math.max(1, Math.min(baender.length, st - 4)));
+    const bandFarbe = st >= 6 ? ton.band : null;
+    for (const b of sichtbar) vpRing(c, cx, cy + laenge*b, Rr*(zweig==='festung'?1.16:1), rohr*(zweig==='festung'?1.35:1), 0.26, false, ton, bandFarbe);
+    vpDrehkoerper(c, cx, cy, R, laenge, profil, ton, kipp);
+    if (st >= 7){
+      const yOben = cy - laenge/2;
+      for (let i = 1; i < 9; i++){
+        const z = i/9, rz = profil(z)*R;
+        if (rz <= 1) continue;
+        const y = yOben + (1-z)*laenge;
+        c.strokeStyle = 'rgba(0,0,0,0.32)'; c.lineWidth = Math.max(0.5, R*0.014);
+        c.beginPath(); c.ellipse(cx, y, rz, rz*kipp, 0, 0.06, Math.PI-0.06); c.stroke();
+        c.strokeStyle = 'rgba(240,246,255,0.20)'; c.lineWidth = Math.max(0.4, R*0.008);
+        c.beginPath(); c.ellipse(cx, y - R*0.008, rz, rz*kipp, 0, 0.10, Math.PI-0.10); c.stroke();
+      }
+    }
+    if (st >= 5){
+      vpMantelFenster(c, cx, cy, R, laenge, profil, 0.34, kipp, ton.band);
+      vpMantelFenster(c, cx, cy, R, laenge, profil, 0.52, kipp, 'rgba(150,205,255,0.95)');
+      if (st >= 6) vpMantelFenster(c, cx, cy, R, laenge, profil, 0.70, kipp, ton.band);
+    }
+    for (const b of sichtbar) vpRing(c, cx, cy + laenge*b, Rr*(zweig==='festung'?1.16:1), rohr*(zweig==='festung'?1.35:1), 0.26, true, ton, bandFarbe);
+    c.restore();
+  }
+  /* Einmal je Kombination rechnen, dann nur noch holen - genau wie getPlanetTextureDataUrl.
+     Faellt das Rendern aus (kein 2D-Context), gibt es null und der Aufrufer zeichnet die
+     Strichfassung: eine Karte ohne Vorposten waere schlimmer als eine altmodische. */
+  function vorpostenBildUrl(zweig, stufe){
+    const key = (zweig||'null') + ':' + Math.max(4, Math.min(8, stufe||4));
+    if (!(key in VP_BILD_CACHE)){
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = VP_BILD; cv.height = VP_BILD;
+        const c = cv.getContext('2d');
+        if (!c) throw new Error('kein 2D-Context');
+        vpZeichneKapsel(c, VP_BILD, zweig, stufe);
+        VP_BILD_CACHE[key] = cv.toDataURL();
+      } catch(e){ VP_BILD_CACHE[key] = null; }
+    }
+    return VP_BILD_CACHE[key];
+  }
   function vorpostenSilhouette(vp, x, y, r, farbe){
-    // Kern (Zweig) PLUS Aufbauten (Stufe) - die eine Stelle, die beides zusammensetzt.
+    // Seit GR-5 ein gerendertes Bild statt Striche. Der Rueckfall auf die alte Zeichnung bleibt
+    // stehen, damit die Karte auch ohne Canvas etwas zeigt.
+    const url = vorpostenBildUrl(vp && vp.zweig, (vp && vp.stufe) || 4);
+    if (url){
+      const s = r*2.9;
+      return `<image data-vp-bild="1" href="${url}" x="${(x-s/2).toFixed(1)}" y="${(y-s/2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`;
+    }
     return vorpostenSilhouetteKern(vp, x, y, r, farbe) + vorpostenAufbauten(vp, x, y, r, farbe);
   }
   function vorpostenSilhouetteKern(vp, x, y, r, farbe){
