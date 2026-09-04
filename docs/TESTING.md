@@ -322,6 +322,23 @@ Zwei Dinge, die dabei zu beachten sind:
 - Die Stücke sind **nach Dateizahl** gleich groß, nicht nach Laufzeit: gemessen 1600 s, 1602 s,
   1829 s und 2198 s. Der Gewinn ist deshalb Faktor 2,5 und nicht 4.
 
+**Mehr Stücke machen den Lauf langsamer, nicht schneller** (gemessen 04.09.2026, derselbe Stand,
+derselbe Rechner):
+
+| `--gleichzeitig` | längstes Stück | rote Dateien | **Gesamtdauer** |
+|---|---|---|---|
+| 4 (Vorgabe) | 2001 s / 2057 s | 3 | **2051 s / 2107 s** |
+| 6 | 1809 s | **21** | **2701 s** |
+
+Die Parallelphase wurde tatsächlich rund vier Minuten kürzer — aber sechs gleichzeitige Browser
+erzeugen so viel Last, dass aus 3 roten Dateien **21** werden, und die fährt das Skript einzeln und
+**nacheinander** nach. Diese Nachprüfung kostete 892 s statt 50 s und fraß den Gewinn mehr als auf:
+unterm Strich **zehn Minuten langsamer**.
+
+Der Griff ist naheliegend — wer gegen die Merge-Ampel um Zeit kämpft, will das Fenster verkleinern.
+Er macht es größer. Die Vorgabe 4 ist also nicht nur gemessen, sie ist auch gegen genau diesen
+Reflex robust; wer sie ändern will, misst vorher die **Gesamtdauer**, nicht die der Stücke.
+
 Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln die langsamen Tests
 (`test_wiedergabe_*`, `test_admin_*`) in wenigen Stücken, und dann wartet alles auf das langsamste.
 
