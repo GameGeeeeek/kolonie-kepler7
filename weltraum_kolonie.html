@@ -9388,11 +9388,15 @@
     const ringRohr = S*(0.016 + w*0.016);
     const ringY    = cy + kernH*0.06;
     const hatRing  = st >= ringAb, hatRing2 = st >= ring2Ab;
-    const ring2R   = ringR*1.34, ring2Rohr = ringRohr*0.72, ring2Y = ringY + kernH*0.20;
+    /* Der zweite Ring traegt den halben Ausbau der Endstufen - er war im ersten Anlauf so duenn,
+       dass zwischen Wahlstufe und Endstufe kaum etwas dazukam (gemessen an der Bildgroesse:
+       9,5 % statt der geforderten 15 %, test_vorposten_station 5b). Jetzt ist er kraeftig genug,
+       um den Ausbau zu zeigen, und traegt ab seiner eigenen Stufe ein eigenes Fensterband. */
+    const ring2R   = ringR*1.40, ring2Rohr = ringRohr*0.92, ring2Y = ringY + kernH*0.21;
     const speiche  = S*(0.008 + w*0.005);
 
     // Von hinten nach vorne, damit der Kern wirklich zwischen den Ringhaelften liegt.
-    if (hatRing2) vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, st>=lukenAb ? ton.band : null, false);
+    if (hatRing2) vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, ton.band, st>=lukenAb);
     if (hatRing){
       vpRing(c, cx, ringY, ringR, ringRohr, kipp, false, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
       vpSpeichen(c, cx, ringY, kernR*0.66, ringR, kipp, false, ton, speiche);
@@ -9401,7 +9405,7 @@
     vpDrehkoerper(c, cx, cy, kernR, kernH, profil, ton, kipp);
 
     if (st >= nahtAb){
-      const naehte = Math.min(9, 3 + st);
+      const naehte = Math.min(13, 3 + st);
       for (let i = 1; i < naehte; i++){
         const z = i/naehte, rz = profil(z)*kernR;
         if (rz <= 1) continue;
@@ -9415,6 +9419,7 @@
     }
     if (st >= ringAb + 1) vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.63, kipp, ton.band);
     if (st >= bandAb)     vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.24, kipp, 'rgba(150,205,255,0.95)');
+    if (st >= lukenAb)    vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.42, kipp, ton.band);
 
     // Die Kommandokuppel - ab der Bandstufe leuchtet sie.
     const ky = cy - kernH/2, kR = kernR*kuppelR;
@@ -9435,7 +9440,7 @@
       c.beginPath(); c.ellipse(cx, ringY + ringRohr*0.5, ringR, ringR*kipp, 0, 0, Math.PI*2); c.fill();
       c.restore(); c.globalAlpha = 1;
     }
-    if (hatRing2) vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, st>=lukenAb ? ton.band : null, false);
+    if (hatRing2) vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, ton.band, st>=lukenAb);
   }
   function vorpostenBildUrl(zweig, stufe){
     const B = vpStufenBereich();
