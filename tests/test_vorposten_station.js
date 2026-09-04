@@ -206,10 +206,15 @@ async function lauf(browser, vp){
   await browser.close();
   ende();
 })().catch(e => { console.log('FAIL - Ausnahme: ' + (e && e.stack || e)); process.exit(1); });
-// Gegenprobe GR-6 gemessen 04.09.2026 (KEPLER_SPIELDATEI = v8.668.0, also der Stand mit Bodenlager):
-// rot 1a 1b 3b (3) - dort steht auf Stufe 2 das Bodenlager statt der Station, und die Landmarke
-// traegt noch das Zelt. Gruen bleiben alle uebrigen, weil die Station ab der Wahlstufe dort schon
-// richtig gezeichnet wurde. Prueflisten identisch.
+// Gegenprobe GR-6 GEMESSEN 04.09.2026 (KEPLER_SPIELDATEI = v8.668.0, der Stand mit Bodenlager):
+// rot 1a 1b 1c 3b (4), gruen bleiben 15. Auf Stufe 2 steht dort das Bodenlager statt der Station
+// (1a), Palisade und Fahnenmast sind da (1b), es gibt folglich gar kein Stufenbild zu vergleichen
+// (1c), und die Landmarke traegt noch das Zelt (3b). Alles ab der Wahlstufe bleibt gruen - die
+// Station war dort schon richtig gezeichnet, nur eben erst ab Stufe 4.
+//
+// Die erste Notiz hier sagte "rot 1a 1b 3b (3)" - 1c war vergessen. Eine Vorhersage, die um eine
+// Pruefung danebenliegt, ist keine: Sie haette einen echten Ausfall von 1c als "erwartet"
+// durchgewinkt. Deshalb steht hier die GEMESSENE Liste, nicht die geschaetzte.
 //
 // Aeltere Gegenprobe (02.09.2026, KEPLER_SPIELDATEI = v8.641.0): rot 0a 0b 2a 2b 2c 2d 3a 3b (8).
 //
