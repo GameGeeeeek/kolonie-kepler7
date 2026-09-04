@@ -408,3 +408,23 @@ den Exit-Code, und selbst das nur, wenn überhaupt ein Test rot war. Ein Lauf, i
 Spieldatei anfasst, war damit grün und still. **Eine Messung, die niemand in ein Urteil überführt,
 ist keine Sicherung, sondern eine Fußnote** — und sie sieht von außen genauso aus wie eine, die
 wirkt. Wer eine Prüfung einbaut, muss zeigen können, welcher Ausgang sich dadurch ändert.
+
+## Eine Konstante im Frontend, zwei im Backend (04.09.2026)
+
+`ALLIANCE_MUSTER_DURATIONS` speiste im Frontend **beide** Sammelzeit-Auswahlfelder: den
+koordinierten Angriff *und* den Sternenfresser-Raid. Das Backend prüft die beiden aber gegen
+**zwei verschiedene** Konstanten (`ALLIANCE_MUSTER_DURATIONS` für `/musterattack/create`,
+`ALLIANCE_RAID_GATHER_DURATIONS` für `/allianceraid/start`). Solange beide `[30, 60, 120]` waren,
+war die Doppelnutzung unsichtbar — und genau deshalb hat sie jahrelang gehalten.
+
+Beim Umstellen des Verbands auf 15/30/45/60 hätte der Raid still 15 und 45 Minuten angeboten und
+der Server sie mit „Ungültige Anfrage" abgelehnt: eine Auswahl, die nur fehlschlagen kann. Gefunden
+wurde es nicht beim Ändern, sondern beim Nachlesen, **wer die Konstante sonst noch liest**.
+
+**Vor der Änderung einer geteilten Konstante zählen, wie viele Stellen sie lesen — und für jede
+prüfen, ob sie derselben Gegenstelle gehört.** Eine Kopie-Familie ist erst dann eine, wenn beide
+Seiten dieselbe *Anzahl* Listen haben. Zwei Listen drüben und eine hier ist keine Kopie, sondern
+eine Verschmelzung, die nur zufällig stimmt.
+
+Die Prüfung dagegen misst deshalb nicht nur die neuen Werte, sondern dass der Raid-Block die
+Verbandsliste **nirgends** mehr liest — ein einziger übersehener Verweis würde reichen.
