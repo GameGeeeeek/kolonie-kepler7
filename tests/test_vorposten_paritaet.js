@@ -38,7 +38,15 @@ const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 const SRV = fs.existsSync(SERVER_JS) ? fs.readFileSync(SERVER_JS, 'utf8') : '';
 check('0: server.js des Nachbar-Klons ist lesbar', SRV.length > 1000, { pfad: SERVER_JS });
-if (!SRV) return ende();
+/* KEIN Frueh-Ausstieg mehr (Befund aus der Durchsicht von PR #579, 04.09.2026). Hier stand
+   `if (!SRV) return ende();` - richtig fuer die Abschnitte 1 bis 7, die den Nachbar-Klon WIRKLICH
+   brauchen, aber der Ausstieg lag vor der ganzen Datei. In einem Checkout ohne Nachbar-Klon (und
+   in jedem `git worktree`, siehe .claude/skills/backend-abgleich) meldete der Test dann gruen,
+   ohne die rein frontendseitigen Pruefungen ueberhaupt zu registrieren - genau die Falle, die die
+   Skill-Datei fuer andere Tests schon beschreibt.
+   Jetzt haengt nur noch am Klon, was ohne ihn nichts messen kann: Abschnitte 1-7 und die drei
+   Serverpruefungen aus Abschnitt 8. Der Rest (8c und der ganze Abschnitt 9) laeuft immer. */
+if (SRV) {
 
 // ---- 1) Routen ---------------------------------------------------------------------------------
 const srvRouten = [...SRV.matchAll(/app\.(get|post)\('\/api\/vorposten(\/[a-z]+)?'/g)].map(m => (m[2] || ''));
@@ -207,6 +215,7 @@ if (hilfeSatz) {
     { imHilfetext: genannteVert, imServer: passend.length === 1 ? passend[0].verteidigung : null });
 }
 
+}   // Ende der serverabhaengigen Abschnitte 1-7
 
 /* ---- 8) Rohstoffschluessel der Kostentabellen (04.09.2026) ------------------------------------
    ANLASS, ein echter Fehler im laufenden Spiel: Der Server schrieb in die Kosten der Stufe 8 und
@@ -255,6 +264,8 @@ check('8-anker1: die Rohstoff-Definitionen des Frontends sind lesbar (sonst miss
 const kostenSchluessel = s => [...s.matchAll(/kosten: *\{([^}]*)\}/g)]
   .flatMap(m => [...m[1].matchAll(/([a-z0-9_]+) *:/g)].map(x => x[1]));
 
+const unbekannt = liste => liste.filter(k => !VORRAT.has(k));
+if (SRV) {
 const srvStufen = listeAb(SRV, 'const VORPOSTEN_STUFEN = [');
 const srvProjekte = listeAb(SRV, 'const VP_PROJEKT_DEFS = [');
 const stufenKosten = [...new Set(kostenSchluessel(srvStufen))];
@@ -270,13 +281,13 @@ check('8-anker2: die Kostentabellen des Servers sind vollstaendig lesbar (sonst 
     stufenKostenBloecke: (srvStufen.match(/kosten: *\{/g) || []).length,
     projektKostenBloecke: (srvProjekte.match(/kosten: *\{/g) || []).length });
 
-const unbekannt = liste => liste.filter(k => !VORRAT.has(k));
 check('8a: jeder Rohstoff in den Ausbaukosten des Servers ist im Spielstand bekannt',
   unbekannt(stufenKosten).length === 0,
   { unbekannt: unbekannt(stufenKosten), gelesen: stufenKosten });
 check('8b: jeder Rohstoff in den Projektkosten des Servers ist im Spielstand bekannt',
   unbekannt(projektKosten).length === 0,
   { unbekannt: unbekannt(projektKosten), gelesen: projektKosten });
+}   // Ende des serverabhaengigen Teils von Abschnitt 8 - 8c darunter laeuft immer
 
 const bauRoh = (JS.match(/const VORPOSTEN_BAUKOSTEN *= *\{([^}]*)\}/) || ['', ''])[1];
 const bauKosten = [...bauRoh.matchAll(/([a-z0-9_]+) *:/g)].map(m => m[1]);
@@ -311,9 +322,27 @@ const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\
 const abbauZweig = abbauVon < 0 ? '' : ohneKommentar(JS.slice(abbauVon, abbauVon + 4000));
 check('9-anker: der Abbau-Zweig von claimPendingRewards ist auffindbar (sonst misst 9a nichts)',
   abbauVon > 0 && /r\.garnison/.test(abbauZweig), { gefunden: abbauVon > 0 });
-check('9a: der Abbau loest die Garnison ueber SHIP_DEFS.find auf, nicht ueber einen Index',
-  /SHIP_DEFS\.find\(\s*d\s*=>[^)]*d\.key === k/.test(abbauZweig),
-  { imZweig: (abbauZweig.match(/SHIP_DEFS[.[][^\n]{0,40}/) || [])[0] || null });
+/* 9a verlangt shipDefOrSuper, nicht SHIP_DEFS.find - und 9c misst, WARUM.
+   Der erste Reparaturversuch schrieb hier `SHIP_DEFS.find(d => d.key === k)`. Das holt 39 von 40
+   Schiffstypen zurueck und laesst ausgerechnet das teuerste verfallen: Das Superschlachtschiff ist
+   das einzige Angriffsschiff OHNE SHIP_DEFS-Eintrag (die Werft haengt es per `.concat` an), steht
+   aber in ATTACK_SHIP_KEYS - und vorpostenGarnisonSenden reicht genau diese Liste als `keys` an die
+   Flottenwahl durch, es ist also stationierbar. Derselbe Fehler eine Etage tiefer, gefunden in der
+   Durchsicht von PR #579 (04.09.2026).
+   9c haelt die drei gemessenen Voraussetzungen fest. Faellt eine davon (z. B. weil das Schiff
+   spaeter doch in SHIP_DEFS aufgenommen wird), soll 9c das MELDEN statt 9a stillschweigend
+   ueberfluessig zu machen - dann gehoert die Regel neu bedacht, nicht der Test angepasst. */
+check('9a: der Abbau loest die Garnison ueber shipDefOrSuper auf, nicht ueber SHIP_DEFS.find',
+  /shipDefOrSuper\(\s*k\s*\)/.test(abbauZweig) && !/SHIP_DEFS\.find/.test(abbauZweig),
+  { imZweig: (abbauZweig.match(/(shipDefOrSuper|SHIP_DEFS[.[])[^\n]{0,40}/) || [])[0] || null });
+const jsOhneKommentar = ohneKommentar(JS);
+const superInDefs = /\{ *key: *'superschlachtschiff'/.test(listeAb(jsOhneKommentar, 'const SHIP_DEFS = ['));
+const superInAngriff = /const ATTACK_SHIP_KEYS = \[[^\]]*'superschlachtschiff'/.test(jsOhneKommentar);
+const garniVon = jsOhneKommentar.indexOf('function vorpostenGarnisonSenden(');
+const garniKeys = garniVon > 0 && /keys: ATTACK_SHIP_KEYS/.test(jsOhneKommentar.slice(garniVon, garniVon + 2500));
+check('9c: die Voraussetzung von 9a stimmt noch - Superschlachtschiff ohne SHIP_DEFS-Eintrag, aber stationierbar',
+  !superInDefs && superInAngriff && garniKeys,
+  { inShipDefs: superInDefs, inAttackShipKeys: superInAngriff, garnisonNimmtAttackShipKeys: garniKeys });
 
 const LISTEN = ['RES_DEFS', 'BUILDING_DEFS', 'RESEARCH_DEFS', 'SHIP_DEFS', 'TIER2_DEFS', 'MODULE_DEFS'];
 const ZAHLENINDEX = /^(\d+|i|j|n|idx|index|Math\.[\s\S]+)$/;
@@ -369,5 +398,17 @@ ende();
       9a den Zweig OHNE Kommentare. Ein Waechter, der seine eigene Erklaerung mitliest, misst
       nichts.
    F) Eine ANDERE Liste falsch indiziert (`RES_DEFS[key]` in resDefFor): nur 9b faellt - die
-      dateiweite Regel greift auch dort, wo der Vorposten nichts damit zu tun hat. */
+      dateiweite Regel greift auch dort, wo der Vorposten nichts damit zu tun hat.
+
+   NACHTRAG aus der Durchsicht von PR #579, drei weitere Richtungen gemessen:
+
+   G) `shipDefOrSuper(k)` zurueck auf `SHIP_DEFS.find(d => d.key === k)`: 9a FAELLT. Das ist der
+      halbrichtige Fix, der 39 von 40 Schiffstypen zurueckholt und ausgerechnet das teuerste
+      verfallen laesst.
+   H) Der Nachbar-Klon fehlt (server.js beiseitegelegt): Pruefung 0 faellt wie bisher, aber es
+      laufen jetzt ACHT Pruefungen statt keiner - 8-anker1, 8-anker3, 8c und der ganze Abschnitt 9.
+      Vorher stieg die Datei an dieser Stelle komplett aus. 29 serverabhaengige Pruefungen fehlen
+      dann, und Pruefung 0 sagt warum.
+   I) Das Superschlachtschiff in SHIP_DEFS aufgenommen: 9c FAELLT - und nur 9c. Die Regel von 9a
+      haette dann keine Grundlage mehr; das soll auffallen, statt dass 9a still zur Formsache wird. */
 

@@ -28262,7 +28262,13 @@ async function claimPendingRewards(){
              hier bewusst umschrieben. */
           for (const [k, n] of Object.entries(r.garnison || {})){
             const anz = Math.max(0, Math.round(Number(n) || 0));
-            const defA = SHIP_DEFS.find(d => d && d.key === k);
+            // shipDefOrSuper, NICHT SHIP_DEFS.find: Das Superschlachtschiff ist das einzige
+            // Angriffsschiff ohne SHIP_DEFS-Eintrag (es steht in ATTACK_SHIP_KEYS und ist damit in
+            // der Garnisonswahl anklickbar - vorpostenGarnisonSenden reicht ATTACK_SHIP_KEYS als
+            // `keys` durch). Mit .find waere ausgerechnet das teuerste Schiff des Spiels weiterhin
+            // beim Abbau verfallen, waehrend alle anderen zurueckkehren - derselbe Fehler eine
+            // Etage tiefer. Gefunden in der Durchsicht von PR #579 (04.09.2026).
+            const defA = shipDefOrSuper(k);
             if (anz && defA){
               flotteA[k] = (flotteA[k] || 0) + anz;
               zurueck.push(anz + '\u00d7 ' + (defA.name || k));
