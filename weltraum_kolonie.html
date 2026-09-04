@@ -14630,7 +14630,17 @@
     const lim = moduleMarketCache.limits || {};
     const mineCount = listings.filter(l => l.mine).length;
     if (!listings.length){
-      setBoxHtml(box, 'moduleMarketBox', '<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Gerade bietet niemand ein Modul an. Stell selbst eins ein – im Offiziere-Tab hat jedes Modul im Inventar einen „Börse"-Knopf.</div>');
+      /* AUCH HIER die eigenen Grenzen und den Handelsknoten nennen (Befund der Durchsicht von
+         PR #582, 04.09.2026). Der Zweig lag VOR der Kopfzeile und kehrte zurueck - auf einer
+         leeren Boerse sah der Spieler damit weder seine geltende Gebuehr noch seine Platzzahl
+         noch den Rabatt, den diese Etappe gerade benennen soll. Und leer ist die Boerse nicht
+         selten: Sie ist es zu Rundenbeginn und immer dann, wenn das letzte Angebot gekauft wurde.
+         Der Testaufbau lieferte stets ein Angebot und mass diesen Zustand nie mit. */
+      const vpLeer = marktVorpostenText(lim);
+      setBoxHtml(box, 'moduleMarketBox',
+        '<div class="bmeta"><i class="ti ti-box" aria-hidden="true"></i> Gerade bietet niemand ein Modul an. Stell selbst eins ein – im Offiziere-Tab hat jedes Modul im Inventar einen „Börse"-Knopf.</div>'
+        + `<div class="bmeta" style="margin-top:4px;">Du darfst ${lim.maxPerUser||5} Angebot(e) gleichzeitig führen · Börsengebühr beim Verkauf: ${marktGebuehrText(lim.feePct||0.05)}</div>`
+        + (vpLeer ? `<div class="bmeta" data-vp-markt="${Math.round((Number(lim.vorpostenRabatt)||0)*1000)/10}" style="color:#5dcaa5;"><i class="ti ti-building-community" aria-hidden="true"></i> Dein Handelsknoten: ${vpLeer}</div>` : ''));
       return;
     }
     // Günstigste zuerst - beim Stöbern ist der Preis das erste Kriterium.
@@ -15066,8 +15076,19 @@
   // Fragt den Wunschpreis ab und stellt das Modul ein. Als Vorschlag steht das Doppelte des
   // Kredit-Sofortverkaufswerts (moduleSellValue) darin - das ist der Betrag, den man ohne Börse
   // bekäme, also die sinnvolle Untergrenze für einen Handel mit Mitspielern.
-  function promptOfferModule(isShip, instKey){
+  /* Der Knopf sitzt im OFFIZIERE-Tab, die Grenzen kommen aus dem MARKT-Tab (Befund der Durchsicht
+     von PR #582, 04.09.2026). Wer nie auf „Markt" war, hatte `moduleMarketCache === null` - der
+     Dialog nannte dann den Rueckfall (5 %, 1.000 bis 5.000.000) und liess den Handelsknoten weg,
+     waehrend der Server beim Verkauf sehr wohl den Rabatt zieht. Ein Dialog, der eine Zahl nennt,
+     die nachher nicht gilt, ist schlimmer als einer, der schweigt - und der Weg
+     Offiziere -> „Börse" ist der im Hilfetext ausdruecklich beschriebene.
+     Deshalb wird hier notfalls nachgeladen, BEVOR gefragt wird. `loadModuleMarket` hat eine eigene
+     Sperre gegen Mehrfachlaeufe und einen 10-Sekunden-Riegel; der `erzwingen`-Schalter umgeht nur
+     den Riegel, nicht die Sperre. Schlaegt das Laden fehl (offline, Serverfehler), bleibt der
+     Rueckfall - dann steht aber auch keine Rabatt-Behauptung darin, weil vorpostenRabatt fehlt. */
+  async function promptOfferModule(isShip, instKey){
     if (modulGesperrt(isShip, instKey)){ log('Dieses Modul ist gesperrt – öffne erst das Schloss an der Karte.', 'ti-lock'); return; }
+    if (!moduleMarketCache) await loadModuleMarket(true);
     const lim = (moduleMarketCache && moduleMarketCache.limits) || { minPrice:1000, maxPrice:5000000, feePct:0.05 };
     const info = isShip ? shipModuleInstanceInfo(instKey) : moduleInstanceInfo(instKey);
     const name = info ? info.rar.label+' '+info.def.name : 'Modul';

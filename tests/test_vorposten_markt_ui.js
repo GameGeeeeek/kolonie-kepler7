@@ -76,6 +76,22 @@ check('0a2: und es gibt genau EINE Stelle, die sie in Text verwandelt',
     /lim\.maxPerUser/.test(kopf) && !/basisMaxPerUser/.test(kopf), {});
 }
 
+/* 0e: Der „Boerse"-Knopf sitzt im OFFIZIERE-Tab, die Grenzen kommen aus dem MARKT-Tab. Wer nie
+   auf „Markt" war, hatte `moduleMarketCache === null`; der Dialog nannte dann den Rueckfall (5 %)
+   und liess den Handelsknoten weg, waehrend der Server beim Verkauf sehr wohl den Rabatt zieht -
+   ein Dialog, der eine Zahl nennt, die nachher nicht gilt (Befund der Durchsicht von PR #582).
+   Gemessen wird die REIHENFOLGE im Rumpf: Erst laden, dann `lim` lesen. */
+{
+  const von = JS.indexOf('async function promptOfferModule(');
+  const rumpf = von < 0 ? '' : JS.slice(von, JS.indexOf('\n  }', von));
+  const iLaden = rumpf.indexOf('await loadModuleMarket(');
+  const iLim = rumpf.indexOf('const lim =');
+  check('0-anker4: promptOfferModule ist als async-Funktion auffindbar (sonst misst 0e nichts)',
+    von > 0 && iLim > 0, { gefunden: von > 0, limBei: iLim });
+  check('0e: der Verkaufsdialog laedt die Grenzen, BEVOR er die Gebuehr nennt',
+    iLaden > 0 && iLim > iLaden, { ladenBei: iLaden, limBei: iLim });
+}
+
 const now = Date.now();
 function spielstand(){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil']) g[t] = true;
@@ -90,7 +106,7 @@ function spielstand(){
 (async () => {
   const browser = await starteBrowser();
 
-  async function messe(limits){
+  async function messe(limits, angebote){
     const ctx = await browser.newContext({ viewport:{ width:1280, height:1000 } });
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
@@ -103,7 +119,9 @@ function spielstand(){
       if (p === 'me') return j({ userId:ICH, username:'Ich', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
       if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, activePirateFaction:null, unlockedAlienRaces:[], activeWar:null, collapsedSystems:[] });
       if (p === 'modulemarket') return j({
-        listings: [{ id:'l1', instKey:'panzerung:selten', isShip:false, price:120000, sellerName:'Nachbar', mine:false }],
+        listings: angebote === undefined
+          ? [{ id:'l1', instKey:'panzerung:selten', isShip:false, price:120000, sellerName:'Nachbar', mine:false }]
+          : angebote,
         limits });
       if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
       if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
@@ -127,14 +145,16 @@ function spielstand(){
        geladen…" in dieselbe Box; ein fester Zeitwert misst gelegentlich den. */
     await page.waitForFunction(() => {
       const b = document.getElementById('moduleMarketBox');
-      return b && /Angebot\(e\)/.test(b.textContent || '');
+      const t = (b && b.textContent) || '';
+      return /Angebot\(e\)/.test(t) || /bietet niemand ein Modul an/.test(t);
     }, null, { timeout: 20000 });
     await page.waitForTimeout(300);
     const gemessen = await page.evaluate(() => {
       const b = document.getElementById('moduleMarketBox');
       const zeile = b && b.querySelector('[data-vp-markt]');
       const kopf = b ? (b.querySelector('.bmeta') || {}).textContent || '' : '';
-      return { kopf: kopf.trim(), vpZeile: zeile ? (zeile.textContent || '').trim() : null,
+      return { kopf: kopf.trim(), kopfAlles: b ? (b.textContent || '').trim() : '',
+        vpZeile: zeile ? (zeile.textContent || '').trim() : null,
         vpProzent: zeile ? Number(zeile.getAttribute('data-vp-markt')) : null };
     });
     await ctx.close();
@@ -142,8 +162,13 @@ function spielstand(){
   }
 
   const BASIS = { minPrice:1000, maxPrice:5000000, basisFeePct:0.05, basisMaxPerUser:5 };
-  const mit = await messe({ ...BASIS, maxPerUser:7, feePct:0.0324, vorpostenRabatt:0.352, vorpostenAngebote:2 });
+  const MIT_RABATT = { ...BASIS, maxPerUser:7, feePct:0.0324, vorpostenRabatt:0.352, vorpostenAngebote:2 };
+  const mit = await messe(MIT_RABATT);
   const ohne = await messe({ ...BASIS, maxPerUser:5, feePct:0.05, vorpostenRabatt:0, vorpostenAngebote:0 });
+  // Die LEERE Boerse: derselbe Rabatt, aber kein einziges Angebot. Der Zweig lag vor der
+  // Kopfzeile und kehrte zurueck - der Aufbau lieferte bis zum 04.09.2026 immer ein Angebot und
+  // hat diesen Zustand nie gemessen (Befund der Durchsicht von PR #582).
+  const leer = await messe(MIT_RABATT, []);
 
   check('1-anker: die Boerse wurde in beiden Laeufen befuellt gezeichnet',
     /Angebot\(e\)/.test(mit.kopf) && /Angebot\(e\)/.test(ohne.kopf), { mit: mit.kopf, ohne: ohne.kopf });
@@ -157,8 +182,13 @@ function spielstand(){
     { zeile: ohne.vpZeile, kopf: ohne.kopf });
   check('2b: die Platzzahl der Kopfzeile ist die des Servers, nicht die Grundzahl',
     /max\. 7/.test(mit.kopf) && /max\. 5/.test(ohne.kopf), { mit: mit.kopf, ohne: ohne.kopf });
-  check('3a: kein JavaScript-Fehler in beiden Durchlaeufen',
-    [...mit.errs, ...ohne.errs].length === 0, [...mit.errs, ...ohne.errs].slice(0, 3));
+  check('2c: auch die LEERE Boerse nennt Platzzahl, Gebuehr und den Handelsknoten',
+    leer.vpProzent === 35.2 && /max\. 7|7 Angebot\(e\) gleichzeitig/.test(leer.kopfAlles)
+    && /3,2%/.test(leer.kopfAlles) && /Dein Handelsknoten/.test(leer.kopfAlles),
+    { prozent: leer.vpProzent, text: (leer.kopfAlles || '').slice(0, 200) });
+  check('3a: kein JavaScript-Fehler in allen drei Durchlaeufen',
+    [...mit.errs, ...ohne.errs, ...leer.errs].length === 0,
+    [...mit.errs, ...ohne.errs, ...leer.errs].slice(0, 3));
 
   await browser.close();
   ende();
@@ -184,4 +214,17 @@ function spielstand(){
        Schreibweisen derselben Groesse nebeneinander sind ein Fehler, auch wenn beide „stimmen".
        Seitdem gibt es `anteilProzentText()` als einzige Stelle dafuer.
    Beides waere ohne den Test in die Auslieferung gegangen: Es faellt niemandem auf, der die
-   Zeile nicht Wort fuer Wort liest. */
+   Zeile nicht Wort fuer Wort liest.
+
+   NACHTRAG aus der Durchsicht von PR #582, zwei weitere Richtungen gemessen:
+
+   G) Den Leerzustand wieder ohne Grenzen und Rabatt: 2c FAELLT. Der Zweig lag VOR der Kopfzeile
+      und kehrte zurueck - auf einer leeren Boerse sah der Spieler weder seine geltende Gebuehr
+      noch seine Platzzahl noch den Rabatt, den diese Etappe gerade benennen soll. Und leer ist
+      die Boerse nicht selten: zu Rundenbeginn und immer, wenn das letzte Angebot gekauft wurde.
+   H) Das Nachladen vor dem Verkaufsdialog entfernt: 0e FAELLT.
+
+   DER EIGENE TESTFEHLER DAHINTER: Der Aufbau lieferte IMMER genau ein Angebot. Damit war der
+   Leerzustand nie gemessen - nicht, weil jemand ihn fuer unwichtig hielt, sondern weil er im
+   Testaufbau gar nicht vorkam. `messe()` nimmt die Angebotsliste jetzt entgegen; ein Zustand,
+   den der Aufbau nicht herstellen kann, wird nie geprueft. */
