@@ -358,3 +358,51 @@ Praktisch: `/code-review <commit-oder-diff> high` vor dem Merge. Die Befunde wer
 geglaubt** — von den elf war einer entschärft (das gemeldete Schiff steht gar nicht im Baukorb; das
 echte Loch lag beim Nachbarn daneben). Jeder bestätigte Befund bekommt einen Wächter mit Gegenprobe,
 sonst kommt er wieder.
+
+### Zwei wortgleiche Meldungen kann keine Log-Prüfung auseinanderhalten (04.09.2026)
+
+Die Durchsicht zu SP-3 hat eine fünfte Fehlerklasse aufgedeckt, und zwar **durch Sabotage
+bewiesen**, nicht durch Lesen: Sie nahm der geprüften Stelle die Meldung vollständig weg — und die
+Prüfung blieb grün.
+
+Die Ursache liegt in `logMitschnitt` (`tests/lib/umgebung.js`). Der Beobachter hängt eine Zeile nur
+an, wenn sie sich von der **letzten** unterscheidet:
+
+```js
+if (t && t !== a[a.length - 1]) a.push(t);
+```
+
+Wer den Mitschnitt zwischen zwei Klicks mit `__logMitschnitt.length = 0` leert, macht `a[a.length-1]`
+zu `undefined`. Die nächstbeste DOM-Änderung schiebt daraufhin den **unveränderten** Log-Text erneut
+in die leere Liste — und dort steht noch die Zeile des vorigen Klicks. Die zweite Prüfung liest also
+die Antwort der ersten und meldet Erfolg.
+
+Sichtbar wird das nur, wenn beide Stellen **denselben Wortlaut** führen. Genau das war der Fall: Die
+Meldung „Dafür fehlen dir Kampfschiffe" stand wortgleich am NPC-Knopf und am Piraten-Versteck.
+
+Zwei Konsequenzen, beide umgesetzt:
+
+- `logMarke(page)` ersetzt das Leeren. Es hält den alten Text als Wasserzeichen fest und liefert
+  eine Funktion, die nur die **seither** hinzugekommenen Zeilen zurückgibt. Wer mehrere Klicks
+  nacheinander misst, benutzt das statt `logZeilen` + Leeren.
+- Meldungen, die an mehreren Stellen für dieselbe Lage stehen, nennen **ihr Vorhaben**
+  („Für einen Tauchgang fehlen dir …", „Für einen Schlag gegen das Piraten-Versteck …"). Das ist
+  zuerst für den Spieler richtig — wer schnell mehrere Knöpfe antippt, sieht sonst dreimal denselben
+  Satz und weiß nicht, welcher gerade antwortet — und macht die Stellen nebenbei unterscheidbar.
+
+Der Gegenbeweis gehört zur Behebung: Dieselbe Sabotage, die die alte Prüfung überstand, lässt die
+neue fallen — und lässt die Nachbarprüfungen grün, weil sie eine andere Stelle trifft.
+
+### Eine Meldung, die in die falsche Richtung schickt, ist schlechter als keine (04.09.2026)
+
+Der schwerste Befund derselben Durchsicht steckte nicht im entfernten Riegel, sondern im **Text**,
+der ihn ersetzte. „Dafür fehlen dir Kampfschiffe – bau in der Werft welche" klingt richtig, ist aber
+falsch, sobald Jäger dastehen: `combatFleetCount` zählt Jäger und Bomber nur, soweit Hangarplätze da
+sind, und ohne Trägerschiff sind das null. Wer 60 Jäger und keinen Träger hat, wurde damit Jäger
+nachbauen geschickt — und wäre für immer in derselben Meldung hängen geblieben. Das Spiel nennt
+genau diese Verwechslung in seiner eigenen Hilfe die „häufigste".
+
+Daraus die Regel: Wer einen Riegel durch eine Meldung ersetzt, prüft **jede Lage, in der die
+Bedingung zutrifft**, nicht nur die naheliegende. Eine Bedingung, die aus einer abgeleiteten Größe
+kommt (hier `combatFleetCount` statt der reinen Schiffszahl), hat fast immer mehr als eine Ursache —
+und der Spieler braucht die, die auf ihn zutrifft.

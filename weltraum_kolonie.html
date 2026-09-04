@@ -21224,6 +21224,47 @@
     return html;
   }
 
+  /* SP-3, nachgezogen aus der adversarischen Durchsicht: Warum gerade keine Kampfflotte
+     losfliegen kann - EINE Antwort fuer alle Angriffsarten (NPC, Piraten-Versteck, Abgrund,
+     Spielerangriff).
+
+     Der erste Anlauf sagte hier pauschal "Dafuer fehlen dir Kampfschiffe - bau in der Werft
+     welche und komm wieder." Das ist FALSCH, sobald Jaeger oder Bomber dastehen:
+     combatFleetCount zaehlt sie nur, soweit Hangarplaetze da sind (deployableFighters), und
+     ohne Traegerschiff sind das null. Wer 60 Jaeger und keinen Traeger hatte, wurde damit
+     Jaeger nachbauen geschickt - und waere fuer immer in derselben Meldung haengen geblieben.
+     Das Spiel nennt genau diese Verwechslung in seiner eigenen Hilfe die "haeufigste"
+     (HELP_SECTIONS, "Hangar-Kapazitaet - haeufigste Verwechslung"). Eine Meldung, die den
+     Spieler in die falsche Richtung schickt, ist schlechter als gar keine. */
+  function kampfflottenMangel(cf, vorhaben){
+    const f = cf || currentFleet();
+    if (combatFleetCount(f) > 0) return null;
+    const df = deployableFighters(f);
+    const untaetig = (df.idleJaeger||0) + (df.idleBomber||0);
+    /* Ohne `vorhaben` die Kurzform fuer die enge Kartenzeile, mit `vorhaben` der volle Satz.
+       Das Vorhaben steht bewusst VORNE: Die Meldung sagt damit, worauf sie sich bezieht - wer
+       schnell mehrere Angriffsknoepfe antippt, sieht sonst dreimal denselben Satz und weiss
+       nicht, welcher davon gerade antwortet. (Nebenwirkung, die es auch braucht: Zwei
+       wortgleiche Meldungen kann keine Log-Pruefung auseinanderhalten - genau daran war die
+       erste Fassung dieses Bereichs blind, siehe test_sperrgrund_fortschritt_galaxie.js.) */
+    if (untaetig > 0)
+      return vorhaben
+        ? 'Für ' + vorhaben + ' brauchst du Hangarplätze: Deine ' + fmt(untaetig)
+          + ' Jäger/Bomber kommen ohne Trägerschiff nicht mit (eins trägt ' + CARRIER_HANGAR_SLOTS
+          + ', ein Superschlachtschiff ' + SUPER_HANGAR_SLOTS + ').'
+        : 'Jäger ohne Trägerschiff';
+    return vorhaben
+      ? 'Für ' + vorhaben + ' fehlen dir Kampfschiffe - bau in der Werft welche und komm wieder.'
+      : 'noch keine Kampfschiffe gebaut';
+  }
+  /* Belegte Kampf-Slots. Die Liste MUSS dieselbe sein, die die Startfunktionen anwenden
+     (sendAttackMission, sendPirateLairMission, sendeAbgrundMission) - sonst sagt die Vorschau
+     "geht" und der Start lehnt ab, und genau diese Sackgasse sollte SP-3 abschaffen. Der erste
+     Anlauf hatte die Fuenferliste des alten Riegels uebernommen; 'attack-alliance-base' fehlte. */
+  const KAMPF_SLOT_MISSIONEN = ['attack','attack-player','piratelair','abgrund','worldboss','attack-alliance-base'];
+  function belegteKampfSlots(cf){
+    return (cf || currentFleet()).missions.filter(m => KAMPF_SLOT_MISSIONEN.includes(m.type)).length;
+  }
   /* SP-3: Warum ein Angriff gerade nicht geht - EINE Regel fuer beide Einstiegspunkte (der
      Knopf im Galaxie-Reiter und das Menue der Sektorkarte rufen beide oeffneNpcAngriff).
      Hausmuster: null heisst "geht", sonst der Text.
@@ -21242,11 +21283,52 @@
     const cf = currentFleet();
     if (cf.missions.some(m => m.type === 'attack' && m.targetId === npcId))
       return 'Gegen ' + npc.name + ' läuft bereits ein Angriff.';
+    const mangel = kampfflottenMangel(cf, 'einen Angriff');
+    if (mangel) return mangel;
     const kampfschiffe = combatFleetCount(cf);
-    if (kampfschiffe <= 0)
-      return 'Dafür fehlen dir Kampfschiffe - bau in der Werft welche und komm wieder.';
-    const belegt = cf.missions.filter(m => m.type === 'attack' || m.type === 'attack-player'
-      || m.type === 'piratelair' || m.type === 'abgrund' || m.type === 'worldboss').length;
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Dasselbe fuer das Piraten-Versteck. Bewusst ein EIGENER Wortlaut fuer den Doppelangriff:
+     Der Spieler soll erkennen, worauf sich die Meldung bezieht - und ein Test kann zwei
+     wortgleiche Meldungen nicht auseinanderhalten (in der Durchsicht vom 04.09.2026 bewiesen:
+     eine Pruefung meldete Erfolg, obwohl der geprueften Stelle die Meldung fehlte). */
+  function verstecksSperrGrund(){
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'piratelair'))
+      return 'Gegen das Piraten-Versteck läuft bereits ein Angriff.';
+    const mangel = kampfflottenMangel(cf, 'einen Schlag gegen das Piraten-Versteck');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Und fuer den Abgrund. Bis zur Durchsicht sperrte er als einziger der drei nur auf
+     "laeuft schon" - drei Geschwister mit drei verschiedenen Antworten auf dieselbe Lage. */
+  function abgrundSperrGrund(){
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'abgrund'))
+      return 'Ein Tauchgang läuft bereits.';
+    const mangel = kampfflottenMangel(cf, 'einen Tauchgang');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Und fuer den Spielerangriff. Eigener Wortlaut beim Doppelangriff, aus demselben Grund wie
+     beim Versteck: zwei wortgleiche Meldungen kann keine Pruefung auseinanderhalten. */
+  function pvpAngriffSperrGrund(){
+    const cf = currentFleet();
+    const mangel = kampfflottenMangel(cf, 'einen Angriff auf einen Spieler');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
     if (belegt >= kampfschiffe)
       return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
     return null;
@@ -22803,7 +22885,12 @@
   // bemessen (2 statt der 6 eines dedizierten Trägerschiffs) - das Flaggschiff kann eine winzige
   // Eigen-Eskorte tragen, ohne die Trägerschiff-Klasse für größere Jäger-/Bomber-Flotten zu entwerten.
   const SUPER_HANGAR_SLOTS = 2;
-  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6 + (f.superschlachtschiff||0)*SUPER_HANGAR_SLOTS; }
+  /* Der Traegerhangar als benannte Groesse. Das Backend fuehrt beide Zahlen laengst so
+     (SUPER_HANGAR_SLOTS_SERVER / CARRIER_HANGAR_SLOTS_SERVER, "Spiegel von hangarCapacity()"),
+     im Frontend stand die 6 hart in der Formel. Seit SP-3 nennt eine Spielermeldung sie - eine
+     eingetippte Zweitschrift waere genau die Kopie ohne Familie. */
+  const CARRIER_HANGAR_SLOTS = 6;
+  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*CARRIER_HANGAR_SLOTS + (f.superschlachtschiff||0)*SUPER_HANGAR_SLOTS; }
   function deployableFighters(fleet){
     const f = fleet || currentFleet();
     const cap = hangarCapacity(f);
@@ -34572,7 +34659,7 @@ async function claimPendingRewards(){
     { icon:'ti-building-factory-2', title:'Basis & Ressourcen', text:'Im Basis-Tab baust du Gebäude, die Energie, Erz, Kristalle, Deuterium und Antimaterie produzieren. Fast jeder Gebäude-, Schiffs- und Forschungsausbau kostet unter anderem Energie – baue Solarzellen früh mit aus, sonst fehlt dir bald das Kleingeld für alles andere.' },
     { icon:'ti-flask', title:'Forschung & Doktrin', text:'Im Forschung-Tab verbesserst du Produktion, Kampfkraft und mehr dauerhaft. Im Spätspiel kannst du dort außerdem eine Doktrin wählen – eine strategische Grundsatzentscheidung fuers ganze Imperium – die einen entscheiden ueber Angriff und Verteidigung, die anderen ueber Foerderung, Expeditionen und den Abgrund.' },
     { icon:'ti-user-circle', title:'Offiziere & Module', text:'Im Offiziere-Tab wartet dein Ausrüstungs-Baukasten. Sieben Offiziere verstärken dein Imperium dauerhaft – alle gleichzeitig aktiv, angeheuert und befördert mit Kommandopunkten, die du fürs Kämpfen verdienst. Dazu zwei Modulsysteme: Standort-Module stecken in den Slots eines Planeten (Produktion, Verteidigung, Lager und mehr), Schiffsklassen-Module wirken auf jedes Schiff einer Klasse, egal wo es steht. Module gibt es in acht Seltenheiten von Gewöhnlich bis Primordial, jeder Fund würfelt seinen Hauptwert und seine Zweitwerte. Drei gleichartige verschmelzen zur nächsthöheren Seltenheit, überzählige zerlegst du zu Fragmenten und fertigst daraus dein Wunschmodul. Gespeicherte Vorlagen wechseln ganze Ausrüstungs-Profile mit einem Klick – die Wechselvorschau zeigt vorher, was sich ändert.' },
-    { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
+    { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – die Angriffsflotte stellst du direkt am Angreifen-Knopf zusammen. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     // Ohne HTML: renderTutorialStep setzt den Text per textContent, ein <strong> stünde wörtlich im
     // Fenster. test_tutorial prüft das - und hat genau diesen Fehler bei v8.349.0 gemeldet.
     { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die Galaxie als acht benannte Sektorregionen. Tippe eine Region an, dann zeigt der Sektor seine Systeme; ein Tipp auf ein System klappt seine Planeten auf – ein Klick auf einen Planeten öffnet ein kleines Menü mit Erkunden und Kolonisieren. Gürtelsysteme tragen einen gestrichelten goldenen Ring – klapp so ein System auf, dann liegen seine Asteroiden auf der Gürtelbahn, und ein Klick auf einen Brocken schickt eine Abbaumission los (Forschung Minentechnik nötig). Zurück geht es Ebene für Ebene mit ‹, ⌂ oder Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft, Handel, Forschung, Logistik oder Tiefenhafen) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
@@ -40812,7 +40899,7 @@ async function claimPendingRewards(){
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
-      { title:'Vier Unterreiter', body:'Der Galaxie-Tab ist in vier klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten.' },
+      { title:'Sechs Unterreiter', body:'Der Galaxie-Tab ist in sechs klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Der Abgrund</strong> (Tauchgänge, Werkstatt, Reliquien), <strong>Front</strong> (Kriegsraum und Lieferungen), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten. <strong>Kein Angreifen-Knopf ist mehr grau:</strong> Steht dem Angriff etwas im Weg – kein Kampfschiff, kein Hangarplatz, alle Flottenplätze belegt oder ein Angriff auf dasselbe Ziel unterwegs –, sagt der Knopf das beim Antippen, statt sich stumm zu verweigern.' },
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
@@ -51655,11 +51742,15 @@ async function claimPendingRewards(){
     const wiederholung = abgrundWiederholungsFaktor(tiefe, undefined, flotte);
     const splitterErwartet = Math.max(1, Math.round(sektor.splitter * abgrundSplitterFaktor(flotte, state.activeBasePlanet) * wiederholung));
     const bergung = abgrundBeuteFaktor(flotte);
-    /* SP-3: `kann` beschreibt weiterhin die Lage, riegelt aber nicht mehr ab. Derselbe Fall wie
-       bei den NPC-Knoepfen: gewaehlt===0 sperrte den Knopf, der als einziger zur Auswahl fuehrt.
-       Der Kommentar am Startknopf sagte es schon - die Sperre im Feld ist Komfort, keine
-       Autoritaet; sendeAbgrundMission() prueft Tiefe, Slots und Treibstoff ohnehin selbst. */
-    const kann = !busy && gewaehlt > 0;
+    /* SP-3: Der Riegel ist weg - derselbe Fall wie bei den NPC-Knoepfen: gewaehlt===0 sperrte
+       den Knopf, der als einziger zur Auswahl fuehrt. Der Kommentar am Startknopf sagte es
+       schon - die Sperre im Feld ist Komfort, keine Autoritaet; sendeAbgrundMission() prueft
+       Tiefe, Slots und Treibstoff ohnehin selbst.
+       Das frueher hier stehende `const kann` ist mit dem Riegel entfallen: Es wurde danach von
+       keiner Zeile mehr gelesen, waehrend der Kommentar daneben das Gegenteil behauptete
+       (Befund der Durchsicht). `busy` und `gewaehlt` stehen weiter im Markup und halten die
+       Signatur des Kastens wirksam. */
+    const tauchSperre = abgrundSperrGrund();
     const maxT = abgrundMaxTiefe();
     const gegenVorrat = abgrundGegenVorrat();
     const mutHtml = rohSektor.mutatoren.map(m => {
@@ -51949,7 +52040,7 @@ async function claimPendingRewards(){
         </div>` : ''}
         <div class="bmeta" style="margin-bottom:6px;">Gegnerstärke ${fmt(sektor.defense)} · Anflug ${fmtDuration(abgrundAnflugdauer(tiefe, sektor.mods.dur, flotte))}${abgrundRissKuerzung()>0?' <span style="color:#7f77dd;">(Rissströmung: −'+Math.round(abgrundRissKuerzung()*100)+'%)</span>':''} · Bergung ~${fmt(Math.round(sektor.loot.erz*bergung*wiederholung))} Erz, ${fmt(Math.round(sektor.loot.kristalle*bergung*wiederholung))} Kristalle, ${fmt(Math.round(sektor.loot.deuterium*bergung*wiederholung))} Deuterium (Frachter nötig!) · +${fmt(splitterErwartet)} Abgrundsplitter · +${fmt(Math.max(1, Math.round(sektor.bergung*wiederholung)))} Bergungsgut${wiederholung<1?' <span style="color:#f0997b;">(Wiederholung: nur '+Math.round(wiederholung*100)+'% Ausbeute)</span>':''}</div>
         ${mutHtml}
-        <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':'Tippe auf „Abtauchen" – dort stellst du deine Tauchflotte zusammen.'}</div>
+        <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':escapeHtml(tauchSperre || 'Tippe auf „Abtauchen" – dort stellst du deine Tauchflotte zusammen.')}</div>
         ${vorschauHtml ? `<div class="sonde-vorschau" style="margin:6px 0; padding-top:6px;"><span class="bmeta" style="color:#85b7eb;">Tiefensonde – was darunter wartet:</span>${vorschauHtml}</div>` : ''}
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
           <button data-abgrund-tiefe="-1" ${tiefe>1?'':'disabled'} style="min-width:44px;"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
@@ -52076,9 +52167,8 @@ async function claimPendingRewards(){
     // in keiner Tauchgang-Komposition landen) - das ist der offene Punkt aus der Kartierung vom
     // 05.08.2026 und ein eigenes Ticket, kein Teil dieses Umbaus.
     if (startBtn) startBtn.onclick = () => {
-      if (currentFleet().missions.some(m => m.type === 'abgrund')){
-        log('Ein Tauchgang läuft bereits.', 'ti-alert-triangle'); return;
-      }
+      const sperre = abgrundSperrGrund();
+      if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
       oeffneFlottenwahl({
       art: 'Abgrund', titel: 'In den Abgrund tauchen',
       // Kampfschiffe UND Tiefenflotte (v8.436.0, Task #23) - nur hier, in keiner anderen Angriffsart.
@@ -58908,10 +58998,16 @@ async function claimPendingRewards(){
       // Alles, was an der Auswahl haengt (Erfolgschance, Konter, Flugzeit, Treibstoff, Fracht),
       // steht IM Feld und zieht live mit; der Infoblock unten traegt die Zahlen, die ohne Auswahl
       // gelten. Beide Seiten rechnen ueber npcKampfLage - siehe dort.
-      { icon:'ti-sword', label:'Angreifen',
-        grund: 'Öffnet die Flottenwahl.',
-        disabled: false,
-        fn: () => oeffneNpcAngriff(npcId) }
+      /* SP-3 (Durchsicht): Der Eintrag versprach "Öffnet die Flottenwahl" auch dann, wenn
+         npcAngriffSperrGrund den Klick abweist - das Menue schloss sich und erklaerte erst
+         danach per Meldung, dass es das nicht getan hat. Die Geschwister-Eintraege desselben
+         Menues (Nest, Vorposten) fuellen `grund`/`disabled` seit jeher aus derselben Regel;
+         dieser tut es jetzt auch. */
+      (() => { const sperre = npcAngriffSperrGrund(npcId);
+        return { icon:'ti-sword', label:'Angreifen',
+          grund: sperre || 'Öffnet die Flottenwahl.',
+          disabled: !!sperre,
+          fn: () => oeffneNpcAngriff(npcId) }; })()
     ];
     /* Infoblock statt eines nackten "Angreifen" (E1b). Das Menue trug bis dahin KEINE einzige
        Zahl - wer ueber die Karte angriff, wusste nicht einmal, wie stark der Gegner ist. Gezeigt
@@ -66807,15 +66903,19 @@ async function claimPendingRewards(){
       } else {
         const attackFleetForTarget = buildAttackFleet(state.activeBasePlanet, cf);
         const totalSelectedForTarget = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleetForTarget[k]||0),0);
-        const canSendPending = totalSelectedForTarget > 0;
+        /* SP-3 (Durchsicht): Derselbe Fall wie bei den NPC-Knoepfen - `totalSelectedForTarget > 0`
+           sperrte genau den Knopf, der die Flottenwahl oeffnet. Der Satz daneben verwies dabei
+           auf eine Auswahl "oben", die es seit v8.427.0 gar nicht mehr gibt (siehe Kommentar
+           weiter oben in dieser Funktion). Beides ersetzt durch den echten Grund. */
+        const pendingSperre = pvpAngriffSperrGrund();
         pendingAttackBox.innerHTML = `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(226,75,74,0.1); border-color:rgba(226,75,74,0.4); margin-top:0.5rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div class="bmeta"><i class="ti ti-target" aria-hidden="true" style="color:#e24b4a;"></i> Markiertes Ziel: <strong style="color:#fff;">${pendingAttackTarget.name}</strong></div>
               <button aria-label="Angriff abbrechen" data-cancel-pending-attack style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
-            <button class="buy ${canSendPending?'affordable':''}" id="pendingAttackBtn" ${canSendPending?'':'disabled'}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
-            ${!canSendPending ? `<div class="bmeta">Wähle oben mindestens ein Kampfschiff für die Angriffsflotte aus.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`}
+            <button class="buy ${pendingSperre?'':'affordable'}" id="pendingAttackBtn"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
+            ${pendingSperre ? `<div class="bmeta">${escapeHtml(pendingSperre)}</div>` : (totalSelectedForTarget < 1 ? `<div class="bmeta">Tippe auf „Spieler angreifen" – dort stellst du deine Angriffsflotte zusammen.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`)}
           </div>
         `;
         /* Der Knopf startet nicht mehr direkt, sondern oeffnet das Flottenwahl-Feld (05.08.2026,
@@ -66827,6 +66927,8 @@ async function claimPendingRewards(){
            Es entsteht eine zweite BEDIENSTELLE, keine zweite QUELLE. */
         const pendingBtn = document.getElementById('pendingAttackBtn');
         if (pendingBtn) pendingBtn.onclick = () => {
+          const sperre = pvpAngriffSperrGrund();
+          if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
           const target = pendingAttackTarget;
           /* Die Standortwahl gilt immer nur fuer EIN Ziel. Beim Oeffnen wird sie deshalb
              zurueckgesetzt, wenn sie einem anderen Spieler galt - sonst wirkte eine bei Spieler A
@@ -66920,7 +67022,10 @@ async function claimPendingRewards(){
       /* SP-3: kein Riegel mehr, aus demselben Grund wie bei den NPC-Knoepfen. plSelected===0
          hiess bisher "gesperrt" - und der Text daneben schickte den Spieler zu einer Auswahl
          "unten", die es an dieser Stelle gar nicht gibt: Sie steckt im Menue, das genau dieser
-         Knopf oeffnet. plBusy bleibt als Beschriftung sichtbar ("Angriff laeuft ..."). */
+         Knopf oeffnet. plBusy bleibt als Beschriftung sichtbar ("Angriff laeuft ...").
+         Nachtrag aus der Durchsicht: Die Zeile darunter darf keine Auswahl versprechen, die der
+         Klick gar nicht oeffnet - sie zeigt deshalb denselben Grund, den der Knopf nennen wuerde. */
+      const plSperre = verstecksSperrGrund();
       const prestigeNote = prestige > 0 ? ` · <span style="color:#fac775;"><i class="ti ti-star" aria-hidden="true"></i> ${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)}× abgeschlossen (+${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)*2}% Angriff dauerhaft)</span>` : '';
       setBoxHtml(pirateLairBox, 'pirateLairBox', `
         <div class="section-title" style="margin-top:0.75rem;"><i class="ti ti-skull" aria-hidden="true"></i>Piraten-Versteck <span class="lvl-pill" style="margin-left:6px;">Stufe ${stage}/${PIRATE_LAIR_MAX_STAGE}</span></div>
@@ -66930,18 +67035,14 @@ async function claimPendingRewards(){
             <span class="lvl-pill">Stärke ${fmt(lairDef)}</span>
           </div>
           <div class="bmeta" style="margin-bottom:4px;">Sieg: ~${fmt(plLoot.erz)} Erz, ${fmt(plLoot.kristalle)} Kristalle, ${fmt(plLoot.deuterium)} Deuterium (Frachter nötig!) · +${30+stage*20} Kredite · +${5+stage*3} Kampfpunkte · ${stage>=PIRATE_LAIR_MAX_STAGE?'garantiertes Modul + 500 Bonus-Kredite + Ketten-Neustart mit dauerhaftem Angriffsbonus':Math.round((0.10+stage*0.02)*100)+'% Modul-Chance'}${prestigeNote}</div>
-          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(Math.round(plPower*(plSchwaecheGenutzt?WEAKNESS_POWER_MULT:1)))+' → Siegchance ~'+Math.round(plChance*100)+'%':'Tippe auf „Versteck angreifen" – dort stellst du deine Angriffsflotte zusammen.'}</div>
+          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(Math.round(plPower*(plSchwaecheGenutzt?WEAKNESS_POWER_MULT:1)))+' → Siegchance ~'+Math.round(plChance*100)+'%':escapeHtml(plSperre || 'Tippe auf „Versteck angreifen" – dort stellst du deine Angriffsflotte zusammen.')}</div>
           <div class="bmeta" style="margin-bottom:6px; color:${plSchwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle dieser Stufe: ${weaknessName(plSchwaeche)}${plSchwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>
           <button data-attack-lair>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
         </div>`);
       const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
       if (lairBtn) lairBtn.onclick = () => {
-        if (currentFleet().missions.some(m => m.type === 'piratelair')){
-          log('Gegen das Piraten-Versteck läuft bereits ein Angriff.', 'ti-alert-triangle'); return;
-        }
-        if (combatFleetCount(currentFleet()) <= 0){
-          log('Dafür fehlen dir Kampfschiffe - bau in der Werft welche und komm wieder.', 'ti-alert-triangle'); return;
-        }
+        const sperre = verstecksSperrGrund();
+        if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
         oeffneFlottenwahl({
           art: 'Piratenversteck · Stufe '+(state.pirateLairStage||1), titel: 'Piratenversteck angreifen',
           keys: ATTACK_SHIP_KEYS, fracht: true, startLabel: 'Versteck angreifen',
@@ -66952,13 +67053,14 @@ async function claimPendingRewards(){
     setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => npcFreigeschaltet(n)).map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
-      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss').length < combatShipsN;
+
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-      /* SP-3: `slotsFreeN` und `busy` bleiben ANZEIGE-Wissen (die Zeilen darunter lesen sie),
-         sind aber kein Riegel mehr. Wer nicht angreifen kann, erfaehrt beim Klick warum - die
-         Regel steht in npcAngriffSperrGrund(), damit Knopf und Kartenmenue nicht zwei Fassungen
-         derselben Bedingung pflegen. */
+      /* SP-3: kein Riegel mehr. Wer nicht angreifen kann, erfaehrt beim Klick warum - die Regel
+         steht in npcAngriffSperrGrund(), damit Knopf und Kartenmenue nicht zwei Fassungen
+         derselben Bedingung pflegen. `busy` bleibt als Beschriftung ("im Einsatz"); das frueher
+         hier gerechnete `slotsFreeN` ist entfallen, weil es danach niemand mehr las - der erste
+         Kommentar an dieser Stelle behauptete das Gegenteil (Befund der Durchsicht). */
       /* Die fuenfzehn Zwischenwerte standen bis E1b hier inline. Sie liegen jetzt in
          npcKampfLage(), weil die Kartenvorschau dieselben Zahlen braucht - eine zweite Rechnung
          daneben waere genau die Anzeigestelle, die beim naechsten Balance-Schritt die alte
@@ -66987,7 +67089,7 @@ async function claimPendingRewards(){
             <div class="bicon" style="background:rgba(226,75,74,0.16); color:#f0997b;"><i class="ti ti-alien" aria-hidden="true"></i></div>
             <div>
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
-              <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?(combatShipsN>0?' (keine Schiffe gewählt)':' (noch keine Kampfschiffe gebaut)'):''} · Erfolgschance ~${chance}%</div>
+              <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?(combatShipsN>0?' (keine Schiffe gewählt)':' ('+kampfflottenMangel(cf)+')'):''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
               ${n.weakness ? `<div class="bmeta" style="color:${schwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: ${weaknessName(n.weakness)}${schwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>` : ''}
