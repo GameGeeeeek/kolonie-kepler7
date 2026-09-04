@@ -35627,7 +35627,35 @@ async function claimPendingRewards(){
       save();
     }
     if (!useBackend()) return;
-    try { await backendFetch('/reports', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ report }) }); } catch(e){}
+    try {
+      const res = await backendFetch('/reports', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ report }) });
+      // KI-Kampfbericht (E1b, 04.09.2026): Der Server nennt seit dem Backend-PR #233 die ID des
+      // gespeicherten Berichts; damit bestellt der Client den Erzähltext, und der Server hängt ihn
+      // an genau diesen Bericht. Ein älterer Server nennt keine ID - dann wird nichts bestellt.
+      if (res.ok && report.type === 'npc-attack'){
+        let antwort = null;
+        try { antwort = await res.json(); } catch(e){}
+        if (antwort && antwort.id) kampftextBestellen(report, antwort.id);
+      }
+    } catch(e){}
+  }
+  /* KI-Kampfberichte, Etappe E1b (04.09.2026) - der Client bestellt, der Server erzählt.
+     Konzept: docs/ki-kampfberichte-konzept.md. Der Client schickt fünf FELDER (nie Text, nie einen
+     Prompt) und die ID des gerade gespeicherten Berichts. Das Backend baut den Prompt, lässt AI Core
+     auf dem M715q schreiben (gemessen ~70 s), prüft den Text gegen die Kampfdaten und hängt ihn als
+     `kiText` an genau diesen Bericht. Hier gibt es deshalb KEINEN Poll und keinen Ladezustand: Der
+     15-Sekunden-Abruf der Berichte bringt den Text mit, sobald er da ist - auf jedem Gerät des
+     Spielers, weil die Berichte auf dem Server liegen und nicht im Spielstand.
+     Ein fehlender Text ist per Konzept kein Fehler: 503 (abgeschaltet oder Notaus), 429
+     (Tagesdeckel), 400, Netzfehler - alles bleibt still. Der Bericht ist ohne den Text vollständig,
+     er ist es heute ja auch. Deshalb kein alert(), kein log(), kein Toast. */
+  function kampftextBestellen(report, reportId){
+    if (!useBackend() || !report || !reportId) return;
+    const koerper = { npcName: report.npcName, npcLevel: report.npcLevel, result: report.result,
+      fleet: report.fleet || {}, ownLostShips: report.ownLostShips || {}, reportId };
+    try {
+      backendFetch('/kampfbericht/text', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(koerper) }).catch(() => {});
+    } catch(e){}
   }
   /* EIN Angriff, der gar nicht erst zum Kampf kam, ist trotzdem ein Ereignis, das der Spieler
      nachvollziehen koennen muss (Auftrag Sascha 19.08.2026, zweite Etappe).
@@ -41224,6 +41252,7 @@ async function claimPendingRewards(){
       { title:'Heimatbasis-Bonus', body:'Die Heimatbasis hat <strong>+20% Verteidigungspunkte</strong> gegenüber identisch ausgebauten Kolonien. Macht "Heimat verteidigen" bewusst wichtiger.' },
       { title:'Grenznutzen bei Mega-Flotten', body:'Ab <strong>300 Schiffen eines einzigen Typs</strong> zählen weitere nur noch mit halber Angriffskraft-Wirkung. Beispiel: 600 Kreuzer bringen nicht 12.000 Angriffskraft (600×20), sondern nur 9.000 – eine gemischte Flotte ist ab dieser Größenordnung effizienter als eine Mono-Flotte. Auch die <strong>Kosten</strong> ziehen bei Mono-Flotten an: Ab dem 250. Schiff wächst der Stückpreis exponentiell, und mehrere Klassen verlangen oberhalb einer Bestands-Schwelle Tier-2-Komponenten (Details im Abschnitt „Imperiums-Skalierung der Kosten").' },
       { title:'Verluste nachbauen', body:'Enthält ein Kampfbericht eigene Schiffsverluste, erscheint darunter der Knopf <strong>„Verluste nachbauen"</strong>: reiht alle verlorenen Schiffstypen in der passenden Menge am aktuell gewählten Standort in die Bauwarteschlange ein - zu den regulären Kosten ab dem heutigen Bestand. Seltene, itemgebundene Einheiten werden bewusst nicht automatisch nachgebaut (kein stiller Item-Verbrauch per Klick), ebenso wenig Schiffe, die bereits am Maximalbestand sind - dafür erscheint ein Hinweis.' },
+      { title:'Logbuch des Kommandanten', body:'Zu Angriffen auf NPC-Ziele erscheint im Bericht nach ein bis zwei Minuten ein kurzer <strong>Erzähltext</strong> – geschrieben von einer KI, die auf dem eigenen Server des Spiels läuft, nicht bei einem Anbieter im Internet. <strong>Der Text entscheidet nichts.</strong> Ausgang, Verluste und Beute kommen aus dem Spiel und stehen daneben in Zahlen; das Logbuch erzählt nur, was passiert ist. Fehlt es einmal, ist der Bericht trotzdem vollständig: Es gibt eine kleine Tagesgrenze je Konto, und die Maschine schreibt einen Text nach dem anderen. Nur mit eigenem Server verfügbar.' },
       { title:'Berichte-Filter', body:'Im Berichte-Tab lässt sich die Liste über zwei Filterzeilen eingrenzen: eine <strong>Kategorie</strong> (Alle, Kämpfe, Expeditionen, Spionage, Sonstiges - jeweils mit Trefferzahl in Klammern) und ein <strong>Ergebnis</strong> (Alle Ergebnisse, Nur Erfolge, Nur Rückschläge). Praktisch, sobald die Liste über die Zeit lang wird - z.B. nur fehlgeschlagene Kämpfe zum Nachjustieren der Verteidigung ansehen, oder nur Expeditionsfunde durchgehen. Die Auswahl gilt nur für die aktuelle Sitzung, kein Teil des gespeicherten Spielstands.' },
       { title:'Schiffsbau beschleunigen (Tier-2)', body:'Zwei Quantenchip-basierte Wege verkürzen die <strong>Schiffsbauzeit imperiumsweit</strong>: <strong>(1) Quanten-Assemblierwerft</strong> (Nutzgebäude, Basis-Tab, ab Forschung Quantenphysik) - -1,5% je Stufe, dauerhaft. Sie teilt sich einen <strong>gemeinsamen Deckel</strong> mit dem <strong>Fusions-Werftkern</strong>: die Stufen beider Gebäude über alle Standorte werden zusammengezählt und sind gemeinsam bei <strong>-20%</strong> gekappt (additiv, kein Aufschaukeln). <strong>(2) Werft-Overdrive</strong> (Verbrauchs-Boost, direkt unter der Schiffswerft im Flotte-Tab): 12 Quantenchips → <strong>-25% Schiffsbauzeit für 30 Minuten</strong>, gilt für alle in dieser Zeit laufenden und neu eingereihten Aufträge. Beide wirken zusätzlich zu Werft-Rolle, Offizier Ingenieur, Orbitalstation-Dock und den Allianz-Werftboni. Der Overdrive zählt für den Erfolg „Verbrauchsstratege".' },
       { title:'Flotten-Vorlagen', body:'Direkt im <strong>Flottenwahl-Feld</strong> (öffnet sich bei jedem Angriff) lässt sich die aktuelle Schiffsauswahl unter einem Namen als <strong>Vorlage</strong> speichern und später mit einem Klick wieder anwenden - praktisch für wiederkehrende Zusammenstellungen wie „Nur Jäger" oder „Vollangriff ohne Frachter". Vorlagen speichern absolute Schiffszahlen, werden beim Anwenden aber immer auf die am jeweiligen Standort <strong>aktuell verfügbare</strong> Menge gekappt - sie bleiben so auch nutzbar, wenn die Flotte seither gewachsen, geschrumpft oder anderswo unterwegs ist.' },
@@ -41809,6 +41838,15 @@ async function claimPendingRewards(){
   }
   // Sichtbarkeits-/Tab-Gate für das Nachladen geteilter Aufklärung (reines Anzeige-Polling).
   setInterval(() => { if (document.visibilityState === 'visible' && activeTab === 'berichte' && myAllianceTag() && useBackend()){ loadSharedIntel().then(() => { lastIntelSig = null; renderIntelBox(); }); } }, 30000);
+  // Die Logbuch-Sektion eines Berichts. escapeHtml, weil der Text Serverdaten ist, die ein
+  // Sprachmodell geschrieben hat - der Server prüft ihn gegen die Kampfdaten, nicht gegen HTML.
+  // Leer (oder kein String) heißt: keine Sektion, nicht einmal eine Überschrift.
+  function kiLogbuchHtml(text){
+    if (typeof text !== 'string' || !text.trim()) return '';
+    return '<div class="ki-logbuch" style="margin-top:8px; padding:8px 10px; border-left:3px solid #9fe1cb; background:rgba(159,225,203,0.06); border-radius:0 6px 6px 0;">'
+      + '<div class="bmeta" style="margin-bottom:3px;"><i class="ti ti-message" aria-hidden="true" style="margin-right:4px;"></i><strong>Logbuch des Kommandanten</strong></div>'
+      + '<em>'+escapeHtml(text.trim())+'</em></div>';
+  }
   function renderReportsBox(){
     const box = document.getElementById('reportsBox');
     if (!box) return;
@@ -41851,7 +41889,12 @@ async function claimPendingRewards(){
     // Die Archiv-Zeile MUSS in die Signatur: Sie ist ein neu hinzugekommenes Anzeigefeld, und genau
     // solche lassen eine Wertlisten-Signatur stillschweigend veralten (siehe die Kommentare oben -
     // derselbe Fehler ist hier schon zweimal passiert).
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig+'|'+archivHtml;
+    // Der KI-Text gehört in die Signatur (E1b, 04.09.2026): Er kommt mit dem 15-s-Abruf NACHTRÄGLICH
+    // an denselben Bericht, dessen ID sich dabei nicht ändert. Ohne diesen Zusatz bliebe die
+    // Signatur gleich, die Box würde nicht neu geschrieben, und der Spieler sähe das Logbuch erst
+    // nach einem Filterwechsel - dieselbe Falle wie bei den vier Zusätzen darüber.
+    const kiSig = reportsCache.map(r => (typeof r.kiText === 'string' && r.kiText ? r.id+':'+r.kiText.length : '')).filter(Boolean).join(',');
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig+'|'+archivHtml+'|'+kiSig;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
@@ -42439,6 +42482,10 @@ async function claimPendingRewards(){
           body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Eigene Verluste: '+shipCountRowHtml(r.ownLostShips)+' (Trümmerfeld hinterlassen)';
           body += debrisReportLine(r.debris);
         }
+        // Logbuch des Kommandanten (E1b, 04.09.2026): der Erzähltext vom M715q, sobald der Server ihn
+        // an den Bericht gehängt hat. Nur MIT Text - kein Ladezustand, kein „wird verfasst"; ein
+        // fehlender Text ist per Konzept kein Fehler (docs/ki-kampfberichte-konzept.md).
+        body += kiLogbuchHtml(r.kiText);
       } else if (r.type === 'player-attack'){
         title = (r.warTag?'⚔ ':'')+'Angriff auf Spieler '+escapeHtml(r.targetName);
         body = '<strong>'+(r.result==='win' ? 'Erfolgreich! Angriffskraft ('+r.attackPower+') war überlegen (vs. Verteidigungspunkte '+r.defensePower+').' : 'Gescheitert. Angriffskraft ('+r.attackPower+') reichte nicht (vs. Verteidigungspunkte '+r.defensePower+').')+'</strong>';

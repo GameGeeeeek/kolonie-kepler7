@@ -142,10 +142,19 @@ geprüft hält.
     (ein Auftrag gleichzeitig Richtung M715q), Tagesdeckel je Konto und gesamt, Prompt-Schablone
     und die drei Wahrheits-Sperren, alles hinter `KAMPFTEXT_AKTIV = false`. Einzelheiten und die
     sieben Entscheidungen: `kolonie-kepler7-backend/docs/ki-kampfberichte.md`.
-  - **E1b – Frontend: offen.** Client-Sektion im Bericht, 30-s-Poll, und das Umlegen des
-    Schalters. **Drei Vorbedingungen, alle am Pi:** `AI_CORE_URL` und `AI_CORE_API_KEY` als
-    Container-Env (verlangt ein Neuerzeugen des Containers), und eine erste Messung, ob der Pi
-    den M715q überhaupt erreicht — das ist bis heute nicht geprüft.
+  - **E1b – FERTIG am 04.09.2026, in zwei Hälften und mit einer Abweichung vom Plan.**
+    Die Vorbedingungen am Pi sind erfüllt: `AI_CORE_API_KEY` im Portainer-Stack (Sascha), die
+    Erreichbarkeit misst das Backend seither selbst (`/api/health` → `kampftext`, Backend #231:
+    `erreichbar: true`, `passt`). **Die Abweichung:** Das Konzept nahm an, die Berichte lägen im
+    Spielstand — sie liegen aber auf dem Server (`db.private[userId].__reports`), der Client hält
+    nur einen Cache und lädt ihn alle 15 s neu. Deshalb gibt es **keinen Client-Poll**: Der Client
+    bestellt mit dem Bericht dessen Server-ID mit (`POST /api/reports` nennt sie seit Backend #233),
+    und das Backend hängt den fertigen Text als `kiText` an genau diesen Bericht — der nächste
+    Berichte-Abruf bringt ihn mit, auf jedem Gerät des Spielers. Die Sektion heißt „Logbuch des
+    Kommandanten" und erscheint nur mit Text. Dazu der Notaus `kampftext` (Betreiber schaltet zur
+    Laufzeit ab) und `KAMPFTEXT_AKTIV = true` im Backend-PR, weil die Repos getrennt sind und der
+    Client mit 503 still umgeht. Wächter: `tests/test_kampfbericht_logbuch.js` (16 Prüfungen,
+    Gegenprobe im Dateikopf) und Backend `test_kampftext_http.js` Abschnitte 12/13.
 - **E2 – die großen Momente:** Weltboss, Festungs-Fall, Königin, PvP-Angriff (dort beide
   Perspektiven: Der Verteidiger bekommt denselben Kampf aus seiner Sicht erzählt – zwei Texte
   aus einem Datensatz).
@@ -170,6 +179,8 @@ geprüft hält.
   Hälfte allein wäre trivial grün), Prompt entsteht nie aus Client-Text (Feld `prompt` im
   Request wird ignoriert/abgelehnt).
 - Frontend-Test: Sektion erscheint NUR mit Text (Gegenrichtung: ohne Text keine leere
-  Überschrift), `escapeHtml` gemessen (Text mit `<script>` rendert als Text), Poll endet
-  (kein Endlos-Poll nach `fehlgeschlagen`).
+  Überschrift), `escapeHtml` gemessen (Text mit `<script>` rendert als Text), ~~Poll endet~~ —
+  seit E1b gibt es keinen Client-Poll (siehe oben); stattdessen: die Anzeigebremse schreibt die
+  Box neu, wenn der Text nachträglich am selben Bericht ankommt, und die Bestellung schickt genau
+  die fünf Felder plus Berichts-ID, nie den ganzen Bericht, nicht für andere Berichtsarten.
 - Parität: keine – es gibt bewusst keine zweite Formel; der Text trägt keine Wirkung.
