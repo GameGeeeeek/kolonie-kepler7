@@ -9327,10 +9327,22 @@
      LAENGER und DICKER, statt Anbauten zu bekommen, und bekommt nacheinander Baender, Fenster
      und Panelnaehte. Der Zweig steckt im Farbton und in der Zahl der Baender - die drei
      Stationen bleiben damit unterscheidbar, ohne dass etwas absteht. */
+  /* Die Leiter gehoert dem Backend: VORPOSTEN_ZWEIG_AB und die Laenge von VORPOSTEN_STUFEN
+     kommen als zweigAb/maxStufe im Cache an, und vorpostenIstStation nebenan liest sie bereits.
+     Hier standen 4 und 8 eingetippt - eine neunte Stufe haette dann dasselbe Bild bekommen wie
+     die achte, und ein gesenktes zweigAb haette Stufe 3 und 4 ununterscheidbar gemacht. Genau
+     die Kopie-Familien-Falle, vor der CLAUDE.md warnt (Befund der Durchsicht zu v8.665.0). */
+  function vpStufenBereich(){
+    const ab = vorpostenCache.zweigAb || 4;
+    const max = Math.max(ab + 1, vorpostenCache.maxStufe || (vorpostenCache.stufen||[]).length || 8);
+    return { ab, max };
+  }
   function vpZeichneKapsel(c, S, zweig, stufe){
     const ton = VP_ZWEIG_TON[zweig] || VP_ZWEIG_TON.null;
-    const st = Math.max(4, Math.min(8, stufe||4));
-    const w = st - 4;                                  // 0 bis 4
+    const B = vpStufenBereich();
+    const st = Math.max(B.ab, Math.min(B.max, stufe||B.ab));
+    // Auf 0..4 normieren, damit die Form unabhaengig von der Laenge der Leiter gleich waechst
+    const w = (B.max > B.ab) ? (st - B.ab) / (B.max - B.ab) * 4 : 0;
     const cx = S/2, cy = S/2;
     /* Schlanker als im ersten Anlauf: Bei 1,8:1 sah die Kapsel aus wie eine Dose, und die
        Ringe verdeckten mehr Koerper, als sie umfassten. */
@@ -9348,7 +9360,12 @@
     const Rr = R*(1.30 + w*0.055), rohr = S*(0.0085 + w*0.0018);
     // Handel traegt drei Baender, Werft zwei, Festung eines breites - der Zweig bleibt lesbar
     const baender = zweig === 'handel' ? [-0.20, 0.06, 0.30] : (zweig === 'festung' ? [0.02] : [-0.16, 0.22]);
-    const sichtbar = baender.slice(0, Math.max(1, Math.min(baender.length, st - 4)));
+    /* Vorher `st - 4`, also EIN Band auf den Stufen 4 und 5 - ausgerechnet dort, wo der Zweig
+       gerade erst gewaehlt wurde und das Bild ihn zeigen soll. Die drei Zweige unterschieden sich
+       dann nur im Farbton, obwohl Patchnote und Kommentar die Baenderzahl als Merkmal nennen
+       (Befund der Durchsicht zu v8.665.0). Jetzt traegt jeder Zweig seine volle Zahl von Anfang an;
+       gewachsen wird ueber Laenge, Fenster und Naehte. */
+    const sichtbar = baender;
     const bandFarbe = st >= 6 ? ton.band : null;
     for (const b of sichtbar) vpRing(c, cx, cy + laenge*b, Rr*(zweig==='festung'?1.16:1), rohr*(zweig==='festung'?1.35:1), 0.26, false, ton, bandFarbe);
     vpDrehkoerper(c, cx, cy, R, laenge, profil, ton, kipp);
@@ -9376,7 +9393,8 @@
      Faellt das Rendern aus (kein 2D-Context), gibt es null und der Aufrufer zeichnet die
      Strichfassung: eine Karte ohne Vorposten waere schlimmer als eine altmodische. */
   function vorpostenBildUrl(zweig, stufe){
-    const key = (zweig||'null') + ':' + Math.max(4, Math.min(8, stufe||4));
+    const B = vpStufenBereich();
+    const key = (zweig||'null') + ':' + Math.max(B.ab, Math.min(B.max, stufe||B.ab));
     if (!(key in VP_BILD_CACHE)){
       try {
         const cv = document.createElement('canvas');
@@ -21314,17 +21332,23 @@
      Tiefenflotte (v8.337.0): ueber die REKORDTIEFE freigeschaltet, nicht ueber Forschung.
      Allianzflotte (05.08.2026): zwei zusaetzliche Tore. Bereits GEBAUTE Schiffe sind von beidem
      nicht betroffen - hier steht ausschliesslich "darf ich NEUE bauen". */
-  function schiffSperrGrund(def){
-    if (!def) return 'Unbekanntes Schiff.';
+  /* nurPruefen=true liefert nur true/null statt eines fertigen Satzes. shipRequirementsMet laeuft
+     ueber den Renderpfad rund 135-mal je Sekunde (Kartenliste, Filter, Baukorb); dort einen
+     deutschen Satz samt findeForschung-Suche zu bauen, war verschwendet - fuer einen jungen
+     Spieler sind 40 von 45 Schiffen gesperrt, der teure Zweig also der HAEUFIGE, nicht der
+     seltene (Befund der Durchsicht zu v8.665.0). Es bleibt EINE Wahrheit: dieselbe Funktion,
+     dieselben Bedingungen, dieselbe Reihenfolge - nur die Formulierung entfaellt. */
+  function schiffSperrGrund(def, nurPruefen){
+    if (!def) return nurPruefen ? true : 'Unbekanntes Schiff.';
     if (typeof def.tiefe === 'number' && ((state.abgrund||{}).best||0) < def.tiefe)
-      return def.name + ' braucht Tiefe ' + def.tiefe + ' im Abgrund - deine Bestmarke ist '
+      return nurPruefen ? true : def.name + ' braucht Tiefe ' + def.tiefe + ' im Abgrund - deine Bestmarke ist '
              + ((state.abgrund||{}).best||0) + '.';
     if (def.allianzSchiff){
       if (!inAllianz())
-        return def.name + ' ist ein Allianzschiff - tritt einer Allianz bei oder gründe eine (Allianz-Tab).';
+        return nurPruefen ? true : def.name + ' ist ein Allianzschiff - tritt einer Allianz bei oder gründe eine (Allianz-Tab).';
       const noetig = def.allianzWerft || 0;
       if (allianceTechLevel('ab_werft') < noetig)
-        return 'Dafür fehlt noch: ' + ((findAllianceStructure('ab_werft')||{}).name || 'Gemeinsame Flottenwerft')
+        return nurPruefen ? true : 'Dafür fehlt noch: ' + ((findAllianceStructure('ab_werft')||{}).name || 'Gemeinsame Flottenwerft')
              + ' Stufe ' + noetig + ' (aktuell ' + allianceTechLevel('ab_werft') + ').';
     }
     /* Erst billig pruefen OB etwas fehlt, dann erst den Satz bauen: Diese Funktion laeuft bei
@@ -21336,12 +21360,13 @@
       if ((state.research[v.key]||0) < v.level){ fehltEtwas = true; break; }
     }
     if (!fehltEtwas) return null;
+    if (nurPruefen) return true;
     const fehlt = vor.map(techVoraussetzung)
       .filter(v => (state.research[v.key]||0) < v.level)
       .map(v => (findeForschung(v.key)||{name:v.key}).name + ' Stufe ' + v.level).join(', ');
     return 'Dafür fehlt noch: ' + fehlt + '.';
   }
-  function shipRequirementsMet(def){ return !schiffSperrGrund(def); }
+  function shipRequirementsMet(def){ return !schiffSperrGrund(def, true); }
   // Kredite liegen NICHT in state.resources, sondern in state.credits - ein Kostenposten 'credits'
   // wurde deshalb bis v8.298.26 als "0 vorhanden" gelesen und machte den Posten UNBEZAHLBAR (Spieler-
   // Report 26.07.2026: das Botschaftsviertel mit 400 Kredit-Anteil liess sich nie bauen). Der
@@ -59907,8 +59932,13 @@ async function claimPendingRewards(){
       });
     }
     /* Vorposten (B2): ein Objekt je System auf der inneren Bahn (vorpostenMarkerXY), durch den
-       Kollisionsschieber. Eigen gruen, fremd rot - dieselbe Farbregel wie die Schuerfrechte.
-       Gezeichnet als Palisade mit Fahne; die Punkte darunter zaehlen die Stufe. */
+       Kollisionsschieber.
+       ZWEI ZEICHNUNGEN, nicht eine: Bis zur Wahlstufe ein BODENLAGER (vorpostenLager - Palisade,
+       Tor, Wachturm, gezeichnet in der Zweigfarbe), ab der Wahlstufe eine STATION - und die ist
+       seit GR-5 kein SVG mehr, sondern ein gerendertes <image> (vorpostenSilhouette). Dessen
+       Inhalt haengt nur an Zweig und Stufe; der uebergebene `farbeV` wirkt dort NICHT mehr.
+       Die Farbregel eigen gruen / fremd rot lebt deshalb nur noch im Hof-Ring, im Kernbalken
+       und in der Beschriftung darunter - wer sie in der Silhouette sucht, sucht vergebens. */
     {
       const vp = vorpostenAn(activeSystem);
       if (vp){
@@ -65281,7 +65311,7 @@ async function claimPendingRewards(){
             </div>
           </div>
           <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-            <button class="buy ${(unlocked&&ok&&!atOwnedCap)?'affordable':''}" data-buyship="${def.key}"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>${(unlocked&&!atOwnedCap&&!ok)?'Einreihen':'Bauen'} (+${shipQty})</button>
+            <button class="buy ${(unlocked&&ok&&!atOwnedCap)?'affordable':''}" data-buyship="${def.key}"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>${(!unlocked||atOwnedCap)?'Gesperrt':((!ok)?'Einreihen':'Bauen')} (+${shipQty})</button>
             ${count>0 ? `<button data-scrapship="${def.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>Verschrotten (-${Math.min(shipQty,count)})</button>` : ''}
           </div>
         </div>
@@ -65317,7 +65347,7 @@ async function claimPendingRewards(){
           </div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
-          <button class="buy ${(canAfford(superC)&&superQty>=1&&superHaveItem>=superQty)?'affordable':''}" id="buySuperschlachtschiff" ${(canAfford(superC)&&superQty>=1&&superHaveItem>=superQty)?'':'disabled'}><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Bauen (+${superQty})</button>
+          <button class="buy ${(canAfford(superC)&&superQty>=1&&superHaveItem>=superQty)?'affordable':''}" id="buySuperschlachtschiff"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>${(superQty>=1&&superHaveItem>=superQty&&!canAfford(superC))?'Einreihen':'Bauen'} (+${superQty})</button>
           ${(cf.superschlachtschiff||0)>0 ? `<button data-scrapship="superschlachtschiff" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-recycle" aria-hidden="true" style="margin-right:3px;"></i>Verschrotten</button>` : ''}
         </div>
       </div>
@@ -65855,13 +65885,32 @@ async function claimPendingRewards(){
           // und Start passieren pro Schiffstyp einzeln in activateQueuedJobs, sobald bezahlbar.
           let any = false;
           const skippedQueueFull = [];
+          /* SELTENE GEGENSTAENDE MUESSEN HIER ABGEZOGEN WERDEN (Befund der Durchsicht zu
+             v8.665.0, 04.09.2026). queueConstruction stempelt fuer jedes Schiff aus
+             SPECIAL_UNIT_ITEMS automatisch specialItemKey/specialItemQty an den Auftrag, und
+             cancelConstruction erstattet diese Menge bedingungslos zurueck - im Vertrauen
+             darauf, dass der AUFRUFER sie vorher abgezogen hat (so macht es der Einzelknopf).
+             Der Baukorb tat das nie. Damit liess sich der Vorrat vermehren: einreihen, ohne
+             dass etwas abgeht, abbrechen, Erstattung kassieren, beliebig oft. Wer den Auftrag
+             stattdessen durchlaufen liess, bekam die Schiffe fuer null Gegenstaende.
+             Die Menge wird zusaetzlich auf den Vorrat gedeckelt, statt den Korb stumm zu
+             verwerfen - dieselbe Regel wie am Einzelknopf. */
+          const zuWenigItem = [];
           for (const d of basketDefs){
-            const qty = shipBasket[d.key]||0;
+            let qty = shipBasket[d.key]||0;
             if (qty <= 0) continue;
             if (shipQueueCount() >= SHIP_QUEUE_MAX){ skippedQueueFull.push(d.name); continue; }
+            const itemKey = SPECIAL_UNIT_ITEMS[d.key];
+            if (itemKey){
+              const vorrat = state.rareItems[itemKey]||0;
+              if (vorrat < 1){ zuWenigItem.push(d.name); continue; }
+              qty = Math.min(qty, vorrat);
+              state.rareItems[itemKey] = vorrat - qty;
+            }
             queueConstruction('ship', state.activeBasePlanet, d.key, qty, d.buildTime, d.name+' (+'+qty+', Baukorb)', 'ti-rocket', shipCostForRange(d, cf[d.key]||0, qty));
             any = true;
           }
+          if (zuWenigItem.length) log(zuWenigItem.join(', ')+' übersprungen - dafür fehlt der nötige Gegenstand.', 'ti-alert-triangle');
           if (skippedQueueFull.length) log(skippedQueueFull.join(', ')+' übersprungen - Flotten-Warteschlange voll (max. '+SHIP_QUEUE_MAX+').', 'ti-alert-triangle');
           if (!any) return;
           shipBasket = {};
