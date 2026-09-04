@@ -9,32 +9,32 @@
 // ein Mensch, hinterher, wenn er daran dachte. Eine Regel, an die man sich erinnern muss, ist bei
 // einer regelmäßigen Aufgabe keine Absicherung (docs/PROJECT_MEMORY.md).
 //
-// GEPRÜFT WIRD (Funktionen ausgeführt, gegen ein ECHTES Wegwerf-Git mit echtem origin):
-//   1) ampelStand() misst gegen origin/main und meldet die Spieldatei nur, wenn sie sich dort
-//      wirklich bewegt hat.
-//   2) Die Gegenrichtung: Ein fremder Merge, der die Spieldatei NICHT anfasst, entwertet nichts -
-//      ohne diese Prüfung wäre eine Ampel grün, die einfach immer rot sagt.
-//   3) Ohne origin liefert sie null und wirft nicht: Der LAUF fällt offen aus (eine Sicherung, die
-//      bei einem Netzhänger 35 Minuten verweigert, wird abgeschaltet und sichert dann gar nichts).
-//   4) Die AUSSAGE fällt geschlossen aus: Der Satz „kein fremder Merge" darf nur nach einer
-//      gelungenen Messung fallen - das ist der Unterschied zu einer Sicherung, deren Ausfall wie
-//      Normalbetrieb aussieht.
-//   5) Ein echter Testfehler bleibt Code 1 und wird von der Ampel nicht überschrieben.
+// GEPRÜFT WIRD — Funktionen ausgeführt, nicht gegreppt:
+//   1) `ampelStand()` gegen ein ECHTES Wegwerf-Git mit echtem `origin`. Die Funktion setzt fetch,
+//      rev-parse und einen Drei-Punkt-Diff hintereinander; ein Mock beantwortete nur, ob ich mir
+//      die Kommandos richtig gemerkt habe. Mit der Gegenrichtung (ein fremder Merge OHNE die
+//      Spieldatei entwertet nichts — sonst wäre es eine Ampel, die immer rot sagt) und dem Ausfall
+//      ohne `origin`.
+//   2) `ampelUrteil()` mit allen 32 Eingabekombinationen. Der zitierfähige Satz „kein fremder
+//      Merge" darf in keiner anderen Lage fallen, und „das Urteil gilt" in keiner entwerteten.
+//   3) Der Exit-Ausdruck, aus der Datei geschnitten und mit allen vier Kombinationen ausgewertet.
 //
-// GEGENPROBE, GEMESSEN (`git show HEAD:pruflauf.js` als alter Stand, vor dem Einbau):
-//   Exit 1, es fallen GENAU DREI: 0b, 4a und 5. Die Prüfungen 1 bis 4 laufen dort gar nicht - ohne
-//   ampelStand() greift das `if (quelle)`, und der ganze ausgeführte Teil wird übersprungen. Das
-//   ist richtig so: Eine Funktion, die es nicht gibt, kann man nicht ausführen, und ein erfundener
-//   Ersatz würde nichts belegen.
+// WARUM NICHT ÜBER TEXTNÄHE: Der erste Entwurf prüfte „steht `ampelNachher` in der Nähe des
+// Satzes?" — ein Fenster über dem Quelltext. Die adversarische Durchsicht hat es in BEIDE
+// Richtungen widerlegt: grün, als der Satz in den nicht-messbaren Zweig verschoben wurde (der
+// verbotene Fall), und rot, als ein Kommentar daneben um sechs harmlose Zeilen wuchs. Deshalb ist
+// das Urteil jetzt eine reine Funktion — dieselbe Bauform wie `_build_ask_prompt` im AI-Core-Repo.
 //
-//   ICH HATTE ZWEI VORHERGESAGT (0b und 4b) und lag zweifach daneben: Prüfung 5 hatte ich
-//   schlicht vergessen, und bei 4a/4b habe ich die Richtung verwechselt. Gemessen fällt 4a (der
-//   Satz „kein fremder Merge" kommt am alten Stand NULLMAL vor), während 4b grün bleibt - denn
-//   „keiner der Sätze ist ungesichert" ist bei null Sätzen wahr.
-//   Genau dafür steht 4a daneben: 4b allein wäre an einem Werkzeug grün, das die Behauptung nie
-//   aufstellt. Eine Prüfung, die eine leere Menge durchwinkt, belegt nichts - und man sieht es ihr
-//   erst an, wenn man die Gegenprobe MISST statt sie zu schätzen (docs/PROJECT_MEMORY.md; dieselbe
-//   Falle hat test_pruflauf_urteil.js am 03.09.2026 schon einmal gestellt).
+// GEGENPROBE, GEMESSEN gegen `git show origin/main:pruflauf.js` (Stand b514281, vor dem Einbau):
+//   Exit 1, es fallen GENAU DREI — und alle drei sind Anker: 0b, 5-anker, 6-anker. Alles andere
+//   läuft dort nicht, weil es die Funktionen nicht gibt. Das ist richtig so, belegt aber wenig über
+//   die REGELN. Deshalb daneben drei gezielte Sabotagen am neuen Stand, jede mit genau einem
+//   Treffer gemessen:
+//     `if (!weltUnveraendert)` abgeschaltet          -> FAIL 5c
+//     `zusatz` bedingungslos auf „das Urteil gilt"   -> FAIL 5j
+//     `process.exit(testCode || 0)`                  -> FAIL 6b
+//   Jede Regel hängt damit an genau der Prüfung, die sie bewachen soll — und keine an zweien,
+//   was eine Sabotage sonst schwer zuzuordnen macht.
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -64,8 +64,15 @@ if (quelle){
   /* Ein ECHTES Git statt gefälschter spawnSync-Aufrufe: ampelStand() setzt fetch, rev-parse und
      einen Drei-Punkt-Diff hintereinander, und genau dieses Zusammenspiel soll gemessen werden.
      Ein Mock würde die Frage beantworten, ob ich mir die Kommandos richtig gemerkt habe. */
-  const G = (cwd, ...a) => spawnSync('git', ['-c','user.email=t@t','-c','user.name=T', ...a],
-    { cwd, encoding:'utf8' });
+  /* Ein fehlgeschlagenes Einrichtungskommando darf nicht als Fehler der GEPRUEFTEN Funktion
+     erscheinen: Ohne diese Meldung sieht ein `commit.gpgsign=true` ohne Schluessel wie ein Defekt
+     in ampelStand() aus ("liefert null"), und man sucht an der falschen Stelle. */
+  const einrichtungsfehler = [];
+  const G = (cwd, ...a) => {
+    const r = spawnSync('git', ['-c','user.email=t@t','-c','user.name=T', ...a], { cwd, encoding:'utf8' });
+    if (r.status !== 0) einrichtungsfehler.push(a.slice(0,2).join(' ') + ': ' + String(r.stderr || r.error).trim().slice(0,90));
+    return r;
+  };
   const basis = fs.mkdtempSync(path.join(os.tmpdir(), 'kepler-ampel-'));
   const bare = path.join(basis, 'origin.git');
   const arbeit = path.join(basis, 'arbeit');
@@ -76,6 +83,8 @@ if (quelle){
   fs.writeFileSync(path.join(arbeit, 'liesmich.txt'), 'A');
   G(arbeit, 'add', '-A'); G(arbeit, 'commit', '-m', 'start'); G(arbeit, 'push', '-u', 'origin', 'main');
   G(basis, 'clone', bare, fremd);
+
+  check('0c: die Wegwerf-Repos liessen sich einrichten', einrichtungsfehler.length === 0, einrichtungsfehler);
 
   const bau = wurzel => new Function('WURZEL, spawnSync, AMPEL_ZWEIG, AMPEL_DATEI',
     quelle + '; return ampelStand;')(wurzel, spawnSync, 'main', 'weltraum_kolonie.html');
@@ -120,25 +129,90 @@ if (quelle){
   fs.rmSync(basis, { recursive: true, force: true });
 }
 
-// ---- 4a/4b) Die Aussage haengt an der Messung ---------------------------------------------------
-/* Was diese beiden Prüfungen NICHT können: Sie lesen Quelltext und sehen nur die heutige
-   Schreibweise. Ihr Zweck ist auch ein anderer - die AUSSAGE. Der Satz "kein fremder Merge" ist
-   die einzige Stelle, an der das Werkzeug etwas behauptet, das ein Mensch danach im PR zitiert.
-   Fiele er auch ohne Messung, wäre die Ampel genau die Sicherung, deren Ausfall wie Normalbetrieb
-   aussieht. */
-const saetze = [...SRC.matchAll(/kein fremder Merge/g)].map(m => m.index);
-check('4a: das Werkzeug sagt "kein fremder Merge" ueberhaupt', saetze.length >= 1, saetze.length);
-const ungesichert = saetze.filter(i => {
-  const um = SRC.slice(Math.max(0, i - 900), i + 300);
-  return um.includes('console.log') && !um.includes('ampelNachher');
-});
-check('4b: und zwar nur im Zweig einer gelungenen Messung', ungesichert.length === 0, ungesichert.length);
+// ---- 5) Das Urteil, ausgefuehrt ueber alle Eingaben ---------------------------------------------
+/* Hier stand im ersten Entwurf eine NAEHERUNG: "steht das Wort ampelNachher in der Naehe des
+   Satzes?" - ein Textfenster ueber dem Quelltext. Die adversarische Durchsicht hat sie gemessen
+   widerlegt, und zwar in BEIDE Richtungen: Sie blieb gruen, als der Satz versuchsweise in den
+   nicht-messbaren Zweig verschoben wurde (also genau im verbotenen Fall), und sie wurde rot, als
+   ein Kommentar daneben um sechs harmlose Zeilen wuchs. Beides ist die Sorte Pruefung, vor der
+   docs/PROJECT_MEMORY.md warnt: Sie haelt eine Schreibweise fest, nicht die Sache.
+   Deshalb ist das Urteil jetzt eine REINE FUNKTION, und sie wird mit allen Eingaben AUFGERUFEN. */
+const urteilQuelle = schneide('function ampelUrteil({ vorher, nachher, weltUnveraendert, ampelAn }){');
+check('5-anker: ampelUrteil() ist auffindbar', !!urteilQuelle, urteilQuelle ? urteilQuelle.length : null);
+if (urteilQuelle){
+  const urteil = new Function('AMPEL_ZWEIG, AMPEL_DATEI',
+    urteilQuelle + '; return ampelUrteil;')('main', 'weltraum_kolonie.html');
+  const A = { sha:'aaaaaaa', spieldateiVoraus:false };
+  const B = { sha:'bbbbbbb', spieldateiVoraus:false };
+  const MIT = { sha:'ccccccc', spieldateiVoraus:true };
+  const txt = u => u.zeilen.join(' ');
 
-// ---- 5) Ein echter Testfehler bleibt Code 1 -----------------------------------------------------
-/* Die Reihenfolge ist inhaltlich: Ein roter Test ist das schwerere Urteil. Würde die Ampel ihn
-   überschreiben, meldete ein Lauf mit echtem Fehler und fremdem Merge nur noch "entwertet" - und
-   der Fehler ginge im Rauschen unter. */
-check('5: der Testfehler-Code 1 wird von der Ampel nicht ueberschrieben',
-  /const testCode = [^\n]*;\s*\n\s*process\.exit\(testCode \|\| ampelHinweis\);/.test(SRC));
+  const still = urteil({ vorher:A, nachher:A, weltUnveraendert:true, ampelAn:true });
+  check('5: nichts bewegt sich - nicht entwertet, und der Satz faellt',
+    still.entwertet === false && /kein fremder Merge/.test(txt(still)), still);
+
+  const voraus = urteil({ vorher:A, nachher:MIT, weltUnveraendert:true, ampelAn:true });
+  check('5b: fremde Aenderung an der Spieldatei - ENTWERTET', voraus.entwertet === true, voraus);
+
+  /* Der Fund, den die Durchsicht aufgedeckt hat: weltAbdruck() mass die lokale Aenderung seit
+     v8.662.0, aber das Ergebnis floss nur in die Formulierung - nie in den Exit-Code, und nur bei
+     einem roten Test ueberhaupt. Ein Lauf, in dem jemand die Spieldatei anfasst, war gruen. */
+  const lokal = urteil({ vorher:A, nachher:A, weltUnveraendert:false, ampelAn:true });
+  check('5c: die LOKALE Welt hat sich geaendert - ebenfalls entwertet', lokal.entwertet === true, lokal);
+
+  /* Wir waren online und wissen es jetzt nicht mehr. "Offen" darf nicht wie "in Ordnung" aussehen. */
+  const verloren = urteil({ vorher:A, nachher:null, weltUnveraendert:true, ampelAn:true });
+  check('5d: Schlussmessung misslungen NACH gelungener Anfangsmessung - entwertet',
+    verloren.entwertet === true, verloren);
+
+  /* Durchgehend offline: Das wurde beim Start gesagt, der Lauf bleibt beim Urteil der Tests. */
+  const blind = urteil({ vorher:null, nachher:null, weltUnveraendert:true, ampelAn:true });
+  check('5e: durchgehend nicht messbar - NICHT entwertet (der Start hat es gesagt)',
+    blind.entwertet === false, blind);
+
+  /* Die haeufigste Falle, und die Durchsicht hat sie gefunden: origin/main bewegt sich, ohne die
+     Spieldatei anzufassen. Das entwertet nichts - aber "kein fremder Merge" waere schlicht falsch.
+     Wer den Satz spaeter im PR zitiert, soll das Richtige zitieren. */
+  const daneben = urteil({ vorher:A, nachher:B, weltUnveraendert:true, ampelAn:true });
+  check('5f: main bewegte sich ohne die Spieldatei - nicht entwertet',
+    daneben.entwertet === false, daneben);
+  check('5g: und der Satz "kein fremder Merge" faellt dort NICHT',
+    !/kein fremder Merge/.test(txt(daneben)), txt(daneben));
+
+  /* DIE ZENTRALE ZUSAGE, als Regel ueber ALLE Eingaben statt als Textfenster: Der zitierfaehige
+     Satz darf nur fallen, wenn wirklich gemessen wurde UND sich nichts bewegt hat. */
+  const alle = [];
+  for (const v of [null, A]) for (const n of [null, A, B, MIT]) for (const w of [true, false]) for (const an of [true, false])
+    alle.push({ ein:{ vorher:v, nachher:n, weltUnveraendert:w, ampelAn:an }, aus: urteil({ vorher:v, nachher:n, weltUnveraendert:w, ampelAn:an }) });
+  const unerlaubt = alle.filter(f => /kein fremder Merge/.test(txt(f.aus))
+    && !(f.ein.ampelAn && f.ein.nachher && !f.ein.nachher.spieldateiVoraus
+         && (!f.ein.vorher || f.ein.vorher.sha === f.ein.nachher.sha)));
+  /* Und die zweite Haelfte derselben Zusage, gefunden weil die Ausgabe von 5c sie verletzte:
+     "das Urteil gilt" darf in KEINER Lage stehen, in der der Lauf entwertet ist. Der erste Entwurf
+     schrieb woertlich "DER LAUF IST ENTWERTET" und zwei Zeilen darunter "das Urteil gilt". */
+  const widerspruch = alle.filter(f => f.aus.entwertet && /das Urteil gilt/.test(txt(f.aus)));
+  check('5j: "das Urteil gilt" steht in keiner entwerteten Lage', widerspruch.length === 0,
+    widerspruch.map(f => txt(f.aus).slice(0, 120)));
+  check('5h: der Satz faellt in KEINER anderen Lage (32 Eingaben durchgespielt)',
+    unerlaubt.length === 0, unerlaubt.map(f => f.ein));
+  check('5i: und in der erlaubten Lage faellt er wirklich (sonst waere 5h leer-gruen)',
+    alle.some(f => /kein fremder Merge/.test(txt(f.aus))), true);
+}
+
+// ---- 6) Der Exit-Code, ebenfalls ausgefuehrt ----------------------------------------------------
+/* Die eine Zeile, um die es geht, wird aus der Datei GESCHNITTEN und mit allen vier Kombinationen
+   ausgewertet - nicht mit einem Regex bestaetigt. Ein Regex haette auch dann gepasst, wenn
+   `entwertet` nirgends mehr gesetzt wuerde. */
+const exitAusdruck = (SRC.match(/process\.exit\((testCode [^\n]*?)\);/) || [])[1];
+check('6-anker: der Exit-Ausdruck ist auffindbar', !!exitAusdruck, exitAusdruck);
+if (exitAusdruck){
+  const werte = (t, e) => new Function('testCode, urteil', 'return ' + exitAusdruck + ';')(t, { entwertet: e });
+  check('6: alles in Ordnung -> 0', werte(0, false) === 0, werte(0, false));
+  check('6b: Lauf entwertet, Tests gruen -> 2', werte(0, true) === 2, werte(0, true));
+  check('6c: echter Testfehler -> 1', werte(1, false) === 1, werte(1, false));
+  /* Der Testfehler ist das schwerere Urteil: Wuerde die Ampel ihn ueberschreiben, meldete ein Lauf
+     mit echtem Fehler UND fremdem Merge nur noch "entwertet" - der Fehler ginge im Rauschen unter. */
+  check('6d: beides zugleich -> der Testfehler gewinnt', werte(1, true) === 1, werte(1, true));
+}
 
 ende();

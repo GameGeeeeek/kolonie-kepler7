@@ -80,15 +80,11 @@ Prüflauf startet** — wer erst danach sperrt, sperrt das Fenster nicht, in dem
 stattfindet (gemessen am 03.09.2026).
 
 Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die Spieldatei anfasst. **Das misst
-`pruflauf.js` seit dem 04.09.2026 selbst** — vorher (dann bricht er ab, statt 35 Minuten auf einem
-überholten Stand zu messen) und nachher (dann ist das Urteil hin, und der Exit-Code sagt **2**).
-Der Satz „kein fremder Merge während des Laufs" steht nur nach einer gelungenen Messung in der
-Ausgabe; ohne Netz sagt das Werkzeug, dass es *nicht* messen konnte. Die Ampel oben bleibt trotzdem
-Pflicht: Sie verhindert das Rennen, die Messung stellt es nur fest.
-
-Der Anlass, gemessen am 04.09.2026: **25 der letzten 25 Merges nach `main` fassen die Spieldatei
-an**, ihr Abstand liegt bei 31–67 Minuten, ein Lauf dauert 35 — rechnerisch wird mehr als jeder
-zweite Lauf entwertet. Ein einzelner Änderungssatz brauchte an diesem Tag vier Anläufe.
+`pruflauf.js` seit dem 04.09.2026 selbst** — vor dem Lauf (dann bricht er ab, Code **2**) und nach
+dem Lauf (dann ist das Urteil hin, ebenfalls Code **2**, auch bei grünen Tests). Ein echter
+Testfehler bleibt Code 1. Die PR-Ampel oben bleibt trotzdem Pflicht: Sie soll das Rennen
+*verhindern*, die Messung stellt es nur *fest*. Was die Messung kann und was nicht:
+`docs/TESTING.md`, Abschnitt „Die Merge-Ampel".
 
 Details: `docs/TESTING.md`.
 

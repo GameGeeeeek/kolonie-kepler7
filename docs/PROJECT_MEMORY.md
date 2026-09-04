@@ -379,10 +379,9 @@ hinterher, wenn er daran dachte. An einem Tag mit acht solchen Merges reicht das
 
 **Die Zahl, die es entschieden hat:** 25 der letzten 25 Merges nach `main` fassen die Spieldatei an
 — ausnahmslos. Abstand 31–67 Minuten, Laufzeit eines Prüflaufs 35. Rechnerisch wird **mehr als jeder
-zweite Lauf entwertet, bevor er fertig ist**. Ein Änderungssatz brauchte vier Anläufe, drei davon
-mit grünem, aber wertlosem Ergebnis. Solange die Prüfung im Kopf steckte, kostete jeder vergessene
-Blick 35 Minuten — und der Blick wird gerade dann vergessen, wenn der Lauf endlich grün ist und man
-liefern will.
+zweite Lauf entwertet, bevor er fertig ist**. Solange die Prüfung im Kopf steckte, kostete jeder
+vergessene Blick 35 Minuten — und der Blick wird gerade dann vergessen, wenn der Lauf endlich grün
+ist und man liefern will. (Mechanik und Grenzen: `docs/TESTING.md`.)
 
 **Die übertragbare Form:** Wenn eine Regel bei jedem Durchgang derselben Aufgabe angewendet werden
 muss, gehört sie ins Werkzeug, nicht in die Dokumentation. Die Dokumentation beschreibt dann, was
@@ -401,3 +400,11 @@ aussieht.
 trotzdem unbrauchbar" ist nicht dasselbe wie „ein Test ist rot" — deshalb Code 2 neben Code 1, und
 der Testfehler gewinnt, wenn beides zutrifft. Ein Urteil, das ein anderes überschreibt, lässt den
 schwereren Fund im Rauschen untergehen.
+
+**Nachtrag aus derselben Umsetzung, gefunden von der Pflicht-Durchsicht:** Die Messung existierte
+zur Hälfte schon — `weltAbdruck()` prüft seit `v8.662.0`, ob sich die lokalen Dateien während des
+Laufs geändert haben. Ihr Ergebnis floss aber **nur in die Formulierung** der Nachprüfung, nie in
+den Exit-Code, und selbst das nur, wenn überhaupt ein Test rot war. Ein Lauf, in dem jemand die
+Spieldatei anfasst, war damit grün und still. **Eine Messung, die niemand in ein Urteil überführt,
+ist keine Sicherung, sondern eine Fußnote** — und sie sieht von außen genauso aus wie eine, die
+wirkt. Wer eine Prüfung einbaut, muss zeigen können, welcher Ausgang sich dadurch ändert.

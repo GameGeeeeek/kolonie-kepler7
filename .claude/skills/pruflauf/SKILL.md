@@ -12,7 +12,11 @@ Spielern steht. Vor jedem Commit an `weltraum_kolonie.html`, in dieser Reihenfol
 ## 1. Pflichtschritte
 
 1. **`node tests/run.js`** (voller Lauf, ~25 Min) oder **`node tests/run.js --nur-pflicht`**
-   (Sekunden) für schnelle Zwischenstände. Exit-Code 0 = sauber.
+   (Sekunden) für schnelle Zwischenstände. **Exit-Code 0 = sauber, 1 = echter Testfehler,
+   2 = Ergebnis nicht verwendbar** (Merge-Ampel: entweder gar nicht erst gelaufen, weil `main` mit
+   der Spieldatei voraussteht, oder gelaufen und währenddessen entwertet). Bei 2 ist die Handlung
+   in beiden Fällen dieselbe: `git merge origin/main`, dann neu laufen lassen. Details:
+   `docs/TESTING.md`, Abschnitt „Die Merge-Ampel".
 2. Prüft automatisch: Syntax des `<script>`-Blocks, Icon-Whitelist (`check-icons.js`),
    dass keine `index.html`-Kopie im Repo liegt, ob der Backend-Nachbar-Klon aktuell ist — danach
    alle Tests unter `tests/`.

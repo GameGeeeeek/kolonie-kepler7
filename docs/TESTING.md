@@ -290,7 +290,7 @@ Exit-Code:
 node pruflauf.js                    # alle Tests, 4 Stücke gleichzeitig
 node pruflauf.js --gleichzeitig 6   # mehr Stücke nebeneinander
 node pruflauf.js --fortsetzen       # fertige Stücke überspringen (nach einem Abbruch)
-node pruflauf.js --ohne-ampel       # ohne die Merge-Ampel (offline; sagt es in der Ausgabe)
+node pruflauf.js --ohne-ampel       # absichtlich auf altem Stand messen (sagt es in der Ausgabe)
 ```
 
 Warum das überhaupt geht: Gemessen an einem vollständigen Lauf brauchen 107 der 332 Tests 0 s (reine
@@ -337,39 +337,67 @@ Lauf entwertet, bevor er fertig ist**; ein einzelner Änderungssatz brauchte an 
 Anläufe, drei davon mit grünem, aber wertlosem Ergebnis.
 
 Die Regel dagegen stand längst in `CLAUDE.md` („das wird gemessen, nicht vermutet"). Gemessen hat
-sie aber ein Mensch, hinterher, wenn er daran dachte — und das ist bei einer Aufgabe, die sich
-mehrmals täglich stellt, keine Absicherung, sondern eine Erinnerung. Seit dem 04.09.2026 misst
-`pruflauf.js` selbst:
+sie aber ein Mensch, hinterher, wenn er daran dachte — und vergessen wird der Blick gerade dann,
+wenn der Lauf endlich grün ist und man liefern will. Seit dem 04.09.2026 misst `pruflauf.js` selbst.
 
-| | wann | was passiert |
+**Vier Gründe, aus denen ein Lauf entwertet ist.** Der erste war vorher gar keiner:
+
+| # | Lage | Folge |
 |---|---|---|
-| **vorher** | vor dem ersten Stück | Hat `origin/main` die Spieldatei geändert und dieser Zweig kennt sie nicht, **bricht der Lauf ab** (Code 2). Das spart die 35 Minuten, statt sie erst am Ende als verloren zu erkennen. |
-| **nachher** | nach der Nachprüfung | Hat sich `origin/main` **während** des Laufs an der Spieldatei bewegt, ist das Urteil hin — Exit **2**, auch wenn jeder Test grün war. |
-| **still** | — | Dann steht in der Ausgabe: „kein fremder Merge während des Laufs — das Urteil gilt für `origin/main <sha>`". Dieser Satz ist zitierfähig; er fällt nur nach einer gelungenen Messung. |
+| 1 | Die **lokale** Welt hat sich während des Laufs geändert (Spieldatei oder Nachbar-`server.js`) | Code 2 |
+| 2 | `origin/main` steht jetzt mit der Spieldatei voraus | Code 2 |
+| 3 | Die **Schlussmessung misslang, obwohl die Anfangsmessung gelang** — wir waren online und wissen es jetzt nicht mehr | Code 2 |
+| 4 | `origin/main` bewegte sich **ohne** die Spieldatei | kein Grund; die Ausgabe sagt genau das |
+
+Grund 1 ist der Nachtrag, der beim Bauen aufgefallen ist: `weltAbdruck()` misst die lokale Änderung
+seit `v8.662.0`, aber das Ergebnis floss **nur in die Formulierung** der Nachprüfung — nie in den
+Exit-Code, und nur dann, wenn überhaupt ein Test rot war. Ein Lauf, in dem jemand die Spieldatei
+anfasst, war also grün und still.
+
+Grund 4 ist die häufigste Falle: Der Satz „kein fremder Merge während des Laufs" wäre dort schlicht
+falsch — es gab einen, er hat nur die Spieldatei nicht angefasst. Die Ausgabe nennt dann beide
+Stände: „`origin/main` bewegte sich von X nach Y, aber NICHT an `weltraum_kolonie.html`".
+
+**Vor dem Lauf** bricht die Ampel ab, statt 35 Minuten auf einem überholten Stand zu messen — und
+sie sagt dazu, dass `git merge` bei offenen Änderungen abgelehnt wird, denn der Prüflauf läuft laut
+`CLAUDE.md` **vor** dem Commit, dieser Fall ist also der Normalfall. **Auch `--nummer` ist
+geschützt**: Das ist die Abschlussprüfung nach der Nummernvergabe, also die letzte Messung vor dem
+Merge — dort sagt `CLAUDE.md` ausdrücklich „`main` in diesem Moment nochmal ansehen". `--nur-pflicht`
+bleibt bewusst frei: Zwischenprüfung während der Arbeit, mehrmals je Änderung, ein Netzzugriff je
+Tastendruck wäre dort nur Bremse.
+
+**Exit-Codes.** `0` sauber · `1` echter Testfehler · `2` das Ergebnis ist nicht verwendbar. Code 2
+deckt zwei Lagen ab — „gar nicht erst gelaufen" (Abbruch) und „gelaufen, aber entwertet". Die
+Ausgabe unterscheidet sie in Klartext; **die Handlung ist in beiden Fällen dieselbe**: `main`
+hereinholen und neu laufen lassen. Ein echter Testfehler **gewinnt** gegen die Ampel — er ist das
+schwerere Urteil und darf im Rauschen nicht untergehen.
 
 **Was fail-open ist und was fail-closed — die Unterscheidung ist der Kern.** Der *Lauf* fällt offen
 aus: Kein Netz, kein `origin`, kaputtes `git` — es wird trotzdem geprüft. Eine Sicherung, die bei
 einem Netzhänger 35 Minuten Arbeit verweigert, wird nach dem zweiten Mal dauerhaft abgeschaltet, und
 dann sichert sie gar nichts mehr. Die *Aussage* fällt geschlossen aus: Ohne Messung sagt das
-Werkzeug „konnte nicht messen" und **niemals** „kein fremder Merge". Genau das ist der Unterschied
-zu einer Sicherung, deren Ausfall wie Normalbetrieb aussieht.
+Werkzeug „konnte nicht messen" und **niemals** „kein fremder Merge". Und „das Urteil gilt" steht in
+keiner Lage, in der der Lauf entwertet ist — im ersten Entwurf stand wörtlich „DER LAUF IST
+ENTWERTET" und zwei Zeilen darunter „das Urteil gilt".
 
-**Exit 2 statt 1**, weil es ein anderes Urteil ist: Die Tests haben nichts zu beanstanden, das
-Ergebnis ist trotzdem nicht verwendbar. Ein echter Testfehler bleibt Code 1 und wird von der Ampel
-**nicht** überschrieben — er ist das schwerere Urteil und darf im Rauschen nicht untergehen.
+**Warum hier gefetcht wird**, obwohl `tests/run.js` beim Nachbar-Klon ausdrücklich das Gegenteil
+entscheidet („Bewusst OHNE `git fetch`: Der Prüflauf soll nicht ans Netz"): Die beiden beantworten
+verschiedene Fragen. Der Nachbar-Vergleich fragt „ist mein Klon alt?" — darauf antwortet eine alte
+Fernreferenz ehrlich, solange sie ihr Alter nennt. Die Ampel fragt „hat sich `main` in den letzten
+35 Minuten bewegt?" — darauf antwortet eine neun Stunden alte Referenz gar nicht. Timeout 20 s je
+Aufruf, zwei Aufrufe je Lauf.
 
-**Bewusst nur die Spieldatei.** Die `server.js` des Nachbarn deckt `weltAbdruck()` ab (der misst
-lokal), und ein fremder Merge, der nur Tests hinzufügt, entwertet den eigenen Lauf nicht — er macht
-ihn unvollständig, und das ist eine andere Frage.
+**Was die Ampel NICHT kann:** Sie verhindert das Rennen nicht, sie stellt es fest — verhindern soll
+es die PR-Ampel oben. Und sie sieht nur `origin/main`; ob eine andere Sitzung gerade ausliefert,
+steht auf GitHub, und `pruflauf.js` spricht bewusst kein GitHub (es soll auch ohne Zugangsdaten
+laufen).
 
-**Was die Ampel NICHT kann:** Sie verhindert das Rennen nicht, sie stellt es nur fest. Wer es
-verhindern will, hält sich an die PR-Ampel oben (Entwurf heißt „mergt ruhig"). Und sie sieht nur
-`origin/main` — ob eine andere Sitzung gerade ausliefert, weiß sie nicht; das steht auf GitHub, und
-`pruflauf.js` spricht bewusst kein GitHub (es soll auch ohne Zugangsdaten und offline laufen).
-
-Wächter: `tests/test_pruflauf_ampel.js` — führt `ampelStand()` gegen ein **echtes** Wegwerf-Git mit
-echtem `origin` aus, samt der Gegenrichtung (ein fremder Merge ohne die Spieldatei entwertet nichts)
-und dem Ausfall ohne `origin`.
+**Das Urteil ist eine reine Funktion** (`ampelUrteil()`), damit es direkt prüfbar ist. Der erste
+Entwurf traf es inline; der Test musste es dann über die *Nähe* von Textstellen im Quelltext
+erraten, und diese Näherung war gemessen in beide Richtungen falsch — grün, als der Satz in den
+verbotenen Zweig verschoben wurde, rot, als ein Kommentar daneben wuchs. Wächter:
+`tests/test_pruflauf_ampel.js` (26 Prüfungen; `ampelStand()` gegen ein echtes Wegwerf-Git,
+`ampelUrteil()` über alle 32 Eingabekombinationen, der Exit-Ausdruck ausgeführt).
 
 ## Adversarische Durchsicht vor jeder Auslieferung (04.09.2026)
 
