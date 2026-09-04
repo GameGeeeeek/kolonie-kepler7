@@ -20356,16 +20356,24 @@
     const s = shipSignatur(key);
     return s > 0 && s < TARNUNG_GRENZE;
   }
-  /* Die Signatur-Zeile der Werftkarte, an EINER Stelle. Die Werft baut ihre Karten an ZWEI Orten:
-     die datengetriebene Schleife ueber SHIP_DEFS - und den handgeschriebenen Block des
-     Superschlachtschiffs, das wie ueberall in keiner Liste steht. Bis zum 04.09.2026 trug nur die
-     Schleife die Zeile. Ausgerechnet das Schiff mit Signatur 800 zeigte sie also nicht, und damit
-     das EINZIGE der ganzen Werft, bei dem der Zusatz "nicht zu verbergen" ueberhaupt zutrifft:
-     Kausalitaetsbrecher und Mondzerstoerer stehen mit 1000 in SHIP_DEFS und bekamen ihn.
-     Die Zusage "die Zahl steht auf jeder Werftkarte" war damit fuer genau ein Schiff falsch - und
-     zwar fuer das, dessen ganzer Witz ist, dass es sich nicht verbergen laesst.
+  /* Die Signatur-Zeile der Werftkarte, an EINER Stelle - weil die Werft ihre Karten in FUENF
+     Formen zeichnet und die Zeile bis zum 04.09.2026 nur in einer davon stand.
+     Gemessen an der gerenderten Werft: 46 Karten, 7 ohne die Zahl.
+
+       Normalkarte (SHIP_DEFS-Schleife, dritter Ausgang)   hatte sie
+       unlockItems, gesperrt   (Mondzerstoerer, 1000)      fehlte
+       unlockEventParts, gesperrt (sechs Event-Schiffe)    fehlte
+       Superschlachtschiff, gesperrt (800)                 fehlte
+       Superschlachtschiff, frei (800)                     fehlte
+
+     Die Schleife hat DREI Ausgaenge, nicht einen; dazu die zwei handgeschriebenen Bloecke des
+     Superschlachtschiffs, das wie ueberall in keiner Liste steht. Wer nur den letzten Ausgang
+     anfasst, laesst die gesperrten Karten stehen - und das sind genau die, an denen die
+     Kaufentscheidung faellt: Beim Mondzerstoerer verbrennt man dafuer vier seltene Gegenstaende.
      Die Grenze steht hier als Konstante, nicht als eingetippte 600: Die Nachbaranzeige in der
-     Tarnungsbox liest sie seit jeher aus TARNUNG_GRENZE, die Werftkarte war die letzte Kopie. */
+     Tarnungsbox liest sie seit jeher aus TARNUNG_GRENZE, die Werftkarte war die letzte Kopie.
+     Der Zusatz "nicht zu verbergen" trifft uebrigens 14 Klassen, nicht eine - 13 in SHIP_DEFS ab
+     Signatur 600 plus das Superschlachtschiff. Er ist kein Sonderfall eines Schiffes. */
   function signaturZeileHtml(key){
     const s = shipSignatur(key);
     return `<div class="bmeta" title="Wie schwer dieses Schiff zu verbergen ist. Ein Verband ist so sichtbar wie sein sichtbarstes Schiff - ab ${TARNUNG_GRENZE} gilt er als Grosskampfschiff und ist praktisch nicht mehr zu tarnen."><i class="ti ti-target" aria-hidden="true"></i> Signatur ${fmt(s)}${s >= TARNUNG_GRENZE ? ' <span style="color:#e24b4a;">(nicht zu verbergen)</span>' : ''}</div>`;
@@ -65156,6 +65164,7 @@ async function claimPendingRewards(){
                 <div class="bmeta">Ultimatives Endgame-Schiff (Angriff ${def.atk}, extrem zäh, extrem langsam - entsprechend lange Flugzeit und hoher Treibstoffverbrauch) - kann immer nur ein einziges Exemplar gleichzeitig besessen werden. Ermöglicht über die Bestenliste (<i class="ti ti-skull" aria-hidden="true"></i>-Symbol) die gezielte, dauerhafte Zerstörung eines kolonisierten Mondes eines anderen Spielers (Erfolgschance gedeckelt, 48 Std. Abklingzeit je Einsatz).</div>
                 ${reqList ? `<div class="bmeta"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${reqList}</div>` : ''}
                 <div class="bmeta">Benötigt zusätzlich je 1x ${itemList} GLEICHZEITIG im Inventar (werden beim Freischalten verbraucht)</div>
+                ${signaturZeileHtml(def.key)}
               </div>
             </div>
             <button class="buy ${haveAll?'affordable':''}" data-unlock="${def.key}" ${haveAll?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
@@ -65196,6 +65205,7 @@ async function claimPendingRewards(){
                   </summary>
                   <div class="bmeta" style="margin-top:6px;">Exklusives Event-Schiff (Angriff ${def.atk}${def.shield!==undefined?', Schild '+def.shield:''} - ${def.nicheDesc||'exklusive Sondereinheit'}). Nur über ${evDef.partName} freischaltbar, die ausschließlich während des Events "${evDef.name}" bei Expeditionen gefunden werden.</div>
                   <div class="bmeta" style="margin-top:2px;">${statusLine}</div>
+                  ${signaturZeileHtml(def.key)}
                 </details>
                 <div class="progress-outer" style="margin-top:6px;" title="${evDef.partName}: ${have} von ${needed}"><div class="progress-inner" style="width:${pct}%; background:${evDef.color};"></div></div>
               </div>
