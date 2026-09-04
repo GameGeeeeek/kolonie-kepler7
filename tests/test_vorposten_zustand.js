@@ -290,12 +290,28 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
     return f > 0 && n > 0 && n < f;
   })(), { fern: fern.mess.alarm[0], nah: nah.mess.alarm[0] });
 
-  // ---- 7) Das Bodenlager bleibt ein Bodenlager -------------------------------------------------
+  // ---- 7) Gezeichnet wird nur, was auch wirkt --------------------------------------------------
+  /* HIER STAND "das Bodenlager bleibt ein Bodenlager" (04.09.2026 umgeschrieben). Die Regel gibt
+     es nicht mehr: Seit GR-6 ist der Vorposten auf JEDER Stufe eine Station, das Bodenlager ist
+     entfallen. Eine Pruefung, die eine abgeschaffte Regel festhaelt, haelt die Entwicklung auf,
+     statt sie zu sichern - sie muss der neuen Regel folgen, nicht rueckgaengig machen.
+     Die neue Regel ist die staerkere: Der Server rechnet die Wirkung eines Moduls mit
+     `.slice(0, slots)`. Ein Modul jenseits der Steckplaetze zaehlt NICHT - also darf es auch
+     nicht gezeichnet werden, sonst verspricht das Bild eine Wirkung, die es nicht gibt. Genau
+     diese Luecke war vorher durch die Stufenpruefung verdeckt. */
   const lager = await lauf(browser, doc({ stufe:2, name:'Stützpunkt', zweig:null, zweigName:null, slots:0,
     module:['geschuetz:legendaer'], projekte:['sprungtor'], kern:{ lp: 5000, lpMax: 100000 } }));
-  check('7a: bis zur Wahlstufe bekommt der Vorposten KEINE Stationsteile, auch nicht mit Modulen im Gepaeck',
-    lager.mess.module.length === 0 && lager.mess.projekte.length === 0,
-    { module: lager.mess.module.length, projekte: lager.mess.projekte.length });
+  check('7a: ein Modul ohne Steckplatz wird NICHT gezeichnet - es wirkt auch nicht',
+    lager.mess.module.length === 0,
+    { module: lager.mess.module.length, slots: 0, imDokument: 1 });
+  const einSlot = await lauf(browser, doc({ stufe:2, name:'Stützpunkt', zweig:null, zweigName:null, slots:1,
+    module:['geschuetz:legendaer','kernpanzer:episch'], projekte:['sprungtor'], kern:{ lp: 5000, lpMax: 100000 } }));
+  check('7b: mit EINEM Steckplatz wird genau eines gezeichnet, nicht beide',
+    einSlot.mess.module.length === 1,
+    { gezeichnet: einSlot.mess.module.length, slots: 1, imDokument: 2 });
+  check('7c: fertige Projekte haengen dagegen an der Station selbst, nicht an einem Steckplatz',
+    lager.mess.projekte.length > 0,
+    { projekte: lager.mess.projekte.length });
 
   // ---- 9) Die Uebersicht auf der Startseite (D3) ------------------------------------------------
   /* Geprueft wird die REGEL, nicht die Schreibweise der Zahl: fmt() kuerzt auf "1.5k", und ein
@@ -444,7 +460,7 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
     return !/99\.999\.999/.test(zeile) && /verfallen/.test(zeile) && !/es war leer/.test(zeile);
   })(), { zeile: (klein.logs || []).find(t => /Lager deines/.test(t)) || null, anzahlMeldungen: (klein.logs || []).length });
 
-  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, ohneLager, mitLager, vollAus, klein, grossLager, beute];
+  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, einSlot, gekaempft, ohneLager, mitLager, vollAus, klein, grossLager, beute];
   check('8: keine Skriptfehler in irgendeinem Lauf', alleLaeufe.every(l => l.errs.length === 0),
     { fehler: alleLaeufe.flatMap(l => l.errs).slice(0, 3) });
 

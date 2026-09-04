@@ -1045,3 +1045,49 @@ nicht nur die, die sich „eigentlich" ändert.**
   konnte nie fallen, ohne dass 8 mitfällt. Es misst jetzt das Protokoll, das sein Name nennt; dafür
   schneidet `lauf()` die Meldungen per MutationObserver mit, statt `#log` am Ende auszulesen (dort
   überschreibt jede Meldung die vorige).
+
+## Was der Wegfall des Bodenlagers an dieser Etappe geändert hat (04.09.2026)
+
+`main` hat mit GR-6 das Bodenlager abgeschafft — der Vorposten ist auf **jeder** Stufe eine
+Raumstation. Das ist dieselbe Zeichenroutine, an der diese Etappe die Anbauten hängt, und der Merge
+hat drei Dinge sichtbar gemacht.
+
+**1. Eine abgeschaffte Regel darf man nicht festhalten.** Prüfung 7a hieß „bis zur Wahlstufe bekommt
+der Vorposten KEINE Stationsteile". Diese Regel gibt es nicht mehr. Ein Test, der sie weiter
+einfordert, hält die Entwicklung auf, statt sie zu sichern — er muss der neuen Regel folgen, nicht
+die alte zurückholen.
+
+**2. Hinter der alten Regel steckte eine echte Lücke.** `vorpostenModulTeile` las die **ganze**
+Modulliste des Dokuments. Der Server rechnet die Wirkung dagegen mit `.slice(0, slots)` — ein Modul
+jenseits der Steckplätze zählt nicht. Solange die Stufenprüfung davorstand, fiel das nie auf; ohne
+sie hätte das Bild eine Wirkung versprochen, die es nicht gibt. Die Zeichnung folgt jetzt `v.slots`
+(vom Server, nicht neu gerechnet). Neue Prüfung 7b: zwei Module im Dokument, ein Steckplatz, **ein**
+gezeichnetes Teil.
+
+**3. Ein Riegel, der über ein Merkmal statt über eine Form geht, überlebt Erweiterungen.** Die
+Prüfung „keine Spur des alten Bodenlagers" zählte **alle** `<polygon>` im Marker und verlangte null.
+Das traf das Bodenlager — aber auch die Garnisonszeichen und die Modulteile dieser Etappe, beides
+Polygone. Sie hätte an einer richtigen Erweiterung gefallen und dazu gedrängt, die Erweiterung
+zurückzunehmen statt die Messung zu schärfen. Gezählt werden jetzt Polygone **ohne** `data-vp-`
+Merkmal: Das Bodenlager trug keines, jedes Teil der Station trägt eines. Gemessen: 0 von 5.
+
+### Und ein Fehler beim Auflösen des Merges
+
+`tests/test_vorposten_station.js` habe ich zunächst **pauschal** von `main` übernommen — genau das,
+wovor CLAUDE.md warnt („Nach Konflikten in Testdateien niemals pauschal eine Seite übernehmen"). Dabei
+ging eine Umschreibung verloren, die es schon gab: Prüfung 0b pinnte in mains Fassung den Faktor
+`sichtV = rV * 2.0` **wörtlich** fest, während der Schieber inzwischen `VORPOSTEN_SICHT` (2,45)
+bekommt. Die Prüfung fiel damit an einer richtigen Änderung. Wiederhergestellt ist die Fassung, die
+die **Regel** misst: Die Radien wachsen mit der Stufe, und der Schieber bekommt ein Vielfaches von
+`rV` — welches, ist seine Sache.
+
+### Ein zerbrechlicher Anker in einem fremden Test
+
+`test_bossset_pve` schneidet den `PATCHNOTES`-Block heraus und belegt den Schnitt mit einer Probe von
+120 Zeichen aus der **Mitte** des Blocks: Sie muss im ganzen Text stehen und im Rest fehlen. Die
+Annahme dahinter — eine beliebige Stelle des Blocks sei einmalig — hält in diesem Projekt nicht:
+Patchnotes zitieren Spieltexte wörtlich. Ein neuer Eintrag verschiebt die Mitte, und traf sie auf so
+ein Zitat, fiel der Anker an einem völlig richtigen Schnitt (gemessen: die Probe stand zweimal in
+der Datei, einmal im Patchnote und einmal im Hilfetext, den es zitiert). Der Anker **sucht** jetzt
+vom Mittelpunkt aus, bis er eine Probe findet, die genau einmal vorkommt; findet er keine, fällt er.
+Die Gegenprobe (`S_LEBEND = S`, also ein fehlgeschlagener Schnitt) fällt weiterhin.

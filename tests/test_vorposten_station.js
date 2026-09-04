@@ -44,9 +44,25 @@ check('0c: die Hilfe nennt fuer den Vorposten das Zeichen, das die Karte auch se
   && !/⛺/.test(src), { zeltNochDa: /⛺/.test(src) });
 check('0d: und die Hilfe behauptet nicht mehr drei Stufen, wo die Leiter acht hat',
   !/<strong>Drei Stufen<\/strong>/.test(src) && /<strong>Acht Stufen<\/strong>/.test(src));
+/* GEPRUEFT WIRD DIE REGEL, NICHT DER WORTLAUT (04.09.2026). Diese Pruefung stand zweimal:
+   einmal mit der Formel und dem Faktor 2.0 eingetippt, einmal ausgewertet. Der eingetippte
+   Faktor ist eine Momentaufnahme - der Kollisionsschieber bekommt inzwischen VORPOSTEN_SICHT
+   (2,45), weil Alarmring und Projektteile weiter hinausgehen, und die feste Fassung waere an
+   genau dieser richtigen Aenderung gefallen. Gemessen wird deshalb: die Radien WACHSEN mit der
+   Stufe, und der Schieber bekommt ein Vielfaches von rV - welches, ist seine Sache. */
+const radien = (() => {
+  const m = src.match(/function vorpostenRadius\(stufe\)\{([^}]*)\}/);
+  if (!m) return [];
+  try {
+    const f = new Function('stufe', m[1]);
+    return [1,2,3,4,5,6,7,8].map(s2 => f(s2));
+  } catch (e) { return []; }
+})();
 check('0b: der Radius waechst mit der Stufe und der Kollisionsschieber bekommt ihn mit',
-  /function vorpostenRadius\(stufe\)\{ return 11 \+ Math\.max\(0, Math\.min\(7, \(stufe\|\|1\) - 1\)\) \* 0\.85; \}/.test(src)
-  && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* 2\.0;/.test(src));
+  radien.length === 8
+  && radien.every((v, i) => i === 0 || v > radien[i-1])
+  && /const rV = vorpostenRadius\(vp\.stufe\), sichtV = rV \* [^;]+;/.test(src),
+  { radien, schieber: (src.match(/const rV = vorpostenRadius\(vp\.stufe\), sichtV = [^;]+;/) || [])[0] });
 
 const now = Date.now();
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp: 20000*s, verteidigung: 2500*s, garnisonMax: 300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
@@ -108,7 +124,13 @@ async function lauf(browser, vp){
     const r = n.getBoundingClientRect(), svg = n.ownerSVGElement;
     const sr = svg ? svg.getBoundingClientRect() : null;
     const hof = (n.innerHTML.match(/<circle[^>]*r="([\d.]+)"[^>]*stroke-opacity="0\.4"/) || [])[1];
-    return { da:true, html: n.innerHTML, hofR: hof ? Number(hof) : 0, breite: b ? b.width : 0, hoehe: b ? b.height : 0,
+    /* JEDES Teil der Station traegt ein data-vp-Merkmal (Bild, Modul, Projekt, Garnison, Schaden,
+       Bau, Abbau). Das alte BODENLAGER trug keines - es war nur eine Ansammlung von Polygonen und
+       Linien. Gezaehlt wird deshalb, was OHNE solches Merkmal gezeichnet wird; das ist die Regel,
+       die 1b eigentlich meint, und sie bleibt richtig, wenn die Station neue Teile bekommt. */
+    const MARKEN = '[data-vp-bild],[data-vp-modul],[data-vp-projekt],[data-vp-garnison],[data-vp-schaden],[data-vp-bau],[data-vp-abbau],[data-vp-verlauf]';
+    const ohneMarke = [...n.querySelectorAll('polygon')].filter(el => !el.closest(MARKEN)).length;
+    return { da:true, html: n.innerHTML, ohneMarke, hofR: hof ? Number(hof) : 0, breite: b ? b.width : 0, hoehe: b ? b.height : 0,
       links: r.left, oben: r.top, rechts: r.right, unten: r.bottom,
       svgL: sr ? sr.left : 0, svgT: sr ? sr.top : 0, svgR: sr ? sr.right : 0, svgB: sr ? sr.bottom : 0 };
   });
@@ -130,10 +152,20 @@ async function lauf(browser, vp){
     { hatBild: /data-vp-bild="1"/.test(a.mark.html || ''), laenge: (a.mark.html||'').length });
   /* Der Rueckfall-Riegel: Palisade, Mast und Fahne duerfen nicht wiederkommen. Ohne diese
      Pruefung waere 1a auch dann gruen, wenn jemand das Bodenlager NEBEN die Station zeichnet. */
+  /* GEZAEHLT WIRD, WAS KEIN MERKMAL TRAEGT - nicht jedes Polygon (04.09.2026). Die erste Fassung
+     verlangte NULL Polygone im ganzen Marker. Das traf das Bodenlager, aber auch alles, was die
+     Station seither dazubekommen hat: Die Garnisonszeichen und die Modulteile sind Polygone. Die
+     Pruefung waere an einer richtigen Erweiterung gefallen und haette dazu gedraengt, die
+     Erweiterung zurueckzunehmen statt die Messung zu schaerfen.
+     Der Riegel bleibt vollstaendig: Das Bodenlager trug KEIN data-vp-Merkmal, es wuerde also
+     weiterhin gezaehlt. Dazu die Quelle - die Funktion selbst darf nicht wiederkommen. */
   check('1b: und keine Spur des alten Bodenlagers mehr daneben',
-    ((a.mark.html || '').match(/<polygon /g) || []).length === 0
-    && !/<line [^>]*stroke-width="1\.3"/.test(a.mark.html || ''),
-    { polygone: ((a.mark.html || '').match(/<polygon /g) || []).length });
+    a.mark.ohneMarke === 0
+    && !/<line [^>]*stroke-width="1\.3"/.test(a.mark.html || '')
+    && !/function vorpostenLager\(/.test(src),
+    { polygoneOhneMerkmal: a.mark.ohneMarke,
+      polygoneGesamt: ((a.mark.html || '').match(/<polygon /g) || []).length,
+      funktionNochDa: /function vorpostenLager\(/.test(src) });
   /* 1c HIESS "das Bild der Stufe 2 ist ein anderes als das der Wahlstufe" und pruefte in
      Wahrheit nur, ob ueberhaupt ein Bild da ist - sie verglich nichts. Zwei Blickwinkel der
      Durchsicht fanden das unabhaengig. Der Vergleich braucht BEIDE Bilder; die liegen erst in

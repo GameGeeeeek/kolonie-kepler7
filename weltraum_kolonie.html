@@ -9211,7 +9211,13 @@
      symmetrisch um ihren Platz stehen und nicht in den Winkel des Nachbartyps laufen. */
   const VP_MODUL_WINKEL = { geschuetz: 270, kernpanzer: 315, raffinerie: 0, hangar: 90, sprungrechner: 180, horchposten: 225 };
   function vorpostenModulTeile(vp, x, y, r, farbe){
-    const liste = (vp && Array.isArray(vp.module)) ? vp.module : [];
+    /* NUR WAS AUCH WIRKT WIRD GEZEICHNET (Befund 04.09.2026): Der Server rechnet die Wirkung mit
+       `.slice(0, slots)` - ein Modul jenseits der Steckplaetze zaehlt nicht. Die Zeichnung las
+       dagegen die ganze Liste und haette eine Wirkung versprochen, die es nicht gibt. Aufgefallen,
+       als das Bodenlager entfiel: Vorher war die Stelle durch die Stufenpruefung verdeckt.
+       `v.slots` kommt vom Server (vpModulSlots), wird also nicht ein zweites Mal gerechnet. */
+    const slots = Math.max(0, Number(vp && vp.slots) || 0);
+    const liste = (vp && Array.isArray(vp.module)) ? vp.module.slice(0, slots) : [];
     if (!liste.length) return '';
     const P = (n) => n.toFixed(1);
     const gezaehlt = {};
