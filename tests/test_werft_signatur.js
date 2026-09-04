@@ -39,10 +39,12 @@ function backend(store){ return async r => {
   return j({});
 };}
 
-/* Das Superschlachtschiff ist freigeschaltet UND vorhanden: Nur dann zeichnet die Werft seine
-   volle Karte (die gesperrte Fassung ist ein anderer Block - der traegt die Zeile ebenfalls, steht
-   hier aber nicht im Bild). Genug Ressourcen, damit keine Karte an einer Kostenpruefung haengt. */
-const SPIELSTAND = JSON.stringify({
+/* Zwei Spielstaende, weil die Werft das Superschlachtschiff in ZWEI handgeschriebenen Fassungen
+   zeichnet - gesperrt und freigeschaltet. Beide haben die Signatur-Zeile bis zum 04.09.2026 nicht
+   getragen, also muessen auch beide gemessen werden; die freigeschaltete allein zu pruefen hiesse,
+   die Haelfte der geaenderten Stellen ungeprueft zu lassen.
+   Genug Ressourcen, damit keine Karte an einer Kostenpruefung haengt. */
+function spielstand(zusatz){ return JSON.stringify(Object.assign({
   tutorialSeen: true, newbieWelcomeSeen: true,
   resources: { energie:999999, erz:999999, kristalle:999999, deuterium:99999, antimaterie:9999, forschungspunkte:9999 },
   buildings: { solar:12, mine:12, werft:10, labor:8 },
@@ -53,29 +55,43 @@ const SPIELSTAND = JSON.stringify({
   battleStats: { wins:0, losses:0 }, xp:5000, buffs:[], lastTick: Date.now(),
   colonyNames:{}, colonyNotes:{}, modules:{}, shipModules:{}, equippedShipModules:{}, moduleFragments:0,
   rareItems: { antimateriekern:1 },
-  unlocked: { superschlachtschiff:true }
-});
+  unlocked: {}
+}, zusatz || {})); }
+const FREI     = spielstand({ fleet:{ superschlachtschiff:1, jaeger:5, schlachtschiff:2, missions:[] }, unlocked:{ superschlachtschiff:true } });
+const GESPERRT = spielstand({ fleet:{ jaeger:5, schlachtschiff:2, missions:[] }, unlocked:{} });
 
-(async () => {
-  const browser = await starteBrowser();
+async function oeffneWerft(browser, spielstand, ohneFilter){
   const ctx = await browser.newContext({ viewport:{ width:1100, height:1600 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
-  const store = { 'kepler7-save-v3': SPIELSTAND };
+  const store = { 'kepler7-save-v3': spielstand };
   await page.route('**/api/**', backend(store));
   await page.addInitScript(() => { localStorage.setItem('kepler7_token','tok'); });
   await page.goto(FILE); await page.waitForTimeout(2500);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display='none'; }); });
-
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="flotte"]'); if (b) b.click(); });
   await page.waitForTimeout(400);
   await page.evaluate(() => {
     const b = document.querySelector('[data-fleet-subtab="werft"]') || document.querySelector('[data-fleet-subtab]');
     if (b) b.click();
   });
+  if (ohneFilter){
+    // Der Filter "Nur baubare Schiffe anzeigen" wuerde die gesperrte Karte verstecken.
+    await page.evaluate(() => {
+      const t = document.querySelector('[data-toggle-hide-locked] i.ti-check');
+      if (t) t.closest('[data-toggle-hide-locked]').click();
+    });
+  }
   await page.waitForTimeout(1200);
+  return { ctx, page, errs };
+}
 
-  const karten = await page.evaluate(() => [...document.querySelectorAll('#fleet .card-row.ship-card')].map(c => ({
+(async () => {
+  const browser = await starteBrowser();
+
+  // ==== A) Die freigeschaltete Werft ==============================================================
+  const a = await oeffneWerft(browser, FREI, false);
+  const karten = await a.page.evaluate(() => [...document.querySelectorAll('#fleet .card-row.ship-card')].map(c => ({
     name: (c.querySelector('.bname') ? c.querySelector('.bname').textContent : '').replace(/\s+/g,' ').trim().slice(0,40),
     text: c.textContent.replace(/\s+/g,' '),
     super: !!c.querySelector('[data-scrapship="superschlachtschiff"]')
@@ -92,11 +108,11 @@ const SPIELSTAND = JSON.stringify({
   const sup = karten.find(k => k.super);
   check('2-anker: die Karte des Superschlachtschiffs steht im Bild', !!sup, sup ? sup.name : karten.map(k=>k.name).slice(0,6));
   if (sup){
-    check('2: sie nennt die Signatur 800', /Signatur\s*800/.test(sup.text), sup.text.slice(0,200));
+    check('2: sie nennt die Signatur 800', /Signatur\s*800/.test(sup.text), sup.text.slice(0,160));
     /* Der Zusatz ist der eigentliche Inhalt der Zusage: 800 liegt ueber der Grenze, und das
        Superschlachtschiff ist das einzige Schiff der Werft, bei dem er ueberhaupt faellig wird -
        Kausalitaetsbrecher und Mondzerstoerer (1000) stehen in SHIP_DEFS und hatten ihn immer. */
-    check('2b: und den Zusatz "nicht zu verbergen"', /nicht zu verbergen/.test(sup.text), sup.text.slice(0,200));
+    check('2b: und den Zusatz "nicht zu verbergen"', /nicht zu verbergen/.test(sup.text), sup.text.slice(0,160));
   }
 
   // ---- 3) Gegenrichtung: der Zusatz ist NICHT ueberall -------------------------------------------
@@ -106,9 +122,27 @@ const SPIELSTAND = JSON.stringify({
   const mitZusatz = karten.filter(k => /nicht zu verbergen/.test(k.text)).length;
   check('3: der Zusatz steht NICHT auf jeder Karte', mitZusatz > 0 && mitZusatz < karten.length,
     { mitZusatz, karten: karten.length });
+  check('4: keine JS-Fehler', a.errs.length === 0, a.errs.slice(0,3));
+  await a.ctx.close();
 
-  check('4: keine JS-Fehler', errs.length === 0, errs.slice(0,3));
+  // ==== B) Die GESPERRTE Karte ====================================================================
+  /* Die zweite handgeschriebene Fassung. Sie traegt nicht einmal die Klasse ship-card, faellt also
+     durch jede Pruefung, die ueber .ship-card laeuft - Abschnitt A sieht sie nicht. Und gerade hier
+     zaehlt die Zahl: Es ist die Karte, an der die Kaufentscheidung faellt. */
+  const b = await oeffneWerft(browser, GESPERRT, true);
+  const gesperrt = await b.page.evaluate(() => {
+    const btn = document.querySelector('#fleet [data-unlock="superschlachtschiff"]');
+    const karte = btn ? btn.closest('.card-row') : null;
+    return karte ? karte.textContent.replace(/\s+/g,' ') : null;
+  });
+  check('5-anker: die gesperrte Karte des Superschlachtschiffs steht im Bild', gesperrt !== null, gesperrt);
+  if (gesperrt !== null){
+    check('5: auch sie nennt die Signatur 800', /Signatur\s*800/.test(gesperrt), gesperrt.slice(0,160));
+    check('5b: samt Zusatz "nicht zu verbergen"', /nicht zu verbergen/.test(gesperrt), gesperrt.slice(0,160));
+  }
+  check('6: keine JS-Fehler im gesperrten Zustand', b.errs.length === 0, b.errs.slice(0,3));
+  await b.ctx.close();
 
-  await ctx.close(); await browser.close();
+  await browser.close();
   ende();
 })();
