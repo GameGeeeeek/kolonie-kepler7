@@ -35644,7 +35644,7 @@ async function claimPendingRewards(){
       // KI-Kampfbericht (E1b, 04.09.2026): Der Server nennt seit dem Backend-PR #233 die ID des
       // gespeicherten Berichts; damit bestellt der Client den Erzähltext, und der Server hängt ihn
       // an genau diesen Bericht. Ein älterer Server nennt keine ID - dann wird nichts bestellt.
-      if (res.ok && report.type === 'npc-attack'){
+      if (res.ok && kampftextBerechtigt(report)){
         let antwort = null;
         try { antwort = await res.json(); } catch(e){}
         if (antwort && antwort.id) kampftextBestellen(report, antwort.id);
@@ -35661,6 +35661,15 @@ async function claimPendingRewards(){
      Ein fehlender Text ist per Konzept kein Fehler: 503 (abgeschaltet oder Notaus), 429
      (Tagesdeckel), 400, Netzfehler - alles bleibt still. Der Bericht ist ohne den Text vollständig,
      er ist es heute ja auch. Deshalb kein alert(), kein log(), kein Toast. */
+  // Welche Berichte einen Text bekommen: E1 ist der Pilot - der gewöhnliche NPC-Angriff samt
+  // Piratennest (das Konzept nennt „Piratennest Kharon-Tiefe" als Beispielgegner). Weltboss und
+  // Abgrund tragen DENSELBEN Berichtstyp, gehören aber zu E2 bzw. gar nicht ins Konzept, und ein
+  // keinKampf-Bericht (Ziel unerreichbar, Server weg) hat keinen Kampf zu erzählen. Ohne diese
+  // Sperre hätten sie das Tageskontingent (zehn Texte je Konto) still verbraucht - Befund des
+  // Review-Bots am PR #577, gegengeprüft an den drei Erzeugerstellen.
+  function kampftextBerechtigt(report){
+    return !!report && report.type === 'npc-attack' && !report.keinKampf && !report.weltboss && !report.abgrund;
+  }
   function kampftextBestellen(report, reportId){
     if (!useBackend() || !report || !reportId) return;
     const koerper = { npcName: report.npcName, npcLevel: report.npcLevel, result: report.result,
