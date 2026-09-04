@@ -326,3 +326,82 @@ Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln d
 
 Die Marken machen den Lauf gegen Abbrüche robust — ein Container-Neustart oder ein fremder Merge
 kostet dann ein Stück statt des ganzen Laufs.
+
+## Adversarische Durchsicht vor jeder Auslieferung (04.09.2026)
+
+Der grüne Prüflauf beweist, dass nichts Bekanntes gebrochen ist. Er beweist **nicht**, dass die
+Änderung richtig ist — er kennt nur die Regeln, die schon jemand aufgeschrieben hat. Deshalb geht
+vor dem Merge eine **adversarische Durchsicht des eigenen Änderungssatzes** darüber, mit der
+Leitfrage „was habe ich übersehen", nicht „stimmt das".
+
+Anlass war eine gemessene Lücke: Bei v8.663.0 fand die automatische Durchsicht am PR einen echten
+Fehler (eine Voraussetzungs-Schreibweise, die die neue Meldung still verschluckte). Bei v8.665.0
+fiel sie aus — das Kontingent war erschöpft —, und die nachgeholte Durchsicht förderte **elf**
+Befunde zutage, darunter ein Wirtschaftsloch, das schon vorher live war: Der Baukorb reihte
+Schiffe mit Gegenstandskosten ein, ohne den Gegenstand abzuziehen, während der Abbruch ihn
+bedingungslos erstattete. Vorrat 3 → einreihen → abbrechen → Vorrat 5, beliebig wiederholbar.
+
+Was die Durchsicht findet, das Tests strukturell nicht finden:
+
+- **Die Ausnahme, die der Wächter nicht sieht.** `test_werft_sperrgrund` zählte
+  `[data-buyship]`; das Superschlachtschiff hat einen eigenen Block mit eigener id und blieb als
+  einziger Knopf gesperrt. Wer seine Prüfmenge über ein Attribut bildet, das nicht alle Mitglieder
+  tragen, misst genau die Ausnahme nicht.
+- **Die leere Prüfung.** „Bezahlbare Schiffe heißen weiterhin Bauen" zählte nur, ob irgendein
+  Knopf „Bauen" sagt — und das taten auch die gesperrten. Grün, ohne etwas zu belegen.
+- **Die gespaltene Gegenprobe.** Ein Test lud die Seite über `KEPLER_TESTDATEI`, las die Merkmale
+  aber über `SPIELDATEI` — zwei verschiedene Fassungen, ohne dass etwas rot wurde.
+- **Die eingetippte Kopie-Familie.** Eine Leiter, die das Backend besitzt (`zweigAb`, `maxStufe`),
+  stand als `4` und `8` im Code, obwohl die Nachbarfunktion sie längst aus dem Cache liest.
+
+Praktisch: `/code-review <commit-oder-diff> high` vor dem Merge. Die Befunde werden **geprüft, nicht
+geglaubt** — von den elf war einer entschärft (das gemeldete Schiff steht gar nicht im Baukorb; das
+echte Loch lag beim Nachbarn daneben). Jeder bestätigte Befund bekommt einen Wächter mit Gegenprobe,
+sonst kommt er wieder.
+
+## Während `pruflauf.js` läuft, kein zweiter Browser-Test daneben (04.09.2026)
+
+`pruflauf.js` fährt vier Browser gleichzeitig und fängt Lastsymptome damit ab, dass es rote Dateien
+danach **einzeln** nachfährt — die Nachprüfung ist ihr Urteil. Genau diese Nachprüfung war einmal
+wertlos, weil ich in derselben Zeit vier eigene Browser-Läufe gestartet hatte (eine Messung plus drei
+Gegenproben). `test_kartenrichtungen` fiel dabei „einzeln rot" mit `3e` (↓ scrollt die Seite nicht),
+war danach aber **dreimal hintereinander grün** auf demselben Stand — und auf `origin/main` wie auf
+der Merge-Basis ebenfalls grün.
+
+**Die Nachprüfung ist der einzige Teil des Laufs, der ohne Last stattfinden MUSS.** Wer währenddessen
+etwas anderes startet, nimmt ihr genau die Eigenschaft, für die es sie gibt. Arbeit, die keinen
+Browser braucht (Backend, Dokumentation, Textanker suchen), ist unbedenklich.
+
+### Der Abdruck ist global, die Betroffenheit nicht
+
+Derselbe Lauf warnte: „Spieldatei oder die server.js des Nachbar-Repos haben sich während des Laufs
+geändert — *Lastsymptom* ist hier keine gültige Erklärung." Die Warnung stimmte in der Sache und war
+für drei der vier Dateien trotzdem gegenstandslos: Gemessen hatte sich **nur** die `server.js` des
+Nachbarn bewegt (Änderungszeit 07:23; die Spieldatei stand unverändert seit 07:10 und war identisch
+mit `HEAD`), und keiner der drei Tests liest `server.js` überhaupt.
+
+**Bevor man die Warnung als Urteil nimmt, misst man zwei Dinge:** *welche* der beiden Dateien sich
+bewegt hat (Änderungszeit, `git diff --quiet HEAD -- <datei>`) und ob der rote Test sie *liest*
+(`grep -l "SERVER_JS\|server.js" tests/<test>.js`). Nur wenn beides zusammenfällt, entwertet der
+Abdruck-Wechsel das Ergebnis.
+
+## Teillauf nach einem fremden Merge (Absprache Sascha, 04.09.2026)
+
+`main` nimmt die eigene Versionsnummer etwa alle 15 Minuten; ein voller Prüflauf braucht 40–70. In
+dieser Lage gilt: Der volle Lauf gilt für den eigenen Stand. Kommt danach ein fremder Merge, wird
+gemergt, umnummeriert und **nur noch der berührte Bereich** gefahren — die Pflichtprüfungen plus die
+Tests der Bereiche, die der fremde Merge wirklich anfasst.
+
+**Die Auswahl wird gemessen, nicht geraten.** Aus dem Diff die berührten Bezeichner ziehen, dann die
+Tests suchen, die sie lesen:
+
+```bash
+git diff HEAD...origin/main -- weltraum_kolonie.html \
+  | grep "^[+-]" | grep -v "^[+-][+-]" \
+  | grep -oE "function [a-zA-Z0-9_]+|const [A-Z_]+ =|id=\"[a-zA-Z0-9_-]+\"|data-[a-z-]+" | sort -u
+grep -ln "<bezeichner1>\|<bezeichner2>" tests/*.js
+```
+
+Dazu kommen die Tests des **eigenen** Bereichs, wenn der fremde Merge ihn mit anfasst. Was gelaufen
+ist und was nicht, gehört ausdrücklich in den PR-Text — ein Teillauf, der sich als voller ausgibt,
+ist schlimmer als keiner.

@@ -82,6 +82,15 @@ stattfindet (gemessen am 03.09.2026).
 Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die Spieldatei anfasst — das wird gemessen
 (`git diff --name-only HEAD...origin/main`), nicht vermutet.
 
+**Tut er es doch, wird nicht der ganze Lauf wiederholt** (Absprache Sascha, 04.09.2026): mergen,
+umnummerieren, dann Pflichtprüfungen plus die Tests der Bereiche, die der fremde Merge wirklich
+anfasst — die Auswahl aus dem Diff **gemessen**, nicht geraten. Was gelaufen ist und was nicht,
+gehört ausdrücklich in den PR-Text.
+
+**Während `pruflauf.js` läuft, keinen zweiten Browser-Test starten.** Seine Einzel-Nachprüfung ist
+der Teil, der ohne Last stattfinden muss; wer daneben etwas startet, macht sie wertlos (gemessen am
+04.09.2026: ein Test fiel „einzeln rot" und war danach dreimal grün).
+
 Details: `docs/TESTING.md`.
 
 Wichtig:
@@ -91,6 +100,9 @@ Wichtig:
 - Selektoren in Tests auf den tatsächlich geprüften Container begrenzen.
 - Such-/Slice-Anker vor Benutzung explizit auf Existenz prüfen.
 - Nach Konflikten in Testdateien niemals pauschal eine Seite übernehmen; prüfen, dass keine Prüfungen verloren gingen.
+- Vor jedem Merge eine adversarische Durchsicht des eigenen Änderungssatzes (`/code-review <ziel> high`).
+  Der grüne Lauf beweist nur, dass nichts Bekanntes gebrochen ist. Befunde werden geprüft, nicht
+  geglaubt — und jeder bestätigte bekommt einen Wächter mit Gegenprobe.
 
 Mehr: `docs/TESTING.md` und `tests/README.md`.
 
