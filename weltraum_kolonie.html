@@ -3518,6 +3518,7 @@
         </div>
         <div id="defenseSabotageBanner" style="display:none;"></div>
         <div id="attackShieldBanner" style="display:none;"></div>
+        <div id="anflugBanner" style="display:none;"></div>
         <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-shield-lock" aria-hidden="true"></i>Aufstellung</div>
         <div id="defenseFormationBox"></div>
         <div class="section-title" style="margin-top:0.5rem;"><i class="ti ti-building-lighthouse" aria-hidden="true"></i>Tarnung</div>
@@ -20253,6 +20254,59 @@
     if (w * 2 >= sig) return 'etwas';
     return 'blind';
   }
+  /* ====================== DER ANFLUG - Tarnwert Etappe 2 (03.09.2026) ======================
+     Die Empfangsseite. Der Server schreibt anflug:<meineId> beim Abflug eines fremden Angriffs;
+     hier wird gelesen, was der eigene Signaturscanner davon durchlaesst.
+
+     WICHTIG: Es wird NICHT verschleiert, was schon da ist - der Kanal traegt von vornherein nur
+     Ankunftszeit und Signatur, keinen Namen und keine Zusammensetzung. Der Sensor entscheidet
+     lediglich, ob dieser Anflug ueberhaupt auftaucht und wie genau er benannt wird. Dieselbe
+     Staffelung wie beim Bestand: blind / "da bewegt sich etwas" / Groessenklasse.
+
+     Ein zu schwacher Sensor sieht GAR NICHTS - kein "da ist etwas, aber unklar". Das ist die
+     Entscheidung, die den Ausbau lohnend macht: Wer nicht gebaut hat, wird weiterhin ueberrascht,
+     genau wie vor dieser Etappe. */
+  let anflugCache = { stand: 0, liste: [] };
+  const ANFLUG_ABRUF_MS = 45000;
+  async function ladeAnfluege(){
+    if (!useBackend() || !state.player.id) return;
+    if (Date.now() - anflugCache.stand < ANFLUG_ABRUF_MS) return;
+    anflugCache.stand = Date.now();
+    try {
+      const r = await storageGet('anflug:' + state.player.id, true);
+      const doc = r && r.value ? JSON.parse(r.value) : null;
+      anflugCache.liste = (doc && Array.isArray(doc.anfluege)) ? doc.anfluege : [];
+    } catch(e){ /* Anzeige-Abruf: ein Fehlschlag darf den Takt nicht anhalten */ }
+  }
+  /* Nur die Anfluege, die noch unterwegs sind UND die der eigene Sensor ueberhaupt bemerkt.
+     Angekommene fallen heraus: Der Server streicht sie beim Aufloesen, aber zwischen Ankunft und
+     Aufloesung liegt der Moment, in dem der Angreifer seinen Tab noch nicht offen hat - und ein
+     Verteidiger, dem stundenlang ein "Anflug" angezeigt wird, der laengst da ist, lernt die
+     Anzeige zu ignorieren. */
+  function erkannteAnfluege(){
+    const jetzt = Date.now();
+    const wert = sensorWert();
+    return (anflugCache.liste || [])
+      .filter(a => a && (a.arrivalAt || 0) > jetzt)
+      .map(a => ({ arrivalAt: a.arrivalAt, signatur: a.signatur || 0, urteil: sensorUrteil(a.signatur || 0, wert) }))
+      .filter(a => a.urteil === 'groesse' || a.urteil === 'etwas')
+      .sort((a, b) => a.arrivalAt - b.arrivalAt);
+  }
+  /* DIE STARTSPERRE (Entscheidung Sascha, 03.09.2026). Wer einen Anflug sieht, darf umbauen und
+     aufstellen - aber nicht mehr fliehen. Ohne sie waere die Vorwarnung eine Ausweichmoeglichkeit,
+     und PvP liefe absehbar ins Leere, sobald sich das herumspricht.
+     Sie haengt ausdruecklich an erkannteAnfluege(), nicht am rohen Kanal: Wer keinen ausreichenden
+     Sensor hat, sieht nichts UND wird nicht gesperrt. Eine Sperre fuer etwas, das man nicht sehen
+     kann, waere aus Spielersicht ein Fehler.
+     Das Reaktionsfenster selbst bleibt unangetastet - Tarnung aendert das WAS, nie das WANN. */
+  function anflugSperrtStart(){
+    return erkannteAnfluege().length > 0;
+  }
+  function anflugSperrText(){
+    const a = erkannteAnfluege()[0];
+    if (!a) return '';
+    return 'Ein Anflug ist erkannt – die eigene Flotte bleibt am Boden, bis er abgewehrt ist. Umbauen und Aufstellen geht weiter.';
+  }
   function sensorUrteilText(urteil, tarnSig){
     if (urteil === 'groesse'){
       const klasse = (tarnSig || 0) >= 200 ? 'Grosskampfschiff-Klasse'
@@ -26493,6 +26547,17 @@
   // Gemeinsame Prüfung für alle Missions-Start-Funktionen: true = Limit erreicht, blockiert und
   // loggt bereits die Meldung (damit an jeder der zehn Versand-Stellen nur eine Zeile nötig ist).
   function fleetLimitBlocks(){
+    /* DIE STARTSPERRE BEI ERKANNTEM ANFLUG (Tarnwert Etappe 2, 03.09.2026) steht HIER, weil dies
+       die eine Stelle ist, durch die alle 25 Missionsstarts gehen. Sie in jeden einzelnen Starter
+       zu schreiben waere die Sorte Auslassung, an der dieses Projekt regelmaessig scheitert - eine
+       davon vergessen, und ausgerechnet ueber die entkommt die Flotte.
+       Der Name der Funktion stimmt danach nicht mehr ganz ("Limit"), aber ihre AUFGABE schon: Sie
+       beantwortet die Frage "darf jetzt eine Flotte starten?", und das ist genau die Frage. Ein
+       zweiter Waechter daneben waere die Kopie-Familie, nicht die Loesung. */
+    if (anflugSperrtStart()){
+      log(anflugSperrText(), 'ti-alert-triangle', 'warn');
+      return true;
+    }
     const used = activeFleetMissionCount();
     const max = maxConcurrentFleets();
     if (used >= max){
@@ -31300,14 +31365,32 @@ async function claimPendingRewards(){
     if (fleetLimitBlocks()) return;
     pay(fuel);
     const fleetName = resolveFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag,
+    const mission = { id: nextMissionId(), type:'attack-player', targetId: playerId, targetName: name, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, composition: attackFleet, cargoCapacity, isWarAttack, targetAllianceTag,
       // Der Standortname reist als TEXT mit, nicht nur als Schluessel: planetDisplayName loest
       // ueber state.colonyNames auf, also ueber die EIGENEN Umbenennungen - bei einem fremden
       // Standort auf demselben Planeten stuende dort sonst der eigene Kolonienname.
-      ...(zielKey ? { targetPlanet: zielKey, standortArt: standortArtVon(zielKey), standortName: fremdStandortName(zielKey) } : {}) });
+      ...(zielKey ? { targetPlanet: zielKey, standortArt: standortArtVon(zielKey), standortName: fremdStandortName(zielKey) } : {}) };
+    cf.missions.push(mission);
     trackEvent('attack_sent');
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' gegen Spieler '+name+' gestartet (Flugzeit ~'+Math.round(dur)+'s). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-sword');
-    render(); save();
+    /* ABFLUG MELDEN (Tarnwert Etappe 2). Der Server fuehrt den Anflug, aber er kann ihn nur
+       fuehren, wenn er von ihm erfaehrt - und er liest die Mission im GESPEICHERTEN Spielstand
+       nach. Deshalb `await save()` VOR der Meldung: Ohne das findet der Server die frisch
+       angelegte Mission nicht und weist den Abflug mit 404 ab.
+       Fehlschlaege sind hier bewusst still: Der Angriff selbst ist bereits bezahlt und
+       losgeschickt, und solange ANFLUG_PFLICHT im Backend aus ist, aendert eine fehlende Meldung
+       nichts am Ausgang. Wird der Schalter umgelegt, wird aus dem stillen Fehlschlag ein
+       sichtbarer - dann meldet /api/attack den fehlenden Anflug mit 409, und der Spieler erfaehrt
+       es dort. Eine Sicherung, deren Ausfall wie Normalbetrieb aussieht, ist keine - hier ist der
+       Ausfall aber folgenlos, solange der Schalter aus ist. */
+    render();
+    await save();
+    if (useBackend()){
+      try {
+        await backendFetch('/attack/abflug', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ targetUserId: playerId, missionId: String(mission.id) }) });
+      } catch(e){ /* siehe Kommentar oben - folgenlos, solange der Schalter aus ist */ }
+    }
   }
   async function resolvePlayerAttackMission(m, planetKey, showLog, fleet){
     const name = m.targetName || 'Unbekannt';
@@ -34438,6 +34521,10 @@ async function claimPendingRewards(){
   setTimeout(checkLiveVersionUpdate, 15000);
   setInterval(() => { if (document.visibilityState === 'visible') checkLiveVersionUpdate(); }, 600000);
   setInterval(() => { if (document.visibilityState === 'visible') checkChatUnread(); }, 60000);
+  /* Anfluege abrufen. Eigener Takt statt Anhaengen an den Sekunden-Tick: Der Abruf geht ueber das
+     Netz, und ein Netzaufruf je Sekunde waere fuer eine Anzeige, die sich hoechstens minuetlich
+     aendert, reine Last. ladeAnfluege() deckelt zusaetzlich selbst (ANFLUG_ABRUF_MS). */
+  setInterval(() => { if (document.visibilityState === 'visible') ladeAnfluege(); }, 30000);
   // Allianz-Tiefenlauf: reines ANZEIGE-Polling, also mit Sichtbarkeits-Gate (CLAUDE.md). Der eigene
   // Beitrag wird davon unabhaengig beim Tauchgang gemeldet - der haengt an echter Spielmechanik und
   // darf nicht davon abhaengen, ob der Reiter gerade sichtbar ist.
@@ -66677,6 +66764,33 @@ async function claimPendingRewards(){
         dsb.innerHTML = `<div class="card-row" style="background:rgba(224,165,72,0.12); border-color:rgba(224,165,72,0.5); margin-bottom:0.75rem;"><div class="left"><div class="bicon" style="background:rgba(224,165,72,0.2); color:#e0a548;"><i class="ti ti-bolt" aria-hidden="true"></i></div><div><div class="bname" style="color:#e0a548;">Verteidigung sabotiert</div><div class="bmeta">Feindliches Störmanöver: -${Math.round(ds.pct*100)}% Verteidigungspunkte – noch ${mm}m ${ss}s. Sofort behebbar per Metamaterial-Reparaturschwarm oder Automatischer Reparatur.</div></div></div></div>`;
       } else if (dsb.style.display !== 'none'){
         dsb.style.display = 'none'; dsb.innerHTML = '';
+      }
+    }
+
+    /* ANFLUG-BANNER (Tarnwert Etappe 2). Steht direkt beim Schutzschild-Banner, weil beide dieselbe
+       Frage beantworten: "Ist gerade etwas gegen mich im Gange?"
+       Gezeigt wird nur, was der eigene Signaturscanner durchlaesst - erkannteAnfluege() filtert
+       bereits. Wer keinen ausreichenden Sensor hat, sieht hier NICHTS und wird auch nicht gesperrt;
+       eine Sperre fuer etwas, das man nicht sehen kann, waere aus Spielersicht ein Fehler. */
+    const anb = document.getElementById('anflugBanner');
+    if (anb){
+      const anf = erkannteAnfluege();
+      if (!anf.length){ anb.style.display = 'none'; }
+      else {
+        const zeilen = anf.map(a => {
+          const rest = Math.max(0, a.arrivalAt - Date.now());
+          const wann = fmtDuration(rest/1000);
+          return a.urteil === 'groesse'
+            ? '<div>Ankunft in <strong>' + escapeHtml(wann) + '</strong> – ' + escapeHtml(sensorUrteilText('groesse', a.signatur)) + '</div>'
+            : '<div>Ankunft in <strong>' + escapeHtml(wann) + '</strong> – ' + escapeHtml(sensorUrteilText('etwas', a.signatur)) + '</div>';
+        }).join('');
+        anb.style.display = '';
+        anb.innerHTML = '<div style="background:rgba(226,75,74,0.10); border:var(--bw-1) solid rgba(226,75,74,0.45); border-radius:8px; padding:8px 10px; margin-bottom:8px;">'
+          + '<div style="font-weight:600; color:#e24b4a;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> '
+          + (anf.length === 1 ? 'Ein Anflug erkannt' : fmt(anf.length) + ' Anflüge erkannt') + '</div>'
+          + '<div class="bmeta" style="margin-top:4px;">' + zeilen + '</div>'
+          + '<div class="bmeta" style="margin-top:4px;">Deine Flotte bleibt am Boden, bis er abgewehrt ist – umbauen und aufstellen geht weiter. Das Reaktionsfenster verschiebt sich dadurch nicht.</div>'
+          + '</div>';
       }
     }
 
