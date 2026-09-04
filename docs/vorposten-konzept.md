@@ -934,3 +934,62 @@ Wächter: `tests/test_vorposten_zustand.js` (30 Prüfungen). Gegenprobe in beide
 Stand ohne die Zeichenschicht fallen 15, gegen den Stand ohne Übersicht und Kampfverlauf weitere 7 —
 Prüflisten per `diff` verglichen. Grün bleiben in beiden Fällen genau die Prüfungen, die das
 **Ausbleiben** einer Zeichnung belegen; sie sind nur zusammen mit ihrem positiven Gegenstück etwas wert.
+
+## Vier Befunde der adversarischen Durchsicht zu v8.667.0 (04.09.2026)
+
+Acht Perspektiven, 67 Befunde, davon 33 nach dreifacher Gegenprüfung bestätigt. Vier davon
+betrafen diesen Auslieferungsstand direkt.
+
+**1. Der Tiefenhorchposten ragte 2,87 r hinaus, reserviert sind 2,45 r.** Also genau der Fehler,
+gegen den `VORPOSTEN_SICHT` in dieser Etappe eingeführt wurde — und er stand die ganze Zeit im
+selben Änderungssatz. Ursache waren die Bogen-Flags `0 1 0`: Nach SVG F.6.5 hängt die Wahl des
+Mittelpunkts am Vergleich `fA != fS`, `1 0` und `0 1` wählen also **denselben** Punkt (2,361 r vom
+Marker entfernt) — aber `1 0` zeichnet den **großen** Bogen darum, 264 Grad, weitester Tintenpunkt
+2,781 r, mit halber Strichbreite 2,872 r. `0 1` nimmt den kurzen 95-Grad-Bogen; sein Maximum sind
+die Endpunkte bei 2,102 r. Die Nebenwirkung ist die eigentliche: Aus einem fast geschlossenen Ring
+um einen Punkt neben der Speisestelle wird eine Schüssel, deren hohle Seite nach außen zeigt. Das
+Modul-Gegenstück `horchposten` macht es seit jeher so.
+
+**2. Der Wächter konnte das bauartbedingt nicht sehen.** Prüfung 12a maß die **Achsen**-Ausdehnung
+der Bounding-Box. Für Formen, die um den *Markermittelpunkt* rund sind, ist das die richtige
+Größe — die Ecken-Messung meldete für den Hof 3,12 statt 2,35, wo keine Tinte ist. Für **versetzte**
+Teile ist es das Gegenteil: Beim diagonal sitzenden Horchposten-Bogen ergab die Achsen-Messung
+2,09 r, während der weiteste Punkt bei 2,78 r lag — 17 % Überstand, grün gemeldet. `kbMarkerFrei`
+rechnet aber mit `Math.hypot`, also mit dem Abstand. 12a unterscheidet jetzt danach, ob die Box den
+Mittelpunkt **enthält**: dann Achsen-Ausdehnung, sonst Eckabstand. Gemessen: mit den alten Flags
+2,95 (rot), mit den neuen 2,38 (grün) — genau eine Prüfung fällt.
+
+**3. Die erbeutete Lagerbeute des Angreifers wurde verworfen.** Das Backend hängt an die Beute jedes
+Beitragenden beim Fall eines Vorpostens das Feld `lagerBeute` (anteilig nach Schadensanteil, gemessen
+bevor das Dokument gelöscht wird). Der Frontend-Zweig `vorposten` buchte nur Kampfpunkte, Erfahrung
+und Kredite; `lagerBeute` kam im ganzen Frontend nicht vor. Der Ertrag wurde gepusht, beim Abholen
+serverseitig aus der Warteschlange geräumt und im Client ersatzlos verworfen. Die **Gegenseite**
+derselben Sache — `lagerVerloren` für den Besitzer — war längst da; die Angreiferhälfte war
+vergessen, und `docs/vorposten.md` behauptete ausdrücklich das Gegenteil. Gebucht wird jetzt über
+`gainResources`, wie beim `vorposten-lager`-Zweig: dort hängt der Lagerdeckel, und gemeldet wird,
+was **ankommt**. Wächter 11c/11d, Gegenprobe gemessen.
+
+**4. Die Signatur der Startseiten-Übersicht kannte `lpMax` und `garnisonMax` nicht.** Die Zeile zeigt
+den Kern als *Prozent* (`lp/lpMax`) und die Garnison als `anzahl/max`. Ein eingebauter Kernpanzer
+hebt `lpMax`, eine Hangarerweiterung `garnisonMax` — beide Male ändert sich die angezeigte Zahl,
+während `lp` und `garnisonAnzahl` gleich bleiben. Die Zeile wurde dann nicht neu gebaut und zeigte
+weiter den alten Prozentsatz. **Eine Signatur muss jede Größe enthalten, die in der Zeile steht,
+nicht nur die, die sich „eigentlich" ändert.**
+
+### Zwei Fehler in der eigenen Messvorrichtung, beide beim Nachbauen der Wächter
+
+- **Ein Vergleich zweier Läufe ist nur so viel wert wie ihre Übereinstimmung in allem, was nicht
+  gemessen wird.** Der erste Entwurf von 11c verglich gegen einen Lauf mit anderem Ausgangsvorrat;
+  das Lager stand dadurch schon am Deckel, 11c war zufällig grün und 11d fiel, weil gar nichts mehr
+  ankam.
+- **`fmt()` schreibt `51.0k`, nicht `51.000`.** 11d suchte nach der zweiten Form und fiel an einer
+  richtigen Meldung. Geprüft wird jetzt die Regel — alle drei Rohstoffe stehen neben den drei alten
+  Größen —, nicht die Schreibweise der Zahl. Derselbe Fehler war in dieser Sitzung schon einmal da.
+- **13a war eine Tautologie.** Die Bedingung lautete `n.erz < v.erz + 99999999`; da `v.erz >= 0` ist,
+  folgt sie logisch aus dem Vergleich davor und konnte nie fallen. Der im Kommentar behauptete
+  Vergleich (kleines Lager nimmt weniger auf als großes) stand nirgends. Jetzt läuft ein zweiter
+  Lauf mit Stufe 200 und derselben Riesenlieferung: 1.200 gegen 80.800.
+- **13b zählte ein zweites Mal Skriptfehler** und war damit eine echte Teilmenge von Prüfung 8 — es
+  konnte nie fallen, ohne dass 8 mitfällt. Es misst jetzt das Protokoll, das sein Name nennt; dafür
+  schneidet `lauf()` die Meldungen per MutationObserver mit, statt `#log` am Ende auszulesen (dort
+  überschreibt jede Meldung die vorige).

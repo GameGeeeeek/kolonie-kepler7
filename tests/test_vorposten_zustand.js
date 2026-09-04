@@ -100,7 +100,23 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
     if (p.startsWith('storage/')){ const k = decodeURIComponent(p.slice(8)); if (req.method() === 'PUT'){ try { st[k] = JSON.parse(req.postData()||'{}').value; } catch(e){} return j({ ok:true, version:2 }); } if (st[k] !== undefined) return j({ key:k, value:st[k], version:1 }); return j({ error:'nicht gefunden' }, 404); }
     return j({ ok:true });
   });
-  await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+  /* DAS PROTOKOLL WIRD MITGESCHNITTEN, statt am Ende ausgelesen (Durchsicht 04.09.2026).
+     `log()` schreibt per innerHTML in EIN Element - der Endzustand sagt nur, welche Meldung
+     zuletzt dastand, nicht welche erschienen ist. Ein MutationObserver haelt jede fest. */
+  await page.addInitScript(() => {
+    localStorage.setItem('kepler7_token', 'tok');
+    window.__logs = [];
+    const beobachte = () => {
+      const l = document.getElementById('log');
+      if (!l) return;
+      new MutationObserver(() => {
+        const t = (l.textContent || '').replace(/\s+/g, ' ').trim();
+        if (t && t !== window.__logs[window.__logs.length - 1]) window.__logs.push(t);
+      }).observe(l, { subtree: true, childList: true, characterData: true });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', beobachte);
+    else beobachte();
+  });
   await page.goto(SPIEL_URL); await page.waitForTimeout(6000);
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display='none'; }));
   /* D3: Die Uebersicht steht auf dem Basis-Tab und wird deshalb VOR dem Wechsel zur Karte
@@ -157,11 +173,22 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
           if (el.classList && el.classList.contains('planet-label')) continue;
           const b = el.getBoundingClientRect();
           if (!b || (!b.width && !b.height)) continue;
-          /* Gemessen wird die ACHSEN-Ausdehnung, nicht die Ecke der Box: Bei einem Kreis mit Radius
-             2,35 liegt die Ecke bei 2,35 x Wurzel(2) = 3,32 - dort ist aber keine Tinte. Die
-             Ecken-Messung meldete deshalb 3,12 fuer den Hof, der in Wahrheit auf 2,35 aufgeht.
-             Fast alles hier ist rund; fuer runde Formen ist die Achsen-Ausdehnung die wahre. */
-          const m = Math.max(Math.abs(b.left - cx), Math.abs(b.right - cx), Math.abs(b.top - cy), Math.abs(b.bottom - cy));
+          /* ZWEI MASSE, JE NACH LAGE DES TEILS (Durchsicht 04.09.2026 - die erste Fassung war
+             bauartbedingt blind).
+             Die Achsen-Ausdehnung ist die wahre NUR fuer Formen, die um den MARKERMITTELPUNKT
+             herum rund sind: Bei einem Kreis mit Radius 2,35 liegt die Box-Ecke bei
+             2,35 x Wurzel(2) = 3,32, dort ist aber keine Tinte - die Ecken-Messung meldete
+             deshalb 3,12 fuer den Hof, der in Wahrheit auf 2,35 aufgeht.
+             Fuer VERSETZTE Teile gilt das Gegenteil, und genau dort war die Achsen-Messung blind:
+             Der Bogen des Tiefenhorchpostens sitzt diagonal unten links; die Achsen-Messung ergab
+             2,09 r, waehrend der weiteste Tintenpunkt bei 2,78 r lag - 17 % Ueberstand, gruen
+             gemeldet. `kbMarkerFrei` rechnet aber mit `Math.hypot`, also mit dem ABSTAND.
+             Unterschieden wird daran, ob die Box den Mittelpunkt ENTHAELT. */
+          const drin = b.left <= cx && b.right >= cx && b.top <= cy && b.bottom >= cy;
+          const m = drin
+            ? Math.max(Math.abs(b.left - cx), Math.abs(b.right - cx), Math.abs(b.top - cy), Math.abs(b.bottom - cy))
+            : Math.max.apply(null, [[b.left, b.top], [b.right, b.top], [b.left, b.bottom], [b.right, b.bottom]]
+                .map(function (p) { return Math.hypot(p[0] - cx, p[1] - cy); }));
           liste.push({ tag: el.tagName, attr: (el.getAttribute('data-vp-projekt') || el.getAttribute('data-vp-modul') || ''), f: Math.round(m / rV * 100) / 100 });
         }
         liste.sort((x, y) => y.f - x.f);
@@ -184,7 +211,8 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
      dass der Zweig save() gerufen hat. */
   let gespeichert = null;
   try { gespeichert = JSON.parse(st['kepler7-save-v3']); } catch (e) {}
-  return { ctx, page, errs, mess, liste, menue, gespeichert };
+  const logs = await page.evaluate(() => (window.__logs || []).slice());
+  return { ctx, page, errs, mess, liste, menue, gespeichert, logs };
 }
 (async () => {
   const browser = await starteBrowser();
@@ -330,6 +358,37 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
   })(), { nachher: nachher && { erz: nachher.erz, kristalle: nachher.kristalle, deuterium: nachher.deuterium },
           vorher: vorher && { erz: vorher.erz, kristalle: vorher.kristalle, deuterium: vorher.deuterium } });
 
+  /* 11c/11d: DIE ANDERE HAELFTE DERSELBEN SACHE (Durchsicht 04.09.2026). Faellt ein fremder
+     Vorposten, haengt der Server an die Beute JEDES Beitragenden das Feld `lagerBeute`
+     (server.js, V4) - anteilig nach Schadensanteil aus dem Stand beim Fall. Der Frontend-Zweig
+     `vorposten` bucht es nicht: Der Ertrag wurde gepusht, beim Abholen serverseitig aus der
+     Warteschlange geraeumt und im Client ersatzlos verworfen. Die Gegenseite fuer den BESITZER
+     (`lagerVerloren`) war laengst da; die Angreiferhaelfte war vergessen, und docs/vorposten.md
+     behauptete ausdruecklich das Gegenteil.
+     DIESELBEN LAUFBEDINGUNGEN WIE `ohneLager` (Stufe 200 UND wenig Vorrat) - der erste Entwurf
+     verglich gegen einen Lauf mit anderem Ausgangsvorrat, und das Lager stand dadurch schon am
+     Deckel: 11c war zufaellig gruen, 11d fiel, weil gar nichts mehr ankam. Ein Vergleich zweier
+     Laeufe ist nur so viel wert wie ihre Uebereinstimmung in allem, was nicht gemessen wird. */
+  const beute = await lauf(browser, doc({}), { type:'vorposten', system:SYS, name:'Sternenwerft',
+    besitzerName:'Rivale', anteil:0.5, kampfpunkte:400, xp:2000, credits:9000,
+    lagerBeute:{ erz: 51000, kristalle: 17000, deuterium: 13000 }, zeit: now }, 200, true);
+  const bVor = ohneLager.gespeichert && ohneLager.gespeichert.resources;
+  const bNach = beute.gespeichert && beute.gespeichert.resources;
+  check('11c: die erbeutete Lagerbeute des geschleiften Vorpostens wird gebucht, nicht verworfen',
+    !!bNach && !!bVor && bNach.erz >= bVor.erz + 51000 && bNach.kristalle >= bVor.kristalle + 17000
+      && bNach.deuterium >= bVor.deuterium + 13000,
+    { nachher: bNach && { erz: bNach.erz, kristalle: bNach.kristalle, deuterium: bNach.deuterium },
+      vorher: bVor && { erz: bVor.erz, kristalle: bVor.kristalle, deuterium: bVor.deuterium } });
+  /* Geprueft wird die REGEL (alle drei Rohstoffe stehen neben den drei alten Groessen), nicht die
+     Schreibweise der Zahl: `fmt()` macht aus 51000 ein „51.0k", nicht „51.000" - der erste Entwurf
+     suchte nach der zweiten Form und fiel an einer richtigen Meldung. */
+  check('11d: und die Meldung nennt die Rohstoffe neben Kampfpunkten, Erfahrung und Krediten', (() => {
+    const zeile = (beute.logs || []).find(t => /Anteil an der Beute/.test(t));
+    if (!zeile) return false;
+    return ['Kampfpunkte', 'Erfahrung', 'Kredite', 'Erz', 'Kristalle', 'Deuterium']
+      .every(w => zeile.indexOf(w) >= 0);
+  })(), { zeile: (beute.logs || []).find(t => /Anteil an der Beute/.test(t)) || null });
+
   // ---- 12) Die Ausdehnung passt in den reservierten Platz ---------------------------------------
   /* Befund des Review-Bots auf PR #562: Der Kollisionsschieber reservierte rV x 2,0, waehrend der
      Alarmring auf 2,35 aufging und die Projektteile noch weiter hinaus - das Sprungtor nach oben,
@@ -362,16 +421,30 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
      haette kein Lager mehr gebraucht. Gemessen mit einem winzigen Lager und einer riesigen Lieferung. */
   const klein = await lauf(browser, doc({}), { type:'vorposten-lager', system:SYS, name:'Sternenwerft',
     erz: 99999999, kristalle: 99999999, deuterium: 99999999, zeit: now }, 1);
+  /* DIESELBE RIESENLIEFERUNG AN EIN GROSSES LAGER - die Gegenprobe zur Deckelung. Ohne sie war
+     13a bauartbedingt blind (Durchsicht 04.09.2026): Der zweite Vergleich lautete
+     `n.erz < v.erz + 99999999` und folgt logisch aus dem ersten, da v.erz >= 0. Er konnte nie
+     fallen. Gemessen wird jetzt, was der Kommentar immer behauptet hat: Der Deckel der
+     TATSAECHLICHEN Stufe wirkt - ein kleines Lager nimmt WENIGER auf als ein grosses. */
+  const grossLager = await lauf(browser, doc({}), { type:'vorposten-lager', system:SYS, name:'Sternenwerft',
+    erz: 99999999, kristalle: 99999999, deuterium: 99999999, zeit: now }, 200);
   check('13a: eine Lieferung ueber dem Lagerdeckel wird gekappt, nicht durchgereicht', (() => {
     const n = klein.gespeichert && klein.gespeichert.resources;
-    const v = voll.gespeichert && voll.gespeichert.resources;
-    // Das kleine Lager (Stufe 1) muss deutlich unter dem grossen (Stufe 60) bleiben - und weit
-    // unter der Liefermenge. Ohne Deckelung stuende dort die volle Summe.
-    return !!n && n.erz < 99999999 && n.erz < (v ? v.erz : 0) + 99999999;
-  })(), { mitKleinemLager: klein.gespeichert && klein.gespeichert.resources.erz, geliefert: 99999999 });
-  check('13b: und das Protokoll behauptet nicht, was nie ankam', klein.errs.length === 0, { errs: klein.errs.slice(0, 2) });
+    const g = grossLager.gespeichert && grossLager.gespeichert.resources;
+    return !!n && !!g && n.erz < 99999999 && n.erz < g.erz;
+  })(), { mitKleinemLager: klein.gespeichert && klein.gespeichert.resources.erz,
+          mitGrossemLager: grossLager.gespeichert && grossLager.gespeichert.resources.erz, geliefert: 99999999 });
+  /* 13b misst jetzt das PROTOKOLL, das sein Name nennt. Vorher zaehlte es ein zweites Mal
+     Skriptfehler und war damit eine echte Teilmenge von Pruefung 8 - es konnte nie fallen, ohne
+     dass 8 mitfaellt. Die Regel dahinter: Die Meldung nennt, was ANKOMMT, nicht was geschickt
+     wurde, und sagt beim Deckel ausdruecklich, dass der Rest verfallen ist. */
+  check('13b: und das Protokoll nennt, was ankam - nicht die geschickte Menge', (() => {
+    const zeile = (klein.logs || []).find(t => /Lager deines/.test(t));
+    if (!zeile) return false;
+    return !/99\.999\.999/.test(zeile) && /verfallen/.test(zeile) && !/es war leer/.test(zeile);
+  })(), { zeile: (klein.logs || []).find(t => /Lager deines/.test(t)) || null, anzahlMeldungen: (klein.logs || []).length });
 
-  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, ohneLager, mitLager, vollAus, klein];
+  const alleLaeufe = [voll, andere, halb, wrack, baut, weg, halbeFlotte, fern, nah, lager, gekaempft, ohneLager, mitLager, vollAus, klein, grossLager, beute];
   check('8: keine Skriptfehler in irgendeinem Lauf', alleLaeufe.every(l => l.errs.length === 0),
     { fehler: alleLaeufe.flatMap(l => l.errs).slice(0, 3) });
 

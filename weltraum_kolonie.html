@@ -9318,10 +9318,19 @@
         + `</g>`;
     }
     if (fertig.indexOf('tiefenhorchen') >= 0){
-      // Eine weit ausgefahrene Lauschanlage - der Ausleger gehoert zum Bild, nicht nur die Schuessel.
+      /* Eine weit ausgefahrene Lauschanlage - der Ausleger gehoert zum Bild, nicht nur die Schuessel.
+         BOGEN-FLAGS `0 0 1`, NICHT `0 1 0` (Durchsicht 04.09.2026, nachgerechnet nach SVG F.6.5):
+         Beide Kombinationen waehlen denselben Mittelpunkt (Vorzeichen haengt an fA != fS), aber
+         `1 0` zeichnet den GROSSEN Bogen - 264 Grad um einen Punkt bei 2,361 r, dessen weitester
+         Tintenpunkt bei 2,781 r liegt, mit halber Strichbreite 2,872 r. VORPOSTEN_SICHT reserviert
+         2,45 r; der Kollisionsschieber haette also 0,42 r zu wenig freigehalten - genau der Fehler,
+         gegen den VORPOSTEN_SICHT eingefuehrt wurde. `0 1` nimmt den KURZEN Bogen: 95 Grad,
+         Maximum sind die Endpunkte bei 2,102 r. Nebenwirkung, die die eigentliche ist: Aus einem
+         fast geschlossenen Ring wird eine Schuessel, deren hohle Seite nach aussen zeigt. Das
+         Modul-Gegenstueck `horchposten` macht es seit jeher so. */
       const ax = x - r*0.9, ay = y + r*0.9, ex = x - r*1.35, ey = y + r*1.35;   // Ausleger eingezogen (Diagonale!)
       out += `<g data-vp-projekt="tiefenhorchen"><line x1="${P(ax)}" y1="${P(ay)}" x2="${P(ex)}" y2="${P(ey)}" stroke="${farbe}" stroke-width="1.5"/>`
-        + `<path d="M ${P(ex - r*0.34)} ${P(ey - r*0.1)} A ${P(r*0.42)} ${P(r*0.42)} 0 1 0 ${P(ex + r*0.1)} ${P(ey + r*0.34)}" fill="none" stroke="${farbe}" stroke-width="2"/>`
+        + `<path d="M ${P(ex - r*0.34)} ${P(ey - r*0.1)} A ${P(r*0.42)} ${P(r*0.42)} 0 0 1 ${P(ex + r*0.1)} ${P(ey + r*0.34)}" fill="none" stroke="${farbe}" stroke-width="2"/>`
         + `<circle cx="${P(ex)}" cy="${P(ey)}" r="${P(r*0.09)}" fill="${farbe}"/></g>`;
     }
     if (fertig.indexOf('sprungtor') >= 0){
@@ -27906,8 +27915,28 @@ async function claimPendingRewards(){
           if (xpV > 0){ state.xp = (state.xp||0) + xpV; teile.push(fmt(xpV) + ' Erfahrung'); }
           const crV = Math.max(0, Math.round(r.credits||0));
           if (crV > 0){ state.credits = (state.credits||0) + crV; teile.push(fmt(crV) + ' Kredite'); }
+          /* DAS LAGER DES GEFALLENEN VORPOSTENS (V4, `lagerBeute`, server.js). Es fehlte hier
+             (Durchsicht 04.09.2026): Der Server rechnet den Anteil, reiht ihn ein und raeumt ihn
+             beim Abholen aus der Warteschlange - der Client verwarf ihn ersatzlos. Die Gegenseite
+             derselben Sache, `lagerVerloren` fuer den Besitzer, war laengst da; die
+             Angreiferhaelfte war vergessen, und docs/vorposten.md behauptete das Gegenteil.
+             Durch gainResources wie der `vorposten-lager`-Zweig weiter unten: dort haengt der
+             Lagerdeckel, und gemeldet wird, was ANKOMMT - nicht, was geschickt wurde. */
+          const vorherB = {}, gabenB = {};
+          for (const k of ['erz','kristalle','deuterium']){
+            const menge = Math.max(0, Math.round(Number((r.lagerBeute||{})[k]) || 0));
+            if (menge){ vorherB[k] = state.resources[k] || 0; gabenB[k] = menge; }
+          }
+          if (Object.keys(gabenB).length) gainResources(gabenB);
+          let verfielB = false;
+          for (const k of Object.keys(gabenB)){
+            const bekommen = Math.max(0, Math.round((state.resources[k] || 0) - vorherB[k]));
+            if (bekommen > 0) teile.push(fmt(bekommen) + ' ' + resDefFor(k).label);
+            if (bekommen < gabenB[k]) verfielB = true;
+          }
           const sysNameV = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
-          log('Anteil an der Beute des geschleiften ' + (r.name||'Vorpostens') + ' von ' + (r.besitzerName||'?') + ' bei ' + sysNameV + ' (' + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts'), 'ti-trophy', 'wichtig');
+          log('Anteil an der Beute des geschleiften ' + (r.name||'Vorpostens') + ' von ' + (r.besitzerName||'?') + ' bei ' + sysNameV + ' (' + Math.round((r.anteil||0)*100) + '% deiner Arbeit): ' + (teile.join(', ') || 'nichts')
+            + (verfielB ? ' – dein Lager war voll, ein Teil der erbeuteten Rohstoffe ist verfallen' : ''), 'ti-trophy', 'wichtig');
           save();
           continue;
         }
@@ -27974,9 +28003,15 @@ async function claimPendingRewards(){
             if (bekommen > 0) teileL.push(fmt(bekommen) + ' ' + resDefFor(k).label);
             if (bekommen < gaben[k]) verfielL = true;
           }
+          /* „es war leer" gilt nur, wenn wirklich NICHTS geschickt wurde. Vorher hing der Satz an
+             dem, was ANKAM - kam nichts an, weil das Lager voll war, las sich die Meldung
+             „ist eingetroffen – es war leer – dein Lager war voll, der Rest ist verfallen"
+             (Durchsicht 04.09.2026). Zwei Aussagen ueber dieselbe Lieferung, die einander
+             widersprechen. */
+          const nichtsGeschickt = Object.keys(gaben).length === 0;
           log('Das Lager deines ' + (r.name||'Vorposten') + ' bei ' + sysNameL + ' ist eingetroffen'
-            + (teileL.length ? ': ' + teileL.join(', ') : ' – es war leer')
-            + (verfielL ? ' – dein Lager war voll, der Rest ist verfallen' : '') + '.', 'ti-truck', 'ok');
+            + (teileL.length ? ': ' + teileL.join(', ') : (nichtsGeschickt ? ' – es war leer' : ''))
+            + (verfielL ? ' – dein Lager war voll, ' + (teileL.length ? 'der Rest' : 'alles davon') + ' ist verfallen' : '') + '.', 'ti-truck', 'ok');
           ladeVorposten();
           save();
           continue;
@@ -63724,8 +63759,16 @@ async function claimPendingRewards(){
            Befund, der beim Anflug-Countdown schon einmal zugeschlagen hat. Auf Minuten gerundet,
            nicht auf Sekunden. */
         const vpRestMin = (bis) => Math.max(0, Math.round(((bis||0) - Date.now())/60000));
+        /* DIE SIGNATUR MUSS JEDE GROESSE ENTHALTEN, DIE IN DER ZEILE STEHT - sonst friert die
+           Anzeige ein, ohne dass etwas kaputt aussieht. `lpMax` und `garnisonMax` fehlten
+           (Durchsicht 04.09.2026): Die Zeile zeigt den Kern als PROZENT (lp/lpMax) und die
+           Garnison als `anzahl/max`. Ein eingebauter Kernpanzer hebt lpMax, eine
+           Hangarerweiterung garnisonMax - beide Male aendert sich die angezeigte Zahl, waehrend
+           lp und garnisonAnzahl gleich bleiben. Die Zeile wurde dann nicht neu gebaut und zeigte
+           weiter den alten Prozentsatz. */
         const vpSig = meine.map(v => v.sys + ':' + (v.stufe||1) + ':' + ((v.anflug||[]).length) + ':' + vpAnflugMin(v) + ':' + Math.round(((v.kern||{}).lp||0)/1000)
-          + ':' + (v.garnisonAnzahl||0) + ':' + ((v.projektLaeuft && v.projektLaeuft.key) || '-') + ':' + vpRestMin((v.projektLaeuft||{}).fertigAb)
+          + ':' + Math.round(((v.kern||{}).lpMax||0)/1000)
+          + ':' + (v.garnisonAnzahl||0) + ':' + (v.garnisonMax||0) + ':' + ((v.projektLaeuft && v.projektLaeuft.key) || '-') + ':' + vpRestMin((v.projektLaeuft||{}).fertigAb)
           + ':' + (v.abbauAb ? vpRestMin(v.abbauAb) : '-')).join('|')
           + '@' + (vorpostenCache.maxJeKonto || 3);
         if (vpSig !== lastVorpostenSig){
