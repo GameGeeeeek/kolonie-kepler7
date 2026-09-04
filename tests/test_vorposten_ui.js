@@ -5,7 +5,7 @@
 //
 // GEPRUEFT WIRD:
 //   1. Ein fremder Vorposten erscheint als SICHTBARER Kartenknoten (data-map-vorposten), als
-//      ⛺-Landmarke am Systemplatz der Sektoransicht und als Chip in der Detailtafel; sein
+//      🛰-Landmarke am Systemplatz der Sektoransicht und als Chip in der Detailtafel; sein
 //      Kartenmenü nennt Besitzer, Kern, Verteidigung und den Angriffs-Eintrag. Ohne Vorposten
 //      (aktiv:false = altes Backend) ist nichts davon da (Gegenrichtung 1e/1f).
 //   2. Der BAU: In einem fremden System ohne Vorposten steht der Knopf „Vorposten errichten";
@@ -167,7 +167,9 @@ async function anfechtungHinflug(t){
   const t1 = await tab(browser, fixture(), {});
   await t1.page.waitForTimeout(2500);
   const lm = await landmarke(t1);
-  check('1b: die ⛺-Landmarke steht SICHTBAR am Systemplatz', lm.da && /⛺/.test(lm.zeichen), lm);
+  /* Seit GR-6 (04.09.2026) traegt die Landmarke immer 🛰: Der Vorposten ist auf jeder Stufe eine
+     Raumstation, das Zelt waere eine Falschaussage. */
+  check('1b: die 🛰-Landmarke steht SICHTBAR am Systemplatz', lm.da && /🛰/.test(lm.zeichen), lm);
   await aufKarte(t1);
   const k1 = await knoten(t1.page);
   check('1a: der fremde Vorposten ist auf der Karte SICHTBAR und nennt den Besitzer', k1.da && k1.breite > 4 && /Rivale/.test(k1.titel) && /Stützpunkt/.test(k1.titel), k1);
@@ -192,7 +194,9 @@ async function anfechtungHinflug(t){
   const t0 = await tab(browser, fixture(), { inaktiv: true });
   await t0.page.waitForTimeout(2500);
   const lm0 = await landmarke(t0);
-  check('1e: ohne Vorposten keine Landmarke (der Systemplatz ist da)', lm0.da && !/⛺/.test(lm0.zeichen), lm0);
+  /* MUSS mitwandern: Diese Gegenrichtung suchte das Zelt, und das gibt es seit GR-6 nirgends
+     mehr - sie waere damit immer gruen gewesen und haette nichts mehr belegt. */
+  check('1e: ohne Vorposten keine Landmarke (der Systemplatz ist da)', lm0.da && !/🛰/.test(lm0.zeichen), lm0);
   await aufKarte(t0);
   const k0 = await knoten(t0.page); const tf0 = await tafel(t0.page);
   check('1f: kein Knoten, kein Chip, kein Bau-Knopf (der Server kennt keine Vorposten)', !k0.da && !/Vorposten/.test(tf0.chips) && !tf0.bauKnopf.da && !tf0.vpKnopf, { k0, tf0 });
