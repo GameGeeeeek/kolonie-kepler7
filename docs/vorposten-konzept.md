@@ -690,7 +690,7 @@ identische Prüflisten.
 > Entwurfsgeschichte stehen – was heute gilt, steht am Ende der Datei.
 
 Bis Stufe 3 bleibt der Vorposten eine **Palisade mit Fahne** – ein Feldlager soll wie eines
-aussehen. Ab der Wahlstufe zeichnet `vorpostenSilhouette()` eine **Station im Orbit**, je Zweig
+aussehen (der Name „Feldlager" fiel mit GR-7 weg, siehe unten). Ab der Wahlstufe zeichnet `vorpostenSilhouette()` eine **Station im Orbit**, je Zweig
 eine eigene Form:
 
 - **Werft** – zwei Dockklammern, dazwischen ein Schiffsrumpf im Bau (spitzer Bug, Triebwerksglut am
@@ -930,7 +930,49 @@ beim nächsten Umbau derselben Zeichnung wiederkommen kann:
    **Zeichen** – `test_vorposten_ui` prüfte die ⛺-Landmarke und fiel erst im Prüflauf auf. Bei
    einer Symboländerung gehört das Symbol selbst ins Suchmuster.
 
-**Offen, weil es dem Backend gehört:** Die Stufennamen 1–3 heißen weiterhin Feldlager,
-Stützpunkt und Bastion (`VORPOSTEN_STUFEN` in `kolonie-kepler7-backend/server.js`). Das ist
-Bodenvokabular unter einer Raumstation. Eine Umbenennung ist eine spielersichtbare Änderung und
-gehört nach der Hausregel zuerst ins Backend, dann ins Frontend – also in eine eigene Etappe.
+**Erledigt in GR-7:** Die Stufennamen 1–3 hießen nach GR-6 noch Feldlager, Stützpunkt und
+Bastion – Bodenvokabular unter einer Raumstation. Der nächste Abschnitt beschreibt die
+Umbenennung.
+
+## GR-7: die Stufennamen ziehen nach (04.09.2026)
+
+Nach GR-6 stand die Raumstation auf der Karte, aber der Text darunter sagte weiter „Feldlager".
+Ein Name, der dem Bild widerspricht, ist derselbe Fehler wie ein falsches Bild – nur billiger zu
+beheben. Die acht Stufen heißen deshalb seit dieser Etappe nach dem, was gezeichnet wird:
+
+| Stufe | vorher | jetzt |
+|---|---|---|
+| 1 | Feldlager | **Ankerkern** |
+| 2 | Stützpunkt | Stützpunkt (unverändert) |
+| 3 | Bastion | **Kernstation** |
+| 4 | Ausbaustufe 4 | **Ringstation** |
+| 5 | Ausbaustufe 5 | **Weitring** |
+| 6 | Ausbaustufe 6 | **Habitatkranz** |
+| 7 | Ausbaustufe 7 | **Doppelring** |
+| 8 | Ausbaustufe 8 | **Orbitalfeste** |
+
+Zwei Fehler in einer Reihe: Stufe 1–3 war Bodenvokabular, Stufe 4–8 waren fünf **Platzhalter**.
+Die neuen Namen folgen der Zeichnung: Stufe 1 ist der blanke Kern am Anker, ab Stufe 2 kommt der
+Habitatring dazu, ab Stufe 4 der zweite Ring, und Stufe 8 trägt beide Ringe in voller Breite.
+
+Die **Zweignamen** ab Stufe 4 (`VORPOSTEN_ZWEIGE.namen`: Werftgerüst … Sternenwerft,
+Handelsposten … Sternenmarkt, Wehrring … Sternenfestung) sind unverändert; sie überschreiben den
+Leiternamen, sobald ein Zweig gewählt ist. Die Leiternamen 4–8 sieht deshalb nur, wer noch keinen
+Zweig hat – und, bis zu dieser Etappe, jede Meldung, die den Zweig unterwegs verlor (siehe unten).
+
+**Reihenfolge (Hausregel).** Die Namen wohnen im Backend (`VORPOSTEN_STUFEN` in `server.js`) und
+sind spielersichtbar – also Backend zuerst live (PR #230, per `/api/health` belegt), Frontend
+danach. Das Frontend besitzt von den Namen nur einen **Rückfall**: An vier Stellen steht
+`|| 'Ankerkern'` für den Fall, dass der Server keinen Namen mitschickt.
+
+**Der stille Fehler, den dieselbe Etappe mitgenommen hat.** Fünf Stellen im Backend riefen
+`vorpostenStufe(x.stufe)` und verloren dabei den **Zweig** des Dokuments – die Stufen 4 bis 8
+heißen je Zweig unterschiedlich, also lieferten diese fünf Stellen ab Stufe 4 den falschen Namen
+(Push-Nachrichten und Kampfberichte). Richtig ist `vorpostenStufeVon(x)`, das den Zweig mitliest.
+Der Wächter dazu steht in `tests/test_vorposten_http.js` (1c4–1c6) und sucht die Fehlerform, nicht
+die einzelne Fundstelle: Kein Aufruf darf die Stufe eines Dokuments ohne dessen Zweig lesen.
+
+**Die Kopie-Familie ist jetzt gemessen.** `tests/test_vorposten_paritaet.js` (6-anker/6a/6b) liest
+den Rückfallnamen aus der Spieldatei und die erste Stufe aus `server.js` und verlangt Gleichheit.
+Geprüft wird die Regel, nicht der Name – eine spätere Umbenennung ist frei, sie muss nur auf
+beiden Seiten geschehen.

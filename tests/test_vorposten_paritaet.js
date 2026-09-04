@@ -114,8 +114,26 @@ const stufenBlock = (() => {
 })();
 const ersteStufe = (stufenBlock.match(/name: *'([^']+)'/) || [])[1] || null;
 check('6-anker: der Name der ersten Stufe ist im Server auffindbar', !!ersteStufe, { ersteStufe });
-const rueckfaelle = [...JS.matchAll(/\|\| *'([^']+)'/g)].map(m => m[1])
-  .filter(n => /^(Ankerkern|Feldlager|Stützpunkt|Bastion|Kernstation)$/.test(n));
+/* Gesucht wird der Rueckfall an seinem ORT, nicht an seinem Wortlaut. Eine Namensliste waere
+   hier falsch: Sie muesste bei jeder Umbenennung mitgepflegt werden und verwechselt sich mit
+   gleichnamigen Dingen anderswo im Spiel (es gibt Bastionsmarken namens "Bastion"). Der Ort ist
+   eindeutig - das Feld heisst stufeName, oder die Quelle ist vorposten.name:
+     stufeName: <irgendwas> || 'X'      r.stufeName || 'X'      daten.vorposten.name) || 'X'
+   In so einem Fach steht entweder der Name der ersten Stufe oder ein bewusstes GATTUNGSWORT
+   ("Vorposten", "Nest", "Festung", "neue Stufe") - das ist der Notbehelf, wenn gar kein Objekt
+   bekannt ist oder wenn die Stufe erst noch kommt. Ein siebtes Gattungswort laesst diesen Test
+   fallen; das ist Absicht: Wer ein Stufennamen-Fach anfasst, soll hier vorbeikommen. */
+const GATTUNG = /^(Vorposten|Nest|Nestes|Festung|Asteroidenfestung|neue Stufe)$/;
+const FAECHER = [
+  /stufeName *: *[^,;\n]{0,160}?\|\| *'([^']+)'/g,
+  /\.stufeName *\|\| *'([^']+)'/g,
+  /vorposten\.name\)? *\|\| *'([^']+)'/g
+];
+const faecher = [];
+for (const muster of FAECHER) for (const m of JS.matchAll(muster)) faecher.push(m[1]);
+const rueckfaelle = faecher.filter(n => !GATTUNG.test(n));
+check('6-anker2: die Stufennamen-Faecher sind ueberhaupt auffindbar (sonst misst 6a/6b nichts)',
+  faecher.length >= 10, { gefunden: faecher.length });
 check('6a: das Frontend tippt ueberhaupt einen Rueckfallnamen ein (sonst misst 6b nichts)',
   rueckfaelle.length > 0, { gefunden: rueckfaelle });
 check('6b: und jeder davon ist der Name der ERSTEN Stufe des Servers',
@@ -123,3 +141,10 @@ check('6b: und jeder davon ist der Name der ERSTEN Stufe des Servers',
   { ersteStufe, imFrontend: [...new Set(rueckfaelle)] });
 
 ende();
+
+/* GEGENPROBE, beide Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei zurueckgesetzt,
+   die Testdatei blieb neu):
+   - Spieldatei auf origin/main (Rueckfall noch "Feldlager"), Server "Ankerkern": 6b FAELLT.
+   - Spieldatei neu ("Ankerkern"), Server auf "Ringkern" umbenannt: 6b FAELLT.
+   Die beiden Anker (6-anker, 6-anker2) blieben in beiden Laeufen gruen - sie messen die
+   Auffindbarkeit, nicht den Namen. */
