@@ -79,8 +79,12 @@ Requests ist die Ampel: Entwurf heißt „ich arbeite noch, mergt ruhig", bereit
 Prüflauf startet** — wer erst danach sperrt, sperrt das Fenster nicht, in dem das Rennen
 stattfindet (gemessen am 03.09.2026).
 
-Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die Spieldatei anfasst — das wird gemessen
-(`git diff --name-only HEAD...origin/main`), nicht vermutet.
+Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die Spieldatei anfasst. **Das misst
+`pruflauf.js` seit dem 04.09.2026 selbst** — vor dem Lauf (dann bricht er ab, Code **2**) und nach
+dem Lauf (dann ist das Urteil hin, ebenfalls Code **2**, auch bei grünen Tests). Ein echter
+Testfehler bleibt Code 1. Die PR-Ampel oben bleibt trotzdem Pflicht: Sie soll das Rennen
+*verhindern*, die Messung stellt es nur *fest*. Was die Messung kann und was nicht:
+`docs/TESTING.md`, Abschnitt „Die Merge-Ampel".
 
 **Tut er es doch, wird nicht der ganze Lauf wiederholt** (Absprache Sascha, 04.09.2026): mergen,
 umnummerieren, dann Pflichtprüfungen plus die Tests der Bereiche, die der fremde Merge wirklich

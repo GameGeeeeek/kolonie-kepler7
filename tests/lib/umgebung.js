@@ -142,6 +142,26 @@ async function logZeilen(page) {
   return page.evaluate(() => (window.__logMitschnitt || []).slice());
 }
 
+/* Setzt eine Marke und liefert eine Funktion, die NUR die seither hinzugekommenen Zeilen
+   zurueckgibt. Fuer Tests, die mehrere Klicks nacheinander messen.
+
+   WARUM NICHT EINFACH `__logMitschnitt.length = 0`: Der Beobachter oben vergleicht gegen
+   `a[a.length-1]`, und bei einer geleerten Liste ist das `undefined`. Die naechstbeste
+   DOM-Aenderung schiebt dann den UNVERAENDERTEN Log-Text erneut hinein - die Pruefung liest
+   also die Zeile des VORIGEN Klicks und meldet Erfolg, obwohl der geprueften Stelle die
+   Meldung fehlt. Am 04.09.2026 durch gezielte Sabotage bewiesen: Eine Pruefung blieb gruen,
+   nachdem die gemessene Meldung vollstaendig entfernt worden war. Die Marke haelt den alten
+   Text deshalb als Wasserzeichen fest, statt die Liste zu leeren. */
+async function logMarke(page) {
+  const ab = await page.evaluate(() => {
+    const el = document.getElementById('log');
+    const t = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    window.__logMitschnitt = t ? [t] : [];
+    return window.__logMitschnitt.length;
+  });
+  return async () => (await logZeilen(page)).slice(ab);
+}
+
 // Bewusst ein Schluessel, den RANDOM_EVENTS nie tragen wird - der Unterstrich-Rahmen macht ihn
 // beim Lesen eines Spielstands sofort als Test-Riegel erkennbar.
 const RUHE_EREIGNIS_KEY = '__testruhe__';
@@ -184,10 +204,72 @@ function ruhigeUhren(stunden) {
   };
 }
 
+/* version.txt abfangen - gegen den haeufigsten Wackler der Suite (04.09.2026).
+   ------------------------------------------------------------------------------------------------
+   GEMESSEN: `test_fraktionsgebiet_karte` fiel in 14 von 20 Prueflauf-Protokollen eines Tages als
+   "Lastsymptom" auf und war einzeln jedes Mal gruen. Die Ursache ist kein Zufall und keine Last im
+   eigentlichen Sinn, sondern eine KANTE: Das Spiel ruft `setTimeout(checkLiveVersionUpdate, 15000)`,
+   und der Abruf von `version.txt` scheitert unter `file://` an CORS - sichtbar als Konsolenfehler.
+   Der Test dauert gemessen 19-20 s, liegt also knapp hinter der Kante; unter Last verschiebt sich
+   alles nach hinten, und der Fehler faellt mal ins Messfenster und mal nicht.
+
+   WARUM ABFANGEN UND NICHT WEGFILTERN: Ein Filter auf die Meldung ("CORS" ignorieren) macht den Test
+   auch fuer ECHTE CORS-Fehler blind - er wuerde die Pruefung schwaechen, um sie gruen zu bekommen.
+   Hier wird stattdessen die URSACHE beseitigt: Die Anfrage wird beantwortet, wie es der Test mit
+   den api-Routen ohnehin tut, und der Fehler entsteht gar nicht erst.
+   (Das Routenmuster steht bewusst nur im Code darunter: Ein Glob mit Sternchen und Schraegstrich
+   beendet einen Blockkommentar - genau daran ist der erste Entwurf dieser Zeilen gescheitert.)
+
+   DIE ANTWORT IST BEWUSST "0.0.0": Sie ist nach VERSION_TXT_MUSTER gueltig und immer AELTER als die
+   laufende Version. Eine neuere wuerde `scheduleAutoReload` ausloesen und die Seite mitten im Test
+   neu laden - aus einem stillen Wackler wuerde ein lauter.
+
+   Betrifft potenziell jeden Browser-Test, der Konsolenfehler zaehlt UND laenger als 15 s laeuft
+   (gemessen: 36 Tests zaehlen Konsolenfehler). Beobachtet wurde bisher nur der eine; wer einen
+   zweiten findet, braucht hier eine Zeile statt einer neuen Fehlersuche. */
+async function versionAbfangen(page) {
+  await page.route('**/version.txt*', r => r.fulfill({
+    status: 200, contentType: 'text/plain', body: '0.0.0'
+  }));
+}
+
+/* Auf eine BEDINGUNG warten statt auf eine Dauer (04.09.2026).
+   ------------------------------------------------------------------------------------------------
+   GEMESSEN: Nach dem version.txt-Wackler waren `test_forschung_lagerwand` (7x) und
+   `test_kartenrichtungen` (6x) die naechsthaeufigen "Lastsymptome" eines Tages. Beide haben
+   dieselbe Form - sie warten eine feste Zeit und messen danach:
+
+     forschung_lagerwand  wartet 1500 ms und liest den GESPEICHERTEN Stand. Unter Last erwischt er
+                          ihn mitten in der Bewegung: `rsolar` war schon aus der Warteschlange
+                          genommen, `activeResearch` aber noch nicht gesetzt.
+     kartenrichtungen     drueckt Pfeil-ab, wartet 500 ms und liest window.scrollY. Unter Last hat
+                          das (weiche) Scrollen dann noch nicht stattgefunden: 1621 px Spielraum,
+                          scrollY unveraendert 0.
+
+   Eine LAENGERE feste Wartezeit verschiebt die Kante nur - unter mehr Last faellt der Test wieder,
+   und im Normalfall kostet sie jeden Lauf Sekunden. Deshalb hier: kurz und oft nachsehen, bis die
+   Bedingung eintritt.
+
+   DER RUECKGABEWERT BEI ZEITUEBERSCHREITUNG IST DER LETZTE MESSWERT, kein Wurf. Ein Helfer, der
+   wirft, macht aus einer roten PRUEFUNG einen Absturz - und ein Absturz passt auf kein FAIL-Muster
+   (CLAUDE.md: "Der Exit-Code entscheidet"). So bleibt die Meldung erhalten, die den Fehler erklaert
+   ("activeResearch": null), und der Test faellt dort, wo er es soll. */
+async function warteBis(pruefen, maxMs, schrittMs) {
+  const ende = Date.now() + (maxMs || 8000);
+  const schritt = schrittMs || 100;
+  let wert;
+  for (;;) {
+    try { wert = await pruefen(); } catch (e) { wert = undefined; }
+    if (wert) return wert;
+    if (Date.now() >= ende) return wert;
+    await new Promise(r => setTimeout(r, schritt));
+  }
+}
+
 function ueberspringen(grund) {
   console.log('SKIP - ' + grund);
   console.log('\nPASS (übersprungen)');
   process.exit(0);
 }
 
-module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, ruhigeUhren };
+module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren, versionAbfangen, warteBis };

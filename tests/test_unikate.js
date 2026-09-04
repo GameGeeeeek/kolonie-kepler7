@@ -187,10 +187,16 @@ check('5d: die Weltboss-Unikatchance haelt die dokumentierte Regel (4% + 10%*Ant
   /0\.04/.test(unikatChanceZeile) && /\*\s*0\.10/.test(unikatChanceZeile) && /0\.06/.test(unikatChanceZeile),
   { zeile: unikatChanceZeile });
 // Und der Drop haengt AN dieser Chance - sonst stuende die Regel da, ohne etwas auszuloesen.
-const drop = JS.indexOf("grantUnikatModul('leviathanherz')");
+// ALLE Vorkommen ansehen, nicht nur das erste (04.09.2026): indexOf() traf einen KOMMENTAR, der
+// den Aufruf woertlich zitierte, und die Pruefung fiel an einer Erklaerung statt an der Mechanik.
+// Ein Anker, den jeder kuenftige Kommentar verschieben kann, ist keiner - die Regel lautet
+// "es gibt eine Stelle, an der das Herz an genau dieser Chance faellt", und genau das wird gezaehlt.
+const dropStellen = [...JS.matchAll(/grantUnikatModul\('leviathanherz'\)/g)].map(m => m.index);
+const gehaengt = dropStellen.filter(i => /Math\.random\(\)\s*<\s*\w+\.unikatChance/.test(JS.slice(Math.max(0, i - 200), i)));
 check('5d2: das Leviathanherz faellt an genau dieser Chance',
-  drop > 0 && /Math\.random\(\)\s*<\s*\w+\.unikatChance/.test(JS.slice(Math.max(0, drop - 200), drop)),
-  { davor: JS.slice(Math.max(0, drop - 90), drop).trim().slice(-80) });
+  dropStellen.length > 0 && gehaengt.length === 1,
+  { stellen: dropStellen.length, gehaengt: gehaengt.length,
+    davor: dropStellen.length ? JS.slice(Math.max(0, dropStellen[0] - 90), dropStellen[0]).trim().slice(-80) : null });
 // Die Chance darf nur EINMAL im Code stehen - zwei Kopien liefen beim naechsten Balance-Pass
 // auseinander, und die Vorschau zeigte dann etwas anderes als die Auszahlung gibt.
 const chanceKopien = (JS.match(/unikatChance:/g) || []).length;

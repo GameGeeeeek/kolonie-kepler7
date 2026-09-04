@@ -2803,6 +2803,7 @@
         <button id="adminTabAllianzenBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Allianzen</button>
         <button id="adminTabLageBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Lage</button>
         <button id="adminTabGalaxieBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-world" aria-hidden="true" style="margin-right:4px;"></i>Galaxie</button>
+        <button id="adminTabModuleBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-box" aria-hidden="true" style="margin-right:4px;"></i>Module</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2967,6 +2968,9 @@
       <!-- Lage (02.09.2026): Wirtschaft ueber alle Spielstaende, Markt, lebende PvE-Ziele - nur lesen. -->
       <!-- Galaxie-Eingriff (02.09.2026). db.galaxy ist fuer Clients bauartbedingt unerreichbar;
            dieser Reiter ist der einzige Weg dorthin, der nicht ueber die db.json auf dem Pi geht. -->
+      <div id="adminModuleView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div id="adminModuleInhalt"></div>
+      </div>
       <div id="adminGalaxieView" style="display:none; max-height:60vh; overflow-y:auto;">
         <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Greift direkt in die Galaxie ein: Weltboss, Alien-Nester, Wrackkonvois, Marktereignis und Kopfgeld. Gesetzt wird über dieselben Erzeuger, die auch der Weltentakt benutzt – ein von Hand gebautes Ziel hätte fehlende Felder.</div>
         <div id="adminGalaxieInhalt"></div>
@@ -7430,9 +7434,9 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.667.0';
+  const VERSION = '8.671.0';
   const PATCHNOTES = [
-    { version:'8.667.0', date:'04.09.2026', changes:[
+    { version:'8.671.0', date:'04.09.2026', changes:[
       '<strong>Deine Vorposten zeigen endlich, was in ihnen steckt.</strong> Bisher verriet die Station nur ihre <strong>Stufe</strong> und ihre <strong>Ausrichtung</strong> – sechs Modultypen, fünf Projekte und der Zustand des Kerns waren unsichtbar. Ein <strong>Sprungtor</strong> kostet 6 Mio. Erz und 24 Stunden Bauzeit, und die Station sah danach aus wie vorher.',
       '<strong>Jedes eingebaute Modul hängt jetzt sichtbar an der Station.</strong> Wo es sitzt, entscheidet sein <em>Typ</em>: Eine <strong>Geschützbank</strong> hängt an jeder Station an derselben Stelle, eine <strong>Umlaufraffinerie</strong> an ihrer. Die <strong>Seltenheit</strong> färbt das Teil – ein legendäres Modul ist von einem gewöhnlichen zu unterscheiden, ohne das Menü zu öffnen.',
       '<strong>Fertige Projekte bekommen eigene Bauteile.</strong> Das <strong>Bollwerk</strong> als schwerer Panzergürtel, der <strong>Dockring</strong> als zweiter Liegeplatzring mit vier Klauen, die <strong>Handelskammer</strong> als Kontorblock, der <strong>Tiefenhorchposten</strong> als weit ausgefahrene Lauschanlage – und das <strong>Sprungtor</strong> als offenstehender Torus über der Station, das einzige Teil mit einem Schimmern.',
@@ -7440,8 +7444,36 @@
       '<strong>Die Garnison ist ablesbar</strong> – fünf Rumpfzeichen unter der Station, gefüllt nach Belegung. Und ein <strong>Anflug</strong> legt einen roten Alarmring um den Marker, der umso schneller schlägt, je näher der Einschlag ist.',
       '<strong>Die Vorposten-Liste auf der Startseite nennt jetzt den Zustand</strong>: Kern in Prozent, Garnison, und – falls etwas läuft – das Vorhaben mit Restzeit oder die Abbaufrist. Der Abbau steht vor dem Vorhaben, weil er das Wichtigere ist.',
       '<strong>Das Kartenmenü zeigt die Angriffe vor dem jüngsten.</strong> Wer eine Station hält, sieht damit, ob ihn jemand beharrlich schleift oder ob es ein einzelner Versuch war – der Server führt diesen Verlauf seit dem ersten Tag, angezeigt wurde bisher nur der letzte Schlag.',
-      '<strong>Die gerenderte Kapsel aus der letzten Version bleibt der Körper</strong> – die neuen Teile hängen um sie herum, sie ersetzen sie nicht. Beides ist am selben Tag entstanden und beantwortet zwei verschiedene Fragen: die Kapsel, <em>wie</em> deine Station aussieht, die Anbauten, <em>was</em> in ihr steckt.'
+      '<strong>Die gerenderte Station bleibt der Körper</strong> – die neuen Teile hängen um sie herum, sie ersetzen sie nicht. An der Station selbst haben am selben Tag zwei Hände gebaut, und beide Hälften bleiben: Die Station beantwortet, <em>wie</em> sie aussieht, die Anbauten, <em>was</em> in ihr steckt. Seit die Station schon auf Stufe 1 steht, gilt das von Anfang an – auf einer frischen Station ist einfach noch nichts dran.'
     ] },
+    { version:'8.670.0', date:'04.09.2026', changes:[
+      '<strong>Der Vorposten ist von der ersten Stufe an eine Raumstation.</strong> Bisher stand auf den Stufen 1 bis 3 ein Bodenlager aus Palisade und Fahne, und erst ab der vierten wurde daraus eine Station im Orbit. Das hieß: Wer einen Vorposten errichtete, musste zweimal ausbauen – zweimal zwölf Stunden Abstand –, ehe überhaupt etwas davon zu sehen war. Der <em>Stützpunkt</em> ist Stufe 2, also genau die Stufe, auf der man am längsten steht und am wenigsten sah.',
+      '<strong>Und sie sieht anders aus.</strong> Statt eines liegenden Körpers, an den Bänder geschnallt waren, steht jetzt ein Kern aufrecht in der Mitte, um den ein Habitatring läuft – die Silhouette, die man aus dem Sci-Fi kennt. Beides ist derselbe Körper: Der Ring hängt an Speichen aus demselben Material, nichts steht ab und nichts ist angesetzt.',
+      '<strong>Der Ausbau ist eine Baugeschichte, keine Größenskala.</strong> Stufe 1 eine gedrungene Kerntrommel mit Kommandokuppel · 2 sie streckt sich · 3 Panelnähte und das erste Fensterband · 4 der Habitatring kommt, an vier Speichen · 5 er löst sich vom Kern und wird breiter · 6 Fensterbänder, die Kuppel leuchtet · 7 ein zweiter, äußerer Ring · 8 Andocklichter an beiden Ringen. Die Station streckt sich dabei von rund zwei auf vier Radien Höhe, und ihre Gliederung wächst mit.',
+      '<strong>Nebenbei halbiert:</strong> Jedes Stationsbild wog 123 kB, weil ein weicher Lichtschein über die ganze Bildkachel lag – auf der Karte bei rund 30 Pixel Kantenlänge praktisch unsichtbar. Ein enger Lichtsaum leistet dasselbe für 57 kB. Diese Bilder hängen als Daten direkt im Seitenquelltext, das war also Ballast in jeder Kartenansicht.',
+      'Die Landmarke auf der Karte trägt jetzt immer das Satelliten-Zeichen; das Zelt wäre eine Falschaussage. Die Hilfe wurde mitgezogen: Sie beschrieb den Vorposten noch mit dem Zelt und sprach von drei Stufen, wo die Leiter acht hat und ab der vierten Zweige anbietet.',
+      'Wächter: <code>test_vorposten_station</code> hält jetzt fest, dass schon Stufe 2 eine Station zeigt, dass vom Bodenlager keine Spur mehr danebensteht und dass der Hilfetext dasselbe Zeichen nennt wie die Karte. Die Gegenprobe am Stand davor fällt an genau vier Stellen.'
+    ]},
+    { version:'8.669.0', date:'04.09.2026', changes:[
+      '<strong>In der Sammlung steht jetzt bei jedem Modul, wie groß der Topf ist, aus dem es fällt.</strong> Die Herkunftszeile sagte bisher, WO etwas fällt – nicht, wie viel Auswahl die Quelle hat. Neu daneben: „Fällt dabei ein Modul, ist es zu 6,3 % dieses (16 im Topf)." Der Satz sagt ausdrücklich, was er <em>nicht</em> sagt: Wie oft eine Quelle überhaupt etwas ausschüttet, hängt an ihrer Mechanik und steht dort, nicht am Modul.',
+      '<strong>Boss-Set-Teile sind ein Viertel ihres Sets.</strong> Fünf Bosse zu je vier Teilen; wer eine Raid-Welle oder ein schweres PvE-Ziel erlegt, zieht gleichverteilt eines davon. Diese Zahl stand nirgends im Spiel. Bei Abgrund-Modulen zählt der Topf der jeweiligen Tiefe – die Zeile nennt sie mit.',
+      'Unikate und Wrackkonvoi-Module bekommen bewusst <em>keine</em> Prozentzahl: Sie werden benannt vergeben, nicht gezogen. Eine Zahl dort wäre eine erfundene Auskunft.',
+      'Für den Betreiber: ein neuer Admin-Reiter „Module" mit allen 93 Modulen nach Fundort gruppiert, den beiden serverseitigen Drop-Chancen zum Stellen und einem Entwurfsfeld für neue Module. Die Übersicht wird aus der Ziehfunktion selbst abgeleitet und kann deshalb nicht veralten; ein Modul, das in keinem Topf liegt, wird als Auffälligkeit gemeldet (zurzeit gibt es keines).',
+      'Nebenbei: Konnte eine Admin-Liste nicht geladen werden, stand dort „Liste konnte nicht geladen werden (500)" – bei mehreren Kästen auf einem Reiter sagte das nicht, welche. Die Meldung nennt jetzt die Liste.',
+      'Wächter: <code>test_modul_fundorte</code> mit 26 Prüfungen; die Kernmessung hängt ein Modul zur Laufzeit in den Abgrund um und weist damit nach, dass die Übersicht wirklich abgeleitet ist. Gegenprobe am Stand davor: 22 von 24 fallen. Drei vorhandene Wächter sind der Zusammenlegung der Boss-Teile-Liste gefolgt und dabei schärfer geworden – einer prüft jetzt, dass es den Filter genau <em>einmal</em> gibt.'
+    ]},
+    { version:'8.668.0', date:'04.09.2026', changes:[
+      '<strong>Im Fortschritt- und im Galaxie-Reiter sagen die gesperrten Knöpfe jetzt, was fehlt.</strong> Gemessen mit allen aufgeklappten Abschnitten: 37 graue Knöpfe im Fortschritt, 34 in der Galaxie. Nicht jeder war ein Problem – wo der Grund ohnehin danebensteht („erst ab Rang 3", „Noch 830", Kosten samt Vorrat), bleibt alles wie es war. Behandelt sind die drei Stellen, an denen der Grund <em>nirgends</em> stand.',
+      '<strong>Der Fähigkeitsbaum (26 Knöpfe).</strong> „Nicht genug Fähigkeitspunkte" stand an der Zeile gar nicht – nur die Kosten am Knopf und der Kontostand ganz oben, den Abgleich durfte man selbst machen. Und eine fehlende Vorstufe hieß schlicht „Vorstufe", ohne Namen, während die Meisterschaftszeile direkt darunter den Namen seit jeher führt. Beides steht jetzt da.',
+      '<strong>Der Flotten-Anstrich (5 Knöpfe).</strong> Hier war der Grund die ganze Zeit im Spiel – aber im Mauszeiger-Hinweis, und den gibt es am Handy nicht. Ein Tippen sagt jetzt „25 Kampfsiege" statt gar nichts.',
+      '<strong>Die Angriffsknöpfe waren eine Sackgasse.</strong> Gesperrt wurde bei „keine Schiffe gewählt" – und zwar genau der Knopf, der das Fenster öffnet, in dem man wählt. Wer alles auf null gestellt hatte, kam an die Auswahl nicht mehr heran, die ihn wieder herausgeholt hätte. Betroffen waren NPC-Gegner, Piraten-Versteck, Abgrund und der Spielerangriff; alle vier antworten jetzt, statt stumm zu bleiben.',
+      '<strong>Und die Antwort ist die richtige: Wer Jäger ohne Trägerschiff hat, wird nicht mehr in die Werft geschickt.</strong> Jäger und Bomber zählen nur mit, soweit Hangarplätze da sind – ohne Träger sind das null. Die erste Fassung dieser Meldung hätte „bau in der Werft welche" gesagt, und wer dem folgt, baut Jäger nach und kommt nie heraus. Sie nennt jetzt den Hangar: ein Trägerschiff trägt sechs, ein Superschlachtschiff zwei.',
+      'Nebenbei richtiggestellt: Der Vorschautext behauptete „keine Schiffe gewählt" auch dann, wenn es gar keine zu wählen gab. Die Slot-Prüfung vor dem Start zählte fünf Missionsarten, der Start selbst sechs – die Vorschau sagte damit „geht", wo der Start ablehnte. Hilfe und Tutorial trugen noch die alte Anweisung „wähle vorher deine Angriffsflotte aus", die seit dem 06.08.2026 überholt ist, und die Hilfe sprach von vier Unterreitern der Galaxie, wo sechs stehen.',
+      'Wächter: <code>test_sperrgrund_fortschritt_galaxie</code> mit 20 Prüfungen, Gegenprobe am Stand davor fällt an genau den dreizehn vorhergesagten Stellen. Zwei Prüfungen des eigenen Wächters waren zunächst unehrlich und wurden durch gezielte Sabotage überführt – eine las die Meldung der vorigen Prüfung mit, weil beide Stellen denselben Wortlaut führten. Der Mitschnitt-Helfer der Testumgebung ist gegen diesen Fehler gehärtet, und die Meldungen nennen jetzt ihr Vorhaben („Für einen Tauchgang …"), was zuerst für den Spieler richtig ist.'
+    ]},
+    { version:'8.667.0', date:'04.09.2026', changes:[
+      '<strong>Auf jeder Werftkarte steht jetzt wirklich, wie schwer sich das Schiff verbergen lässt.</strong> Die Signatur stand seit ihrer Einführung auf den gewöhnlichen Baukarten – nicht aber auf den <em>gesperrten</em>: den sechs Event-Schiffen, dem Mondzerstörer und dem Superschlachtschiff. Ausgerechnet dort fällt die Entscheidung. Der Mondzerstörer verlangt zum Freischalten vier seltene Gegenstände und trägt mit 1.000 den höchsten Signaturwert des Spiels – die Zahl erschien bisher erst, nachdem man bezahlt hatte. Jetzt zeigen alle Werftkarten sie, samt dem Hinweis „nicht zu verbergen" bei allen vierzehn Klassen, die über der Grenze liegen.'
+    ]},
     { version:'8.666.0', date:'04.09.2026', changes:[
       '<strong>Behoben: Über den Baukorb ließen sich seltene Gegenstände vermehren.</strong> Schiffe, die einen Gegenstand verbrauchen – der Leerenjäger seinen Splitter, das Superschlachtschiff seinen Antimateriekern –, wurden über den Baukorb eingereiht, <em>ohne dass der Gegenstand abging</em>. Der Abbruch erstattete ihn trotzdem. Wer einreihte und abbrach, hatte danach mehr als vorher, beliebig oft. Wer den Auftrag stattdessen durchlaufen ließ, bekam die Schiffe umsonst. Der Korb zieht jetzt beim Einreihen ab, deckelt die Menge auf deinen Vorrat und sagt es, wenn ein Schiff deswegen übersprungen wird. Über den Einzelknopf war das nie möglich – dort wurde immer korrekt abgebucht.',
       '<strong>Der letzte gesperrte Werft-Knopf ist entriegelt: das Superschlachtschiff.</strong> Es hat einen eigenen Block und war deshalb bei der Umstellung aus der vorigen Version übersehen worden – es blieb als einziges Schiff grau, ohne ein Wort dazu. Außerdem sagt die Beschriftung jetzt die Wahrheit: <strong>Gesperrt</strong>, wenn eine Voraussetzung fehlt oder der Höchstbestand erreicht ist, <strong>Einreihen</strong>, wenn nur die Mittel fehlen, und <strong>Bauen</strong>, wenn es sofort geht. Vorher stand „Bauen" auch dort, wo gar nichts ging.',
@@ -7530,31 +7562,11 @@
       '<strong>Die Weltboss-Karte nennt die mögliche Belohnung</strong>, bevor du angreifst. Vorschau und Auszahlung rechnen dieselbe Formel.',
       '<strong>Behoben:</strong> Wer einen Vorposten abgebaut hat, bekommt seine Garnison zurück. Der Server schickte sie, das Spiel kannte den Fall nicht – die Schiffe waren still weg.'
     ]},
-    { version:'8.651.0', date:'03.09.2026', changes:[
-      '<strong>Asteroiden lassen sich endlich antippen.</strong> Auf einem Spieler-Report hin nachgemessen: Der Klick war nie kaputt – die Brocken waren am Handy nur 8 Pixel groß, bei einem Fingerkontakt von rund 40. Zum Vergleich im selben Bild: Planeten 20–37, Gegner 45 Pixel. Jedes Vorkommen bekommt jetzt eine unsichtbare Trefferfläche von 26 Pixeln; der gezeichnete Brocken bleibt unverändert, die Karte sieht also aus wie zuvor. Größer geht es auf der Gürtelbahn bewusst nicht – dort stehen die Plätze so dicht, dass ein größeres Feld dem Nachbarbrocken den Klick abnehmen würde.'
-    ]},
-    { version:'8.650.0', date:'03.09.2026', changes:[
-      '<strong>Das Wurmloch tut endlich etwas.</strong> Bisher war es reine Zeichnung: Der Server öffnete es, die Karte malte einen Wirbel, und das war alles. Solange eine Passage offen steht, dauern Flüge zu <strong>beiden</strong> ihrer Mündungen jetzt 25% weniger – der stärkste Ortsbonus des Spiels, dafür nur für zwei Systeme und nur zeitweise. Beide Seiten sehen ihn, er verschiebt also niemandem heimlich ein Reaktionsfenster.',
-      '<strong>Das Portal ist antippbar</strong> und bringt dich mit einem Tipp auf die andere Seite. Das 🌀-Abzeichen und die Kopfzeile der Systemansicht nennen die Wirkung, damit man sie findet, ohne sie zu suchen.',
-      '<strong>Wurmlöcher verbinden ab sofort beliebige Systeme.</strong> Bisher hing ein Ende immer am Kepler-System – bei rund drei Vierteln Präsenz war das kein besonderer Ort mehr, sondern ein Dauerzustand. Jetzt zieht der Server zwei zufällige Systeme, und ein Ziel, das gerade nach einer Supernova unzugänglich ist, kommt nicht mehr vor.'
-    ]},
-    { version:'8.649.0', date:'03.09.2026', changes:[
-      '<strong>Deine Raumstation baut jetzt Projekte – und eines davon ist ein Sprungtor.</strong> Ein Projekt ist etwas anderes als ein Modul: Es ist <em>einmalig</em> je Vorposten, dauerhaft, nicht umsteckbar, und es hängt an Stufe <em>und</em> Ausrichtung. Damit können die drei Ausrichtungen endlich etwas, das nur sie können. Die <strong>Werft</strong> baut den <em>Dockring</em> (ein Viertel mehr Garnisonsplätze), der <strong>Handelsknoten</strong> die <em>Handelskammer</em> (deutlich mehr Produktionsbonus), der <strong>Festungsring</strong> das <em>Bollwerk</em> (Kern und Abwehr je ein Fünftel mehr). Ab Stufe 6 steht allen der <em>Tiefenhorchposten</em> offen (eine Aufklärungsstufe mehr).',
-      '<strong>Das Sprungtor hebt die Grenze, statt noch etwas draufzulegen.</strong> Ab Stufe 7, einen ganzen Tag Bauzeit und sehr teuer: Ein durchgehend offenes Tor im Orbit. Die Verkürzung eigener Nicht-PvP-Anflüge in dieses System war bisher bei der Hälfte gedeckelt – und eine hohe Ausbaustufe liegt mit Modulen längst an dieser Grenze. Ein Tor, das nur weitere Prozentpunkte gäbe, hätte deshalb <em>nichts</em> getan. Es verschiebt stattdessen die Grenze selbst auf drei Viertel.',
-      '<strong>Das Fenster zeigt auch, was noch nicht geht – und warum.</strong> Unter „Möglich" stehen alle Vorhaben, auch die verschlossenen, mit dem Grund am Eintrag („Braucht Stufe 7.", „Baut nur Handelsknoten."). Eine Liste, die nur die heute baubaren zeigt, würde verschweigen, dass es das Sprungtor überhaupt gibt. Es läuft höchstens ein Vorhaben je Station, jedes gibt es nur einmal, und abbrechen lässt es sich nicht – sonst wäre ein Projekt ein Zwischenlager für Rohstoffe. Bezahlt wird erst, wenn der Server zugesagt hat.',
-      '<strong>Die Kernpanzerung wirkt endlich.</strong> Das eingebaute Modul hob den Kern deiner Station bisher erst beim <em>nächsten</em> Ausbau – bis dahin stand da die alte Zahl, obwohl das Modul steckte. Der Kern rechnet sich jetzt aus Stufe, Ausrichtung und Modulen zusammen, also wirkt die Panzerung sofort. Wer eine eingebaut hat, sieht seinen Kern ohne weiteres Zutun steigen. Ein Einbau heilt dabei nicht, und ein Ausbau nimmt genau so viel wieder weg – sonst wäre Ein- und Ausbauen eine Reparatur für 250 Kredite.',
-      'Wächter: <code>test_vorposten_projekte_ui</code> (17 Prüfungen) hält fest, dass der Projektkatalog vom Server kommt, dass verschlossene Vorhaben mit ihrem Grund dastehen und dass das Sprungtor als <em>Grenze</em> beschrieben wird, nicht als Prozentwert. Neu ist auch eine Prüfung, die vorher niemand hatte: Die Icons der Server-Tabellen liefen an der Icon-Kontrolle vorbei, weil die nur die Spieldatei liest – ein Projekt mit einem unbekannten Icon hätte ein leeres Kästchen gezeichnet, ohne dass ein Prüflauf es sähe.',
-    ] },
-    { version:'8.648.0', date:'03.09.2026', changes:[
-      '<strong>Karte: Wischen ist kein Antippen mehr – auf allen drei Ebenen.</strong> Wer die Regionsübersicht oder eine Sektoransicht verschoben hat, öffnete dabei manchmal ungewollt eine Region oder ein System. Der Schutz, den das aufgeklappte System längst hatte, gilt jetzt überall. Und er hält nicht mehr zu lange an: Nach dem Loslassen ist der nächste Klick sofort wieder frei – vorher blieb die Karte bis zum nächsten Aufsetzen taub.',
-      '<strong>Pfeiltasten wirken jetzt auch in der Sektoransicht</strong> und blättern dort zum Nachbarsektor – dieselbe Bewegung wie die ‹ ›-Knöpfe daneben. Am PC war das bisher die einzige Kartenebene, die man nicht mit der Hand auf den Tasten bedienen konnte. Zoomen bleibt dem geöffneten System vorbehalten, ↑ und ↓ scrollen weiterhin die Seite.',
-      '<strong>Spähschiffe verkürzen die Flugzeit jetzt höchstens um die Hälfte.</strong> Jeder Späher spart 3 % – bisher ohne jede Untergrenze, sodass ein großer Späherstapel Flüge auf wenige Sekunden zusammenschrumpfen ließ und einem Verteidiger keine Zeit mehr zum Reagieren blieb. Ab 23 Spähern greift nun eine Grenze, wie sie Prestige, Aufstieg, Navigator und Fusionsantrieb längst haben; wer weniger fliegt, merkt keinen Unterschied.'
-    ]},
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1070;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1074;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -9134,57 +9146,13 @@
      Gemessen wird er zusaetzlich am gezeichneten Bild (test_vorposten_zustand 12a), damit ein
      kuenftiges Teil, das weiter hinausgeht, nicht wieder still darueber hinauswaechst. */
   const VORPOSTEN_SICHT = 2.45;
-  function vorpostenIstStation(vp){ return (vp && (vp.stufe||1)) >= (vorpostenCache.zweigAb || 4); }
-  /* DAS BODENLAGER, drei eigene Stufen (03.09.2026). Spieler-Urteil zur alten Zeichnung: "sieht
-     billig und langweilig aus". Sie war fuer alle drei Bodenstufen DIESELBE Palisade; nur drei
-     Punkte darunter zaehlten die Stufe mit - man sah dem Vorposten seinen Ausbau nicht an.
-     Jetzt hat jede Stufe ihr eigenes Bild, und die Reihe erzaehlt eine Geschichte: aus zwei
-     Zelten wird ein befestigter Posten, daraus eine geschlossene Bastion. */
-  function vorpostenLager(vp, x, y, r, farbe){
-    const st = Math.max(1, Math.min(3, (vp && vp.stufe) || 1));
-    const dunkel = 'rgba(10,13,26,0.85)';
-    const P = (n) => n.toFixed(1);
-    // Die Fahne waechst mit: Wimpel, Fahne, Banner - immer am selben Mast, damit die Reihe sitzt.
-    const masthoehe = [0.95, 1.2, 1.45][st-1];
-    const fahnenbreite = [0.4, 0.6, 0.72][st-1];
-    const mast = `<line x1="${P(x)}" y1="${P(y - r*0.35)}" x2="${P(x)}" y2="${P(y - r*masthoehe)}" stroke="${farbe}" stroke-width="1.3"/>`
-      + (st >= 3
-        ? `<rect x="${P(x)}" y="${P(y - r*masthoehe)}" width="${P(r*fahnenbreite)}" height="${P(r*0.34)}" fill="${farbe}" opacity="0.92"/>`
-        : `<polygon points="${P(x)},${P(y - r*masthoehe)} ${P(x + r*fahnenbreite)},${P(y - r*(masthoehe-0.13))} ${P(x)},${P(y - r*(masthoehe-0.26))}" fill="${farbe}" opacity="0.92"/>`);
-    if (st === 1){
-      /* FELDLAGER: zwei Zelte und ein paar Kisten - alles, was eine Baukolonne absetzt. Bewusst
-         ohne Mauer: Der Unterschied zur naechsten Stufe soll sofort ins Auge fallen. */
-      const zelt = (dx, w, h) => `<polygon points="${P(x + r*dx)},${P(y + r*0.45 - r*h)} ${P(x + r*(dx + w))},${P(y + r*0.45)} ${P(x + r*(dx - w))},${P(y + r*0.45)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.4" stroke-linejoin="round"/>`
-        + `<line x1="${P(x + r*dx)}" y1="${P(y + r*0.45 - r*h)}" x2="${P(x + r*dx)}" y2="${P(y + r*0.45)}" stroke="${farbe}" stroke-width="0.8" stroke-opacity="0.55"/>`;
-      return `<g>${zelt(-0.45, 0.42, 0.62)}${zelt(0.5, 0.34, 0.48)}`
-        + `<rect x="${P(x - r*0.12)}" y="${P(y + r*0.2)}" width="${P(r*0.26)}" height="${P(r*0.24)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1"/>`
-        + `<line x1="${P(x - r*0.95)}" y1="${P(y + r*0.45)}" x2="${P(x + r*0.95)}" y2="${P(y + r*0.45)}" stroke="${farbe}" stroke-width="1.5" stroke-opacity="0.75"/>`
-        + mast + `</g>`;
-    }
-    if (st === 2){
-      /* STUETZPUNKT: eine Palisade mit TOR und ein Wachturm - der Posten haelt jetzt etwas aus.
-         Die Luecke in der Mauer ist die Erzaehlung: befestigt, aber noch nicht geschlossen. */
-      const zinnen = [[-1,0.5],[-1,-0.12],[-0.78,-0.12],[-0.78,-0.34],[-0.56,-0.34],[-0.56,-0.12],[-0.2,-0.12],[-0.2,0.5]]
-        .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
-      const zinnen2 = [[0.2,0.5],[0.2,-0.12],[0.56,-0.12],[0.56,-0.34],[0.78,-0.34],[0.78,-0.12],[1,-0.12],[1,0.5]]
-        .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
-      return `<g><polygon points="${zinnen}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5" stroke-linejoin="round"/>`
-        + `<polygon points="${zinnen2}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5" stroke-linejoin="round"/>`
-        + `<rect x="${P(x - r*0.95)}" y="${P(y - r*0.62)}" width="${P(r*0.34)}" height="${P(r*1.12)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.5"/>`
-        + `<line x1="${P(x - r*0.95)}" y1="${P(y - r*0.62)}" x2="${P(x - r*0.61)}" y2="${P(y - r*0.62)}" stroke="${farbe}" stroke-width="2"/>`
-        + mast + `</g>`;
-    }
-    /* BASTION: geschlossener Wehrring mit zwei Tuermen und einem Landefeld davor - die letzte
-       Bodenstufe, sichtbar bereit fuer den Sprung in den Orbit. */
-    const mauer = [[-1,0.5],[-1,-0.18],[-0.8,-0.18],[-0.8,-0.42],[-0.55,-0.42],[-0.55,-0.18],[-0.25,-0.18],[-0.25,-0.42],[0.25,-0.42],[0.25,-0.18],[0.55,-0.18],[0.55,-0.42],[0.8,-0.42],[0.8,-0.18],[1,-0.18],[1,0.5]]
-      .map(([dx,dy]) => P(x + dx*r) + ',' + P(y + dy*r)).join(' ');
-    const turm = (v) => `<rect x="${P(x + v*r*0.9 - r*0.19)}" y="${P(y - r*0.85)}" width="${P(r*0.38)}" height="${P(r*1.35)}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.6"/>`
-      + `<polygon points="${P(x + v*r*0.9 - r*0.26)},${P(y - r*0.85)} ${P(x + v*r*0.9)},${P(y - r*1.12)} ${P(x + v*r*0.9 + r*0.26)},${P(y - r*0.85)}" fill="${farbe}" opacity="0.9"/>`;
-    return `<g><polygon points="${mauer}" fill="${dunkel}" stroke="${farbe}" stroke-width="1.6" stroke-linejoin="round"/>`
-      + turm(-1) + turm(1)
-      + `<circle cx="${P(x)}" cy="${P(y + r*0.16)}" r="${P(r*0.26)}" fill="none" stroke="${farbe}" stroke-width="1.1" stroke-dasharray="2,2"/>`
-      + mast + `</g>`;
-  }
+  /* GR-6 (04.09.2026): Hier standen vorpostenIstStation() und vorpostenLager() - ein
+     BODENLAGER aus Palisade, Tor und Wachturm fuer die Stufen unterhalb der Zweigwahl. Beide
+     sind entfallen. Der Vorposten ist auf JEDER Stufe eine Raumstation, weil der Spieler genau
+     das bestellt hatte ("anfangs klein, dann wird sie immer groesser") und weil die Zeichnung
+     sonst erst nach zwei Ausbaustufen erscheint - der "Stuetzpunkt" ist Stufe 2. Die Landmarke
+     auf der Karte ist aus demselben Grund immer das Satelliten-Zeichen; das Zelt waere jetzt
+     eine Falschaussage. */
   /* Was die Station ab Stufe 5 dazubekommt - fuer ALLE Zweige gleich, damit der Ausbau ablesbar
      bleibt, waehrend der Kern die Ausrichtung erzaehlt. Jede Stufe legt genau eine Schicht drauf. */
   function vorpostenAufbauten(vp, x, y, r, farbe){
@@ -9468,7 +9436,7 @@
   }
   /* Ein Ring als echte Roehre: dichte Folge beleuchteter Querschnitte, halbweise gezeichnet,
      damit der Koerper dazwischenliegen kann. */
-  function vpRing(c, cx, cy, R, rohr, kipp, vorne, ton, bandFarbe){
+  function vpRing(c, cx, cy, R, rohr, kipp, vorne, ton, bandFarbe, luken){
     const dunkel = [15,20,33];
     const schritte = Math.max(110, Math.round(R*2.4));
     const basis = vorne ? 0 : Math.PI;
@@ -9512,6 +9480,44 @@
       }
       c.globalAlpha = 1;
     }
+    /* Andockleuchten am Aussenrand - nur auf der letzten Stufe. Sie sitzen bewusst AUF dem
+       Ringrand und nicht daneben: alles, was neben dem Koerper schwebt, liest sich als
+       angesetztes Teil, und genau das sollte die Station nicht haben. */
+    if (luken){
+      for (let k = 0; k < 16; k++){
+        const t3 = basis + (k/15)*Math.PI;
+        const lx = cx + Math.cos(t3)*(R + rohr*0.72), ly = cy + Math.sin(t3)*(R + rohr*0.72)*kipp;
+        c.globalAlpha = vorne ? 0.95 : 0.30;
+        c.fillStyle = '#ffd08a';
+        c.beginPath(); c.arc(lx, ly, Math.max(0.9, rohr*0.17), 0, Math.PI*2); c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+  }
+  /* Die Speichen zwischen Kernhals und Habitatring. Sie sind KEIN Anbau, sondern das, was den
+     Ring haelt - deshalb im Ton des Koerpers und ohne eigene Kontur. */
+  function vpSpeichen(c, cx, cy, rInnen, rAussen, kipp, vorne, ton, dicke, anzahl){
+    const dunkel = [15,20,33];
+    /* Je weiter der Ring vom Kern absteht, desto mehr Traeger braucht er - deshalb waechst
+       ihre Zahl mit der Stufe statt bei zwei je Haelfte zu bleiben. Das ist Statik, keine
+       Dekoration: Ein Ring mit doppeltem Abstand an zwei Speichen saehe falsch aus. */
+    const n = Math.max(2, anzahl || 2);
+    const winkel = [];
+    for (let i = 0; i < n; i++){
+      const t = 0.30 + (i/(n-1 || 1))*(Math.PI - 0.60);
+      winkel.push(vorne ? t : t + Math.PI);
+    }
+    for (const w of winkel){
+      const x1 = cx + Math.cos(w)*rInnen, y1 = cy + Math.sin(w)*rInnen*kipp;
+      const x2 = cx + Math.cos(w)*rAussen, y2 = cy + Math.sin(w)*rAussen*kipp;
+      const f = vpLicht(Math.cos(w), Math.sin(w)*kipp, 0.3);
+      const g = c.createLinearGradient(x1, y1 - dicke, x1, y1 + dicke);
+      g.addColorStop(0, vpMisch(ton.mitte, ton.hell, Math.min(1, f*1.2)));
+      g.addColorStop(1, vpMisch(dunkel, ton.mitte, Math.max(0, f*0.6)));
+      c.strokeStyle = g; c.lineWidth = dicke*2; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.lineCap = 'butt';
   }
   /* Fensterband auf dem Mantel des Drehkoerpers - folgt der Woelbung, weil es aus demselben
      Profil kommt. */
@@ -9534,85 +9540,161 @@
     }
     c.globalAlpha = 1;
   }
-  /* Die Kapsel selbst. Stufe 4 bis 8 (darunter zeigt die Karte das Bodenlager); sie wird
-     LAENGER und DICKER, statt Anbauten zu bekommen, und bekommt nacheinander Baender, Fenster
-     und Panelnaehte. Der Zweig steckt im Farbton und in der Zahl der Baender - die drei
-     Stationen bleiben damit unterscheidbar, ohne dass etwas absteht. */
   /* Die Leiter gehoert dem Backend: VORPOSTEN_ZWEIG_AB und die Laenge von VORPOSTEN_STUFEN
-     kommen als zweigAb/maxStufe im Cache an, und vorpostenIstStation nebenan liest sie bereits.
-     Hier standen 4 und 8 eingetippt - eine neunte Stufe haette dann dasselbe Bild bekommen wie
-     die achte, und ein gesenktes zweigAb haette Stufe 3 und 4 ununterscheidbar gemacht. Genau
-     die Kopie-Familien-Falle, vor der CLAUDE.md warnt (Befund der Durchsicht zu v8.665.0). */
+     kommen als zweigAb/maxStufe im Cache an. Hier standen 4 und 8 eingetippt - eine neunte Stufe
+     haette dann dasselbe Bild bekommen wie die achte, und ein gesenktes zweigAb haette zwei
+     Stufen ununterscheidbar gemacht. Genau die Kopie-Familien-Falle, vor der CLAUDE.md warnt. */
   function vpStufenBereich(){
     const ab = vorpostenCache.zweigAb || 4;
     const max = Math.max(ab + 1, vorpostenCache.maxStufe || (vorpostenCache.stufen||[]).length || 8);
     return { ab, max };
   }
-  function vpZeichneKapsel(c, S, zweig, stufe){
+  /* DIE STATION. Ein senkrecht stehender KERN in der Mitte, um den ein grosser HABITATRING in
+     der Ebene laeuft - die Silhouette, die man aus dem Sci-Fi kennt. Beides ist derselbe
+     Koerper: Der Ring haengt an Speichen aus demselben Material, nichts steht ab.
+
+     SIE ERSETZT DIE KAPSEL AUS GR-5 (Spieler-Urteil 04.09.2026). Zwei Befunde, beide am
+     gerenderten Bild gemessen, nicht vermutet:
+       - Die Kapsel begann erst auf der Wahlstufe. Der "Stuetzpunkt" ist aber Stufe 2, und dort
+         stand ein Bodenlager - der Spieler haette zweimal ausbauen muessen, ehe ueberhaupt eine
+         Station erscheint. Der Entwurf war fuer acht Stufen geschrieben; eingebaut war er auf
+         der halben Leiter.
+       - Auch ab der Wahlstufe las sie sich als Pille: auf ganzer Laenge gleich dick, Fenster als
+         Staubkoerner, zwischen erster und letzter Stufe kaum ein sichtbarer Unterschied.
+
+     Das Wachstum ist jetzt eine Baugeschichte, keine Groessenskala:
+       1  gedrungene Kerntrommel mit Kommandokuppel
+       2  der Kern streckt sich
+       3  Panelnaehte ueber die volle Hoehe, erstes Fensterband
+       4  DER RING kommt - schmal, eng am Kern, an vier Speichen
+       5  der Ring loest sich vom Kern und wird breiter
+       6  Fensterbaender auf dem Ring, die Kuppel leuchtet
+       7  ein zweiter, aeusserer Ring darunter
+       8  Andocklichter an beiden Ringen                                                     */
+  function vpZeichneStation(c, S, zweig, stufe){
     const ton = VP_ZWEIG_TON[zweig] || VP_ZWEIG_TON.null;
     const B = vpStufenBereich();
-    const st = Math.max(B.ab, Math.min(B.max, stufe||B.ab));
-    // Auf 0..4 normieren, damit die Form unabhaengig von der Laenge der Leiter gleich waechst
-    const w = (B.max > B.ab) ? (st - B.ab) / (B.max - B.ab) * 4 : 0;
-    const cx = S/2, cy = S/2;
-    /* Schlanker als im ersten Anlauf: Bei 1,8:1 sah die Kapsel aus wie eine Dose, und die
-       Ringe verdeckten mehr Koerper, als sie umfassten. */
-    const laenge = S*(0.40 + w*0.075);
-    const R = S*(0.082 + w*0.0115);
-    const kipp = 0.30;
-    const enden = 0.16;
-    const profil = (z) => {
-      if (z < enden) return Math.sqrt(Math.max(0, 1 - Math.pow((enden-z)/enden, 2)));
-      if (z > 1-enden) return Math.sqrt(Math.max(0, 1 - Math.pow((z-(1-enden))/enden, 2)));
-      return 1;
-    };
-    c.save();
-    c.translate(cx, cy); c.rotate(Math.PI/2 - 0.20); c.translate(-cx, -cy);
-    const Rr = R*(1.30 + w*0.055), rohr = S*(0.0085 + w*0.0018);
-    // Handel traegt drei Baender, Werft zwei, Festung eines breites - der Zweig bleibt lesbar
-    const baender = zweig === 'handel' ? [-0.20, 0.06, 0.30] : (zweig === 'festung' ? [0.02] : [-0.16, 0.22]);
-    /* Vorher `st - 4`, also EIN Band auf den Stufen 4 und 5 - ausgerechnet dort, wo der Zweig
-       gerade erst gewaehlt wurde und das Bild ihn zeigen soll. Die drei Zweige unterschieden sich
-       dann nur im Farbton, obwohl Patchnote und Kommentar die Baenderzahl als Merkmal nennen
-       (Befund der Durchsicht zu v8.665.0). Jetzt traegt jeder Zweig seine volle Zahl von Anfang an;
-       gewachsen wird ueber Laenge, Fenster und Naehte. */
-    const sichtbar = baender;
-    const bandFarbe = st >= 6 ? ton.band : null;
-    for (const b of sichtbar) vpRing(c, cx, cy + laenge*b, Rr*(zweig==='festung'?1.16:1), rohr*(zweig==='festung'?1.35:1), 0.26, false, ton, bandFarbe);
-    vpDrehkoerper(c, cx, cy, R, laenge, profil, ton, kipp);
-    if (st >= 7){
-      const yOben = cy - laenge/2;
-      for (let i = 1; i < 9; i++){
-        const z = i/9, rz = profil(z)*R;
+    const st = Math.max(1, Math.min(B.max, stufe || 1));
+    const w = (B.max > 1) ? (st - 1) / (B.max - 1) : 0;      // 0 .. 1 ueber die ganze Leiter
+    const cx = S/2, cy = S/2, kipp = 0.30;
+
+    /* KEIN grossflaechiger Halo mehr. Der erste Anlauf legte einen weichen Verlauf ueber die
+       ganze Kachel - auf der Karte bei rund 30 px Kantenlaenge praktisch unsichtbar, aber er
+       kostete rund neun Zehntel der PNG-Groesse: 123 kB je Bild gegen 17 kB der alten Zeichnung,
+       und diese Bilder haengen als data-URL IM DOM. Nebenwirkung, an der es auffiel: Der echte
+       Zuwachs des Ausbaus ging in der Halo-Flaeche unter (test_vorposten_station 5b mass 11 %
+       Zuwachs, waehrend die belegte Flaeche um 153 % stieg). Ein enger Lichtsaum dicht am
+       Koerper leistet dasselbe fuer einen Bruchteil. */
+    const halo = c.createRadialGradient(cx, cy, S*0.10, cx, cy, S*0.30);
+    halo.addColorStop(0, 'rgba(120,170,220,0.13)');
+    halo.addColorStop(1, 'rgba(120,170,220,0)');
+    c.fillStyle = halo; c.beginPath(); c.arc(cx, cy, S*0.30, 0, Math.PI*2); c.fill();
+
+    /* Die Station STRECKT sich beim Wachsen, statt nur groesser zu werden: Stufe 1 ist rund
+       zwei Radien hoch, die Endstufe rund vier. Der erste Anlauf startete schon bei 3,5 - die
+       fruehen Stufen lasen sich dadurch als duenne Schraube statt als Bauwerk (im Bild geprueft). */
+    const kernH = S*(0.215 + w*0.285);
+    const kernR = S*(0.108 + w*0.010);
+    /* Auch die GLIEDERUNG waechst mit: Stufe 1 ist eine schlichte Trommel mit Kuppel, Hals und
+       Habitatblock arbeiten sich erst mit den Stufen heraus. Ein festes Profil hatte bei kleiner
+       Groesse zu viele Absaetze auf zu wenig Pixeln - das ergab einen Wurm, keine Station. */
+    const g = Math.min(1, w*1.7);
+    const halsTiefe = 0.10 + g*0.28;
+    const kuppelR   = 0.66 - g*0.14;
+    function profil(z){
+      if (z < 0.14) return 0.60 + z/0.14*0.40;                                   // Antriebstrommel
+      if (z < 0.32) return 1.00 - (z-0.14)/0.18*halsTiefe;                       // Einzug zum Hals
+      if (z < 0.50) return 1.00 - halsTiefe;                                     // Hals
+      if (z < 0.58) return (1.00-halsTiefe) + (z-0.50)/0.08*(halsTiefe*0.86);    // Schulter
+      if (z < 0.80) return 1.00 - halsTiefe*0.14;                                // Habitatblock
+      if (z < 0.87) return (1.00-halsTiefe*0.14) - (z-0.80)/0.07*((1.00-halsTiefe*0.14) - kuppelR);
+      return Math.sqrt(Math.max(0, 1 - Math.pow((z-0.87)/0.13, 2)))*kuppelR;     // Kommandokuppel
+    }
+
+    /* Die Schwellen haengen an der Leiter des Servers, nicht an eingetippten Zahlen: Der Ring
+       kommt auf der Wahlstufe (zweigAb), der zweite und die Leuchten im letzten Viertel. Eine
+       neunte Stufe verschiebt sie damit von selbst mit. */
+    const ringAb  = B.ab;
+    const ring2Ab = Math.max(ringAb + 1, B.max - 1);
+    const lukenAb = B.max;
+    const bandAb  = Math.max(ringAb + 1, Math.round(B.ab + (B.max - B.ab) * 0.5));
+    const nahtAb  = Math.max(2, Math.round(B.ab * 0.75));
+
+    const ringR    = kernR*(1.95 + w*0.80);
+    const ringRohr = S*(0.016 + w*0.024);
+    const ringY    = cy + kernH*0.06;
+    const hatRing  = st >= ringAb, hatRing2 = st >= ring2Ab;
+    /* Der zweite Ring traegt den halben Ausbau der Endstufen - er war im ersten Anlauf so duenn,
+       dass zwischen Wahlstufe und Endstufe kaum etwas dazukam (gemessen an der Bildgroesse:
+       9,5 % statt der geforderten 15 %, test_vorposten_station 5b). Jetzt ist er kraeftig genug,
+       um den Ausbau zu zeigen, und traegt ab seiner eigenen Stufe ein eigenes Fensterband. */
+    const ring2R   = ringR*1.40, ring2Rohr = ringRohr*0.92, ring2Y = ringY + kernH*0.21;
+    const speiche  = S*(0.008 + w*0.005);
+    const speichen = 2 + Math.round(w*3);        // 2 je Haelfte unten, bis 5 auf der Endstufe
+
+    // Von hinten nach vorne, damit der Kern wirklich zwischen den Ringhaelften liegt.
+    if (hatRing2){
+      vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, ton.band, st>=lukenAb);
+      vpSpeichen(c, cx, ring2Y, ringR*0.96, ring2R, kipp, false, ton, speiche*0.82, speichen);
+    }
+    if (hatRing){
+      vpRing(c, cx, ringY, ringR, ringRohr, kipp, false, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      vpSpeichen(c, cx, ringY, kernR*0.66, ringR, kipp, false, ton, speiche, speichen);
+    }
+
+    vpDrehkoerper(c, cx, cy, kernR, kernH, profil, ton, kipp);
+
+    if (st >= nahtAb){
+      const naehte = Math.min(13, 3 + st);
+      for (let i = 1; i < naehte; i++){
+        const z = i/naehte, rz = profil(z)*kernR;
         if (rz <= 1) continue;
-        const y = yOben + (1-z)*laenge;
-        c.strokeStyle = 'rgba(0,0,0,0.32)'; c.lineWidth = Math.max(0.5, R*0.014);
+        const y = cy - kernH/2 + (1-z)*kernH;
+        c.strokeStyle = 'rgba(0,0,0,0.34)'; c.lineWidth = Math.max(0.5, kernR*0.030);
         c.beginPath(); c.ellipse(cx, y, rz, rz*kipp, 0, 0.06, Math.PI-0.06); c.stroke();
-        c.strokeStyle = 'rgba(240,246,255,0.20)'; c.lineWidth = Math.max(0.4, R*0.008);
-        c.beginPath(); c.ellipse(cx, y - R*0.008, rz, rz*kipp, 0, 0.10, Math.PI-0.10); c.stroke();
+        c.strokeStyle = 'rgba(240,246,255,0.20)'; c.lineWidth = Math.max(0.4, kernR*0.016);
+        c.beginPath(); c.ellipse(cx, y - kernR*0.016, rz, rz*kipp, 0, 0.10, Math.PI-0.10); c.stroke();
       }
+      vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.70, kipp, ton.band);
     }
-    if (st >= 5){
-      vpMantelFenster(c, cx, cy, R, laenge, profil, 0.34, kipp, ton.band);
-      vpMantelFenster(c, cx, cy, R, laenge, profil, 0.52, kipp, 'rgba(150,205,255,0.95)');
-      if (st >= 6) vpMantelFenster(c, cx, cy, R, laenge, profil, 0.70, kipp, ton.band);
+    if (st >= ringAb + 1) vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.63, kipp, ton.band);
+    if (st >= bandAb)     vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.24, kipp, 'rgba(150,205,255,0.95)');
+    if (st >= lukenAb)    vpMantelFenster(c, cx, cy, kernR, kernH, profil, 0.42, kipp, ton.band);
+
+    // Die Kommandokuppel - ab der Bandstufe leuchtet sie.
+    const ky = cy - kernH/2, kR = kernR*kuppelR;
+    const kg = c.createRadialGradient(cx - kR*0.34, ky - kR*0.30, 0, cx, ky, kR*1.5);
+    kg.addColorStop(0, st>=bandAb ? 'rgba(226,244,255,0.98)' : 'rgba(206,226,244,0.85)');
+    kg.addColorStop(0.45, st>=bandAb ? 'rgba(140,205,255,0.55)' : 'rgba(120,150,180,0.35)');
+    kg.addColorStop(1, 'rgba(30,44,64,0)');
+    c.fillStyle = kg;
+    c.beginPath(); c.ellipse(cx, ky, kR*1.20, kR*0.70, 0, 0, Math.PI*2); c.fill();
+
+    if (hatRing){
+      vpSpeichen(c, cx, ringY, kernR*0.66, ringR, kipp, true, ton, speiche, speichen);
+      vpRing(c, cx, ringY, ringR, ringRohr, kipp, true, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      // Der Ring wirft seinen Schatten auf den Kern - ohne ihn schwebt er davor statt darum.
+      c.save();
+      c.beginPath(); c.ellipse(cx, cy, kernR*1.02, kernH*0.5, 0, 0, Math.PI*2); c.clip();
+      c.globalAlpha = 0.30; c.fillStyle = '#000';
+      c.beginPath(); c.ellipse(cx, ringY + ringRohr*0.5, ringR, ringR*kipp, 0, 0, Math.PI*2); c.fill();
+      c.restore(); c.globalAlpha = 1;
     }
-    for (const b of sichtbar) vpRing(c, cx, cy + laenge*b, Rr*(zweig==='festung'?1.16:1), rohr*(zweig==='festung'?1.35:1), 0.26, true, ton, bandFarbe);
-    c.restore();
+    if (hatRing2){
+      vpSpeichen(c, cx, ring2Y, ringR*0.96, ring2R, kipp, true, ton, speiche*0.82, speichen);
+      vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, ton.band, st>=lukenAb);
+    }
   }
-  /* Einmal je Kombination rechnen, dann nur noch holen - genau wie getPlanetTextureDataUrl.
-     Faellt das Rendern aus (kein 2D-Context), gibt es null und der Aufrufer zeichnet die
-     Strichfassung: eine Karte ohne Vorposten waere schlimmer als eine altmodische. */
   function vorpostenBildUrl(zweig, stufe){
     const B = vpStufenBereich();
-    const key = (zweig||'null') + ':' + Math.max(B.ab, Math.min(B.max, stufe||B.ab));
+    const key = (zweig||'null') + ':' + Math.max(1, Math.min(B.max, stufe||1));
     if (!(key in VP_BILD_CACHE)){
       try {
         const cv = document.createElement('canvas');
         cv.width = VP_BILD; cv.height = VP_BILD;
         const c = cv.getContext('2d');
         if (!c) throw new Error('kein 2D-Context');
-        vpZeichneKapsel(c, VP_BILD, zweig, stufe);
+        vpZeichneStation(c, VP_BILD, zweig, stufe);
         VP_BILD_CACHE[key] = cv.toDataURL();
       } catch(e){ VP_BILD_CACHE[key] = null; }
     }
@@ -9625,12 +9707,15 @@
        Sie widersprechen sich nicht - die eine beantwortet "wie sieht die Station aus", die
        andere "was steckt in ihr". Der Koerper kommt jetzt aus der Kapsel, alles Weitere liegt
        davor und dahinter wie zuvor.
+       GR-6 (main, 04.09.2026) hat danach das Bodenlager abgeschafft - der Vorposten ist auf JEDER
+       Stufe eine Station, deshalb ist die Rueckfallstufe jetzt 1 statt 4. An den Anbauten aendert
+       das nichts: Sie zeichnen, was DA ist, und auf Stufe 1 ist das nichts.
        Der Rueckfall ohne Canvas zeichnet den Kern wieder aus Strichen. Die Anbauten sind davon
        unberuehrt: Sie haengen an r, nicht an der Zeichenweise des Koerpers.
        Die Groessen passen gemessen zusammen - die Kapsel misst laengs hoechstens r*1,02 und quer
        r*0,66 (laenge = S*0,70 und Rr = S*0,226 bei Stufe 8, abgebildet auf s = r*2,9), der
        Modulkranz sitzt bei r*1,55 und liegt damit ausserhalb. */
-    const url = vorpostenBildUrl(vp && vp.zweig, (vp && vp.stufe) || 4);
+    const url = vorpostenBildUrl(vp && vp.zweig, (vp && vp.stufe) || 1);
     const s = r * 2.9;
     const koerper = url
       ? `<image data-vp-bild="1" href="${url}" x="${(x-s/2).toFixed(1)}" y="${(y-s/2).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`
@@ -15768,7 +15853,10 @@
         ? `<span style="display:inline-block; width:26px; height:12px; background:linear-gradient(90deg,${sk.stops[0]},${sk.stops[1]},${sk.stops[2]});"></span>`
         : `<span style="display:inline-block; width:26px; height:12px; background:linear-gradient(90deg,#4da8d6,#c0504f,#d1ad5c);"></span>`;
       const tail = unlocked ? (active?' <i class="ti ti-check" aria-hidden="true"></i>':'') : ' <i class="ti ti-lock" aria-hidden="true"></i>';
-      return `<button data-ship-skin="${sk.key}" ${unlocked?'':'disabled'} title="${unlocked?(active?'Aktiv':'Anwenden'):('Gesperrt – '+sk.hint)}" style="display:flex; align-items:center; gap:5px; font-size:10px; padding:4px 8px; ${active?'border-color:#c3bef5; color:#c3bef5; background:rgba(126,119,221,0.16);':''}">${swatch}${sk.name}${tail}</button>`;
+      /* SP-3: kein `disabled` mehr. Der Grund stand hier laengst - aber NUR im title, und ein
+         title ist am Handy nicht abrufbar: Es gibt kein Hover. setShipSkin() nennt denselben
+         Grund als Meldung, war ueber den gesperrten Knopf aber nie erreichbar. */
+      return `<button data-ship-skin="${sk.key}" title="${unlocked?(active?'Aktiv':'Anwenden'):('Gesperrt – '+sk.hint)}" style="display:flex; align-items:center; gap:5px; font-size:10px; padding:4px 8px; ${active?'border-color:#c3bef5; color:#c3bef5; background:rgba(126,119,221,0.16);':''}">${swatch}${sk.name}${tail}</button>`;
     }).join('') + `</div>`;
     box.innerHTML = html;
     box.querySelectorAll('[data-ship-skin]').forEach(btn => btn.onclick = () => setShipSkin(btn.getAttribute('data-ship-skin')));
@@ -20584,6 +20672,28 @@
     const s = shipSignatur(key);
     return s > 0 && s < TARNUNG_GRENZE;
   }
+  /* Die Signatur-Zeile der Werftkarte, an EINER Stelle - weil die Werft ihre Karten in FUENF
+     Formen zeichnet und die Zeile bis zum 04.09.2026 nur in einer davon stand.
+     Gemessen an der gerenderten Werft: 46 Karten, 7 ohne die Zahl.
+
+       Normalkarte (SHIP_DEFS-Schleife, dritter Ausgang)   hatte sie
+       unlockItems, gesperrt   (Mondzerstoerer, 1000)      fehlte
+       unlockEventParts, gesperrt (sechs Event-Schiffe)    fehlte
+       Superschlachtschiff, gesperrt (800)                 fehlte
+       Superschlachtschiff, frei (800)                     fehlte
+
+     Die Schleife hat DREI Ausgaenge, nicht einen; dazu die zwei handgeschriebenen Bloecke des
+     Superschlachtschiffs, das wie ueberall in keiner Liste steht. Wer nur den letzten Ausgang
+     anfasst, laesst die gesperrten Karten stehen - und das sind genau die, an denen die
+     Kaufentscheidung faellt: Beim Mondzerstoerer verbrennt man dafuer vier seltene Gegenstaende.
+     Die Grenze steht hier als Konstante, nicht als eingetippte 600: Die Nachbaranzeige in der
+     Tarnungsbox liest sie seit jeher aus TARNUNG_GRENZE, die Werftkarte war die letzte Kopie.
+     Der Zusatz "nicht zu verbergen" trifft uebrigens 14 Klassen, nicht eine - 13 in SHIP_DEFS ab
+     Signatur 600 plus das Superschlachtschiff. Er ist kein Sonderfall eines Schiffes. */
+  function signaturZeileHtml(key){
+    const s = shipSignatur(key);
+    return `<div class="bmeta" title="Wie schwer dieses Schiff zu verbergen ist. Ein Verband ist so sichtbar wie sein sichtbarstes Schiff - ab ${TARNUNG_GRENZE} gilt er als Grosskampfschiff und ist praktisch nicht mehr zu tarnen."><i class="ti ti-target" aria-hidden="true"></i> Signatur ${fmt(s)}${s >= TARNUNG_GRENZE ? ' <span style="color:#e24b4a;">(nicht zu verbergen)</span>' : ''}</div>`;
+  }
   /* Die angehakten Klassen, gefiltert auf die tatsaechlich tarnbaren. Der Filter steht HIER und
      nicht nur in der Bedienoberflaeche: Ein alter Spielstand kann eine Klasse enthalten, die
      spaeter ueber die Grenze gehoben wurde, und dann darf sie nicht stillschweigend weiter
@@ -21449,9 +21559,120 @@
     return html;
   }
 
+  /* SP-3, nachgezogen aus der adversarischen Durchsicht: Warum gerade keine Kampfflotte
+     losfliegen kann - EINE Antwort fuer alle Angriffsarten (NPC, Piraten-Versteck, Abgrund,
+     Spielerangriff).
+
+     Der erste Anlauf sagte hier pauschal "Dafuer fehlen dir Kampfschiffe - bau in der Werft
+     welche und komm wieder." Das ist FALSCH, sobald Jaeger oder Bomber dastehen:
+     combatFleetCount zaehlt sie nur, soweit Hangarplaetze da sind (deployableFighters), und
+     ohne Traegerschiff sind das null. Wer 60 Jaeger und keinen Traeger hatte, wurde damit
+     Jaeger nachbauen geschickt - und waere fuer immer in derselben Meldung haengen geblieben.
+     Das Spiel nennt genau diese Verwechslung in seiner eigenen Hilfe die "haeufigste"
+     (HELP_SECTIONS, "Hangar-Kapazitaet - haeufigste Verwechslung"). Eine Meldung, die den
+     Spieler in die falsche Richtung schickt, ist schlechter als gar keine. */
+  function kampfflottenMangel(cf, vorhaben){
+    const f = cf || currentFleet();
+    if (combatFleetCount(f) > 0) return null;
+    const df = deployableFighters(f);
+    const untaetig = (df.idleJaeger||0) + (df.idleBomber||0);
+    /* Ohne `vorhaben` die Kurzform fuer die enge Kartenzeile, mit `vorhaben` der volle Satz.
+       Das Vorhaben steht bewusst VORNE: Die Meldung sagt damit, worauf sie sich bezieht - wer
+       schnell mehrere Angriffsknoepfe antippt, sieht sonst dreimal denselben Satz und weiss
+       nicht, welcher davon gerade antwortet. (Nebenwirkung, die es auch braucht: Zwei
+       wortgleiche Meldungen kann keine Log-Pruefung auseinanderhalten - genau daran war die
+       erste Fassung dieses Bereichs blind, siehe test_sperrgrund_fortschritt_galaxie.js.) */
+    if (untaetig > 0)
+      return vorhaben
+        ? 'Für ' + vorhaben + ' brauchst du Hangarplätze: Deine ' + fmt(untaetig)
+          + ' Jäger/Bomber kommen ohne Trägerschiff nicht mit (eins trägt ' + CARRIER_HANGAR_SLOTS
+          + ', ein Superschlachtschiff ' + SUPER_HANGAR_SLOTS + ').'
+        : 'Jäger ohne Trägerschiff';
+    return vorhaben
+      ? 'Für ' + vorhaben + ' fehlen dir Kampfschiffe - bau in der Werft welche und komm wieder.'
+      : 'noch keine Kampfschiffe gebaut';
+  }
+  /* Belegte Kampf-Slots. Die Liste MUSS dieselbe sein, die die Startfunktionen anwenden
+     (sendAttackMission, sendPirateLairMission, sendeAbgrundMission) - sonst sagt die Vorschau
+     "geht" und der Start lehnt ab, und genau diese Sackgasse sollte SP-3 abschaffen. Der erste
+     Anlauf hatte die Fuenferliste des alten Riegels uebernommen; 'attack-alliance-base' fehlte. */
+  const KAMPF_SLOT_MISSIONEN = ['attack','attack-player','piratelair','abgrund','worldboss','attack-alliance-base'];
+  function belegteKampfSlots(cf){
+    return (cf || currentFleet()).missions.filter(m => KAMPF_SLOT_MISSIONEN.includes(m.type)).length;
+  }
+  /* SP-3: Warum ein Angriff gerade nicht geht - EINE Regel fuer beide Einstiegspunkte (der
+     Knopf im Galaxie-Reiter und das Menue der Sektorkarte rufen beide oeffneNpcAngriff).
+     Hausmuster: null heisst "geht", sonst der Text.
+
+     GEMESSEN am 04.09.2026, drei Flottenlagen im Browser: Der Riegel traf ausschliesslich
+     Spieler OHNE Kampfschiffe - mit 60 Jaegern war kein einziger der 23 Knoepfe gesperrt.
+     Getroffen hat er also genau die, die am wenigsten wissen, was ihnen fehlt, und die Zeile
+     daneben sagte ihnen "keine Schiffe gewaehlt" - in dieser Lage schlicht falsch, es gibt
+     keine zu waehlen. Die Auswahl selbst ist hier bewusst KEIN Sperrgrund mehr: Der Knopf
+     oeffnet das Menue, in dem man waehlt, und dieses Menue sperrt seinen eigenen Startknopf
+     mit sichtbarem Grund (fwahlMindestensEins). Wer alles auf 0 gestellt hatte, kam vorher
+     nicht mehr an die Auswahl heran, die ihn wieder herausgeholt haette. */
+  function npcAngriffSperrGrund(npcId){
+    const npc = NPCS.find(n => n.id === npcId);
+    if (!npc) return 'Unbekannter Gegner.';
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'attack' && m.targetId === npcId))
+      return 'Gegen ' + npc.name + ' läuft bereits ein Angriff.';
+    const mangel = kampfflottenMangel(cf, 'einen Angriff');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Dasselbe fuer das Piraten-Versteck. Bewusst ein EIGENER Wortlaut fuer den Doppelangriff:
+     Der Spieler soll erkennen, worauf sich die Meldung bezieht - und ein Test kann zwei
+     wortgleiche Meldungen nicht auseinanderhalten (in der Durchsicht vom 04.09.2026 bewiesen:
+     eine Pruefung meldete Erfolg, obwohl der geprueften Stelle die Meldung fehlte). */
+  function verstecksSperrGrund(){
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'piratelair'))
+      return 'Gegen das Piraten-Versteck läuft bereits ein Angriff.';
+    const mangel = kampfflottenMangel(cf, 'einen Schlag gegen das Piraten-Versteck');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Und fuer den Abgrund. Bis zur Durchsicht sperrte er als einziger der drei nur auf
+     "laeuft schon" - drei Geschwister mit drei verschiedenen Antworten auf dieselbe Lage. */
+  function abgrundSperrGrund(){
+    const cf = currentFleet();
+    if (cf.missions.some(m => m.type === 'abgrund'))
+      return 'Ein Tauchgang läuft bereits.';
+    const mangel = kampfflottenMangel(cf, 'einen Tauchgang');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
+  /* Und fuer den Spielerangriff. Eigener Wortlaut beim Doppelangriff, aus demselben Grund wie
+     beim Versteck: zwei wortgleiche Meldungen kann keine Pruefung auseinanderhalten. */
+  function pvpAngriffSperrGrund(){
+    const cf = currentFleet();
+    const mangel = kampfflottenMangel(cf, 'einen Angriff auf einen Spieler');
+    if (mangel) return mangel;
+    const kampfschiffe = combatFleetCount(cf);
+    const belegt = belegteKampfSlots(cf);
+    if (belegt >= kampfschiffe)
+      return 'Alle Flottenplätze sind belegt (' + belegt + '/' + kampfschiffe + ') - warte, bis ein Verband zurück ist.';
+    return null;
+  }
   function oeffneNpcAngriff(npcId){
     const npc = NPCS.find(n => n.id === npcId);
     if (!npc) return;
+    const grund = npcAngriffSperrGrund(npcId);
+    if (grund){ log(grund, 'ti-alert-triangle'); return; }
     oeffneFlottenwahl({
       art: npc.boss ? 'Gegner · Boss' : 'Gegner',
       titel: npc.name + ' angreifen',
@@ -22999,7 +23220,12 @@
   // bemessen (2 statt der 6 eines dedizierten Trägerschiffs) - das Flaggschiff kann eine winzige
   // Eigen-Eskorte tragen, ohne die Trägerschiff-Klasse für größere Jäger-/Bomber-Flotten zu entwerten.
   const SUPER_HANGAR_SLOTS = 2;
-  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*6 + (f.superschlachtschiff||0)*SUPER_HANGAR_SLOTS; }
+  /* Der Traegerhangar als benannte Groesse. Das Backend fuehrt beide Zahlen laengst so
+     (SUPER_HANGAR_SLOTS_SERVER / CARRIER_HANGAR_SLOTS_SERVER, "Spiegel von hangarCapacity()"),
+     im Frontend stand die 6 hart in der Formel. Seit SP-3 nennt eine Spielermeldung sie - eine
+     eingetippte Zweitschrift waere genau die Kopie ohne Familie. */
+  const CARRIER_HANGAR_SLOTS = 6;
+  function hangarCapacity(fleet){ const f = fleet || currentFleet(); return (f.carrier||0)*CARRIER_HANGAR_SLOTS + (f.superschlachtschiff||0)*SUPER_HANGAR_SLOTS; }
   function deployableFighters(fleet){
     const f = fleet || currentFleet();
     const cap = hangarCapacity(f);
@@ -24902,6 +25128,61 @@
       return true;
     });
   }
+  /* --- Fundort und Anteil je Modul (04.09.2026, Idee Sascha "Module-Editor") ---
+     ABGELEITET, NICHT GEPFLEGT. Diese Funktion fragt fundPool() - dieselbe Funktion, die im Spiel
+     wirklich zieht - und rechnet den Anteil aus der Topfgroesse. Damit kann die Uebersicht nicht
+     veralten: Kommt ein Modul dazu, aendert sich die Topfgroesse und damit jede Prozentzahl von
+     selbst. Eine gepflegte Fundort-Tabelle waere die dritte Kopie neben Frontend und Backend
+     gewesen, und die erste, die niemand nachzieht.
+     WARUM 1/n eine ehrliche Zahl ist: zieheAusPool() indiziert GLEICHVERTEILT
+     (pool[Math.floor(Math.random()*pool.length)]) - jeder Eintrag im Topf ist gleich wahrscheinlich.
+     Die Zahl sagt "wenn diese Quelle ein Modul ausschuettet, ist es mit dieser Wahrscheinlichkeit
+     dieses" - sie sagt NICHT, wie oft die Quelle ueberhaupt etwas ausschuettet. Genau so steht sie
+     auch in der Anzeige, sonst liest sie sich als Fundchance und ist um Groessenordnungen falsch. */
+  const MODUL_HERKUNFT_TEXT = {
+    normal:    'Normale Funde (Expedition, Erkundung, Fraktionen)',
+    abgrund:   'Abgrund',
+    boss:      'Boss-Set - nur nach einer Allianz-Raid-Welle gegen diesen Boss',
+    unikat:    'Unikat - genau eine benannte Quelle',
+    konvoi:    'Wrackkonvoi - der Server wuerfelt',
+    fertigung: 'Nur Fertigung (Werkbank)',
+    event:     'Nur waehrend seines Events',
+    direkt:    'Wird gezielt vergeben, nie zufaellig gefunden'
+  };
+  function modulFundort(d, defs, art){
+    // Reihenfolge zaehlt: Das ENGSTE Schloss gewinnt. Ein Boss-Set-Teil mit chance:0 ist zuerst
+    // "wird gezielt vergeben" und erst danach ein Boss-Teil - beides zu nennen waere doppelt.
+    const quelle = d.quelle || HERKUNFT_NORMAL;
+    // Zwei Arten von Topf, und sie kommen aus verschiedenen Funktionen: `opt` heisst "fundPool
+    // zieht", `festerTopf` heisst "eine andere Ziehstelle zieht gleichverteilt aus dieser Liste".
+    // Boss-Set-Teile gehoeren zur zweiten Sorte - gemessen: 20 Teile, fuenf Bosse zu je vieren,
+    // grantBossSetModule wuerfelt unter den vier Teilen DESSELBEN Bosses. Sie als "gezielt
+    // vergeben" auszuweisen waere fuer ein Fuenftel aller Module schlicht falsch gewesen.
+    let herkunft, opt = null, festerTopf = null;
+    if (d.chance === 0) herkunft = 'direkt';
+    else if (quelle === HERKUNFT_BOSS){ herkunft = 'boss'; festerTopf = bosssetTeile(d.bossKey, defs).length; }
+    // Unikat und Konvoi werden WIRKLICH benannt vergeben: grantUnikatModul bekommt den Schluessel
+    // uebergeben, und beim Konvoi entscheidet der Server (`mod.defKey`). Da gibt es keinen Topf.
+    else if (quelle === HERKUNFT_UNIKAT) herkunft = 'unikat';
+    else if (quelle === HERKUNFT_KONVOI) herkunft = 'konvoi';
+    else if (quelle === HERKUNFT_ABGRUND){ herkunft = 'abgrund'; opt = { quelle: HERKUNFT_ABGRUND, tiefe: d.minTiefe || 0 }; }
+    else if (d.craftOnly){ herkunft = 'fertigung'; opt = { craft: true }; }
+    else if (d.eventKey){ herkunft = 'event'; opt = { event: true }; }
+    else { herkunft = 'normal'; opt = {}; }
+    let topf = 0, anteil = null;
+    if (festerTopf !== null) topf = festerTopf;
+    else if (opt) topf = fundPool(defs, opt).length;
+    if (opt || festerTopf !== null) anteil = topf > 0 ? 1 / topf : null;
+    return { key: d.key, name: d.name, art, herkunft, text: MODUL_HERKUNFT_TEXT[herkunft],
+      topf, anteil, minTiefe: d.minTiefe || 0, bossKey: d.bossKey || null,
+      // Der eigentliche Befund, wegen dem die Uebersicht gebaut wurde: ein Modul, das in KEINEM
+      // Topf liegt und auch keine gezielte Quelle hat, ist im Spiel unerreichbar.
+      unerreichbar: !!((opt || festerTopf !== null) && topf === 0) };
+  }
+  function modulFundorte(){
+    return MODULE_DEFS.map(d => modulFundort(d, MODULE_DEFS, 'standort'))
+      .concat(SHIP_MODULE_DEFS.map(d => modulFundort(d, SHIP_MODULE_DEFS, 'schiff')));
+  }
   // Zieht EINEN Eintrag. Es gibt bewusst keine Variante, die ein Array direkt indiziert - genau die
   // waere der Weg, an dem der naechste Umbau die Filter wieder vergisst.
   function zieheAusPool(defs, opt){
@@ -24950,8 +25231,14 @@
     return grantBossSetModule(bs.bossKey, bs.seltenheit);
   }
 
+  // Die Teile EINES Bosses - eine Funktion, zwei Leser: grantBossSetModule zieht daraus, und
+  // modulFundort() rechnet daraus den Anteil. Vorher stand der Filter nur hier; die Uebersicht
+  // haette ihn abschreiben muessen, und eine abgeschriebene Regel ist die naechste zweite Wahrheit.
+  function bosssetTeile(bossKey, defs){
+    return (defs || MODULE_DEFS).filter(d => d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey);
+  }
   function grantBossSetModule(bossKey, vorgabeSeltenheit){
-    const teile = MODULE_DEFS.filter(d => d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey);
+    const teile = bosssetTeile(bossKey);
     if (!teile.length) return null;
     const def = teile[Math.floor(Math.random()*teile.length)];
     const rarity = (vorgabeSeltenheit && MODULE_RARITY[vorgabeSeltenheit]) ? vorgabeSeltenheit : 'selten';
@@ -33024,7 +33311,8 @@ async function claimPendingRewards(){
     { tab:'protokoll', btn:'adminTabProtokollBtn', view:'adminProtokollView', anzeige:'block', sub:'Protokoll der Betreiber-Handlungen', laden:() => loadAdminProtokoll() },
     { tab:'allianzen', btn:'adminTabAllianzenBtn', view:'adminAllianzenView', anzeige:'block', sub:'Allianzen',                   laden:() => loadAdminAllianzen() },
     { tab:'lage',      btn:'adminTabLageBtn',      view:'adminLageView',      anzeige:'block', sub:'Wirtschaft und Galaxie',      laden:() => loadAdminLage() },
-    { tab:'galaxie',   btn:'adminTabGalaxieBtn',   view:'adminGalaxieView',   anzeige:'block', sub:'Eingriffe in die Welt',       laden:() => loadAdminGalaxie() }
+    { tab:'galaxie',   btn:'adminTabGalaxieBtn',   view:'adminGalaxieView',   anzeige:'block', sub:'Eingriffe in die Welt',       laden:() => loadAdminGalaxie() },
+    { tab:'module',    btn:'adminTabModuleBtn',    view:'adminModuleView',    anzeige:'block', sub:'Fundorte und Drop-Chancen',   laden:() => loadAdminModule() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -33767,6 +34055,126 @@ async function claimPendingRewards(){
   /* Galaxie-Eingriff (Backend #208). Jede Handlung fragt nach, weil keine davon einen Rueckgaengig-
      Knopf hat: Ein entferntes Nest ist weg, ein gesetztes steht sofort auf der Karte aller Spieler. */
   let galaxieDaten = null;
+  /* --- Modul-Reiter (04.09.2026) ---
+     Zwei Quellen, klar getrennt: Die FUNDORTE kommen aus modulFundorte() und damit aus dem Code
+     dieser Datei - der Server kennt sie nicht und behauptet es auch nicht (er schickt seinen
+     hinweisQuellen mit). Die REGLER und die eigenen Eintraege kommen vom Server. */
+  async function loadAdminModule(){
+    const box = document.getElementById('adminModuleInhalt');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    let d = null, fehler = null;
+    try {
+      const res = await backendFetch('/admin/module');
+      if (!res.ok) fehler = adminListenFehler(res, 'die Modul-Verwaltung'); else d = await res.json();
+    } catch(e){ fehler = adminListenFehler(null, 'die Modul-Verwaltung'); }
+
+    // Die Fundorte stehen AUCH ohne Server - sie kommen aus dem Code. Ein Serverfehler nimmt dem
+    // Reiter die Regler, nicht die Uebersicht.
+    const funde = modulFundorte();
+    const nachHerkunft = {};
+    for (const f of funde) (nachHerkunft[f.herkunft] = nachHerkunft[f.herkunft] || []).push(f);
+    const unerreichbar = funde.filter(f => f.unerreichbar);
+    const zeile = (k, v, farbe) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:${farbe || '#c9d4e8'}; text-align:right;">${v}</span></div>`;
+    const karte = (titel, icon, inhalt) => `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px;"><div class="bname"><i class="ti ${icon}" aria-hidden="true" style="margin-right:5px;"></i>${titel}</div>${inhalt}</div>`;
+
+    const kopf = `<div class="bmeta" style="margin-bottom:8px; line-height:1.5;">${adminZahl(funde.length)} Module im Spiel – ${adminZahl(funde.filter(f => f.art === 'standort').length)} Standort-, ${adminZahl(funde.filter(f => f.art === 'schiff').length)} Schiffsmodule. Die Fundorte sind aus <code>fundPool()</code> abgeleitet, also aus der Funktion, die im Spiel wirklich zieht – sie können nicht veralten. Der Anteil sagt: <strong>Schüttet diese Quelle ein Modul aus, ist es mit dieser Wahrscheinlichkeit dieses.</strong> Wie oft die Quelle überhaupt etwas ausschüttet, hängt an ihrer Mechanik und steht nicht am Modul.</div>`;
+
+    const gruppen = Object.keys(nachHerkunft).sort().map(h => {
+      const liste = nachHerkunft[h].slice().sort((a, b) => a.name.localeCompare(b.name));
+      const inhalt = liste.map(f => zeile(
+        escapeHtml(f.name) + ' <span style="opacity:0.6;">' + (f.art === 'standort' ? 'Standort' : 'Schiff') + '</span>',
+        (f.anteil !== null ? String(Math.round(f.anteil * 1000) / 10).replace('.', ',') + ' % von ' + adminZahl(f.topf) : 'gezielt vergeben')
+          + (f.minTiefe ? ' · ab Tiefe ' + adminZahl(f.minTiefe) : '')
+          + (f.bossKey ? ' · ' + escapeHtml(f.bossKey) : ''),
+        f.unerreichbar ? '#f0997b' : '#c9d4e8')).join('');
+      return karte(MODUL_HERKUNFT_TEXT[h] + ' (' + adminZahl(liste.length) + ')', 'ti-box', inhalt);
+    }).join('');
+
+    const luecke = karte('Auffälligkeiten', 'ti-alert-triangle',
+      zeile('Module in keinem Topf und ohne gezielte Quelle', unerreichbar.length ? escapeHtml(unerreichbar.map(f => f.name).join(', ')) : 'keine',
+        unerreichbar.length ? '#f0997b' : '#5dcaa5'));
+
+    const regler = d ? karte('Drop-Chancen des Servers', 'ti-adjustments',
+      `<div class="bmeta" style="line-height:1.5;">${escapeHtml(d.hinweisQuellen || '')}</div>`
+      + (d.quellen || []).map(q => `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+          <span class="bmeta" style="flex:2 1 190px;">${escapeHtml(q.name)} <span style="opacity:0.6;">(${escapeHtml(q.modul)})</span></span>
+          <input type="number" min="0" max="1" step="0.05" data-modul-chance="${escapeHtml(q.quelle)}" value="${q.aktuell}" style="flex:1 1 80px; font-size:11.5px;">
+          <button data-modul-chance-setzen="${escapeHtml(q.quelle)}" style="flex:1 1 90px; font-size:11px;">Übernehmen</button>
+          ${q.gestellt ? `<button data-modul-chance-zurueck="${escapeHtml(q.quelle)}" style="flex:1 1 110px; font-size:11px;">Auf ${String(q.basis).replace('.', ',')} zurück</button>`
+            : `<span class="bmeta" style="flex:1 1 110px; opacity:0.7;">Code-Wert ${String(q.basis).replace('.', ',')}</span>`}
+        </div><div class="bmeta" style="opacity:0.7;">${escapeHtml(q.hinweis || '')}</div>`).join('')) : '';
+
+    const eigene = d ? karte('Eigene Einträge', 'ti-plus',
+      `<div class="bmeta" style="line-height:1.5; color:#f0997b;">Ein hier angelegtes Modul <strong>wirkt im Spiel nicht</strong>: Die 99 Module leben im Code, und ein Eintrag aus der Datenbank hat keinen Verbraucher. Er ist als Entwurf gedacht – umgesetzt wird er im Code. Der Schlüssel beginnt deshalb mit <code>eigen_</code>, damit er nie ein echtes Modul überschreiben kann.</div>`
+      + ((d.eigene || []).length
+        ? d.eigene.map(m => `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+            <span class="bmeta" style="flex:2 1 200px;"><strong>${escapeHtml(m.name)}</strong> <span style="opacity:0.6;">${escapeHtml(m.key)}</span> · <span style="color:#f0997b;">ohne Wirkung im Spiel</span></span>
+            <button data-modul-eigen-weg="${escapeHtml(m.key)}" style="flex:1 1 90px; font-size:11px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Entfernen</button>
+          </div><div class="bmeta" style="opacity:0.75;">${escapeHtml(m.beschreibung)}</div>`).join('')
+        : `<div class="bmeta">Noch kein eigener Eintrag.</div>`)
+      + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <input type="text" id="adminModulKey" maxlength="30" placeholder="eigen_kaperhaken" autocomplete="off" style="flex:1 1 150px; font-size:11.5px;">
+          <input type="text" id="adminModulName" maxlength="60" placeholder="Name" autocomplete="off" style="flex:1 1 150px; font-size:11.5px;">
+          <select id="adminModulArt" aria-label="Art des Moduls" style="flex:1 1 120px; font-size:11.5px;"><option value="standort">Standortmodul</option><option value="schiff">Schiffsmodul</option></select>
+        </div>
+        <textarea id="adminModulText" maxlength="300" placeholder="Beschreibung – was soll es tun?" style="width:100%; min-height:50px; resize:vertical; font-size:12px; margin-top:4px;"></textarea>
+        <button id="adminModulAnlegenBtn" style="width:100%; font-size:11.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Als Entwurf anlegen</button>`) : '';
+
+    box.innerHTML = kopf + (fehler || '') + luecke + regler + eigene + gruppen;
+
+    box.querySelectorAll('[data-modul-chance-setzen]').forEach(b => b.onclick = () => {
+      const q = b.getAttribute('data-modul-chance-setzen');
+      const feld = box.querySelector('[data-modul-chance="' + CSS.escape(q) + '"]');
+      adminModulChance(q, feld ? feld.value : '', b);
+    });
+    box.querySelectorAll('[data-modul-chance-zurueck]').forEach(b => b.onclick = () =>
+      adminModulChance(b.getAttribute('data-modul-chance-zurueck'), null, b));
+    box.querySelectorAll('[data-modul-eigen-weg]').forEach(b => b.onclick = () =>
+      adminModulEigenWeg(b.getAttribute('data-modul-eigen-weg')));
+    const anlegen = document.getElementById('adminModulAnlegenBtn');
+    if (anlegen) anlegen.onclick = () => adminModulEigenAnlegen(anlegen);
+  }
+  async function adminModulChance(quelle, wert, knopf){
+    if (knopf) knopf.disabled = true;
+    try {
+      const res = await backendFetch('/admin/module/chance', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ quelle, wert: wert === null || wert === '' ? null : Number(wert) }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Die Chance konnte nicht gesetzt werden.', 'ti-alert-triangle'); return; }
+      log(d.zurueckgesetzt ? 'Zurück auf den Code-Wert ' + String(d.basis).replace('.', ',') + '.'
+        : 'Chance auf ' + String(d.aktuell).replace('.', ',') + ' gesetzt (Code-Wert ' + String(d.basis).replace('.', ',') + ').', 'ti-check', 'ok');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung – nichts gesetzt.', 'ti-alert-triangle'); }
+    finally { if (knopf) knopf.disabled = false; }
+  }
+  async function adminModulEigenAnlegen(knopf){
+    const key = (document.getElementById('adminModulKey') || {}).value || '';
+    const name = (document.getElementById('adminModulName') || {}).value || '';
+    const beschreibung = (document.getElementById('adminModulText') || {}).value || '';
+    const art = (document.getElementById('adminModulArt') || {}).value || 'standort';
+    if (!key.trim() || !name.trim() || !beschreibung.trim()){ log('Schlüssel, Name und Beschreibung ausfüllen.', 'ti-alert-triangle'); return; }
+    if (knopf) knopf.disabled = true;
+    try {
+      const res = await backendFetch('/admin/module/eigen', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key: key.trim(), name: name.trim(), beschreibung: beschreibung.trim(), art }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Der Entwurf konnte nicht angelegt werden.', 'ti-alert-triangle'); return; }
+      log(d.ersetzt ? 'Entwurf ersetzt – er wirkt im Spiel nicht.' : 'Entwurf angelegt – er wirkt im Spiel nicht.', 'ti-check', 'ok');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung – nichts angelegt.', 'ti-alert-triangle'); }
+    finally { if (knopf) knopf.disabled = false; }
+  }
+  async function adminModulEigenWeg(key){
+    if (!confirm('Entwurf „' + key + '" entfernen?')) return;
+    try {
+      const res = await backendFetch('/admin/module/eigen/loeschen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Entfernen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Entwurf entfernt.', 'ti-check');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
   async function loadAdminGalaxie(){
     const box = document.getElementById('adminGalaxieInhalt');
     if (!box) return;
@@ -34375,10 +34783,15 @@ async function claimPendingRewards(){
   function adminListenFehler(res, was){
     const s = res ? res.status : 0;
     if (s === 404) return `<div class="bmeta">Dieser Server kennt <strong>${escapeHtml(was)}</strong> noch nicht (404) – das Backend auf dem Pi läuft hinterher. Dort <code>cd /DATA/kepler7/backend &amp;&amp; git pull origin master</code> ausführen, dann diese Seite neu laden.</div>`;
-    if (s === 403) return `<div class="bmeta">Kein Admin-Zugriff auf diese Liste (403).</div>`;
+    if (s === 403) return `<div class="bmeta">Kein Admin-Zugriff auf <strong>${escapeHtml(was)}</strong> (403).</div>`;
     if (s === 401) return `<div class="bmeta">Sitzung abgelaufen oder nicht angemeldet (401) – bitte neu anmelden.</div>`;
     if (!s) return `<div class="bmeta">Keine Verbindung zum Server – die Liste konnte nicht geladen werden.</div>`;
-    return `<div class="bmeta">Liste konnte nicht geladen werden (${s}).</div>`;
+    // Auch der Sammelfall nennt die Liste (04.09.2026): Auf einem Reiter mit mehreren Kaesten sagte
+    // "Liste konnte nicht geladen werden (500)" nicht, WELCHE - und der Modul-Reiter zeigt seine
+    // Fundorte auch bei totem Server weiter, dort stand die Meldung also neben lauter richtigen Daten.
+    // `was` ist an allen Aufrufstellen ein Akkusativ ("den Kampfverlauf", "die Allianzen"), deshalb
+    // dieser Satzbau statt "X konnte nicht geladen werden".
+    return `<div class="bmeta">Der Server konnte <strong>${escapeHtml(was)}</strong> nicht laden (${s}).</div>`;
   }
   // Spenden ohne E-Mail (05.08.2026). Auf dem Pi gemessen: kofiDonationsByEmail hatte 0 Einträge,
   // kofiSupporters 2 Namen - beide entstehen im selben Webhook. Die Spende kam also an, nur die
@@ -34813,7 +35226,7 @@ async function claimPendingRewards(){
     { icon:'ti-building-factory-2', title:'Basis & Ressourcen', text:'Im Basis-Tab baust du Gebäude, die Energie, Erz, Kristalle, Deuterium und Antimaterie produzieren. Fast jeder Gebäude-, Schiffs- und Forschungsausbau kostet unter anderem Energie – baue Solarzellen früh mit aus, sonst fehlt dir bald das Kleingeld für alles andere.' },
     { icon:'ti-flask', title:'Forschung & Doktrin', text:'Im Forschung-Tab verbesserst du Produktion, Kampfkraft und mehr dauerhaft. Im Spätspiel kannst du dort außerdem eine Doktrin wählen – eine strategische Grundsatzentscheidung fuers ganze Imperium – die einen entscheiden ueber Angriff und Verteidigung, die anderen ueber Foerderung, Expeditionen und den Abgrund.' },
     { icon:'ti-user-circle', title:'Offiziere & Module', text:'Im Offiziere-Tab wartet dein Ausrüstungs-Baukasten. Sieben Offiziere verstärken dein Imperium dauerhaft – alle gleichzeitig aktiv, angeheuert und befördert mit Kommandopunkten, die du fürs Kämpfen verdienst. Dazu zwei Modulsysteme: Standort-Module stecken in den Slots eines Planeten (Produktion, Verteidigung, Lager und mehr), Schiffsklassen-Module wirken auf jedes Schiff einer Klasse, egal wo es steht. Module gibt es in acht Seltenheiten von Gewöhnlich bis Primordial, jeder Fund würfelt seinen Hauptwert und seine Zweitwerte. Drei gleichartige verschmelzen zur nächsthöheren Seltenheit, überzählige zerlegst du zu Fragmenten und fertigst daraus dein Wunschmodul. Gespeicherte Vorlagen wechseln ganze Ausrüstungs-Profile mit einem Klick – die Wechselvorschau zeigt vorher, was sich ändert.' },
-    { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – wähle vorher deine Angriffsflotte aus. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
+    { icon:'ti-sword', title:'Flotte & Kampf', text:'Im Flotte-Tab baust du Schiffe. Im Galaxie-Tab greifst du NPC-Gegner oder andere Spieler an – die Angriffsflotte stellst du direkt am Angreifen-Knopf zusammen. Ein Spähschiff kann vor einem Angriff günstig die gegnerische Stärke aufklären.' },
     // Ohne HTML: renderTutorialStep setzt den Text per textContent, ein <strong> stünde wörtlich im
     // Fenster. test_tutorial prüft das - und hat genau diesen Fehler bei v8.349.0 gemeldet.
     { icon:'ti-map-2', title:'Erkunden & Kolonisieren', text:'Im Sektorkarte-Tab siehst du zuerst die Galaxie als acht benannte Sektorregionen. Tippe eine Region an, dann zeigt der Sektor seine Systeme; ein Tipp auf ein System klappt seine Planeten auf – ein Klick auf einen Planeten öffnet ein kleines Menü mit Erkunden und Kolonisieren. Gürtelsysteme tragen einen gestrichelten goldenen Ring – klapp so ein System auf, dann liegen seine Asteroiden auf der Gürtelbahn, und ein Klick auf einen Brocken schickt eine Abbaumission los (Forschung Minentechnik nötig). Zurück geht es Ebene für Ebene mit ‹, ⌂ oder Esc. Jede Kolonie – und auch deine Heimatbasis – kann eine Rolle bekommen (Bergbau, Festung, Werft, Handel, Forschung, Logistik oder Tiefenhafen) – nutze das Suchfeld, um bei vielen Systemen schnell ein Ziel zu finden.' },
@@ -40736,7 +41149,7 @@ async function claimPendingRewards(){
             + '<strong>Gemessen wird der Abstand, nicht der Bestand</strong>, und das ist der ganze Unterschied: Sind die Nester gleichmäßig über die Galaxie verteilt, steht <em>jede</em> Region auf „Ruhig" und niemand zahlt etwas – auch dann nicht, wenn insgesamt viele Nester stehen. Erst eine <strong>Ballung</strong> macht eine Region gefährlich. Wie schwer die Galaxie als Ganzes ist, sagt weiterhin die galaktische Gegnerstärke, die an derselben Nestzahl hängt; die Sektorlage sagt nur, <em>wo</em> es schlimmer ist als anderswo. Eine Region wird durch sie nie leichter als der Grundwert.<br><br>'
             + 'Auf der Karte siehst du sie am <strong>farbigen Rand</strong> einer Region (Übersicht) und als eigene Zeile in der Kopfzeile der Sektoransicht; Angriffsvorschau und Kartenmenü eines Gegners nennen den Aufschlag, sobald er greift. Der Wert wird beim <strong>Start</strong> deiner Mission eingefroren – was die Vorschau zeigt, ist das, wogegen deine Flotte bei Ankunft kämpft, auch wenn sich die Lage währenddessen bewegt.';
         })() },
-      { title:'Landmarken: was in einem System steht', body:'Die Karte zeigt an jedem System, was dort los ist - auf allen drei Ebenen. Ein <strong>🛡</strong> steht für eine <strong>Asteroidenfestung</strong> und nennt ihren Kernstand und die Abbau-Drosselung, ein <strong>👾</strong> für ein <strong>Alien-Nest</strong> mit Volk, Stufe und Schwäche - stehen mehrere im selben System, trägt das Abzeichen die Zahl und nennt die stärkste Stufe. Aus dem 👾 wird ein <strong>👑</strong>, sobald dort die Königin sitzt. Ein <strong>⛺</strong> zeigt einen <strong>Vorposten</strong> mit Besitzer, Kernstand und Garnison. Ein <strong>♻️</strong> zeigt einen <strong>Wrackkonvoi</strong> mit seinem Rumpfstand – er wandert und entkommt, siehe den eigenen Hilfe-Eintrag. Das <strong>🎯</strong> markiert <strong>Gegner</strong> mit ihrem Namen und ihrer Stufe. Ein <strong>🚩</strong> steht für den <strong>Statthalter</strong> der Region mit seiner Stufe, seiner Schwäche und deiner Siegbilanz gegen ihn - er hat ein eigenes Abzeichen und taucht deshalb nicht zusätzlich im 🎯 auf. Auf der Regionsübersicht werden diese Abzeichen zusammengefasst: Ein 🛡 an einer Region heißt, dass irgendwo darin eine Festung steht. <strong>Tippe die Abzeichenzeile an</strong>, und du bekommst jedes betroffene System namentlich mit seinem Hinweis - ein Tipp darauf bringt dich direkt hin. Am PC nennt sie der Tooltip zusätzlich beim Überfahren. Bis dahin musste man jedes der 67 Systeme einzeln aufklappen, um eine Festung überhaupt zu finden. Diese Abzeichen hängen an der Ebene <strong>Ereignisse</strong> und lassen sich dort abschalten - mit zwei Ausnahmen: die Allianzbasis (🏰) und der Statthalter (🚩) bleiben stehen. Beide sind keine wechselnde Lage, sondern eine feste Tatsache der Karte. <strong>Über das Suchfeld findest du sie bewusst nicht</strong> - es sucht Systeme und Planeten. Wo etwas los ist, verraten dir die Abzeichen auf der Karte. Das <strong>👽</strong> für ein gesichtetes Volk bleibt daneben stehen, schweigt aber in Systemen mit einem eigenen Nest-Abzeichen - dort wäre es dieselbe Aussage zweimal.' },
+      { title:'Landmarken: was in einem System steht', body:'Die Karte zeigt an jedem System, was dort los ist - auf allen drei Ebenen. Ein <strong>🛡</strong> steht für eine <strong>Asteroidenfestung</strong> und nennt ihren Kernstand und die Abbau-Drosselung, ein <strong>👾</strong> für ein <strong>Alien-Nest</strong> mit Volk, Stufe und Schwäche - stehen mehrere im selben System, trägt das Abzeichen die Zahl und nennt die stärkste Stufe. Aus dem 👾 wird ein <strong>👑</strong>, sobald dort die Königin sitzt. Ein <strong>🛰</strong> zeigt einen <strong>Vorposten</strong> mit Besitzer, Kernstand und Garnison – auf jeder Ausbaustufe, denn er ist von der ersten an eine Raumstation. Ein <strong>♻️</strong> zeigt einen <strong>Wrackkonvoi</strong> mit seinem Rumpfstand – er wandert und entkommt, siehe den eigenen Hilfe-Eintrag. Das <strong>🎯</strong> markiert <strong>Gegner</strong> mit ihrem Namen und ihrer Stufe. Ein <strong>🚩</strong> steht für den <strong>Statthalter</strong> der Region mit seiner Stufe, seiner Schwäche und deiner Siegbilanz gegen ihn - er hat ein eigenes Abzeichen und taucht deshalb nicht zusätzlich im 🎯 auf. Auf der Regionsübersicht werden diese Abzeichen zusammengefasst: Ein 🛡 an einer Region heißt, dass irgendwo darin eine Festung steht. <strong>Tippe die Abzeichenzeile an</strong>, und du bekommst jedes betroffene System namentlich mit seinem Hinweis - ein Tipp darauf bringt dich direkt hin. Am PC nennt sie der Tooltip zusätzlich beim Überfahren. Bis dahin musste man jedes der 67 Systeme einzeln aufklappen, um eine Festung überhaupt zu finden. Diese Abzeichen hängen an der Ebene <strong>Ereignisse</strong> und lassen sich dort abschalten - mit zwei Ausnahmen: die Allianzbasis (🏰) und der Statthalter (🚩) bleiben stehen. Beide sind keine wechselnde Lage, sondern eine feste Tatsache der Karte. <strong>Über das Suchfeld findest du sie bewusst nicht</strong> - es sucht Systeme und Planeten. Wo etwas los ist, verraten dir die Abzeichen auf der Karte. Das <strong>👽</strong> für ein gesichtetes Volk bleibt daneben stehen, schweigt aber in Systemen mit einem eigenen Nest-Abzeichen - dort wäre es dieselbe Aussage zweimal.' },
        { title:'Die Systemansicht lesen: Licht, Schatten, Ringe', body:'Im geöffneten System zeichnet die Karte, was du sonst nur aus Listen wüsstest. <strong>Jede Welt hat eine Tag- und eine Nachtseite</strong>: Der Schatten liegt immer auf der sonnenabgewandten Seite, die Sonne selbst trägt eine Korona mit langsam wandernden Strahlen. <strong>Die farbige Spur auf der Bahn</strong> hinter jedem Planeten nennt seinen Typ (grün erdähnlich, blau Wasserwelt, orange Gasriese, violett Kristallwelt, grau Asteroid) – auch bei noch unerforschten Welten, dort blasser. <strong>Ein Leuchtsaum in der Typfarbe</strong> bekommen nur erforschte Welten; unerforschte bleiben abgedunkelt mit gestricheltem Rand. <strong>Gasriesen tragen einen Ring</strong>, Monde sitzen auf einer feinen Bahn um ihren Planeten. Wer am Gerät Bewegung reduziert hat, sieht dieselbe Zeichnung ohne die wandernden Strahlen.' },
       { title:'Wem gehört ein System? Der Ring sagt es', body:'Jeder Systemknoten trägt den Ring genau <strong>einer</strong> Macht – der stärksten, die dort sitzt. Die Reihenfolge geht von der härtesten zur weichsten Aussage: <strong>erobert</strong> (militärisch genommen, der Server führt je System genau einen Eroberer) schlägt <strong>Kolonie-Herrschaft</strong> (jemand hält <em>alle</em> besiedelten Planeten und bekommt dafür +5 % Produktion), diese schlägt das <strong>Fraktions-Territorium</strong> (politische Zuordnung ohne eigene Präsenz), und ganz zuletzt steht ein <strong>Alien-Nest</strong> – es beansprucht nichts, es sitzt nur da. Ein Nest färbt den Ring deshalb nur, wenn sonst niemand herrscht; sitzt ein Spieler drauf, gilt der, und das Nest bleibt als 👾 sichtbar.<br><br><strong>Was dir gehört, ist gefüllt</strong> und grün gezeichnet, alles Fremde nur umrandet – so musst du keine Farben auseinanderhalten, um deinen Besitz zu finden. Rot heißt: von einem fremden Spieler erobert. In der <strong>Regionsübersicht</strong> trägt jeder Systempunkt dieselbe Farbe, du siehst also schon von oben, wie eine Gegend aufgeteilt ist. Und im geöffneten System nennt die Chip-Zeile alles im Klartext.<br><br>Die politische Landkarte (Fraktions-Territorien) lässt sich über die Ebene „Fraktionen" ausblenden; Eroberungen und Kolonie-Herrschaft bleiben immer sichtbar – das sind Tatsachen über Besitz, keine Zuordnung.' },
       { title:'Aufklärung auf der Sektorkarte', body:'Spieler, die du bereits ausgespäht hast, tragen auf der <strong>Sektorkarte</strong> (im System, in dem sie stehen) einen <strong>Aufklärungs-Ring</strong> (🔎) samt bekannter Verteidigungsstärke (🛡) direkt am Marker - dein Aufklärungsstand ist also nicht mehr nur im Berichte-Tab, sondern direkt am Ziel sichtbar. Die Farbe zeigt die Verlässlichkeit: <strong>cyan</strong> = frisch (unter 30 Min.), <strong>grau gestrichelt</strong> = veraltet, <strong>amber gestrichelt</strong> = dein Späher wurde entdeckt und die Werte sind verfälscht. Der Tooltip nennt Aufklärungsalter, Verteidigung und ob es ein Tiefenscan war. In der <strong>Sektoransicht</strong> trägt jedes System mit Aufklärung ein 🔎-Abzeichen samt der <strong>stärksten bekannten Verteidigung</strong> (🛡, Farbe = Verlässlichkeit wie am Marker), und schon die Übersicht zeigt das 🔎 an der Region - so siehst du auf jeder Ebene, wo du bereits Aufklärung hast.' },
@@ -40781,7 +41194,7 @@ async function claimPendingRewards(){
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.<br><br><strong>Seit dem 01.08.2026 hängt am Rang mehr als eine Kampfzahl</strong> – was genau, entscheidet die <strong>Rolle</strong> der Welt. Auf einer <strong>Festungs-Welt</strong> zählt der Rang auf die Verteidigung ein zweites Mal (bei „Legende" also +8% zusätzlich zu den +8%, die er ohnehin gibt). Auf einer <strong>Werft-Welt</strong> verkürzt er zusätzlich die Schiffsbauzeit dieser Welt (bis −12%). Auf einem <strong>Tiefenhafen</strong> bringt er zusätzlich Abgrundsplitter aus Tauchgängen, die von dort starten (bis +16%). Die übrigen vier Rollen bekommen bewusst nichts: Sie haben ihre eigene Wirkung, und Kampferfahrung, die Forschung beschleunigt, wäre eine Zahl ohne Geschichte. Welche Zusatzwirkung deine aktuelle Basis hat, steht direkt unter dem Veteranenrang.<br><br><strong>Seit dem 02.08.2026 zieht die Erfahrung mit um.</strong> Vorher klebte sie am Boden: Eine Flotte, die fünfzig Gefechte überstanden hatte und dann verlegt wurde, kam als Rekrut an, und der Rang blieb auf der alten Welt liegen – auch wenn dort kein Schiff mehr stand. Jetzt wandert sie <strong>anteilig</strong> mit: Wer die halbe Kampfflotte verlegt, nimmt die halbe Erfahrung mit. Sie wird beim Abflug abgezogen und reist mit; geht das Ziel unterwegs verloren, kehrt sie mit den Schiffen zurück. Gerechnet wird nur mit <em>Kampfschiffen</em> – ein Konvoi aus Frachtern hat keine Gefechtserfahrung zu vergeben.' },
       { title:'Alien-Nester und die Königin', body:'In der Galaxie nisten sich <strong>Alien-Völker</strong> ein. Anders als eine Asteroidenfestung, die einfach dasteht, ist ein Nest ein <strong>lebendiges Ziel</strong>: Es <em>wächst</em>, es <em>breitet sich aus</em>, und wer es stehen lässt, hat übermorgen mehr davon als heute. Auf der Karte erkennst du es an der pulsierenden Zellform im geöffneten System – ein Klick öffnet das Menü mit <strong>Nest angreifen</strong>.<br><br><strong>Fünf Stufen:</strong> ' + NEST_STUFEN.slice(1).map((st,i) => '<strong>' + st.name + '</strong> (' + fmt(st.lp) + ' LP)').join(', ') + '. Ein Nest reift von selbst weiter; das Kartenmenü sagt dir, <em>wann</em> die nächste Stufe kommt. Und es <strong>heilt dabei nicht</strong> – was du ihm abgenommen hast, bleibt ihm abgenommen.<br><br><strong>Vier Völker, vier Eigenarten:</strong><br>' + Object.values(ALIEN_VOELKER).map(v => '• <strong>' + v.name + '</strong> – ' + v.art + '. Wirksam dagegen: <strong>' + nestSchwaecheName(v.schwaeche) + '</strong>.').join('<br>') + '<br><br><strong>Die Schwäche ist keine Formalität:</strong> Führt dein Verband die passende Schiffsklasse mit, richtet jeder Schlag <strong>25% mehr</strong> an. Die Startvorschau sagt dir vorher, ob sie dabei ist – du sollst es nicht erst aus dem Bericht danach erfahren.<br><br><strong>Angegriffen wird über das Kartenmenü.</strong> Der Verband fliegt hin und zurück, und der Server rechnet den Schaden aus deiner Flotte. Nach jedem Schlag gilt an <em>diesem</em> Nest eine <strong>Abklingzeit von ' + NEST_ABKLING_STD + ' Stunden</strong>; Mitstreiter können in der Zwischenzeit weitermachen. Beim Fall wird die Bergung <strong>nach Schadensanteil</strong> geteilt – wer ein Drittel beigetragen hat, bekommt ein Drittel, auch wenn ein anderer den letzten Schlag geführt hat. Gezählt wird dabei, was <em>angekommen</em> ist. Dein Anteil liegt danach unter den <strong>Belohnungen</strong>, auch wenn du beim Fall gerade offline warst – und mit etwas Glück ist ein <strong>Boss-Set-Teil</strong> dabei, umso eher, je höher die Stufe des Nestes war.<br><br><strong>Die Nomaden von Vex sind der Sonderfall:</strong> Ihr Nest <em>wandert</em>. Ist es bei der Ankunft weitergezogen, findet dein Verband nichts vor – und kehrt <strong>unversehrt</strong> zurück, ohne Verluste und ohne Abklingzeit. Das ist kein Fehlschlag, sondern der Preis des Zögerns.<br><br><strong>Und die Königin.</strong> Hat ein Volk genug Nester, schlüpft am ältesten die Königin – die stärkste Stufe mit ' + fmt(NEST_STUFEN[5].lp) + ' Lebenspunkten. Sie ist das Ereignis, für das eine Allianz zusammenkommt: <strong>Fällt sie, zerfällt der ganze Schwarm ihres Volkes</strong>, alle seine Nester verschwinden mit ihr, und das Volk sammelt sich tagelang neu. Wer früh räumt, zahlt wenig und bekommt wenig; wer wachsen lässt, spielt auf die große Ausschüttung – und alle anderen bezahlen die Zwischenzeit mit.' },
       { title:'Wrackkonvois: die Beute, die entkommt', body:'Ab und zu treibt ein <strong>Wrackkonvoi</strong> durch ein freies System – ein zerbrochener Rumpf mit Trümmerspur auf der Karte, als Landmarke ein <strong>♻️</strong>. Er ist das Gegenstück zum Alien-Nest: Er hat <strong>keine Schwäche, keine Stufen</strong>, er wächst nicht – aber er <strong>entkommt</strong>. Nach <strong>' + KONVOI_LEBENSDAUER_STD + ' Stunden</strong> ist er ganz weg, und bis dahin kann er in ein Nachbarsystem driften. Wer zu lange zögert, findet nichts mehr vor – der Verband kehrt dann <strong>unversehrt</strong> zurück, ohne Verluste und ohne Abklingzeit. Das Kartenmenü und die Startvorschau sagen dir vorher, wie lange er noch da ist und ob dein Hinflug rechtzeitig ankommt.<br><br><strong>Angegriffen wird über das Kartenmenü</strong>, wie bei Festung und Nest: Der Verband fliegt hin und zurück, der Server rechnet den Schaden aus deiner Flotte, und was <em>angekommen</em> ist, zählt auf deinen Anteil. Nach jedem Schlag gilt an <em>diesem</em> Konvoi eine <strong>Abklingzeit von ' + KONVOI_ABKLING_STD + ' Stunden</strong>. Ein Konvoi ist bewusst <strong>solo zu schaffen</strong> – so groß wie ein Einsteiger-Nest.<br><br><strong>Die Bergung</strong> geht beim Fall an alle Beteiligten nach Schadensanteil und liegt danach unter den <strong>Belohnungen</strong>: <strong>Sternenessenz</strong> (die einzige Währung, die Prestige und Aufstieg übersteht – bewusst wenig, aber wiederkehrend), Kampfpunkte, Erfahrung und Kredite. Dazu würfelt der Server für jeden Beteiligten <strong>zwei Module, die es nirgends sonst gibt</strong>: die <strong>Bergungslogik</strong> (Standort, Produktion) und die <strong>Bergungspanzerung</strong> (Schiffsmodul der Schweren Linie, Hülle) – jeweils mit einer Chance je Schadensanteil. Beide sind episch, nicht schmiedbar und nicht handelbar; das Herkunfts-Schloss hält sie aus jedem anderen Fundtopf heraus.' },
-      { title:'Vorposten: eine gehaltene Präsenz auf der Karte', body:'Ein <strong>Vorposten</strong> ist die erste spielergebaute Struktur jenseits von Kolonie und Allianzbasis: Du errichtest ihn in einem fremden System (nicht im Heimatsystem, nicht bei einer eigenen Kolonie, <strong>einer je System</strong>, höchstens drei je Konto) über den Knopf <strong>„Vorposten errichten"</strong> in der Detailtafel des aufgeklappten Systems. Eine <strong>Baukolonne</strong> (ein Kolonieschiff, es kommt zurück) fliegt hin; die Baukosten sind fällig beim Start und kommen zurück, falls der Bau nicht zustande kommt. Der Server führt jeden Vorposten – Stufe, Kern, Garnison und Verteidigung sieht jeder, und jeder andere Spieler kann ihn nach dem <strong>Bauschutz</strong> angreifen.<br><br><strong>Vier Nutzen, alle aus den Zahlen des Servers:</strong> Missionen in das System des Vorpostens sind <strong>schneller</strong> – aber nur Erkundung, Kolonisierung, Abbau und der Vorposten-Bau selbst; Anfechtung, Mondbelagerung, Spielerangriff und Spionage bleiben unberührt, damit sich das Reaktionsfenster eines Verteidigers nie verschiebt. Alle deine Standorte produzieren etwas <strong>mehr</strong> (Handelsposten-Wirkung, gedeckelt bei 10 %). Deine <strong>Späher</strong> gegen Spieler, deren Heimat den Vorposten trägt, werden seltener entdeckt, und ab Stufe 2 bleibt Aufklärung dort frisch. Und eine <strong>Garnison</strong> aus Kampfschiffen verteidigt ihn – sie verliert dabei, und fällt der Vorposten, ist sie mit ihm verloren.<br><br><strong>Drei Stufen</strong> (Feldlager, Stützpunkt, Bastion), ausgebaut gegen Rohstoffe mit zwölf Stunden Abstand; ein Ausbau heilt nicht. <strong>Angegriffen</strong> wird über das Kartenmenü: Der Server rechnet den Durchschlag aus deiner Kraft gegen die Verteidigung, gezählt wird, was am Kern ankommt, nach dem Schlag gilt eine Abklingzeit an diesem Vorposten. Fällt er, teilen sich alle Beitragenden eine flache Beute (Kampfpunkte, Erfahrung, Kredite) nach Schadensanteil; der Besitzer erfährt es im Belohnungsfach und im Bericht. <strong>Aufgeben</strong> erstattet nichts – der Bau ist eine verbindliche Ortswahl.<br><br><strong>Du siehst einen Allianz-Verband kommen, bevor er da ist.</strong> Ruft eine Allianz einen koordinierten Angriff auf deinen Vorposten aus, steht ab dem Abflug eine Warnung im Kartenmenü – mit Angreifer-Tag, Schiffszahl und verbleibender Zeit – und dieselbe Meldung liegt in deinem Postfach. Genau dafür ist das Fenster da: Eine Garnison lohnt sich nur, wenn du sie noch losschicken kannst. Fliegen zwei Allianzen gleichzeitig an, siehst du beide. <em>Einzelne</em> Angreifer kündigen sich nicht an – sie fliegen ohne Sammelphase, und der Server erfährt von ihnen erst bei der Ankunft; von ihnen erfährst du beim ersten Schlag.' },
+      { title:'Vorposten: eine gehaltene Präsenz auf der Karte', body:'Ein <strong>Vorposten</strong> ist die erste spielergebaute Struktur jenseits von Kolonie und Allianzbasis: Du errichtest ihn in einem fremden System (nicht im Heimatsystem, nicht bei einer eigenen Kolonie, <strong>einer je System</strong>, höchstens drei je Konto) über den Knopf <strong>„Vorposten errichten"</strong> in der Detailtafel des aufgeklappten Systems. Eine <strong>Baukolonne</strong> (ein Kolonieschiff, es kommt zurück) fliegt hin; die Baukosten sind fällig beim Start und kommen zurück, falls der Bau nicht zustande kommt. Der Server führt jeden Vorposten – Stufe, Kern, Garnison und Verteidigung sieht jeder, und jeder andere Spieler kann ihn nach dem <strong>Bauschutz</strong> angreifen.<br><br><strong>Vier Nutzen, alle aus den Zahlen des Servers:</strong> Missionen in das System des Vorpostens sind <strong>schneller</strong> – aber nur Erkundung, Kolonisierung, Abbau und der Vorposten-Bau selbst; Anfechtung, Mondbelagerung, Spielerangriff und Spionage bleiben unberührt, damit sich das Reaktionsfenster eines Verteidigers nie verschiebt. Alle deine Standorte produzieren etwas <strong>mehr</strong> (Handelsposten-Wirkung, gedeckelt bei 10 %). Deine <strong>Späher</strong> gegen Spieler, deren Heimat den Vorposten trägt, werden seltener entdeckt, und ab Stufe 2 bleibt Aufklärung dort frisch. Und eine <strong>Garnison</strong> aus Kampfschiffen verteidigt ihn – sie verliert dabei, und fällt der Vorposten, ist sie mit ihm verloren.<br><br><strong>Acht Stufen</strong>, ausgebaut gegen Rohstoffe mit zwölf Stunden Abstand; ein Ausbau heilt nicht. Ab der vierten wählst du einen <strong>Zweig</strong> (Werft, Handelsknoten oder Festungsring), der die Station umbaut und ihr eine eigene Farbe gibt. Sichtbar ist der Ausbau auf der Karte: Die Station wächst mit jeder Stufe, ab der vierten legt sich ein Habitatring um sie, später ein zweiter. <strong>Angegriffen</strong> wird über das Kartenmenü: Der Server rechnet den Durchschlag aus deiner Kraft gegen die Verteidigung, gezählt wird, was am Kern ankommt, nach dem Schlag gilt eine Abklingzeit an diesem Vorposten. Fällt er, teilen sich alle Beitragenden eine flache Beute (Kampfpunkte, Erfahrung, Kredite) nach Schadensanteil; der Besitzer erfährt es im Belohnungsfach und im Bericht. <strong>Aufgeben</strong> erstattet nichts – der Bau ist eine verbindliche Ortswahl.<br><br><strong>Du siehst einen Allianz-Verband kommen, bevor er da ist.</strong> Ruft eine Allianz einen koordinierten Angriff auf deinen Vorposten aus, steht ab dem Abflug eine Warnung im Kartenmenü – mit Angreifer-Tag, Schiffszahl und verbleibender Zeit – und dieselbe Meldung liegt in deinem Postfach. Genau dafür ist das Fenster da: Eine Garnison lohnt sich nur, wenn du sie noch losschicken kannst. Fliegen zwei Allianzen gleichzeitig an, siehst du beide. <em>Einzelne</em> Angreifer kündigen sich nicht an – sie fliegen ohne Sammelphase, und der Server erfährt von ihnen erst bei der Ankunft; von ihnen erfährst du beim ersten Schlag.' },
       { title:'Weltboss: fünf Namen, fünf Archetypen', body:'<strong>Seit dem 02.08.2026 hat der Weltboss Varianten.</strong> Name und Archetyp leiten sich aus seiner Stufe ab, die Kombination wiederholt sich erst nach 20 Stufen: fünf Namen (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) und fünf Archetypen. <strong>Wandelnder Koloss</strong> ist der Normalfall. <strong>Panzer-Bastion</strong> lässt den Schwächen-Bonus kaum greifen (+15% statt +25%) und kostet rund ein Drittel mehr Schiffe. <strong>Schwarm-Titan</strong> trifft schlechter – ein Drittel weniger Verluste. <strong>Phasen-Phantom</strong> macht die Schwäche entscheidend: +50% statt +25%. <strong>Piratenboss</strong> schlägt härter zurück (rund ein Fünftel mehr Verluste), ist dafür schlecht gepanzert: +40% statt +25%. Die <strong>Trefferschwäche</strong> (ein bestimmter Schiffstyp) steht jetzt <em>vor</em> dem Angriff in der Boss-Karte, samt Hinweis, ob deine Angriffsflotte sie überhaupt dabeihat – vorher erfuhr man sie erst aus dem Bericht danach. Die <strong>HP bleiben bewusst allein von der Stufe abhängig</strong>: Die Belohnung hängt an der Stufe, ein zäherer oder dünnerer Boss würde also still die Belohnungsrate verschieben.<br><br>Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. Schon <em>jeder einzelne Schlag</em> kann außerdem ein <strong>Boss-Set-Teil</strong> aus den Überresten bergen – die Chance wächst mit deinem Schadensanteil. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
@@ -41053,7 +41466,7 @@ async function claimPendingRewards(){
       { title:'Automatische Versions-Aktualisierung', body:'Alle 5 Minuten wird im Hintergrund geprüft, ob eine neuere Version live ist. Falls ja, lädt die Seite automatisch neu (mit kurzer Vorwarnung), sobald gerade nicht in ein Textfeld getippt wird – ohne dass man selbst manuell neu laden muss.' }
     ]},
     { key:'galaxie', icon:'ti-world', title:'Lebendige Galaxie', entries:[
-      { title:'Vier Unterreiter', body:'Der Galaxie-Tab ist in vier klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten.' },
+      { title:'Sechs Unterreiter', body:'Der Galaxie-Tab ist in sechs klickbare Bereiche unterteilt, ganz oben auf der Seite: <strong>Kampf & Eroberung</strong> (angreifbare NPC-Fraktionen, Weltboss, Piraten-Versteck, Territorien-Kontrolle – die Flottenwahl öffnet sich seit dem 06.08.2026 direkt am jeweiligen Angreifen-Knopf), <strong>Der Abgrund</strong> (Tauchgänge, Werkstatt, Reliquien), <strong>Front</strong> (Kriegsraum und Lieferungen), <strong>Diplomatie & Handel</strong> (NPC-Fraktionen-Übersicht, Nichtangriffspakte, Schwarzmarkt), <strong>Rangliste & Ruhm</strong> (Bestenliste, Ruhmeshalle, Wochenliga) und <strong>Nachrichten</strong> (Galaxie-Nachrichten, eigenes Profil). Die Auswahl bleibt über einen Tab-Wechsel hinweg erhalten. <strong>Kein Angreifen-Knopf ist mehr grau:</strong> Steht dem Angriff etwas im Weg – kein Kampfschiff, kein Hangarplatz, alle Flottenplätze belegt oder ein Angriff auf dasselbe Ziel unterwegs –, sagt der Knopf das beim Antippen, statt sich stumm zu verweigern.' },
       { title:'Diplomatie: Nichtangriffspakte', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du einen <strong>Nichtangriffspakt</strong> anbieten (Angebot 48h gültig). Nimmt der andere an, sind gegenseitige Angriffe und Spionage für <strong>7 Tage</strong> blockiert - Pakt-Partner sind in der Bestenliste mit einem Pakt-Abzeichen markiert. Beide Seiten können jederzeit kündigen, der Pakt endet dann aber erst nach einer <strong>24-Stunden-Frist</strong> - kein Blitz-Verrat direkt vor einem Angriff. In den letzten 24h vor Ablauf lässt sich ein Pakt stattdessen auch direkt um weitere 7 Tage <strong>verlängern</strong>, ohne die Angebot-Warten-Annehmen-Prozedur erneut zu durchlaufen. Aktive Pakte, eingehende und ausgehende Angebote verwaltest du im Bereich "Diplomatie" im Galaxie-Tab. <strong>Friedensdividende:</strong> Jeder aktive Pakt bringt +5% Produktion (mehr mit der Forschung „Diplomatie-Protokolle"), standardmäßig zählen bis zu 2 Pakte, die Forschung „Diplomatischer Kontaktkreis" erhöht das auf bis zu 4 - additiv zu den anderen globalen Boni. <strong>Diplomatische Doktrin</strong> (Endgame-Anschluss, ab „Diplomatie-Protokolle" Stufe 15 und „Diplomatischer Kontaktkreis" Stufe 2) vertieft die Friedensdividende ein weiteres Mal UND erhöht den Ruf-Zuwachs bei allen Fraktionen um 1%/Stufe. <strong>Pakt-Stufen:</strong> Ein bestehender Pakt lässt sich mit Zustimmung beider Seiten auf „Handelsabkommen" (Stufe 2, schaltet einmal täglich ein gedeckeltes Ressourcengeschenk an den Partner frei) und weiter auf „Frühwarnpartnerschaft" (Stufe 3, zusätzliche Überfall-Vorwarnzeit) anheben. Verschenken lassen sich auch <strong>Tier-2-Ressourcen</strong> (sobald du welche besitzt) - mit bewusst harten Fixdeckeln je Geschenk (20 Nanolegierungen, 10 Quantenchips, 8 Hochenergiekristalle, 4 Fusionskerne, 3 KI-Kerne), damit Geschenke eine Geste bleiben und kein zweiter Produktionskanal; beim Empfänger gilt zudem das kleine Tier-2-Lager. Im Pakt-Eintrag siehst du außerdem, auf welcher Piraten-Stufe dein Partner gerade jagt, und über das Spielerprofil kannst du Spieler per Nachricht in deine Allianz einladen (nur mit eigenem Server).' },
       { title:'Spieler melden', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) kannst du unangemessenes Verhalten (z.B. einen anstößigen Namen) melden - kurze Begründung reicht. Spieler-/Allianznamen werden außerdem automatisch beim Anlegen auf eindeutig unangemessene Begriffe geprüft. Nur mit eigenem Server verfügbar.' },
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
@@ -51896,7 +52309,15 @@ async function claimPendingRewards(){
     const wiederholung = abgrundWiederholungsFaktor(tiefe, undefined, flotte);
     const splitterErwartet = Math.max(1, Math.round(sektor.splitter * abgrundSplitterFaktor(flotte, state.activeBasePlanet) * wiederholung));
     const bergung = abgrundBeuteFaktor(flotte);
-    const kann = !busy && gewaehlt > 0;
+    /* SP-3: Der Riegel ist weg - derselbe Fall wie bei den NPC-Knoepfen: gewaehlt===0 sperrte
+       den Knopf, der als einziger zur Auswahl fuehrt. Der Kommentar am Startknopf sagte es
+       schon - die Sperre im Feld ist Komfort, keine Autoritaet; sendeAbgrundMission() prueft
+       Tiefe, Slots und Treibstoff ohnehin selbst.
+       Das frueher hier stehende `const kann` ist mit dem Riegel entfallen: Es wurde danach von
+       keiner Zeile mehr gelesen, waehrend der Kommentar daneben das Gegenteil behauptete
+       (Befund der Durchsicht). `busy` und `gewaehlt` stehen weiter im Markup und halten die
+       Signatur des Kastens wirksam. */
+    const tauchSperre = abgrundSperrGrund();
     const maxT = abgrundMaxTiefe();
     const gegenVorrat = abgrundGegenVorrat();
     const mutHtml = rohSektor.mutatoren.map(m => {
@@ -52186,7 +52607,7 @@ async function claimPendingRewards(){
         </div>` : ''}
         <div class="bmeta" style="margin-bottom:6px;">Gegnerstärke ${fmt(sektor.defense)} · Anflug ${fmtDuration(abgrundAnflugdauer(tiefe, sektor.mods.dur, flotte))}${abgrundRissKuerzung()>0?' <span style="color:#7f77dd;">(Rissströmung: −'+Math.round(abgrundRissKuerzung()*100)+'%)</span>':''} · Bergung ~${fmt(Math.round(sektor.loot.erz*bergung*wiederholung))} Erz, ${fmt(Math.round(sektor.loot.kristalle*bergung*wiederholung))} Kristalle, ${fmt(Math.round(sektor.loot.deuterium*bergung*wiederholung))} Deuterium (Frachter nötig!) · +${fmt(splitterErwartet)} Abgrundsplitter · +${fmt(Math.max(1, Math.round(sektor.bergung*wiederholung)))} Bergungsgut${wiederholung<1?' <span style="color:#f0997b;">(Wiederholung: nur '+Math.round(wiederholung*100)+'% Ausbeute)</span>':''}</div>
         ${mutHtml}
-        <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+        <div class="bmeta" style="margin:8px 0 6px;">${gewaehlt>0?'Deine Flotte: Kraft '+fmt(Math.round(rohkraft))+(Math.abs(kraft-rohkraft)>1?' → im Sektor '+fmt(Math.round(kraft)):'')+' → Siegchance ~'+Math.round(chance*100)+'%':escapeHtml(tauchSperre || 'Tippe auf „Abtauchen" – dort stellst du deine Tauchflotte zusammen.')}</div>
         ${vorschauHtml ? `<div class="sonde-vorschau" style="margin:6px 0; padding-top:6px;"><span class="bmeta" style="color:#85b7eb;">Tiefensonde – was darunter wartet:</span>${vorschauHtml}</div>` : ''}
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
           <button data-abgrund-tiefe="-1" ${tiefe>1?'':'disabled'} style="min-width:44px;"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
@@ -52194,7 +52615,7 @@ async function claimPendingRewards(){
           <button data-abgrund-tiefe="1" ${tiefe<maxT?'':'disabled'} style="min-width:44px;"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
         </div>
         ${tiefenListe.length ? `<div class="bmeta" style="margin-bottom:6px; color:#7d8199;">${soTief>0 ? soTief+' der geladenen Kommandanten '+(soTief===1?'war':'waren')+' schon mindestens so tief.' : 'Aus den geladenen Eintraegen war hier noch niemand.'}</div>` : ''}
-        <button data-abgrund-start ${kann?'':'disabled'}>${busy?'Tauchgang läuft ...':'<i class="ti ti-infinity" aria-hidden="true" style="margin-right:4px;"></i>Abtauchen'}</button>
+        <button data-abgrund-start>${busy?'Tauchgang läuft ...':'<i class="ti ti-infinity" aria-hidden="true" style="margin-right:4px;"></i>Abtauchen'}</button>
       </div>
       <div class="fleet-subtabs abgrund-reiter" style="grid-template-columns:repeat(4, 1fr); margin-bottom:12px;">
         ${ABGRUND_REITER.map(r => `<button type="button" class="fleet-subtab${r.key===reiter?' on':''}" data-abgrund-reiter="${r.key}"><i class="ti ${r.icon}" aria-hidden="true"></i> ${r.name}<small>${r.note}</small></button>`).join('')}
@@ -52312,11 +52733,15 @@ async function claimPendingRewards(){
     // Die Tiefenschiffe fehlen hier WEITERHIN (sie stehen nicht in ATTACK_SHIP_KEYS und koennen
     // in keiner Tauchgang-Komposition landen) - das ist der offene Punkt aus der Kartierung vom
     // 05.08.2026 und ein eigenes Ticket, kein Teil dieses Umbaus.
-    if (startBtn) startBtn.onclick = () => oeffneFlottenwahl({
+    if (startBtn) startBtn.onclick = () => {
+      const sperre = abgrundSperrGrund();
+      if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
+      oeffneFlottenwahl({
       art: 'Abgrund', titel: 'In den Abgrund tauchen',
       // Kampfschiffe UND Tiefenflotte (v8.436.0, Task #23) - nur hier, in keiner anderen Angriffsart.
       keys: ATTACK_SHIP_KEYS.concat(TIEFEN_SHIP_KEYS), startLabel: 'Abtauchen',
       sperre: fwahlMindestensEins, start: () => sendeAbgrundMission() });
+    };
     box.querySelectorAll('[data-abgrund-kauf]').forEach(el => {
       el.onclick = () => kaufeAbgrundAusbau(el.getAttribute('data-abgrund-kauf'));
     });
@@ -52380,6 +52805,25 @@ async function claimPendingRewards(){
     unikat:  'Fällt ausschließlich bei seiner eigenen Jagd (Weltboss bzw. Wächter) - immer mit Spitzenwurf.',
     konvoi:  'Fällt ausschließlich beim Erlegen eines Wrackkonvois - nicht schmiedbar, nicht handelbar.'
   };
+  /* Der ANTEIL im Fundtopf, an dieselbe Zeile gehaengt (04.09.2026). Die Herkunftszeile stand
+     schon da und sagt, WO etwas faellt; sie sagte nur nicht, wie viel Auswahl der Topf hat - und
+     genau das ist die Frage, die ein Spieler stellt ("wie selten ist das?"). Der Satz sagt
+     ausdruecklich "wenn dabei ein Modul faellt": Die Zahl ist der Anteil INNERHALB des Topfes,
+     nicht die Chance, dass die Quelle ueberhaupt etwas ausschuettet - die haengt an der Mechanik
+     und steht dort, nicht am Modul.
+     Nur fuer Module: Die uebrigen Katalog-Arten (Verbrauch, Material, Reliquie) ziehen aus anderen
+     Toepfen mit eigenen Gewichten, fuer sie waere 1/n schlicht falsch. */
+  function sammlungAnteilText(g){
+    if (g.art !== 'standortmodul' && g.art !== 'schiffsmodul') return '';
+    const defs = g.art === 'standortmodul' ? MODULE_DEFS : SHIP_MODULE_DEFS;
+    const d = defs.find(x => x.key === g.key);
+    if (!d) return '';
+    const f = modulFundort(d, defs, g.art === 'standortmodul' ? 'standort' : 'schiff');
+    if (f.anteil === null) return '';
+    const pct = Math.round(f.anteil * 1000) / 10;
+    return ` <span style="opacity:0.85;">Fällt dabei ein Modul, ist es zu ${String(pct).replace('.', ',')} % dieses (${adminZahl(f.topf)} im Topf)`
+      + (f.minTiefe ? `, und erst ab Tiefe ${adminZahl(f.minTiefe)}` : '') + '.</span>';
+  }
   // Lazy, nicht beim Laden: Zwei der fuenf Listen stehen weiter unten in der Datei, und ein
   // Aufruf waehrend der Modulauswertung traefe sie in ihrer temporalen Todeszone (Arbeitsregel 38).
   // Ein Zwischenspeicher ist tragfaehig, weil sich keine der fuenf Listen zur Laufzeit aendert.
@@ -52496,7 +52940,7 @@ async function claimPendingRewards(){
             <div class="bname">${escapeHtml(g.name)}</div>
             <div class="bmeta">${teile.join(' · ')}</div>
             <div class="bmeta" style="opacity:0.85;">${beschr}</div>
-            <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}</div>
+            <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}${sammlungAnteilText(g)}</div>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">${pille}${aktivieren}</div>
@@ -58295,13 +58739,13 @@ async function claimPendingRewards(){
             + (konvois.length > 1 ? ' und ' + (konvois.length-1) + ' weiterer' : '')
             + ' · driftet weiter, wenn niemand ihn stellt' });
       }
-      /* ⛺ Vorposten (B2): eigen oder fremd - der Titel nennt den Besitzer, denn das ist die
+      /* 🛰 Vorposten (B2): eigen oder fremd - der Titel nennt den Besitzer, denn das ist die
          Entscheidung, die man an der Landmarke trifft (angreifen oder meiden). */
       const vpHier = vorpostenAn(sysId);
       if (vpHier){
         const kernPct = Math.round(100 * Math.max(0, Math.min(1, ((vpHier.kern||{}).lp||0) / Math.max(1, (vpHier.kern||{}).lpMax||1))));
-        // Ab der Wahlstufe ist es keine Palisade mehr, sondern eine Station - die Landmarke sagt es.
-        badges.push({ icon: vorpostenIstStation(vpHier) ? '🛰' : '⛺', title: (vpHier.eigener ? 'Dein ' : '') + (vpHier.name||'Vorposten') + (vpHier.eigener ? '' : ' von ' + (vpHier.besitzerName||'?')) + ' – Kern ' + kernPct + '%, ' + (vpHier.garnisonAnzahl||0) + ' Schiffe Garnison' });
+        // Auf jeder Stufe eine Station (GR-6) - deshalb traegt die Landmarke immer dasselbe Zeichen.
+        badges.push({ icon: '🛰', title: (vpHier.eigener ? 'Dein ' : '') + (vpHier.name||'Vorposten') + (vpHier.eigener ? '' : ' von ' + (vpHier.besitzerName||'?')) + ' – Kern ' + kernPct + '%, ' + (vpHier.garnisonAnzahl||0) + ' Schiffe Garnison' });
       }
       /* 🎯 statt ⚔️ - das Schwerter-Zeichen ist an den Fraktionskrieg vergeben (siehe oben), und
          zwei Bedeutungen fuer dasselbe Symbol sind die zweite Anzeigestelle in Reinform. */
@@ -59140,10 +59584,16 @@ async function claimPendingRewards(){
       // Alles, was an der Auswahl haengt (Erfolgschance, Konter, Flugzeit, Treibstoff, Fracht),
       // steht IM Feld und zieht live mit; der Infoblock unten traegt die Zahlen, die ohne Auswahl
       // gelten. Beide Seiten rechnen ueber npcKampfLage - siehe dort.
-      { icon:'ti-sword', label:'Angreifen',
-        grund: 'Öffnet die Flottenwahl.',
-        disabled: false,
-        fn: () => oeffneNpcAngriff(npcId) }
+      /* SP-3 (Durchsicht): Der Eintrag versprach "Öffnet die Flottenwahl" auch dann, wenn
+         npcAngriffSperrGrund den Klick abweist - das Menue schloss sich und erklaerte erst
+         danach per Meldung, dass es das nicht getan hat. Die Geschwister-Eintraege desselben
+         Menues (Nest, Vorposten) fuellen `grund`/`disabled` seit jeher aus derselben Regel;
+         dieser tut es jetzt auch. */
+      (() => { const sperre = npcAngriffSperrGrund(npcId);
+        return { icon:'ti-sword', label:'Angreifen',
+          grund: sperre || 'Öffnet die Flottenwahl.',
+          disabled: !!sperre,
+          fn: () => oeffneNpcAngriff(npcId) }; })()
     ];
     /* Infoblock statt eines nackten "Angreifen" (E1b). Das Menue trug bis dahin KEINE einzige
        Zahl - wer ueber die Karte angriff, wusste nicht einmal, wie stark der Gegner ist. Gezeigt
@@ -60204,9 +60654,9 @@ async function claimPendingRewards(){
     }
     /* Vorposten (B2): ein Objekt je System auf der inneren Bahn (vorpostenMarkerXY), durch den
        Kollisionsschieber.
-       ZWEI ZEICHNUNGEN, nicht eine: Bis zur Wahlstufe ein BODENLAGER (vorpostenLager - Palisade,
-       Tor, Wachturm, gezeichnet in der Zweigfarbe), ab der Wahlstufe eine STATION - und die ist
-       seit GR-5 kein SVG mehr, sondern ein gerendertes <image> (vorpostenSilhouette). Dessen
+       EINE ZEICHNUNG, auf jeder Stufe: die Station, seit GR-5 kein SVG mehr, sondern ein
+       gerendertes <image> (vorpostenSilhouette). Bis GR-6 stand darunter ein zweites Bild, ein
+       Bodenlager fuer die Stufen unter der Zweigwahl - es ist entfallen, siehe dort. Dessen
        Inhalt haengt nur an Zweig und Stufe; der uebergebene `farbeV` wirkt dort NICHT mehr.
        Die Farbregel eigen gruen / fremd rot lebt deshalb nur noch im Hof-Ring, im Kernbalken
        und in der Beschriftung darunter - wer sie in der Silhouette sucht, sucht vergebens. */
@@ -60249,7 +60699,7 @@ async function claimPendingRewards(){
               <animate attributeName="stroke-opacity" values="0.45;0.1;0.45" dur="3.4s" repeatCount="indefinite"/>
             </circle>
             ${alarmV}
-            ${vorpostenIstStation(vp) ? vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV) : vorpostenLager(vp, posV.x, posV.y, rV, farbeV)}
+            ${vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV)}
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2*anteilV).toFixed(1)}" height="2.6" fill="${farbeV}"/>
             <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(posV.y - rV - 8).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.name||'Vorposten') : (vp.name||'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>
@@ -65475,6 +65925,7 @@ async function claimPendingRewards(){
                 <div class="bmeta">Ultimatives Endgame-Schiff (Angriff ${def.atk}, extrem zäh, extrem langsam - entsprechend lange Flugzeit und hoher Treibstoffverbrauch) - kann immer nur ein einziges Exemplar gleichzeitig besessen werden. Ermöglicht über die Bestenliste (<i class="ti ti-skull" aria-hidden="true"></i>-Symbol) die gezielte, dauerhafte Zerstörung eines kolonisierten Mondes eines anderen Spielers (Erfolgschance gedeckelt, 48 Std. Abklingzeit je Einsatz).</div>
                 ${reqList ? `<div class="bmeta"><i class="ti ti-flask" aria-hidden="true"></i> Voraussetzung: ${reqList}</div>` : ''}
                 <div class="bmeta">Benötigt zusätzlich je 1x ${itemList} GLEICHZEITIG im Inventar (werden beim Freischalten verbraucht)</div>
+                ${signaturZeileHtml(def.key)}
               </div>
             </div>
             <button class="buy ${haveAll?'affordable':''}" data-unlock="${def.key}" ${haveAll?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
@@ -65515,6 +65966,7 @@ async function claimPendingRewards(){
                   </summary>
                   <div class="bmeta" style="margin-top:6px;">Exklusives Event-Schiff (Angriff ${def.atk}${def.shield!==undefined?', Schild '+def.shield:''} - ${def.nicheDesc||'exklusive Sondereinheit'}). Nur über ${evDef.partName} freischaltbar, die ausschließlich während des Events "${evDef.name}" bei Expeditionen gefunden werden.</div>
                   <div class="bmeta" style="margin-top:2px;">${statusLine}</div>
+                  ${signaturZeileHtml(def.key)}
                 </details>
                 <div class="progress-outer" style="margin-top:6px;" title="${evDef.partName}: ${have} von ${needed}"><div class="progress-inner" style="width:${pct}%; background:${evDef.color};"></div></div>
               </div>
@@ -65620,7 +66072,7 @@ async function claimPendingRewards(){
                       dort einsortiert, zeigt sie bei knapp der Haelfte der Schiffe nicht - und
                       ausgerechnet die Kaufentscheidung faellt hier, nicht in der Flottenwahl.
                       Deshalb eine eigene Zeile, datengetrieben, fuer JEDES Schiff. */''}
-                <div class="bmeta" title="Wie schwer dieses Schiff zu verbergen ist. Ein Verband ist so sichtbar wie sein sichtbarstes Schiff - ab 600 gilt er als Grosskampfschiff und ist praktisch nicht mehr zu tarnen."><i class="ti ti-target" aria-hidden="true"></i> Signatur ${fmt(shipSignatur(def.key))}${shipSignatur(def.key) >= 600 ? ' <span style="color:#e24b4a;">(nicht zu verbergen)</span>' : ''}</div>
+                ${signaturZeileHtml(def.key)}
                 ${/* def.desc wurde bis v8.347.0 NIRGENDS gerendert. Die 30 gewöhnlichen Schiffe erklärt
                       die meta-if/else-Kette oben, die 9 Tiefenschiffe tragen stattdessen ein desc – und
                       hatten damit weder das eine noch das andere: sechs Karten mit vier Nullen in den
@@ -65657,6 +66109,7 @@ async function claimPendingRewards(){
           <div>
             <div class="bname">Superschlachtschiff <span class="lvl-pill">gesperrt</span></div>
             <div class="bmeta">Endgame-Klasse, Angriffspunkte ${shipBaseAtk('superschlachtschiff')} · benötigt 1x Antimateriekern (du hast: ${state.rareItems.antimateriekern||0})</div>
+            ${signaturZeileHtml('superschlachtschiff')}
           </div>
         </div>
         <button class="buy ${(state.rareItems.antimateriekern||0)>=1?'affordable':''}" data-unlock="superschlachtschiff" ${(state.rareItems.antimateriekern||0)>=1?'':'disabled'}><i class="ti ti-lock-open" aria-hidden="true" style="margin-right:4px;"></i>Freischalten</button>
@@ -65671,6 +66124,7 @@ async function claimPendingRewards(){
           <div>
             <div class="bname">Superschlachtschiff <span class="lvl-pill">${cf.superschlachtschiff||0}</span>${superPendingQty?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;">+${superPendingQty} im Bau</span>`:''}</div>
             <div class="bmeta">Angriffspunkte ${shipBaseAtk('superschlachtschiff')} · ${slotsUsedAttack}/${combatShips} Kampf-Slots (gemeinsamer Pool) · Endgame-Flaggschiff · eigener Hangar für ${SUPER_HANGAR_SLOTS} Jäger/Bomber je Schiff (Gesamtkapazität ${hangarCap})${(awayByType.superschlachtschiff||0)>0?' · <span style="color:#e24b4a;">'+awayByType.superschlachtschiff+' unterwegs</span>':''}</div>
+            ${signaturZeileHtml('superschlachtschiff')}
             ${shipStatBarsHtml(shipBaseAtk('superschlachtschiff'), SUPERSCHLACHTSCHIFF_SHIELD, Math.round(shipBaseAtk('superschlachtschiff')*0.4)+SUPERSCHLACHTSCHIFF_SHIELD, SUPER_SPEED, 'superschlachtschiff')}
             ${state.unlocked.superschlachtschiff ? shipMarkRowHtml('superschlachtschiff') : ''}
             <div class="bmeta" style="${superHaveItem<superQty?'color:#e24b4a;':''}"><i class="ti ti-atom-2" aria-hidden="true"></i> Verbraucht ${superQty}x Antimateriekern (vorhanden: ${superHaveItem})${superHaveItem<superQty?' – nicht genug!':''} · sehr seltener Fund bei Erkundungsmissionen</div>
@@ -67099,15 +67553,19 @@ async function claimPendingRewards(){
       } else {
         const attackFleetForTarget = buildAttackFleet(state.activeBasePlanet, cf);
         const totalSelectedForTarget = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleetForTarget[k]||0),0);
-        const canSendPending = totalSelectedForTarget > 0;
+        /* SP-3 (Durchsicht): Derselbe Fall wie bei den NPC-Knoepfen - `totalSelectedForTarget > 0`
+           sperrte genau den Knopf, der die Flottenwahl oeffnet. Der Satz daneben verwies dabei
+           auf eine Auswahl "oben", die es seit v8.427.0 gar nicht mehr gibt (siehe Kommentar
+           weiter oben in dieser Funktion). Beides ersetzt durch den echten Grund. */
+        const pendingSperre = pvpAngriffSperrGrund();
         pendingAttackBox.innerHTML = `
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:8px; background:rgba(226,75,74,0.1); border-color:rgba(226,75,74,0.4); margin-top:0.5rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div class="bmeta"><i class="ti ti-target" aria-hidden="true" style="color:#e24b4a;"></i> Markiertes Ziel: <strong style="color:#fff;">${pendingAttackTarget.name}</strong></div>
               <button aria-label="Angriff abbrechen" data-cancel-pending-attack style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
-            <button class="buy ${canSendPending?'affordable':''}" id="pendingAttackBtn" ${canSendPending?'':'disabled'}><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
-            ${!canSendPending ? `<div class="bmeta">Wähle oben mindestens ein Kampfschiff für die Angriffsflotte aus.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`}
+            <button class="buy ${pendingSperre?'':'affordable'}" id="pendingAttackBtn"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
+            ${pendingSperre ? `<div class="bmeta">${escapeHtml(pendingSperre)}</div>` : (totalSelectedForTarget < 1 ? `<div class="bmeta">Tippe auf „Spieler angreifen" – dort stellst du deine Angriffsflotte zusammen.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`)}
           </div>
         `;
         /* Der Knopf startet nicht mehr direkt, sondern oeffnet das Flottenwahl-Feld (05.08.2026,
@@ -67119,6 +67577,8 @@ async function claimPendingRewards(){
            Es entsteht eine zweite BEDIENSTELLE, keine zweite QUELLE. */
         const pendingBtn = document.getElementById('pendingAttackBtn');
         if (pendingBtn) pendingBtn.onclick = () => {
+          const sperre = pvpAngriffSperrGrund();
+          if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
           const target = pendingAttackTarget;
           /* Die Standortwahl gilt immer nur fuer EIN Ziel. Beim Oeffnen wird sie deshalb
              zurueckgesetzt, wenn sie einem anderen Spieler galt - sonst wirkte eine bei Spieler A
@@ -67209,7 +67669,13 @@ async function claimPendingRewards(){
       const plChance = plSelected > 0 ? battleWinChance(plPhasenBasis, lairDef, 1) : 0;
       const plBusy = cf.missions.some(m=>m.type==='piratelair');
       const plLoot = pirateLairLoot(stage);
-      const plCan = !plBusy && plSelected > 0;
+      /* SP-3: kein Riegel mehr, aus demselben Grund wie bei den NPC-Knoepfen. plSelected===0
+         hiess bisher "gesperrt" - und der Text daneben schickte den Spieler zu einer Auswahl
+         "unten", die es an dieser Stelle gar nicht gibt: Sie steckt im Menue, das genau dieser
+         Knopf oeffnet. plBusy bleibt als Beschriftung sichtbar ("Angriff laeuft ...").
+         Nachtrag aus der Durchsicht: Die Zeile darunter darf keine Auswahl versprechen, die der
+         Klick gar nicht oeffnet - sie zeigt deshalb denselben Grund, den der Knopf nennen wuerde. */
+      const plSperre = verstecksSperrGrund();
       const prestigeNote = prestige > 0 ? ` · <span style="color:#fac775;"><i class="ti ti-star" aria-hidden="true"></i> ${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)}× abgeschlossen (+${Math.min(PIRATE_LAIR_PRESTIGE_CAP,prestige)*2}% Angriff dauerhaft)</span>` : '';
       setBoxHtml(pirateLairBox, 'pirateLairBox', `
         <div class="section-title" style="margin-top:0.75rem;"><i class="ti ti-skull" aria-hidden="true"></i>Piraten-Versteck <span class="lvl-pill" style="margin-left:6px;">Stufe ${stage}/${PIRATE_LAIR_MAX_STAGE}</span></div>
@@ -67219,24 +67685,32 @@ async function claimPendingRewards(){
             <span class="lvl-pill">Stärke ${fmt(lairDef)}</span>
           </div>
           <div class="bmeta" style="margin-bottom:4px;">Sieg: ~${fmt(plLoot.erz)} Erz, ${fmt(plLoot.kristalle)} Kristalle, ${fmt(plLoot.deuterium)} Deuterium (Frachter nötig!) · +${30+stage*20} Kredite · +${5+stage*3} Kampfpunkte · ${stage>=PIRATE_LAIR_MAX_STAGE?'garantiertes Modul + 500 Bonus-Kredite + Ketten-Neustart mit dauerhaftem Angriffsbonus':Math.round((0.10+stage*0.02)*100)+'% Modul-Chance'}${prestigeNote}</div>
-          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(Math.round(plPower*(plSchwaecheGenutzt?WEAKNESS_POWER_MULT:1)))+' → Siegchance ~'+Math.round(plChance*100)+'%':'Stelle unten eine Angriffsflotte zusammen.'}</div>
+          <div class="bmeta" style="margin-bottom:6px;">Niederlage: 20-35% Flottenverluste, Stufe bleibt. ${plSelected>0?'Deine Angriffsflotte: Kraft '+fmt(Math.round(plPower*(plSchwaecheGenutzt?WEAKNESS_POWER_MULT:1)))+' → Siegchance ~'+Math.round(plChance*100)+'%':escapeHtml(plSperre || 'Tippe auf „Versteck angreifen" – dort stellst du deine Angriffsflotte zusammen.')}</div>
           <div class="bmeta" style="margin-bottom:6px; color:${plSchwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle dieser Stufe: ${weaknessName(plSchwaeche)}${plSchwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>
-          <button data-attack-lair ${plCan?'':'disabled'}>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
+          <button data-attack-lair>${plBusy?'Angriff läuft ...':'<i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Versteck angreifen'}</button>
         </div>`);
       const lairBtn = pirateLairBox.querySelector('[data-attack-lair]');
-      if (lairBtn) lairBtn.onclick = () => oeffneFlottenwahl({
-        art: 'Piratenversteck · Stufe '+(state.pirateLairStage||1), titel: 'Piratenversteck angreifen',
-        keys: ATTACK_SHIP_KEYS, fracht: true, startLabel: 'Versteck angreifen',
-        sperre: fwahlMindestensEins, start: () => sendPirateLairMission() });
+      if (lairBtn) lairBtn.onclick = () => {
+        const sperre = verstecksSperrGrund();
+        if (sperre){ log(sperre, 'ti-alert-triangle'); return; }
+        oeffneFlottenwahl({
+          art: 'Piratenversteck · Stufe '+(state.pirateLairStage||1), titel: 'Piratenversteck angreifen',
+          keys: ATTACK_SHIP_KEYS, fracht: true, startLabel: 'Versteck angreifen',
+          sperre: fwahlMindestensEins, start: () => sendPirateLairMission() });
+      };
     }
     renderAbgrundBox(cf);
     setBoxHtml(document.getElementById('npcList'), 'npcList', NPCS.filter(n => npcFreigeschaltet(n)).map(n => {
       const busy = cf.missions.some(m=>m.type==='attack' && m.targetId===n.id);
       const combatShipsN = combatFleetCount(cf);
-      const slotsFreeN = cf.missions.filter(m=>m.type==='attack'||m.type==='attack-player'||m.type==='piratelair'||m.type==='abgrund'||m.type==='worldboss').length < combatShipsN;
+
       const attackFleet = buildAttackFleet(state.activeBasePlanet, cf);
       const totalSelected = ATTACK_SHIP_KEYS.reduce((a,k)=>a+(attackFleet[k]||0),0);
-      const canSendN = slotsFreeN && !busy && totalSelected > 0;
+      /* SP-3: kein Riegel mehr. Wer nicht angreifen kann, erfaehrt beim Klick warum - die Regel
+         steht in npcAngriffSperrGrund(), damit Knopf und Kartenmenue nicht zwei Fassungen
+         derselben Bedingung pflegen. `busy` bleibt als Beschriftung ("im Einsatz"); das frueher
+         hier gerechnete `slotsFreeN` ist entfallen, weil es danach niemand mehr las - der erste
+         Kommentar an dieser Stelle behauptete das Gegenteil (Befund der Durchsicht). */
       /* Die fuenfzehn Zwischenwerte standen bis E1b hier inline. Sie liegen jetzt in
          npcKampfLage(), weil die Kartenvorschau dieselben Zahlen braucht - eine zweite Rechnung
          daneben waere genau die Anzeigestelle, die beim naechsten Balance-Schritt die alte
@@ -67265,7 +67739,7 @@ async function claimPendingRewards(){
             <div class="bicon" style="background:rgba(226,75,74,0.16); color:#f0997b;"><i class="ti ti-alien" aria-hidden="true"></i></div>
             <div>
               <div class="bname">${n.name} <span class="lvl-pill">Stufe ${n.level}</span>${wins?` <span class="lvl-pill" style="background:rgba(93,202,165,0.25); color:#5dcaa5;"><i class="ti ti-arrow-up" aria-hidden="true"></i> ${wins}x besiegt</span>`:''}</div>
-              <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?' (keine Schiffe gewählt)':''} · Erfolgschance ~${chance}%</div>
+              <div class="bmeta">Gegner-Verteidigungspunkte: ${effDefense}${wins?' (skaliert)':''} · Deine Angriffskraft: ${power}${totalSelected<1?(combatShipsN>0?' (keine Schiffe gewählt)':' ('+kampfflottenMangel(cf)+')'):''} · Erfolgschance ~${chance}%</div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${kv.text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
               ${n.weakness ? `<div class="bmeta" style="color:${schwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: ${weaknessName(n.weakness)}${schwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>` : ''}
@@ -67276,7 +67750,7 @@ async function claimPendingRewards(){
               <div class="bcost">${rewardHtml(effLoot)}</div>
             </div>
           </div>
-          <button class="attack" data-attack="${n.id}" ${canSendN?'':'disabled'}>${busy?'im Einsatz':'Angreifen'}</button>
+          <button class="attack" data-attack="${n.id}">${busy?'im Einsatz':'Angreifen'}</button>
         </div>
       `;
     }).join(''));
@@ -68756,7 +69230,7 @@ async function claimPendingRewards(){
           const mCan = !mLocked && !mMax && avail >= m.cost;
           masteryHtml = `<div class="card-row" style="padding:0.45rem 0.6rem; border-top:var(--bw-1) dashed rgba(255,255,255,0.15); margin-top:2px; ${mLocked?'opacity:0.5;':''}">
                 <div class="left"><div><div class="bname" style="font-size:11.5px;"><i class="ti ${m.icon}" aria-hidden="true" style="color:${info.color};"></i> ${m.name} <span class="lvl-pill">Stufe ${stufe}/${m.maxStufen}</span></div><div class="bmeta">${m.desc}${mLocked?' · benötigt '+((SKILL_TREE.find(n=>n.key===m.requires)||{}).name||'Vorstufe'):''}</div></div></div>
-                ${mMax ? '<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i>' : `<button class="buy ${mCan?'affordable':''}" data-skillmastery="${m.key}" ${mCan?'':'disabled'} style="font-size:10px; padding:4px 8px;">${m.cost} <i class="ti ti-award" aria-hidden="true"></i></button>`}
+                ${mMax ? '<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i>' : `<button class="buy ${mCan?'affordable':''}" data-skillmastery="${m.key}" style="font-size:10px; padding:4px 8px;">${m.cost} <i class="ti ti-award" aria-hidden="true"></i></button>`}
               </div>`;
         }
         html += `<div style="border:var(--bw-1) solid rgba(255,255,255,0.08); padding:10px;">
@@ -68767,8 +69241,8 @@ async function claimPendingRewards(){
               const locked = n.requires && !state.skillTree[n.requires];
               const canBuy = !owned && !locked && avail >= n.cost;
               return `<div class="card-row" style="padding:0.45rem 0.6rem; ${locked?'opacity:0.5;':''}">
-                <div class="left"><div><div class="bname" style="font-size:11.5px;">${owned?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}<i class="ti ${n.icon||'ti-award'}" aria-hidden="true" style="color:${info.color};"></i> ${n.name}</div><div class="bmeta">${n.desc}${locked?' · benötigt Vorstufe':''}</div></div></div>
-                ${owned ? '' : `<button class="buy ${canBuy?'affordable':''}" data-skillnode="${n.key}" ${canBuy?'':'disabled'} style="font-size:10px; padding:4px 8px;">${n.cost} <i class="ti ti-award" aria-hidden="true"></i></button>`}
+                <div class="left"><div><div class="bname" style="font-size:11.5px;">${owned?'<i class="ti ti-check" aria-hidden="true" style="color:#5dcaa5;"></i> ':''}<i class="ti ${n.icon||'ti-award'}" aria-hidden="true" style="color:${info.color};"></i> ${n.name}</div><div class="bmeta">${n.desc}${locked?' · benötigt '+((SKILL_TREE.find(v=>v.key===n.requires)||{}).name||'Vorstufe'):''}</div></div></div>
+                ${owned ? '' : `<button class="buy ${canBuy?'affordable':''}" data-skillnode="${n.key}" style="font-size:10px; padding:4px 8px;">${n.cost} <i class="ti ti-award" aria-hidden="true"></i></button>`}
               </div>`;
             }).join('')}
             ${masteryHtml}
@@ -68778,7 +69252,9 @@ async function claimPendingRewards(){
       html += `</div>`;
       // Markup-Signatur (v8.382.0): Der Baum aendert sich nur beim Kauf eines Knotens/einer
       // Meisterschaftsstufe oder wenn ein Levelaufstieg neue Punkte bringt - beides steckt im Markup
-      // (Punktzahl, Stufenzaehler, affordable-Klasse, disabled) und damit in der Signatur.
+      // (Punktzahl, Stufenzaehler, affordable-Klasse) und damit in der Signatur. Seit SP-3 traegt
+      // kein Knopf mehr `disabled`; die affordable-Klasse wechselt bei genau denselben Anlaessen
+      // und haelt die Signatur damit unveraendert wirksam.
       if (setBoxHtml(skillTreeBox, 'skillTree', html)){
         skillTreeBox.querySelectorAll('[data-skillnode]').forEach(btn => btn.onclick = () => buySkillNode(btn.getAttribute('data-skillnode')));
         skillTreeBox.querySelectorAll('[data-skillmastery]').forEach(btn => btn.onclick = () => buySkillMastery(btn.getAttribute('data-skillmastery')));

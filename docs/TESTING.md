@@ -290,6 +290,7 @@ Exit-Code:
 node pruflauf.js                    # alle Tests, 4 Stücke gleichzeitig
 node pruflauf.js --gleichzeitig 6   # mehr Stücke nebeneinander
 node pruflauf.js --fortsetzen       # fertige Stücke überspringen (nach einem Abbruch)
+node pruflauf.js --ohne-ampel       # absichtlich auf altem Stand messen (sagt es in der Ausgabe)
 ```
 
 Warum das überhaupt geht: Gemessen an einem vollständigen Lauf brauchen 107 der 332 Tests 0 s (reine
@@ -321,11 +322,99 @@ Zwei Dinge, die dabei zu beachten sind:
 - Die Stücke sind **nach Dateizahl** gleich groß, nicht nach Laufzeit: gemessen 1600 s, 1602 s,
   1829 s und 2198 s. Der Gewinn ist deshalb Faktor 2,5 und nicht 4.
 
+**Mehr Stücke machen den Lauf langsamer, nicht schneller** (gemessen 04.09.2026, derselbe Stand,
+derselbe Rechner):
+
+| `--gleichzeitig` | längstes Stück | rote Dateien | **Gesamtdauer** |
+|---|---|---|---|
+| 4 (Vorgabe) | 2001 s / 2057 s | 3 | **2051 s / 2107 s** |
+| 6 | 1809 s | **21** | **2701 s** |
+
+Die Parallelphase wurde tatsächlich rund vier Minuten kürzer — aber sechs gleichzeitige Browser
+erzeugen so viel Last, dass aus 3 roten Dateien **21** werden, und die fährt das Skript einzeln und
+**nacheinander** nach. Diese Nachprüfung kostete 892 s statt 50 s und fraß den Gewinn mehr als auf:
+unterm Strich **zehn Minuten langsamer**.
+
+Der Griff ist naheliegend — wer gegen die Merge-Ampel um Zeit kämpft, will das Fenster verkleinern.
+Er macht es größer. Die Vorgabe 4 ist also nicht nur gemessen, sie ist auch gegen genau diesen
+Reflex robust; wer sie ändern will, misst vorher die **Gesamtdauer**, nicht die der Stücke.
+
 Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln die langsamen Tests
 (`test_wiedergabe_*`, `test_admin_*`) in wenigen Stücken, und dann wartet alles auf das langsamste.
 
 Die Marken machen den Lauf gegen Abbrüche robust — ein Container-Neustart oder ein fremder Merge
 kostet dann ein Stück statt des ganzen Laufs.
+
+### Die Merge-Ampel (04.09.2026, gemessen)
+
+**Der Anlass ist eine Zahl.** Am 04.09.2026 nachgezählt: **25 der letzten 25 Merges nach `main`
+fassen `weltraum_kolonie.html` an** — ausnahmslos. Ihr Abstand liegt im aktiven Fenster bei 31 bis
+67 Minuten (Median rund 42), ein Prüflauf dauert 35. Rechnerisch wird damit **mehr als jeder zweite
+Lauf entwertet, bevor er fertig ist**; ein einzelner Änderungssatz brauchte an diesem Tag vier
+Anläufe, drei davon mit grünem, aber wertlosem Ergebnis.
+
+Die Regel dagegen stand längst in `CLAUDE.md` („das wird gemessen, nicht vermutet"). Gemessen hat
+sie aber ein Mensch, hinterher, wenn er daran dachte — und vergessen wird der Blick gerade dann,
+wenn der Lauf endlich grün ist und man liefern will. Seit dem 04.09.2026 misst `pruflauf.js` selbst.
+
+**Vier Gründe, aus denen ein Lauf entwertet ist.** Der erste war vorher gar keiner:
+
+| # | Lage | Folge |
+|---|---|---|
+| 1 | Die **lokale** Welt hat sich während des Laufs geändert (Spieldatei oder Nachbar-`server.js`) | Code 2 |
+| 2 | `origin/main` steht jetzt mit der Spieldatei voraus | Code 2 |
+| 3 | Die **Schlussmessung misslang, obwohl die Anfangsmessung gelang** — wir waren online und wissen es jetzt nicht mehr | Code 2 |
+| 4 | `origin/main` bewegte sich **ohne** die Spieldatei | kein Grund; die Ausgabe sagt genau das |
+
+Grund 1 ist der Nachtrag, der beim Bauen aufgefallen ist: `weltAbdruck()` misst die lokale Änderung
+seit `v8.662.0`, aber das Ergebnis floss **nur in die Formulierung** der Nachprüfung — nie in den
+Exit-Code, und nur dann, wenn überhaupt ein Test rot war. Ein Lauf, in dem jemand die Spieldatei
+anfasst, war also grün und still.
+
+Grund 4 ist die häufigste Falle: Der Satz „kein fremder Merge während des Laufs" wäre dort schlicht
+falsch — es gab einen, er hat nur die Spieldatei nicht angefasst. Die Ausgabe nennt dann beide
+Stände: „`origin/main` bewegte sich von X nach Y, aber NICHT an `weltraum_kolonie.html`".
+
+**Vor dem Lauf** bricht die Ampel ab, statt 35 Minuten auf einem überholten Stand zu messen — und
+sie sagt dazu, dass `git merge` bei offenen Änderungen abgelehnt wird, denn der Prüflauf läuft laut
+`CLAUDE.md` **vor** dem Commit, dieser Fall ist also der Normalfall. **Auch `--nummer` ist
+geschützt**: Das ist die Abschlussprüfung nach der Nummernvergabe, also die letzte Messung vor dem
+Merge — dort sagt `CLAUDE.md` ausdrücklich „`main` in diesem Moment nochmal ansehen". `--nur-pflicht`
+bleibt bewusst frei: Zwischenprüfung während der Arbeit, mehrmals je Änderung, ein Netzzugriff je
+Tastendruck wäre dort nur Bremse.
+
+**Exit-Codes.** `0` sauber · `1` echter Testfehler · `2` das Ergebnis ist nicht verwendbar. Code 2
+deckt zwei Lagen ab — „gar nicht erst gelaufen" (Abbruch) und „gelaufen, aber entwertet". Die
+Ausgabe unterscheidet sie in Klartext; **die Handlung ist in beiden Fällen dieselbe**: `main`
+hereinholen und neu laufen lassen. Ein echter Testfehler **gewinnt** gegen die Ampel — er ist das
+schwerere Urteil und darf im Rauschen nicht untergehen.
+
+**Was fail-open ist und was fail-closed — die Unterscheidung ist der Kern.** Der *Lauf* fällt offen
+aus: Kein Netz, kein `origin`, kaputtes `git` — es wird trotzdem geprüft. Eine Sicherung, die bei
+einem Netzhänger 35 Minuten Arbeit verweigert, wird nach dem zweiten Mal dauerhaft abgeschaltet, und
+dann sichert sie gar nichts mehr. Die *Aussage* fällt geschlossen aus: Ohne Messung sagt das
+Werkzeug „konnte nicht messen" und **niemals** „kein fremder Merge". Und „das Urteil gilt" steht in
+keiner Lage, in der der Lauf entwertet ist — im ersten Entwurf stand wörtlich „DER LAUF IST
+ENTWERTET" und zwei Zeilen darunter „das Urteil gilt".
+
+**Warum hier gefetcht wird**, obwohl `tests/run.js` beim Nachbar-Klon ausdrücklich das Gegenteil
+entscheidet („Bewusst OHNE `git fetch`: Der Prüflauf soll nicht ans Netz"): Die beiden beantworten
+verschiedene Fragen. Der Nachbar-Vergleich fragt „ist mein Klon alt?" — darauf antwortet eine alte
+Fernreferenz ehrlich, solange sie ihr Alter nennt. Die Ampel fragt „hat sich `main` in den letzten
+35 Minuten bewegt?" — darauf antwortet eine neun Stunden alte Referenz gar nicht. Timeout 20 s je
+Aufruf, zwei Aufrufe je Lauf.
+
+**Was die Ampel NICHT kann:** Sie verhindert das Rennen nicht, sie stellt es fest — verhindern soll
+es die PR-Ampel oben. Und sie sieht nur `origin/main`; ob eine andere Sitzung gerade ausliefert,
+steht auf GitHub, und `pruflauf.js` spricht bewusst kein GitHub (es soll auch ohne Zugangsdaten
+laufen).
+
+**Das Urteil ist eine reine Funktion** (`ampelUrteil()`), damit es direkt prüfbar ist. Der erste
+Entwurf traf es inline; der Test musste es dann über die *Nähe* von Textstellen im Quelltext
+erraten, und diese Näherung war gemessen in beide Richtungen falsch — grün, als der Satz in den
+verbotenen Zweig verschoben wurde, rot, als ein Kommentar daneben wuchs. Wächter:
+`tests/test_pruflauf_ampel.js` (26 Prüfungen; `ampelStand()` gegen ein echtes Wegwerf-Git,
+`ampelUrteil()` über alle 32 Eingabekombinationen, der Exit-Ausdruck ausgeführt).
 
 ## Adversarische Durchsicht vor jeder Auslieferung (04.09.2026)
 
@@ -358,6 +447,54 @@ Praktisch: `/code-review <commit-oder-diff> high` vor dem Merge. Die Befunde wer
 geglaubt** — von den elf war einer entschärft (das gemeldete Schiff steht gar nicht im Baukorb; das
 echte Loch lag beim Nachbarn daneben). Jeder bestätigte Befund bekommt einen Wächter mit Gegenprobe,
 sonst kommt er wieder.
+
+### Zwei wortgleiche Meldungen kann keine Log-Prüfung auseinanderhalten (04.09.2026)
+
+Die Durchsicht zu SP-3 hat eine fünfte Fehlerklasse aufgedeckt, und zwar **durch Sabotage
+bewiesen**, nicht durch Lesen: Sie nahm der geprüften Stelle die Meldung vollständig weg — und die
+Prüfung blieb grün.
+
+Die Ursache liegt in `logMitschnitt` (`tests/lib/umgebung.js`). Der Beobachter hängt eine Zeile nur
+an, wenn sie sich von der **letzten** unterscheidet:
+
+```js
+if (t && t !== a[a.length - 1]) a.push(t);
+```
+
+Wer den Mitschnitt zwischen zwei Klicks mit `__logMitschnitt.length = 0` leert, macht `a[a.length-1]`
+zu `undefined`. Die nächstbeste DOM-Änderung schiebt daraufhin den **unveränderten** Log-Text erneut
+in die leere Liste — und dort steht noch die Zeile des vorigen Klicks. Die zweite Prüfung liest also
+die Antwort der ersten und meldet Erfolg.
+
+Sichtbar wird das nur, wenn beide Stellen **denselben Wortlaut** führen. Genau das war der Fall: Die
+Meldung „Dafür fehlen dir Kampfschiffe" stand wortgleich am NPC-Knopf und am Piraten-Versteck.
+
+Zwei Konsequenzen, beide umgesetzt:
+
+- `logMarke(page)` ersetzt das Leeren. Es hält den alten Text als Wasserzeichen fest und liefert
+  eine Funktion, die nur die **seither** hinzugekommenen Zeilen zurückgibt. Wer mehrere Klicks
+  nacheinander misst, benutzt das statt `logZeilen` + Leeren.
+- Meldungen, die an mehreren Stellen für dieselbe Lage stehen, nennen **ihr Vorhaben**
+  („Für einen Tauchgang fehlen dir …", „Für einen Schlag gegen das Piraten-Versteck …"). Das ist
+  zuerst für den Spieler richtig — wer schnell mehrere Knöpfe antippt, sieht sonst dreimal denselben
+  Satz und weiß nicht, welcher gerade antwortet — und macht die Stellen nebenbei unterscheidbar.
+
+Der Gegenbeweis gehört zur Behebung: Dieselbe Sabotage, die die alte Prüfung überstand, lässt die
+neue fallen — und lässt die Nachbarprüfungen grün, weil sie eine andere Stelle trifft.
+
+### Eine Meldung, die in die falsche Richtung schickt, ist schlechter als keine (04.09.2026)
+
+Der schwerste Befund derselben Durchsicht steckte nicht im entfernten Riegel, sondern im **Text**,
+der ihn ersetzte. „Dafür fehlen dir Kampfschiffe – bau in der Werft welche" klingt richtig, ist aber
+falsch, sobald Jäger dastehen: `combatFleetCount` zählt Jäger und Bomber nur, soweit Hangarplätze da
+sind, und ohne Trägerschiff sind das null. Wer 60 Jäger und keinen Träger hat, wurde damit Jäger
+nachbauen geschickt — und wäre für immer in derselben Meldung hängen geblieben. Das Spiel nennt
+genau diese Verwechslung in seiner eigenen Hilfe die „häufigste".
+
+Daraus die Regel: Wer einen Riegel durch eine Meldung ersetzt, prüft **jede Lage, in der die
+Bedingung zutrifft**, nicht nur die naheliegende. Eine Bedingung, die aus einer abgeleiteten Größe
+kommt (hier `combatFleetCount` statt der reinen Schiffszahl), hat fast immer mehr als eine Ursache —
+und der Spieler braucht die, die auf ihn zutrifft.
 
 ## Während `pruflauf.js` läuft, kein zweiter Browser-Test daneben (04.09.2026)
 
