@@ -243,8 +243,17 @@ pruef('1f2: keine Beschreibung ist ein blosses Kuerzel', zuKurz.length === 0, zu
       return [...texte];
     });
     pruef('5: es gibt mehr als EINEN Fundort-Text', f.length > 1, f.length);
-    pruef('5a: jede Herkunftsart der Datei kommt vor',
-      herkKeys.length > 0 && f.length === herkKeys.length, { gezeichnet:f.length, arten:herkKeys.length, f });
+    // Seit dem 04.09.2026 haengt hinter dem Herkunftssatz bei Modulen noch der Anteil im Fundtopf
+    // ("Faellt dabei ein Modul, ist es zu 6,3 % dieses (16 im Topf)."). Die Zeile ist damit je
+    // Topfgroesse verschieden - gemessen 12 verschiedene Texte statt 5. Die REGEL ist deshalb
+    // nicht mehr "so viele Texte wie Arten", sondern: Jeder Herkunftssatz der Datei steht am
+    // ANFANG mindestens einer gezeichneten Zeile. Das ist die staerkere Pruefung: Sie faellt auch,
+    // wenn ein Zusatz den Herkunftssatz verdraengt, statt sich dahinter zu haengen.
+    const herkTexte = [...herkBlk.matchAll(/'([^']{20,})'/g)].map(m => m[1]);
+    const fehlend = herkTexte.filter(t => !f.some(z => z.startsWith(t)));
+    pruef('5a: jede Herkunftsart der Datei steht am Anfang mindestens einer gezeichneten Zeile',
+      herkTexte.length === herkKeys.length && fehlend.length === 0,
+      { arten: herkKeys.length, texte: herkTexte.length, gezeichnet: f.length, fehlend });
 
     pruef('6: keine Seitenfehler', seitenfehler.length === 0, seitenfehler);
     await ctx.close();

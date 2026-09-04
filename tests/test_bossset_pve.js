@@ -257,6 +257,11 @@ check('3d: alle drei Empfangsstellen rufen den EINEN Helfer', rufer.length === 3
       "function mitWertWurf(){ return 'x'; }",
       'function playSound(){}',
       "function moduleInstanceInfo(k){ const r = k.split(':')[1]; return { rar: MODULE_RARITY[r], def: MODULE_DEFS[0] }; }",
+      // bosssetTeile() seit dem 04.09.2026: Der bossKey-Filter wohnt dort, grantBossSetModule und
+      // der Admin-Reiter "Module" lesen ihn beide. Er gehoert hier mit hinein - sonst stirbt der
+      // Messaufruf an "bosssetTeile is not defined" (genau so gemessen), und die Pruefung faellt
+      // an der Testvorrichtung statt am Prueflings-Verhalten.
+      block(S, '  function bosssetTeile(', '\n  }'),
       block(S, '  function grantBossSetModule(', '\n  }'),
       block(S, '  function bosssetAusServerwurf(', '\n  }')
     ];

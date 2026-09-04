@@ -237,3 +237,67 @@ genau der Bug, wegen dem `check-icons.js` existiert.
 3a/3b und 4a/4b. Gegenprobe gegen origin/main v8.641.0: 28 von 34 fallen, Prüflisten identisch.
 Der erste Entwurf starb dabei mitten im Lauf an einem Zugriff auf ein leeres Listenelement, statt
 rot zu werden (Arbeitsregel 34) — jeder solche Zugriff trägt seither eine Existenzprüfung.
+
+**Fünfzehnter Reiter „Module" (04.09.2026, Idee Sascha „Module-Editor").** Die Übersicht ist
+**abgeleitet, nicht gepflegt**: `modulFundort()` fragt `fundPool()` — dieselbe Funktion, mit der das
+Spiel wirklich zieht — und rechnet den Anteil aus der Topfgröße. Eine gepflegte Fundort-Tabelle wäre
+die dritte Kopie neben Frontend und Backend gewesen und die erste, die niemand nachzieht. Gemessen:
+93 Module (48 Standort-, 45 Schiffsmodule) in sieben Herkünften, keines davon unerreichbar.
+
+- **Der Anteil ist 1/n und sagt ausdrücklich, was er nicht ist.** `zieheAusPool()` indiziert
+  gleichverteilt, jeder Eintrag im Topf ist also gleich wahrscheinlich. Der Satz lautet deshalb
+  „Schüttet diese Quelle ein Modul aus, ist es mit dieser Wahrscheinlichkeit dieses" — er sagt
+  **nicht**, wie oft die Quelle überhaupt etwas ausschüttet. Ohne diesen Zusatz liest sich die Zahl
+  als Fundchance und ist um Größenordnungen falsch.
+- **Zwei Arten von Topf, und sie kommen aus verschiedenen Funktionen.** `fundPool()` ist die eine;
+  die andere sind Ziehstellen mit eigener Liste. Die adversarische Durchsicht hat genau dort einen
+  Fehler des ersten Entwurfs gefunden: Boss-Set-Teile standen als „gezielt vergeben" da, obwohl
+  `grantBossSetModule()` gleichverteilt unter den vier Teilen **desselben** Bosses würfelt — gemessen
+  20 Teile, fünf Bosse zu je vieren, also 25 % je Stück und ein Fünftel aller Module falsch
+  ausgewiesen. Die Teile-Liste ist jetzt eine gemeinsame Funktion (`bosssetTeile()`), die die
+  Ziehstelle **und** die Übersicht lesen. Unikate (`grantUnikatModul('leviathanherz')`) und
+  Konvoi-Module (der Server nennt `defKey`) werden dagegen wirklich benannt vergeben — dort steht
+  „gezielt vergeben" zu Recht. Wächter-Paar 1g/1h.
+- **Die Karte „Auffälligkeiten"** nennt Module, die in **keinem** Topf liegen und auch keine gezielte
+  Quelle haben — im Spiel unerreichbar. Sie steht auch dann da, wenn es keine gibt („keine", grün):
+  Eine Auffälligkeitsliste, die bei null Befunden verschwindet, ist von „noch nicht geladen" nicht
+  zu unterscheiden.
+- **Drop-Chancen** (Backend #229, `GET/POST /api/admin/module…`): Der Server vergibt nur die beiden
+  Wrackkonvoi-Module, alle übrigen Fundorte stehen im Frontend-Code — das sagt der Kasten selbst.
+  Je Quelle Zahlenfeld, „Übernehmen" und, **nur bei einer wirklich gestellten Quelle**, „Auf 0,3
+  zurück". Zurücksetzen schickt `null`, nie den Code-Wert: Sonst fröre der Eingriff die heutige
+  Balance ein, und eine spätere Änderung im Code hätte keine Wirkung mehr.
+- **Eigene Einträge sind Entwürfe.** Die Kennzeichnung „ohne Wirkung im Spiel" steht an jedem
+  Eintrag, in der Einleitung des Kastens und in der Meldung nach dem Anlegen. Der Schlüssel beginnt
+  mit `eigen_` (Backend-Sperre), damit ein Entwurf nie ein echtes Modul überschreiben kann.
+- **Fällt der Server aus, bleiben die Fundorte stehen** — sie kommen aus dem Code. Ein Fehler nimmt
+  dem Reiter die Regler und die Entwürfe, nicht die Übersicht.
+
+**Der Anteil in der Sammlung.** Die Herkunftszeile stand schon da und sagt, WO etwas fällt; sie sagte
+nur nicht, wie viel Auswahl der Topf hat — genau die Frage, die ein Spieler stellt. `sammlungAnteilText()`
+hängt den Satz an dieselbe Zeile und ruft **dieselbe** Funktion wie der Admin-Reiter. Nur für Module:
+Verbrauchsgüter, Material und Reliquien ziehen aus Töpfen mit eigenen Gewichten, für sie wäre 1/n falsch.
+
+**Nebenbefund, in der gemeinsamen Funktion behoben.** `adminListenFehler()` nannte die Liste nur beim
+404er; bei jedem anderen Status stand „Liste konnte nicht geladen werden (500)" — auf einem Reiter mit
+mehreren Kästen sagt das nicht, welche. Der Sammelfall und der 403er nennen jetzt beide die Liste.
+Das gilt für alle siebzehn Admin-Listen, nicht nur für die neue.
+
+**Drei vorhandene Wächter sind der Zusammenlegung gefolgt**, statt sie zu blockieren (der volle Lauf
+hat sie gefunden): `test_bossmodulsets` 5b prüft den `bossKey`-Filter jetzt an seinem neuen Ort und
+zusätzlich, dass es ihn **genau einmal** gibt (5b2 — eine abgeschriebene zweite Kopie fällt dort mit
+„stellen: 2"); `test_bossset_pve` nimmt `bosssetTeile()` in seine Messvorrichtung auf, sonst stürbe
+der Aufruf an der Vorrichtung statt am Prüfling; `test_gegenstandskatalog` 5a zählte die *verschiedenen*
+Fundort-Texte und traf damit 12 statt 5, seit der Anteil hinter dem Herkunftssatz steht — es misst
+jetzt die Regel („jeder Herkunftssatz steht am **Anfang** einer gezeichneten Zeile") und fällt dadurch
+auch, wenn ein Zusatz den Herkunftssatz verdrängt statt sich anzuhängen. Alle drei mit Sabotage-Gegenprobe.
+
+**Wächter** `tests/test_modul_fundorte.js` (26 Prüfungen). Die Kernmessung ist 1c: Sie hängt ein Modul
+**zur Laufzeit** in den Abgrund um und prüft, dass Herkunft und Topfgröße mitgehen — eine gepflegte
+Tabelle würde das nicht mitbekommen. Paare 1a/1b, 2a/2b, 3a/3b. Gegenprobe gegen origin/main d677ffc
+(v8.668.0): 22 von 24 fallen; grün bleiben genau die zwei „keine Seitenfehler"-Prüfungen, die es am
+alten Stand auch nicht gibt. **Lehre für die nächste UI-Prüfung dieser Art:** Das ganze Spielskript
+liegt in einem `(function(){ … })()`, über `page.evaluate` ist deshalb **keine** Spielfunktion
+erreichbar (der erste Entwurf starb an „modulFundorte is not defined"). Der Weg ist derselbe wie in
+`test_abgrund_gegenstaende.js`: den Quelltext holen und in Node auswerten — und diese Auswertung
+fängt ihren eigenen Fehler, sonst hätte die Gegenprobe keine Prüfnamen zum Vergleichen.

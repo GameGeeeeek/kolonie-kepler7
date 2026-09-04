@@ -124,8 +124,18 @@ check('2a: kein Teil-Effekt und kein Stufen-Bonus nutzt atk/raidloss',
   check('5a: der Raid-Claim zieht das Teil des bekämpften Bosses, mit Rückfall auf den Normal-Topf',
     /grantBossSetModule\(data\.boss \? data\.boss\.key : null, data\.modulSeltenheit\) \|\| grantRandomModule\(data\.modulSeltenheit\)/.test(rumpf));
   const gbs = funktionsRumpf('grantBossSetModule');
-  check('5b: grantBossSetModule filtert exklusiv nach bossKey und liefert null bei unbekanntem Boss',
-    gbs.includes("d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey") && gbs.includes('if (!teile.length) return null;'));
+  // Der Filter wohnt seit dem 04.09.2026 in bosssetTeile() - die Ziehstelle und der Admin-Reiter
+  // "Module" lesen dieselbe Funktion. Die Pruefung folgt ihm dorthin, statt zu verschwinden, und
+  // wird dabei schaerfer: Sie misst zusaetzlich, dass es den Filter genau EINMAL gibt. Eine
+  // abgeschriebene zweite Kopie waere sonst genau der Fall, den die Zusammenlegung verhindern soll.
+  const bst = funktionsRumpf('bosssetTeile');
+  check('5b: die Teile-Liste filtert exklusiv nach bossKey; grantBossSetModule liest sie und liefert null bei unbekanntem Boss',
+    bst.includes("d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey")
+    && gbs.includes('const teile = bosssetTeile(bossKey);') && gbs.includes('if (!teile.length) return null;'));
+  check('5b2: den Filter gibt es genau einmal, und die Modul-Uebersicht liest dieselbe Funktion',
+    (JS.match(/d\.quelle === HERKUNFT_BOSS && d\.bossKey === bossKey/g) || []).length === 1
+    && /bosssetTeile\(d\.bossKey, defs\)/.test(JS),
+    { stellen: (JS.match(/d\.quelle === HERKUNFT_BOSS && d\.bossKey === bossKey/g) || []).length });
   // Die Anzeige kennt die Stufen: Fortschrittszaehler und naechste Stufe stehen im Markup.
   check('5c: die Standort-Ansicht zeigt Fortschritt und nächste Stufe',
     JS.includes('Boss-Set „${s.name}" ${have.length}/${s.req.length}') && JS.includes('nächste Stufe (${naechste.teile} Teile)'));
