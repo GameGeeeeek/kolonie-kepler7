@@ -114,8 +114,17 @@ for (const k of ALLE){
 }
 
 // ---- 3) Freischaltung ueber die Rekordtiefe, ausgefuehrt ----
-const SRM = new Function('state', fnAus('shipRequirementsMet')+'; return shipRequirementsMet;');
-const darf = (best, forschung, def) => SRM({ abgrund:{ best }, research: forschung })(def);
+/* Seit SP-2 (04.09.2026) enthaelt shipRequirementsMet() die Bedingungen nicht mehr selbst,
+   sondern leitet sie aus schiffSperrGrund() ab. Isoliert ausgefuehrt braucht sie deshalb die
+   ganze Kette: die Normalisierung der Voraussetzungsform und die vier Allianz-Helfer. Letztere
+   sind hier Attrappen - die Probe unten ist kein Allianzschiff, sie sollen nur nicht fehlen. */
+const SRM = new Function('state', 'inAllianz', 'allianceTechLevel', 'findAllianceStructure', 'findeForschung',
+  fnAus('techVoraussetzung') + ';' + fnAus('schiffSperrGrund') + ';' + fnAus('shipRequirementsMet')
+  + '; return shipRequirementsMet;');
+const darf = (best, forschung, def) => SRM(
+  { abgrund:{ best }, research: forschung },
+  () => false, () => 0, () => ({ name:'Allianzwerft' }), (k) => ({ name:k })
+)(def);
 const probe = { requires:[{key:'rsingularitaet',level:1}], tiefe:15 };
 check('3: ohne Rekordtiefe kein Schiff, auch mit Forschung', darf(0, { rsingularitaet:1 }, probe) === false);
 check('3: knapp darunter noch nicht', darf(14, { rsingularitaet:1 }, probe) === false);

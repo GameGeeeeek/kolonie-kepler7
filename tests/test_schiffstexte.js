@@ -98,10 +98,16 @@ if (/<details/.test(bruecke)){
 }
 
 // ---- 4) DIE INVARIANTE: keine stumme Sperre ----
-// shipRequirementsMet() ist die eine Wahrheit dafuer, ob ein Schiff baubar ist. Jede Bedingung
-// darin muss in den Anforderungs-Zeilen der Karte einen Namen haben, sonst ist der Knopf grau und
-// die Karte schweigt zum Grund. Gelesen werden die def-Felder, die die Funktion abfragt.
-const srm = fnAus('shipRequirementsMet');
+// Jede Bedingung, die ueber die Baubarkeit eines Schiffes entscheidet, muss in den Anforderungs-
+// Zeilen der Karte einen Namen haben - sonst ist der Knopf grau und die Karte schweigt zum Grund.
+// Gelesen werden die def-Felder, die die Pruefung abfragt.
+// SEIT SP-2 (04.09.2026) stehen diese Bedingungen in schiffSperrGrund(); shipRequirementsMet()
+// leitet sich nur noch daraus ab (`return !schiffSperrGrund(def)`). Dieser Test las ausschliesslich
+// shipRequirementsMet und fand danach GAR KEIN def-Feld mehr - er fiel an seiner eigenen
+// Gegenprobe, und das war richtig so: Sie ist genau dafuer da. Gelesen werden jetzt BEIDE
+// Funktionen, damit die Pruefung nicht wieder daran haengt, in welcher von ihnen die Bedingungen
+// gerade wohnen.
+const srm = fnAus('schiffSperrGrund') + '\n' + fnAus('shipRequirementsMet');
 const gelesen = [...new Set([...srm.matchAll(/def\.([a-zA-Z]+)/g)].map(m => m[1]))];
 // 05.08.2026: Hier stand bis heute eine HANDGEPFLEGTE Freigabeliste (`new Set(['requires','tiefe'])`).
 // Sie war rot, sobald jemand ein neues Feld abfragte - aber sie war auch dann rot, wenn er die
@@ -146,7 +152,11 @@ const mitHilfslisten = (zeile) => {
   return t;
 };
 const reqText = mitHilfslisten(reqZeile), allText = mitHilfslisten(allZeile);
-const fehltIn = (text) => gelesen.filter(f => f !== 'requires' && text.indexOf('def.' + f) < 0);
+/* 'requires' ist der Regelfall und wird generisch aufgeloest; 'name' ist ueberhaupt keine
+   Bedingung, sondern steht nur in den Meldungstexten von schiffSperrGrund ("<Name> ist ein
+   Allianzschiff ..."). Beide gehoeren nicht in die Liste der Dinge, die die Karte benennen muss. */
+const KEINE_BEDINGUNG = ['requires', 'name'];
+const fehltIn = (text) => gelesen.filter(f => KEINE_BEDINGUNG.indexOf(f) < 0 && text.indexOf('def.' + f) < 0);
 check('4: die „Benoetigt"-Zeile nennt jede Bedingung, die die Sperre prueft',
   fehltIn(reqText).length === 0,
   { unbenannt: fehltIn(reqText), geprueft: gelesen,
