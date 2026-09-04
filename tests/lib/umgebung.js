@@ -204,10 +204,39 @@ function ruhigeUhren(stunden) {
   };
 }
 
+/* version.txt abfangen - gegen den haeufigsten Wackler der Suite (04.09.2026).
+   ------------------------------------------------------------------------------------------------
+   GEMESSEN: `test_fraktionsgebiet_karte` fiel in 14 von 20 Prueflauf-Protokollen eines Tages als
+   "Lastsymptom" auf und war einzeln jedes Mal gruen. Die Ursache ist kein Zufall und keine Last im
+   eigentlichen Sinn, sondern eine KANTE: Das Spiel ruft `setTimeout(checkLiveVersionUpdate, 15000)`,
+   und der Abruf von `version.txt` scheitert unter `file://` an CORS - sichtbar als Konsolenfehler.
+   Der Test dauert gemessen 19-20 s, liegt also knapp hinter der Kante; unter Last verschiebt sich
+   alles nach hinten, und der Fehler faellt mal ins Messfenster und mal nicht.
+
+   WARUM ABFANGEN UND NICHT WEGFILTERN: Ein Filter auf die Meldung ("CORS" ignorieren) macht den Test
+   auch fuer ECHTE CORS-Fehler blind - er wuerde die Pruefung schwaechen, um sie gruen zu bekommen.
+   Hier wird stattdessen die URSACHE beseitigt: Die Anfrage wird beantwortet, wie es der Test mit
+   den api-Routen ohnehin tut, und der Fehler entsteht gar nicht erst.
+   (Das Routenmuster steht bewusst nur im Code darunter: Ein Glob mit Sternchen und Schraegstrich
+   beendet einen Blockkommentar - genau daran ist der erste Entwurf dieser Zeilen gescheitert.)
+
+   DIE ANTWORT IST BEWUSST "0.0.0": Sie ist nach VERSION_TXT_MUSTER gueltig und immer AELTER als die
+   laufende Version. Eine neuere wuerde `scheduleAutoReload` ausloesen und die Seite mitten im Test
+   neu laden - aus einem stillen Wackler wuerde ein lauter.
+
+   Betrifft potenziell jeden Browser-Test, der Konsolenfehler zaehlt UND laenger als 15 s laeuft
+   (gemessen: 36 Tests zaehlen Konsolenfehler). Beobachtet wurde bisher nur der eine; wer einen
+   zweiten findet, braucht hier eine Zeile statt einer neuen Fehlersuche. */
+async function versionAbfangen(page) {
+  await page.route('**/version.txt*', r => r.fulfill({
+    status: 200, contentType: 'text/plain', body: '0.0.0'
+  }));
+}
+
 function ueberspringen(grund) {
   console.log('SKIP - ' + grund);
   console.log('\nPASS (übersprungen)');
   process.exit(0);
 }
 
-module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren };
+module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren, versionAbfangen };

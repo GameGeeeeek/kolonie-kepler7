@@ -13,7 +13,7 @@
 // Knoten" und die Ring-Farbprüfungen. Die Kontrollprüfungen („Karte überhaupt gezeichnet",
 // „Knoten vorhanden") bleiben in beiden Läufen grün - der Test misst den Unterschied.
 
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, versionAbfangen } = require('./lib/umgebung');
 const { oeffneSektorMitSystem, oeffneSystemUeberSektoren } = require('./lib/karte');
 // Die Spiel-Interna liegen in einer IIFE und sind aus page.evaluate nicht erreichbar. Die
 // Kartenpositionen kommen deshalb aus demselben Helfer, den die Entwurfsbilder benutzen: Er
@@ -84,6 +84,12 @@ const GALAXIE = {
   // uebrigen Schluessel (Allianz, Markt, ...) fehlen absichtlich. Sie zaehlen deshalb nicht als
   // Fehler - echte Skriptfehler (pageerror) dagegen schon.
   page.on('console', m => { if (m.type()==='error' && !/Failed to load resource/.test(m.text())) fehler.push(m.text()); });
+  /* version.txt abfangen, BEVOR die Seite laedt: Das Spiel ruft checkLiveVersionUpdate nach
+     15 s, und der Abruf scheitert unter file:// an CORS - als Konsolenfehler, den die
+     Pruefung unten zaehlt. Dieser Test dauert gemessen 19-20 s und liegt damit knapp hinter
+     der Kante; unter Last fiel er dadurch in 14 von 20 Prueflaeufen eines Tages rot und war
+     einzeln jedes Mal gruen. Begruendung und Messung: tests/lib/umgebung.js. */
+  await versionAbfangen(page);
   galaxieAntwort = GALAXIE;
   await page.route('**/api/**', backend(store));
   // Schluessel aus dem Quelltext abgelesen, nicht geraten: STORE_KEY ist 'kepler7-save-v3' mit
