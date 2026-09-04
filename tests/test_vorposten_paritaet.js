@@ -155,13 +155,60 @@ check('6b: und jeder davon ist der Name der ERSTEN Stufe des Servers',
   !!ersteStufe && rueckfaelle.every(n => n === ersteStufe),
   { ersteStufe, imFrontend: [...new Set(rueckfaelle)] });
 
+
+/* ---- 7) Der Hilfetext nennt eine Stufe beim Namen (GR-7, 04.09.2026) --------------------------
+   Gefunden von der adversarischen Durchsicht: HELP_SECTIONS, Eintrag "Koordinierte Angriffe",
+   sagte nach der Umbenennung weiter "eine Bastion haelt 400.000 Kernpunkte und 60.000
+   Verteidigung". Die Zahlen gehoeren zu Stufe 3 - die heisst seit dem Backend-Merge
+   "Kernstation". Der Rueckfall-Waechter (Abschnitt 6) kann das bauartbedingt nicht sehen: Er
+   prueft Faecher im Code, nicht Fliesstext.
+   Der Satz ist eine KOPIE-FAMILIE aus DREI Werten (Name, Kernpunkte, Verteidigung). Geprueft
+   wird deshalb nicht das Wort, sondern die Zuordnung: Die im Satz genannten Zahlen bestimmen
+   EINDEUTIG eine Stufe des Servers, und der im selben Satz genannte Name muss deren Name sein.
+   Eine spaetere Umbenennung oder Balance-Aenderung faellt damit auf, ohne dass hier ein Name
+   gepflegt werden muss. */
+const hilfeSatz = JS.match(/eine ([A-Za-zÄÖÜäöüß]+) hält ([\d.]+) Kernpunkte und ([\d.]+) Verteidigung/);
+check('7-anker: der Hilfesatz mit Stufenname und Kennzahlen ist auffindbar (sonst misst 7a/7b nichts)',
+  !!hilfeSatz, { gefunden: hilfeSatz ? hilfeSatz[0] : null });
+if (hilfeSatz) {
+  const zahl = t => Number(String(t).replace(/\./g, ''));
+  const genannterName = hilfeSatz[1];
+  const genannterKern = zahl(hilfeSatz[2]);
+  const genannteVert  = zahl(hilfeSatz[3]);
+  const stufenRoh = [...stufenBlock.matchAll(/\{ *stufe: *(\d+), *name: *'([^']+)', *kernLp: *(\d+), *verteidigung: *(\d+)/g)]
+    .map(m => ({ stufe: Number(m[1]), name: m[2], kernLp: Number(m[3]), verteidigung: Number(m[4]) }));
+  check('7-anker2: die Stufentabelle des Servers ist mit Kennzahlen lesbar',
+    stufenRoh.length >= 8, { gelesen: stufenRoh.length });
+  const passend = stufenRoh.filter(x => x.kernLp === genannterKern);
+  check('7a: die im Hilfetext genannten Kernpunkte gehören zu GENAU EINER Serverstufe',
+    passend.length === 1, { genannterKern, treffer: passend.map(x => x.stufe + ':' + x.name) });
+  check('7b: und diese Stufe heißt im Server genauso wie im Hilfetext',
+    passend.length === 1 && passend[0].name === genannterName,
+    { imHilfetext: genannterName, imServer: passend.length === 1 ? passend[0].name : null });
+  check('7c: auch die genannte Verteidigung stimmt mit derselben Stufe überein',
+    passend.length === 1 && passend[0].verteidigung === genannteVert,
+    { imHilfetext: genannteVert, imServer: passend.length === 1 ? passend[0].verteidigung : null });
+}
+
 ende();
 
-/* GEGENPROBE, drei Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei angefasst,
+
+/* GEGENPROBE, sechs Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei angefasst,
    die Testdatei blieb neu):
+
+   Zum Rueckfallnamen (Abschnitt 6):
    A) Spieldatei auf origin/main (Rueckfall noch "Feldlager"), Server "Ankerkern": 6b FAELLT.
    B) Spieldatei neu ("Ankerkern"), Server auf "Ringkern" umbenannt: 6b FAELLT.
    C) Fremdes Stufenfach umbenannt (Nest-Rueckfall 'Nest' -> 'Brutkammer'): bleibt GRUEN.
-      Das ist die Gegenprobe zur Einengung selbst - ohne sie haette C den Test gefaellt.
-   Die beiden Anker (6-anker, 6-anker2) blieben in allen drei Laeufen gruen; 6-anker2 mass
-   durchgehend 14 Faecher. */
+      Das ist die Gegenprobe zur Einengung auf Vorposten-Zeilen - ohne sie haette C den Test
+      gefaellt, obwohl am Vorposten nichts falsch ist.
+
+   Zum Hilfetext (Abschnitt 7) - je eine je kopierter Groesse:
+   D) Name im Hilfetext auf den alten Stand ("Bastion"): 7b FAELLT, 7a und 7c bleiben gruen.
+   E) Kernpunkte im Hilfetext verdreht (400.000 -> 401.000): 7a FAELLT (kein Treffer), 7b und
+      7c fallen mit, weil ohne Stufe nichts mehr zuzuordnen ist.
+   F) Verteidigung der Stufe 3 im SERVER geaendert (60.000 -> 66.000): 7c FAELLT.
+
+   Die Anker blieben in allen sechs Laeufen gruen: 6-anker2 mass durchgehend 14 Faecher,
+   7-anker fand den Satz auch im sabotierten Zustand, 7-anker2 las durchgehend 8 Stufen. */
+

@@ -952,8 +952,21 @@ beheben. Die acht Stufen heißen deshalb seit dieser Etappe nach dem, was gezeic
 | 8 | Ausbaustufe 8 | **Orbitalfeste** |
 
 Zwei Fehler in einer Reihe: Stufe 1–3 war Bodenvokabular, Stufe 4–8 waren fünf **Platzhalter**.
-Die neuen Namen folgen der Zeichnung: Stufe 1 ist der blanke Kern am Anker, ab Stufe 2 kommt der
-Habitatring dazu, ab Stufe 4 der zweite Ring, und Stufe 8 trägt beide Ringe in voller Breite.
+
+Die neuen Namen folgen der Zeichnung, und zwar an ihren **gemessenen** Schwellen. `vpZeichneStation`
+leitet sie aus `B.ab` (= `VORPOSTEN_ZWEIG_AB`, 4) und `B.max` (= Stufenzahl, 8) ab:
+
+| Schwelle | Code | bei 4/8 | Name dort |
+|---|---|---|---|
+| Panelnähte | `nahtAb = max(2, round(B.ab*0.75))` | ab 3 | Kernstation |
+| Habitatring | `ringAb = B.ab` | ab 4 | **Ringstation** |
+| Fensterband | `bandAb = max(ringAb+1, round(B.ab + (B.max-B.ab)*0.5))` | ab 6 | Habitatkranz |
+| zweiter Ring | `ring2Ab = max(ringAb+1, B.max-1)` | ab 7 | **Doppelring** |
+| Luken | `lukenAb = B.max` | ab 8 | Orbitalfeste |
+
+Stufe 1 ist der blanke Kern am Anker; ab 4 läuft der Habitatring, ab 7 der zweite, und Stufe 8
+trägt beide in voller Breite. Wer eine Schwelle verschiebt, verschiebt damit die Aussage eines
+Namens – beides gehört in denselben Auftrag.
 
 Die **Zweignamen** ab Stufe 4 (`VORPOSTEN_ZWEIGE.namen`: Werftgerüst … Sternenwerft,
 Handelsposten … Sternenmarkt, Wehrring … Sternenfestung) sind unverändert; sie überschreiben den
