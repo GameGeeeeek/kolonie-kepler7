@@ -119,20 +119,35 @@ check('6-anker: der Name der ersten Stufe ist im Server auffindbar', !!ersteStuf
    gleichnamigen Dingen anderswo im Spiel (es gibt Bastionsmarken namens "Bastion"). Der Ort ist
    eindeutig - das Feld heisst stufeName, oder die Quelle ist vorposten.name:
      stufeName: <irgendwas> || 'X'      r.stufeName || 'X'      daten.vorposten.name) || 'X'
-   In so einem Fach steht entweder der Name der ersten Stufe oder ein bewusstes GATTUNGSWORT
-   ("Vorposten", "Nest", "Festung", "neue Stufe") - das ist der Notbehelf, wenn gar kein Objekt
-   bekannt ist oder wenn die Stufe erst noch kommt. Ein siebtes Gattungswort laesst diesen Test
-   fallen; das ist Absicht: Wer ein Stufennamen-Fach anfasst, soll hier vorbeikommen. */
-const GATTUNG = /^(Vorposten|Nest|Nestes|Festung|Asteroidenfestung|neue Stufe)$/;
+   ABER: stufeName tragen auch Nester und Festungen. Ein Faecher-Fund zaehlt deshalb nur, wenn in
+   DERSELBEN ZEILE das Wort "vorposten" steht. Gemessen am 04.09.2026: 32 Faecher insgesamt,
+   davon 14 beim Vorposten (Ankerkern, Vorposten, neue Stufe) und 18 bei Nestern und Festungen
+   (Nest, Nestes, Festung, Asteroidenfestung). Ohne diese Einengung liesse ein neuer, voellig
+   richtiger Nest-Stufenname ausgerechnet den VORPOSTEN-Paritaetstest fallen - falsche Datei,
+   falsche Meldung. (Befund des Codex-Review am PR #574, nachgemessen und bestaetigt.)
+   In einem Vorposten-Fach steht entweder der Name der ersten Stufe oder ein bewusstes
+   GATTUNGSWORT: "Vorposten", wenn gar kein Objekt bekannt ist, und "neue Stufe" nach dem Ausbau,
+   wo "Ankerkern" sogar falsch waere - die Stufe ist ja gerade gewachsen. Ein drittes Gattungswort
+   laesst diesen Test fallen; das ist Absicht: Wer ein Stufennamen-Fach anfasst, soll hier
+   vorbeikommen. */
+const GATTUNG = /^(Vorposten|neue Stufe)$/;
 const FAECHER = [
   /stufeName *: *[^,;\n]{0,160}?\|\| *'([^']+)'/g,
   /\.stufeName *\|\| *'([^']+)'/g,
   /vorposten\.name\)? *\|\| *'([^']+)'/g
 ];
+const zeileUm = i => {
+  const a = JS.lastIndexOf('\n', i) + 1;
+  const b = JS.indexOf('\n', i);
+  return JS.slice(a, b < 0 ? JS.length : b);
+};
 const faecher = [];
-for (const muster of FAECHER) for (const m of JS.matchAll(muster)) faecher.push(m[1]);
+for (const muster of FAECHER) for (const m of JS.matchAll(muster)) {
+  if (!/vorposten/i.test(zeileUm(m.index))) continue;
+  faecher.push(m[1]);
+}
 const rueckfaelle = faecher.filter(n => !GATTUNG.test(n));
-check('6-anker2: die Stufennamen-Faecher sind ueberhaupt auffindbar (sonst misst 6a/6b nichts)',
+check('6-anker2: die Vorposten-Faecher sind ueberhaupt auffindbar (sonst misst 6a/6b nichts)',
   faecher.length >= 10, { gefunden: faecher.length });
 check('6a: das Frontend tippt ueberhaupt einen Rueckfallnamen ein (sonst misst 6b nichts)',
   rueckfaelle.length > 0, { gefunden: rueckfaelle });
@@ -142,9 +157,11 @@ check('6b: und jeder davon ist der Name der ERSTEN Stufe des Servers',
 
 ende();
 
-/* GEGENPROBE, beide Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei zurueckgesetzt,
+/* GEGENPROBE, drei Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei angefasst,
    die Testdatei blieb neu):
-   - Spieldatei auf origin/main (Rueckfall noch "Feldlager"), Server "Ankerkern": 6b FAELLT.
-   - Spieldatei neu ("Ankerkern"), Server auf "Ringkern" umbenannt: 6b FAELLT.
-   Die beiden Anker (6-anker, 6-anker2) blieben in beiden Laeufen gruen - sie messen die
-   Auffindbarkeit, nicht den Namen. */
+   A) Spieldatei auf origin/main (Rueckfall noch "Feldlager"), Server "Ankerkern": 6b FAELLT.
+   B) Spieldatei neu ("Ankerkern"), Server auf "Ringkern" umbenannt: 6b FAELLT.
+   C) Fremdes Stufenfach umbenannt (Nest-Rueckfall 'Nest' -> 'Brutkammer'): bleibt GRUEN.
+      Das ist die Gegenprobe zur Einengung selbst - ohne sie haette C den Test gefaellt.
+   Die beiden Anker (6-anker, 6-anker2) blieben in allen drei Laeufen gruen; 6-anker2 mass
+   durchgehend 14 Faecher. */
