@@ -19,6 +19,13 @@
 //   5. Der Flugzeit-Kanal haengt NICHT in missionDurationFor (Weiche i), sondern nur an
 //      Nicht-PvP-Aufrufstellen: Anfechtung, Mondbelagerung, Spielerangriff und Spionage rufen
 //      vorpostenFlug NICHT.
+//   6./7. Der Name der ersten Stufe (Rueckfaelle im Frontend) und der Hilfetext ueber Stufe 3.
+//   8. Jeder Rohstoffschluessel der drei Kostenquellen ist im Spielstand bekannt - sonst zeigt
+//      canAfford() dauerhaft "zu teuer" und die Kostenzeile den Rohschluessel (echter Fehler,
+//      04.09.2026: `singularitaetskerne` statt `singularitaetskern` sperrte Stufe 8 und alle
+//      drei Endprojekte, das Sprungtor seit Etappe 4).
+//   9. Die *_DEFS-Listen sind Arrays und werden nirgends mit einem Schluessel indiziert (echter
+//      Fehler, 04.09.2026: der Abbau gab die Garnison nicht zurueck).
 //
 // GEGENPROBE: einen Belohnungs-Zweig umbenennen -> 3 faellt; vorpostenFlug in die Anfechtung
 // einhaengen -> 5b faellt; 'vorposten-defend' aus EINWEGIG_ERLAUBT nehmen -> 4a faellt.
@@ -200,6 +207,128 @@ if (hilfeSatz) {
     { imHilfetext: genannteVert, imServer: passend.length === 1 ? passend[0].verteidigung : null });
 }
 
+
+/* ---- 8) Rohstoffschluessel der Kostentabellen (04.09.2026) ------------------------------------
+   ANLASS, ein echter Fehler im laufenden Spiel: Der Server schrieb in die Kosten der Stufe 8 und
+   der drei Endprojekte `singularitaetskerne` (Mehrzahl). Der Schluessel im Spielstand heisst
+   `singularitaetskern` (Einzahl) - nur das LABEL lautet "Singularitätskerne". Der Server liest
+   `kosten` nirgends selbst, sie reisen rein als Anzeige zum Client; dort gab
+   costAmountAvailable() fuer den unbekannten Schluessel immer 0 zurueck, canAfford() also immer
+   false. Folge: "Ausbauen zur Stufe 8" war dauerhaft gesperrt und mit ihm ALLE drei Endprojekte
+   (stufeAb 8); das Sprungtor wurde seit Etappe 4 angeboten und liess sich nie starten. Zusaetzlich
+   druckte resDefFor() den Rohschluessel: "120 singularitaetskern" statt "120 Singularitätskerne".
+
+   Die Fehlerklasse ist NICHT auf diesen einen Tippfehler beschraenkt: Jeder Rohstoffschluessel in
+   einer Kostentabelle ist eine Kopie-Familie mit dem Spielstand. Ein falscher sperrt still, ohne
+   Fehlermeldung, ohne Log, auf beiden Seiten gruen - und bleibt es, bis ihn jemand im Spiel
+   ausprobiert.
+
+   DIE REGEL, die hier geprueft wird: Jeder Schluessel in einer Vorposten-Kostentabelle muss von
+   resDefFor() aufloesbar sein - also in RES_DEFS oder TIER2_DEFS stehen oder einer der drei
+   Sonderzweige (credits, bergung, protomaterie) sein. Genau diese Menge ist auch die Menge, fuer
+   die costAmountAvailable() etwas anderes als 0 liefern kann.
+   Der gueltige Vorrat wird AUS DEM FRONTEND GELESEN, nicht in den Test getippt: eine neue
+   Tier-2-Ressource erweitert ihn von selbst, ein Tippfehler nicht.
+
+   Geprueft werden alle drei Kostenquellen, die am Vorposten haengen:
+     - VORPOSTEN_STUFEN[].kosten  (Server, reist als naechsteStufe.kosten -> vorpostenAusbauKosten)
+     - VP_PROJEKT_DEFS[].kosten   (Server, reist als projektDefs -> costText)
+     - VORPOSTEN_BAUKOSTEN        (Frontend, dieselbe Klasse, dieselbe Folge) */
+function listeAb(quelle, anker){
+  const i = quelle.indexOf(anker);
+  if (i < 0) return '';
+  const enden = ['\n  ];', '\n];'].map(e => quelle.indexOf(e, i)).filter(x => x > 0).sort((a, b) => a - b);
+  return enden.length ? quelle.slice(i, enden[0]) : '';
+}
+const defKeys = s => [...s.matchAll(/\bkey: *'([a-z0-9_]+)'/g)].map(m => m[1]);
+const resBlock  = listeAb(JS, 'const RES_DEFS = [');
+const tierBlock = listeAb(JS, 'const TIER2_DEFS = [');
+const rdVon = JS.indexOf('function resDefFor(');
+const rdBlock = rdVon < 0 ? '' : JS.slice(rdVon, rdVon + 2500);
+const sonderzweige = [...rdBlock.matchAll(/key === '([a-z]+)'/g)].map(m => m[1]);
+const VORRAT = new Set([...defKeys(resBlock), ...defKeys(tierBlock), ...sonderzweige]);
+check('8-anker1: die Rohstoff-Definitionen des Frontends sind lesbar (sonst misst 8a-8c nichts)',
+  defKeys(resBlock).length >= 6 && defKeys(tierBlock).length >= 9 && sonderzweige.length >= 3,
+  { resDefs: defKeys(resBlock).length, tier2: defKeys(tierBlock).length, sonderzweige });
+
+// Aus einem Tabellenblock jeden Schluessel jedes `kosten: { ... }` ziehen.
+const kostenSchluessel = s => [...s.matchAll(/kosten: *\{([^}]*)\}/g)]
+  .flatMap(m => [...m[1].matchAll(/([a-z0-9_]+) *:/g)].map(x => x[1]));
+
+const srvStufen = listeAb(SRV, 'const VORPOSTEN_STUFEN = [');
+const srvProjekte = listeAb(SRV, 'const VP_PROJEKT_DEFS = [');
+const stufenKosten = [...new Set(kostenSchluessel(srvStufen))];
+const projektKosten = [...new Set(kostenSchluessel(srvProjekte))];
+// Gemessen am 04.09.2026: 8 Stufenzeilen mit 7 Kostenbloecken (Stufe 1 wird errichtet, nicht
+// ausgebaut) und 8 Projekte mit je einem Block. Ein Anker, der nur "> 0" verlangt, laesst eine
+// kaputte Ausschnittsgrenze als "alles gruen" durchgehen.
+check('8-anker2: die Kostentabellen des Servers sind vollstaendig lesbar (sonst misst 8a/8b nichts)',
+  (srvStufen.match(/\{ *stufe:/g) || []).length === 8 &&
+  (srvStufen.match(/kosten: *\{/g) || []).length === 7 &&
+  (srvProjekte.match(/kosten: *\{/g) || []).length === 8,
+  { stufenZeilen: (srvStufen.match(/\{ *stufe:/g) || []).length,
+    stufenKostenBloecke: (srvStufen.match(/kosten: *\{/g) || []).length,
+    projektKostenBloecke: (srvProjekte.match(/kosten: *\{/g) || []).length });
+
+const unbekannt = liste => liste.filter(k => !VORRAT.has(k));
+check('8a: jeder Rohstoff in den Ausbaukosten des Servers ist im Spielstand bekannt',
+  unbekannt(stufenKosten).length === 0,
+  { unbekannt: unbekannt(stufenKosten), gelesen: stufenKosten });
+check('8b: jeder Rohstoff in den Projektkosten des Servers ist im Spielstand bekannt',
+  unbekannt(projektKosten).length === 0,
+  { unbekannt: unbekannt(projektKosten), gelesen: projektKosten });
+
+const bauRoh = (JS.match(/const VORPOSTEN_BAUKOSTEN *= *\{([^}]*)\}/) || ['', ''])[1];
+const bauKosten = [...bauRoh.matchAll(/([a-z0-9_]+) *:/g)].map(m => m[1]);
+check('8-anker3: die Baukosten des Frontends sind lesbar (sonst misst 8c nichts)',
+  bauKosten.length >= 3, { gelesen: bauKosten });
+check('8c: auch die Baukosten des Vorpostens nennen nur bekannte Rohstoffe',
+  unbekannt(bauKosten).length === 0, { unbekannt: unbekannt(bauKosten), gelesen: bauKosten });
+
+
+/* ---- 9) Registerform: die *_DEFS-Listen sind ARRAYS (04.09.2026) ------------------------------
+   ANLASS, der zweite echte Fehler im laufenden Spiel: Im Abbau-Zweig von claimPendingRewards
+   stand ein Index-Zugriff auf SHIP_DEFS mit einem SCHIFFSSCHLUESSEL. SHIP_DEFS ist aber eine
+   Liste, kein Register - der Zugriff ergibt immer undefined, die Bedingung darum immer false.
+   Folge: Wer seinen Vorposten abbaut, bekam die Garnison NICHT zurueck; die Belohnung wurde
+   trotzdem aus der Warteschlange geraeumt, die Schiffe waren ersatzlos weg. Nichts daran ist von
+   aussen sichtbar - kein Fehler, kein Log, die Meldung laesst den Halbsatz einfach weg.
+
+   Es waren die einzigen beiden solchen Zugriffe der ganzen Datei; ueberall sonst steht
+   `SHIP_DEFS.find(d => d.key === k)`. Genau deshalb ist die Regel billig zu halten:
+   9a haelt den reparierten Zweig fest, 9b verbietet die Form ueberhaupt.
+
+   9b ist bewusst DATEIWEIT und nicht auf den Vorposten eingeengt: die Fehlerklasse gehoert nicht
+   dem Vorposten, sie war hier nur zum ersten Mal messbar. Der Test sucht als Zeichenkette und
+   unterscheidet Kommentar nicht von Code - der Kommentar an der reparierten Stelle ist deshalb
+   umschrieben. Erlaubt bleibt ein echter Zahlenindex (RES_DEFS[Math.floor(...)] im
+   Zufallsereignis); wer eine Zaehlvariable braucht, traegt sie in ZAHLENINDEX nach. */
+const abbauVon = JS.indexOf("r.type === 'vorposten-abbau'");
+// OHNE KOMMENTARE messen. Der erklaerende Kommentar an der reparierten Stelle nennt die richtige
+// Form im Fliesstext - gegen den rohen Ausschnitt geprueft waere 9a auch am kaputten Stand gruen
+// (gemessen 04.09.2026, die Gegenprobe fiel zuerst durch).
+const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
+const abbauZweig = abbauVon < 0 ? '' : ohneKommentar(JS.slice(abbauVon, abbauVon + 4000));
+check('9-anker: der Abbau-Zweig von claimPendingRewards ist auffindbar (sonst misst 9a nichts)',
+  abbauVon > 0 && /r\.garnison/.test(abbauZweig), { gefunden: abbauVon > 0 });
+check('9a: der Abbau loest die Garnison ueber SHIP_DEFS.find auf, nicht ueber einen Index',
+  /SHIP_DEFS\.find\(\s*d\s*=>[^)]*d\.key === k/.test(abbauZweig),
+  { imZweig: (abbauZweig.match(/SHIP_DEFS[.[][^\n]{0,40}/) || [])[0] || null });
+
+const LISTEN = ['RES_DEFS', 'BUILDING_DEFS', 'RESEARCH_DEFS', 'SHIP_DEFS', 'TIER2_DEFS', 'MODULE_DEFS'];
+const ZAHLENINDEX = /^(\d+|i|j|n|idx|index|Math\.[\s\S]+)$/;
+const alsArray = LISTEN.filter(n => new RegExp('const ' + n + ' = \\[').test(JS));
+check('9-anker2: alle sechs Listen sind in der Spieldatei als Array deklariert (sonst misst 9b nichts)',
+  alsArray.length === LISTEN.length, { gefunden: alsArray, erwartet: LISTEN.length });
+const schluesselZugriffe = [];
+for (const name of LISTEN) {
+  for (const m of JS.matchAll(new RegExp('\\b' + name + '\\[([^\\]]*)\\]', 'g'))) {
+    if (!ZAHLENINDEX.test(m[1].trim())) schluesselZugriffe.push(name + '[' + m[1] + ']');
+  }
+}
+check('9b: keine der sechs *_DEFS-Listen wird mit einem Schluessel indiziert (sie sind Arrays)',
+  schluesselZugriffe.length === 0, { gefunden: schluesselZugriffe });
+
 ende();
 
 
@@ -220,5 +349,25 @@ ende();
    F) Verteidigung der Stufe 3 im SERVER geaendert (60.000 -> 66.000): 7c FAELLT.
 
    Die Anker blieben in allen sechs Laeufen gruen: 6-anker2 mass durchgehend 14 Faecher,
-   7-anker fand den Satz auch im sabotierten Zustand, 7-anker2 las durchgehend 8 Stufen. */
+   7-anker fand den Satz auch im sabotierten Zustand, 7-anker2 las durchgehend 8 Stufen.
+
+   GEGENPROBE zu den Abschnitten 8 und 9, fuenf Richtungen gemessen am 04.09.2026 (Pruefnamen
+   beider Laeufe per `diff` verglichen, nicht gezaehlt). Was fallen MUSS:
+
+   A) Server zurueck auf `singularitaetskerne` (Mehrzahl, der echte Fehler, 5 Stellen):
+      8a und 8b FALLEN. Genau der Stand, der seit Etappe 4 live war.
+   B) Tippfehler in VORPOSTEN_BAUKOSTEN des Frontends (`deuterium` -> `deuterien`): 8c FAELLT.
+   C) FREMDE Kostentabelle kaputt (Singularitaets-Geschuetzturm, `singularitaetskerne:15`):
+      NICHTS faellt - richtig, der Waechter ist auf die drei Vorposten-Quellen eingeengt. Ohne
+      diese Richtung waere nicht belegt, dass 8a-8c ueberhaupt etwas eingrenzen.
+   D) Die Anker beider Seiten: TIER2_DEFS umbenannt -> 8-anker1 faellt (und mit ihm 8a/8b, weil
+      der Vorrat dann unvollstaendig ist); einen Kostenblock aus VORPOSTEN_STUFEN entfernt ->
+      8-anker2 faellt. Ein Ausschnitt, der ins Leere greift, kann sich damit nicht gruen melden.
+   E) Der Index-Zugriff auf SHIP_DEFS zurueck in den Abbau-Zweig: 9a UND 9b FALLEN.
+      Wichtig: Beim ERSTEN Versuch blieb 9a gruen - der erklaerende Kommentar an derselben Stelle
+      nennt die richtige Form im Fliesstext, und der rohe Ausschnitt enthaelt ihn. Seitdem misst
+      9a den Zweig OHNE Kommentare. Ein Waechter, der seine eigene Erklaerung mitliest, misst
+      nichts.
+   F) Eine ANDERE Liste falsch indiziert (`RES_DEFS[key]` in resDefFor): nur 9b faellt - die
+      dateiweite Regel greift auch dort, wo der Vorposten nichts damit zu tun hat. */
 
