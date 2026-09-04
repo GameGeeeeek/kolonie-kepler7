@@ -495,3 +495,50 @@ Daraus die Regel: Wer einen Riegel durch eine Meldung ersetzt, prüft **jede Lag
 Bedingung zutrifft**, nicht nur die naheliegende. Eine Bedingung, die aus einer abgeleiteten Größe
 kommt (hier `combatFleetCount` statt der reinen Schiffszahl), hat fast immer mehr als eine Ursache —
 und der Spieler braucht die, die auf ihn zutrifft.
+
+## Während `pruflauf.js` läuft, kein zweiter Browser-Test daneben (04.09.2026)
+
+`pruflauf.js` fährt vier Browser gleichzeitig und fängt Lastsymptome damit ab, dass es rote Dateien
+danach **einzeln** nachfährt — die Nachprüfung ist ihr Urteil. Genau diese Nachprüfung war einmal
+wertlos, weil ich in derselben Zeit vier eigene Browser-Läufe gestartet hatte (eine Messung plus drei
+Gegenproben). `test_kartenrichtungen` fiel dabei „einzeln rot" mit `3e` (↓ scrollt die Seite nicht),
+war danach aber **dreimal hintereinander grün** auf demselben Stand — und auf `origin/main` wie auf
+der Merge-Basis ebenfalls grün.
+
+**Die Nachprüfung ist der einzige Teil des Laufs, der ohne Last stattfinden MUSS.** Wer währenddessen
+etwas anderes startet, nimmt ihr genau die Eigenschaft, für die es sie gibt. Arbeit, die keinen
+Browser braucht (Backend, Dokumentation, Textanker suchen), ist unbedenklich.
+
+### Der Abdruck ist global, die Betroffenheit nicht
+
+Derselbe Lauf warnte: „Spieldatei oder die server.js des Nachbar-Repos haben sich während des Laufs
+geändert — *Lastsymptom* ist hier keine gültige Erklärung." Die Warnung stimmte in der Sache und war
+für drei der vier Dateien trotzdem gegenstandslos: Gemessen hatte sich **nur** die `server.js` des
+Nachbarn bewegt (Änderungszeit 07:23; die Spieldatei stand unverändert seit 07:10 und war identisch
+mit `HEAD`), und keiner der drei Tests liest `server.js` überhaupt.
+
+**Bevor man die Warnung als Urteil nimmt, misst man zwei Dinge:** *welche* der beiden Dateien sich
+bewegt hat (Änderungszeit, `git diff --quiet HEAD -- <datei>`) und ob der rote Test sie *liest*
+(`grep -l "SERVER_JS\|server.js" tests/<test>.js`). Nur wenn beides zusammenfällt, entwertet der
+Abdruck-Wechsel das Ergebnis.
+
+## Teillauf nach einem fremden Merge (Absprache Sascha, 04.09.2026)
+
+`main` nimmt die eigene Versionsnummer etwa alle 15 Minuten; ein voller Prüflauf braucht 40–70. In
+dieser Lage gilt: Der volle Lauf gilt für den eigenen Stand. Kommt danach ein fremder Merge, wird
+gemergt, umnummeriert und **nur noch der berührte Bereich** gefahren — die Pflichtprüfungen plus die
+Tests der Bereiche, die der fremde Merge wirklich anfasst.
+
+**Die Auswahl wird gemessen, nicht geraten.** Aus dem Diff die berührten Bezeichner ziehen, dann die
+Tests suchen, die sie lesen:
+
+```bash
+git diff HEAD...origin/main -- weltraum_kolonie.html \
+  | grep "^[+-]" | grep -v "^[+-][+-]" \
+  | grep -oE "function [a-zA-Z0-9_]+|const [A-Z_]+ =|id=\"[a-zA-Z0-9_-]+\"|data-[a-z-]+" | sort -u
+grep -ln "<bezeichner1>\|<bezeichner2>" tests/*.js
+```
+
+Dazu kommen die Tests des **eigenen** Bereichs, wenn der fremde Merge ihn mit anfasst. Was gelaufen
+ist und was nicht, gehört ausdrücklich in den PR-Text — ein Teillauf, der sich als voller ausgibt,
+ist schlimmer als keiner.

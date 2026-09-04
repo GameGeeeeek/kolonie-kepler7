@@ -86,6 +86,15 @@ Testfehler bleibt Code 1. Die PR-Ampel oben bleibt trotzdem Pflicht: Sie soll da
 *verhindern*, die Messung stellt es nur *fest*. Was die Messung kann und was nicht:
 `docs/TESTING.md`, Abschnitt „Die Merge-Ampel".
 
+**Tut er es doch, wird nicht der ganze Lauf wiederholt** (Absprache Sascha, 04.09.2026): mergen,
+umnummerieren, dann Pflichtprüfungen plus die Tests der Bereiche, die der fremde Merge wirklich
+anfasst — die Auswahl aus dem Diff **gemessen**, nicht geraten. Was gelaufen ist und was nicht,
+gehört ausdrücklich in den PR-Text.
+
+**Während `pruflauf.js` läuft, keinen zweiten Browser-Test starten.** Seine Einzel-Nachprüfung ist
+der Teil, der ohne Last stattfinden muss; wer daneben etwas startet, macht sie wertlos (gemessen am
+04.09.2026: ein Test fiel „einzeln rot" und war danach dreimal grün).
+
 Details: `docs/TESTING.md`.
 
 Wichtig:

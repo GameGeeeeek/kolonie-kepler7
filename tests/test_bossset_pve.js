@@ -100,7 +100,27 @@ const S_LEBEND = PN_BLOCK ? S.slice(0, PN_VON) + S.slice(PN_BIS) : S;
 //   OK. Mit der Probe aus dem Block faellt er in genau diesem Fall.
 const NUR_HISTORIE = 'Boss-Set-Teile nur bei einer Allianz-Raid-Welle';
 const HISTORIE = require('./lib/patchnotes').patchnotesText(S);
-const PROBE = PN_BLOCK.slice(Math.floor(PN_BLOCK.length / 2), Math.floor(PN_BLOCK.length / 2) + 120);
+/* DIE PROBE MUSS IM GANZEN TEXT EINMALIG SEIN, sonst misst der Anker nichts (gefunden 04.09.2026).
+   Die erste Fassung nahm 120 Zeichen aus der MITTE des Blocks und nahm an, die seien einmalig.
+   Patchnotes zitieren in diesem Projekt aber regelmaessig Spieltexte woertlich - ein neuer Eintrag
+   verschiebt die Mitte, und traf sie auf so eine Stelle, stand die Probe auch im lebenden Text.
+   Der Anker fiel dann an einem voellig richtigen Schnitt. Gemessen: die Probe stand zweimal in der
+   Datei, einmal im Patchnote und einmal im Hilfetext, den er zitiert.
+   Statt einer festen Stelle wird jetzt GESUCHT: vom Mittelpunkt aus in Schritten, bis eine Probe
+   gefunden ist, die im ganzen Text genau EINMAL vorkommt. Findet sich keine, faellt der Anker -
+   dann taugt der Schnitt nicht als Messgrundlage, und das soll auffallen. */
+const PROBE = (() => {
+  if (!PN_BLOCK) return '';
+  const mitte = Math.floor(PN_BLOCK.length / 2);
+  for (let d = 0; d < PN_BLOCK.length; d += 137) {
+    for (const start of [mitte + d, mitte - d]) {
+      if (start < 0 || start + 120 > PN_BLOCK.length) continue;
+      const kandidat = PN_BLOCK.slice(start, start + 120);
+      if (S.split(kandidat).length - 1 === 1) return kandidat;
+    }
+  }
+  return '';
+})();
 check('0-anker: der PATCHNOTES-Block wurde wirklich herausgeschnitten',
   PN_BLOCK.length > 0 && PROBE.length === 120 && S.includes(PROBE) && !S_LEBEND.includes(PROBE),
   { ganz: S.length, lebend: S_LEBEND.length, weggefallen: S.length - S_LEBEND.length,

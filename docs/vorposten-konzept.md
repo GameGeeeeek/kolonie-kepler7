@@ -989,3 +989,165 @@ die einzelne Fundstelle: Kein Aufruf darf die Stufe eines Dokuments ohne dessen 
 den Rückfallnamen aus der Spieldatei und die erste Stufe aus `server.js` und verlangt Gleichheit.
 Geprüft wird die Regel, nicht der Name – eine spätere Umbenennung ist frei, sie muss nur auf
 beiden Seiten geschehen.
+
+**Offen, weil es dem Backend gehört:** Die Stufennamen 1–3 heißen weiterhin Feldlager,
+Stützpunkt und Bastion (`VORPOSTEN_STUFEN` in `kolonie-kepler7-backend/server.js`). Das ist
+Bodenvokabular unter einer Raumstation. Eine Umbenennung ist eine spielersichtbare Änderung und
+gehört nach der Hausregel zuerst ins Backend, dann ins Frontend – also in eine eigene Etappe.
+
+## Etappe V1: Die Station zeigt, was in ihr steckt (03.09.2026)
+
+Auftrag Sascha: die gesamte Vorposten-Auswahl umsetzen. Dies ist ihr optischer Teil — und er war
+die größte Lücke des Systems: Bis hierher trug die Silhouette **nur Stufe und Zweig**. Sechs
+Modultypen in fünf Seltenheiten, fünf Projekte, der Zustand des Kerns, die Garnison, der laufende
+Ausbau, der laufende Abbau und der Anflug — nichts davon war zu sehen. Ein Sprungtor kostet
+6 Mio. Erz, 40 Singularitätskerne und 24 Stunden Bauzeit, und die Station sah danach aus wie vorher.
+
+**Kein Backend-Schritt nötig.** Gemessen an `vorpostenFuerClient`: `module`, `projekte`, `kern`,
+`abbauAb` und `garnisonAnzahl` gehen an **jeden** (damit ein Angreifer sieht, worauf er sich
+einlässt), `projektLaeuft`, `anflug` und `kampfverlauf` nur an den Besitzer. Es fehlte allein das Bild.
+
+### Was dazukommt
+
+- **Module** (`vorpostenModulTeile`): Jedes eingebaute Stück hängt sichtbar an der Station. **Wo** es
+  sitzt, entscheidet sein Typ (`VP_MODUL_WINKEL`), nicht der Steckplatz — so hängt eine Geschützbank
+  an jeder Station an derselben Stelle, und zwei gleich ausgerüstete Stationen sehen gleich aus.
+  Steckt ein Typ mehrfach, wandert das zweite Stück eine Stufe weiter nach außen. Die Seltenheit
+  färbt das Akzentteil; die Farbe kommt aus `MODULE_RARITY`, gelesen im **Funktionsrumpf**
+  (`vpSeltenheitFarbe`) — ein direkter Verweis liefe in die temporale Todeszone, eine eigene
+  Farbtabelle wäre eine Kopie-Familie.
+- **Projekte** (`vorpostenProjektTeile`): Bollwerk als schwerer Panzergürtel, Dockring als zweiter
+  Liegeplatzring mit vier Klauen, Handelskammer als Kontorblock, Tiefenhorchposten als weit
+  ausgefahrene Lauschanlage, Sprungtor als offenstehender Torus über der Station. Das Sprungtor ist
+  bewusst das **einzige** Teil mit einer Füllung — es soll aus jeder Entfernung zuerst auffallen.
+- **Zustand** (`vorpostenSchaden`): Risse ab zwei Dritteln Kern, ab einem Drittel zusätzlich ein
+  dunkles Bruchsegment und ein rot blinkender Kern. Der Balken unter dem Marker war bisher die
+  einzige Auskunft.
+- **Baustelle und Abbau** (`vorpostenBaustelle`, `vorpostenAbbauZeichen`): ein Kranausleger mit
+  blitzendem Schweißpunkt am laufenden Vorhaben, ein Demontagegerüst über der Station im Abbau.
+- **Garnison** (`vorpostenGarnisonZeichen`): fünf Rumpfzeichen unter der Station, gefüllt nach
+  Belegung. Bewusst **nicht** an den Dockpads — die gibt es erst ab Stufe 5, die Garnison aber ab
+  der ersten Stationsstufe.
+- **Anflug** (A4): ein zweiter, roter Ring um den Marker, der schneller schlägt, je näher der
+  Einschlag ist (2,4 s bei zwei Stunden, 0,7 s bei wenigen Minuten).
+- **Übersicht** (D3): die Liste auf der Startseite nennt jetzt Kernzustand, Garnison und — falls
+  etwas läuft — Vorhaben oder Abbaufrist. Der Abbau verdrängt das Vorhaben, weil er das Wichtigere
+  ist. **Alles Neue steht in der Signatur** (`vpSig`), sonst friert der Countdown ein — genau der
+  Befund, der beim Anflug schon einmal zugeschlagen hat.
+- **Kampfverlauf** (D2): das Kartenmenü zeigt die Angriffe **vor** dem jüngsten. Der Server führt
+  `doc.kampfverlauf` (zehn Vermerke) seit dem ersten Tag; angezeigt wurde nur `letzterKampf`.
+
+### Was bewusst NICHT passiert
+
+Das Bodenlager (Stufe 1–3) bekommt nichts davon, auch nicht mit Modulen im Gepäck: Es hat keine
+Steckplätze (`vpModulSlots` liefert dort 0), und ein Feldlager mit Sprungtor wäre eine Falschaussage.
+
+Wächter: `tests/test_vorposten_zustand.js` (30 Prüfungen). Gegenprobe in beide Richtungen: gegen den
+Stand ohne die Zeichenschicht fallen 15, gegen den Stand ohne Übersicht und Kampfverlauf weitere 7 —
+Prüflisten per `diff` verglichen. Grün bleiben in beiden Fällen genau die Prüfungen, die das
+**Ausbleiben** einer Zeichnung belegen; sie sind nur zusammen mit ihrem positiven Gegenstück etwas wert.
+
+## Vier Befunde der adversarischen Durchsicht zu v8.667.0 (04.09.2026)
+
+Acht Perspektiven, 67 Befunde, davon 33 nach dreifacher Gegenprüfung bestätigt. Vier davon
+betrafen diesen Auslieferungsstand direkt.
+
+**1. Der Tiefenhorchposten ragte 2,87 r hinaus, reserviert sind 2,45 r.** Also genau der Fehler,
+gegen den `VORPOSTEN_SICHT` in dieser Etappe eingeführt wurde — und er stand die ganze Zeit im
+selben Änderungssatz. Ursache waren die Bogen-Flags `0 1 0`: Nach SVG F.6.5 hängt die Wahl des
+Mittelpunkts am Vergleich `fA != fS`, `1 0` und `0 1` wählen also **denselben** Punkt (2,361 r vom
+Marker entfernt) — aber `1 0` zeichnet den **großen** Bogen darum, 264 Grad, weitester Tintenpunkt
+2,781 r, mit halber Strichbreite 2,872 r. `0 1` nimmt den kurzen 95-Grad-Bogen; sein Maximum sind
+die Endpunkte bei 2,102 r. Die Nebenwirkung ist die eigentliche: Aus einem fast geschlossenen Ring
+um einen Punkt neben der Speisestelle wird eine Schüssel, deren hohle Seite nach außen zeigt. Das
+Modul-Gegenstück `horchposten` macht es seit jeher so.
+
+**2. Der Wächter konnte das bauartbedingt nicht sehen.** Prüfung 12a maß die **Achsen**-Ausdehnung
+der Bounding-Box. Für Formen, die um den *Markermittelpunkt* rund sind, ist das die richtige
+Größe — die Ecken-Messung meldete für den Hof 3,12 statt 2,35, wo keine Tinte ist. Für **versetzte**
+Teile ist es das Gegenteil: Beim diagonal sitzenden Horchposten-Bogen ergab die Achsen-Messung
+2,09 r, während der weiteste Punkt bei 2,78 r lag — 17 % Überstand, grün gemeldet. `kbMarkerFrei`
+rechnet aber mit `Math.hypot`, also mit dem Abstand. 12a unterscheidet jetzt danach, ob die Box den
+Mittelpunkt **enthält**: dann Achsen-Ausdehnung, sonst Eckabstand. Gemessen: mit den alten Flags
+2,95 (rot), mit den neuen 2,38 (grün) — genau eine Prüfung fällt.
+
+**3. Die erbeutete Lagerbeute des Angreifers wurde verworfen.** Das Backend hängt an die Beute jedes
+Beitragenden beim Fall eines Vorpostens das Feld `lagerBeute` (anteilig nach Schadensanteil, gemessen
+bevor das Dokument gelöscht wird). Der Frontend-Zweig `vorposten` buchte nur Kampfpunkte, Erfahrung
+und Kredite; `lagerBeute` kam im ganzen Frontend nicht vor. Der Ertrag wurde gepusht, beim Abholen
+serverseitig aus der Warteschlange geräumt und im Client ersatzlos verworfen. Die **Gegenseite**
+derselben Sache — `lagerVerloren` für den Besitzer — war längst da; die Angreiferhälfte war
+vergessen, und `docs/vorposten.md` behauptete ausdrücklich das Gegenteil. Gebucht wird jetzt über
+`gainResources`, wie beim `vorposten-lager`-Zweig: dort hängt der Lagerdeckel, und gemeldet wird,
+was **ankommt**. Wächter 11c/11d, Gegenprobe gemessen.
+
+**4. Die Signatur der Startseiten-Übersicht kannte `lpMax` und `garnisonMax` nicht.** Die Zeile zeigt
+den Kern als *Prozent* (`lp/lpMax`) und die Garnison als `anzahl/max`. Ein eingebauter Kernpanzer
+hebt `lpMax`, eine Hangarerweiterung `garnisonMax` — beide Male ändert sich die angezeigte Zahl,
+während `lp` und `garnisonAnzahl` gleich bleiben. Die Zeile wurde dann nicht neu gebaut und zeigte
+weiter den alten Prozentsatz. **Eine Signatur muss jede Größe enthalten, die in der Zeile steht,
+nicht nur die, die sich „eigentlich" ändert.**
+
+### Zwei Fehler in der eigenen Messvorrichtung, beide beim Nachbauen der Wächter
+
+- **Ein Vergleich zweier Läufe ist nur so viel wert wie ihre Übereinstimmung in allem, was nicht
+  gemessen wird.** Der erste Entwurf von 11c verglich gegen einen Lauf mit anderem Ausgangsvorrat;
+  das Lager stand dadurch schon am Deckel, 11c war zufällig grün und 11d fiel, weil gar nichts mehr
+  ankam.
+- **`fmt()` schreibt `51.0k`, nicht `51.000`.** 11d suchte nach der zweiten Form und fiel an einer
+  richtigen Meldung. Geprüft wird jetzt die Regel — alle drei Rohstoffe stehen neben den drei alten
+  Größen —, nicht die Schreibweise der Zahl. Derselbe Fehler war in dieser Sitzung schon einmal da.
+- **13a war eine Tautologie.** Die Bedingung lautete `n.erz < v.erz + 99999999`; da `v.erz >= 0` ist,
+  folgt sie logisch aus dem Vergleich davor und konnte nie fallen. Der im Kommentar behauptete
+  Vergleich (kleines Lager nimmt weniger auf als großes) stand nirgends. Jetzt läuft ein zweiter
+  Lauf mit Stufe 200 und derselben Riesenlieferung: 1.200 gegen 80.800.
+- **13b zählte ein zweites Mal Skriptfehler** und war damit eine echte Teilmenge von Prüfung 8 — es
+  konnte nie fallen, ohne dass 8 mitfällt. Es misst jetzt das Protokoll, das sein Name nennt; dafür
+  schneidet `lauf()` die Meldungen per MutationObserver mit, statt `#log` am Ende auszulesen (dort
+  überschreibt jede Meldung die vorige).
+
+## Was der Wegfall des Bodenlagers an dieser Etappe geändert hat (04.09.2026)
+
+`main` hat mit GR-6 das Bodenlager abgeschafft — der Vorposten ist auf **jeder** Stufe eine
+Raumstation. Das ist dieselbe Zeichenroutine, an der diese Etappe die Anbauten hängt, und der Merge
+hat drei Dinge sichtbar gemacht.
+
+**1. Eine abgeschaffte Regel darf man nicht festhalten.** Prüfung 7a hieß „bis zur Wahlstufe bekommt
+der Vorposten KEINE Stationsteile". Diese Regel gibt es nicht mehr. Ein Test, der sie weiter
+einfordert, hält die Entwicklung auf, statt sie zu sichern — er muss der neuen Regel folgen, nicht
+die alte zurückholen.
+
+**2. Hinter der alten Regel steckte eine echte Lücke.** `vorpostenModulTeile` las die **ganze**
+Modulliste des Dokuments. Der Server rechnet die Wirkung dagegen mit `.slice(0, slots)` — ein Modul
+jenseits der Steckplätze zählt nicht. Solange die Stufenprüfung davorstand, fiel das nie auf; ohne
+sie hätte das Bild eine Wirkung versprochen, die es nicht gibt. Die Zeichnung folgt jetzt `v.slots`
+(vom Server, nicht neu gerechnet). Neue Prüfung 7b: zwei Module im Dokument, ein Steckplatz, **ein**
+gezeichnetes Teil.
+
+**3. Ein Riegel, der über ein Merkmal statt über eine Form geht, überlebt Erweiterungen.** Die
+Prüfung „keine Spur des alten Bodenlagers" zählte **alle** `<polygon>` im Marker und verlangte null.
+Das traf das Bodenlager — aber auch die Garnisonszeichen und die Modulteile dieser Etappe, beides
+Polygone. Sie hätte an einer richtigen Erweiterung gefallen und dazu gedrängt, die Erweiterung
+zurückzunehmen statt die Messung zu schärfen. Gezählt werden jetzt Polygone **ohne** `data-vp-`
+Merkmal: Das Bodenlager trug keines, jedes Teil der Station trägt eines. Gemessen: 0 von 5.
+
+### Und ein Fehler beim Auflösen des Merges
+
+`tests/test_vorposten_station.js` habe ich zunächst **pauschal** von `main` übernommen — genau das,
+wovor CLAUDE.md warnt („Nach Konflikten in Testdateien niemals pauschal eine Seite übernehmen"). Dabei
+ging eine Umschreibung verloren, die es schon gab: Prüfung 0b pinnte in mains Fassung den Faktor
+`sichtV = rV * 2.0` **wörtlich** fest, während der Schieber inzwischen `VORPOSTEN_SICHT` (2,45)
+bekommt. Die Prüfung fiel damit an einer richtigen Änderung. Wiederhergestellt ist die Fassung, die
+die **Regel** misst: Die Radien wachsen mit der Stufe, und der Schieber bekommt ein Vielfaches von
+`rV` — welches, ist seine Sache.
+
+### Ein zerbrechlicher Anker in einem fremden Test
+
+`test_bossset_pve` schneidet den `PATCHNOTES`-Block heraus und belegt den Schnitt mit einer Probe von
+120 Zeichen aus der **Mitte** des Blocks: Sie muss im ganzen Text stehen und im Rest fehlen. Die
+Annahme dahinter — eine beliebige Stelle des Blocks sei einmalig — hält in diesem Projekt nicht:
+Patchnotes zitieren Spieltexte wörtlich. Ein neuer Eintrag verschiebt die Mitte, und traf sie auf so
+ein Zitat, fiel der Anker an einem völlig richtigen Schnitt (gemessen: die Probe stand zweimal in
+der Datei, einmal im Patchnote und einmal im Hilfetext, den es zitiert). Der Anker **sucht** jetzt
+vom Mittelpunkt aus, bis er eine Probe findet, die genau einmal vorkommt; findet er keine, fällt er.
+Die Gegenprobe (`S_LEBEND = S`, also ein fehlgeschlagener Schnitt) fällt weiterhin.

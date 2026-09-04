@@ -77,6 +77,16 @@ const zweigSave = srvTypen.every(t => {
   return /\bsave\(\);/.test(b);
 });
 check('3c: und jeder Zweig ruft save() (Regel 73)', zweigSave);
+/* 3d (03.09.2026): KEIN Typ hat ZWEI Zweige. Diese Fehlerklasse ist in diesem Projekt jetzt zweimal
+   aufgetreten - erst als doppelte Schluessel in NOTIF_EVENT_INFO, dann als zwei unabhaengig
+   gebaute `vorposten-abbau`-Zweige, die zwei Sitzungen parallel angelegt hatten. Die Kette der
+   if-Zweige nimmt den ERSTEN, jeder weitere liegt unbemerkt als toter Code herum - und
+   ausgerechnet der tote enthielt beim Social-Hub-Vorfall einmal die einzige richtige Pruefung.
+   Ein doppelter Zweig faellt in keinem Spieltest auf: Der Ablauf ist ja korrekt, nur eben nicht
+   der, den man liest. Gezaehlt wird deshalb hier. */
+const doppelte = srvTypen.filter(t => (claimBlock.match(new RegExp("r\\.type === '" + t + "'", 'g')) || []).length > 1);
+check('3d: kein Belohnungstyp hat ZWEI Zweige - der zweite waere stiller toter Code', doppelte.length === 0,
+  { doppelte, zaehlung: Object.fromEntries(srvTypen.map(t => [t, (claimBlock.match(new RegExp("r\\.type === '" + t + "'", 'g')) || []).length])) });
 
 // ---- 4) Missionsfamilie ---------------------------------------------------------------------------
 const rund = fs.readFileSync(path.join(__dirname, 'test_rundflug.js'), 'utf8');
