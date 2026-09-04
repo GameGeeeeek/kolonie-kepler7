@@ -233,10 +233,43 @@ async function versionAbfangen(page) {
   }));
 }
 
+/* Auf eine BEDINGUNG warten statt auf eine Dauer (04.09.2026).
+   ------------------------------------------------------------------------------------------------
+   GEMESSEN: Nach dem version.txt-Wackler waren `test_forschung_lagerwand` (7x) und
+   `test_kartenrichtungen` (6x) die naechsthaeufigen "Lastsymptome" eines Tages. Beide haben
+   dieselbe Form - sie warten eine feste Zeit und messen danach:
+
+     forschung_lagerwand  wartet 1500 ms und liest den GESPEICHERTEN Stand. Unter Last erwischt er
+                          ihn mitten in der Bewegung: `rsolar` war schon aus der Warteschlange
+                          genommen, `activeResearch` aber noch nicht gesetzt.
+     kartenrichtungen     drueckt Pfeil-ab, wartet 500 ms und liest window.scrollY. Unter Last hat
+                          das (weiche) Scrollen dann noch nicht stattgefunden: 1621 px Spielraum,
+                          scrollY unveraendert 0.
+
+   Eine LAENGERE feste Wartezeit verschiebt die Kante nur - unter mehr Last faellt der Test wieder,
+   und im Normalfall kostet sie jeden Lauf Sekunden. Deshalb hier: kurz und oft nachsehen, bis die
+   Bedingung eintritt.
+
+   DER RUECKGABEWERT BEI ZEITUEBERSCHREITUNG IST DER LETZTE MESSWERT, kein Wurf. Ein Helfer, der
+   wirft, macht aus einer roten PRUEFUNG einen Absturz - und ein Absturz passt auf kein FAIL-Muster
+   (CLAUDE.md: "Der Exit-Code entscheidet"). So bleibt die Meldung erhalten, die den Fehler erklaert
+   ("activeResearch": null), und der Test faellt dort, wo er es soll. */
+async function warteBis(pruefen, maxMs, schrittMs) {
+  const ende = Date.now() + (maxMs || 8000);
+  const schritt = schrittMs || 100;
+  let wert;
+  for (;;) {
+    try { wert = await pruefen(); } catch (e) { wert = undefined; }
+    if (wert) return wert;
+    if (Date.now() >= ende) return wert;
+    await new Promise(r => setTimeout(r, schritt));
+  }
+}
+
 function ueberspringen(grund) {
   console.log('SKIP - ' + grund);
   console.log('\nPASS (übersprungen)');
   process.exit(0);
 }
 
-module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren, versionAbfangen };
+module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren, versionAbfangen, warteBis };

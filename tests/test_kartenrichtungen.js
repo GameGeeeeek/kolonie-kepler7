@@ -17,7 +17,7 @@
 // BEIDE HAELFTEN werden geprueft, und das ist hier die halbe Miete: Ein Wisch-Schutz laesst sich
 // trivial erfuellen, indem der Klick GAR NICHTS mehr tut. Jede Sperr-Pruefung hat deshalb ihre
 // Gegenrichtung - derselbe Knoten, nur ohne Bewegung, MUSS oeffnen (Hausregel 33).
-const { SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { SPIEL_URL, starteBrowser, pruefer, warteBis } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 /* DIE MESSVORRICHTUNG - und warum sie mit synthetischen Ereignissen arbeitet.
@@ -199,7 +199,13 @@ const systemListe   = page => page.evaluate(() => [...document.querySelectorAll(
   const scrollVorAb = await page.evaluate(() => Math.round(window.scrollY));
   await fokusAusFormular(page);
   await page.keyboard.press('ArrowDown');
-  await page.waitForTimeout(500);
+  /* Auf die BEWEGUNG warten, nicht auf 500 ms. Gemessen unter echter Last: Das (weiche) Scrollen
+     hatte nach 500 ms noch nicht stattgefunden - 1621 px Spielraum, scrollY unveraendert 0, und
+     3e fiel. Eine laengere feste Wartezeit verschoebe die Kante nur und kostete jeden Lauf eine
+     halbe Sekunde mehr. Bleibt die Seite wirklich stehen, laeuft die Frist ab, der letzte Messwert
+     kommt zurueck, und 3e faellt mit genau der Zahl, die den Fehler erklaert.
+     Kein Spielraum -> gar nicht warten: Dort ist 3e ohnehin gegenstandslos (siehe unten). */
+  if (spielraum > 0) await warteBis(async () => (await page.evaluate(() => Math.round(window.scrollY))) > scrollVorAb, 4000);
   const nachAb = await page.evaluate(() => ({ y: Math.round(window.scrollY), liste: [...document.querySelectorAll('#galaxyMapSvg [data-sektor-sys]')].map(g => g.getAttribute('data-sektor-sys')).join(',') }));
   check('3d: ↓ laesst den Sektor unberuehrt - die Karte kapert die Taste nicht',
     nachAb.liste === listeZurueck, { vorher: listeZurueck.slice(0, 60), nachher: nachAb.liste.slice(0, 60) });
