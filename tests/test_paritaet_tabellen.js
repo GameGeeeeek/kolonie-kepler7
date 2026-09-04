@@ -269,6 +269,55 @@ check('5e: Gegenprobe - die drei Backend-Tabellen wurden ueberhaupt gelesen',
   Object.keys(beAtk).length > 20 && Object.keys(beDw).length > 20 && Object.keys(beSch).length > 5,
   { atk: Object.keys(beAtk).length, defWeight: Object.keys(beDw).length, schild: Object.keys(beSch).length });
 
+// ---- 5f. Die Signatur (Tarnwert, 03.09.2026) ---------------------------------------------------
+/* Der Spiegel kam bewusst erst mit Etappe 2 ins Backend: In Etappe 1 las serverseitig nichts die
+   Signatur, ein Spiegel waere toter Code gewesen. Seit die Anflug-Meldung ihn liest, ist er eine
+   Kopie-Familie wie SHIP_ATK_VALUES daneben - und damit genau die Bauform, an der dieses Projekt
+   regelmaessig scheitert (rawFleetPower fehlten vier Klassen, DEFENSE_VALUES fehlte resonanzschild
+   mit dem hoechsten Verteidigungswert des Spiels).
+
+   Verglichen werden SCHLUESSELMENGEN UND WERTE, nicht eine Schwelle. Eine Schwelle
+   (`laenge > 30`) laesst durch, wer umsortiert; genau davor warnt die Projektdokumentation.
+
+   Das Superschlachtschiff steht im Frontend in KEINER Liste (eigener Zweig in shipSignatur), im
+   Backend dagegen ganz normal in der Tabelle. Der Test zaehlt es deshalb auf der Frontend-Seite
+   ausdruecklich dazu - ohne das faende er eine Abweichung, die keine ist. */
+const beSigBlock = (beSrc.match(/const SHIP_SIGNATUR = \{([\s\S]*?)\n\};/) || [])[1] || '';
+const beSig = {};
+for (const m of beSigBlock.matchAll(/([A-Za-z]+)\s*:\s*(\d+)/g)) beSig[m[1]] = Number(m[2]);
+check('5f0: der Backend-Block SHIP_SIGNATUR ist auffindbar', Object.keys(beSig).length > 40,
+  Object.keys(beSig).length);
+
+const feSig = {};
+for (const z of feZeilen) {
+  const k = /^\s*\{ ?key:'([A-Za-z]+)'/.exec(z);
+  if (!k) continue;
+  const sg = /signatur:(\d+)/.exec(z);
+  if (sg) feSig[k[1]] = Number(sg[1]);
+}
+/* Der eigene Zweig aus shipSignatur() - aus dem Quelltext gelesen, nicht eingetippt, aber GESCOPT
+   auf die richtige Funktion. Ein ungescoptes Muster traf hier zuerst shipBaseAtk() zwanzig Zeilen
+   darueber und las 220 (den Angriffswert) statt 800. Der Test meldete dann eine Paritaetsluecke,
+   die es nicht gab - genau die Sorte Fehlbefund, die Vertrauen in einen Waechter zerstoert.
+   VIER Funktionen im Frontend tragen diesen Sonderzweig (shipBaseAtk, shipSignatur,
+   shipDisplayName, shipDefOrSuper); das Superschlachtschiff steht in keiner Liste. */
+const sigFnBlock = (feSrc.match(/function shipSignatur\(key\)\{([\s\S]*?)\n  \}/) || [])[1] || '';
+check('5f1a: die Funktion shipSignatur ist auffindbar', sigFnBlock.length > 20, sigFnBlock.length);
+const superSig = Number((sigFnBlock.match(/if \(key === 'superschlachtschiff'\) return (\d+);/) || [])[1]);
+check('5f1: der Superschlachtschiff-Zweig im Frontend ist auffindbar', superSig > 0, superSig);
+if (superSig > 0) feSig.superschlachtschiff = superSig;
+
+const sigFehltImBackend = Object.keys(feSig).filter(k => !(k in beSig));
+const sigFehltImFrontend = Object.keys(beSig).filter(k => !(k in feSig));
+check('5f2: keine Signatur-Klasse fehlt im Backend', sigFehltImBackend.length === 0, sigFehltImBackend);
+check('5f3: und keine steht nur im Backend', sigFehltImFrontend.length === 0, sigFehltImFrontend);
+const sigAbweichung = Object.keys(feSig).filter(k => k in beSig && feSig[k] !== beSig[k])
+  .map(k => k + ': Frontend ' + feSig[k] + ' vs Backend ' + beSig[k]);
+check('5f4: jeder Signaturwert stimmt auf beiden Seiten ueberein', sigAbweichung.length === 0, sigAbweichung);
+check('5f5: Gegenprobe - beide Seiten wurden ueberhaupt gelesen',
+  Object.keys(feSig).length >= 46 && Object.keys(beSig).length >= 46,
+  { frontend: Object.keys(feSig).length, backend: Object.keys(beSig).length });
+
 // ---- 6. Gegenprobe -----------------------------------------------------------------------------
 // Ohne sie waeren gruene Haken oben auch dann zu sehen, wenn die Leseregeln gar nichts finden.
 check('Gegenprobe: die Leseregeln finden ueberhaupt etwas',
