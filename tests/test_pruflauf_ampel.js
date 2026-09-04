@@ -215,4 +215,16 @@ if (exitAusdruck){
   check('6d: beides zugleich -> der Testfehler gewinnt', werte(1, true) === 1, werte(1, true));
 }
 
+// ---- 7) Der Satz nach der Nachpruefung ----------------------------------------------------------
+/* Gefunden im ERSTEN echten Lauf der Ampel, in ihrer eigenen Ausgabe: Unter "DER LAUF IST
+   ENTWERTET" stand zwei Zeilen spaeter "Alle roten Tests waren Lastsymptome - der Lauf ist gruen."
+   Der Satz hing an weltUnveraendert allein, also an EINER Zutat des Urteils statt am Urteil. */
+const nachQuelle = schneide('function nachpruefUrteilText(entwertet){');
+check('7-anker: nachpruefUrteilText() ist auffindbar', !!nachQuelle, nachQuelle ? nachQuelle.length : null);
+if (nachQuelle){
+  const text = new Function(nachQuelle + '; return nachpruefUrteilText;')();
+  check('7: ohne Entwertung sagt er, der Lauf sei gruen', /der Lauf ist gruen/.test(text(false)), text(false));
+  check('7b: mit Entwertung sagt er das NICHT', !/der Lauf ist gruen/.test(text(true)), text(true));
+}
+
 ende();

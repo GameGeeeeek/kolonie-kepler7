@@ -134,6 +134,16 @@ function ampelStand(){
      4. (kein eigener Grund, aber die haeufigste Falle) origin/main hat sich bewegt, OHNE die
         Spieldatei anzufassen. Das entwertet nichts - und deshalb darf hier auch nicht der Satz
         "kein fremder Merge" stehen, der etwas Staerkeres behauptet als gemessen wurde. */
+/* Der Satz nach der Nachpruefung. Er stand bis zum 04.09.2026 auf weltUnveraendert allein und
+   behauptete damit "der Lauf ist gruen", waehrend die Ampel darunter "DER LAUF IST ENTWERTET"
+   meldete - gesehen im ersten echten Lauf der Ampel, in ihrer eigenen Ausgabe. Er haengt jetzt am
+   GANZEN Urteil, nicht an einer seiner Zutaten. */
+function nachpruefUrteilText(entwertet){
+  return entwertet
+    ? 'Alle roten Tests sind einzeln gruen - der Lauf ist trotzdem NICHT verwendbar, siehe oben.'
+    : 'Alle roten Tests waren Lastsymptome - der Lauf ist gruen.';
+}
+
 function ampelUrteil({ vorher, nachher, weltUnveraendert, ampelAn }){
   const zeilen = [];
   let entwertet = false;
@@ -382,12 +392,10 @@ function starte(i) {
     weltUnveraendert,
     ampelAn: AMPEL_AN
   });
+  /* Reihenfolge: erst was die TESTS sagen, dann ob das Ergebnis ueberhaupt gilt. So ist die
+     Gueltigkeit das Letzte auf dem Schirm - direkt ueber dem Exit-Code, der sie traegt. */
+  if (verdaechtig.length && !echtRot.length) console.log(nachpruefUrteilText(urteil.entwertet));
   if (urteil.zeilen.length) console.log('\n' + urteil.zeilen.join('\n'));
-
-  if (verdaechtig.length && !echtRot.length) console.log(weltUnveraendert
-    ? 'Alle roten Tests waren Lastsymptome - der Lauf ist gruen.'
-    : 'Alle roten Tests sind einzeln gruen - aber die Welt hat sich waehrend des Laufs geaendert.'
-      + ' Kein automatisches Gruen-Urteil; siehe Hinweis oben.');
 
   /* Der Exit-Code entscheidet - und er richtet sich nach der NACHPRUEFUNG, nicht nach den Stuecken.
      Waere es umgekehrt, muesste jeder Aufrufer die Ausgabe lesen, und genau das verbietet CLAUDE.md.
