@@ -175,8 +175,29 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     check('4: die Tiefenflotte fliegt mit (Kessel und Lotsenboot in der Zusammensetzung)',
       !!mission && mission.composition && mission.composition.kessel === 5 && mission.composition.lotsenboot === 3,
       mission && { kessel: mission.composition.kessel, lotsenboot: mission.composition.lotsenboot });
-    const zweiter = await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-start]'); return !!b && b.disabled; });
-    check('4: waehrend eines laufenden Tauchgangs ist der Knopf gesperrt', zweiter);
+    /* Bis SP-3 (04.09.2026) stand hier `b.disabled` - reine Riegel-Optik. Der Riegel ist weg,
+       weil er am Abgrund eine Sackgasse war: gewaehlt===0 sperrte genau den Knopf, der als
+       einziger zur Flottenauswahl fuehrt. Geprueft wird jetzt die WIRKUNG, und die ist strenger
+       als die alte Fassung: Ein zweiter Klick darf keine zweite Mission buchen, und der Spieler
+       muss erfahren, warum. Die alte Pruefung waere auch dann gruen gewesen, wenn der Riegel
+       zwar stand, ein zweiter Tauchgang aber ueber einen anderen Weg doch gebucht haette. */
+    const missionenVorher = ((gespeichert(store).fleet||{}).missions||[]).filter(m=>m.type==='abgrund').length;
+    await page.evaluate(()=>{
+      if (window.__logMitschnitt) window.__logMitschnitt.length = 0;
+      const b=document.querySelector('[data-abgrund-start]'); if(b) b.click();
+    });
+    await page.waitForTimeout(700);
+    const zweiterVersuch = await page.evaluate(()=>({
+      feldOffen: !!(document.getElementById('fwahlOverlay')||{}).classList
+                 && document.getElementById('fwahlOverlay').classList.contains('open'),
+      logText: ((document.getElementById('log')||{}).textContent||'').replace(/\s+/g,' ').trim()
+    }));
+    const missionenNachher = ((gespeichert(store).fleet||{}).missions||[]).filter(m=>m.type==='abgrund').length;
+    check('4: waehrend eines laufenden Tauchgangs kommt kein zweiter zustande',
+      missionenNachher === missionenVorher && zweiterVersuch.feldOffen === false,
+      { missionenVorher, missionenNachher, feldOffen: zweiterVersuch.feldOffen });
+    check('4: und der Spieler erfaehrt, warum nicht',
+      /Tauchgang läuft bereits/.test(zweiterVersuch.logText), zweiterVersuch.logText.slice(-120));
     check('4: keine Konsolenfehler bis hierhin', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
