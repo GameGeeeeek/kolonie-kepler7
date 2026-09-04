@@ -142,6 +142,26 @@ async function logZeilen(page) {
   return page.evaluate(() => (window.__logMitschnitt || []).slice());
 }
 
+/* Setzt eine Marke und liefert eine Funktion, die NUR die seither hinzugekommenen Zeilen
+   zurueckgibt. Fuer Tests, die mehrere Klicks nacheinander messen.
+
+   WARUM NICHT EINFACH `__logMitschnitt.length = 0`: Der Beobachter oben vergleicht gegen
+   `a[a.length-1]`, und bei einer geleerten Liste ist das `undefined`. Die naechstbeste
+   DOM-Aenderung schiebt dann den UNVERAENDERTEN Log-Text erneut hinein - die Pruefung liest
+   also die Zeile des VORIGEN Klicks und meldet Erfolg, obwohl der geprueften Stelle die
+   Meldung fehlt. Am 04.09.2026 durch gezielte Sabotage bewiesen: Eine Pruefung blieb gruen,
+   nachdem die gemessene Meldung vollstaendig entfernt worden war. Die Marke haelt den alten
+   Text deshalb als Wasserzeichen fest, statt die Liste zu leeren. */
+async function logMarke(page) {
+  const ab = await page.evaluate(() => {
+    const el = document.getElementById('log');
+    const t = el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    window.__logMitschnitt = t ? [t] : [];
+    return window.__logMitschnitt.length;
+  });
+  return async () => (await logZeilen(page)).slice(ab);
+}
+
 // Bewusst ein Schluessel, den RANDOM_EVENTS nie tragen wird - der Unterstrich-Rahmen macht ihn
 // beim Lesen eines Spielstands sofort als Test-Riegel erkennbar.
 const RUHE_EREIGNIS_KEY = '__testruhe__';
@@ -190,4 +210,4 @@ function ueberspringen(grund) {
   process.exit(0);
 }
 
-module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, ruhigeUhren };
+module.exports = { chromium, devices, starteBrowser, BROWSER, SPIELDATEI, SPIEL_URL, SERVER_JS, WURZEL, pruefer, ueberspringen, logMitschnitt, logZeilen, logMarke, ruhigeUhren };
