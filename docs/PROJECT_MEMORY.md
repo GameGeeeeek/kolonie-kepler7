@@ -370,3 +370,34 @@ Prüfungen fielen bei richtigem Code. Seither steht eine eigene Ankerprüfung da
 und die beiden sehen sonst gleich aus. Dasselbe galt für den Anker selbst: Das Prestige-Literal
 lebt nicht in `doPrestige()`, sondern in `confirmPrestigeWithPerk()` — `doPrestige` öffnet nur die
 Perk-Auswahl.
+
+## Eine Regel, die ein Mensch hinterher messen muss, ist keine Absicherung (04.09.2026)
+
+`CLAUDE.md` sagte seit jeher richtig: „Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die
+Spieldatei anfasst — das wird **gemessen**, nicht vermutet." Gemessen hat es trotzdem ein Mensch,
+hinterher, wenn er daran dachte. An einem Tag mit acht solchen Merges reicht das nicht.
+
+**Die Zahl, die es entschieden hat:** 25 der letzten 25 Merges nach `main` fassen die Spieldatei an
+— ausnahmslos. Abstand 31–67 Minuten, Laufzeit eines Prüflaufs 35. Rechnerisch wird **mehr als jeder
+zweite Lauf entwertet, bevor er fertig ist**. Ein Änderungssatz brauchte vier Anläufe, drei davon
+mit grünem, aber wertlosem Ergebnis. Solange die Prüfung im Kopf steckte, kostete jeder vergessene
+Blick 35 Minuten — und der Blick wird gerade dann vergessen, wenn der Lauf endlich grün ist und man
+liefern will.
+
+**Die übertragbare Form:** Wenn eine Regel bei jedem Durchgang derselben Aufgabe angewendet werden
+muss, gehört sie ins Werkzeug, nicht in die Dokumentation. Die Dokumentation beschreibt dann, was
+das Werkzeug tut — sie ersetzt es nicht. (Dieselbe Lehre steht im Nachbar-Repo `gamegeeeeek-ai-core`
+als Lektion 8a, dort über einen Schalter, den man „nur beim ersten Lauf setzen" sollte.)
+
+**Die Unterscheidung, ohne die so eine Sicherung wieder abgeschaltet wird:** Der *Vorgang* fällt
+offen aus, die *Aussage* geschlossen. Kein Netz, kein `origin`, kaputtes `git` → es wird trotzdem
+geprüft; eine Sicherung, die bei einem Netzhänger 35 Minuten Arbeit verweigert, ist nach dem zweiten
+Mal dauerhaft deaktiviert und sichert dann gar nichts. Aber der Satz „kein fremder Merge während des
+Laufs" fällt **nur** nach einer gelungenen Messung; ohne sie steht dort, dass nicht gemessen werden
+konnte. Wer beides zusammenwirft, baut genau die Sicherung, deren Ausfall wie Normalbetrieb
+aussieht.
+
+**Und ein eigener Exit-Code für ein eigenes Urteil.** „Die Tests sind grün, das Ergebnis ist
+trotzdem unbrauchbar" ist nicht dasselbe wie „ein Test ist rot" — deshalb Code 2 neben Code 1, und
+der Testfehler gewinnt, wenn beides zutrifft. Ein Urteil, das ein anderes überschreibt, lässt den
+schwereren Fund im Rauschen untergehen.

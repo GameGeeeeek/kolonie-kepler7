@@ -290,6 +290,7 @@ Exit-Code:
 node pruflauf.js                    # alle Tests, 4 Stücke gleichzeitig
 node pruflauf.js --gleichzeitig 6   # mehr Stücke nebeneinander
 node pruflauf.js --fortsetzen       # fertige Stücke überspringen (nach einem Abbruch)
+node pruflauf.js --ohne-ampel       # ohne die Merge-Ampel (offline; sagt es in der Ausgabe)
 ```
 
 Warum das überhaupt geht: Gemessen an einem vollständigen Lauf brauchen 107 der 332 Tests 0 s (reine
@@ -326,6 +327,49 @@ Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln d
 
 Die Marken machen den Lauf gegen Abbrüche robust — ein Container-Neustart oder ein fremder Merge
 kostet dann ein Stück statt des ganzen Laufs.
+
+### Die Merge-Ampel (04.09.2026, gemessen)
+
+**Der Anlass ist eine Zahl.** Am 04.09.2026 nachgezählt: **25 der letzten 25 Merges nach `main`
+fassen `weltraum_kolonie.html` an** — ausnahmslos. Ihr Abstand liegt im aktiven Fenster bei 31 bis
+67 Minuten (Median rund 42), ein Prüflauf dauert 35. Rechnerisch wird damit **mehr als jeder zweite
+Lauf entwertet, bevor er fertig ist**; ein einzelner Änderungssatz brauchte an diesem Tag vier
+Anläufe, drei davon mit grünem, aber wertlosem Ergebnis.
+
+Die Regel dagegen stand längst in `CLAUDE.md` („das wird gemessen, nicht vermutet"). Gemessen hat
+sie aber ein Mensch, hinterher, wenn er daran dachte — und das ist bei einer Aufgabe, die sich
+mehrmals täglich stellt, keine Absicherung, sondern eine Erinnerung. Seit dem 04.09.2026 misst
+`pruflauf.js` selbst:
+
+| | wann | was passiert |
+|---|---|---|
+| **vorher** | vor dem ersten Stück | Hat `origin/main` die Spieldatei geändert und dieser Zweig kennt sie nicht, **bricht der Lauf ab** (Code 2). Das spart die 35 Minuten, statt sie erst am Ende als verloren zu erkennen. |
+| **nachher** | nach der Nachprüfung | Hat sich `origin/main` **während** des Laufs an der Spieldatei bewegt, ist das Urteil hin — Exit **2**, auch wenn jeder Test grün war. |
+| **still** | — | Dann steht in der Ausgabe: „kein fremder Merge während des Laufs — das Urteil gilt für `origin/main <sha>`". Dieser Satz ist zitierfähig; er fällt nur nach einer gelungenen Messung. |
+
+**Was fail-open ist und was fail-closed — die Unterscheidung ist der Kern.** Der *Lauf* fällt offen
+aus: Kein Netz, kein `origin`, kaputtes `git` — es wird trotzdem geprüft. Eine Sicherung, die bei
+einem Netzhänger 35 Minuten Arbeit verweigert, wird nach dem zweiten Mal dauerhaft abgeschaltet, und
+dann sichert sie gar nichts mehr. Die *Aussage* fällt geschlossen aus: Ohne Messung sagt das
+Werkzeug „konnte nicht messen" und **niemals** „kein fremder Merge". Genau das ist der Unterschied
+zu einer Sicherung, deren Ausfall wie Normalbetrieb aussieht.
+
+**Exit 2 statt 1**, weil es ein anderes Urteil ist: Die Tests haben nichts zu beanstanden, das
+Ergebnis ist trotzdem nicht verwendbar. Ein echter Testfehler bleibt Code 1 und wird von der Ampel
+**nicht** überschrieben — er ist das schwerere Urteil und darf im Rauschen nicht untergehen.
+
+**Bewusst nur die Spieldatei.** Die `server.js` des Nachbarn deckt `weltAbdruck()` ab (der misst
+lokal), und ein fremder Merge, der nur Tests hinzufügt, entwertet den eigenen Lauf nicht — er macht
+ihn unvollständig, und das ist eine andere Frage.
+
+**Was die Ampel NICHT kann:** Sie verhindert das Rennen nicht, sie stellt es nur fest. Wer es
+verhindern will, hält sich an die PR-Ampel oben (Entwurf heißt „mergt ruhig"). Und sie sieht nur
+`origin/main` — ob eine andere Sitzung gerade ausliefert, weiß sie nicht; das steht auf GitHub, und
+`pruflauf.js` spricht bewusst kein GitHub (es soll auch ohne Zugangsdaten und offline laufen).
+
+Wächter: `tests/test_pruflauf_ampel.js` — führt `ampelStand()` gegen ein **echtes** Wegwerf-Git mit
+echtem `origin` aus, samt der Gegenrichtung (ein fremder Merge ohne die Spieldatei entwertet nichts)
+und dem Ausfall ohne `origin`.
 
 ## Adversarische Durchsicht vor jeder Auslieferung (04.09.2026)
 

@@ -30,15 +30,17 @@
  *   node pruflauf.js --gleichzeitig 6   mehr Stücke nebeneinander
  *   node pruflauf.js --fortsetzen       fertige Stücke überspringen (nach einem Abbruch)
  *   node pruflauf.js --nur-pflicht      reicht direkt an tests/run.js durch (Sekunden)
+ *   node pruflauf.js --ohne-ampel       ohne die Merge-Ampel (offline; sagt es in der Ausgabe)
  *
  * EXIT-CODE: 0 nur, wenn JEDES Stück 0 geliefert hat. Der Exit-Code entscheidet, nicht die
- * Ausgabe - ein Absturz passt auf kein FAIL-Muster (CLAUDE.md).
+ * Ausgabe - ein Absturz passt auf kein FAIL-Muster (CLAUDE.md). Code 2 heißt: die Tests sagen
+ * nichts Schlechtes, aber das Ergebnis ist trotzdem nicht verwendbar (siehe Ampel unten).
  */
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const WURZEL = __dirname;
 
@@ -63,6 +65,61 @@ function weltAbdruck(){
   }
   return h.digest('hex').slice(0, 12);
 }
+
+/* DIE AMPEL - was bisher eine Regel im Kopf war (04.09.2026).
+   ------------------------------------------------------------------------------------------------
+   CLAUDE.md sagt seit jeher: "Ein fremder Merge entwertet den eigenen Lauf nur, wenn er die
+   Spieldatei anfasst - das wird gemessen." Gemessen hat das bisher ein MENSCH, hinterher, wenn er
+   daran dachte. Am 04.09.2026 nachgezaehlt: 25 der letzten 25 Merges nach main fassen die
+   Spieldatei an, ihr Abstand liegt bei 31 bis 67 Minuten, ein Lauf dauert 35. Rechnerisch wird
+   damit mehr als jeder zweite Lauf entwertet; ein einzelner Aenderungssatz brauchte an diesem Tag
+   VIER Anlaeufe. Eine Regel, an die man sich erinnern muss, ist bei einer regelmaessigen Aufgabe
+   keine Absicherung (docs/PROJECT_MEMORY.md) - also misst das Werkzeug es selbst.
+
+   ZWEI MESSUNGEN, verschiedene Zwecke:
+     VORHER  Steht origin/main mit einer Aenderung an der Spieldatei VOR mir, ist der Lauf schon
+             beim Start wertlos. Er wird deshalb gar nicht erst gefahren - das spart die 35 Minuten,
+             statt sie erst hinterher als verloren zu erkennen.
+     NACHHER Bewegt sich origin/main WAEHREND des Laufs an der Spieldatei, ist das Urteil hin. Dann
+             darf hier kein gruener Exit-Code stehen: Er wuerde zu einem Merge fuehren, dem keine
+             Messung entspricht - und der Merge IST bei diesem Projekt die Auslieferung.
+
+   WAS FAIL-OPEN IST UND WAS FAIL-CLOSED (die Unterscheidung ist der Kern):
+   Der LAUF faellt offen aus - kein Netz, kein origin, kaputtes git: es wird trotzdem geprueft. Eine
+   Sicherung, die bei einem Netzhaenger 35 Minuten Arbeit verweigert, wird nach dem zweiten Mal
+   dauerhaft abgeschaltet, und dann sichert sie gar nichts mehr.
+   Die AUSSAGE faellt geschlossen aus: Ohne Messung sagt das Skript "konnte nicht messen" und
+   NIEMALS "kein fremder Merge". Genau das ist der Unterschied zwischen einer Sicherung, deren
+   Ausfall wie Normalbetrieb aussieht, und einer, die ihn benennt.
+
+   Bewusst nur die Spieldatei: server.js des Nachbarn deckt weltAbdruck() ab (der misst lokal), und
+   ein fremder Merge, der nur Tests hinzufuegt, entwertet den eigenen Lauf nicht - er macht ihn
+   unvollstaendig, und das ist eine andere Frage. */
+const AMPEL_ZWEIG = 'main';
+const AMPEL_DATEI = 'weltraum_kolonie.html';
+
+function git(args, sekunden){
+  try {
+    const r = spawnSync('git', args, { cwd: WURZEL, encoding: 'utf8', timeout: (sekunden || 20) * 1000 });
+    if (r.error || r.status !== 0) return null;
+    return r.stdout;
+  } catch (e) { return null; }
+}
+
+/* Liefert { sha, spieldateiVoraus } - oder null, wenn nicht gemessen werden konnte. null ist ein
+   eigener Zustand und ausdruecklich NICHT dasselbe wie "alles in Ordnung"; die Aufrufer unten
+   behandeln ihn getrennt. */
+function ampelStand(){
+  if (git(['fetch', 'origin', AMPEL_ZWEIG], 60) === null) return null;
+  const sha = git(['rev-parse', 'origin/' + AMPEL_ZWEIG]);
+  const diff = git(['diff', '--name-only', 'HEAD...origin/' + AMPEL_ZWEIG]);
+  if (sha === null || diff === null) return null;
+  return {
+    sha: sha.trim().slice(0, 7),
+    spieldateiVoraus: diff.split('\n').some(z => z.trim() === AMPEL_DATEI)
+  };
+}
+
 const argumente = process.argv.slice(2);
 
 // --nur-pflicht und --nummer sind Sache von tests/run.js - hier nur durchreichen, damit niemand
@@ -81,6 +138,7 @@ const zahlNach = (flag, standard) => {
 };
 const GLEICHZEITIG = zahlNach('--gleichzeitig', 4);
 const FORTSETZEN = argumente.includes('--fortsetzen');
+const AMPEL_AN = !argumente.includes('--ohne-ampel');
 
 const ABLAGE = path.join(os.tmpdir(), 'kepler-pruflauf');
 fs.mkdirSync(ABLAGE, { recursive: true });
@@ -154,6 +212,32 @@ function starte(i) {
 
 (async () => {
   const start = Date.now();
+
+  /* AMPEL, erste Messung. Steht origin/main mit einer Aenderung an der Spieldatei vor uns, ist der
+     Lauf schon jetzt wertlos - dann lieber sofort abbrechen als in 35 Minuten feststellen, dass
+     ein Stand gemessen wurde, den es nicht mehr gibt. */
+  let ampelVorher = null;
+  if (!AMPEL_AN) {
+    console.log('Ampel abgeschaltet (--ohne-ampel) - dieser Lauf sagt NICHTS ueber fremde Merges.');
+  } else {
+    ampelVorher = ampelStand();
+    if (!ampelVorher) {
+      console.log('Ampel: origin/' + AMPEL_ZWEIG + ' nicht messbar (kein Netz oder kein origin).');
+      console.log('       Der Lauf geht weiter, aber er kann hinterher NICHT sagen, ob jemand dazwischen gemergt hat.');
+    } else if (ampelVorher.spieldateiVoraus) {
+      console.log('ABBRUCH: origin/' + AMPEL_ZWEIG + ' (' + ampelVorher.sha + ') hat ' + AMPEL_DATEI + ' geaendert,');
+      console.log('dieser Zweig kennt die Aenderung noch nicht. Ein Lauf darauf misst einen Stand, den es');
+      console.log('nicht mehr gibt - und das faellt sonst erst am Ende auf, nach der vollen Laufzeit.');
+      console.log('');
+      console.log('  git merge origin/' + AMPEL_ZWEIG + '   und dann neu starten');
+      console.log('');
+      console.log('(Absichtlich auf altem Stand messen: node pruflauf.js --ohne-ampel)');
+      process.exit(2);
+    } else {
+      console.log('Ampel: origin/' + AMPEL_ZWEIG + ' steht auf ' + ampelVorher.sha + ', ' + AMPEL_DATEI + ' ist hier aktuell.');
+    }
+  }
+
   const abdruckVorher = weltAbdruck();
   const ergebnisse = await Promise.all(stuecke.map((_, i) => starte(i)));
   const rot = ergebnisse.filter(e => e.code !== 0);
@@ -207,6 +291,32 @@ function starte(i) {
     console.log('\nDie Protokolle der Stücke liegen unter ' + ABLAGE + '.');
   }
   console.log('Dauer: ' + Math.round((Date.now() - start) / 1000) + 's');
+
+  /* AMPEL, zweite Messung - die eigentliche. Hat sich origin/main waehrend des Laufs an der
+     Spieldatei bewegt, ist das Urteil hin, egal wie gruen die Tests waren. Der Exit-Code muss das
+     sagen: Ein gruener Code hier fuehrt zu einem Merge, dem keine Messung entspricht, und der
+     Merge IST bei diesem Projekt die Auslieferung.
+     Der Satz "kein fremder Merge" faellt NUR nach einer gelungenen Messung - ohne sie steht da,
+     dass nicht gemessen werden konnte. */
+  let ampelHinweis = 0;
+  if (AMPEL_AN) {
+    const ampelNachher = ampelStand();
+    if (!ampelNachher) {
+      console.log('\nAmpel: origin/' + AMPEL_ZWEIG + ' war am Ende nicht messbar - ob jemand waehrend des Laufs');
+      console.log('gemergt hat, ist damit OFFEN. Vor dem Merge von Hand pruefen:');
+      console.log('  git fetch origin ' + AMPEL_ZWEIG + ' && git diff --name-only HEAD...origin/' + AMPEL_ZWEIG);
+    } else if (ampelNachher.spieldateiVoraus) {
+      console.log('\nDER LAUF IST ENTWERTET: origin/' + AMPEL_ZWEIG + ' steht jetzt auf ' + ampelNachher.sha
+        + ' und hat ' + AMPEL_DATEI);
+      console.log('waehrend des Laufs geaendert. Gemessen wurde ein Stand, den es nicht mehr gibt.');
+      console.log('');
+      console.log('  git merge origin/' + AMPEL_ZWEIG + '   und neu laufen lassen');
+      ampelHinweis = 2;
+    } else {
+      console.log('\nAmpel: kein fremder Merge waehrend des Laufs - das Urteil gilt fuer origin/'
+        + AMPEL_ZWEIG + ' ' + ampelNachher.sha + '.');
+    }
+  }
   /* Der Exit-Code entscheidet - und er richtet sich nach der NACHPRUEFUNG, nicht nach den Stuecken.
      Waere es umgekehrt, muesste jeder Aufrufer die Ausgabe lesen, und genau das verbietet CLAUDE.md.
      ACHTUNG BEIM AUFRUF: `node pruflauf.js | tail` verwirft diesen Code (die Pipe liefert den von
@@ -215,5 +325,9 @@ function starte(i) {
     ? 'Alle roten Tests waren Lastsymptome - der Lauf ist gruen.'
     : 'Alle roten Tests sind einzeln gruen - aber die Welt hat sich waehrend des Laufs geaendert.'
       + ' Kein automatisches Gruen-Urteil; siehe Hinweis oben.');
-  process.exit(echtRot.length ? 1 : (rot.length && !verdaechtig.length ? 1 : 0));
+  /* Reihenfolge: Ein echter Testfehler bleibt Code 1 - er ist das schwerere Urteil und darf nicht
+     von der Ampel ueberschrieben werden. Erst wenn die Tests nichts zu beanstanden haben, entscheidet
+     die Ampel, ob das Ergebnis ueberhaupt verwendbar ist (Code 2). */
+  const testCode = echtRot.length ? 1 : (rot.length && !verdaechtig.length ? 1 : 0);
+  process.exit(testCode || ampelHinweis);
 })();
