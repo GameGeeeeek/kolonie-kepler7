@@ -2803,6 +2803,7 @@
         <button id="adminTabAllianzenBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Allianzen</button>
         <button id="adminTabLageBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-planet" aria-hidden="true" style="margin-right:4px;"></i>Lage</button>
         <button id="adminTabGalaxieBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-world" aria-hidden="true" style="margin-right:4px;"></i>Galaxie</button>
+        <button id="adminTabModuleBtn" style="flex:1 1 96px; font-size:11.5px;"><i class="ti ti-box" aria-hidden="true" style="margin-right:4px;"></i>Module</button>
       </div>
       <div id="adminReportsList" style="display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto;"></div>
       <div id="adminAnalyticsView" style="display:none; max-height:60vh; overflow-y:auto;"></div>
@@ -2967,6 +2968,9 @@
       <!-- Lage (02.09.2026): Wirtschaft ueber alle Spielstaende, Markt, lebende PvE-Ziele - nur lesen. -->
       <!-- Galaxie-Eingriff (02.09.2026). db.galaxy ist fuer Clients bauartbedingt unerreichbar;
            dieser Reiter ist der einzige Weg dorthin, der nicht ueber die db.json auf dem Pi geht. -->
+      <div id="adminModuleView" style="display:none; max-height:60vh; overflow-y:auto;">
+        <div id="adminModuleInhalt"></div>
+      </div>
       <div id="adminGalaxieView" style="display:none; max-height:60vh; overflow-y:auto;">
         <div class="bmeta" style="margin-bottom:10px; line-height:1.5;">Greift direkt in die Galaxie ein: Weltboss, Alien-Nester, Wrackkonvois, Marktereignis und Kopfgeld. Gesetzt wird über dieselben Erzeuger, die auch der Weltentakt benutzt – ein von Hand gebautes Ziel hätte fehlende Felder.</div>
         <div id="adminGalaxieInhalt"></div>
@@ -24819,6 +24823,61 @@
       return true;
     });
   }
+  /* --- Fundort und Anteil je Modul (04.09.2026, Idee Sascha "Module-Editor") ---
+     ABGELEITET, NICHT GEPFLEGT. Diese Funktion fragt fundPool() - dieselbe Funktion, die im Spiel
+     wirklich zieht - und rechnet den Anteil aus der Topfgroesse. Damit kann die Uebersicht nicht
+     veralten: Kommt ein Modul dazu, aendert sich die Topfgroesse und damit jede Prozentzahl von
+     selbst. Eine gepflegte Fundort-Tabelle waere die dritte Kopie neben Frontend und Backend
+     gewesen, und die erste, die niemand nachzieht.
+     WARUM 1/n eine ehrliche Zahl ist: zieheAusPool() indiziert GLEICHVERTEILT
+     (pool[Math.floor(Math.random()*pool.length)]) - jeder Eintrag im Topf ist gleich wahrscheinlich.
+     Die Zahl sagt "wenn diese Quelle ein Modul ausschuettet, ist es mit dieser Wahrscheinlichkeit
+     dieses" - sie sagt NICHT, wie oft die Quelle ueberhaupt etwas ausschuettet. Genau so steht sie
+     auch in der Anzeige, sonst liest sie sich als Fundchance und ist um Groessenordnungen falsch. */
+  const MODUL_HERKUNFT_TEXT = {
+    normal:    'Normale Funde (Expedition, Erkundung, Fraktionen)',
+    abgrund:   'Abgrund',
+    boss:      'Boss-Set - nur nach einer Allianz-Raid-Welle gegen diesen Boss',
+    unikat:    'Unikat - genau eine benannte Quelle',
+    konvoi:    'Wrackkonvoi - der Server wuerfelt',
+    fertigung: 'Nur Fertigung (Werkbank)',
+    event:     'Nur waehrend seines Events',
+    direkt:    'Wird gezielt vergeben, nie zufaellig gefunden'
+  };
+  function modulFundort(d, defs, art){
+    // Reihenfolge zaehlt: Das ENGSTE Schloss gewinnt. Ein Boss-Set-Teil mit chance:0 ist zuerst
+    // "wird gezielt vergeben" und erst danach ein Boss-Teil - beides zu nennen waere doppelt.
+    const quelle = d.quelle || HERKUNFT_NORMAL;
+    // Zwei Arten von Topf, und sie kommen aus verschiedenen Funktionen: `opt` heisst "fundPool
+    // zieht", `festerTopf` heisst "eine andere Ziehstelle zieht gleichverteilt aus dieser Liste".
+    // Boss-Set-Teile gehoeren zur zweiten Sorte - gemessen: 20 Teile, fuenf Bosse zu je vieren,
+    // grantBossSetModule wuerfelt unter den vier Teilen DESSELBEN Bosses. Sie als "gezielt
+    // vergeben" auszuweisen waere fuer ein Fuenftel aller Module schlicht falsch gewesen.
+    let herkunft, opt = null, festerTopf = null;
+    if (d.chance === 0) herkunft = 'direkt';
+    else if (quelle === HERKUNFT_BOSS){ herkunft = 'boss'; festerTopf = bosssetTeile(d.bossKey, defs).length; }
+    // Unikat und Konvoi werden WIRKLICH benannt vergeben: grantUnikatModul('leviathanherz') nennt
+    // das Stueck, und beim Konvoi entscheidet der Server (`mod.defKey`). Da gibt es keinen Topf.
+    else if (quelle === HERKUNFT_UNIKAT) herkunft = 'unikat';
+    else if (quelle === HERKUNFT_KONVOI) herkunft = 'konvoi';
+    else if (quelle === HERKUNFT_ABGRUND){ herkunft = 'abgrund'; opt = { quelle: HERKUNFT_ABGRUND, tiefe: d.minTiefe || 0 }; }
+    else if (d.craftOnly){ herkunft = 'fertigung'; opt = { craft: true }; }
+    else if (d.eventKey){ herkunft = 'event'; opt = { event: true }; }
+    else { herkunft = 'normal'; opt = {}; }
+    let topf = 0, anteil = null;
+    if (festerTopf !== null) topf = festerTopf;
+    else if (opt) topf = fundPool(defs, opt).length;
+    if (opt || festerTopf !== null) anteil = topf > 0 ? 1 / topf : null;
+    return { key: d.key, name: d.name, art, herkunft, text: MODUL_HERKUNFT_TEXT[herkunft],
+      topf, anteil, minTiefe: d.minTiefe || 0, bossKey: d.bossKey || null,
+      // Der eigentliche Befund, wegen dem die Uebersicht gebaut wurde: ein Modul, das in KEINEM
+      // Topf liegt und auch keine gezielte Quelle hat, ist im Spiel unerreichbar.
+      unerreichbar: !!((opt || festerTopf !== null) && topf === 0) };
+  }
+  function modulFundorte(){
+    return MODULE_DEFS.map(d => modulFundort(d, MODULE_DEFS, 'standort'))
+      .concat(SHIP_MODULE_DEFS.map(d => modulFundort(d, SHIP_MODULE_DEFS, 'schiff')));
+  }
   // Zieht EINEN Eintrag. Es gibt bewusst keine Variante, die ein Array direkt indiziert - genau die
   // waere der Weg, an dem der naechste Umbau die Filter wieder vergisst.
   function zieheAusPool(defs, opt){
@@ -24867,8 +24926,14 @@
     return grantBossSetModule(bs.bossKey, bs.seltenheit);
   }
 
+  // Die Teile EINES Bosses - eine Funktion, zwei Leser: grantBossSetModule zieht daraus, und
+  // modulFundort() rechnet daraus den Anteil. Vorher stand der Filter nur hier; die Uebersicht
+  // haette ihn abschreiben muessen, und eine abgeschriebene Regel ist die naechste zweite Wahrheit.
+  function bosssetTeile(bossKey, defs){
+    return (defs || MODULE_DEFS).filter(d => d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey);
+  }
   function grantBossSetModule(bossKey, vorgabeSeltenheit){
-    const teile = MODULE_DEFS.filter(d => d.quelle === HERKUNFT_BOSS && d.bossKey === bossKey);
+    const teile = bosssetTeile(bossKey);
     if (!teile.length) return null;
     const def = teile[Math.floor(Math.random()*teile.length)];
     const rarity = (vorgabeSeltenheit && MODULE_RARITY[vorgabeSeltenheit]) ? vorgabeSeltenheit : 'selten';
@@ -32896,7 +32961,8 @@ async function claimPendingRewards(){
     { tab:'protokoll', btn:'adminTabProtokollBtn', view:'adminProtokollView', anzeige:'block', sub:'Protokoll der Betreiber-Handlungen', laden:() => loadAdminProtokoll() },
     { tab:'allianzen', btn:'adminTabAllianzenBtn', view:'adminAllianzenView', anzeige:'block', sub:'Allianzen',                   laden:() => loadAdminAllianzen() },
     { tab:'lage',      btn:'adminTabLageBtn',      view:'adminLageView',      anzeige:'block', sub:'Wirtschaft und Galaxie',      laden:() => loadAdminLage() },
-    { tab:'galaxie',   btn:'adminTabGalaxieBtn',   view:'adminGalaxieView',   anzeige:'block', sub:'Eingriffe in die Welt',       laden:() => loadAdminGalaxie() }
+    { tab:'galaxie',   btn:'adminTabGalaxieBtn',   view:'adminGalaxieView',   anzeige:'block', sub:'Eingriffe in die Welt',       laden:() => loadAdminGalaxie() },
+    { tab:'module',    btn:'adminTabModuleBtn',    view:'adminModuleView',    anzeige:'block', sub:'Fundorte und Drop-Chancen',   laden:() => loadAdminModule() }
   ];
   function switchAdminTab(tab){
     const sub = document.getElementById('adminPanelSub');
@@ -33639,6 +33705,126 @@ async function claimPendingRewards(){
   /* Galaxie-Eingriff (Backend #208). Jede Handlung fragt nach, weil keine davon einen Rueckgaengig-
      Knopf hat: Ein entferntes Nest ist weg, ein gesetztes steht sofort auf der Karte aller Spieler. */
   let galaxieDaten = null;
+  /* --- Modul-Reiter (04.09.2026) ---
+     Zwei Quellen, klar getrennt: Die FUNDORTE kommen aus modulFundorte() und damit aus dem Code
+     dieser Datei - der Server kennt sie nicht und behauptet es auch nicht (er schickt seinen
+     hinweisQuellen mit). Die REGLER und die eigenen Eintraege kommen vom Server. */
+  async function loadAdminModule(){
+    const box = document.getElementById('adminModuleInhalt');
+    if (!box) return;
+    box.innerHTML = `<div class="bmeta">Wird geladen…</div>`;
+    let d = null, fehler = null;
+    try {
+      const res = await backendFetch('/admin/module');
+      if (!res.ok) fehler = adminListenFehler(res, 'die Modul-Verwaltung'); else d = await res.json();
+    } catch(e){ fehler = adminListenFehler(null, 'die Modul-Verwaltung'); }
+
+    // Die Fundorte stehen AUCH ohne Server - sie kommen aus dem Code. Ein Serverfehler nimmt dem
+    // Reiter die Regler, nicht die Uebersicht.
+    const funde = modulFundorte();
+    const nachHerkunft = {};
+    for (const f of funde) (nachHerkunft[f.herkunft] = nachHerkunft[f.herkunft] || []).push(f);
+    const unerreichbar = funde.filter(f => f.unerreichbar);
+    const zeile = (k, v, farbe) => `<div style="display:flex; justify-content:space-between; gap:8px;"><span class="bmeta">${k}</span><span class="bmeta" style="color:${farbe || '#c9d4e8'}; text-align:right;">${v}</span></div>`;
+    const karte = (titel, icon, inhalt) => `<div class="card-row" style="flex-direction:column; align-items:stretch; gap:4px;"><div class="bname"><i class="ti ${icon}" aria-hidden="true" style="margin-right:5px;"></i>${titel}</div>${inhalt}</div>`;
+
+    const kopf = `<div class="bmeta" style="margin-bottom:8px; line-height:1.5;">${adminZahl(funde.length)} Module im Spiel – ${adminZahl(funde.filter(f => f.art === 'standort').length)} Standort-, ${adminZahl(funde.filter(f => f.art === 'schiff').length)} Schiffsmodule. Die Fundorte sind aus <code>fundPool()</code> abgeleitet, also aus der Funktion, die im Spiel wirklich zieht – sie können nicht veralten. Der Anteil sagt: <strong>Schüttet diese Quelle ein Modul aus, ist es mit dieser Wahrscheinlichkeit dieses.</strong> Wie oft die Quelle überhaupt etwas ausschüttet, hängt an ihrer Mechanik und steht nicht am Modul.</div>`;
+
+    const gruppen = Object.keys(nachHerkunft).sort().map(h => {
+      const liste = nachHerkunft[h].slice().sort((a, b) => a.name.localeCompare(b.name));
+      const inhalt = liste.map(f => zeile(
+        escapeHtml(f.name) + ' <span style="opacity:0.6;">' + (f.art === 'standort' ? 'Standort' : 'Schiff') + '</span>',
+        (f.anteil !== null ? String(Math.round(f.anteil * 1000) / 10).replace('.', ',') + ' % von ' + adminZahl(f.topf) : 'gezielt vergeben')
+          + (f.minTiefe ? ' · ab Tiefe ' + adminZahl(f.minTiefe) : '')
+          + (f.bossKey ? ' · ' + escapeHtml(f.bossKey) : ''),
+        f.unerreichbar ? '#f0997b' : '#c9d4e8')).join('');
+      return karte(MODUL_HERKUNFT_TEXT[h] + ' (' + adminZahl(liste.length) + ')', 'ti-box', inhalt);
+    }).join('');
+
+    const luecke = karte('Auffälligkeiten', 'ti-alert-triangle',
+      zeile('Module in keinem Topf und ohne gezielte Quelle', unerreichbar.length ? escapeHtml(unerreichbar.map(f => f.name).join(', ')) : 'keine',
+        unerreichbar.length ? '#f0997b' : '#5dcaa5'));
+
+    const regler = d ? karte('Drop-Chancen des Servers', 'ti-adjustments',
+      `<div class="bmeta" style="line-height:1.5;">${escapeHtml(d.hinweisQuellen || '')}</div>`
+      + (d.quellen || []).map(q => `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+          <span class="bmeta" style="flex:2 1 190px;">${escapeHtml(q.name)} <span style="opacity:0.6;">(${escapeHtml(q.modul)})</span></span>
+          <input type="number" min="0" max="1" step="0.05" data-modul-chance="${escapeHtml(q.quelle)}" value="${q.aktuell}" style="flex:1 1 80px; font-size:11.5px;">
+          <button data-modul-chance-setzen="${escapeHtml(q.quelle)}" style="flex:1 1 90px; font-size:11px;">Übernehmen</button>
+          ${q.gestellt ? `<button data-modul-chance-zurueck="${escapeHtml(q.quelle)}" style="flex:1 1 110px; font-size:11px;">Auf ${String(q.basis).replace('.', ',')} zurück</button>`
+            : `<span class="bmeta" style="flex:1 1 110px; opacity:0.7;">Code-Wert ${String(q.basis).replace('.', ',')}</span>`}
+        </div><div class="bmeta" style="opacity:0.7;">${escapeHtml(q.hinweis || '')}</div>`).join('')) : '';
+
+    const eigene = d ? karte('Eigene Einträge', 'ti-plus',
+      `<div class="bmeta" style="line-height:1.5; color:#f0997b;">Ein hier angelegtes Modul <strong>wirkt im Spiel nicht</strong>: Die 99 Module leben im Code, und ein Eintrag aus der Datenbank hat keinen Verbraucher. Er ist als Entwurf gedacht – umgesetzt wird er im Code. Der Schlüssel beginnt deshalb mit <code>eigen_</code>, damit er nie ein echtes Modul überschreiben kann.</div>`
+      + ((d.eigene || []).length
+        ? d.eigene.map(m => `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+            <span class="bmeta" style="flex:2 1 200px;"><strong>${escapeHtml(m.name)}</strong> <span style="opacity:0.6;">${escapeHtml(m.key)}</span> · <span style="color:#f0997b;">ohne Wirkung im Spiel</span></span>
+            <button data-modul-eigen-weg="${escapeHtml(m.key)}" style="flex:1 1 90px; font-size:11px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:4px;"></i>Entfernen</button>
+          </div><div class="bmeta" style="opacity:0.75;">${escapeHtml(m.beschreibung)}</div>`).join('')
+        : `<div class="bmeta">Noch kein eigener Eintrag.</div>`)
+      + `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <input type="text" id="adminModulKey" maxlength="30" placeholder="eigen_kaperhaken" autocomplete="off" style="flex:1 1 150px; font-size:11.5px;">
+          <input type="text" id="adminModulName" maxlength="60" placeholder="Name" autocomplete="off" style="flex:1 1 150px; font-size:11.5px;">
+          <select id="adminModulArt" aria-label="Art des Moduls" style="flex:1 1 120px; font-size:11.5px;"><option value="standort">Standortmodul</option><option value="schiff">Schiffsmodul</option></select>
+        </div>
+        <textarea id="adminModulText" maxlength="300" placeholder="Beschreibung – was soll es tun?" style="width:100%; min-height:50px; resize:vertical; font-size:12px; margin-top:4px;"></textarea>
+        <button id="adminModulAnlegenBtn" style="width:100%; font-size:11.5px;"><i class="ti ti-plus" aria-hidden="true" style="margin-right:4px;"></i>Als Entwurf anlegen</button>`) : '';
+
+    box.innerHTML = kopf + (fehler || '') + luecke + regler + eigene + gruppen;
+
+    box.querySelectorAll('[data-modul-chance-setzen]').forEach(b => b.onclick = () => {
+      const q = b.getAttribute('data-modul-chance-setzen');
+      const feld = box.querySelector('[data-modul-chance="' + CSS.escape(q) + '"]');
+      adminModulChance(q, feld ? feld.value : '', b);
+    });
+    box.querySelectorAll('[data-modul-chance-zurueck]').forEach(b => b.onclick = () =>
+      adminModulChance(b.getAttribute('data-modul-chance-zurueck'), null, b));
+    box.querySelectorAll('[data-modul-eigen-weg]').forEach(b => b.onclick = () =>
+      adminModulEigenWeg(b.getAttribute('data-modul-eigen-weg')));
+    const anlegen = document.getElementById('adminModulAnlegenBtn');
+    if (anlegen) anlegen.onclick = () => adminModulEigenAnlegen(anlegen);
+  }
+  async function adminModulChance(quelle, wert, knopf){
+    if (knopf) knopf.disabled = true;
+    try {
+      const res = await backendFetch('/admin/module/chance', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ quelle, wert: wert === null || wert === '' ? null : Number(wert) }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Die Chance konnte nicht gesetzt werden.', 'ti-alert-triangle'); return; }
+      log(d.zurueckgesetzt ? 'Zurück auf den Code-Wert ' + String(d.basis).replace('.', ',') + '.'
+        : 'Chance auf ' + String(d.aktuell).replace('.', ',') + ' gesetzt (Code-Wert ' + String(d.basis).replace('.', ',') + ').', 'ti-check', 'ok');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung – nichts gesetzt.', 'ti-alert-triangle'); }
+    finally { if (knopf) knopf.disabled = false; }
+  }
+  async function adminModulEigenAnlegen(knopf){
+    const key = (document.getElementById('adminModulKey') || {}).value || '';
+    const name = (document.getElementById('adminModulName') || {}).value || '';
+    const beschreibung = (document.getElementById('adminModulText') || {}).value || '';
+    const art = (document.getElementById('adminModulArt') || {}).value || 'standort';
+    if (!key.trim() || !name.trim() || !beschreibung.trim()){ log('Schlüssel, Name und Beschreibung ausfüllen.', 'ti-alert-triangle'); return; }
+    if (knopf) knopf.disabled = true;
+    try {
+      const res = await backendFetch('/admin/module/eigen', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ key: key.trim(), name: name.trim(), beschreibung: beschreibung.trim(), art }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Der Entwurf konnte nicht angelegt werden.', 'ti-alert-triangle'); return; }
+      log(d.ersetzt ? 'Entwurf ersetzt – er wirkt im Spiel nicht.' : 'Entwurf angelegt – er wirkt im Spiel nicht.', 'ti-check', 'ok');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung – nichts angelegt.', 'ti-alert-triangle'); }
+    finally { if (knopf) knopf.disabled = false; }
+  }
+  async function adminModulEigenWeg(key){
+    if (!confirm('Entwurf „' + key + '" entfernen?')) return;
+    try {
+      const res = await backendFetch('/admin/module/eigen/loeschen', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok){ log(d.error || 'Entfernen fehlgeschlagen.', 'ti-alert-triangle'); return; }
+      log('Entwurf entfernt.', 'ti-check');
+      loadAdminModule();
+    } catch(e){ log('Keine Verbindung.', 'ti-alert-triangle'); }
+  }
   async function loadAdminGalaxie(){
     const box = document.getElementById('adminGalaxieInhalt');
     if (!box) return;
@@ -34247,10 +34433,15 @@ async function claimPendingRewards(){
   function adminListenFehler(res, was){
     const s = res ? res.status : 0;
     if (s === 404) return `<div class="bmeta">Dieser Server kennt <strong>${escapeHtml(was)}</strong> noch nicht (404) – das Backend auf dem Pi läuft hinterher. Dort <code>cd /DATA/kepler7/backend &amp;&amp; git pull origin master</code> ausführen, dann diese Seite neu laden.</div>`;
-    if (s === 403) return `<div class="bmeta">Kein Admin-Zugriff auf diese Liste (403).</div>`;
+    if (s === 403) return `<div class="bmeta">Kein Admin-Zugriff auf <strong>${escapeHtml(was)}</strong> (403).</div>`;
     if (s === 401) return `<div class="bmeta">Sitzung abgelaufen oder nicht angemeldet (401) – bitte neu anmelden.</div>`;
     if (!s) return `<div class="bmeta">Keine Verbindung zum Server – die Liste konnte nicht geladen werden.</div>`;
-    return `<div class="bmeta">Liste konnte nicht geladen werden (${s}).</div>`;
+    // Auch der Sammelfall nennt die Liste (04.09.2026): Auf einem Reiter mit mehreren Kaesten sagte
+    // "Liste konnte nicht geladen werden (500)" nicht, WELCHE - und der Modul-Reiter zeigt seine
+    // Fundorte auch bei totem Server weiter, dort stand die Meldung also neben lauter richtigen Daten.
+    // `was` ist an allen Aufrufstellen ein Akkusativ ("den Kampfverlauf", "die Allianzen"), deshalb
+    // dieser Satzbau statt "X konnte nicht geladen werden".
+    return `<div class="bmeta">Der Server konnte <strong>${escapeHtml(was)}</strong> nicht laden (${s}).</div>`;
   }
   // Spenden ohne E-Mail (05.08.2026). Auf dem Pi gemessen: kofiDonationsByEmail hatte 0 Einträge,
   // kofiSupporters 2 Namen - beide entstehen im selben Webhook. Die Spende kam also an, nur die
@@ -52264,6 +52455,25 @@ async function claimPendingRewards(){
     unikat:  'Fällt ausschließlich bei seiner eigenen Jagd (Weltboss bzw. Wächter) - immer mit Spitzenwurf.',
     konvoi:  'Fällt ausschließlich beim Erlegen eines Wrackkonvois - nicht schmiedbar, nicht handelbar.'
   };
+  /* Der ANTEIL im Fundtopf, an dieselbe Zeile gehaengt (04.09.2026). Die Herkunftszeile stand
+     schon da und sagt, WO etwas faellt; sie sagte nur nicht, wie viel Auswahl der Topf hat - und
+     genau das ist die Frage, die ein Spieler stellt ("wie selten ist das?"). Der Satz sagt
+     ausdruecklich "wenn dabei ein Modul faellt": Die Zahl ist der Anteil INNERHALB des Topfes,
+     nicht die Chance, dass die Quelle ueberhaupt etwas ausschuettet - die haengt an der Mechanik
+     und steht dort, nicht am Modul.
+     Nur fuer Module: Die uebrigen Katalog-Arten (Verbrauch, Material, Reliquie) ziehen aus anderen
+     Toepfen mit eigenen Gewichten, fuer sie waere 1/n schlicht falsch. */
+  function sammlungAnteilText(g){
+    if (g.art !== 'standortmodul' && g.art !== 'schiffsmodul') return '';
+    const defs = g.art === 'standortmodul' ? MODULE_DEFS : SHIP_MODULE_DEFS;
+    const d = defs.find(x => x.key === g.key);
+    if (!d) return '';
+    const f = modulFundort(d, defs, g.art === 'standortmodul' ? 'standort' : 'schiff');
+    if (f.anteil === null) return '';
+    const pct = Math.round(f.anteil * 1000) / 10;
+    return ` <span style="opacity:0.85;">Fällt dabei ein Modul, ist es zu ${String(pct).replace('.', ',')} % dieses (${adminZahl(f.topf)} im Topf)`
+      + (f.minTiefe ? `, und erst ab Tiefe ${adminZahl(f.minTiefe)}` : '') + '.</span>';
+  }
   // Lazy, nicht beim Laden: Zwei der fuenf Listen stehen weiter unten in der Datei, und ein
   // Aufruf waehrend der Modulauswertung traefe sie in ihrer temporalen Todeszone (Arbeitsregel 38).
   // Ein Zwischenspeicher ist tragfaehig, weil sich keine der fuenf Listen zur Laufzeit aendert.
@@ -52380,7 +52590,7 @@ async function claimPendingRewards(){
             <div class="bname">${escapeHtml(g.name)}</div>
             <div class="bmeta">${teile.join(' · ')}</div>
             <div class="bmeta" style="opacity:0.85;">${beschr}</div>
-            <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}</div>
+            <div class="bmeta" style="opacity:0.7;"><i class="ti ti-map-pin" aria-hidden="true" style="margin-right:3px;"></i>${escapeHtml(herk)}${sammlungAnteilText(g)}</div>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">${pille}${aktivieren}</div>
