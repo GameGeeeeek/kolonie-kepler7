@@ -98,4 +98,28 @@ check('5b: Anfechtung, Vorposten-Angriff, Spionage und Spielerangriff rufen vorp
 const nichtPvp = (JS.match(/vorpostenFlug\(/g) || []).length;
 check('5c: der Kanal ist an Nicht-PvP-Stellen eingehaengt (Erkundung, Kolonisierung, Abbau, Bau)', nichtPvp >= 6, { aufrufe: nichtPvp });
 
+/* ---- 6) Der eingetippte Rueckfallname (GR-7, 04.09.2026) --------------------------------------
+   Das Frontend schreibt an vier Stellen `|| 'Ankerkern'` - der Name der ersten Stufe, falls der
+   Server keinen mitschickt. Das ist eine KOPIE-FAMILIE: Benennt das Backend die erste Stufe um,
+   erfindet das Frontend still einen Namen, den es nicht mehr gibt. Genau so ist "Feldlager" nach
+   GR-6 stehen geblieben, als der Vorposten laengst eine Raumstation war.
+   Geprueft wird die REGEL, nicht der Name: Was das Frontend als Rueckfall eintippt, MUSS die
+   erste Stufe in VORPOSTEN_STUFEN heissen. Eine spaetere Umbenennung ist damit frei - sie muss
+   nur auf beiden Seiten geschehen. */
+const stufenBlock = (() => {
+  const i = SRV.indexOf('const VORPOSTEN_STUFEN = [');
+  if (i < 0) return '';
+  const j = SRV.indexOf('\n];', i);
+  return j < 0 ? '' : SRV.slice(i, j);
+})();
+const ersteStufe = (stufenBlock.match(/name: *'([^']+)'/) || [])[1] || null;
+check('6-anker: der Name der ersten Stufe ist im Server auffindbar', !!ersteStufe, { ersteStufe });
+const rueckfaelle = [...JS.matchAll(/\|\| *'([^']+)'/g)].map(m => m[1])
+  .filter(n => /^(Ankerkern|Feldlager|Stützpunkt|Bastion|Kernstation)$/.test(n));
+check('6a: das Frontend tippt ueberhaupt einen Rueckfallnamen ein (sonst misst 6b nichts)',
+  rueckfaelle.length > 0, { gefunden: rueckfaelle });
+check('6b: und jeder davon ist der Name der ERSTEN Stufe des Servers',
+  !!ersteStufe && rueckfaelle.every(n => n === ersteStufe),
+  { ersteStufe, imFrontend: [...new Set(rueckfaelle)] });
+
 ende();
