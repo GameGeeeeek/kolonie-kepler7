@@ -80,6 +80,10 @@ function eintragVon(quelle, key){
   return quelle.slice(i, j < 0 ? i + 1200 : j);
 }
 function sperrgrundSchiffe(schluessel){
+  /* SPIELDATEI folgt KEPLER_SPIELDATEI, DATEI folgt KEPLER_TESTDATEI - wer nur eine der beiden
+     umleitet, laedt die eine Fassung und liest die Merkmale aus der anderen. lib/spieldatei.js
+     warnt vor genau diesem stillen Auseinanderlaufen. Deshalb hier ein Riegel: Zeigt die geladene
+     Seite auf eine Kopie, muss auch die gelesene Datei dorthin zeigen. */
   const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
   const allianz = [];
   let forschung = null;
@@ -111,7 +115,13 @@ function sperrgrundSchiffe(schluessel){
   check('0-vorab: Boot ohne Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
 
   const knoepfe = await page.evaluate(() => {
-    const els = [...document.querySelectorAll('[data-buyship]')]
+    /* ALLE Bauknoepfe der Werft, nicht nur die mit data-buyship: Das Superschlachtschiff hat
+       einen eigenen Block mit id="buySuperschlachtschiff" und war deshalb fuer die erste Fassung
+       dieses Tests unsichtbar - es blieb als einziger Knopf der Box gesperrt, ohne dass eine
+       Pruefung das bemerkt haette (Befund der Durchsicht zu v8.665.0). Ein Waechter, der seine
+       Menge ueber ein Attribut definiert, das nicht alle Mitglieder tragen, misst genau die
+       Ausnahme nicht, die zaehlt. */
+    const els = [...document.querySelectorAll('[data-buyship], #buySuperschlachtschiff')]
       .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
     return { anzahl: els.length,
              schluessel: els.map(e => e.getAttribute('data-buyship')),
@@ -125,6 +135,9 @@ function sperrgrundSchiffe(schluessel){
   if (knoepfe.anzahl < 5) return ende(async () => browser.close());
 
   const { allianz: allianzKandidaten, forschung } = sperrgrundSchiffe(knoepfe.schluessel);
+  check('0-anker: geladene Seite und gelesene Quelle sind dieselbe Fassung',
+    !process.env.KEPLER_TESTDATEI || !!process.env.KEPLER_SPIELDATEI,
+    { geladen: process.env.KEPLER_TESTDATEI || '(Standard)', gelesen: process.env.KEPLER_SPIELDATEI || '(Standard)' });
   check('0-anker: beide Sperrgrund-Arten aus der Spieldatei gelesen',
     allianzKandidaten.length > 0 && !!forschung,
     { allianzSchiffe: allianzKandidaten, forschungsSchiff: forschung });
@@ -182,9 +195,33 @@ function sperrgrundSchiffe(schluessel){
     !!teuer && /zur Warteschlange auf .* hinzugefügt/.test(log5),
     { schiff: teuer, zeile: (log5.match(/[^\n]*zur Warteschlange[^\n]*/) || ['(keine)'])[0] });
 
-  // 6) Die Gegenrichtung: Bezahlbares heißt weiterhin "Bauen". Ohne sie wäre auch ein Knopf grün,
-  //    der stur immer "Einreihen" sagt - die Beschriftung trüge dann keine Information mehr.
-  check('6) bezahlbare Schiffe heißen weiterhin "Bauen"', knoepfe.bauen > 0, zahlen);
+  /* 6) Die Gegenrichtung, und diesmal eine echte. Die erste Fassung zaehlte nur, ob IRGENDEIN
+        Knopf "Bauen" heisst - und das taten damals auch die gesperrten, weil die Beschriftung
+        nur die Bezahlbarkeit kannte. Damit war die Pruefung leer: Sie waere selbst dann gruen
+        geblieben, wenn es kein einziges bezahlbares Schiff gegeben haette (Befund der Durchsicht
+        zu v8.665.0). Jetzt traegt die Beschriftung drei unterscheidbare Zustaende, und geprueft
+        wird, dass alle drei an der richtigen Stelle stehen: "Gesperrt" nur wo ein Sperrgrund
+        vorliegt, "Einreihen" nur wo es an den Mitteln fehlt, "Bauen" nur wo es sofort geht. */
+  const beschriftung = await page.evaluate(() => {
+    const els = [...document.querySelectorAll('[data-buyship], #buySuperschlachtschiff')]
+      .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+    const wort = e => (/Gesperrt/.test(e.textContent) ? 'gesperrt'
+                     : /Einreihen/.test(e.textContent) ? 'einreihen'
+                     : /Bauen/.test(e.textContent) ? 'bauen' : 'sonst');
+    const zahl = { gesperrt:0, einreihen:0, bauen:0, sonst:0 };
+    // "affordable" traegt der Knopf genau dann, wenn das Schiff jetzt gebaut werden koennte.
+    const falsch = [];
+    for (const e of els){
+      const w = wort(e); zahl[w]++;
+      if (e.classList.contains('affordable') && w !== 'bauen') falsch.push({ w, k: e.getAttribute('data-buyship') || e.id });
+      if (!e.classList.contains('affordable') && w === 'bauen') falsch.push({ w, k: e.getAttribute('data-buyship') || e.id });
+    }
+    return { zahl, falsch: falsch.slice(0, 4) };
+  });
+  check('6) die Beschriftung trennt gesperrt, einreihen und bauen sauber',
+    beschriftung.falsch.length === 0, beschriftung);
+  check('6b) und alle drei Zustände kommen im Bild wirklich vor',
+    beschriftung.zahl.gesperrt > 0 && beschriftung.zahl.einreihen > 0, beschriftung.zahl);
 
   await ctx.close();
   await ende(async () => browser.close());

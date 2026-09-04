@@ -326,3 +326,35 @@ Die Verteilung ist **reihum, nicht blockweise**: Alphabetische Blöcke sammeln d
 
 Die Marken machen den Lauf gegen Abbrüche robust — ein Container-Neustart oder ein fremder Merge
 kostet dann ein Stück statt des ganzen Laufs.
+
+## Adversarische Durchsicht vor jeder Auslieferung (04.09.2026)
+
+Der grüne Prüflauf beweist, dass nichts Bekanntes gebrochen ist. Er beweist **nicht**, dass die
+Änderung richtig ist — er kennt nur die Regeln, die schon jemand aufgeschrieben hat. Deshalb geht
+vor dem Merge eine **adversarische Durchsicht des eigenen Änderungssatzes** darüber, mit der
+Leitfrage „was habe ich übersehen", nicht „stimmt das".
+
+Anlass war eine gemessene Lücke: Bei v8.663.0 fand die automatische Durchsicht am PR einen echten
+Fehler (eine Voraussetzungs-Schreibweise, die die neue Meldung still verschluckte). Bei v8.665.0
+fiel sie aus — das Kontingent war erschöpft —, und die nachgeholte Durchsicht förderte **elf**
+Befunde zutage, darunter ein Wirtschaftsloch, das schon vorher live war: Der Baukorb reihte
+Schiffe mit Gegenstandskosten ein, ohne den Gegenstand abzuziehen, während der Abbruch ihn
+bedingungslos erstattete. Vorrat 3 → einreihen → abbrechen → Vorrat 5, beliebig wiederholbar.
+
+Was die Durchsicht findet, das Tests strukturell nicht finden:
+
+- **Die Ausnahme, die der Wächter nicht sieht.** `test_werft_sperrgrund` zählte
+  `[data-buyship]`; das Superschlachtschiff hat einen eigenen Block mit eigener id und blieb als
+  einziger Knopf gesperrt. Wer seine Prüfmenge über ein Attribut bildet, das nicht alle Mitglieder
+  tragen, misst genau die Ausnahme nicht.
+- **Die leere Prüfung.** „Bezahlbare Schiffe heißen weiterhin Bauen" zählte nur, ob irgendein
+  Knopf „Bauen" sagt — und das taten auch die gesperrten. Grün, ohne etwas zu belegen.
+- **Die gespaltene Gegenprobe.** Ein Test lud die Seite über `KEPLER_TESTDATEI`, las die Merkmale
+  aber über `SPIELDATEI` — zwei verschiedene Fassungen, ohne dass etwas rot wurde.
+- **Die eingetippte Kopie-Familie.** Eine Leiter, die das Backend besitzt (`zweigAb`, `maxStufe`),
+  stand als `4` und `8` im Code, obwohl die Nachbarfunktion sie längst aus dem Cache liest.
+
+Praktisch: `/code-review <commit-oder-diff> high` vor dem Merge. Die Befunde werden **geprüft, nicht
+geglaubt** — von den elf war einer entschärft (das gemeldete Schiff steht gar nicht im Baukorb; das
+echte Loch lag beim Nachbarn daneben). Jeder bestätigte Befund bekommt einen Wächter mit Gegenprobe,
+sonst kommt er wieder.
