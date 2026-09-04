@@ -562,3 +562,22 @@ Seitdem misst 9a den Ausschnitt **ohne Kommentare**. Zwei übertragbare Regeln:
   nicht der Wächter aufgeweicht — und an der Stelle steht, warum er so klingt, wie er klingt.
 
 Gefunden hat es nur die Gegenprobe. Ohne sie wäre ein Test entstanden, der auf ewig grün ist.
+
+## Auf das gemessene Element warten, nicht auf die Uhr (04.09.2026)
+
+`test_vorposten_werft_ui.js` misst eine Bauzeit von einer Karte im Werft-Tab. Mit festen
+`waitForTimeout` fiel er sporadisch: Die Liste stand noch nicht, die Zeit wurde als 0 gelesen.
+
+Der naheliegende Zwischenschritt machte es **schlimmer**: `waitForSelector('.card-row .bcost')`
+trifft 23 Elemente, und Playwright wartet auf die Sichtbarkeit des **ersten** — das liegt in einem
+eingeklappten Bereich und wird nie sichtbar. Drei Läufe in Folge liefen in den Zeitablauf.
+
+Richtig ist `waitForFunction` mit **demselben Prädikat wie die Messung**: warten, bis genau die
+Karte da ist, deren Text gleich gelesen wird. Danach dreimal in Folge grün.
+
+Zwei Regeln daraus:
+
+- **Ein Wächter, der gelegentlich grundlos rot wird, wird irgendwann ignoriert** — und meldet dann
+  auch den echten Fehler an niemanden mehr. Flattern ist ein Fehler des Tests, kein Schicksal.
+- **Ein `waitForSelector` auf einen Selektor, der mehrfach trifft, wartet auf das falsche Element.**
+  Warten und Messen müssen dasselbe Element meinen.
