@@ -283,6 +283,15 @@ Verbrauchsgüter, Material und Reliquien ziehen aus Töpfen mit eigenen Gewichte
 mehreren Kästen sagt das nicht, welche. Der Sammelfall und der 403er nennen jetzt beide die Liste.
 Das gilt für alle siebzehn Admin-Listen, nicht nur für die neue.
 
+**Drei vorhandene Wächter sind der Zusammenlegung gefolgt**, statt sie zu blockieren (der volle Lauf
+hat sie gefunden): `test_bossmodulsets` 5b prüft den `bossKey`-Filter jetzt an seinem neuen Ort und
+zusätzlich, dass es ihn **genau einmal** gibt (5b2 — eine abgeschriebene zweite Kopie fällt dort mit
+„stellen: 2"); `test_bossset_pve` nimmt `bosssetTeile()` in seine Messvorrichtung auf, sonst stürbe
+der Aufruf an der Vorrichtung statt am Prüfling; `test_gegenstandskatalog` 5a zählte die *verschiedenen*
+Fundort-Texte und traf damit 12 statt 5, seit der Anteil hinter dem Herkunftssatz steht — es misst
+jetzt die Regel („jeder Herkunftssatz steht am **Anfang** einer gezeichneten Zeile") und fällt dadurch
+auch, wenn ein Zusatz den Herkunftssatz verdrängt statt sich anzuhängen. Alle drei mit Sabotage-Gegenprobe.
+
 **Wächter** `tests/test_modul_fundorte.js` (26 Prüfungen). Die Kernmessung ist 1c: Sie hängt ein Modul
 **zur Laufzeit** in den Abgrund um und prüft, dass Herkunft und Topfgröße mitgehen — eine gepflegte
 Tabelle würde das nicht mitbekommen. Paare 1a/1b, 2a/2b, 3a/3b. Gegenprobe gegen origin/main d677ffc
