@@ -1212,3 +1212,35 @@ Wächter: `tests/test_vorposten_werft_ui.js` (16 Prüfungen, sechs Gegenproben g
 lehrreichste ist `C`: Tippt man den Deckel hart ein, statt ihn vom Server zu lesen, fällt **nur**
 die Quelltextprüfung `0b` — die Wirkungsprüfung kann diesen Fehler bauartbedingt nicht sehen und
 würde ihn erst bemerken, wenn Sascha den Deckel im Backend ändert, und dann im laufenden Spiel.
+
+## Etappe V3 im Spiel: Die Marktgebühr wird benannt (04.09.2026)
+
+**Der Unterschied zu V2:** Die *Wirkung* lag hier immer schon vollständig beim Server. `limits.feePct`
+und `limits.maxPerUser` kommen fertig verrechnet, und das Spiel liest beide seit jeher. Mit dem
+Umlegen von `VP_MARKT_AKTIV` wären Gebühr und Platzzahl sofort richtig gewesen — der Verkäufer hätte
+nur nicht erfahren, **warum**. Diese Etappe ist deshalb fast ganz Benennung.
+
+Benannt wird an drei Stellen, und keine davon rechnet etwas nach:
+
+1. **Kopfzeile der Börse** — eine eigene Zeile mit Rabatt und Zusatzplätzen, wenn es welche gibt.
+2. **Verkaufsdialog** — der Moment, in dem der Verkäufer den Preis festlegt.
+3. **Verkaufsmeldung** — sonst sieht er nur eine kleinere Gebühr als beim letzten Mal.
+
+Der Server schickt `basisFeePct`, `basisMaxPerUser`, `vorpostenRabatt` und `vorpostenAngebote` genau
+dafür daneben mit. Prüfung `0b` und `0d` halten fest, dass das Spiel sie **liest** statt sie aus
+`feePct` zurückzurechnen — das wäre die zweite Rechenstelle, die der Serverkommentar ausdrücklich
+vermeidet.
+
+**Ein echter Anzeigefehler nebenbei:** Das Spiel rundete die Gebühr auf ganze Prozent. Ohne
+Vorposten stimmte das (5 %); mit Rabatt wurden 3,24 % zu „3%", und 2,6 % wie 3,4 % ebenfalls.
+
+**Zwei Fehler in meinem eigenen frischen Code hat der Wächter im ersten Lauf gefangen:**
+„+2 Angebotsplatz**plätze**" (Stamm plus Endung statt zweier ganzer Wörter) und „−35**.**2%" mit
+einem Punkt, direkt neben „3**,**2%" mit Komma in derselben Box. Zwei Schreibweisen derselben Größe
+nebeneinander sind ein Fehler, auch wenn beide „stimmen"; seitdem gibt es `anteilProzentText()` als
+einzige Stelle dafür. Beides wäre ohne den Test ausgeliefert worden — es fällt niemandem auf, der
+die Zeile nicht Wort für Wort liest.
+
+Wächter: `tests/test_vorposten_markt_ui.js` (14 Prüfungen, sechs Gegenproben gemessen). `E` wiederholt
+die Lehre aus V2: Addiert man die Platzzahl selbst, fällt **nur** die Quelltextprüfung — die
+Wirkungsprüfung sieht es nicht, weil die Zahl heute dieselbe ist.
