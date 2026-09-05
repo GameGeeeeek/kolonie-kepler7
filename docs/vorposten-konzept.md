@@ -1445,15 +1445,84 @@ bekommt.
   `node --check` findet das nicht, der Browser schon. Dieselbe Falle, vor der die
   Backend-`CLAUDE.md` wegen `galaxyTick` warnt — hier eine Etage tiefer.
 
-### Und eine Beobachtung über diesen Test hinaus
+### Und eine Beobachtung über diesen Test hinaus — die sich als falsch erwies
 
-**Der Spielstand dieser Testfamilie lädt nicht.** Die Vorlage führt 80 Jäger, das Menü sagt
-trotzdem „Keine Kampfschiffe auf Heimatbasis". Ein Teil der Ursache ist der Schlüssel: zwei ältere
-Vorposten-Tests legen den Stand unter `kepler7-save-v1` ab, das Spiel liest `kepler7-save-v3`. Mit
-dem richtigen Schlüssel allein reicht es aber noch nicht. Dieser Test umgeht das deshalb bewusst —
-die Kostenprüfung mit einer eigenen teuren Vorlage, der Ablauf mit einer billigen — statt sich auf
-Rohstoffe aus dem Spielstand zu verlassen. Die Aufgabe steht auf der Liste; bisher ist es nicht
-aufgefallen, weil die anderen Tests die betroffenen Werte gar nicht lesen.
+Hier stand: „Der Spielstand dieser Testfamilie lädt nicht." **Das war eine Vermutung, und sie war
+falsch.** Nachgemessen am 05.09.2026 mit einer Sonde, die den Bootvorgang mitschneidet: Das Spiel
+holt `GET storage/kepler7-save-v3`, die Rohstoffe der Vorlage stehen danach im DOM, und im
+Kartenmenü ist „Vorposten angreifen" bedienbar mit dem Grund „Öffnet die Flottenwahl." Der
+Spielstand lädt, die Flotte kommt an.
+
+**Die echte Ursache war der Schlüssel — und zwar allein.** Vier Tests trugen `kepler7-save-v1`
+(lager, markt, verbuendet, werft); bei ihnen kam die Vorlage nie an, und jede Prüfung darin, die an
+Rohstoffen, Flotte oder Gebäuden hängt, maß den Startzustand statt der Vorlage. Still grün aus dem
+falschen Grund, und das ist schlimmer als ein roter Test: Ein roter meldet sich. Alle vier
+umgestellt. Damit sich der Schlüssel nicht wieder auseinanderentwickelt, liest
+`tests/test_spielstand_schluessel.js` jetzt `STORE_KEY` aus dem Spiel und vergleicht ihn mit jeder
+Testvorlage, die einen Spielstand ablegt.
+
+**Die übertragbare Lehre steht in `docs/TESTING.md`:** Eine Vermutung, die als Tatsache in einen
+Kommentar wandert, wird von der nächsten Sitzung als gemessen gelesen. Diese hier stand in zwei
+Tests und in dieser Datei.
 
 Wächter: `tests/test_vorposten_umruesten_ui.js` (18 Prüfungen, fünf Browser-Durchläufe), sechs
 Gegenproben in zwei Läufen gemessen.
+
+
+## #50 und #51 im Spiel: Was der Verbündete sehen muss (05.09.2026)
+
+Zwei Fragen, die das Spiel dem Allianzpartner bis hierher nicht beantwortete.
+
+### #50 — „Wieviel darf ich noch schicken?"
+
+Der Client rechnete `garnisonMax - garnisonAnzahl` und nannte das **frei**. Für den Besitzer stimmt
+das. Für einen Verbündeten ist es die **falsche Grenze**, weil zusätzlich der Anteil aller
+Nicht-Besitzer gilt (`VP_ALLIANZ_GARNISON_ANTEIL`). Im Quelltext stand das sogar als Begründung
+dafür, die Zahl **nicht** zu nennen: „ein Versprechen über eine Zahl, die dieses Spiel nicht
+kennt". Die Folge war nur eine andere Form desselben Schadens — der Verbündete schickte, die
+Station nahm nichts an, der Treibstoff war weg, und den Grund erfuhr er nicht.
+
+Seit Backend #257 kennt das Spiel die Zahl: `meinPlatz` kommt aus **derselben Funktion**, mit der
+`/vorposten/stationieren` annimmt. `vpMeinPlatz()` ist die eine Auslesestelle; drei Stellen lesen
+sie (Flottenwahl mit Vorschau, Warnung und Sperre, Kartenmenü, Stationstafel).
+
+**`null` heißt „unbekannt", nicht „kein Platz".** Ein Serverstand vor #50 schickt das Feld nicht, und
+im Deploy-Fenster soll der Verbündete den alten, ehrlich unbestimmten Text lesen statt einer
+erfundenen Null. Für den Besitzer gibt es den Fremdanteil nicht — für ihn bleibt die alte Rechnung
+richtig und dient als Rückfall.
+
+**Die Zeile in der Stationstafel hängt an `verbuendet`, die anderen nicht.** `meinPlatz` steht für
+*jeden* Betrachter in der Antwort, denn der Server rechnet dort nur Deckel, keine Berechtigung.
+Einem Fremden „für dich noch 150 Plätze frei" zu zeigen wäre ein Versprechen, das
+`/vorposten/stationieren` bricht: ohne Bündnis nimmt die Station gar nichts von ihm.
+
+### #51 — „Wo stehen meine Schiffe eigentlich?"
+
+Wer beigesteuert hatte, fand sie nirgends wieder: Die Flottenposition kennt nur *fliegende eigene*
+Flotten, die Vorposten-Liste im Seitenmenü nur **eigene** Stationen (`meineVorposten()` filtert auf
+`v.eigener`), und die Zahl stand ausschließlich im Kartenmenü der fremden Station. Wer vergessen
+hatte, *wo* er beigesteuert hat, musste jedes System einzeln aufmachen — und beim Fall der Station
+verlor er Schiffe, von denen er nicht mehr wusste, dass sie dort standen.
+
+Neuer Kasten **„Meine Schiffe auswärts"** im Seitenmenü, direkt unter den eigenen Vorposten. Er
+liest nur, was ohnehin im Zwischenspeicher liegt (`meineGarnison` geht an jeden Betrachter) — kein
+neuer Endpunkt, keine zweite Abfrage, kein zusätzliches Feld im Backend.
+
+- **Nicht an `verbuendet` gehängt**, aus demselben Grund wie der Rückruf-Eintrag im Kartenmenü: Wer
+  die Allianz verlassen hat, ist nicht mehr `verbuendet`, seine Schiffe stehen aber weiter dort und
+  der Server gibt sie ihm heraus. Eine Liste an `verbuendet` versteckte genau dann, was er suchen
+  würde.
+- **Der Kernzustand steht mit in der Zeile**, weil er der Grund zur Eile ist: Fällt die Station,
+  sind diese Schiffe verloren. Eine Zeile, die nur „12 Schiffe in Rigel" sagt, verschweigt das.
+- **Jede Größe der Zeile steht in der Signatur.** Diese Falle hat in der Liste darüber schon
+  dreimal zugeschlagen (Anflug-Countdown, `lpMax`/`garnisonMax`, `umruestenAb`): Was in der Zeile
+  steht und nicht in der Signatur, friert ein, ohne dass etwas kaputt aussieht.
+
+### Auslieferungsreihenfolge
+
+**Backend zuerst.** `test_vorposten_paritaet.js` Abschnitt 10 gleicht jede Vorposten-Testvorlage
+gegen die Felder ab, die `vorpostenFuerClient` wirklich erzeugt — solange `meinPlatz` dort nicht
+steht, fällt `10a` an der neuen Vorlage. Das ist die Prüfung, die die Reihenfolge erzwingt, statt
+sie zu erinnern.
+
+Wächter: `tests/test_vorposten_platz_ui.js` (21 Prüfungen, sechs Browser-Durchläufe).
