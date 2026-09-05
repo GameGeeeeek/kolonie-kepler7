@@ -1349,3 +1349,35 @@ Feldnamen, `5a` beim Rückruf-Versprechen des Besitzers, `0e`/`0f` beim Kampfber
 Unterscheidung sonst nicht erbt: `pushReport` bekommt im Verlust-Zweig ein **frisch gebautes**
 Objekt, keine Durchreichung — ohne `alsVerbuendeter` titelte der Bericht dem Partner weiterhin
 „Dein Vorposten wurde geschleift", obwohl die Meldung im Verlauf daneben schon richtig war.
+
+## Etappe V7 im Spiel: Modul-Sets und der sechste Steckplatz (05.09.2026)
+
+Der Server kennt die Sets seit Backend #245: `modulSetDefs` (die Tabelle), `modulSetsAktiv` (der
+Schalter), `zweigSlots` (was die Ausrichtung an Plätzen dazugibt) und je Vorposten `sets` (welche
+Sets **stehen**) plus `setBoni`.
+
+**Drei Anzeigestellen**, und für jede gibt es einen Grund:
+
+- **Im Steckplatz-Fenster** ein eigener Abschnitt zwischen Plätzen und Bestand — genau dort, wo man
+  beim Bestücken die Frage hat. Ein Set, dem ein Modul fehlt, nennt **welches**; ohne diesen Namen
+  müsste man die Tabelle im Kopf haben.
+- **In der Stationstafel** eine Zeile mit den stehenden Sets, **für jeden sichtbar** wie
+  Steckplätze und Verteidigung. Ein Angreifer soll sehen können, warum diese Station härter ist,
+  als ihre Modulliste vermuten lässt.
+- **Die Steckplatz-Zeile** nennt, wieviel davon die Ausrichtung beisteuert. Ohne diesen Halbsatz
+  wäre der sechste Platz eines Festungsrings eine Zahl, die sich niemand erklären kann.
+
+**Was hier bewusst nicht nachgerechnet wird: ob ein Set steht.** Das sagt `v.sets`. Ein Set hebt
+Kern, Verteidigung und Garnison — PvP-Werte, und die rechnet der Server. Gerechnet wird im Spiel
+nur, welches Stück *fehlt*; das ist Auskunft, keine Regel. Prüfung `0b` hält den Unterschied fest,
+Gegenprobe `B` (selbst nachrechnen) lässt sie fallen.
+
+Die Set-Tabelle **reist mit** und wird nicht kopiert — dieselbe Entscheidung wie bei der
+Stufentabelle und den Moduldefinitionen.
+
+Wächter: `tests/test_vorposten_sets_ui.js` (13 Prüfungen, drei Browser-Durchläufe), fünf
+Gegenproben gemessen. Ein eigener Messfehler ist dort festgehalten: Die Vorlage ließ `modulSetDefs`
+bei liegendem Schalter weg — der Server schickt die Tabelle aber **immer**, nur `modulSetsAktiv`
+hängt am Schalter. Damit konnte `4a` einen Client, der den Schalter ignoriert, gar nicht erkennen;
+Sabotage `E` fiel ins Leere. **Zum wiederholten Mal dieselbe Lehre: Eine Vorlage muss den echten
+Sender nachbilden, sonst prüft sie sich selbst.**
