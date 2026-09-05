@@ -1280,7 +1280,7 @@ unter Selektoren, die es nicht gibt, wich auf `document.body` aus und maß damit
 
 ## Etappe V5 im Spiel: Der Verbündete darf mitwirken (05.09.2026)
 
-Der Server kennt den Allianzpartner seit dem 03.09.2026 (`verbuendet`, `garnisonVon`,
+Der Server kennt den Allianzpartner seit dem 03.09.2026 (`verbuendet`, `meineGarnison`,
 `alsVerbuendeter`); das Spiel las **keines** dieser Felder. Ein Partner sah an einem fremden
 Vorposten genau einen Eintrag: „angreifen".
 
@@ -1290,9 +1290,24 @@ Fall wie beim Abbau bekommt er **seine eigene Meldung** statt „Dein Vorposten 
 über fremdes Eigentum.
 
 **Die Zahl ist die gefährlichste Stelle.** Ein Verbündeter sieht die *gesamte* Garnison; wie viele
-davon seine sind, steht nur in `garnisonVon`. Ohne diese Aufschlüsselung stünde „meine Schiffe
-zurückrufen" über einer Zahl, von der ihm vielleicht kein einziges Schiff gehört — und beim Fall
-verlöre er Schiffe, von denen er nicht wusste, dass sie noch dort stehen.
+davon seine sind, steht in `meineGarnison`. Ohne diese Angabe stünde „meine Schiffe zurückrufen"
+über einer Zahl, von der ihm vielleicht kein einziges Schiff gehört — und beim Fall verlöre er
+Schiffe, von denen er nicht wusste, dass sie noch dort stehen.
+
+**Der Feldname war zuerst falsch — aus diesem Papier abgeschrieben.** Die erste Fassung las
+`v.garnisonVon[meineId]`; so heißt die Aufschlüsselung **serverseitig** in `doc`, und genau so
+stand sie vorher auch hier. An den Client geht sie nicht („die vollständige Aufschlüsselung sieht
+weiterhin nur der Besitzer") — er bekommt `meineGarnison`, seinen eigenen Anteil, flach nach
+Schiffstyp. Die Zahl war deshalb immer 0. Aufgefallen ist es nicht, weil die Fixture des
+Browser-Tests das erfundene Feld selbst mitlieferte. Seitdem gleicht
+`tests/test_vorposten_paritaet.js` Abschnitt 10 **jeden** Fixture-Schlüssel gegen die Felder ab,
+die `vorpostenFuerClient` wirklich erzeugt; die übertragbare Lehre steht in `docs/TESTING.md`.
+
+**Auch der Besitzer bekam ein Versprechen, das der Server bricht.** Sein Eintrag „Garnison
+zurückrufen" nannte die *Gesamtzahl* — seit V5 gibt `/api/vorposten/rueckruf` aber nur zurück, was
+*dieses Konto* gestellt hat, und antwortet mit 400 (`leer`), wenn das nichts ist. Ein Besitzer,
+dessen Garnison nur aus Schiffen Verbündeter besteht, sah „Holt alle 900 Schiffe" und bekam einen
+Fehler. Der Eintrag nennt jetzt seine eigene Zahl und sagt, was stehen bleibt.
 
 **Eine Messung hat eine Annahme verhindert.** Der erste Entwurf gab dem Verbündeten die
 Garnison-Einträge *anstelle* des Angriffs — es schien selbstverständlich, dass man den Vorposten
@@ -1301,6 +1316,10 @@ weist nur den **eigenen** Vorposten ab, eine Allianzsperre gibt es dort nicht. D
 jetzt dazu. Ob ein Verbündeter angreifen *dürfen soll*, ist eine Spielfrage — nicht im Menü zu
 entscheiden.
 
-Wächter: `tests/test_vorposten_verbuendet_ui.js` (14 Prüfungen, fünf Gegenproben gemessen).
-Prüfung `1b` hält genau die verhinderte Annahme fest; Gegenprobe `D` fällt, wenn jemand sie wieder
-einbaut.
+Wächter: `tests/test_vorposten_verbuendet_ui.js` (21 Prüfungen, neun Gegenproben gemessen) und
+`tests/test_vorposten_paritaet.js` Abschnitt 10. Prüfung `1b` hält genau die verhinderte Annahme
+fest; Gegenprobe `D` fällt, wenn jemand sie wieder einbaut. `1c`/`5b` fallen beim falschen
+Feldnamen, `5a` beim Rückruf-Versprechen des Besitzers, `0e`/`0f` beim Kampfbericht, der die
+Unterscheidung sonst nicht erbt: `pushReport` bekommt im Verlust-Zweig ein **frisch gebautes**
+Objekt, keine Durchreichung — ohne `alsVerbuendeter` titelte der Bericht dem Partner weiterhin
+„Dein Vorposten wurde geschleift", obwohl die Meldung im Verlauf daneben schon richtig war.

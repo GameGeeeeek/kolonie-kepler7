@@ -1,19 +1,29 @@
 // Der Verbuendete am Vorposten im Spiel (Etappe V5, Frontend-Haelfte, 05.09.2026).
 //
 // Bis hierher sah ein Allianzpartner an einem fremden Vorposten genau EINEN Eintrag: „angreifen".
-// Der Server kennt ihn seit dem 03.09.2026 (`verbuendet`, `garnisonVon`, `alsVerbuendeter`), das
-// Spiel las keines dieser Felder.
+// Der Server kennt ihn seit dem 03.09.2026 (`verbuendet`, `meineGarnison`, `alsVerbuendeter`),
+// das Spiel las keines dieser Felder.
 //
 // DIE GEFAEHRLICHSTE STELLE IST DIE ZAHL. Ein Verbuendeter sieht die GESAMTE Garnison; wie viele
-// davon SEINE sind, steht nur in `garnisonVon`. Ohne diese Aufschluesselung stuende „meine Schiffe
+// davon SEINE sind, steht in `meineGarnison`. Ohne diese Angabe stuende „meine Schiffe
 // zurueckrufen" ueber einer Zahl, von der ihm vielleicht kein einziges Schiff gehoert - und beim
 // Fall verlaere er Schiffe, von denen er nicht wusste, dass sie noch dort stehen.
+//
+// DIE VORLAGE UNTEN ERFAND DAS FELD ZUERST. Sie lieferte `garnisonVon` (so heisst die
+// Aufschluesselung SERVERSEITIG in `doc`) - ein Feld, das vorpostenFuerClient nie verschickt.
+// Der Code las es, die Vorlage lieferte es, der Test war gruen, und im Spiel war die Zahl immer 0.
+// Eine Vorlage, die ein Feld erfindet, prueft nur sich selbst; deshalb steht seit dem 05.09.2026
+// in test_vorposten_paritaet.js Abschnitt 10 ein Waechter, der JEDEN Schluessel dieser Vorlagen
+// gegen die Felder abgleicht, die vorpostenFuerClient wirklich erzeugt.
 //
 // GEPRUEFT:
 //   0a  Ein Gatter fuer „darf mitwirken" statt dreier Kopien von `v.eigener || v.verbuendet`.
 //   0b  Der Flugzeit-Bonus haengt an diesem Gatter, nicht mehr an `v.eigener`.
 //   0c  „Aufgeben" bleibt beim Besitzer - der Verbuendete kann es nicht ausloesen.
 //   0d  Die Verlust-Meldung liest `alsVerbuendeter`, statt „Dein Vorposten" zu behaupten.
+//   0e  ... und reicht das Feld an den KAMPFBERICHT weiter (er erbt die Unterscheidung nicht
+//       von selbst - er wird im selben Zweig gebaut).
+//   0f  battleCardData titelt dem Verbuendeten nicht „Dein Vorposten wurde geschleift".
 //   1a  Der Verbuendete sieht beide Garnison-Eintraege ...
 //   1b  ... UND weiterhin „Vorposten angreifen". GEMESSEN am Server: /api/vorposten/angriff weist
 //       nur den EIGENEN Vorposten ab, eine Allianzsperre gibt es dort nicht. Ein Menue, das ihm
@@ -21,6 +31,9 @@
 //   1c  Die Stationstafel nennt SEINEN Anteil an der Garnison.
 //   2a  Ohne eigene Schiffe ist „zurueckrufen" gesperrt, mit Grund.
 //   3a  Ein Fremder OHNE Buendnis sieht die Eintraege nicht.
+//   5a  Der BESITZER, in dessen Garnison nur Schiffe Verbuendeter stehen, bekommt kein
+//       Versprechen, das der Server bricht („Holt alle 900 Schiffe" -> 400 `leer`).
+//   5b  ... und mit eigenen Schiffen nennt der Eintrag SEINE Zahl und sagt, was stehen bleibt.
 //
 // Gegenprobe: siehe Fuss der Datei.
 const fs = require('fs');
@@ -67,6 +80,26 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
     von > 0 && /geschleift/.test(zweig), { gefunden: von > 0 });
   check('0d: die Verlust-Meldung LIEST alsVerbuendeter und nennt den Besitzer',
     /r\.alsVerbuendeter/.test(zweig) && /r\.besitzerName/.test(zweig), {});
+  /* Der KAMPFBERICHT wird im selben Zweig gebaut, erbt die Unterscheidung aber nicht von selbst:
+     pushReport bekommt ein frisch gebautes Objekt, kein durchgereichtes. Fehlte das Feld dort,
+     saehe der Verbuendete im Verlauf die richtige Meldung und im Bericht „Dein Vorposten wurde
+     geschleift" ueber einer Station, die ihm nie gehoerte. */
+  const pr = zweig.indexOf("pushReport({ type:'vorposten-verteidigung'");
+  const prRuf = pr < 0 ? '' : zweig.slice(pr, zweig.indexOf('});', pr) + 3);
+  check('0e-anker: der pushReport-Ruf im Verlust-Zweig ist auffindbar (sonst misst 0e nichts)',
+    pr >= 0 && prRuf.length > 120, { laenge: prRuf.length });
+  check('0e: der Kampfbericht erbt alsVerbuendeter und besitzerName',
+    /alsVerbuendeter:/.test(prRuf) && /besitzerName:/.test(prRuf), { ruf: prRuf.slice(-160) });
+}
+{
+  /* Ohne Kommentare, aus demselben Grund wie oben bei 0d. */
+  const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
+  const von = JS.indexOf("} else if (r.type === 'vorposten-verteidigung'){");
+  const zweig = von < 0 ? '' : ohneKommentar(JS.slice(von, JS.indexOf('} else if (', von + 20)));
+  check('0f-anker: der Berichts-Zweig ist auffindbar (sonst misst 0f nichts)',
+    von > 0 && /geschleift/.test(zweig) && zweig.length < 4000, { laenge: zweig.length });
+  check('0f: der Bericht unterscheidet Besitzer und Verbuendeten',
+    /r\.alsVerbuendeter/.test(zweig) && /r\.besitzerName/.test(zweig), {});
 }
 
 const now = Date.now();
@@ -76,12 +109,15 @@ function vp(over){
   return Object.assign({ id:'vp1', sys:SYS, besitzer:'u-partner', besitzerName:'Partner', seit: now-86400000,
     stufe:8, name:'Orbitalfeste', zweig:'festung', zweigName:'Festungsring', maxStufe:8,
     kern:{ lp:6000000, lpMax:6500000 }, verteidigung:850000, garnisonAnzahl:900, garnisonMax:14000,
-    garnison:{ jaeger:900 }, schutzBis:0, ausbauAb: now-1000, eigener:false, meinLetzterSchlag:0,
+    schutzBis:0, ausbauAb: now-1000, eigener:false, meinLetzterSchlag:0,
     letzterKampf:null, slots:0, module:[], modulBoni:null, projekte:[], projektBoni:null,
     projektLaeuft:null, projektMoeglich:[], naechsteStufe:null, anflug:[],
     nutzen:{ flug:0.30, prod:0.13, scan:5, werft:0, markt:0, flugDeckel:0.5 },
     lager:{}, lagerRate:{}, lagerVollAb:0,
-    verbuendet:true, garnisonVon:{ 'u-partner':{ jaeger:700 }, [ICH]:{ jaeger:200 } } }, over || {});
+    /* `garnison` steht hier NICHT: Der Server schickt die Aufstellung nur dem Besitzer, und dies
+       ist die Sicht eines Fremden. `meineGarnison` dagegen bekommt JEDER Betrachter - es ist sein
+       eigener Anteil, flach nach Schiffstyp. Beides gemessen an vorpostenFuerClient. */
+    verbuendet:true, meineGarnison:{ jaeger:200 } }, over || {});
 }
 function spielstand(){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil']) g[t] = true;
@@ -156,10 +192,10 @@ function spielstand(){
   }
 
   const verb = await messe(vp());
-  const ohneSchiffe = await messe(vp({ garnisonVon:{ 'u-partner':{ jaeger:900 } } }));
-  const fremd = await messe(vp({ verbuendet:false, garnisonVon:{ 'u-partner':{ jaeger:900 } } }));
+  const ohneSchiffe = await messe(vp({ meineGarnison:{} }));
+  const fremd = await messe(vp({ verbuendet:false, meineGarnison:{} }));
 
-  check('1-anker: das Kartenmenue selbst wurde in allen drei Laeufen gezeichnet',
+  check('1-anker: das Kartenmenue selbst wurde in allen drei Fremd-Laeufen gezeichnet',
     [verb, ohneSchiffe, fremd].every(x => typeof x.text === 'string' && x.text.length > 40 && x.text.length < 20000),
     { laengen: [verb, ohneSchiffe, fremd].map(x => x.text === null ? null : x.text.length) });
   check('1a: der Verbuendete sieht beide Garnison-Eintraege',
@@ -178,14 +214,43 @@ function spielstand(){
     !/Garnison beisteuern/.test(fremd.text) && !/Meine Schiffe zurückrufen/.test(fremd.text)
     && /Vorposten angreifen/.test(fremd.text),
     { auszug: fremd.text.slice(0, 200) });
-  const alle = [...verb.errs, ...ohneSchiffe.errs, ...fremd.errs];
-  check('4a: kein JavaScript-Fehler in den drei Durchlaeufen', alle.length === 0, alle.slice(0, 3));
+  /* DER BESITZER (Befund der Durchsicht, 05.09.2026). `/api/vorposten/rueckruf` gibt seit V5 nur
+     zurueck, was DIESES Konto gestellt hat, und antwortet mit 400 (`leer`), wenn das nichts ist.
+     Ein Eintrag, der dem Besitzer „Holt alle 900 Schiffe" verspricht, obwohl alle 900 dem Partner
+     gehoeren, ist damit ein Versprechen, das der Server bricht. `garnison` steht in dieser Vorlage
+     zu Recht: Die Aufstellung geht an den Besitzer. */
+  /* BEWUSST ZWEIMAL AUSGESCHRIEBEN statt ueber eine gemeinsame Vorlage mit Object.assign: Der
+     Waechter in test_vorposten_paritaet.js (Abschnitt 10) liest die Schluessel der Vorlagen aus
+     DIESER Datei und gleicht sie gegen vorpostenFuerClient ab. Eine Vorlage in einer eigenen
+     Variablen laege ausserhalb seines Blickfelds - und genau ein unbemerktes Feld war der
+     Fehler, den er verhindern soll. */
+  const nurFremde = await messe(vp({ eigener:true, verbuendet:false, besitzer:ICH, besitzerName:'Ich',
+    garnisonAnzahl:900, garnison:{ jaeger:900 }, meineGarnison:{} }));
+  const gemischt = await messe(vp({ eigener:true, verbuendet:false, besitzer:ICH, besitzerName:'Ich',
+    garnisonAnzahl:900, garnison:{ jaeger:900 }, meineGarnison:{ jaeger:200 } }));
+  const rueckrufGrund = x => {
+    const i = x.gruende.findIndex(g => /Garnison|Schiffe/.test(g) && /Holt|gehört|keine Garnison/.test(g));
+    return i < 0 ? '' : x.gruende[i];
+  };
+  check('5-anker: auch die zwei Besitzer-Laeufe haben ein Menue gezeichnet',
+    [nurFremde, gemischt].every(x => typeof x.text === 'string' && /Garnison zurückrufen/.test(x.text)),
+    { laengen: [nurFremde, gemischt].map(x => x.text === null ? null : x.text.length) });
+  check('5a: stehen dort NUR Schiffe Verbuendeter, verspricht der Rueckruf nichts',
+    /gehört dir keines/.test(nurFremde.text) && !/Holt alle 900/.test(nurFremde.text)
+    && !/Holt deine/.test(nurFremde.text),
+    { grund: rueckrufGrund(nurFremde) });
+  check('5b: mit eigenen Schiffen nennt er SEINE Zahl und sagt, was stehen bleibt',
+    /Holt deine 200 Schiffe/.test(gemischt.text) && /Die 700 deiner Verbündeten bleiben stehen/.test(gemischt.text),
+    { grund: rueckrufGrund(gemischt) });
+
+  const alle = [...verb.errs, ...ohneSchiffe.errs, ...fremd.errs, ...nurFremde.errs, ...gemischt.errs];
+  check('4a: kein JavaScript-Fehler in den fuenf Durchlaeufen', alle.length === 0, alle.slice(0, 3));
 
   await browser.close();
   ende();
 })();
 
-/* GEGENPROBE, fuenf Richtungen gemessen am 05.09.2026 (Pruefnamen beider Laeufe per `diff`).
+/* GEGENPROBE, neun Richtungen gemessen am 05.09.2026 (Pruefnamen beider Laeufe per `diff`).
 
    A) `vorpostenFlugMult` zurueck auf `!v.eigener`: 0b FAELLT.
    B) Den `aufgeben`-Riegel entfernt: 0c FAELLT - ohne ihn koennte ein Verbuendeter den Vorposten
@@ -195,8 +260,16 @@ function spielstand(){
    D) Den Angriffs-Eintrag fuer den Verbuendeten uebersprungen: 1b FAELLT. Das ist genau der
       Fehler, den der erste Entwurf hatte, bevor der Server gemessen wurde.
    E) `r.alsVerbuendeter` in der Verlust-Meldung ausgehebelt: 0d FAELLT.
+   F) `alsVerbuendeter` aus dem pushReport-Ruf genommen: 0e FAELLT, und nur 0e.
+   G) Im Berichts-Zweig wieder hart „Dein Vorposten wurde geschleift": 0f FAELLT, und nur 0f.
+   H) `vpMeineGarnison` zurueck auf `v.garnisonVon[meineId]` (der Feldname, den der Server NIE
+      schickt): 1c und 5b FALLEN. Genau diese zwei Pruefungen waren vorher blind, weil die Vorlage
+      das erfundene Feld selbst mitlieferte - siehe Messfehler 3. Dieselbe Sabotage liess den Test
+      am 05.09.2026 vormittags vollstaendig gruen.
+   I) Der Rueckruf-Eintrag des Besitzers wieder auf `v.garnisonAnzahl`: 5a UND 5b FALLEN - 5b,
+      weil der Eintrag dann „Holt deine 900 Schiffe" saehe statt der eigenen 200.
 
-   ZWEI EIGENE MESSFEHLER, beide hier festgehalten:
+   DREI EIGENE MESSFEHLER, alle hier festgehalten:
 
    1) Sabotage D traf im ersten Anlauf INS LEERE: Sie loeschte `eintraege` am Anfang des
       Verbuendeten-Zweigs - der Angriffs-Eintrag kommt aber DANACH dazu. Nichts fiel, und das sah
@@ -208,4 +281,14 @@ function spielstand(){
       docs/TESTING.md). Die Regel stand geschrieben und hat mich nicht davor bewahrt. Was hilft,
       ist keine Erinnerung, sondern eine Gewohnheit: Wer Quelltext fuer eine Pruefung
       ausschneidet, streicht Kommentare ZUERST - und prueft den FELDZUGRIFF (`r.alsVerbuendeter`),
-      nicht das blosse Vorkommen eines Wortes. */
+      nicht das blosse Vorkommen eines Wortes.
+
+   3) DER SCHWERSTE: Die Vorlage lieferte `garnisonVon`, ein Feld, das vorpostenFuerClient gar
+      nicht verschickt. Der Code las es, die Vorlage lieferte es, 1c war gruen - und im Spiel war
+      die Zahl IMMER 0. Der Name stammte aus dem Konzeptpapier (dort heisst das serverseitige
+      `doc.garnisonVon` so), nicht aus dem Quelltext des Senders. Eine Vorlage, die ein Feld
+      erfindet, prueft nur sich selbst; sie kann einen falschen Feldnamen nie fangen.
+      Gegenmassnahme ist deshalb keine Erinnerung, sondern ein Waechter: test_vorposten_paritaet.js
+      Abschnitt 10 gleicht JEDEN Schluessel der Vorposten-Vorlagen dieser Testdatei gegen die
+      Felder ab, die vorpostenFuerClient wirklich erzeugt. Ein erfundenes Feld faellt dort sofort
+      auf - auch ein kuenftiges. */

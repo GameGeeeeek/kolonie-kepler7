@@ -9805,10 +9805,17 @@
      Rolle im GETEILTEN Speicher es hergibt. Der Spielstand ist klientenautoritativ; hier wird
      deshalb nichts nachgeprueft, was dort schon entschieden ist. */
   function vorpostenDarfMitwirken(v){ return !!v && (v.eigener || v.verbuendet); }
-  /* Wie viele der Schiffe an einem Vorposten MEINE sind. `garnisonVon` ist nach Konto
-     geschluesselt und kommt vom Server; er fuehrt es als Quelle und zieht `garnison` daraus nach. */
+  /* Wie viele der Schiffe an einem Vorposten MEINE sind.
+
+     DAS FELD HEISST `meineGarnison` UND IST FLACH (nach Schiffstyp), gemessen an
+     vorpostenFuerClient (05.09.2026). Hier stand zuerst `garnisonVon[meineId]` - so heisst die
+     Aufschluesselung SERVERSEITIG in `doc`, und der Server schickt sie bewusst nicht mit: „die
+     vollstaendige Aufschluesselung sieht weiterhin nur der Besitzer". Der Name kam aus dem
+     Konzeptpapier statt aus dem Quelltext, die Zahl war deshalb IMMER 0, und der Test hat es nicht
+     gemerkt, weil seine Vorlage das erfundene Feld selbst mitlieferte. Lehre: Ein Feldname wird am
+     Sender abgelesen, und eine Vorlage, die ein Feld erfindet, prueft nur sich selbst. */
   function vpMeineGarnison(v){
-    const meine = ((v && v.garnisonVon) || {})[(state.player || {}).id] || {};
+    const meine = (v && v.meineGarnison) || {};
     return Object.values(meine).reduce((a, b) => a + (Number(b) > 0 ? Math.round(Number(b)) : 0), 0);
   }
   function vorpostenFlugMult(sysId){
@@ -28498,7 +28505,13 @@ async function claimPendingRewards(){
                 + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – deine Garnison dort ist verloren' : '')
               : 'Dein ' + (r.name||'Vorposten') + ' bei ' + sysNameV + ' wurde von ' + (r.angreiferName||'einem Spieler') + ' geschleift' + (eskorteSchiffssumme(r.garnisonVerloren) ? ' – die Garnison ist verloren' : ''))
             + ((verlorenL && verlorenL.length) ? ', und das Lager ist mitgegangen (' + verlorenL.join(', ') + ')' : '') + '.', 'ti-alert-triangle', 'warn');
-          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{} });
+          /* DER BERICHT ERBT DIE UNTERSCHEIDUNG (Befund der Durchsicht, 05.09.2026). Die Meldung
+             im Verlauf unterscheidet Besitzer und Verbuendeten schon; der Kampfbericht tat es
+             nicht und titelte dem Partner „Dein Vorposten wurde geschleift" ueber eine Station,
+             die ihm nie gehoerte. Beide Felder werden deshalb durchgereicht - `battleCardData`
+             liest sie. */
+          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName:r.name||'Vorposten', angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{},
+            alsVerbuendeter: alsVerbV, besitzerName: alsVerbV ? (r.besitzerName||'') : '' });
           playSound('lose');
           ladeVorposten();
           save();
@@ -42551,10 +42564,22 @@ async function claimPendingRewards(){
         body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (vvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine')
               + (eskorteSchiffssumme(r.garnisonVerluste) ? ' · Garnison verlor ' + fleetBreakdownHtml(r.garnisonVerluste) : '');
       } else if (r.type === 'vorposten-verteidigung'){
-        title = r.gefallen ? 'Dein Vorposten wurde geschleift' : 'Dein Vorposten wurde angegriffen';
+        /* V5: Zwei Betroffene, zwei Ueberschriften. Fuer den Besitzer ging die STATION verloren,
+           fuer den Verbuendeten seine GARNISON an fremder Station - „Dein Vorposten" waere dort
+           schlicht falsch. Alte Berichte haben `alsVerbuendeter` nicht und fallen damit auf die
+           Besitzer-Fassung zurueck; das ist richtig, denn vor V5 gab es nur diesen Fall. */
+        const vvVerb = !!r.alsVerbuendeter;
+        title = vvVerb
+          ? (r.gefallen ? 'Vorposten deines Verbündeten geschleift' : 'Vorposten deines Verbündeten angegriffen')
+          : (r.gefallen ? 'Dein Vorposten wurde geschleift' : 'Dein Vorposten wurde angegriffen');
         body = '<i class="ti ti-building-community" aria-hidden="true" style="color:' + (r.gefallen ? '#e24b4a' : '#e0a548') + ';"></i> ' + escapeHtml(r.systemName || r.system || '') + ' · ' + escapeHtml(r.stufeName||'Vorposten')
+             + (vvVerb ? ' · Besitzer: ' + escapeHtml(r.besitzerName||'dein Verbündeter') : '')
              + ' · Angreifer: ' + escapeHtml(r.angreiferName||'unbekannt') + ((r.teilnehmer||1) > 1 ? ' und ' + (r.teilnehmer-1) + ' weitere' : '')
-             + (r.gefallen ? '<br>Der Vorposten ist verloren' + (eskorteSchiffssumme(r.garnisonVerloren) ? ', mit ihm die Garnison: ' + fleetBreakdownHtml(r.garnisonVerloren) : '') + '.' : '');
+             + (r.gefallen
+               ? (vvVerb
+                 ? '<br>Der Vorposten ist verloren' + (eskorteSchiffssumme(r.garnisonVerloren) ? ', und mit ihm deine dort stationierten Schiffe: ' + fleetBreakdownHtml(r.garnisonVerloren) : '') + '.'
+                 : '<br>Der Vorposten ist verloren' + (eskorteSchiffssumme(r.garnisonVerloren) ? ', mit ihm die Garnison: ' + fleetBreakdownHtml(r.garnisonVerloren) : '') + '.')
+               : '');
       } else if (r.type === 'konvoi-angriff'){
         /* Wie beim Nest-/Festungsbericht nennt er, was ANGEKOMMEN ist (`schaden`) - der Server
            zaehlt genau das auf den Bergungsanteil. Ein Konvoi hat kein Volk und keine Stufe. */
@@ -62415,8 +62440,22 @@ async function claimPendingRewards(){
       eintraege.push({ icon:'ti-shield', label:'Garnison entsenden',
         grund: garnUnterwegs ? 'Eine Garnison ist bereits unterwegs.' : !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.' : frei < 1 ? 'Die Garnison ist voll (' + grenze + ').' : frei + ' von ' + grenze + ' Plätzen frei – Kampfschiffe verteidigen den Vorposten.',
         disabled: garnUnterwegs || !kampfschiffe || frei < 1, fn: () => vorpostenGarnisonSenden(sysId) });
-      eintraege.push({ icon:'ti-refresh', label:'Garnison zurückrufen', grund: (v.garnisonAnzahl||0) ? 'Holt alle ' + v.garnisonAnzahl + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '.' : 'Dort steht keine Garnison.',
-        disabled: !(v.garnisonAnzahl||0), fn: () => vorpostenRueckruf(sysId, 'rueckruf') });
+      /* DER EIGENE ANTEIL, nicht die Gesamtzahl (Befund der Durchsicht, 05.09.2026). Seit V5
+         gibt `/api/vorposten/rueckruf` NUR zurueck, was DIESES Konto gestellt hat, und antwortet
+         mit 400 (`leer`), wenn das nichts ist - „Der Besitzer eines Vorpostens, in dem
+         Verbuendete stehen, kann deren Schiffe also nicht einziehen." Ein Knopf, der dem Besitzer
+         „Holt alle 900 Schiffe" verspricht, obwohl 900 dem Partner gehoeren, ist damit ein
+         Versprechen, das der Server bricht. */
+      const meineEigenen = vpMeineGarnison(v);
+      const fremdeDa = Math.max(0, (v.garnisonAnzahl||0) - meineEigenen);
+      eintraege.push({ icon:'ti-refresh', label:'Garnison zurückrufen',
+        grund: meineEigenen
+          ? 'Holt deine ' + meineEigenen + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '.'
+            + (fremdeDa ? ' Die ' + fremdeDa + ' deiner Verbündeten bleiben stehen – nur sie selbst können sie holen.' : '')
+          : (v.garnisonAnzahl||0)
+            ? 'Von den ' + v.garnisonAnzahl + ' Schiffen dort gehört dir keines – sie stammen von Verbündeten.'
+            : 'Dort steht keine Garnison.',
+        disabled: !meineEigenen, fn: () => vorpostenRueckruf(sysId, 'rueckruf') });
       /* Steckplätze (Etappe 3): erst ab der Wahlstufe, und der Grund steht sichtbar am Eintrag -
          ein Knopf, der nur ausgegraut ist, sagt am Telefon nichts (Lehre vom Bau-Knopf). */
       const slots = v.slots || 0, drin = (v.module || []).length;
@@ -62473,9 +62512,10 @@ async function claimPendingRewards(){
       /* DER VERBUENDETE (V5, 05.09.2026). Bis hierher sah ein Allianzpartner an einem fremden
          Vorposten genau einen Eintrag: „angreifen". Er darf jetzt Garnison beisteuern und SEINE
          EIGENEN Schiffe zurueckholen - was der Server durchsetzt, nicht dieser Zweig.
-         Die Zahl kommt aus `garnisonVon`, dem Schluessel nach Konto: Sie sagt ihm, wie viele der
-         Schiffe dort SEINE sind. Ohne sie stuende „zurueckrufen" ueber einer Gesamtzahl, von der
-         ihm vielleicht kein einziges Schiff gehoert.
+         Die Zahl kommt aus `meineGarnison` - dem Feld, das der Server JEDEM Betrachter ueber
+         seinen eigenen Anteil schickt: Sie sagt ihm, wie viele der Schiffe dort SEINE sind. Ohne
+         sie stuende „zurueckrufen" ueber einer Gesamtzahl, von der ihm vielleicht kein einziges
+         Schiff gehoert.
 
          DIE EINTRAEGE KOMMEN ZUM ANGRIFF DAZU, nicht an seine Stelle. GEMESSEN am Server
          (05.09.2026): `/api/vorposten/angriff` weist nur den EIGENEN Vorposten ab
