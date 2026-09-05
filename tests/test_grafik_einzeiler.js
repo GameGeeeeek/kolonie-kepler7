@@ -53,35 +53,98 @@ const wrackBlock = wrackVon > 0 && wrackBis > wrackVon ? S.slice(wrackVon, wrack
 check('6b: das Wrack traegt den Atlas-Schluessel des lebenden Schiffs (s.modell), nicht nur die Klasse',
   /k:\s*s\.modell\s*\|\|\s*s\.k/.test(wrackBlock), { auszug: wrackBlock.replace(/\s+/g, ' ').slice(0, 120) });
 
-const ortVon = S.indexOf('ortTyp:        function(k){');
+const ortVon = S.indexOf('ortTyp:        function(k, eigenerOrt){');
 const ortBis = ortVon < 0 ? -1 : S.indexOf('\n          },', ortVon);
 check('7a: die ortTyp-Funktion der Wiedergabe ist auffindbar', ortVon > 0 && ortBis > ortVon);
 const ortBlock = ortVon > 0 && ortBis > ortVon ? S.slice(ortVon, ortBis) : '';
+/* Die zweite Bedingung war leer: der verneinte Ausdruck traf nie zu, 7b haing allein am Wort
+   "effectivePlanetType" - das im KOMMENTAR daneben ebenfalls steht. Jetzt wird der Kommentar
+   entfernt und der ausgefuehrte Code geprueft: der Aufruf muss da sein UND am eigenen Ort haengen
+   (eigenerOrt), damit der fremde Standort weiter seinen Basistyp bekommt. */
+const ortCode = ortBlock.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 check('7b: der Kampfort einer terraformten Welt kommt aus effectivePlanetType, nicht aus PLANETS[].type',
-  /effectivePlanetType\(k\)/.test(ortBlock) && !/^\s*return \(p && p\.type\) \|\| null;\s*$/m.test(ortBlock.split('effectivePlanetType')[0]),
-  { auszug: ortBlock.replace(/\s+/g, ' ').slice(0, 160) });
+  /effectivePlanetType\(k\)/.test(ortCode), { auszug: ortCode.replace(/\s+/g, ' ').slice(0, 200) });
+check('7c: der eigene Ueberschreiber gilt nur am EIGENEN Ort - ein Angriffsbericht traegt den Schluessel des Verteidigers',
+  /eigenerOrt/.test(ortCode) && /ortTyp\(r\.targetPlanet, true\)/.test(S) && /ortTyp\(r\.targetPlanet \|\| r\.debrisPlanet, false\)/.test(S),
+  { imBlock: /eigenerOrt/.test(ortCode), raidEigen: /ortTyp\(r\.targetPlanet, true\)/.test(S),
+    angriffFremd: /ortTyp\(r\.targetPlanet \|\| r\.debrisPlanet, false\)/.test(S) });
+/* Und die beiden Terraform-Ziele brauchen einen eigenen Eintrag in ORT_STIL - ohne ihn faellt die
+   Wiedergabe auf 'heimat' zurueck, also auf einen NEUTRALEREN Hintergrund als vor der Aenderung. */
+const stilVon = S.indexOf('var ORT_STIL = {');
+const stilBis = stilVon < 0 ? -1 : S.indexOf('\n    };', stilVon);
+check('7d-anker: die Tabelle ORT_STIL ist auffindbar', stilVon > 0 && stilBis > stilVon);
+const stilBlock = stilVon > 0 && stilBis > stilVon ? S.slice(stilVon, stilBis) : '';
+check('7d: ORT_STIL kennt jedes Ziel aus TERRAFORM_TARGET_TYPES (kein Rueckfall auf heimat)',
+  (() => {
+    const t = (S.match(/const TERRAFORM_TARGET_TYPES = \[([^\]]*)\]/) || ['', ''])[1].match(/'([a-z]+)'/g) || [];
+    const ziele = t.map(x => x.replace(/'/g, ''));
+    return ziele.length >= 6 && ziele.every(z => new RegExp('^\\s+' + z + ':', 'm').test(stilBlock));
+  })(),
+  { ziele: (S.match(/const TERRAFORM_TARGET_TYPES = \[([^\]]*)\]/) || ['', ''])[1] });
 
 /* ---- Quelltext: der Guertel-Ausweicher, isoliert gerechnet -----------------------------------
    Die Funktion ist reine Geometrie und haengt an nichts als ORBIT_ANGLES - deshalb wird sie hier
    aus der Spieldatei geschnitten und ausgefuehrt, statt sie im Browser zu erraten. Beide Zahlen
    (Bahnwinkel und Freiwinkel) kommen aus dem Quelltext, nicht aus dem Test: sonst pruefte der Test
    seine eigenen Annahmen (Hausregel: gegen den gemessenen Stand, nicht gegen eingetippte Werte). */
-const gwVon = S.indexOf('const GUERTEL_FREIWINKEL =');
+const gwVon = S.indexOf('const GUERTEL_FREIRAUM =');
 const gwBis = gwVon < 0 ? -1 : S.indexOf('\n  function asteroidMarkerR(', gwVon);
 const oaTreffer = S.match(/const ORBIT_ANGLES = \[[^\]]*\]/);
 check('2d-anker: der Guertel-Ausweicher und ORBIT_ANGLES sind im Quelltext auffindbar',
   gwVon > 0 && gwBis > gwVon && !!oaTreffer, { gwVon, gwBis, oa: !!oaTreffer });
-let gw = null;
-if (gwVon > 0 && gwBis > gwVon && oaTreffer) {
-  try { gw = new Function(oaTreffer[0] + ';' + S.slice(gwVon, gwBis) + ';return guertelWinkelFuer;')(); }
-  catch (e) { gw = null; }
-}
-check('2d-anker2: der geschnittene Block laeuft in sich geschlossen', typeof gw === 'function');
-if (typeof gw === 'function') {
+/* Der Ausweicher rechnet jetzt mit der GEOMETRIE des Kastens (kbOrbitMass, kbOrbitRx, guertelRx,
+   SUN_X/SUN_Y). Die werden hier mitgegeben, damit beide Kastenformen einzeln geprueft werden
+   koennen - die Browser-Messung weiter unten sieht nur die runde. Die Masse stehen im Quelltext
+   und werden von dort gelesen, nicht eingetippt. */
+const massTreffer = S.match(/return kbRunderKasten\(\) \? (\{[^}]*\}) : (\{[^}]*\});/);
+const sonneTreffer = S.match(/const SUN_X = (\d+), SUN_Y = (\d+);/);
+check('2d-anker3: Bahnmasse und Sonnenmitte sind im Quelltext lesbar', !!massTreffer && !!sonneTreffer,
+  { mass: massTreffer && massTreffer[0], sonne: sonneTreffer && sonneTreffer[0] });
+const baueGw = (rund) => {
+  if (!(gwVon > 0 && gwBis > gwVon && oaTreffer && massTreffer && sonneTreffer)) return null;
+  const kopf = oaTreffer[0] + ';'
+    + 'const SUN_X = ' + sonneTreffer[1] + ', SUN_Y = ' + sonneTreffer[2] + ';'
+    + 'function kbOrbitMass(){ return ' + (rund ? massTreffer[1] : massTreffer[2]) + '; }'
+    + 'function kbOrbitRx(o){ const m = kbOrbitMass(); return m.basis + o*m.schritt; }'
+    + 'function guertelRx(){ return kbOrbitRx(3.5); }';
+  try { return new Function(kopf + S.slice(gwVon, gwBis) + ';return guertelWinkelFuer;')(); }
+  catch (e) { return null; }
+};
+const gw = baueGw(true), gwFlach = baueGw(false);
+check('2d-anker2: der geschnittene Block laeuft in beiden Kastenformen',
+  typeof gw === 'function' && typeof gwFlach === 'function');
+if (typeof gw === 'function' && typeof gwFlach === 'function') {
   const roh = p => ((p * 36) + 18) % 360;
-  // Der Zweck: Platz 5 liegt 2 Grad neben dem Bahnwinkel des dritten Orbits und muss weichen.
-  check('2d: der Platz auf einem Planetenwinkel weicht aus (Platz 5 wandert)', gw(roh(5)) !== roh(5),
-    { vorher: roh(5), nachher: gw(roh(5)) });
+  /* Die REGEL, nicht die Momentaufnahme (Hausregel 3): Nach dem Ausweichen muss jeder Platz von
+     beiden Planetenbahnen weiter weg sein als vorher - und zwar in JEDER Kastenform. Die erste
+     Fassung erfuellte das nur im runden Kasten; im flachen schob sie Platz 5 von 22,4 auf 14,8
+     Einheiten, also erst auf die Scheibe. Gemessen wird mit denselben Formeln wie im Spiel. */
+  const abstandFn = (rund) => {
+    const m = JSON.parse((rund ? massTreffer[1] : massTreffer[2]).replace(/([a-z]+):/g, '"$1":'));
+    const SX = +sonneTreffer[1], SY = +sonneTreffer[2];
+    const rxO = o => m.basis + o * m.schritt;
+    const pkt = (g, rx, ry) => ({ x: SX + rx * Math.cos(g * Math.PI / 180), y: SY + ry * Math.sin(g * Math.PI / 180) });
+    const bahnen = JSON.parse(oaTreffer[0].split('=')[1].trim());
+    return (g) => Math.min(...[3, 4].map(o => {
+      const a = pkt(g, rxO(3.5), rxO(3.5) * m.ry);
+      const b = pkt(bahnen[(o - 1) % bahnen.length], rxO(o), rxO(o) * m.ry);
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }));
+  };
+  const formen = [{ name: 'rund', fn: gw, d: abstandFn(true) }, { name: 'flach', fn: gwFlach, d: abstandFn(false) }];
+  const nieSchlechter = formen.map(f => ({
+    form: f.name,
+    plaetze: [...Array(10).keys()].map(i => ({
+      platz: i, vorher: +f.d(roh(i)).toFixed(1), nachher: +f.d(f.fn(roh(i))).toFixed(1)
+    })).filter(x => x.nachher < x.vorher - 0.05)
+  }));
+  check('2d: das Ausweichen macht den Abstand zur Planetenscheibe in KEINER Kastenform kleiner',
+    nieSchlechter.every(f => f.plaetze.length === 0), nieSchlechter);
+  // Und es tut ueberhaupt etwas: im runden Kasten liegt Platz 5 nur 9,5 Einheiten neben Aion.
+  check('2d2: der zu nahe Platz weicht im runden Kasten wirklich aus (Platz 5 wandert)',
+    gw(roh(5)) !== roh(5) && abstandFn(true)(gw(roh(5))) > abstandFn(true)(roh(5)) + 5,
+    { vorher: roh(5), nachher: gw(roh(5)),
+      abstandVorher: +abstandFn(true)(roh(5)).toFixed(1), abstandNachher: +abstandFn(true)(gw(roh(5))).toFixed(1) });
   // Und die andere Haelfte: ein ungueltiger Ort darf nicht zu einem gueltigen werden. Eine Festung
   // ohne Platz ergibt NaN; ohne die Finite-Pruefung lieferte die Funktion 214 Grad und die Bastion
   // erschien sichtbar neben Aion (gemessen 05.09.2026, test_kartenbeschriftung fiel vierfach).
@@ -89,9 +152,9 @@ if (typeof gw === 'function') {
     Number.isNaN(gw(roh(undefined))) && Number.isNaN(gw(NaN)),
     { ausUndefined: gw(roh(undefined)), ausNaN: gw(NaN) });
   // Das Ausweichen darf keinen zweiten Platz treffen: zehn Plaetze, zehn verschiedene Endwinkel.
-  const ende10 = [...Array(10).keys()].map(i => gw(roh(i)));
-  check('2f: nach dem Ausweichen liegt kein Platz auf einem anderen',
-    new Set(ende10).size === 10, { endwinkel: ende10 });
+  const ende10 = formen.map(f => [...Array(10).keys()].map(i => f.fn(roh(i))));
+  check('2f: nach dem Ausweichen liegt kein Platz auf einem anderen (beide Kastenformen)',
+    ende10.every(e => new Set(e).size === 10), { rund: ende10[0], flach: ende10[1] });
 }
 
 /* ---- Browser ---------------------------------------------------------------------------------- */
@@ -200,11 +263,15 @@ async function boot(browser, viewport, geraet, saveZusatz) {
       const bbox = el => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, r: Math.max(r.width, r.height) / 2 }; };
       const p5 = document.querySelector('#galaxyMapSvg [data-map-asteroid="5"] polygon');
       const p2 = document.querySelector('#galaxyMapSvg [data-map-asteroid="2"] polygon');
-      /* Die SICHTBARE Scheibe samt Atmosphaeren-Halo: circle.body (r = 11 Einheiten) und die
-         [data-sys-halo]-Ringe (r + 1,3 bzw. r + ~4) - nicht das 45-Einheiten-Texturbild und nicht
-         der Schatten-Verlauf, die beide weit ueber die Scheibe hinausreichen. */
+      /* Die SICHTBARE Aussenkante: beide [data-sys-halo]-Ringe (r + 1,3 und r + 2,8) - nicht das
+         Texturbild und nicht der Schatten-Verlauf, die beide weit ueber die Scheibe hinausreichen.
+         circle.body steht nur im Rueckfall OHNE Textur im DOM (der Regelfall zeichnet ein <image>),
+         taugt also nicht als Mass; er bleibt als Rueckfall im Selektor, damit die Messung auch
+         ohne Textur etwas findet. Der aeussere Ring trug bis GR-9 keine Kennung - der Test mass
+         deshalb 1,5 Einheiten zu wenig und haette ein Vorkommen durchgewunken, das in den
+         sichtbaren Halo hineinragt. */
       const knoten = document.querySelector('#galaxyMapSvg [data-planet="aion"]');
-      const kreise = knoten ? [...knoten.querySelectorAll('circle.body, circle[data-sys-halo]')] : [];
+      const kreise = knoten ? [...knoten.querySelectorAll('circle[data-sys-halo], circle.body')] : [];
       if (!p5 || !p2 || !kreise.length) return { p5: !!p5, p2: !!p2, kreise: kreise.length };
       const a = bbox(p5), c = bbox(p2);
       const b = kreise.map(bbox).reduce((m, k) => k.r > m.r ? k : m);
