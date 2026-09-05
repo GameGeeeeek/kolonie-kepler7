@@ -40680,7 +40680,19 @@ async function claimPendingRewards(){
       g.globalCompositeOperation = 'lighter';
       glut(g, x, y, s * 1.8 * puls, F.ver, (0.10 + 0.14 * anteil) * puls);
       g.globalCompositeOperation = 'source-over';
-      g.fillStyle = '#150a12';
+      /* KOERPER STATT UMRISS (Buendel B, 05.09.2026, Grafik-Aufnahme). Gemessen am alten Bild:
+         die Fuellung war #150a12 auf einem Grund von #060812 - also praktisch unsichtbar. Was man
+         sah, war eine ein bis zwei Pixel starke rote Kontur: eine Ellipse, eine Kritzelkurve, ein
+         Fuenfeck. Kein Volumen, keine Panzerung, kein Kern. Jetzt bekommt jede Gestalt denselben
+         Koerperverlauf (oben links heller, unten rechts fast schwarz), eine Lichtkante und einen
+         glühenden Kern - die SILHOUETTEN bleiben unangetastet, es ist dieselbe Gestalt, nur mit
+         Masse. Der Verlauf haengt an der Groesse s, also gilt er fuer jeden Boss gleich. */
+      var bkg = g.createRadialGradient(x - s * 0.45, y - s * 0.45, s * 0.05, x, y, s * 1.5);
+      bkg.addColorStop(0,    '#3a2440');
+      bkg.addColorStop(0.35, '#2a1830');
+      bkg.addColorStop(0.75, '#1a0f1e');
+      bkg.addColorStop(1,    '#120a16');
+      g.fillStyle = bkg;
       g.strokeStyle = rgba(F.ver, kante);
       g.lineWidth = Math.max(1, 0.6 + 1.6 * anteil);
       if (BOSS.key === 'sternenfresser'){
@@ -40838,6 +40850,15 @@ async function claimPendingRewards(){
         g.lineTo(x, y + s * 0.9); g.lineTo(x - s * 1.3, y);
         g.closePath(); g.fill(); g.stroke();
       }
+
+      /* DER KERN: Auge, Maul oder Reaktor - je nach Gestalt dasselbe Bauteil, ein glühender Fleck
+         mit weissem Zentrum, der mit dem Puls atmet. Er ist das, was einen Koerper lebendig macht
+         und den Blick haelt; die alte Zeichnung hatte nichts dergleichen. Die Staerke haengt am
+         Zustand: ein schwer getroffener Boss glimmt nur noch. */
+      g.globalCompositeOperation = 'lighter';
+      glut(g, x, y, s * 0.42 * puls, F.ver, (0.30 + 0.45 * anteil) * puls);
+      glut(g, x, y, s * 0.16 * puls, '#ffffff', (0.18 + 0.30 * anteil) * puls);
+      g.globalCompositeOperation = 'source-over';
       /* Schadensbild: Risse folgen dem echten Hueellenverlauf. */
       if (anteil < 0.7){
         g.strokeStyle = rgba(F.gold, 0.55 * (1 - anteil) + 0.2); g.lineWidth = 1;
