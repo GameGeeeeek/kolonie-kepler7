@@ -7099,85 +7099,413 @@
     // Phase 2 der Grafik-Umstellung, Fortsetzung: Planeten bekommen eine kleine gerenderte Kugel statt
     // des flachen ti-planet-Icons. Texturen werden PRO TYP nur einmal berechnet (Rauschen ist teuer)
     // und danach für jede Instanz dieses Typs wiederverwendet - PLANET_TEXTURE_CACHE hält sie fest.
-    // Farbrampen an die tatsächlichen PLANET_TYPE_INFO-Farben angelehnt (siehe Vorschau-Datei).
-    function makeNoise2D(seed){
-      function hash(x,y){ const h = Math.sin(x*127.1 + y*311.7 + seed*57.31) * 43758.5453123; return h - Math.floor(h); }
-      function smooth(t){ return t*t*(3-2*t); }
-      return function(x,y){
-        const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
-        const a=hash(xi,yi), b=hash(xi+1,yi), c=hash(xi,yi+1), d=hash(xi+1,yi+1);
-        const u=smooth(xf), v=smooth(yf);
-        const top=a+(b-a)*u, bot=c+(d-c)*u;
-        return top+(bot-top)*v;
+    /* PLANETEN-TEXTUREN (GR-10, 05.09.2026, Grafik-Aufnahme "Kepler-7 in neuem Licht").
+       Gemessen am alten Zeichner: Alle zehn Typen trugen dasselbe V-Schlierenmuster - es entstand
+       aus rowShiftX/rowShiftY (die Rauschkoordinate wanderte linear mit der Zeile) - und
+       unterschieden sich nur in der Farbrampe; mond, erdwelt und leerenwelt hatten keinen eigenen
+       Builder und lieferten Byte fuer Byte die Erdtextur. Jetzt:
+         - Rauschen auf KUGELKOORDINATEN: Laengen-/Breitengrad -> Punkt der Einheitskugel ->
+           3D-Wertrauschen. Der Streifen ist an der Naht x=0/x=B nahtlos, das V-Muster ist weg.
+         - Jeder Typ liefert Albedo UND Hoehe; ein zweiter Durchgang schattiert das Hoehenfeld mit
+           festem Licht von oben links (passend zum Rand-/Kantenlicht in drawPlanetMiniIcon).
+         - 13 Typen mit eigener Geologie: Kontinente mit Kuestenlinie und Eiskappen, Inselwelt,
+           Duenenbaender, Eisschild mit Rissen, Lavaadern (Grat-Rauschen), Kristallfacetten
+           (Zellrauschen), Gasriesenbaender mit Sturm, Krater mit Wall (Hoehenprofil), Maria,
+           Narbenwelt, Aurora, Leerenwelt.
+         - 128x64 statt 90x45: gezeigt werden bis 82 Geraetepixel (Desktop DPR 2) bzw. 78 (Handy
+           DPR 3); der 45er-Ausschnitt war 1,3- bis 1,8-fach hochskaliert. Gemessen 267 ms fuer
+           alle 13 Streifen zusammen, einmal je Typ (Cache unten unveraendert).
+       Schnittstelle unveraendert: PLANET_TEXTURE_BUILDERS[typ]() liefert einen 2:1-Canvas-Streifen,
+       getPlanetTexture cacht ihn, drawPlanetMiniIcon und getPlanetTextureDataUrl lesen Breite und
+       Hoehe vom Streifen. Entwurf und Messung: Sitzungs-Scratchpad grafik/soll/planeten_texturen_A. */
+    const PLANET_TEXTUR_B = 128, PLANET_TEXTUR_H = 64;
+    // ---- Rauschen --------------------------------------------------------------------------
+    function makeNoise3D(seed){
+      function hash(x,y,z){ const h=Math.sin(x*127.1 + y*311.7 + z*74.7 + seed*57.31)*43758.5453123; return h-Math.floor(h); }
+      const sm = t => t*t*(3-2*t);
+      return function(x,y,z){
+        const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+        const u=sm(x-xi), v=sm(y-yi), w=sm(z-zi);
+        const c000=hash(xi,yi,zi),   c100=hash(xi+1,yi,zi),   c010=hash(xi,yi+1,zi),   c110=hash(xi+1,yi+1,zi);
+        const c001=hash(xi,yi,zi+1), c101=hash(xi+1,yi,zi+1), c011=hash(xi,yi+1,zi+1), c111=hash(xi+1,yi+1,zi+1);
+        const x00=c000+(c100-c000)*u, x10=c010+(c110-c010)*u, x01=c001+(c101-c001)*u, x11=c011+(c111-c011)*u;
+        const y0=x00+(x10-x00)*v, y1=x01+(x11-x01)*v;
+        return y0+(y1-y0)*w;
       };
     }
-    function fbm2(noiseFn,x,y,octaves,lac,gain){
-      let sum=0, amp=1, freq=1, norm=0;
-      for(let i=0;i<octaves;i++){ sum+=noiseFn(x*freq,y*freq)*amp; norm+=amp; amp*=gain; freq*=lac; }
-      return sum/norm;
+    function fbm3(n, x,y,z, oct, lac, gain){
+      let s=0, a=1, f=1, norm=0;
+      for(let i=0;i<oct;i++){ s+=n(x*f,y*f,z*f)*a; norm+=a; a*=gain; f*=lac; }
+      return s/norm;
     }
-    function rampColorP(v, stops){
-      for(let i=0;i<stops.length-1;i++){
-        const s0=stops[i], s1=stops[i+1];
-        if(v>=s0[0] && v<=s1[0]){
-          const t=(v-s0[0])/((s1[0]-s0[0])||1);
-          return [ s0[1][0]+(s1[1][0]-s0[1][0])*t, s0[1][1]+(s1[1][1]-s0[1][1])*t, s0[1][2]+(s1[1][2]-s0[1][2])*t ];
+    // Grat-Rauschen: 1-|2n-1| je Oktave -> dünne helle Linien (Risse, Adern, Lava)
+    function ridge3(n, x,y,z, oct, lac, gain){
+      let s=0, a=1, f=1, norm=0;
+      for(let i=0;i<oct;i++){ const r=1-Math.abs(2*n(x*f,y*f,z*f)-1); s+=r*r*a; norm+=a; a*=gain; f*=lac; }
+      return s/norm;
+    }
+    // Zellrauschen (Voronoi) in 3D: F1, F2 und Zellkennung
+    function makeCell3D(seed){
+      function h3(x,y,z,k){ const h=Math.sin(x*127.1 + y*311.7 + z*74.7 + k*19.19 + seed*57.31)*43758.5453123; return h-Math.floor(h); }
+      return function(x,y,z){
+        const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+        let f1=9, f2=9, id=0;
+        for(let dz=-1;dz<=1;dz++) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+          const cx=xi+dx, cy=yi+dy, cz=zi+dz;
+          const px=cx+h3(cx,cy,cz,1), py=cy+h3(cx,cy,cz,2), pz=cz+h3(cx,cy,cz,3);
+          const d=Math.sqrt((px-x)*(px-x)+(py-y)*(py-y)+(pz-z)*(pz-z));
+          if(d<f1){ f2=f1; f1=d; id=h3(cx,cy,cz,4); } else if(d<f2){ f2=d; }
         }
-      }
+        return [f1,f2,id];
+      };
+    }
+    const clamp01 = v => v<0?0:(v>1?1:v);
+    const smooth = (a,b,v) => { const t=clamp01((v-a)/(b-a)); return t*t*(3-2*t); };
+    const mix = (c0,c1,t) => [c0[0]+(c1[0]-c0[0])*t, c0[1]+(c1[1]-c0[1])*t, c0[2]+(c1[2]-c0[2])*t];
+    function ramp(v, stops){
+      if(v<=stops[0][0]) return stops[0][1];
+      for(let i=0;i<stops.length-1;i++){ const s0=stops[i], s1=stops[i+1]; if(v<=s1[0]) return mix(s0[1], s1[1], (v-s0[0])/((s1[0]-s0[0])||1)); }
       return stops[stops.length-1][1];
     }
-    function buildPlanetTexture(width,height,seed,opts){
+    // Winkelabstand zweier Kugelpunkte (Radiant)
+    const angDist = (p,q) => Math.acos(Math.max(-1,Math.min(1, p[0]*q[0]+p[1]*q[1]+p[2]*q[2])));
+    const sph = (lon,lat) => [Math.cos(lat)*Math.cos(lon), Math.sin(lat), Math.cos(lat)*Math.sin(lon)];
+    // Krater als Höhenprofil: Schüssel + Wall. d = Abstand/Radius
+    function craterHeight(d, depth, rimH){
+      if(d>1.6) return 0;
+      const bowl = -depth*(1-smooth(0.35,1.0,d));
+      const rim  = rimH*Math.exp(-((d-1.0)*(d-1.0))/(2*0.13*0.13));
+      return bowl+rim;
+    }
+    // deterministische Kraterliste je Seed, gleichmäßig auf der Kugel, Hauptmasse nahe der Streifenmitte
+    function craterList(seed, n, rMin, rMax){
+      const rnd = (k) => { const h=Math.sin(seed*91.7 + k*57.13)*43758.5453; return h-Math.floor(h); };
+      const list=[];
+      for(let i=0;i<n;i++){
+        const lon = Math.PI + (rnd(i*3)-0.5)*Math.PI*1.6;      // um lon=pi (sichtbarer Mittelausschnitt) streuen
+        const lat = (rnd(i*3+1)-0.5)*Math.PI*0.9;
+        const r = rMin + (rMax-rMin)*Math.pow(rnd(i*3+2), 1.6);
+        list.push({ q: sph(lon,lat), r, k: rnd(i*7+5) });
+      }
+      return list;
+    }
+
+    // ---- Gemeinsamer Streifen-Aufbau ----------------------------------------------------------
+    // spec.albedo(p,lat,lon) -> [r,g,b,hoehe]; spec.relief = Stärke der Reliefschattierung;
+    // spec.clouds(p,lat,lon) -> Deckkraft 0..1 (optional), spec.cloudColor
+    function buildPlanetStrip(width, height, spec){
       const off=document.createElement('canvas'); off.width=width; off.height=height;
-      const octx=off.getContext('2d');
-      if (!octx) return off;
+      const octx=off.getContext('2d'); if(!octx) return off;
       const img=octx.createImageData(width,height);
-      const noiseA=makeNoise2D(seed), noiseB=makeNoise2D(seed+53.7), detailNoise=makeNoise2D(seed+191.3);
-      const wrapR=opts.wrapR||3, rowShiftX=opts.rowShiftX||0.28, rowShiftY=opts.rowShiftY||0.06;
-      const stretchX=opts.stretchX||1, stretchY=opts.stretchY||1;
-      const octaves=opts.octaves||4, lac=opts.lac||2.1, gain=opts.gain||0.52;
+      const N=width*height, col=new Float32Array(N*3), hgt=new Float32Array(N), cosLat=new Float32Array(height);
+      const pts=new Array(N);
       for(let y=0;y<height;y++){
-        const rowN=y/height;
+        const lat=((y+0.5)/height-0.5)*Math.PI; cosLat[y]=Math.cos(lat);
         for(let x=0;x<width;x++){
-          const angle=x/width*Math.PI*2;
-          const nx=Math.cos(angle)*wrapR*stretchX + rowN*rowShiftX*10;
-          const ny=Math.sin(angle)*wrapR*stretchY + rowN*rowShiftY*10;
-          let v=fbm2(noiseA,nx,ny,octaves,lac,gain); v=Math.min(1,Math.max(0,v));
-          let v2=fbm2(noiseB,nx*1.7,ny*1.7,3,2.3,0.5); v2=Math.min(1,Math.max(0,v2));
-          const jitter=(detailNoise(x*0.4,y*0.4)-0.5)*0.06;
-          const vv=Math.min(1,Math.max(0,v+jitter));
-          const rgb = opts.colorize ? opts.colorize(vv,v2,rowN) : rampColorP(vv, opts.ramp);
-          const idx=(y*width+x)*4;
-          img.data[idx]=rgb[0]; img.data[idx+1]=rgb[1]; img.data[idx+2]=rgb[2]; img.data[idx+3]=255;
+          const lon=(x+0.5)/width*Math.PI*2;
+          const p=sph(lon,lat); const i=y*width+x; pts[i]=p;
+          const c=spec.albedo(p,lat,lon);
+          col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]; hgt[i]=c[3]||0;
+        }
+      }
+      const k=spec.relief||0;
+      for(let y=0;y<height;y++){
+        const lat=((y+0.5)/height-0.5)*Math.PI;
+        for(let x=0;x<width;x++){
+          const i=y*width+x;
+          let r=col[i*3], g=col[i*3+1], b=col[i*3+2];
+          if(k>0){
+            const xl=y*width+((x-1+width)%width), xr=y*width+((x+1)%width);
+            const yu=(y>0?y-1:y)*width+x, yd=(y<height-1?y+1:y)*width+x;
+            const dhdx=(hgt[xr]-hgt[xl])*0.5*Math.max(0.15,cosLat[y]);   // Streifen ist am Pol gestreckt
+            const dhdy=(hgt[yd]-hgt[yu])*0.5;
+            // Licht von oben links: Hänge, die nach links/oben zeigen (Höhe fällt nach rechts/unten), werden hell.
+            let lit=1 + k*(-dhdx*0.78 - dhdy*0.62);
+            lit=Math.max(0.35, Math.min(1.55, lit));
+            r*=lit; g*=lit; b*=lit;
+          }
+          if(spec.clouds){
+            const a=clamp01(spec.clouds(pts[i],lat,(x+0.5)/width*Math.PI*2));
+            if(a>0){ const cc=spec.cloudColor||[250,252,255]; r+=(cc[0]-r)*a; g+=(cc[1]-g)*a; b+=(cc[2]-b)*a; }
+          }
+          const o=i*4; img.data[o]=r<0?0:(r>255?255:r); img.data[o+1]=g<0?0:(g>255?255:g); img.data[o+2]=b<0?0:(b>255?255:b); img.data[o+3]=255;
         }
       }
       octx.putImageData(img,0,0);
       return off;
     }
+
+    // ---- Wolken (gemeinsam für die bewohnbaren Typen) ----------------------------------------
+    function makeClouds(seed, freq, stretch, lo, hi, maxA, warpAmt){
+      const nC=makeNoise3D(seed), nW=makeNoise3D(seed+11.3);
+      return function(p){
+        const wx=(fbm3(nW,p[0]*1.3+7,p[1]*1.3,p[2]*1.3,3,2.0,0.5)-0.5)*warpAmt;
+        const wy=(fbm3(nW,p[0]*1.3,p[1]*1.3+3,p[2]*1.3,3,2.0,0.5)-0.5)*warpAmt;
+        const v=fbm3(nC,(p[0]+wx)*freq,(p[1]+wy)*freq*stretch,(p[2]-wx)*freq,4,2.2,0.55);
+        return smooth(lo,hi,v)*maxA;
+      };
+    }
+
+    // ---- Typen ----------------------------------------------------------------------------------
+    function erdTyp(seed, opts){
+      const nA=makeNoise3D(seed), nW=makeNoise3D(seed+53.7), nM=makeNoise3D(seed+91.1), nCap=makeNoise3D(seed+17.2);
+      const thr=opts.thr, capLat=opts.capLat;
+      const ocean=opts.ocean, shelf=opts.shelf, land=opts.land;
+      return {
+        relief: opts.relief,
+        albedo(p,lat){
+          const wx=(fbm3(nW,p[0]*2.1,p[1]*2.1,p[2]*2.1,3,2.0,0.5)-0.5)*0.25;
+          const wy=(fbm3(nW,p[0]*2.1+5,p[1]*2.1,p[2]*2.1,3,2.0,0.5)-0.5)*0.25;
+          const c=fbm3(nA,(p[0]+wx)*opts.freq,(p[1]+wy)*opts.freq,(p[2]-wx)*opts.freq,4,2.2,0.48);
+          const mtn=fbm3(nM,p[0]*5,p[1]*5,p[2]*5,3,2.3,0.5);
+          const capEdge=capLat+(fbm3(nCap,p[0]*3,p[1]*3,p[2]*3,3,2,0.5)-0.5)*0.22;
+          let rgb, h=0;
+          if(c<thr){
+            const dep=(thr-c)/0.14;                          // 0 an der Küste, 1 tief
+            rgb = dep<0.3 ? mix(shelf, ocean[0], dep/0.3) : mix(ocean[0], ocean[1], clamp01((dep-0.3)/0.7));
+            h=-0.02;
+          } else {
+            const t=(c-thr)/opts.span;                       // Höhe über Meer
+            rgb=ramp(t+(mtn-0.5)*0.35, land);
+            h=0.25+t*1.4+(mtn-0.5)*0.35;
+          }
+          const cap=smooth(-0.04,0.05,Math.abs(lat)-capEdge);
+          if(cap>0){ rgb=mix(rgb,[238,243,248],cap); h+=cap*0.3; }
+          return [rgb[0],rgb[1],rgb[2],h];
+        },
+        clouds: makeClouds(seed+300, opts.cloudFreq, opts.cloudStretch, opts.cloudLo, opts.cloudHi, opts.cloudA, opts.cloudWarp)
+      };
+    }
+
     const PLANET_TEXTURE_BUILDERS = {
-      erdaehnlich: () => buildPlanetTexture(90,45,4.21,{ wrapR:2.6, rowShiftX:0.3, rowShiftY:0.08, octaves:5, lac:2.15, gain:0.52,
-        ramp:[[0,[6,20,42]],[0.40,[9,48,84]],[0.48,[22,95,140]],[0.52,[64,150,150]],[0.56,[70,150,90]],[0.64,[110,150,70]],[0.74,[140,120,85]],[0.85,[165,150,130]],[0.93,[225,230,235]],[1,[255,255,255]]] }),
-      wueste: () => buildPlanetTexture(90,45,101.4,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.1,octaves:4,
-        ramp:[[0,[110,78,44]],[0.4,[162,126,76]],[0.55,[212,180,90]],[0.7,[224,180,90]],[0.85,[176,132,80]],[1,[134,90,48]]]}),
-      vulkan: () => buildPlanetTexture(90,45,404.5,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.09,octaves:4,
-        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[10,4,2]],[0.5,[60,20,10]],[1,[224,80,63]]]); const ridge=1-Math.abs(v2*2-1);
-          if(ridge>0.76){ const gl=(ridge-0.76)/0.24; return [base[0]+(255-base[0])*gl*0.9, base[1]+(160-base[1])*gl*0.9, base[2]+(60-base[2])*gl*0.9]; } return base; }}),
-      eis: () => buildPlanetTexture(90,45,303.7,{wrapR:2.4,rowShiftX:0.25,rowShiftY:0.08,octaves:4,
-        ramp:[[0,[110,150,180]],[0.4,[160,196,215]],[0.62,[191,230,245]],[0.82,[240,248,252]],[1,[210,236,246]]]}),
-      kristall: () => buildPlanetTexture(90,45,512.9,{wrapR:2.3,rowShiftX:0.27,rowShiftY:0.09,octaves:4,
-        ramp:[[0,[38,20,64]],[0.42,[90,60,150]],[0.6,[140,105,210]],[0.78,[179,158,240]],[0.92,[220,205,250]],[1,[245,240,255]]]}),
-      wasserwelt: () => buildPlanetTexture(90,45,617.2,{wrapR:2.5,rowShiftX:0.3,rowShiftY:0.09,octaves:5,
-        ramp:[[0,[6,26,52]],[0.55,[16,60,110]],[0.72,[35,100,168]],[0.85,[74,159,224]],[0.94,[150,205,240]],[1,[230,245,252]]]}),
-      gasriese: () => buildPlanetTexture(90,45,202.9,{wrapR:1.6,stretchX:0.4,stretchY:1.6,rowShiftX:0.05,rowShiftY:0.02,octaves:3,lac:2.4,gain:0.5,
-        colorize:(v,v2,rowN)=>{ const bandV=Math.sin(rowN*Math.PI*8+v*2.4)*0.5+0.5;
-          const hue=rampColorP(bandV,[[0,[230,210,180]],[0.33,[217,151,90]],[0.66,[178,110,60]],[1,[130,80,45]]]);
-          const dark=0.55+v*0.45; return [hue[0]*dark,hue[1]*dark,hue[2]*dark]; }}),
-      todeswelt: () => buildPlanetTexture(90,45,808.6,{wrapR:2.2,rowShiftX:0.28,rowShiftY:0.09,octaves:4,
-        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[8,4,4]],[0.5,[50,24,24]],[1,[107,42,42]]]); const ridge=1-Math.abs(v2*2-1);
-          if(ridge>0.8){ const gl=(ridge-0.8)/0.2; return [base[0]+(160-base[0])*gl*0.6, base[1]*(1-gl*0.4), base[2]*(1-gl*0.4)]; } return base; }}),
-      asteroid: () => buildPlanetTexture(90,45,919.4,{wrapR:2.8,rowShiftX:0.32,rowShiftY:0.1,octaves:4,
-        ramp:[[0,[40,38,35]],[0.4,[85,82,76]],[0.62,[125,121,112]],[0.8,[155,151,141]],[1,[180,176,166]]]}),
-      super: () => buildPlanetTexture(90,45,1077.3,{wrapR:2.4,rowShiftX:0.26,rowShiftY:0.09,octaves:4,
-        ramp:[[0,[70,20,50]],[0.4,[180,80,140]],[0.6,[230,140,190]],[0.8,[245,190,220]],[1,[255,235,245]]]})
+      erdaehnlich: () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, erdTyp(4.21,{
+        thr:0.585, capLat:1.22, relief:0.9, freq:1.35, span:0.24,
+        ocean:[[14,52,112],[6,26,70]], shelf:[46,128,158],
+        land:[[0,[70,130,64]],[0.3,[104,138,60]],[0.55,[138,124,74]],[0.8,[150,140,118]],[1.15,[226,230,234]]],
+        cloudFreq:3.2, cloudStretch:2.2, cloudLo:0.55, cloudHi:0.72, cloudA:0.42, cloudWarp:0.6 })),
+
+      erdwelt: () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, erdTyp(7.77,{
+        thr:0.465, capLat:1.3, relief:0.8, freq:1.5, span:0.3,
+        ocean:[[18,70,120],[10,42,90]], shelf:[60,150,150],
+        land:[[0,[52,120,56]],[0.3,[70,146,60]],[0.6,[94,158,66]],[0.85,[128,150,84]],[1.1,[200,200,190]]],
+        cloudFreq:2.4, cloudStretch:1.3, cloudLo:0.54, cloudHi:0.72, cloudA:0.5, cloudWarp:1.6 })),
+
+      wasserwelt: (() => { const seed=617.2, nS=makeNoise3D(seed), nW=makeNoise3D(seed+31), nI=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.5,
+          albedo(p){
+            const wx=(fbm3(nW,p[0]*1.6,p[1]*1.6,p[2]*1.6,3,2,0.5)-0.5)*0.9, wy=(fbm3(nW,p[0]*1.6+4,p[1]*1.6,p[2]*1.6,3,2,0.5)-0.5)*0.9;
+            const s=fbm3(nS,(p[0]+wx)*2.4,(p[1]+wy)*2.4*2.2,(p[2]-wx)*2.4,4,2.1,0.55);
+            let rgb=mix([8,36,96],[18,70,140],smooth(0.35,0.6,s));
+            rgb=mix(rgb,[48,140,196],smooth(0.58,0.74,s)*0.8);
+            const isl=fbm3(nI,p[0]*6.5,p[1]*6.5,p[2]*6.5,3,2.2,0.5);
+            let h=(s-0.5)*0.3;
+            if(isl>0.745){ const t=smooth(0.745,0.78,isl); rgb=mix(rgb,[150,140,100],t); rgb=mix(rgb,[70,120,60],smooth(0.775,0.81,isl)); h+=t*1.2; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          },
+          clouds: makeClouds(seed+300, 3.4, 2.6, 0.58, 0.74, 0.32, 0.5)
+        }); })(),
+
+      wueste: (() => { const seed=101.4, nD=makeNoise3D(seed), nW=makeNoise3D(seed+31), nG=makeNoise3D(seed+77), nB=makeNoise3D(seed+99);
+        const becken=sph(Math.PI+0.35,-0.18);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.9,
+          albedo(p,lat){
+            const w=(fbm3(nW,p[0]*1.4,p[1]*1.4,p[2]*1.4,3,2,0.5)-0.5)*2.2;
+            const band=Math.sin(lat*13+w+Math.sin(lat*4+w*0.5)*0.8)*0.5+0.5;       // Dünenbänder, niedrige Frequenz
+            const grain=fbm3(nG,p[0]*9,p[1]*9,p[2]*9,2,2.2,0.5)-0.5;
+            const broad=fbm3(nD,p[0]*1.8,p[1]*1.8,p[2]*1.8,3,2,0.5);
+            let rgb=mix([214,170,92],[158,112,58],Math.pow(band,1.6)*0.7);
+            rgb=mix(rgb,[228,196,128],smooth(0.55,0.7,broad)*0.5);
+            rgb=mix(rgb,rgb.map(v=>v*0.86),clamp01(grain*3+0.5)*0.35);
+            let h=Math.pow(band,1.4)*0.6+(broad-0.5)*0.8+grain*0.2;
+            const d=angDist(p,becken)/(0.62+(fbm3(nB,p[0]*3,p[1]*3,p[2]*3,3,2,0.5)-0.5)*0.35);
+            if(d<1.3){ const t=1-smooth(0.55,1.15,d); rgb=mix(rgb,[118,80,48],t*0.85); h-=t*0.5; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      eis: (() => { const seed=303.7, nR=makeNoise3D(seed), nS=makeNoise3D(seed+31), nT=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.7,
+          albedo(p){
+            const tone=fbm3(nT,p[0]*2.5,p[1]*2.5,p[2]*2.5,3,2.1,0.5);
+            let rgb=mix([200,222,238],[240,247,252],smooth(0.35,0.65,tone));
+            let h=(tone-0.5)*0.5;
+            const sea=fbm3(nS,p[0]*1.7,p[1]*1.7,p[2]*1.7,4,2.1,0.5);
+            const st=1-smooth(0.42,0.47,sea);
+            if(st>0){ rgb=mix(rgb,[112,146,176],st*0.95); h-=st*0.5; }
+            const r=ridge3(nR,p[0]*3.0,p[1]*3.0,p[2]*3.0,2,2.6,0.5);                 // Risse: Grate invertiert
+            const crack=smooth(0.66,0.8,r);
+            if(crack>0){ rgb=mix(rgb,[80,110,146],crack*0.9*(1-st*0.7)); h-=crack*1.1; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      vulkan: (() => { const seed=404.5, nR=makeNoise3D(seed), nG=makeNoise3D(seed+31), nH=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.7,
+          albedo(p){
+            const g=fbm3(nG,p[0]*7,p[1]*7,p[2]*7,3,2.2,0.5);
+            const broad=fbm3(nH,p[0]*1.8,p[1]*1.8,p[2]*1.8,3,2,0.5);
+            let rgb=mix([16,12,12],[46,36,34],g);
+            rgb=mix(rgb,[30,22,22],smooth(0.5,0.7,broad)*0.5);
+            let h=(g-0.5)*0.6+(broad-0.5)*1.2;
+            const r=ridge3(nR,p[0]*2.4,p[1]*2.4,p[2]*2.4,3,2.3,0.5);
+            const glow=smooth(0.6,0.78,r), core=smooth(0.76,0.88,r);
+            if(glow>0){ rgb=mix(rgb,[176,44,16],glow*0.8); h-=glow*0.7; }
+            if(core>0){ rgb=mix(rgb,[255,176,60],core); }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      kristall: (() => { const seed=512.9, cell=makeCell3D(seed), nT=makeNoise3D(seed+31);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.4,
+          albedo(p){
+            const [f1,f2,id]=cell(p[0]*2.2,p[1]*2.2,p[2]*2.2);
+            const tone=fbm3(nT,p[0]*3,p[1]*3,p[2]*3,2,2,0.5);
+            let rgb=mix([38,18,78],[96,62,170],id*0.75+tone*0.25);            // Facette: eigene Helligkeit je Zelle
+            const edge=1-smooth(0.02,0.09,f2-f1);
+            rgb=mix(rgb,[195,190,245],edge*0.9);
+            const h=-f1*1.5+id*0.3;                                             // Facettenflächen fallen zur Zellkante hin
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      gasriese: (() => { const seed=202.9, nW=makeNoise3D(seed), nT=makeNoise3D(seed+31), nS=makeNoise3D(seed+77);
+        const sturm=sph(Math.PI+0.45,-0.36);
+        const farben=[[0,[128,80,46]],[0.22,[176,108,62]],[0.45,[222,158,96]],[0.62,[238,220,186]],[0.8,[214,150,88]],[1,[150,92,52]]];
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.25,
+          albedo(p,lat,lon){
+            const w=(fbm3(nW,p[0]*1.6,p[1]*4.5,p[2]*1.6,4,2.2,0.55)-0.5)*0.34;       // Domain-Warp: wellige Bandkanten
+            const la=lat+w;
+            const bv=Math.sin(la*10.5+Math.sin(la*3.2)*1.4)*0.5+0.5;
+            const fine=fbm3(nT,p[0]*3,p[1]*12,p[2]*3,3,2.2,0.5);
+            let rgb=ramp(clamp01(bv*0.8+fine*0.25-0.05), farben);
+            let h=bv*0.5+fine*0.3;
+            // ovaler Sturm: Ellipse in Längen-/Breitenrichtung
+            let dl=lon-(Math.PI+0.45); dl=Math.atan2(Math.sin(dl),Math.cos(dl));
+            const ex=dl*Math.cos(lat)/0.5, ey=(lat+0.36)/0.24, d=Math.sqrt(ex*ex+ey*ey);
+            if(d<1.5){
+              const ang=Math.atan2(ey,ex);
+              const sw=Math.sin(d*11-ang*1.5+fbm3(nS,p[0]*6,p[1]*6,p[2]*6,2,2,0.5)*2)*0.5+0.5;
+              const inside=1-smooth(0.85,1.2,d);
+              let sc=mix([236,214,176],[176,96,54],sw*0.8);
+              sc=mix(sc,[248,236,210],1-smooth(0,0.35,d));
+              rgb=mix(rgb,sc,inside);
+              h+=inside*(0.5-sw*0.4)+ (1-smooth(0.9,1.15,d))*0.2;
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      asteroid: (() => { const seed=919.4, nG=makeNoise3D(seed), nB=makeNoise3D(seed+31);
+        const krater=craterList(seed, 11, 0.13, 0.36);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.6,
+          albedo(p){
+            const g=fbm3(nG,p[0]*11,p[1]*11,p[2]*11,3,2.2,0.5);
+            const broad=fbm3(nB,p[0]*1.6,p[1]*1.6,p[2]*1.6,4,2.1,0.5);
+            let rgb=mix([92,84,74],[128,118,104],broad);
+            rgb=mix(rgb,rgb.map(v=>v*0.8),clamp01((g-0.5)*4+0.5)*0.35);
+            let h=(broad-0.5)*1.2+(g-0.5)*0.35;
+            for(const k of krater){
+              const d=angDist(p,k.q)/k.r; if(d>1.6) continue;
+              h+=craterHeight(d,0.9+k.k*0.5,0.35)*k.r*3.2;
+              const floor=1-smooth(0.5,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.2*0.2));
+              rgb=mix(rgb,[58,52,46],floor*0.55); rgb=mix(rgb,[150,140,126],ej*0.35);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      mond: (() => { const seed=733.1, nG=makeNoise3D(seed), nM=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        const krater=craterList(seed, 9, 0.1, 0.3);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.5,
+          albedo(p){
+            const g=fbm3(nG,p[0]*10,p[1]*10,p[2]*10,3,2.2,0.5);
+            const wx=(fbm3(nW,p[0]*2,p[1]*2,p[2]*2,2,2,0.5)-0.5)*0.5;
+            const m=fbm3(nM,(p[0]+wx)*1.5,(p[1]-wx)*1.5,(p[2]+wx)*1.5,4,2.1,0.5);
+            let rgb=mix([150,148,142],[178,176,170],g);
+            const mare=smooth(0.53,0.6,m);                                       // Maria: große dunkle Flecken
+            rgb=mix(rgb,[92,94,102],mare*0.9);
+            let h=(g-0.5)*0.3+(1-mare)*0.5;
+            for(const k of krater){
+              const d=angDist(p,k.q)/k.r; if(d>1.6) continue;
+              h+=craterHeight(d,0.9+k.k*0.6,0.4)*k.r*3.4;
+              const floor=1-smooth(0.5,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.22*0.22));
+              rgb=mix(rgb,[112,112,112],floor*0.4); rgb=mix(rgb,[210,208,202],ej*0.45);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      todeswelt: (() => { const seed=808.6, nG=makeNoise3D(seed), nR=makeNoise3D(seed+31), nB=makeNoise3D(seed+77);
+        const narbe={ q:sph(Math.PI-0.35,0.12), r:0.62 };
+        const klein=craterList(seed+4, 5, 0.09, 0.2);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.2,
+          albedo(p){
+            const g=fbm3(nG,p[0]*8,p[1]*8,p[2]*8,3,2.2,0.5);
+            const broad=fbm3(nB,p[0]*1.7,p[1]*1.7,p[2]*1.7,4,2.1,0.5);
+            let rgb=mix([72,62,56],[110,98,88],broad);
+            rgb=mix(rgb,rgb.map(v=>v*0.82),clamp01((g-0.5)*4+0.5)*0.35);
+            let h=(broad-0.5)*1.0;
+            const r=ridge3(nR,p[0]*2.0,p[1]*2.0,p[2]*2.0,3,2.3,0.5);
+            const glow=smooth(0.62,0.8,r), core=smooth(0.78,0.9,r);
+            if(glow>0){ rgb=mix(rgb,[120,30,24],glow*0.8); h-=glow*0.6; }
+            if(core>0){ rgb=mix(rgb,[210,66,56],core*0.9); }
+            const d=angDist(p,narbe.q)/narbe.r;
+            if(d<1.6){
+              h+=craterHeight(d,1.1,0.45)*narbe.r*3.0;
+              const floor=1-smooth(0.55,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.18*0.18));
+              rgb=mix(rgb,[34,26,26],floor*0.8); rgb=mix(rgb,[130,116,104],ej*0.5);
+            }
+            for(const k of klein){
+              const d2=angDist(p,k.q)/k.r; if(d2>1.6) continue;
+              h+=craterHeight(d2,0.9,0.35)*k.r*3.0; rgb=mix(rgb,[40,32,30],(1-smooth(0.5,0.95,d2))*0.5);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      super: (() => { const seed=1077.3, nT=makeNoise3D(seed), nA=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.35,
+          albedo(p,lat,lon){
+            const tone=fbm3(nT,p[0]*2.2,p[1]*2.2,p[2]*2.2,4,2.1,0.5);
+            let rgb=mix([226,168,204],[250,236,246],smooth(0.35,0.7,tone));
+            rgb=mix(rgb,[196,118,170],(1-smooth(0.3,0.45,tone))*0.6);
+            let h=(tone-0.5)*0.6;
+            // Aurora-Bänder in Gold über den höheren Breiten, wellig durch Domain-Warp
+            const w=(fbm3(nW,p[0]*2,p[1]*2,p[2]*2,3,2,0.5)-0.5)*1.6;
+            const mask=smooth(0.3,0.7,Math.abs(lat))*(1-smooth(1.25,1.45,Math.abs(lat)));
+            const wave=Math.sin(lat*22+w*3.0+Math.sin(lon*5+w)*1.2)*0.5+0.5;          // Vorhaenge quer zur Breite
+            const a=fbm3(nA,p[0]*3,p[1]*3,p[2]*3,3,2.2,0.5);
+            const au=mask*smooth(0.55,0.92,wave)*smooth(0.3,0.55,a);
+            if(au>0){ rgb=mix(rgb,[250,199,117],au); rgb=mix(rgb,[255,236,196],au*au*0.6); h+=au*0.25; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      leerenwelt: (() => { const seed=1313.7, nT=makeNoise3D(seed), nR=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.6,
+          albedo(p){
+            const tone=fbm3(nT,p[0]*2.4,p[1]*2.4,p[2]*2.4,4,2.1,0.5);
+            let rgb=mix([12,7,22],[46,22,74],smooth(0.3,0.7,tone));
+            let h=(tone-0.5)*0.9;
+            const wx=(fbm3(nW,p[0]*1.5,p[1]*1.5,p[2]*1.5,2,2,0.5)-0.5)*0.5;
+            const r=ridge3(nR,(p[0]+wx)*2.5,(p[1]-wx)*2.5,(p[2]+wx)*2.5,3,2.3,0.5);
+            const glow=smooth(0.54,0.76,r), core=smooth(0.72,0.86,r);
+            if(glow>0){ rgb=mix(rgb,[82,66,170],glow*0.8); h+=glow*0.5; }
+            if(core>0){ rgb=mix(rgb,[127,119,221],core); rgb=mix(rgb,[205,200,255],core*core*0.6); }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })()
     };
     const PLANET_TEXTURE_CACHE = {};
     function getPlanetTexture(typeKey){
@@ -65161,7 +65489,7 @@ async function claimPendingRewards(){
               ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
               ${hasDebris ? `<span class="dash-debris-badge" data-debris-info="${debrisTitle.replace(/"/g,'&quot;')}" title="${debrisTitle}"><i class="ti ti-recycle" aria-hidden="true"></i></span>` : ''}
               <div class="dash-colony-icon" style="position:relative;">
-                <canvas data-planet-icon="${isMoonKey(d.id) ? 'asteroid' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
+                <canvas data-planet-icon="${isMoonKey(d.id) ? 'mond' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
                 ${role ? `<span class="dash-role-badge" style="background:${role.color};" title="Rolle: ${role.name}"><i class="ti ${role.icon}" aria-hidden="true"></i></span>` : ''}
               </div>
               <div class="dash-colony-info">
@@ -67593,7 +67921,10 @@ async function claimPendingRewards(){
       return `
         <div class="card-row"${nested?' style="margin-left:1.25rem; border-left:var(--bw-rail) solid rgba(255,255,255,0.15); padding-left:0.6rem;"':''}>
           <div class="left">
-            <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd; border-radius:50%;"><canvas data-planet-icon="asteroid" width="26" height="26" style="display:block;"></canvas></div>
+            <!-- Ein Mond ist kein Asteroid: eigener Builder mit Maria und Kratern (Buendel A, 05.09.2026).
+                 Bis dahin stand hier fest 'asteroid', und der mond-Builder war von KEINER Stelle
+                 erreichbar - gemessen an allen drei Anforderern der Textur. -->
+            <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd; border-radius:50%;"><canvas data-planet-icon="mond" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname"><i class="ti ti-planet" aria-hidden="true" style="font-size:12px; opacity:0.7;"></i> ${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
               <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: eigenständiges Ziel mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung (unabhängig vom Planeten) - produziert, verteidigt und lagert dafür nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten</div>
