@@ -141,12 +141,16 @@ function spielstand(reich){
         projektDefs:[], projekteAktiv:false, flugDeckel:0.5, lagerAktiv:false, lagerStunden:12,
         abbauAktiv:true, abbauMs:86400000, allianzAktiv:false,
         /* DIE KOSTEN KOMMEN AUS DER VORLAGE, weil sie beim echten Server auch von dort kommen -
-           und weil der Spielstand in dieser Testfamilie nicht laedt (die Flotte bleibt leer, obwohl
-           die Vorlage 80 Jaeger fuehrt; dieselbe Beobachtung in test_vorposten_verbuendet_ui und
-           test_vorposten_lager_ui). Das ist hier kein Mangel, sondern die saubere Trennung: Ob das
-           Spiel `canAfford` richtig anwendet, misst der TEURE Lauf (2a); ob Wahl, Bestaetigung und
-           Anfrage stimmen, misst der BILLIGE (1a-1e). Beides an einer Vorlage zu messen, die
-           zufaellig gerade reicht, waere die schlechtere Messung. */
+           und weil die Trennung sauberer ist: Ob das Spiel `canAfford` richtig anwendet, misst der
+           TEURE Lauf (2a); ob Wahl, Bestaetigung und Anfrage stimmen, misst der BILLIGE (1a-1e).
+           Beides an einer Vorlage zu messen, die zufaellig gerade reicht, waere die schlechtere
+           Messung.
+           HIER STAND EINE FALSCHE BEGRUENDUNG (bis 05.09.2026): „der Spielstand dieser Testfamilie
+           laedt nicht". Er laedt. Nachgemessen mit einer Sonde, die den Boot mitschneidet: Das
+           Spiel holt `GET storage/kepler7-save-v3`, die 20 Mio Erz der Vorlage stehen danach im
+           DOM, und der Angriffseintrag im Kartenmenue ist bedienbar („Oeffnet die Flottenwahl.")
+           statt „Keine Kampfschiffe auf Heimatbasis". Die Beobachtung stammte aus Tests mit dem
+           falschen Schluessel `kepler7-save-v1`; die sind seither umgestellt. */
         umruestenAktiv:false, umruestenAbStufe:8, umruestenMs:86400000, umruestenKosten:{ erz:1 },
         nameAktiv: o.aktiv !== false, nameAbStufe: o.abStufe || 3, nameMax:24,
         nameAbklingMs: 6*3600*1000, nameMuster: MUSTER,

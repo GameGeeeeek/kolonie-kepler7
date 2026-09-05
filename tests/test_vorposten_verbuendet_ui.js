@@ -27,8 +27,9 @@
 //   0f  battleCardData titelt dem Verbuendeten nicht „Dein Vorposten wurde geschleift".
 //   0g  Dasselbe beim ABBAU: der Bericht erbt `alsVerbuendeter` ...
 //   0h  ... und battleCardData titelt ihm nicht „Vorposten aufgegeben".
-//   0i  Die Flottenwahl verspricht dem Verbuendeten keine freie Platzzahl - der Server deckelt
-//       den Anteil aller Nicht-Besitzer, und der Client kennt den Deckel nicht.
+//   0i  Die Flottenwahl haelt die beiden Grenzen auseinander: `frei` (die der Station) im
+//       Besitzer-Zweig, `meinPlatz` (die seine) danach. SEIT #50, 05.09.2026 - vorher lautete die
+//       Regel „nennt dem Verbuendeten gar keine Zahl", weil der Server sie nicht schickte.
 //   0j  KEIN Menueeintrag maskiert seinen `grund` selbst - openKarteMenu tut es bereits.
 //   1a  Der Verbuendete sieht beide Garnison-Eintraege ...
 //   1b  ... UND weiterhin „Vorposten angreifen". GEMESSEN am Server: /api/vorposten/angriff weist
@@ -153,11 +154,27 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
   const vorschau = vorschauVon < 0 ? '' : sendRumpf.slice(vorschauVon, sendRumpf.indexOf('startLabel:', vorschauVon));
   check('0i-anker: die Vorschau der Flottenwahl ist auffindbar (sonst misst 0i nichts)',
     sendVon > 0 && vorschau.length > 200 && vorschau.length < 3000, { laenge: vorschau.length });
-  /* Der Server deckelt die SUMME aller Nicht-Besitzer (VP_ALLIANZ_GARNISON_ANTEIL) und schickt
-     weder den Anteil noch den belegten Fremdanteil mit. „14000 frei" waere dort eine Zahl, die
-     dieses Spiel nicht kennt - und der Flug ginge samt Treibstoff trotzdem los. */
-  check('0i: sie nennt die freie Platzzahl nur dem BESITZER',
-    /v\.eigener/.test(vorschau), { auszug: vorschau.slice(0, 160) });
+  /* DIESE REGEL HAT SICH AM 05.09.2026 GEAENDERT (#50) - der alte Wortlaut steht hier bewusst
+     daneben, damit niemand den Wechsel fuer einen Fehler haelt.
+
+     ALT: „sie nennt die freie Platzzahl nur dem BESITZER". Begruendung war, dass der Server die
+     SUMME aller Nicht-Besitzer deckelt (VP_ALLIANZ_GARNISON_ANTEIL) und weder den Anteil noch den
+     belegten Fremdanteil mitschickt - „14000 frei" waere eine Zahl gewesen, die dieses Spiel nicht
+     kennt. Die Pruefung suchte deshalb nur `v.eigener`, also die blosse Verzweigung.
+
+     NEU: Der Server schickt die Zahl jetzt als `meinPlatz`, aus derselben Funktion, mit der er
+     annimmt. Damit ist „nicht nennen" nicht mehr die richtige Antwort, sondern „die RICHTIGE
+     nennen". Gemessen wird deshalb die Trennung selbst: Die Grenze der Station (`frei`) steht im
+     Besitzer-Zweig und NUR dort, `meinPlatz` im Zweig danach. Ein Rueckfall auf `frei` fuer den
+     Verbuendeten - genau der alte Fehler - faellt hier auf. */
+  const eigVon = vorschau.indexOf('v.eigener ?');
+  const sonstVon = vorschau.indexOf(': (platzBekannt ?');
+  check('0i: `frei` bleibt im Besitzer-Zweig, der Verbuendete liest `meinPlatz`',
+    eigVon > 0 && sonstVon > eigVon
+    && vorschau.slice(eigVon, sonstVon).includes('${frei}')
+    && !vorschau.slice(sonstVon).includes('${frei}')
+    && vorschau.slice(sonstVon).includes('${meinPlatz}'),
+    { besitzerzweig: eigVon, sonstzweig: sonstVon, auszug: vorschau.slice(Math.max(0, sonstVon - 40), sonstVon + 120) });
 
   /* `openKarteMenu` maskiert JEDEN Grund selbst (`${escapeHtml(e.grund)}`). Wer hier ein zweites
      Mal maskiert, macht aus „O'Brien" ein „O&#39;Brien" - im Menue sichtbar, sonst nirgends.
@@ -212,7 +229,11 @@ function spielstand(){
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
     const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }),
-      'kepler7-save-v1': spielstand() };
+      /* `kepler7-save-v3` - der Schluessel, den das Spiel wirklich liest (`STORE_KEY`). Hier stand
+         `v1`: Die Vorlage kam damit NIE an, und jede Pruefung, die an Rohstoffen, Flotte oder
+         Gebaeuden haengt, mass den Startzustand statt der Vorlage - still gruen aus dem falschen
+         Grund. Gemessen und behoben am 05.09.2026. */
+      'kepler7-save-v3': spielstand() };
     await page.route('**/api/**', async r => {
       const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
       const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
@@ -402,6 +423,7 @@ function spielstand(){
      0g `alsVerbuendeter` aus dem pushReport des Abbau-Zweigs
      0h Berichtstitel wieder hart „Vorposten aufgegeben"
      0i Vorschau der Flottenwahl wieder mit fester Platzzahl fuer alle
+        (die Sabotage von damals; zum NEUEN Wortlaut von 0i siehe den Nachtrag unten)
      0j `escapeHtml` zurueck in den Menuegrund
      0k Rueckruf-Gatter zurueck auf `vorpostenDarfMitwirken`
    Lauf B: 1d, 1e FALLEN - und mit dem entfernten Rueckfall in `vpMeineGarnison` zusaetzlich
@@ -455,3 +477,17 @@ function spielstand(){
       Abschnitt 10 gleicht JEDEN Schluessel der Vorposten-Vorlagen dieser Testdatei gegen die
       Felder ab, die vorpostenFuerClient wirklich erzeugt. Ein erfundenes Feld faellt dort sofort
       auf - auch ein kuenftiges. */
+
+/* NACHTRAG 05.09.2026 zu 0i (Etappe #50).
+
+   Die Regel wurde umgedreht: Seit `meinPlatz` in der Antwort steht, ist „dem Verbuendeten keine
+   Zahl nennen" nicht mehr richtig, sondern „ihm die richtige nennen". 0i misst jetzt die Trennung
+   der beiden Grenzen im Quelltext.
+
+   GEGENPROBE dazu, gemessen am 05.09.2026: `${meinPlatz}` im Verbuendeten-Zweig durch `${frei}`
+   ersetzt - also genau der alte Fehler wieder eingebaut. 0i FAELLT, und nur 0i (Pruefnamen beider
+   Laeufe per `diff` verglichen). Die uebrigen Pruefungen dieser Datei lesen andere Ausschnitte und
+   bleiben unberuehrt, wie es sein soll.
+
+   Die Verhaltensseite derselben Aenderung - was der Spieler wirklich liest - steht in
+   tests/test_vorposten_platz_ui.js. Diese Datei prueft weiter den Bauplan, jene das Ergebnis. */
