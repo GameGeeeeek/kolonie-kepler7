@@ -1418,3 +1418,42 @@ fallen). Derselbe Mechanismus wie Abschnitt 7 für den Stufennamen, eine Etappe 
 
 Und eine Umbenennung: Das Set hieß **Bollwerk** wie das Stationsprojekt desselben Zweigs — es heißt
 jetzt **Trutzring**.
+
+## Etappe V8 im Spiel: Die Umrüstung (05.09.2026)
+
+Der Server (Backend #250) führt Frist, Kosten und alle Riegel. Das Spiel leistet drei Dinge:
+
+- **Die Wahl anbieten** — und sie **sperren**, wenn der Server sie ohnehin ablehnen würde, mit dem
+  Grund im Klartext: zu niedrige Stufe, laufende Umrüstung, laufender Abbau, zu viele Module für
+  den kleineren Zielzweig, oder schlicht zu wenig Rohstoffe. Ein Knopf, der nur ausgegraut ist,
+  sagt am Telefon nichts.
+- **Die Folgen nennen, bevor jemand zehn Millionen Erz ausgibt.** Die Wahl zeigt den
+  Steckplatz-Unterschied je Zielzweig; die Bestätigung sagt, dass es 24 Stunden dauert, dass nicht
+  abgebrochen werden kann, dass die Werte erst am Ende wechseln — und dass ein Projekt der alten
+  Ausrichtung **schläft statt zu sterben**.
+- **Die laufende Frist anzeigen**, für **jeden**, wie den Abbau.
+
+Bezahlt wird **erst nach** der Serverantwort (`0b`) — andersherum zahlte, wer eine Ablehnung
+bekommt.
+
+### Zwei eigene Fehler, beide vom Test gefangen
+
+- **`vorpostenZweigOk` gibt es im Spiel nicht** — das ist eine Funktion des *Servers*. Alle fünf
+  Durchläufe warfen einen `ReferenceError`. **Zum dritten Mal an einem Tag derselbe Fehlertyp: ein
+  Name von der anderen Seite statt aus dem Code hier.**
+- **Temporale Todeszone:** Der Eintrag las `abbauBis`, eine `const` *weiter unten* im selben Block.
+  `node --check` findet das nicht, der Browser schon. Dieselbe Falle, vor der die
+  Backend-`CLAUDE.md` wegen `galaxyTick` warnt — hier eine Etage tiefer.
+
+### Und eine Beobachtung über diesen Test hinaus
+
+**Der Spielstand dieser Testfamilie lädt nicht.** Die Vorlage führt 80 Jäger, das Menü sagt
+trotzdem „Keine Kampfschiffe auf Heimatbasis". Ein Teil der Ursache ist der Schlüssel: zwei ältere
+Vorposten-Tests legen den Stand unter `kepler7-save-v1` ab, das Spiel liest `kepler7-save-v3`. Mit
+dem richtigen Schlüssel allein reicht es aber noch nicht. Dieser Test umgeht das deshalb bewusst —
+die Kostenprüfung mit einer eigenen teuren Vorlage, der Ablauf mit einer billigen — statt sich auf
+Rohstoffe aus dem Spielstand zu verlassen. Die Aufgabe steht auf der Liste; bisher ist es nicht
+aufgefallen, weil die anderen Tests die betroffenen Werte gar nicht lesen.
+
+Wächter: `tests/test_vorposten_umruesten_ui.js` (18 Prüfungen, fünf Browser-Durchläufe), sechs
+Gegenproben in zwei Läufen gemessen.
