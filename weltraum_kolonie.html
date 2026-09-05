@@ -38037,26 +38037,34 @@ async function claimPendingRewards(){
          krater - Einschlagkrater (Asteroid, Mond)
        Unbekannter oder fehlender Typ faellt auf 'heimat' zurueck - das ist exakt das bisherige
        Aussehen, ein alter Bericht ohne Ortsangabe sieht also aus wie immer. */
+    /* Seit Buendel B traegt jede Zeile ausserdem:
+         saum/saumKraft - die Farbe des Atmosphaerensaums und wie stark er ist. Bis dahin war er
+           IMMER lila, auch auf einem Asteroiden; jetzt hat jede Welt ihren eigenen Dunst, und
+           Asteroid und Mond bekommen fast keinen (0,12 / 0,15) - eine harte Kante ohne Atmosphaere
+           ist genau ihr Erkennungszeichen.
+         tex/texAlpha - welche Planetentextur der Boden benutzt und wie stark sie durchkommt. Die
+           Oberflaeche ist damit dieselbe wie auf der Karte; die Heimat bleibt bewusst schwach
+           (0,30), weil dort die Staedte und die Abwehr die Aussage tragen. */
     var ORT_STIL = {
-      heimat:      { a:'#101830', b:'#0a1020', c:'#05070f', land:'rgba(24,34,58,', flecken:9 },
-      erdaehnlich: { a:'#12304a', b:'#0b2136', c:'#05121f', land:'rgba(34,74,52,', flecken:11 },
-      wasserwelt:  { a:'#0d3350', b:'#082438', c:'#04121d', land:'rgba(28,70,92,', flecken:3 },
-      wueste:      { a:'#4a3a20', b:'#332714', c:'#1b140a', land:'rgba(104,80,42,', flecken:10 },
-      eis:         { a:'#2c4a5e', b:'#1d3242', c:'#0c1a24', land:'rgba(150,186,206,', flecken:8 },
-      vulkan:      { a:'#3a1810', b:'#26100a', c:'#120705', land:'rgba(74,28,18,', flecken:9, glut:true },
-      kristall:    { a:'#2a2350', b:'#1b1638', c:'#0c0a1c', land:'rgba(96,84,176,', flecken:8 },
-      gasriese:    { a:'#3d2c4e', b:'#2a1d38', c:'#150e1e', land:'rgba(120,92,150,', flecken:0, baender:true },
-      asteroid:    { a:'#2e2e33', b:'#1f1f23', c:'#101013', land:'rgba(70,70,78,', flecken:7, krater:true },
-      todeswelt:   { a:'#33302a', b:'#22201c', c:'#111010', land:'rgba(66,60,50,', flecken:9 },
-      super:       { a:'#2b1c36', b:'#1c1224', c:'#0d0812', land:'rgba(64,44,80,', flecken:12 },
-      mond:        { a:'#33363c', b:'#232529', c:'#111214', land:'rgba(84,88,96,', flecken:6, krater:true },
+      heimat:      { a:'#101830', b:'#0a1020', c:'#05070f', land:'rgba(24,34,58,', flecken:9, saum:'#7f77dd', saumKraft:1.0, tex:'erdaehnlich', texAlpha:0.30 },
+      erdaehnlich: { a:'#12304a', b:'#0b2136', c:'#05121f', land:'rgba(34,74,52,', flecken:11, saum:'#4a9fe0', saumKraft:1.0, tex:'erdaehnlich', texAlpha:0.92 },
+      wasserwelt:  { a:'#0d3350', b:'#082438', c:'#04121d', land:'rgba(28,70,92,', flecken:3, saum:'#4a9fe0', saumKraft:1.0, tex:'wasserwelt', texAlpha:0.92 },
+      wueste:      { a:'#4a3a20', b:'#332714', c:'#1b140a', land:'rgba(104,80,42,', flecken:10, saum:'#e0b45a', saumKraft:0.8, tex:'wueste', texAlpha:0.90 },
+      eis:         { a:'#2c4a5e', b:'#1d3242', c:'#0c1a24', land:'rgba(150,186,206,', flecken:8, saum:'#bfe6f5', saumKraft:0.9, tex:'eis', texAlpha:0.88 },
+      vulkan:      { a:'#3a1810', b:'#26100a', c:'#120705', land:'rgba(74,28,18,', flecken:9, glut:true, saum:'#e0503f', saumKraft:1.0, tex:'vulkan', texAlpha:0.90 },
+      kristall:    { a:'#2a2350', b:'#1b1638', c:'#0c0a1c', land:'rgba(96,84,176,', flecken:8, saum:'#b39ef0', saumKraft:1.0, tex:'kristall', texAlpha:0.88 },
+      gasriese:    { a:'#3d2c4e', b:'#2a1d38', c:'#150e1e', land:'rgba(120,92,150,', flecken:0, baender:true, saum:'#d9975a', saumKraft:1.0, tex:'gasriese', texAlpha:0.94 },
+      asteroid:    { a:'#2e2e33', b:'#1f1f23', c:'#101013', land:'rgba(70,70,78,', flecken:7, krater:true, saum:'#9296ac', saumKraft:0.12, tex:'asteroid', texAlpha:0.90 },
+      todeswelt:   { a:'#33302a', b:'#22201c', c:'#111010', land:'rgba(66,60,50,', flecken:9, saum:'#6b2a2a', saumKraft:0.9, tex:'todeswelt', texAlpha:0.88 },
+      super:       { a:'#2b1c36', b:'#1c1224', c:'#0d0812', land:'rgba(64,44,80,', flecken:12, saum:'#d98ac0', saumKraft:1.0, tex:'super', texAlpha:0.80 },
+      mond:        { a:'#33363c', b:'#232529', c:'#111214', land:'rgba(84,88,96,', flecken:6, krater:true, saum:'#9296ac', saumKraft:0.15, tex:'mond', texAlpha:0.90 },
       /* Die beiden Terraform-Ziele. Sie fehlten hier, solange ortTyp den Basistyp aus PLANETS las -
          seit die Funktion effectivePlanetType nimmt, koennen sie ankommen, und ohne Eintrag fielen
          sie auf 'heimat' zurueck: der Spieler haette nach dem teuersten Umbau des Spiels einen
          NEUTRALEREN Hintergrund gesehen als vorher (gemessen 05.09.2026). Farben aus derselben
          Familie wie die Planeten-Texturen: Erdwelt uepppig gruen, Leerenwelt violett-schwarz. */
-      erdwelt:     { a:'#14402c', b:'#0d2b1d', c:'#061510', land:'rgba(42,96,58,', flecken:12 },
-      leerenwelt:  { a:'#1c1436', b:'#120c24', c:'#080512', land:'rgba(72,58,150,', flecken:7 }
+      erdwelt:     { a:'#14402c', b:'#0d2b1d', c:'#061510', land:'rgba(42,96,58,', flecken:12, saum:'#5dcaa5', saumKraft:1.0, tex:'erdwelt', texAlpha:0.92 },
+      leerenwelt:  { a:'#1c1436', b:'#120c24', c:'#080512', land:'rgba(72,58,150,', flecken:7, saum:'#7f77dd', saumKraft:1.0, tex:'leerenwelt', texAlpha:0.90 }
     };
     function ortStil(){
       return ORT_STIL[(DATEN && DATEN.ortTyp) || ''] || ORT_STIL.heimat;
@@ -38092,18 +38100,24 @@ async function claimPendingRewards(){
         }
       }
 
-      /* Atmosphaerensaum ausserhalb der Oberflaeche */
-      for (var s = 12; s >= 1; s--){
-        var rr = RAD + s * (ALT_ATMO * H / 12);
-        g.strokeStyle = 'rgba(127,119,221,' + (0.035 * (1 - s/13)).toFixed(4) + ')';
-        g.lineWidth = ALT_ATMO * H / 8;
-        g.beginPath(); g.arc(cxP, cyP, rr, -Math.PI/2 - THMAX*1.4, -Math.PI/2 + THMAX*1.4); g.stroke();
-      }
-      var atm = g.createLinearGradient(0, yBoden - ALT_ATMO*H, 0, yBoden + 0.06*H);
-      atm.addColorStop(0, rgba(F.vio, 0));
-      atm.addColorStop(0.55, rgba(F.vio, .12));
-      atm.addColorStop(1, rgba(F.an, .05));
-      g.fillStyle = atm; g.fillRect(0, yBoden - ALT_ATMO*H, W, ALT_ATMO*H + 0.06*H);
+      /* ATMOSPHAERENSAUM IN DER TYPFARBE (Buendel B). Bis dahin war er immer lila - auch ueber
+         einem Asteroiden, der gar keine Atmosphaere hat. Jetzt kommt die Farbe aus ORT_STIL.saum
+         und die Staerke aus saumKraft; Asteroid und Mond bekommen fast nichts (0,12 / 0,15), und
+         genau diese harte Kante ohne Dunst ist ihr Erkennungszeichen. Ein einziger radialer
+         Verlauf statt zwoelf gestapelter Boegen: dicht an der Kante am hellsten, nach aussen weich. */
+      var STsaum = ortStil();
+      var saumF = STsaum.saum || '#7f77dd', saumK = (STsaum.saumKraft == null ? 1 : STsaum.saumKraft);
+      var atmoH = ALT_ATMO * H;
+      var atmR = g.createRadialGradient(cxP, cyP, RAD, cxP, cyP, RAD + atmoH);
+      atmR.addColorStop(0,    rgba(saumF, 0.34 * saumK));
+      atmR.addColorStop(0.18, rgba(saumF, 0.16 * saumK));
+      atmR.addColorStop(0.55, rgba(saumF, 0.05 * saumK));
+      atmR.addColorStop(1,    rgba(saumF, 0));
+      g.save();
+      g.beginPath(); g.arc(cxP, cyP, RAD + atmoH, 0, TAU);
+      g.arc(cxP, cyP, RAD, 0, TAU, true);
+      g.fillStyle = atmR; g.fill('evenodd');
+      g.restore();
 
       /* Planetenkoerper */
       g.save();
@@ -38112,6 +38126,30 @@ async function claimPendingRewards(){
       var kb = g.createLinearGradient(0, yBoden, 0, H);
       kb.addColorStop(0, ST.a); kb.addColorStop(0.45, ST.b); kb.addColorStop(1, ST.c);
       g.fillStyle = kb; g.fillRect(0, yBoden - 4, W, H - yBoden + 8);
+
+      /* DIE OBERFLAECHE IST DIESELBE WIE AUF DER KARTE (Buendel B). Bis dahin bestand der Boden
+         aus weichen Farbflecken; eine Wuestenwelt und eine Todeswelt unterschieden sich nur im
+         Ton. Jetzt wird der 2:1-Streifen der Planetentextur ueber den Bogen gelegt - dieselbe
+         Geologie, die der Spieler auf der Karte gesehen hat, bevor er hier gelandet ist. Gestaucht
+         wird nur senkrecht: die Kruemmung uebernimmt der Clip auf den Planetenkreis. Der Streifen
+         ist bereits gecacht (einmal je Typ), hier faellt nur ein drawImage an. */
+      if (typeof getPlanetTexture === 'function' && ST.tex){
+        try {
+          var bTex = getPlanetTexture(ST.tex);
+          if (bTex && bTex.width){
+            var texH = (H - yBoden + 8) * 1.25;
+            var texB = texH * (bTex.width / bTex.height);
+            var wdh = Math.ceil(W / texB) + 1;
+            g.save();
+            g.globalAlpha = (ST.texAlpha == null ? 0.9 : ST.texAlpha);
+            for (var tw = 0; tw < wdh; tw++){
+              g.drawImage(bTex, tw * texB - texB * 0.15, yBoden - 4, texB, texH);
+            }
+            g.globalAlpha = 1;
+            g.restore();
+          }
+        } catch (e){}
+      }
 
       /* Landmassen als weiche Flecken - Anzahl und Farbe je nach Weltentyp. Eine Wasserwelt
          bekommt drei Inseln, ein Gasriese gar keine (er hat stattdessen Baender). */
@@ -38182,9 +38220,18 @@ async function claimPendingRewards(){
       g.strokeStyle = rgba(F.vio, .30); g.lineWidth = 2.4;
       g.beginPath(); g.arc(cxP, cyP, RAD + 1.6, -Math.PI/2 - THMAX*1.2, -Math.PI/2 + THMAX*1.2); g.stroke();
 
-      /* Staedte: Lichterteppiche und ein paar Turmschatten */
+      /* STAEDTE NUR, WO JEMAND WOHNT (Buendel B). Bis dahin trug JEDE Welt Lichterteppiche - auch
+         ein Asteroid, ein Gasriese ohne feste Oberflaeche und eine unbewohnte Eiswelt. Gemessen
+         wird an zwei Dingen, die der Bericht wirklich hergibt, nicht an einer Vermutung:
+           - der Ort traegt planetare Abwehr (DATEN.abwehr.gesamt) - dann wohnt dort jemand, der
+             sie gebaut hat; oder es ist die eigene Heimat.
+           - der Typ hat ueberhaupt eine Oberflaeche: auf einem Gasriesen steht keine Stadt.
+         Faellt eines von beiden aus, bleibt der Boden dunkel - und genau das macht den Unterschied
+         zwischen einer bewohnten Welt und einem Felsbrocken sichtbar. */
       funkelPunkte = [];
-      var staedte = [-0.88,-0.66,-0.44,-0.20,0.04,0.24,0.46,0.64,0.84];
+      var bewohnt = (DATEN && DATEN.abwehr && DATEN.abwehr.gesamt > 0) || (DATEN && DATEN.ortTyp === 'heimat');
+      var traegtStaedte = bewohnt && ST.tex !== 'gasriese' && (DATEN && DATEN.ortTyp !== 'gasriese');
+      var staedte = traegtStaedte ? [-0.88,-0.66,-0.44,-0.20,0.04,0.24,0.46,0.64,0.84] : [];
       for (var st = 0; st < staedte.length; st++){
         var cu = staedte[st] + (zuf()-0.5)*0.05;
         var breite = 0.045 + zuf()*0.05;
