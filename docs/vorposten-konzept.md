@@ -1349,3 +1349,72 @@ Feldnamen, `5a` beim Rückruf-Versprechen des Besitzers, `0e`/`0f` beim Kampfber
 Unterscheidung sonst nicht erbt: `pushReport` bekommt im Verlust-Zweig ein **frisch gebautes**
 Objekt, keine Durchreichung — ohne `alsVerbuendeter` titelte der Bericht dem Partner weiterhin
 „Dein Vorposten wurde geschleift", obwohl die Meldung im Verlauf daneben schon richtig war.
+
+## Etappe V7 im Spiel: Modul-Sets und der sechste Steckplatz (05.09.2026)
+
+Der Server kennt die Sets seit Backend #245: `modulSetDefs` (die Tabelle), `modulSetsAktiv` (der
+Schalter), `zweigSlots` (was die Ausrichtung an Plätzen dazugibt) und je Vorposten `sets` (welche
+Sets **stehen**) plus `setBoni`.
+
+**Drei Anzeigestellen**, und für jede gibt es einen Grund:
+
+- **Im Steckplatz-Fenster** ein eigener Abschnitt zwischen Plätzen und Bestand — genau dort, wo man
+  beim Bestücken die Frage hat. Ein Set, dem ein Modul fehlt, nennt **welches**; ohne diesen Namen
+  müsste man die Tabelle im Kopf haben.
+- **In der Stationstafel** eine Zeile mit den stehenden Sets, **für jeden sichtbar** wie
+  Steckplätze und Verteidigung. Ein Angreifer soll sehen können, warum diese Station härter ist,
+  als ihre Modulliste vermuten lässt.
+- **Die Steckplatz-Zeile** nennt, wieviel davon die Ausrichtung beisteuert. Ohne diesen Halbsatz
+  wäre der sechste Platz eines Festungsrings eine Zahl, die sich niemand erklären kann.
+
+**Was hier bewusst nicht nachgerechnet wird: ob ein Set steht.** Das sagt `v.sets`. Ein Set hebt
+Kern, Verteidigung und Garnison — PvP-Werte, und die rechnet der Server. Gerechnet wird im Spiel
+nur, welches Stück *fehlt*; das ist Auskunft, keine Regel. Prüfung `0b` hält den Unterschied fest,
+Gegenprobe `B` (selbst nachrechnen) lässt sie fallen.
+
+Die Set-Tabelle **reist mit** und wird nicht kopiert — dieselbe Entscheidung wie bei der
+Stufentabelle und den Moduldefinitionen.
+
+Wächter: `tests/test_vorposten_sets_ui.js` (13 Prüfungen, drei Browser-Durchläufe), fünf
+Gegenproben gemessen. Ein eigener Messfehler ist dort festgehalten: Die Vorlage ließ `modulSetDefs`
+bei liegendem Schalter weg — der Server schickt die Tabelle aber **immer**, nur `modulSetsAktiv`
+hängt am Schalter. Damit konnte `4a` einen Client, der den Schalter ignoriert, gar nicht erkennen;
+Sabotage `E` fiel ins Leere. **Zum wiederholten Mal dieselbe Lehre: Eine Vorlage muss den echten
+Sender nachbilden, sonst prüft sie sich selbst.**
+
+### Sechs Befunde der adversarischen Durchsicht zu V7 (05.09.2026)
+
+Codex war an diesem Tag am Kontingentlimit; die Durchsicht lief deshalb über einen eigenen Prüfer,
+und sie hat sich gelohnt — der schwerste Befund war **Datenverlust im bereits live stehenden
+Backend** (dort behoben, `docs/vorposten.md`). Die fünf Frontend-Befunde:
+
+- **Die einmalige Zweigwahl verschwieg den sechsten Steckplatz.** Sie nennt acht Kanäle, gilt „für
+  immer" — und der Platz, der als einziger die Sternwacht möglich macht, stand nicht darin. Genau
+  dieselbe Lücke wie in V2, wo der Wert fehlte, *nach dem der Zweig heißt*. Die Wahl nennt ihn
+  jetzt.
+- **Die Sternwacht wurde Zweigen angeboten, die sie nie tragen können.** Eine Werft auf der
+  Endstufe las „es fehlt noch Horchposten", obwohl alle fünf Plätze belegt sind und der Server
+  ablehnt. Ein Set, das mehr Plätze braucht als die Station hat, nennt jetzt den **Grund** statt
+  einer Fehlliste. Nebenbei: „a, b und c" statt „a und b und c" — bei sechs Modulen war das eine
+  Kette aus fünf „und".
+- **Die Set-Beschreibungen reisten mit und wurden nirgends gezeigt.** Vier neue Inhaltseinträge
+  hatten eine Beschreibung, die kein Spieler je sah, während die Modulzeilen direkt darüber ihre
+  zeigen.
+- **`zusatzPlatz` kam aus dem falschen Feld.** Der Kommentar sagte „aus der Serverangabe" — es war
+  aber ein *zweites* Serverfeld (`zweigSlots`) statt der maßgeblichen Zahl `v.slots`. Heute stimmen
+  beide zufällig überein; würde der Deckel gesenkt, behauptete der Satz einen Platz, den `slots`
+  nicht enthält. Gerechnet wird jetzt die Differenz gegen die Leiter.
+- **Ein Modul ohne Steckplatz war unsichtbar.** Fällt die Steckplatzzahl je unter die Zahl der
+  eingebauten Module, zeichnete das Fenster nur `slots` Zeilen — das überzählige Stück hatte keinen
+  „Ausbauen"-Knopf mehr, obwohl `/vorposten/modul/ausbauen` es herausgibt (die Route kennt keine
+  Steckplatzgrenze). Es bekommt jetzt eine eigene Zeile, die sagt, warum es nicht wirkt.
+
+Dazu der Wächter für eine Fehlerklasse, die dieses Repo sonst konsequent vermeidet: **Der
+Hilfetext ist eine handgetippte Kopie** der Modulnamen und Set-Zusammensetzungen — in Prosa nicht
+zur Laufzeit füllbar, also still alternd. `tests/test_vorposten_paritaet.js` **Abschnitt 11** hält
+Anzahl, Namen und Zusammensetzungen gegen `VP_MODUL_DEFS` und `VP_MODUL_SET_DEFS` des Nachbar-Klons
+(Gegenprobe: ein Modul im Text umbenennen und eine Zusammensetzung verdrehen → `11b` und `11c`
+fallen). Derselbe Mechanismus wie Abschnitt 7 für den Stufennamen, eine Etappe später.
+
+Und eine Umbenennung: Das Set hieß **Bollwerk** wie das Stationsprojekt desselben Zweigs — es heißt
+jetzt **Trutzring**.
