@@ -7796,7 +7796,8 @@
     '<strong>Am Markt l\u00e4sst sich wieder verkaufen, was im Lager steht.</strong> Wer sein volles Energielager verkaufte und gleich danach die nachgewachsene Menge loswerden wollte, bekam \u201eNicht genug Energie zum Verkaufen" \u2013 obwohl die Ressourcenleiste sie anzeigte. Der Grund lag nicht am Markt: \u00dcber einen Verkauf entscheidet der Server, und der sah bis zu zehn Sekunden lang noch den vorherigen Spielstand. Vor einem Verkauf wird jetzt einmal gespeichert, damit er denselben Bestand sieht wie du. Danke an <strong>Hanson</strong> f\u00fcr den Bericht.',
     '<strong>Warum es ausgerechnet bei vollem Lager auffiel:</strong> Ist das Lager voll, ruht die Produktion \u2013 Anzeige und Server stimmen dann \u00fcberein, der erste Verkauf ging deshalb immer durch und setzte den Server auf null. Danach lief die Produktion wieder an, und jeder weitere Verkauf in den n\u00e4chsten zehn Sekunden prallte an dieser Null ab. Einmal ging, mehrmals nicht.',
     '<strong>Gro\u00dfe Sammelauftr\u00e4ge stoppen nicht mehr mittendrin.</strong> Ein Auftrag \u00fcber mehrere Tranchen bot ab der zweiten die inzwischen nachproduzierte Menge mit an und lief an derselben Meldung auf. Jede Tranche bietet jetzt nur noch an, was der Server auch kennt \u2013 der Rest bleibt im Lager und geht beim n\u00e4chsten Auftrag mit.',
-    'W\u00e4chter: <code>test_markt_verkauf_speicherstand</code> (28 Pr\u00fcfungen). Der Nachbau urteilt wie der echte Server \u00fcber den bei ihm gespeicherten Stand \u2013 einer, der jeden Verkauf best\u00e4tigt, h\u00e4tte den Fehler gar nicht zeigen k\u00f6nnen.'
+    '<strong>Und zwei Dinge, die beim Nachpr\u00fcfen dieser \u00c4nderung auffielen.</strong> L\u00e4sst sich dein Spielstand gerade nicht speichern, wird jetzt gar nicht erst gehandelt \u2013 mit Begr\u00fcndung, statt dass der Server wieder \u00fcber den alten Stand entscheidet. Und solange ein Sammelauftrag l\u00e4uft, nimmt der Markt keinen zweiten Handel an: Ein Klick dazwischen lie\u00df den eben gestarteten Auftrag sofort wieder stoppen.',
+    'W\u00e4chter: <code>test_markt_verkauf_speicherstand</code> (35 Pr\u00fcfungen). Der Nachbau urteilt wie der echte Server \u00fcber den bei ihm gespeicherten Stand \u2013 einer, der jeden Verkauf best\u00e4tigt, h\u00e4tte den Fehler gar nicht zeigen k\u00f6nnen.'
   ] },
   { version:'8.688.0', date:'05.09.2026', changes:[
     '<strong>Wer einem Verbündeten Schiffe schickt, sieht jetzt, wie viele die Station überhaupt annimmt.</strong> Bisher stand dort „13100 frei" – die Grenze der <em>Station</em>. Für dich gilt aber zusätzlich ein Deckel: Der Anteil aller Verbündeten an einer Garnison ist begrenzt. Wer die große Zahl las und losflog, bekam die Schiffe zurück, den Treibstoff nicht, und den Grund erfuhr er nirgends. Menü, Flottenwahl und Stationstafel nennen jetzt <strong>deine</strong> Zahl.',
@@ -15621,7 +15622,21 @@
          Bewusst NICHT `!marketBulkRun`: Waehrend eines laufenden Sammelauftrags kann der Spieler
          in einer Tranchenpause einen normalen Verkauf ausloesen (kleine Mengen gehen an dem
          Riegel vorbei direkt hierher). Der ist keine Tranche und braucht den Schutz. */
-      if (!opts.imSammelauftrag) await save();
+      if (!opts.imSammelauftrag){
+        /* Und scheitert das Speichern, wird NICHT gehandelt (Codex-Durchsicht 05.09.2026).
+           save() liefert bei einer Ablehnung `null` (Sitzungskonflikt, Serverstand nicht
+           abrufbar, Rate-Limit). Wer den Rueckgabewert ignoriert und trotzdem handelt, ist
+           genau wieder im gemeldeten Fehler - nur ohne die Chance, ihn zu bemerken: Der
+           Server urteilt weiter ueber den alten Stand, und beim KAUF ueberschreibt seine
+           Antwort obendrein die seither getickten Kredite. Lieber ein ehrliches "gleich
+           nochmal" als ein stiller Verlust. */
+        const gespeichert = await save();
+        if (!gespeichert){
+          marktLetzteAbsage = { status: 0, fehler: 'Speichern' };
+          if (!opts.viaLimit) log('Handel abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
+          return false;
+        }
+      }
       const res = await backendFetch('/market/trade', {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
@@ -15903,8 +15918,18 @@
   let marketBulkRun = null; // { abort, done, total, resource, action } während eines Sammelauftrags
   async function doMarketTradeChunked(action, resource, amount, opts){
     amount = Math.max(0, Math.floor(Number(amount)||0));
-    if (amount <= MARKET_MAX_PER_TRADE) return doMarketTrade(action, resource, amount, opts);
+    /* Der Riegel steht VOR der Kleinmengen-Abkuerzung (Codex-Durchsicht 05.09.2026).
+       Dahinter war er wirkungslos: Eine Menge unter MARKET_MAX_PER_TRADE ging direkt an
+       doMarketTrade und damit am Sammelauftrag vorbei. Seit dieser PR das Speichern VOR den
+       Auftrag setzt, gibt es dafuer auch ein Zeitfenster - ein Klick waehrend dieses await
+       belegte marketTradeInFlight, und die erste Tranche prallte an der eigenen Sperre ab:
+       Der eben gestartete Auftrag meldete sofort "gestoppt".
+       So verhaelt sich der Knopf jetzt wie die Limit-Orders, die waehrend eines Auftrags
+       ohnehin pausieren (siehe processLimitOrders) - und als Nebenwirkung kann kein fremder
+       Handel mehr marktServerBestand ueberschreiben. Die Tranchen selbst rufen doMarketTrade
+       direkt auf, sie sind davon nicht betroffen. */
     if (marketBulkRun){ log('Es läuft bereits ein Sammelauftrag – bitte abwarten oder abbrechen.', 'ti-alert-triangle'); return false; }
+    if (amount <= MARKET_MAX_PER_TRADE) return doMarketTrade(action, resource, amount, opts);
     const label = resDefFor(resource).label;
     const chunks = Math.ceil(amount / MARKET_MAX_PER_TRADE);
     marketBulkRun = { abort:false, done:0, total:chunks, resource, action };
@@ -15916,7 +15941,15 @@
        Bewusst NACH dem Setzen von marketBulkRun: Der Riegel drueber wird synchron geprueft; ein
        `await` davor oeffnete ein Fenster, in dem zwei schnelle Klicks BEIDE durchkaemen und zwei
        Sammelauftraege nebeneinander liefen. */
-    await save();
+    const gespeichert = await save();
+    if (!gespeichert){
+      // Dieselbe Begruendung wie in doMarketTrade - hier zusaetzlich den Riegel wieder loesen,
+      // der oben schon gesetzt wurde, sonst blockierte ein gescheiterter Start den Markt.
+      marketBulkRun = null;
+      log('Sammelauftrag nicht gestartet: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
+      renderMarket();
+      return false;
+    }
     // Nach dem Speichern sind Anzeige und Serverstand deckungsgleich - die Auskunft eines
     // FRÜHEREN Auftrags wäre hier veraltet und würde die erste Tranche unnötig kappen.
     marktServerBestand = null;

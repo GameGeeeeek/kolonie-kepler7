@@ -28,6 +28,14 @@
 //      Stand versorgen. Und die zweite Hälfte desselben Befunds: Ein Sammelauftrag speichert
 //      bewusst nur EINMAL, seine Folgetranchen dürfen deshalb nicht die inzwischen produzierte
 //      Menge mitanbieten (sonst stoppt er mitten im Lauf mit "Nicht genug ...").
+//   5. Codex-Durchsicht 05.09.2026, zwei P2-Befunde am eigenen Änderungssatz:
+//      a) Scheitert das Speichern VOR dem Handel, wird nicht gehandelt. save() liefert bei
+//         einer Ablehnung `null`; wer weiterhandelt, ist wieder im gemeldeten Fehler - nur ohne
+//         die Chance, ihn zu bemerken.
+//      b) Während eines laufenden Sammelauftrags nimmt der Markt keinen weiteren Handel an.
+//         Der Riegel stand hinter der Kleinmengen-Abkürzung und war dadurch wirkungslos; seit
+//         das Speichern VOR dem Auftrag steht, gibt es dafür ein Zeitfenster - ein Klick darin
+//         belegte marketTradeInFlight, und die erste Tranche prallte an der eigenen Sperre ab.
 //   4. Ein KAUF ist genauso geschützt - und zwar mit GENAU EINEM Speichervorgang. Hier stand
 //      zuerst das Gegenteil ("ein Kauf speichert nicht mit, denn die Kredite ändert kein Tick").
 //      Das war gemessen falsch: Handelsrouten und eroberte Systeme schreiben `state.credits` im
@@ -62,7 +70,7 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   // Kommentare leeren, bevor gesucht wird: die Begründung im Code nennt save() wörtlich.
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   check('1a: vor einem Handel wird gespeichert, damit der Server den aktuellen Stand sieht',
-    /if \(!opts\.imSammelauftrag\) await save\(\)/.test(ohneKommentar));
+    /if \(!opts\.imSammelauftrag\)\{[\s\S]{0,300}?await save\(\)/.test(ohneKommentar));
   /* Der Riegel haengt an der HERKUNFT des Aufrufs, nicht an `!marketBulkRun` (Durchsicht
      05.09.2026): Waehrend eines laufenden Sammelauftrags kann der Spieler in einer
      Tranchenpause einen normalen Verkauf ausloesen - kleine Mengen gehen am Sammel-Riegel
@@ -83,6 +91,8 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
      die data.tagesRest daneben schon laenger hat. */
   check('1g: die Bestandsauskunft wird nur uebernommen, wenn wirklich eine Zahl kam',
     /typeof data\.newResourceAmount === 'number'/.test(ohneKommentar));
+  check('1h: scheitert das Speichern, wird NICHT gehandelt',
+    /const gespeichert = await save\(\);[\s\S]{0,400}?if \(!gespeichert\)\{[\s\S]{0,400}?return false;/.test(ohneKommentar));
   check('1c: genau EIN Speichervorgang im Handelspfad - nicht mehrere',
     (ohneKommentar.match(/await save\(\)/g) || []).length === 1,
     { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
@@ -98,6 +108,14 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
     { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
   check('1d2: seine Tranchen weisen sich als solche aus, damit sie den Schutz auslassen',
     /imSammelauftrag: true/.test(ohneKommentar));
+  check('1h2: auch der Sammelauftrag startet nicht ohne gelungenes Speichern',
+    /if \(!gespeichert\)\{[\s\S]{0,300}?marketBulkRun = null;/.test(ohneKommentar));
+  /* Der Riegel muss VOR der Kleinmengen-Abkuerzung stehen, sonst ist er wirkungslos:
+     Eine Menge unter MARKET_MAX_PER_TRADE ginge direkt an doMarketTrade vorbei. */
+  const iRiegel = ohneKommentar.indexOf('if (marketBulkRun)');
+  const iAbk = ohneKommentar.indexOf('amount <= MARKET_MAX_PER_TRADE');
+  check('1i: der Sammel-Riegel steht VOR der Kleinmengen-Abkuerzung',
+    iRiegel > 0 && iAbk > 0 && iRiegel < iAbk, { riegel: iRiegel, abkuerzung: iAbk });
   /* Die Bestandsauskunft traegt ihre Ressource mit - als blosse Zahl wurde sie von jedem
      Handel einer ANDEREN Ressource ueberschrieben und kappte die naechste Tranche falsch. */
   check('1f: die Serverauskunft wird nur fuer DIESELBE Ressource benutzt',
@@ -141,7 +159,8 @@ function fixture(){
 /* Der Mock verhält sich wie server.js: /market/trade urteilt über den bei ihm GESPEICHERTEN
    Spielstand (getSaveValue) und schreibt den geänderten zurück (setSaveValue). Genau daraus
    entsteht der Befund - ein Mock, der jeden Verkauf bestätigt, wäre für diese Frage blind. */
-function backend(store){ return async r => {
+function backend(store, steuer){ return async r => {
+  steuer = steuer || {};
   const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
   const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
   if (p === 'health') return j({ ok:true });
@@ -184,6 +203,9 @@ function backend(store){ return async r => {
   if (p.startsWith('storage/')){
     const k = decodeURIComponent(p.slice(8));
     if (req.method() === 'PUT'){
+      // steuer.saveStatus: der Spielstand laesst sich NICHT speichern (Sitzungskonflikt,
+      // Rate-Limit, Serverstand nicht abrufbar) - genau der Fall aus Abschnitt 5.
+      if (k === SAVE_KEY && steuer.saveStatus){ store.__saveAblehnungen++; return j({ error:'Konflikt' }, steuer.saveStatus); }
       try { store[k] = JSON.parse(req.postData()||'{}').value; } catch(e){}
       if (k === SAVE_KEY){ store.__saves++; store.__version++; }
       return j({ ok:true, key:k, version: store.__version });
@@ -196,15 +218,24 @@ function backend(store){ return async r => {
   return j({});
 };}
 
-async function spiel(browser){
-  const store = { __handel: [], __abgelehnt: 0, __saves: 0, __version: 1 };
+async function spiel(browser, steuer){
+  const store = { __handel: [], __abgelehnt: 0, __saves: 0, __saveAblehnungen: 0, __version: 1 };
   store[SAVE_KEY] = fixture();
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(String(e)));
-  await page.route('**/api/**', backend(store));
+  await page.route('**/api/**', backend(store, steuer));
   await page.addInitScript(k => localStorage.setItem(k, 'tok'), TOKEN_KEY);
+  /* #log ueberschreibt sich mit JEDER Meldung selbst - der Endstand ist deshalb nicht
+     dasselbe wie "die Zeile ist erschienen". Deshalb wird MITGESCHNITTEN. */
+  await page.addInitScript(() => {
+    window.__logZeilen = [];
+    const start = () => { const box = document.getElementById('log'); if (!box) return false;
+      const merke = () => { const t=(box.innerText||'').trim(); if (t && window.__logZeilen[window.__logZeilen.length-1]!==t) window.__logZeilen.push(t); };
+      new MutationObserver(merke).observe(box,{childList:true,characterData:true,subtree:true}); merke(); return true; };
+    if (!start()) document.addEventListener('DOMContentLoaded', start);
+  });
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3500);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o=document.getElementById(id); if(o) o.style.display='none'; }); });
@@ -250,6 +281,9 @@ async function warteAufSpeichern(t, page){
   for (let i = 0; i < 40 && t.store.__saves === vorher; i++) await page.waitForTimeout(500);
   return t.store.__saves > vorher;
 }
+
+const mitschnitt = (page) => page.evaluate(() =>
+  ((window.__logZeilen||[]).join('\n') + '\n' + ((document.getElementById('log')||{}).innerText||'')));
 
 const marktOeffnen = async (page) => {
   await page.evaluate(() => { const b = document.querySelector('[data-tab="markt"]'); if (b) b.click(); });
@@ -354,24 +388,51 @@ const marktOeffnen = async (page) => {
     await t.ctx.close();
   }
 
+  // ---- 5) Scheitert das Speichern, wird nicht gehandelt (Codex-Befund) ----------------------
+  {
+    /* Der Spielstand wird ab dem Start abgelehnt. Ein Handel darf dann GAR NICHT rausgehen:
+       Der Server wuerde ueber einen veralteten Stand urteilen - also genau der gemeldete
+       Fehler, nur ohne die Chance, ihn zu bemerken. */
+    /* Bewusst 500 und NICHT 409: Ein 409 laesst das Spiel dreimal die Serverversion nachladen
+       und danach handleSaveConflict() feuern - der Spieler wird abgemeldet, die Marktbox ist
+       weg, und "keine Handelsanfrage" waere gruen, ohne irgendetwas ueber diesen Fix zu sagen.
+       Genau so ist der erste Anlauf dieses Abschnitts hereingefallen (Mitschnitt leer, weil es
+       gar kein Spiel mehr gab). Ein 500 laesst save() null liefern und die Sitzung stehen. */
+    const t = await spiel(browser, { saveStatus: 500 });
+    await marktOeffnen(t.page);
+    for (let i = 0; i < 40 && t.store.__saveAblehnungen === 0; i++) await t.page.waitForTimeout(500);
+    check('5-vorab: der Server lehnt das Speichern ab', t.store.__saveAblehnungen > 0,
+      { ablehnungen: t.store.__saveAblehnungen });
+    const marktDa = await t.page.evaluate(() => !!document.querySelector('[data-market-sell="energie"]'));
+    check('5-vorab2: die Sitzung steht noch und der Markt ist bedienbar - sonst misst 5a nichts',
+      marktDa, { marktDa });
+    await verkaufeAlles(t.page, 'energie');
+    await t.page.waitForTimeout(2500);
+    check('5a: es wurde keine Handelsanfrage gestellt',
+      t.store.__handel.length === 0, t.store.__handel);
+    check('5b: und der Spieler erfaehrt den Grund, statt ein stummes Nichts zu sehen',
+      /nicht speichern|abgebrochen/i.test(await mitschnitt(t.page)),
+      (await mitschnitt(t.page)).slice(-260));
+    await t.ctx.close();
+  }
+
   await browser.close();
   ende();
 })();
 
 /* GEGENPROBE, GEMESSEN am 05.09.2026 gegen origin/main (KEPLER_SPIELDATEI auf eine Kopie):
-   13 Pruefungen fallen (die Schlusszeile "FAIL" zaehlt NICHT mit - sie ist die Zusammenfassung):
-     1a, 1b, 1c, 1d, 1d2, 1e, 1f, 1g - im Handelspfad wird nicht gespeichert, es gibt weder
-       eine Tranchen-Kennzeichnung noch eine Serverauskunft.
-     2c, 2d - der Befund selbst, mit Zahlen: {"menge":76,"standBeimServer":0,"ok":false},
-       abgelehnt: 1. Die Anzeige stand auf 76 Energie, der Server sah 0.
-     3b, 3d - die zweite Haelfte: {"abgelehnt":1,"versuche":2}. Tranche 2 des Sammelauftrags bot
-       die inzwischen produzierte Menge mit an und prallte ab.
+   18 der 35 Pruefungen fallen (die Schlusszeile "FAIL" zaehlt NICHT mit):
+     1a, 1b, 1c, 1d, 1d2, 1e, 1f, 1g, 1h, 1h2, 1i - im Handelspfad wird nicht gespeichert, es
+       gibt weder Tranchen-Kennzeichnung noch Serverauskunft noch einen wirksamen Sammel-Riegel.
+     2c, 2d - der Befund selbst: {"menge":76,"standBeimServer":0,"ok":false}, abgelehnt: 1.
+       Die Anzeige stand auf 76 Energie, der Server sah 0.
+     3b, 3d - die Tranchen-Drift: {"abgelehnt":1,"versuche":2}.
      4 - der Kauf ist ungeschuetzt (0 Speichervorgaenge statt 1).
-   GRUEN bleiben dort 2a, 3a, 3c, alle -vorab und die drei Anker - Absicht, nicht Schwaeche:
-   2a belegt, dass der ERSTE Verkauf nie das Problem war (genau deshalb klang der Report nach
+     5a, 5b - bei abgelehntem Speichern wird trotzdem gehandelt, und niemand sagt es dem Spieler.
+   GRUEN bleiben dort 2a, 3a, 3c, alle -vorab und die Anker - Absicht, nicht Schwaeche: 2a
+   belegt, dass der ERSTE Verkauf nie das Problem war (genau deshalb klang der Report nach
    "mehrmals"), 3a und 3c belegen, dass die Aenderung nichts gelockert hat.
    EHRLICH ZU 1a2 UND 1a3: Das sind VERNEINUNGEN ("der Riegel fragt nicht !marketBulkRun ab",
    "der Schutz ist nicht auf 'sell' eingeschraenkt"). Am alten Stand gibt es beide Formen gar
-   nicht, sie sind dort also trivial gruen. Sie messen keinen Befund, sondern verhindern den
-   RUECKFALL in zwei Fassungen, die genau dieser PR schon einmal hatte und die die Durchsicht
-   verworfen hat. Das ist ihr ganzer Zweck - kein Beleg, eine Sperre. */
+   nicht, sie sind dort also trivial gruen. Sie belegen keinen Befund, sie sperren den Rueckfall
+   in zwei Fassungen, die dieser PR selbst schon hatte und die die Durchsicht verworfen hat. */
