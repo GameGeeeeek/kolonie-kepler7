@@ -35,6 +35,17 @@
 //   * Prueft kampftextBerechtigt nur den Typ (ohne keinKampf/weltboss/abgrund), fallen genau 3i und 3j.
 //   Befund beim Bau: Eine faellige ERKUNDUNG schreibt keinen Bericht (nur ein Fund tut das) - die
 //   Vorpruefung 3e-vorab hat das gemeldet, sonst waere 3e vacuous gruen gewesen.
+//
+// E2 - die grossen Momente (04.09.2026, Abschnitte 1e und 4): Das Logbuch erscheint auch in den
+// Berichten festung-angriff, nest-angriff, attack-sent und attack-received (nur MIT Text). Bestellt
+// wird mit `art`: der Weltboss-Schlag (npc-attack mit weltboss:true), der FALL einer Festung und der
+// FALL einer Koenigin - ein Schlag, nach dem sie noch steht, bestellt nichts. Den Spielerkampf
+// bestellt der Server selbst, der Client nie. Die Festungs- und Nestberichte tragen seit E2 die
+// eingesetzte Flotte (`fleet`), weil der Erzaehltext die Schiffstypen braucht.
+// GEGENPROBE E2 (04.09.2026, Pruefnamen per diff, Kopie ueber KEPLER_SPIELDATEI): Am Stand vor der
+// Frontend-Haelfte (origin/main v8.676.0) fallen genau 1e, 4a, 4b, 4d, 4e, 4g, 4h; gruen bleiben
+// 1e-ohne (Abwesenheit), 4c und 4f (kein Text fuer die stehende Festung bzw. die lebende Koenigin -
+// am alten Stand wird fuer diese Arten nie bestellt) sowie die npc-Pruefungen.
 const { starteBrowser, SPIEL_URL, pruefer, ruhigeUhren, devices } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -87,6 +98,43 @@ const weltboss = () => ({ id:'w1', type:'worldboss', bossLevel: 1, startTime: Da
 const abgrund = () => ({ id:'a1', type:'abgrund', targetId: 1, startTime: Date.now()-600000, endTime: Date.now()-2000,
   fleetName:'Probe', composition:{ jaeger: 4000, schlachtschiff: 400, frachter: 200 }, power: 200000 });
 
+// E2: faellige Missionen der grossen Momente, so gebaut, wie das Spiel sie anlegt (Festung Z. 11873,
+// Nest Z. 11228) - `system` muss ein echtes System sein, der Bericht liest seinen Namen aus STAR_SYSTEMS.
+const festungMission = () => ({ id:'f1', type:'festung-angriff', targetId:'kepler', system:'kepler', festungId:'fest1',
+  stufe: 3, stufeName:'Sternenfeste', ziel:'kern', startTime: Date.now()-600000, endTime: Date.now()-2000,
+  fleetName:'Probe', composition:{ jaeger: 400 } });
+const nestMission = () => ({ id:'n1', type:'nest-angriff', targetId:'vega', system:'vega', nestId:'nest1', volk:'xantheer',
+  stufe: 5, stufeName:'Königin', startTime: Date.now()-600000, endTime: Date.now()-2000,
+  fleetName:'Probe', composition:{ jaeger: 400 } });
+// Die Serverantworten dazu - Felder wie die echten Endpunkte (server.js /api/festung/angriff,
+// /api/alien/nest-angriff, /api/worldboss/resolve); die Zahlen sind bewusst krumm.
+const festungAntwort = (gefallen) => ({ schaden: 418000, gefallen, kern: gefallen ? 0 : 782000, kernMax: 1200000, lp: gefallen ? 0 : 782000,
+  durchschlag: 1, anteil: 0.35, teilnehmer: 4, eigeneVerluste: { jaeger: 9 }, ziel: 'kern' });
+const nestAntwort = (schwarmGefallen) => ({ volkName: 'Xantheer-Kollektiv', stufeName: 'Königin', schaden: 1310000, gefallen: true,
+  lp: 0, lpMax: 4000000, trifftSchwaeche: false, schwaeche: null, schwarmGefallen, mitgerissen: 3, anteil: 0.33, teilnehmer: 6,
+  eigeneVerluste: { jaeger: 31 } });
+const weltbossAntwort = () => ({ ok: true, damage: 388120, bossMaxHp: 2400000, bossHp: 2011880, killed: false, lostShips: { jaeger: 4 },
+  newCredits: 50000, newBattlePoints: 10, arrivedTooLate: false, hasWeakness: false, bossset: null });
+// Server-Berichte der vier weiteren Arten, je MIT Text (Abschnitt 1e) - Felder wie die echten Zeichner lesen.
+const TEXT_F = 'Die Sternenfeste bei Chronos ist gefallen, ihr Kern erlosch unter unseren Bombern.';
+const TEXT_N = 'Die Königin der Xantheer fiel, ihr Schwarm zerfiel vor unseren Schiffen.';
+const TEXT_S = 'Unsere Kreuzer brachen durch die Reihe der Wächter, die Station lag offen vor uns.';
+const TEXT_E = 'Die Wächter der Station stemmten sich gegen die anrückenden Kreuzer.';
+function e2Berichte(mitText){
+  const t = (x) => mitText ? { kiText: x } : {};
+  const zeit = Date.now() - 60000;
+  return [
+    Object.assign({ id:'r-f', time: zeit, type:'festung-angriff', fleetName:'Probe', system:'kepler', systemName:'Kepler-System', stufe:3, stufeName:'Sternenfeste',
+      schaden: 418000, gefallen: true, kern: 0, kernMax: 1200000, anteil: 0.35, teilnehmer: 4, eigeneVerluste: { jaeger: 9 }, ziel:'kern', bauteile:{}, fleet:{ jaeger: 400 } }, t(TEXT_F)),
+    Object.assign({ id:'r-n', time: zeit, type:'nest-angriff', fleetName:'Probe', system:'vega', systemName:'Vega-System', volk:'xantheer', volkName:'Xantheer-Kollektiv',
+      stufe:5, stufeName:'Königin', schaden: 1310000, gefallen: true, lp: 0, lpMax: 4000000, schwarmGefallen: true, mitgerissen: 3, anteil: 0.33, teilnehmer: 6, eigeneVerluste: { jaeger: 31 }, fleet:{ jaeger: 400 } }, t(TEXT_N)),
+    Object.assign({ id:'r-s', time: zeit, type:'attack-sent', result:'win', targetName:'hanna', attackPower: 73210, defensePower: 58890, stolen:{ erz: 41200 },
+      fleet:{ cruisers: 140 }, defenderFleet:{ waechter: 40 }, phasen: [], defenderLossPct: 0.14 }, t(TEXT_S)),
+    Object.assign({ id:'r-e', time: zeit, type:'attack-received', result:'loss', attackerName:'gerd', attackPower: 73210, defensePower: 58890, stolen:{ erz: 41200 },
+      fleet:{ cruisers: 140 }, defenderFleet:{ waechter: 40 }, phasen: [], defenderLossPct: 0.14 }, t(TEXT_E))
+  ];
+}
+
 // Die Backend-Attrappe: haelt den Spielstand (storage) und die Berichte, schreibt jede Anfrage mit
 // (Methode, Pfad, Rumpf) - daran haengt Abschnitt 3 - und antwortet auf die zwei Kampftext-Wege so,
 // wie `antworten` gerade steht.
@@ -115,6 +163,11 @@ function backend(stand, berichte){
     }
     if (p === 'reports') return j({ reports: berichte });
     if (p === 'kampfbericht/text') return j(antworten.kampftext.body, antworten.kampftext.status);
+    // E2: die drei Serverantworten der grossen Momente. Ohne Vorgabe antwortet jede mit {} - beim
+    // Weltboss heisst das keinKampf (Abschnitt 3i), bei Festung und Nest ein Schlag ohne Fall.
+    if (p === 'worldboss/resolve') return j(antworten.weltboss || {});
+    if (p === 'festung/angriff') return j(antworten.festung || {});
+    if (p === 'alien/nest-angriff') return j(antworten.nest || {});
     if (/leaderboard|messages|ranking|wars|halloffame|bounty|friends|pending/.test(p))
       return j(p.includes('pending') ? { reward:null } : []);
     return j({});
@@ -194,6 +247,24 @@ const aktualisieren = async page => {
     await ctx.close();
   }
 
+  // ---- Abschnitt 1e: das Logbuch in den vier weiteren Berichtsarten (E2) ---------------------
+  {
+    const { ctx, page, seitenfehler } = await seiteMit(browser, e2Berichte(true));
+    const k = (await karten(page)) || [];
+    const mitText = k.filter(x => x.hatLogbuch);
+    check('1e: Festungs-, Nest-, attack-sent- und attack-received-Bericht zeigen das Logbuch, je mit ihrem Text',
+      k.length === 4 && mitText.length === 4 &&
+      [TEXT_F, TEXT_N, TEXT_S, TEXT_E].every(t => k.some(x => x.logbuchText.indexOf(t) >= 0)) && seitenfehler.length === 0,
+      { karten: k.length, mitLogbuch: mitText.length, seitenfehler: seitenfehler.slice(0, 2) });
+    await ctx.close();
+    const ohne = await seiteMit(browser, e2Berichte(false));
+    const k2 = (await karten(ohne.page)) || [];
+    check('1e-ohne: dieselben vier Berichte OHNE Text zeigen keine Sektion (Gegenrichtung)',
+      k2.length === 4 && k2.every(x => !x.hatLogbuch && !/Logbuch des Kommandanten/.test(x.text)) && ohne.seitenfehler.length === 0,
+      { karten: k2.length, mitLogbuch: k2.filter(x => x.hatLogbuch).length });
+    await ohne.ctx.close();
+  }
+
   // ---- Abschnitt 3: die Bestellung ---------------------------------------------------------
   const bestellungen = be => be.aufrufe.filter(a => a.pfad === 'kampfbericht/text');
   const berichtePost = be => be.aufrufe.filter(a => a.pfad === 'reports' && a.methode === 'POST');
@@ -271,6 +342,67 @@ const aktualisieren = async page => {
     check('3h: ein 503 (abgeschaltet/Notaus) bleibt still - bestellt wurde, kein Seitenfehler, kein Logbuch und keine Meldung im Bericht',
       bestellungen(be).length === 1 && seitenfehler.length === 0 && k.length >= 1 && k.every(x => !x.hatLogbuch && !/Logbuch|abgeschaltet|KI-Kampfbericht/i.test(x.text)),
       { bestellungen: bestellungen(be).length, seitenfehler: seitenfehler.slice(0, 2), karten: k.length });
+    await ctx.close();
+  }
+
+  // ---- Abschnitt 4: die Bestellung der grossen Momente (E2) --------------------------------
+  {
+    // Weltboss MIT Serverantwort: derselbe Berichtstyp wie 3i, aber ein Kampf - Art 'weltboss'.
+    const { ctx, be } = await seiteMit(browser, [], [weltboss()], { weltboss: weltbossAntwort() });
+    await warteBis(() => bestellungen(be).length > 0, 8000);
+    await warte(500);
+    const rumpf = (bestellungen(be)[0] && bestellungen(be)[0].rumpf) || {};
+    check('4a: der Weltboss-Schlag bestellt GENAU EINEN Text mit art weltboss', bestellungen(be).length === 1 && rumpf.art === 'weltboss', { bestellungen: bestellungen(be).length, art: rumpf.art });
+    check('4b: ... mit Name samt Stufe, Ausgang des Schlags, Flotte, Verlusten und Berichts-ID - und sonst nichts',
+      Object.keys(rumpf).sort().join(',') === 'art,bossZerstoert,fleet,npcLevel,npcName,ownLostShips,reportId'
+        && /Stufe 1$/.test(rumpf.npcName || '') && rumpf.bossZerstoert === false && rumpf.fleet && rumpf.fleet.jaeger === 400
+        && rumpf.ownLostShips && rumpf.ownLostShips.jaeger === 4 && rumpf.reportId === 'r-neu', rumpf);
+    await ctx.close();
+  }
+  {
+    // Festung, die noch steht: ein Bericht, aber KEIN Text - der Text gehoert dem Fall.
+    const { ctx, be } = await seiteMit(browser, [], [festungMission()], { festung: festungAntwort(false) });
+    await warteBis(() => berichtePost(be).length > 0, 8000);
+    await warte(700);
+    const typen = berichtePost(be).map(a => a.rumpf && a.rumpf.report).filter(Boolean);
+    check('4c: eine Festung, die den Schlag uebersteht, bekommt einen Bericht, aber keinen Text',
+      typen.some(r => r.type === 'festung-angriff' && !r.gefallen) && bestellungen(be).length === 0,
+      { typen: typen.map(r => r.type + (r.gefallen ? '/gefallen' : '')), bestellungen: bestellungen(be).length });
+    await ctx.close();
+  }
+  {
+    const { ctx, be } = await seiteMit(browser, [], [festungMission()], { festung: festungAntwort(true) });
+    await warteBis(() => bestellungen(be).length > 0, 8000);
+    await warte(500);
+    const rumpf = (bestellungen(be)[0] && bestellungen(be)[0].rumpf) || {};
+    check('4d: der FALL der Festung bestellt genau einen Text mit art festung', bestellungen(be).length === 1 && rumpf.art === 'festung', { bestellungen: bestellungen(be).length, art: rumpf.art });
+    check('4e: ... mit Festung, System, gefallen, Verband, eingesetzter Flotte, Verlusten und Berichts-ID',
+      Object.keys(rumpf).sort().join(',') === 'art,eigeneVerluste,fleet,gefallen,reportId,stufeName,systemName,teilnehmer'
+        && rumpf.stufeName === 'Sternenfeste' && rumpf.systemName === 'Kepler-System' && rumpf.gefallen === true && rumpf.teilnehmer === 4
+        && rumpf.fleet && rumpf.fleet.jaeger === 400 && rumpf.eigeneVerluste && rumpf.eigeneVerluste.jaeger === 9 && rumpf.reportId === 'r-neu', rumpf);
+    await ctx.close();
+  }
+  {
+    // Nest gefallen, Koenigin lebt (kein schwarmGefallen): kein Text.
+    const { ctx, be } = await seiteMit(browser, [], [nestMission()], { nest: nestAntwort(false) });
+    await warteBis(() => berichtePost(be).length > 0, 8000);
+    await warte(700);
+    const typen = berichtePost(be).map(a => a.rumpf && a.rumpf.report).filter(Boolean);
+    check('4f: ein Nestschlag ohne Koeniginnen-Fall bekommt einen Bericht, aber keinen Text',
+      typen.some(r => r.type === 'nest-angriff' && !r.schwarmGefallen) && bestellungen(be).length === 0,
+      { typen: typen.map(r => r.type + (r.schwarmGefallen ? '/koenigin' : '')), bestellungen: bestellungen(be).length });
+    await ctx.close();
+  }
+  {
+    const { ctx, be } = await seiteMit(browser, [], [nestMission()], { nest: nestAntwort(true) });
+    await warteBis(() => bestellungen(be).length > 0, 8000);
+    await warte(500);
+    const rumpf = (bestellungen(be)[0] && bestellungen(be)[0].rumpf) || {};
+    check('4g: der FALL der Koenigin bestellt genau einen Text mit art koenigin', bestellungen(be).length === 1 && rumpf.art === 'koenigin', { bestellungen: bestellungen(be).length, art: rumpf.art });
+    check('4h: ... mit Volk, System, schwarmGefallen, Verband, Flotte, Verlusten und Berichts-ID',
+      Object.keys(rumpf).sort().join(',') === 'art,eigeneVerluste,fleet,reportId,schwarmGefallen,systemName,teilnehmer,volkName'
+        && rumpf.volkName === 'Xantheer-Kollektiv' && rumpf.systemName === 'Vega-System' && rumpf.schwarmGefallen === true && rumpf.teilnehmer === 6
+        && rumpf.fleet && rumpf.fleet.jaeger === 400 && rumpf.eigeneVerluste && rumpf.eigeneVerluste.jaeger === 31, rumpf);
     await ctx.close();
   }
 
