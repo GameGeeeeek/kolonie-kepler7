@@ -5965,9 +5965,11 @@
     // ===== Gebäude ohne gezeichnetes Icon (26.07.2026, Icon-Audit, drittes Paket) =====
     // KORREKTUR eines eigenen Fehlbefunds: Das Audit meldete anfangs "11 Gebäude noch flach". Es
     // sind vier. Die anderen sieben (nanoplattform, sensorphalanx, schildkuppel, fusionsbastion,
-    // kiverteidigung, metamaterialwall, singularitaetsturm) haben längst eine ANIMIERTE
-    // CANVAS-Grafik über DEFENSE_ART/DEFENSE_CANVAS_KEYS - defIconHtml() prüft die VOR ICONS, ein
-    // SVG dafür wäre schlicht toter Code gewesen. Die Zählung schaute nur ins ICONS-Objekt.
+    // kiverteidigung, metamaterialwall, singularitaetsturm) hatten längst eine CANVAS-Grafik; die
+    // Zählung schaute nur ins ICONS-Objekt.
+    // NACHTRAG (Bündel C): Seit den isometrischen Bausätzen tragen ALLE Gebäude eine gezeichnete
+    // Kachel, und buildingIconHtml nimmt sie vor dem SVG. Die SVGs hier bleiben als Kleinformat-
+    // Vorrat für iconHtmlFor stehen - in der Gebäudekachel sind sie nicht mehr zu sehen.
     // Motive gegen die vorhandenen geprüft: kein Torus (fusionsreaktor), keine zwei Kreise
     // (rdiplomatie), kein Chip (quantenchipfabrik), keine weitere Kuppel (schild/ionenschild/
     // schildkuppel/mondschild haben davon schon vier).
@@ -6209,257 +6211,1233 @@
     return iconHtmlFor('mod_'+def.key, def.icon, color);
   }
 
-  // Phase 2 der Grafik-Umstellung (siehe Vorschau-Datei): diese drei Verteidigungsgebäude bekommen
-    // statt des flachen SVG-Icons eine kleine animierte Canvas-Grafik (40x40) im bicon-Slot. Bewusst
-    // KEIN requestAnimationFrame-Loop hier - defenseBuildings wird bei jedem Sekunden-Tick neu gebaut,
-    // solange der Verteidigung-Tab aktiv ist (siehe activeTab-Guard), das reicht als "Animation" und
-    // vermeidet, dass sich bei jedem Rebuild ein weiterer Loop auf die (dann bereits ersetzten,
-    // verwaisten) alten Canvas-Elemente stapelt.
-    // Verteidigungsanlagen-Grafik (Spieler-Wunsch 25.07.2026). Ausgangslage: von 21 Anlagen hatten
-    // nur DREI eine gezeichnete Grafik - die übrigen 18 teilten sich rund elf flache ti-Icons
-    // (ti-target dreimal, ti-shield-lock viermal, ti-shield/-castle/-bolt/-map-pin je zweimal).
-    // Mehrere Anlagen waren dadurch schlicht nicht voneinander zu unterscheiden.
-    // Die drei vorhandenen Canvas-Icons (Turm, Schild, Raketensilo) sind handfein abgestimmt und
-    // bleiben deshalb unverändert; die restlichen 18 kommen in derselben Bildsprache dazu:
-    // Bodenschatten + Sockel + typeigener Aufbau + Lichtkante. Jede Anlage bekommt eine eigene
-    // Aufbauform, damit man sie an der Silhouette auseinanderhält, nicht nur am Namen.
-    const DEFENSE_ART = {
-      flak:              { base:'platform', top:'twinup',  col:'#c7cbe0' },
-      ionenschild:       { base:'platform', top:'ringdome',col:'#a48bd9' },
-      // NICHT hier: resonanzschild. Am 03.08.2026 kurz eingetragen, weil er in der
-      // Kampf-Wiedergabe als einzige der 22 Anlagen ohne eigene Grafik dastand - und
-      // wieder entfernt, weil er als einziger ein handgezeichnetes SVG in ICONS hat.
-      // defIconHtml() nimmt die Canvas-Grafik VOR ICONS; ein Eintrag hier haette das
-      // SVG zu totem Code gemacht und zwei Bilder fuer dasselbe Gebaeude hinterlassen.
-      // Auf dem Planetenboden der Wiedergabe bleibt er deshalb die Schildgenerator-
-      // Silhouette. (tests/test_iconabdeckung.js haelt genau diese Regel fest.)
-      laser:             { base:'platform', top:'emitter', col:'#5dcaa5' },
-      plasma:            { base:'platform', top:'orb',     col:'#f3aec6' },
-      gauss:             { base:'platform', top:'longgun', col:'#af9ce6' },
-      railgun:           { base:'platform', top:'rails',   col:'#fac775' },
-      voidbarriere:      { base:'platform', top:'rift',    col:'#c3bef5' },
-      festung:           { base:'bunker',   top:'crystal', col:'#9fe1cb' },
-      bunker:            { base:'bunker',   top:'slab',    col:'#9aa0b8' },
-      nanoplattform:     { base:'platform', top:'lattice', col:'#5dcaa5' },
-      sensorphalanx:     { base:'platform', top:'dish',    col:'#5ce1ff' },
-      schildkuppel:      { base:'platform', top:'bigdome', col:'#85b7eb' },
-      fusionsbastion:    { base:'bunker',   top:'reactor', col:'#f0997b' },
-      kiverteidigung:    { base:'bunker',   top:'core',    col:'#c3bef5' },
-      metamaterialwall:  { base:'wall',     top:'prism',   col:'#5dcaa5' },
-      singularitaetsturm:{ base:'platform', top:'singularity', col:'#a48bd9' },
-      abhorchposten:     { base:'platform', top:'antenna', col:'#85b7eb' },
-      mondschild:        { base:'platform', top:'moondome',col:'#dff1fb' }
+    /* ================= Isometrische Bausätze (Bündel C) =================
+       Eine Zeichenmaschine für ZWEI Reiter: die 23 Verteidigungsanlagen und die 29 Basis-Gebäude
+       stehen auf derselben achteckigen HUD-Platte, in derselben Dreiviertel-Isometrie und unter
+       demselben Licht - Hauptlicht von oben links, +y-Flanke halb im Licht, +x-Flanke im
+       Kernschatten mit kaltem Gegenlichtsaum, Schlagschatten nach rechts unten. Nur so ergeben
+       Basis und Verteidigung eine Stadt statt zweier Bildsprachen.
+       Die Familie trägt die Platte und ihre Kanten, das Motiv trägt die Leuchtfarbe des Gebäudes.
+       Kein Zeit-Parameter: jedes Bild ist ein fester, guter Frame und wird je
+       (Schlüssel, Ausbaustand, Pixelgröße) genau einmal gezeichnet. */
+    const ANLAGE_FAMILIE = {
+      turm:'geschuetz', flak:'geschuetz', laser:'geschuetz', plasma:'geschuetz', raketen:'geschuetz',
+      gauss:'geschuetz', railgun:'geschuetz', singularitaetsturm:'geschuetz',
+      schild:'schild', ionenschild:'schild', schildkuppel:'schild', voidbarriere:'schild',
+      mondschild:'schild', resonanzschild:'schild',
+      sensorphalanx:'sensor', abhorchposten:'sensor', signaturscanner:'sensor', kiverteidigung:'sensor',
+      bunker:'massiv', festung:'massiv', metamaterialwall:'massiv', fusionsbastion:'massiv', nanoplattform:'massiv'
     };
-    const DEFENSE_CANVAS_KEYS = ['turm','schild','raketen'].concat(Object.keys(DEFENSE_ART));
-    function drawDefenseMiniIcon(key, canvas){
+    const GEBAEUDE_FAMILIE = {
+      solar:'produktion', mine:'produktion', raffinerie:'produktion', synth:'produktion', fusionsreaktor:'produktion',
+      bergungswerft:'produktion', urmateriereaktor:'produktion', aufbereitung:'produktion',
+      lager:'lager', hochsicherheitslager:'lager', kryolager:'lager', tresor:'lager',
+      labor:'forschung', kryoarchiv:'forschung', autonomiekern:'forschung', gravkompressor:'forschung',
+      nanolegierungsfabrik:'fabrik', quantenchipfabrik:'fabrik', kristalllabor:'fabrik', fusionsschmiede:'fabrik', kilabor:'fabrik',
+      metamaterialweberei:'fabrik', singularitaetsreaktor:'fabrik', hohlraumweberei:'fabrik', kausalankerwerk:'fabrik',
+      werftkern:'fabrik', quantenwerft:'fabrik',
+      habitat:'siedlung', botschaft:'siedlung'
+    };
+    // Familienfarbe der Platte. `glut` ist die Leuchtfarbe der Anlagen-Familien; bei den Gebäuden
+    // setzt der Zeichner sie auf die Leuchtfarbe (fg) der jeweiligen Def.
+    const ISO_FAMILIENFARBE = {
+      geschuetz: { akzent:'#e0a548', glut:'#fac775' },
+      schild:    { akzent:'#85b7eb', glut:'#d9eeff' },
+      sensor:    { akzent:'#5dcaa5', glut:'#a8f5da' },
+      massiv:    { akzent:'#9296ac', glut:'#e0a548', kante:'#e0a548' },
+      produktion:{ akzent:'#fac775' },
+      lager:     { akzent:'#9296ac' },
+      forschung: { akzent:'#c3bef5' },
+      fabrik:    { akzent:'#378add' },      // --info-rgb 55,138,221
+      siedlung:  { akzent:'#5dcaa5' }
+    };
+    const ISO_DUNKEL = [15,20,33], ISO_KALT = [118,158,210], ISO_WEISS = [255,255,255];
+    // Kurznamen fürs Zeichnen; die Bausteine unten lesen sie so, wie sie im Entwurf standen.
+    const DUNKEL = ISO_DUNKEL, KALT = ISO_KALT, WEISS = ISO_WEISS;
+    function hexRgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+    function misch(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+    function css(a, al){ return 'rgba('+Math.round(a[0])+','+Math.round(a[1])+','+Math.round(a[2])+','+(al==null?1:al)+')'; }
+    /* Materialton: mitte = Familienfarbe ins Dunkel gezogen, hell = Richtung Weiß. Die Platte ist
+       dieselbe Farbe, aber stärker entsättigt (Stahl mit Farbstich statt lackierter Fläche).
+       `bau` ist ein nur leicht getönter Stahl - wären die Körper selbst voll in Familienfarbe,
+       stünden acht orangefarbene Klötze nebeneinander. */
+    function isoTon(fam){
+      const F = ISO_FAMILIENFARBE[fam] || ISO_FAMILIENFARBE.massiv, ak = hexRgb(F.akzent);
+      const koerper = { mitte: misch(ak, DUNKEL, 0.42), hell: misch(ak, WEISS, 0.42), dunkel: DUNKEL };
+      const platte  = { mitte: misch(misch(ak, DUNKEL, 0.50), [80,86,104], 0.45), hell: misch(misch(ak, WEISS, 0.35), [214,218,230], 0.45), dunkel: DUNKEL };
+      const stahl   = { mitte: [96,104,122], hell: [214,220,232], dunkel: DUNKEL };
+      const bau     = { mitte: misch([96,104,122], ak, 0.22), hell: misch([214,220,232], ak, 0.25), dunkel: DUNKEL };
+      const beton   = { mitte: [88,92,104], hell: [196,200,210], dunkel: DUNKEL };
+      return { fam, akzent: F.akzent, glut: F.glut || F.akzent, kante: F.kante || F.akzent, koerper, platte, stahl, bau, beton, ak };
+    }
+    // Ausbaustand der Anlagen: Stufe 1-4 / 5-9 / 10+. Der Abhorchposten hat maxLevel 4 und erreicht
+    // Stand 1 über die feste Schwelle nie - deshalb rechnet auch er relativ zur Höchststufe.
+    function anlageAusbaustand(level, max){
+      const m = Math.max(3, max || 20), l = level || 0;
+      if (m >= 20) return l >= 10 ? 2 : (l >= 5 ? 1 : 0);
+      return l >= m*0.66 ? 2 : (l >= m*0.33 ? 1 : 0);
+    }
+    /* Ausbaustand der Gebäude relativ zur Höchststufe: unteres/mittleres/oberes Drittel. Bei max 30
+       sind das die Schwellen 10 und 20; eine Fabrik mit max 15 erreicht ihr Endbild so bei 10
+       statt nie. */
+    function gebaeudeAusbaustand(level, max){
+      const m = Math.max(3, max || 30), l = level || 0;
+      return l >= m*0.66 ? 2 : (l >= m*0.33 ? 1 : 0);
+    }
+
+    /* Werkzeugkiste der Isometrie: Projektion, Licht und die Grundkörper, aus denen beide
+       Bausätze gebaut sind. `T` ist der Materialton der Familie (siehe isoTon). Alles hängt an
+       `S`, der Kantenlänge des Bildes - dieselbe Zeichnung trägt so 64 wie 192 Pixel. */
+    function isoWerkzeug(c, S, T){
+      const K = 0.866, KY = 0.5, RX = 1.2247, RY = 0.7071;
+      const cx = S*0.5, cy = S*0.655;
+      const P = (x,y,z) => [cx + (x-y)*K*S, cy + (x+y)*KY*S - (z||0)*S];
+      const lw = Math.max(0.6, S*0.011);           // Konturstärke
+      const kontur = 'rgba(4,6,12,0.62)';
+      const farbe = (ton, b) => b <= 1 ? misch(ton.dunkel, ton.mitte, Math.max(0,b)) : misch(ton.mitte, ton.hell, Math.min(1,b-1));
+      const poly = pts => { c.beginPath(); pts.forEach((p,i)=> i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1])); c.closePath(); };
+      const seg = (a,b,st,w,al) => { c.strokeStyle=st; c.lineWidth=w; c.globalAlpha=al==null?1:al; c.beginPath(); c.moveTo(a[0],a[1]); c.lineTo(b[0],b[1]); c.stroke(); c.globalAlpha=1; };
+      const z0 = 0.055, a = 0.27, cut = 0.075, LAM = 0.85;   // Plattendicke, Halbkante, Eckschnitt, Schattenlänge je Höhe
+      /* ---- Prisma: beliebige konvexe Grundfläche (Welt-XY, im Uhrzeigersinn: x+ dann y+), extrudiert.
+         Flanken werden nach ihrer Normalen beleuchtet: +y halb im Licht, +x und Diagonale im Schatten. */
+      function prisma(fp, z, h, ton, opt){
+        opt = opt || {};
+        const n = fp.length;
+        for (let i = 0; i < n; i++){
+          const p = fp[i], q = fp[(i+1)%n];
+          const ex = q[0]-p[0], ey = q[1]-p[1];
+          const nx = ey, ny = -ex;
+          if (nx + ny <= 1e-6) continue;
+          const nl = Math.hypot(nx,ny), ux = nx/nl, uy = ny/nl;
+          const licht = Math.max(0, ux*-0.62 + uy*0.55);
+          const b = 0.30 + licht*0.75;
+          const A=P(p[0],p[1],z), B=P(q[0],q[1],z), C=P(q[0],q[1],z+h), D=P(p[0],p[1],z+h);
+          const g = c.createLinearGradient(0, C[1], 0, A[1]);
+          g.addColorStop(0, css(farbe(ton, b*1.15)));
+          g.addColorStop(1, css(farbe(ton, b*0.78)));
+          poly([A,B,C,D]); c.fillStyle = g; c.fill();
+          c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+          if (ux > 0.9){ seg(B, C, css(KALT, 0.35), lw*0.9); }
+        }
+        const top = fp.map(p => P(p[0],p[1],z+h));
+        const xs = top.map(p=>p[0]), ys = top.map(p=>p[1]);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+        const g = c.createLinearGradient(x0, y0, x1, y1);
+        const tb = opt.top == null ? 1.0 : opt.top;
+        g.addColorStop(0, css(farbe(ton, 1.55*tb)));
+        g.addColorStop(0.38, css(farbe(ton, 1.15*tb)));
+        g.addColorStop(0.62, css(farbe(ton, 0.95*tb)));
+        g.addColorStop(1, css(farbe(ton, 0.62*tb)));
+        poly(top); c.fillStyle = g; c.fill();
+        c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+        for (let i = 0; i < n; i++){
+          const p = fp[i], q = fp[(i+1)%n];
+          const nx = q[1]-p[1], ny = -(q[0]-p[0]);
+          if (nx < -1e-6 || ny < -1e-6){
+            seg(P(p[0],p[1],z+h), P(q[0],q[1],z+h), css(ton.hell, nx < 0 ? 0.75 : 0.45), lw*1.05);
+          }
+        }
+        return top;
+      }
+      const rechteck = (x,y,w,d) => [[x,y],[x+w,y],[x+w,y+d],[x,y+d]];
+      const quader = (x,y,z,w,d,h,ton,opt) => prisma(rechteck(x,y,w,d), z, h, ton, opt);
+      const oktogon = (x,y,r,k) => [[x-r+k,y-r],[x+r-k,y-r],[x+r,y-r+k],[x+r,y+r-k],[x+r-k,y+r],[x-r+k,y+r],[x-r,y+r-k],[x-r,y-r+k]];
+
+      /* ---- Schlagschatten auf die Platte ---- */
+      let plattenClip = null;
+      function schatten(fn){
+        c.save();
+        if (plattenClip){ poly(plattenClip); c.clip(); }
+        c.fillStyle = 'rgba(0,0,0,0.46)';
+        c.beginPath(); fn(); c.fill('nonzero');
+        c.restore();
+      }
+      const schattenQuader = (x,y,w,d,h) => schatten(()=>{
+        [[x,y],[x+w+h*LAM,y],[x+w+h*LAM,y+d],[x,y+d]].map(p=>P(p[0],p[1],z0)).forEach((p,i)=> i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath();
+      });
+      const schattenZylinder = (x,y,r,h) => schatten(()=>{
+        const A = P(x,y,z0), B = P(x+h*LAM,y,z0);
+        c.ellipse(A[0],A[1],r*RX*S,r*RY*S,0,0,Math.PI*2); c.closePath();
+        c.ellipse(B[0],B[1],r*RX*S,r*RY*S,0,0,Math.PI*2); c.closePath();
+        const nx = -(B[1]-A[1]), ny = B[0]-A[0], nl = Math.hypot(nx,ny)||1;
+        const w = r*RY*S*0.98;
+        c.moveTo(A[0]+nx/nl*w, A[1]+ny/nl*w); c.lineTo(B[0]+nx/nl*w, B[1]+ny/nl*w);
+        c.lineTo(B[0]-nx/nl*w, B[1]-ny/nl*w); c.lineTo(A[0]-nx/nl*w, A[1]-ny/nl*w); c.closePath();
+      });
+      // Quader samt Schatten in einem Aufruf (die häufigste Kombination)
+      const block = (x,y,z,w,d,h,ton,opt) => { if (z <= z0+1e-6) schattenQuader(x,y,w,d,h); return quader(x,y,z,w,d,h,ton,opt); };
+
+      /* ---- Zylinder, senkrecht ---- */
+      function zylinder(x,y,z,r,h,ton,opt){
+        opt = opt || {};
+        const B = P(x,y,z), Tt = P(x,y,z+h), rx = r*RX*S, ry = r*RY*S;
+        const g = c.createLinearGradient(B[0]-rx, 0, B[0]+rx, 0);
+        g.addColorStop(0.00, css(farbe(ton, 0.62)));
+        g.addColorStop(0.22, css(farbe(ton, 1.55)));
+        g.addColorStop(0.50, css(farbe(ton, 1.02)));
+        g.addColorStop(0.80, css(farbe(ton, 0.42)));
+        g.addColorStop(0.93, css(farbe(ton, 0.28)));
+        g.addColorStop(1.00, css(misch(farbe(ton, 0.45), KALT, 0.45)));
+        c.beginPath(); c.moveTo(B[0]-rx, Tt[1]); c.lineTo(B[0]-rx, B[1]);
+        c.ellipse(B[0], B[1], rx, ry, 0, Math.PI, 0, true); c.lineTo(B[0]+rx, Tt[1]); c.closePath();
+        c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+        if (opt.naehte){ for (let i=1;i<=opt.naehte;i++){ const yy = Tt[1] + (B[1]-Tt[1])*i/(opt.naehte+1);
+          c.strokeStyle='rgba(0,0,0,0.30)'; c.lineWidth=lw*0.6; c.beginPath(); c.ellipse(B[0], yy, rx, ry, 0, 0.05, Math.PI-0.05); c.stroke(); } }
+        if (!opt.offen){
+          const tg = c.createLinearGradient(Tt[0]-rx, Tt[1]-ry, Tt[0]+rx, Tt[1]+ry);
+          const tb = opt.top == null ? 1 : opt.top;
+          tg.addColorStop(0, css(farbe(ton, 1.6*tb))); tg.addColorStop(0.5, css(farbe(ton, 1.1*tb))); tg.addColorStop(1, css(farbe(ton, 0.7*tb)));
+          c.beginPath(); c.ellipse(Tt[0], Tt[1], rx, ry, 0, 0, Math.PI*2); c.fillStyle = tg; c.fill();
+          c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          c.strokeStyle = css(ton.hell, 0.8); c.lineWidth = lw; c.beginPath(); c.ellipse(Tt[0], Tt[1], rx, ry, 0, Math.PI*1.02, Math.PI*1.62); c.stroke();
+        } else {
+          // offener Schlot: dunkle Mündung, heller Rand, optional Glutrand
+          c.beginPath(); c.ellipse(Tt[0], Tt[1], rx, ry, 0, 0, Math.PI*2); c.fillStyle = '#07090f'; c.fill();
+          c.strokeStyle = css(ton.hell, 0.7); c.lineWidth = lw*0.8; c.stroke();
+          if (opt.glut){ c.strokeStyle = css(hexRgb(opt.glut), 0.85); c.lineWidth = lw*0.7; c.beginPath(); c.ellipse(Tt[0], Tt[1], rx*0.7, ry*0.7, 0, 0, Math.PI*2); c.stroke(); }
+        }
+        return { B, T:Tt, rx, ry };
+      }
+      const schlot = (x,y,z,r,h,ton,glut) => { if (z <= z0+1e-6) schattenZylinder(x,y,r,h); return zylinder(x,y,z,r,h,ton,{offen:true,glut:glut,naehte:1}); };
+      /* ---- Kuppel: massiv oder Glas/Energie ---- */
+      function kuppel(x,y,z,r,ton,opt){
+        opt = opt || {};
+        const B = P(x,y,z), rx = r*RX*S, ry = r*RY*S;
+        c.beginPath();
+        c.arc(B[0], B[1], rx, Math.PI, 0, false);
+        c.ellipse(B[0], B[1], rx, ry, 0, 0, Math.PI, false);
+        c.closePath();
+        if (opt.energie){
+          const ak = hexRgb(opt.farbe || T.akzent), al = opt.alpha == null ? 1 : opt.alpha;
+          const g = c.createRadialGradient(B[0]-rx*0.35, B[1]-rx*0.45, rx*0.05, B[0], B[1], rx*1.15);
+          g.addColorStop(0, css(misch(ak, WEISS, 0.5), 0.34*al)); g.addColorStop(0.55, css(ak, 0.16*al)); g.addColorStop(1, css(ak, 0.05*al));
+          c.fillStyle = g; c.fill();
+          c.strokeStyle = css(ak, 0.95); c.lineWidth = lw*1.15; c.stroke();
+          c.strokeStyle = css(misch(ak, WEISS, 0.7), 0.8); c.lineWidth = lw*0.9; c.beginPath(); c.arc(B[0], B[1], rx*0.86, Math.PI*1.08, Math.PI*1.45); c.stroke();
+          c.strokeStyle = css(ak, 0.55); c.lineWidth = lw*0.8; c.beginPath(); c.ellipse(B[0], B[1], rx, ry, 0, 0, Math.PI*2); c.stroke();
+          if (opt.rippen){ for (let i=1;i<opt.rippen;i++){ const t = i/opt.rippen; c.strokeStyle = css(ak, 0.35); c.lineWidth = lw*0.6;
+            c.beginPath(); c.ellipse(B[0], B[1], rx*Math.abs(Math.cos(t*Math.PI/2))+0.01, rx, 0, Math.PI, 0); c.stroke(); } }
+        } else {
+          const g = c.createRadialGradient(B[0]-rx*0.4, B[1]-rx*0.5, rx*0.05, B[0], B[1], rx*1.2);
+          g.addColorStop(0, css(farbe(ton, 1.85))); g.addColorStop(0.45, css(farbe(ton, 1.05))); g.addColorStop(0.85, css(farbe(ton, 0.4))); g.addColorStop(1, css(misch(farbe(ton,0.4), KALT, 0.4)));
+          c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+        }
+        return { B, rx, ry };
+      }
+      function kugel(x,y,z,r,ton,opt){
+        opt = opt || {}; const M = P(x,y,z), R = r*RX*S;
+        const g = c.createRadialGradient(M[0]-R*0.4, M[1]-R*0.45, R*0.05, M[0], M[1], R*1.15);
+        if (opt.energie){ const ak = hexRgb(opt.farbe||T.akzent);
+          g.addColorStop(0, css(misch(ak,WEISS,0.85))); g.addColorStop(0.35, css(misch(ak,WEISS,0.25))); g.addColorStop(0.8, css(ak,0.9)); g.addColorStop(1, css(misch(ak,DUNKEL,0.5),0.9));
+        } else if (opt.schwarz){
+          g.addColorStop(0, '#2a2438'); g.addColorStop(0.5, '#0a0812'); g.addColorStop(1, '#020104');
+        } else {
+          g.addColorStop(0, css(farbe(ton,1.85))); g.addColorStop(0.5, css(farbe(ton,1.0))); g.addColorStop(1, css(farbe(ton,0.3)));
+        }
+        c.beginPath(); c.arc(M[0], M[1], R, 0, Math.PI*2); c.fillStyle = g; c.fill();
+        if (!opt.energie){ c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke(); }
+        return { M, R };
+      }
+      /* ---- Rohr von Weltpunkt A nach B ---- */
+      function rohr(A3, B3, r, ton, opt){
+        opt = opt || {};
+        const A = P(A3[0],A3[1],A3[2]), B = P(B3[0],B3[1],B3[2]);
+        const rs = r*RX*S, dx = B[0]-A[0], dy = B[1]-A[1], L = Math.hypot(dx,dy)||1;
+        let nx = -dy/L, ny = dx/L; if (nx + ny > 0){ nx = -nx; ny = -ny; }
+        const g = c.createLinearGradient(A[0]+nx*rs, A[1]+ny*rs, A[0]-nx*rs, A[1]-ny*rs);
+        g.addColorStop(0, css(farbe(ton,0.75))); g.addColorStop(0.28, css(farbe(ton,1.6))); g.addColorStop(0.6, css(farbe(ton,0.95))); g.addColorStop(0.92, css(farbe(ton,0.3))); g.addColorStop(1, css(misch(farbe(ton,0.4),KALT,0.4)));
+        poly([[A[0]+nx*rs,A[1]+ny*rs],[B[0]+nx*rs,B[1]+ny*rs],[B[0]-nx*rs,B[1]-ny*rs],[A[0]-nx*rs,A[1]-ny*rs]]);
+        c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.75; c.stroke();
+        if (opt.ringe){ for (let i=0;i<opt.ringe.length;i++){ const t = opt.ringe[i], X = A[0]+dx*t, Y = A[1]+dy*t, rr = rs*(opt.ringR||1.5);
+          c.save(); c.translate(X,Y); c.rotate(Math.atan2(dy,dx));
+          const rg = c.createLinearGradient(0,-rr,0,rr); rg.addColorStop(0, css(farbe(ton,1.7))); rg.addColorStop(0.5, css(farbe(ton,1.0))); rg.addColorStop(1, css(farbe(ton,0.3)));
+          c.fillStyle = rg; c.beginPath(); c.ellipse(0,0, rr*0.42, rr, 0, 0, Math.PI*2); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          if (opt.ringGlut){ c.strokeStyle = css(hexRgb(opt.ringGlut),0.9); c.lineWidth = lw*0.8; c.beginPath(); c.ellipse(0,0, rr*0.42, rr*0.72, 0, 0, Math.PI*2); c.stroke(); }
+          c.restore(); } }
+        if (!opt.ohneMuendung){
+          c.save(); c.translate(B[0],B[1]); c.rotate(Math.atan2(dy,dx));
+          c.fillStyle = opt.kappe ? css(farbe(ton,1.3)) : '#07090f'; c.beginPath(); c.ellipse(0,0, rs*0.45, rs, 0, 0, Math.PI*2); c.fill();
+          c.strokeStyle = css(ton.hell,0.55); c.lineWidth = lw*0.7; c.stroke();
+          c.restore();
+        }
+        return { A, B, rs };
+      }
+      /* ---- Ring (Torus, flach in XY) ---- */
+      function ring(x,y,z,R,rohrR,ton,opt){
+        opt = opt || {};
+        const M = P(x,y,z), rx = R*RX*S, ry = R*RY*S, w = rohrR*RX*S*2;
+        const von = opt.hinten ? Math.PI : 0, bis = opt.hinten ? Math.PI*2 : Math.PI;
+        const voll = opt.teil ? false : true;
+        const s0 = voll ? 0 : von, s1 = voll ? Math.PI*2 : bis;
+        c.strokeStyle = css(farbe(ton, 0.55)); c.lineWidth = w; c.beginPath(); c.ellipse(M[0],M[1],rx,ry,0,s0,s1); c.stroke();
+        c.strokeStyle = kontur; c.lineWidth = w + lw*1.2; c.globalCompositeOperation='destination-over'; c.beginPath(); c.ellipse(M[0],M[1],rx,ry,0,s0,s1); c.stroke(); c.globalCompositeOperation='source-over';
+        c.strokeStyle = css(farbe(ton, 1.55)); c.lineWidth = w*0.42; c.beginPath(); c.ellipse(M[0],M[1]-w*0.22,rx,ry,0, s0, s1); c.stroke();
+        if (opt.glut){ c.strokeStyle = css(hexRgb(opt.glut), 0.95); c.lineWidth = Math.max(0.8, w*0.28); c.beginPath(); c.ellipse(M[0],M[1]-w*0.05,rx*0.98,ry*0.98,0,s0,s1); c.stroke(); }
+        return { M, rx, ry };
+      }
+      /* ---- Leuchte / Fenster */
+      /* ---- Leuchte / Fenster / Saum ---- */
+      function leuchte(x,y,z,r,farb,al){
+        const M = P(x,y,z), R = r*S, ak = hexRgb(farb||T.glut);
+        const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R*3);
+        g.addColorStop(0, css(ak, 0.55*(al==null?1:al))); g.addColorStop(1, css(ak,0));
+        c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R*3,0,Math.PI*2); c.fill();
+        c.fillStyle = css(misch(ak,WEISS,0.45), al==null?1:al); c.beginPath(); c.arc(M[0],M[1],Math.max(0.6,R),0,Math.PI*2); c.fill();
+      }
+      function fensterreihe(x,y,x2,y2,z,n,farb,groesse){
+        const ak = hexRgb(farb||T.glut), gs = Math.max(0.7, (groesse||0.012)*S);
+        for (let i=0;i<n;i++){ const t = (i+0.5)/n, M = P(x+(x2-x)*t, y+(y2-y)*t, z);
+          c.fillStyle = css(ak, 0.95); c.fillRect(M[0]-gs*0.5, M[1]-gs*0.7, gs, gs*1.4); }
+      }
+      function saum(x,y,z,x2,y2,z2,farb,w,al){ seg(P(x,y,z), P(x2,y2,z2), css(hexRgb(farb||T.glut), al==null?0.9:al), (w||1)*lw); }
+      /* ---- Fläche aus Weltpunkten (Tore, Fenster, Bänder auf einer Flanke) ---- */
+      function flaeche(pts3, fill, stroke, w){
+        poly(pts3.map(p=>P(p[0],p[1],p[2]))); if (fill){ c.fillStyle = fill; c.fill(); }
+        if (stroke){ c.strokeStyle = stroke; c.lineWidth = (w||0.7)*lw; c.stroke(); }
+      }
+      // Rechteck auf der +y-Flanke (Lichtseite): x von x1..x2, z von z1..z2, bei y = yf (+ winziger Versatz nach außen)
+      const wandY = (x1,x2,yf,z1,z2,fill,stroke,w) => flaeche([[x1,yf+0.002,z1],[x2,yf+0.002,z1],[x2,yf+0.002,z2],[x1,yf+0.002,z2]], fill, stroke, w);
+      // Kreis auf der +y-Flanke (Tresortür)
+      function kreisY(xm,yf,zm,r,fill,stroke,w){
+        c.beginPath();
+        for (let i=0;i<=28;i++){ const t = i/28*Math.PI*2, p = P(xm+Math.cos(t)*r, yf+0.002, zm+Math.sin(t)*r); i ? c.lineTo(p[0],p[1]) : c.moveTo(p[0],p[1]); }
+        c.closePath(); if (fill){ c.fillStyle = fill; c.fill(); } if (stroke){ c.strokeStyle = stroke; c.lineWidth = (w||0.8)*lw; c.stroke(); }
+      }
+      /* ---- Kegel (Halde, Trichter) ---- */
+      function kegel(x,y,z,r,h,ton,opt){
+        opt = opt || {};
+        const B = P(x,y,z), Sp = P(x,y,z+h), rx = r*RX*S, ry = r*RY*S;
+        const g = c.createLinearGradient(B[0]-rx, 0, B[0]+rx, 0);
+        g.addColorStop(0, css(farbe(ton,0.7))); g.addColorStop(0.3, css(farbe(ton,1.5))); g.addColorStop(0.55, css(farbe(ton,1.0))); g.addColorStop(0.85, css(farbe(ton,0.4))); g.addColorStop(1, css(misch(farbe(ton,0.45),KALT,0.4)));
+        c.beginPath(); c.moveTo(Sp[0],Sp[1]); c.lineTo(B[0]-rx, B[1]); c.ellipse(B[0],B[1],rx,ry,0,Math.PI,0,true); c.closePath();
+        c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+        if (opt.koerner){ // Erzkörner: helle Sprenkel auf der Lichtseite
+          const ak = hexRgb(opt.koerner); c.fillStyle = css(ak, 0.85);
+          for (let i=0;i<opt.n||i<7;i++){ const t = (i*0.618)%1, u = ((i*0.381)+0.2)%1;
+            const px = B[0]-rx*0.75 + rx*1.0*t, py = Sp[1] + (B[1]-Sp[1])*(0.35+u*0.6);
+            c.fillRect(px, py, Math.max(0.8,S*0.018), Math.max(0.8,S*0.018)); }
+        }
+        return { B, Sp, rx, ry };
+      }
+      /* ---- Kristall: Bipyramide, gläsern, Lichtkante links ---- */
+      function kristall(x,y,z,r,h,farb,opt){
+        opt = opt || {};
+        const ak = hexRgb(farb||T.glut), B = P(x,y,z), rx = r*RX*S;
+        const taille = z + h*(opt.taille==null?0.38:opt.taille);
+        const L = P(x-r*0.9,y+r*0.9,taille), R = P(x+r*0.9,y-r*0.9,taille), F = P(x+r*0.7,y+r*0.7,taille), H = P(x-r*0.6,y-r*0.6,taille);
+        const Sp = P(x,y,z+h);
+        void rx;
+        // linke Facette (Licht), rechte Facette (Schatten), vordere Facette (halb)
+        const fac = (pts, b, al) => { poly(pts); c.fillStyle = css(misch(ak, b>1 ? WEISS : DUNKEL, b>1 ? (b-1) : (1-b)), al); c.fill(); c.strokeStyle = css(ak, 0.9); c.lineWidth = lw*0.7; c.stroke(); };
+        fac([B,L,Sp,H], 0.55, 0.9);
+        fac([B,R,Sp,F], 0.35, 0.9);
+        fac([B,L,Sp,F], 1.25, 0.92);
+        fac([B,F,Sp,R], 0.75, 0.92);
+        // Kern-Glanz, Glutspitze
+        const g = c.createRadialGradient(Sp[0]-(Sp[0]-L[0])*0.2, Sp[1]+(L[1]-Sp[1])*0.45, 0, Sp[0], Sp[1]+(B[1]-Sp[1])*0.4, h*S*0.6);
+        g.addColorStop(0, css(misch(ak,WEISS,0.8),0.55)); g.addColorStop(1, css(ak,0));
+        poly([B,L,Sp,R]); c.fillStyle = g; c.fill();
+        seg(L, Sp, css(misch(ak,WEISS,0.75),0.95), lw*1.0);
+        leuchte(x,y,z+h,0.009,farb,0.9);
+        return { B, Sp };
+      }
+      /* ---- Solarpanel: geneigte Glasfläche, hohe Kante hinten (-y), Fläche zeigt nach +y/oben.
+         GEMESSEN in Runde 1: Eine nach -x (zum Hauptlicht) gekippte Fläche hat bei dieser Kamera
+         (+x,+y,+z) Normale·Blick = 0 - sie steht exakt kantig, das Glas war unsichtbar, nur Rahmen
+         und Stützen blieben. Nach +y gekippt ist die Fläche der Kamera zugewandt UND liegt noch im
+         Licht (Lichtvektor hat +y-Anteil). ---- */
+      function panel(x,y,z,w,d,hb,farb){
+        const ak = hexRgb(farb||T.glut);
+        const p0 = P(x,y+d,z+0.012), p1 = P(x+w,y+d,z+0.012), p2 = P(x+w,y,z+hb), p3 = P(x,y,z+hb);
+        // Stützen an der hohen Hinterkante
+        seg(P(x+w*0.15,y,z), P(x+w*0.15,y,z+hb), css(T.stahl.mitte), lw*1.1); seg(P(x+w*0.85,y,z), P(x+w*0.85,y,z+hb), css(T.stahl.mitte), lw*1.1);
+        // Glasfläche: oben links (p3) im Licht, unten rechts (p1) tief
+        const g = c.createLinearGradient(p3[0], p3[1], p1[0], p1[1]);
+        g.addColorStop(0, 'rgba(150,200,250,0.98)'); g.addColorStop(0.30, 'rgba(70,125,200,0.98)'); g.addColorStop(1, 'rgba(26,52,100,0.98)');
+        poly([p0,p1,p2,p3]); c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+        // Zellenraster
+        c.strokeStyle = 'rgba(200,225,255,0.30)'; c.lineWidth = Math.max(0.4, lw*0.45);
+        const nx = 3, ny = 2;
+        for (let i=1;i<nx;i++){ const A = P(x+w*i/nx, y+d, z+0.012), B = P(x+w*i/nx, y, z+hb); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); }
+        for (let j=1;j<ny;j++){ const t=j/ny, A = P(x, y+d*(1-t), z+0.012+(hb-0.012)*t), B = P(x+w, y+d*(1-t), z+0.012+(hb-0.012)*t); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); }
+        // Rahmen-Lichtsaum in der Leuchtfarbe: obere Hinterkante und linke Kante
+        seg(p3, p2, css(misch(ak,WEISS,0.3),0.95), lw*1.0); seg(p0, p3, css(ak,0.75), lw*0.8);
+        // Spiegelglanz oben links
+        const sp = c.createLinearGradient(p3[0], p3[1], (p0[0]+p2[0])/2, (p0[1]+p2[1])/2);
+        sp.addColorStop(0, 'rgba(255,255,255,0.30)'); sp.addColorStop(1, 'rgba(255,255,255,0)');
+        poly([p0,p1,p2,p3]); c.fillStyle = sp; c.fill();
+      }
+      /* ---- Sägezahndach auf einem Hallendach: n Zähne entlang x, Glasschräge nach +x sichtbar ---- */
+      function saegezahn(x,y,z,w,d,n,h,ton,glas){
+        const tw = w/n, ak = hexRgb(glas||T.glut);
+        for (let i=0;i<n;i++){
+          const x0 = x+i*tw, xr = x0+tw*0.42, x1 = x0+tw;
+          // Stirnseite (+y, Lichtseite): Dreieck
+          flaeche([[x0,y+d,z],[xr,y+d,z+h],[x1,y+d,z]], css(farbe(ton,1.0)), kontur, 0.7);
+          // steile Rückflanke sichtbar? nein (-x). Glasschräge nach +x:
+          const A = P(xr,y,z+h), B = P(xr,y+d,z+h), C = P(x1,y+d,z), D = P(x1,y,z);
+          const g = c.createLinearGradient(B[0],B[1],D[0],D[1]);
+          g.addColorStop(0, 'rgba(70,110,160,0.95)'); g.addColorStop(1, 'rgba(22,36,64,0.95)');
+          poly([A,B,C,D]); c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          c.strokeStyle = css(ak,0.35); c.lineWidth = Math.max(0.4, lw*0.45);
+          for (let k=1;k<3;k++){ const t=k/3; c.beginPath(); c.moveTo(A[0]+(D[0]-A[0])*t, A[1]+(D[1]-A[1])*t); c.lineTo(B[0]+(C[0]-B[0])*t, B[1]+(C[1]-B[1])*t); c.stroke(); }
+          // Firstkante Lichtsaum
+          seg(A, B, css(ton.hell,0.8), lw*1.0);
+        }
+      }
+      /* ---- Fabrikhalle: Block + Sägezahndach + Schlote (Anzahl je Stand) + Tor auf der Lichtseite ---- */
+      function halle(x,y,w,d,h,opt){
+        opt = opt || {};
+        const ton = opt.ton || T.bau;
+        block(x,y,z0,w,d,h,ton,{top:0.9});
+        if (opt.zaehne) saegezahn(x+w*0.08,y+d*0.12,z0+h,w*0.84,d*0.76,opt.zaehne,h*0.32,ton,opt.glas);
+        if (opt.tor){ wandY(x+w*0.30,x+w*0.62,y+d,z0+0.004,z0+h*0.55,'#0a0d16',css(ton.hell,0.5),0.6);
+          wandY(x+w*0.30,x+w*0.62,y+d,z0+h*0.55,z0+h*0.60,css(hexRgb(opt.tor===true?T.glut:opt.tor),0.9)); }
+        if (opt.fenster) fensterreihe(x+w*0.08,y+d,x+w*0.26,y+d,z0+h*0.62,opt.fenster,T.glut);
+        const n = opt.schlote||0;
+        for (let i=0;i<n;i++){ const sx = x+w*(0.18+i*0.20), sy = y+d*0.25;
+          schlot(sx,sy,z0+h,0.024,0.13+i*0.02,T.stahl,opt.schlotGlut); }
+      }
+
+      /* Energiefläche zwischen zwei senkrechten Pfosten */
+      function energieWand(A3,B3,h,farb){
+        const ak = hexRgb(farb||T.akzent);
+        const a0=P(A3[0],A3[1],A3[2]), b0=P(B3[0],B3[1],B3[2]), a1=P(A3[0],A3[1],A3[2]+h), b1=P(B3[0],B3[1],B3[2]+h);
+        const g = c.createLinearGradient(0,a1[1],0,a0[1]);
+        g.addColorStop(0, css(ak,0.08)); g.addColorStop(0.5, css(ak,0.30)); g.addColorStop(1, css(misch(ak,WEISS,0.4),0.55));
+        poly([a0,b0,b1,a1]); c.fillStyle = g; c.fill();
+        c.strokeStyle = css(ak,0.85); c.lineWidth = lw*0.8; c.stroke();
+        for (let i=1;i<4;i++){ const t=i/4; seg([a0[0],a0[1]+(a1[1]-a0[1])*t],[b0[0],b0[1]+(b1[1]-b0[1])*t], css(misch(ak,WEISS,0.5),0.35), lw*0.6); }
+      }
+
+      /* Bodenschatten, Sockelplatte, Fugen, Leuchtkante und die vier Ankerleuchten.
+         Setzt nebenbei plattenClip, auf das alle Schlagschatten geclippt werden. */
+      function buehne(){
+      c.clearRect(0,0,S,S);
+      // weicher Fallschatten der Platte auf dem Grund, nach rechts unten
+      { const M = P(0.06,0.02,-0.02); const g = c.createRadialGradient(M[0],M[1],S*0.05,M[0],M[1],S*0.5);
+        g.addColorStop(0,'rgba(0,0,0,0.55)'); g.addColorStop(1,'rgba(0,0,0,0)');
+        c.fillStyle = g; c.beginPath(); c.ellipse(M[0],M[1],S*0.5,S*0.3,0,0,Math.PI*2); c.fill(); }
+      const fpPlatte = oktogon(0,0,a,cut);
+      plattenClip = prisma(fpPlatte, 0, z0, T.platte, { top: 1.0 });
+      // Plattenoberfläche: Fugen + Kantenlicht in der Familienfarbe (Massivbau: Amber-Kante)
+      { const innen = oktogon(0,0,a*0.80,cut*0.8).map(p=>P(p[0],p[1],z0));
+        poly(innen); c.strokeStyle = 'rgba(0,0,0,0.28)'; c.lineWidth = lw*0.7; c.stroke();
+        const kant = hexRgb(T.kante);
+        // Leuchtkante auf den beiden Vorderkanten (zum Betrachter), wie die Bodenleuchten der Station
+        const v = [fpPlatte[2],fpPlatte[3],fpPlatte[4],fpPlatte[5]];
+        for (let i=0;i<v.length-1;i++) saum(v[i][0],v[i][1],z0-0.012, v[i+1][0],v[i+1][1],z0-0.012, T.kante, 0.9, 0.85);
+        // vier Ankerleuchten auf der Platte
+        [[-a*0.86,-a*0.86+cut],[a*0.86-cut,-a*0.86],[a*0.86,a*0.86-cut],[-a*0.86+cut,a*0.86]].forEach(p => leuchte(p[0],p[1],z0+0.004,0.010,T.kante,0.85));
+        void kant;
+      }
+      }
+      return { P, lw, kontur, farbe, poly, seg, z0, a, cut, LAM, K, KY, RX, RY, cx, cy, prisma, rechteck, quader, oktogon, schatten, schattenQuader, schattenZylinder, block, zylinder, schlot, kuppel, kugel, rohr, ring, leuchte, fensterreihe, saum, flaeche, wandY, kreisY, kegel, kristall, panel, saegezahn, halle, energieWand, buehne };
+    }
+
+    function zeichneAnlage(c, S, key, stand){
+      const T = isoTon(ANLAGE_FAMILIE[key] || 'massiv');
+      const W = isoWerkzeug(c, S, T);
+      const { P, lw, kontur, farbe, poly, seg, z0, a, cut, LAM, K, KY, RX, RY, cx, cy, prisma, rechteck, quader, oktogon, schatten, schattenQuader, schattenZylinder, block, zylinder, schlot, kuppel, kugel, rohr, ring, leuchte, fensterreihe, saum, flaeche, wandY, kreisY, kegel, kristall, panel, saegezahn, halle, energieWand } = W;
+      W.buehne();
+    const KO = T.koerper, ST = T.stahl, PL = T.platte;
+    const st = stand|0;
+    switch (key){
+      /* -------- Geschütze -------- */
+      case 'turm': {
+        schattenQuader(-0.16,-0.16,0.32,0.32,0.035); quader(-0.16,-0.16,z0,0.32,0.32,0.035,ST);
+        const zb = z0+0.035; schattenZylinder(0.0,0.0,0.13,0.13);
+        zylinder(0.0,0.0,zb,0.13,0.13,KO,{naehte:1});
+        kuppel(0.0,0.0,zb+0.13,0.085,KO);
+        const zr = zb+0.10;
+        rohr([0.03,-0.02,zr],[0.23,-0.22,zr+0.05],0.026,ST,{ringe:[0.18],ringR:1.35});
+        if (st>=1) rohr([0.00,0.04,zr],[0.20,-0.16,zr+0.05],0.026,ST,{ringe:[0.18],ringR:1.35});
+        if (st>=2){ ring(0,0,zb+0.115,0.135,0.012,ST,{glut:T.glut}); leuchte(-0.06,-0.10,zb+0.16,0.012); }
+        fensterreihe(-0.12,0.13,0.10,0.13,zb+0.05,st>=1?3:2);
+        break; }
+      case 'flak': {
+        schattenQuader(-0.15,-0.13,0.30,0.26,0.07); quader(-0.15,-0.13,z0,0.30,0.26,0.07,ST);
+        const zb = z0+0.07; schattenZylinder(0,0,0.09,0.05); zylinder(0,0,zb,0.09,0.05,KO);
+        const zr = zb+0.05;
+        rohr([-0.02,0.02,zr],[-0.13,-0.06,zr+0.26],0.022,ST,{ringe:[0.14],ringR:1.4});
+        rohr([0.03,0.01,zr],[0.21,-0.13,zr+0.20],0.022,ST,{ringe:[0.14],ringR:1.4});
+        if (st>=1){ schattenZylinder(-0.14,0.14,0.055,0.09); zylinder(-0.14,0.14,z0,0.055,0.09,KO,{naehte:2}); }
+        if (st>=2){ zylinder(0.15,0.15,z0,0.02,0.16,ST); kuppel(0.15,0.15,z0+0.16,0.045,KO); leuchte(0.15,0.15,z0+0.21,0.010,'#ff7a6b'); }
+        fensterreihe(-0.12,0.13,0.12,0.13,z0+0.035,3);
+        break; }
+      case 'laser': {
+        schattenZylinder(0,0,0.13,0.06); zylinder(0,0,z0,0.13,0.06,ST,{naehte:1});
+        const zb = z0+0.06; schattenZylinder(0,0,0.045,0.30);
+        zylinder(0,0,zb,0.045,0.30,KO,{naehte:st>=1?3:0});
+        if (st>=1){ // Kühlrippen
+          [[0.06,0.0],[0.0,0.06],[-0.055,-0.02]].forEach(d=>quader(d[0]-0.015,d[1]-0.015,zb+0.03,0.03,0.03,0.16,ST)); }
+        const zk = zb+0.30; zylinder(0,0,zk,0.075,0.05,ST);
+        if (st>=2) ring(0,0,zk+0.02,0.10,0.012,ST,{glut:T.glut});
+        kuppel(0,0,zk+0.05,0.05,KO,{energie:true,farbe:T.glut});
+        leuchte(0,0,zk+0.075,0.014,T.glut);
+        fensterreihe(-0.09,0.10,0.07,0.10,z0+0.03,3);
+        break; }
+      case 'plasma': {
+        schattenZylinder(0,0,0.12,0.05); zylinder(0,0,z0,0.12,0.05,ST);
+        const zb = z0+0.05;
+        // zwei Zangen als Halterung
+        schattenQuader(-0.11,-0.03,0.05,0.06,0.20); quader(-0.11,-0.03,zb,0.05,0.06,0.20,KO);
+        schattenQuader(0.06,-0.03,0.05,0.06,0.20); quader(0.06,-0.03,zb,0.05,0.06,0.20,KO);
+        if (st>=1) ring(0,0,zb+0.17,0.135,0.012,ST,{glut:T.glut});
+        kugel(0,0,zb+0.19,0.085,KO,{energie:true,farbe:T.akzent});
+        if (st>=2){ ring(0,0,zb+0.01,0.15,0.010,ST,{glut:T.glut}); leuchte(0.12,0.12,zb+0.02,0.011); leuchte(-0.14,0.10,zb+0.02,0.011); }
+        break; }
+      case 'raketen': {
+        const silo = (x,y,w,h,offen) => {
+          schattenQuader(x,y,w,w,h); quader(x,y,z0,w,w,h,ST,{top:0.9});
+          const i = w*0.16, zt = z0+h;
+          // offene Luke: dunkler Schacht, Raketenspitze darin sichtbar
+          poly(rechteck(x+i,y+i,w-2*i,w-2*i).map(p=>P(p[0],p[1],zt))); c.fillStyle='#06080e'; c.fill();
+          const M = P(x+w/2,y+w/2,zt+0.0), R = (w-2*i)*0.5*RX*S;
+          // Rakete: Kegel mit Lichtseite links
+          c.beginPath(); c.moveTo(M[0], M[1]-R*1.45); c.lineTo(M[0]-R*0.62, M[1]+R*0.25); c.lineTo(M[0]+R*0.62, M[1]+R*0.25); c.closePath();
+          const g = c.createLinearGradient(M[0]-R*0.55,0,M[0]+R*0.55,0); g.addColorStop(0, css(KO.hell)); g.addColorStop(0.5, css(farbe(KO,1.1))); g.addColorStop(1, css(farbe(KO,0.35)));
+          c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.6; c.stroke();
+          leuchte(x+w/2,y+w/2,zt+0.10*(w/0.2),0.009,'#ff7a6b',0.9);
+          saum(x,y+w,zt,x,y,zt,T.glut,0.9,0.7);
+        };
+        if (st===0) silo(-0.10,-0.10,0.21,0.19);
+        else if (st===1){ silo(-0.20,0.02,0.17,0.17); silo(0.02,-0.20,0.17,0.17); quader(-0.08,-0.08,z0,0.13,0.13,0.06,ST); }
+        else { silo(-0.22,0.06,0.15,0.16); silo(-0.075,-0.075,0.15,0.18); silo(0.07,-0.22,0.15,0.16); quader(0.08,0.08,z0,0.12,0.12,0.07,ST); leuchte(0.14,0.14,z0+0.08,0.010,'#ff7a6b'); }
+        break; }
+      case 'gauss': {
+        schattenZylinder(0,0,0.14,0.05); zylinder(0,0,z0,0.14,0.05,ST,{naehte:1});
+        const zb = z0+0.05; schattenQuader(-0.10,-0.06,0.14,0.14,0.11); quader(-0.10,-0.06,zb,0.14,0.14,0.11,KO);
+        const ringe = st===0 ? [0.25,0.45] : (st===1 ? [0.22,0.38,0.54,0.70] : [0.18,0.30,0.42,0.54,0.66,0.78]);
+        rohr([-0.02,0.0,zb+0.12],[0.23,-0.21,zb+0.145],0.03,ST,{ringe:ringe, ringR:1.55, ringGlut: st>=1?T.glut:null});
+        if (st>=2){ quader(-0.16,0.10,z0,0.12,0.10,0.09,ST); leuchte(-0.10,0.16,z0+0.10,0.010); leuchte(-0.06,0.16,z0+0.10,0.010); }
+        fensterreihe(-0.10,0.08,0.03,0.08,zb+0.05,2);
+        break; }
+      case 'railgun': {
+        schattenQuader(-0.12,-0.10,0.16,0.20,0.08); quader(-0.12,-0.10,z0,0.16,0.20,0.08,ST);
+        schattenQuader(0.06,-0.20,0.10,0.12,0.07); quader(0.06,-0.20,z0,0.10,0.12,0.07,ST);
+        const zr = z0+0.10;
+        rohr([-0.19,0.15,zr],[0.21,-0.25,zr+0.02],0.017,KO);
+        rohr([-0.15,0.19,zr],[0.25,-0.21,zr+0.02],0.017,KO);
+        if (st>=1){ saum(-0.16,0.16,zr+0.012,0.22,-0.22,zr+0.03,T.glut,1.1,0.95);
+          // Kondensatorblock hinten links: der Ausbaustand soll auf 64 Pixeln zu sehen sein,
+          // eine Leuchtlinie allein war dort nicht mehr als ein Schimmer.
+          schattenQuader(-0.05,-0.22,0.14,0.10,0.10); quader(-0.05,-0.22,z0,0.14,0.10,0.10,KO,{top:0.9});
+          fensterreihe(-0.04,-0.12,0.08,-0.12,z0+0.05,3,T.glut,0.009); }
+        if (st>=2){ quader(-0.23,-0.05,z0,0.10,0.12,0.12,ST); fensterreihe(-0.23,0.07,-0.13,0.07,z0+0.06,3); leuchte(-0.20,-0.02,z0+0.13,0.010); }
+        else fensterreihe(-0.12,0.10,0.04,0.10,z0+0.04,2);
+        break; }
+      case 'singularitaetsturm': {
+        schattenZylinder(0,0,0.13,0.04); zylinder(0,0,z0,0.13,0.04,ST);
+        const zb = z0+0.04; schattenZylinder(0,0,0.06,0.24); zylinder(0,0,zb,0.06,0.24,KO,{naehte:2});
+        const zk = zb+0.31;
+        if (st>=1) ring(0,0,zk-0.05,0.16,0.010,ST,{hinten:true,teil:true,glut:T.glut});
+        ring(0,0,zk,0.12,0.012,ST,{hinten:true,teil:true,glut:T.glut});
+        kugel(0,0,zk,0.065,KO,{schwarz:true});
+        { const M = P(0,0,zk), R = 0.065*RX*S; c.strokeStyle = css(hexRgb(T.glut),0.9); c.lineWidth = lw*0.9; c.beginPath(); c.arc(M[0],M[1],R*1.02,0,Math.PI*2); c.stroke(); }
+        ring(0,0,zk,0.12,0.012,ST,{teil:true,glut:T.glut});
+        if (st>=1) ring(0,0,zk-0.05,0.16,0.010,ST,{teil:true,glut:T.glut});
+        if (st>=2){ [[0.16,0.16],[-0.19,0.13],[0.13,-0.19]].forEach(p=>{ zylinder(p[0],p[1],z0,0.02,0.12,ST); leuchte(p[0],p[1],z0+0.13,0.010); }); }
+        fensterreihe(-0.05,0.06,0.03,0.06,zb+0.08,2);
+        break; }
+
+      /* -------- Schilde -------- */
+      case 'schild': {
+        schattenQuader(-0.11,-0.11,0.22,0.22,0.10); quader(-0.11,-0.11,z0,0.22,0.22,0.10,ST);
+        fensterreihe(-0.11,0.11,0.11,0.11,z0+0.05,3); fensterreihe(0.11,-0.11,0.11,0.11,z0+0.05,3,T.glut,0.010);
+        zylinder(0,0,z0+0.10,0.04,0.05,KO); leuchte(0,0,z0+0.16,0.012);
+        if (st>=1) ring(0,0,z0+0.005,0.20,0.010,ST,{glut:T.akzent});
+        kuppel(0,0,z0,st>=1?0.215:0.19,KO,{energie:true});
+        if (st>=2){ [[0.17,0.17],[-0.2,0.13],[0.13,-0.2],[-0.14,-0.14]].forEach(p=>leuchte(p[0],p[1],z0+0.01,0.011,T.akzent)); }
+        break; }
+      case 'ionenschild': {
+        schattenZylinder(0,0,0.12,0.06); zylinder(0,0,z0,0.12,0.06,ST,{naehte:1});
+        zylinder(0,0,z0+0.06,0.05,0.08,KO); leuchte(0,0,z0+0.15,0.012);
+        ring(0,0,z0+0.13,0.21,0.011,ST,{hinten:true,teil:true,glut:T.akzent});
+        if (st>=1) ring(0,0,z0+0.22,0.16,0.010,ST,{hinten:true,teil:true,glut:T.akzent});
+        kuppel(0,0,z0,0.20,KO,{energie:true});
+        ring(0,0,z0+0.13,0.21,0.011,ST,{teil:true,glut:T.akzent});
+        if (st>=1) ring(0,0,z0+0.22,0.16,0.010,ST,{teil:true,glut:T.akzent});
+        if (st>=2){ [[0.19,0.19],[-0.22,0.14],[0.14,-0.22]].forEach(p=>{ zylinder(p[0],p[1],z0,0.022,0.06,ST); leuchte(p[0],p[1],z0+0.07,0.010,T.akzent); }); }
+        break; }
+      case 'schildkuppel': {
+        schattenZylinder(0,0,0.16,0.04); zylinder(0,0,z0,0.16,0.04,ST);
+        fensterreihe(-0.12,0.11,0.11,0.11,z0+0.02,4);
+        if (st>=1){ [[0.20,0.20],[-0.24,0.15],[0.15,-0.24],[-0.15,-0.15]].forEach(p=>{ zylinder(p[0],p[1],z0,0.025,0.07,KO); leuchte(p[0],p[1],z0+0.08,0.010,T.akzent); }); }
+        const kd = kuppel(0,0,z0+0.04,0.235,KO,{energie:true});
+        // Segmentnähte auf der Kuppel
+        { const ak = hexRgb(T.akzent); c.strokeStyle = css(ak,0.45); c.lineWidth = lw*0.6;
+          for (let i=1;i<3;i++){ const f=i/3; c.beginPath(); c.arc(kd.B[0],kd.B[1],kd.rx*f,Math.PI,0); c.stroke(); }
+          c.beginPath(); c.moveTo(kd.B[0],kd.B[1]-kd.rx); c.lineTo(kd.B[0],kd.B[1]+kd.ry); c.stroke(); }
+        if (st>=2){ zylinder(0,0,z0+0.04+0.235,0.02,0.05,ST); leuchte(0,0,z0+0.33,0.013,T.glut); }
+        break; }
+      case 'voidbarriere': {
+        const h = st>=1 ? 0.34 : 0.28;
+        schattenQuader(-0.24,0.11,0.07,0.07,h); schattenQuader(0.11,-0.24,0.07,0.07,h);
+        quader(-0.24,0.11,z0,0.07,0.07,h,KO); quader(0.11,-0.24,z0,0.07,0.07,h,KO);
+        // dunkle Void-Fläche zwischen den Pfosten, lila/blauer Saum
+        { const A=[-0.205,0.145,z0+0.02], B=[0.145,-0.205,z0+0.02];
+          const a0=P(A[0],A[1],A[2]), b0=P(B[0],B[1],B[2]), a1=P(A[0],A[1],A[2]+h-0.04), b1=P(B[0],B[1],B[2]+h-0.04);
+          poly([a0,b0,b1,a1]); c.fillStyle='rgba(6,4,14,0.92)'; c.fill();
+          const ak = hexRgb(T.akzent), li = hexRgb('#c3bef5');
+          const g = c.createLinearGradient(a0[0],0,b0[0],0); g.addColorStop(0,css(li,0.35)); g.addColorStop(0.5,css(ak,0.05)); g.addColorStop(1,css(li,0.35));
+          poly([a0,b0,b1,a1]); c.fillStyle=g; c.fill(); c.strokeStyle=css(li,0.9); c.lineWidth=lw*0.9; c.stroke();
+          if (st>=2){ // Riss in der Mitte
+            const mx=(a0[0]+b0[0])/2, y0=(a1[1]+b1[1])/2, y1=(a0[1]+b0[1])/2;
+            const rg = c.createLinearGradient(mx-S*0.03,0,mx+S*0.03,0); rg.addColorStop(0,css(li,0)); rg.addColorStop(0.5,css(misch(li,WEISS,0.6),0.85)); rg.addColorStop(1,css(li,0));
+            c.fillStyle = rg; c.fillRect(mx-S*0.03, y0+lw, S*0.06, (y1-y0)-2*lw);
+            c.strokeStyle = css(WEISS,0.9); c.lineWidth = lw*0.8; c.beginPath(); c.moveTo(mx,y0+lw); c.lineTo(mx,y1-lw); c.stroke(); } }
+        if (st>=1){ leuchte(-0.205,0.145,z0+h+0.01,0.011,'#c3bef5'); leuchte(0.145,-0.205,z0+h+0.01,0.011,'#c3bef5'); }
+        if (st>=2){ ring(-0.205,0.145,z0+h*0.5,0.06,0.008,ST,{glut:'#c3bef5'}); ring(0.145,-0.205,z0+h*0.5,0.06,0.008,ST,{glut:'#c3bef5'}); }
+        break; }
+      case 'mondschild': {
+        // Regolith-Sockel: grauer flacher Oktogonblock, darauf der Emitter und die Kuppel
+        const fs = oktogon(0,0,0.18,0.06); schattenQuader(-0.18,-0.18,0.36,0.36,0.05); prisma(fs,z0,0.05,ST);
+        zylinder(0,0,z0+0.05,0.05,0.07,KO); leuchte(0,0,z0+0.13,0.012);
+        const pods = st===0 ? [[0.15,0.15]] : (st===1 ? [[0.15,0.15],[-0.19,0.10]] : [[0.15,0.15],[-0.19,0.10],[0.10,-0.19]]);
+        pods.forEach(p=>{ zylinder(p[0],p[1],z0+0.05,0.03,0.05,KO); leuchte(p[0],p[1],z0+0.11,0.009,T.akzent); });
+        if (st>=1) ring(0,0,z0+0.055,0.19,0.010,ST,{glut:T.akzent});
+        if (st>=2) ring(0,0,z0+0.115,0.155,0.010,ST,{glut:T.glut});
+        kuppel(0,0,z0+0.05,0.185,KO,{energie:true});
+        // Mondsichel als Emblem am Kuppelscheitel (klein, hell)
+        { const M = P(0,0,z0+0.05+0.185*RX*0.5), R = S*0.028; c.fillStyle = css(hexRgb(T.glut),0.95);
+          c.beginPath(); c.arc(M[0],M[1],R,0.5,Math.PI*2-0.5); c.arc(M[0]+R*0.55,M[1],R*0.85,Math.PI*2-0.6,0.6,true); c.closePath(); c.fill(); }
+        break; }
+      case 'resonanzschild': {
+        schattenZylinder(0,0,0.13,0.05); zylinder(0,0,z0,0.13,0.05,ST,{naehte:1});
+        const zb = z0+0.05; schattenZylinder(0,0,0.035,0.30); zylinder(0,0,zb,0.035,0.30,KO,{naehte:3});
+        const n = 2 + st; // Resonatorringe: 2 / 3 / 4
+        for (let i=0;i<n;i++){ const z = zb+0.07+i*(0.23/(n-1||1)), R = 0.17 - i*0.03;
+          ring(0,0,z,R,0.010,ST,{hinten:true,teil:true,glut:T.akzent}); }
+        zylinder(0,0,zb,0.035,0.30,KO,{naehte:3});
+        for (let i=0;i<n;i++){ const z = zb+0.07+i*(0.23/(n-1||1)), R = 0.17 - i*0.03;
+          ring(0,0,z,R,0.010,ST,{teil:true,glut:T.akzent}); }
+        kuppel(0,0,zb+0.30,0.04,KO,{energie:true,farbe:T.glut}); leuchte(0,0,zb+0.33,0.012);
+        fensterreihe(-0.09,0.10,0.07,0.10,z0+0.025,3);
+        break; }
+
+      /* -------- Sensoren -------- */
+      case 'sensorphalanx': {
+        schattenQuader(-0.20,-0.10,0.36,0.22,0.06); quader(-0.20,-0.10,z0,0.36,0.22,0.06,ST);
+        fensterreihe(-0.20,0.12,0.14,0.12,z0+0.03,4);
+        const pos = st===0 ? [[0,0]] : (st===1 ? [[-0.10,0.06],[0.08,-0.06]] : [[-0.14,0.10],[0,0],[0.14,-0.10]]);
+        const schuessel = (x,y) => {
+          const zb = z0+0.06; schattenZylinder(x,y,0.025,0.16); zylinder(x,y,zb,0.025,0.16,KO);
+          const M = P(x,y,zb+0.19), R = S*0.085, ak = hexRgb(T.akzent);
+          c.save(); c.translate(M[0],M[1]); c.rotate(-0.55);
+          const g = c.createLinearGradient(-R,0,R,0); g.addColorStop(0, css(farbe(ST,0.45))); g.addColorStop(0.5, css(farbe(ST,1.5))); g.addColorStop(1, css(farbe(ST,0.35)));
+          c.fillStyle = g; c.beginPath(); c.ellipse(0,0,R,R*0.42,0,0,Math.PI*2); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          c.strokeStyle = css(ak,0.9); c.lineWidth = lw*0.8; c.beginPath(); c.ellipse(0,0,R*0.7,R*0.42*0.7,0,0,Math.PI*2); c.stroke();
+          c.fillStyle = css(misch(ak,WEISS,0.5)); c.beginPath(); c.arc(0,-R*0.15,Math.max(0.7,S*0.012),0,Math.PI*2); c.fill();
+          c.restore();
+        };
+        pos.forEach(p=>schuessel(p[0],p[1]));
+        break; }
+      case 'abhorchposten': {
+        schattenQuader(-0.10,-0.10,0.20,0.20,0.05); quader(-0.10,-0.10,z0,0.20,0.20,0.05,ST);
+        const zb = z0+0.05, H = 0.52;
+        // Abspannseile zu den Plattenecken
+        [[a*0.8,a*0.8],[-a*0.85,a*0.7],[a*0.7,-a*0.85]].forEach(p=> seg(P(p[0],p[1],z0), P(0,0,zb+H*0.7), 'rgba(200,210,230,0.35)', lw*0.55));
+        schattenZylinder(0,0,0.022,H); zylinder(0,0,zb,0.022,H,KO,{naehte:4});
+        const dish = (z,R,rot) => { const M = P(0.02,-0.02,z), ak = hexRgb(T.akzent); c.save(); c.translate(M[0],M[1]); c.rotate(rot);
+          const g = c.createLinearGradient(-R,0,R,0); g.addColorStop(0, css(farbe(ST,0.45))); g.addColorStop(0.5, css(farbe(ST,1.5))); g.addColorStop(1, css(farbe(ST,0.35)));
+          c.fillStyle = g; c.beginPath(); c.ellipse(0,0,R,R*0.42,0,0,Math.PI*2); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          c.strokeStyle = css(ak,0.9); c.lineWidth = lw*0.7; c.beginPath(); c.ellipse(0,0,R*0.7,R*0.42*0.7,0,0,Math.PI*2); c.stroke(); c.restore(); };
+        dish(zb+H*0.62, S*0.07, -0.5);
+        if (st>=1){ dish(zb+H*0.34, S*0.085, 0.6);
+          schattenQuader(-0.20,0.06,0.12,0.10,0.07); quader(-0.20,0.06,z0,0.12,0.10,0.07,ST,{top:0.9}); }
+        if (st>=2){ quader(0.08,0.08,z0,0.11,0.11,0.08,ST); fensterreihe(0.08,0.19,0.19,0.19,z0+0.04,2); ring(0,0,zb+H*0.85,0.05,0.007,ST,{glut:T.akzent}); }
+        leuchte(0,0,zb+H+0.012,0.012,'#ff6b6b');
+        fensterreihe(-0.10,0.10,0.10,0.10,z0+0.025,2);
+        break; }
+      case 'signaturscanner': {
+        schattenZylinder(0,0,0.12,0.05); zylinder(0,0,z0,0.12,0.05,ST,{naehte:1});
+        const panel = (x,y,z,w,h) => {
+          schattenQuader(x,y,w,0.03,h); quader(x,y,z,w,0.03,h,KO);
+          // Phased-Array-Raster auf der +y-Flanke (die im Licht)
+          const nx = Math.max(2, Math.round(w/0.045)), nz = Math.max(2, Math.round(h/0.05)), ak = hexRgb(T.glut);
+          for (let i=0;i<nx;i++) for (let j=0;j<nz;j++){ const M = P(x+w*(i+0.5)/nx, y+0.03, z+h*(j+0.5)/nz); const gs = Math.max(0.7, S*0.010);
+            c.fillStyle = css(ak, (i+j)%3===0 ? 0.95 : 0.55); c.fillRect(M[0]-gs*0.5, M[1]-gs*0.5, gs, gs); }
+        };
+        const zb = z0+0.05; zylinder(0,0,zb,0.04,0.05,ST);
+        panel(-0.14,-0.03,zb+0.05,0.28,0.20);
+        if (st>=1) panel(-0.10,-0.18,z0,0.20,0.14);
+        if (st>=2) panel(0.10,0.08,z0,0.14,0.16);
+        break; }
+      case 'kiverteidigung': {
+        schattenQuader(-0.13,-0.13,0.26,0.26,0.26); quader(-0.13,-0.13,z0,0.26,0.26,0.26,ST,{top:0.9});
+        // Kernschlitze auf beiden Flanken
+        { const ak = hexRgb(T.glut);
+          for (let i=0;i<3;i++){ const yy = -0.13+0.26*(i+0.5)/3; saum(0.13,yy,z0+0.04,0.13,yy,z0+0.22,T.glut,1.0,0.85); }
+          for (let i=0;i<3;i++){ const xx = -0.13+0.26*(i+0.5)/3; saum(xx,0.13,z0+0.04,xx,0.13,z0+0.22,T.glut,1.0,0.95); } void ak; }
+        kuppel(0,0,z0+0.26,0.06,KO,{energie:true,farbe:T.glut}); leuchte(0,0,z0+0.30,0.012);
+        if (st>=1){ schattenQuader(0.10,-0.24,0.12,0.12,0.14); quader(0.10,-0.24,z0,0.12,0.12,0.14,ST); saum(0.22,-0.18,z0+0.03,0.22,-0.18,z0+0.11,T.glut,0.9,0.8); }
+        if (st>=2){ ring(0,0,z0+0.27,0.15,0.008,ST,{glut:T.akzent}); zylinder(0,0,z0+0.31,0.012,0.10,ST); leuchte(0,0,z0+0.42,0.010,'#ff6b6b'); }
+        break; }
+
+      /* -------- Massivbau -------- */
+      case 'bunker': {
+        schattenQuader(-0.22,-0.18,0.44,0.36,0.12); quader(-0.22,-0.18,z0,0.44,0.36,0.12,ST);
+        // Amber-Kante rund um die Oberkante, Schießscharten dunkel
+        saum(-0.22,0.18,z0+0.12,0.22,0.18,z0+0.12,T.kante,1.0,0.9); saum(0.22,0.18,z0+0.12,0.22,-0.18,z0+0.12,T.kante,1.0,0.6);
+        { c.fillStyle = '#07090f'; for (let i=0;i<3;i++){ const M = P(-0.22+0.44*(i+0.5)/3, 0.18, z0+0.07); c.fillRect(M[0]-S*0.02, M[1]-S*0.008, S*0.04, S*0.016); } }
+        zylinder(0.06,-0.06,z0+0.12,0.06,0.05,KO); rohr([0.06,-0.06,z0+0.15],[0.20,-0.20,z0+0.165],0.014,ST);
+        if (st>=1){ zylinder(-0.10,0.06,z0+0.12,0.05,0.045,KO); rohr([-0.10,0.06,z0+0.145],[0.02,-0.06,z0+0.16],0.012,ST); }
+        if (st>=2){ prisma(oktogon(0,0,0.255,0.07),z0,0.03,ST); leuchte(0.20,0.20,z0+0.13,0.010,T.kante); leuchte(-0.20,0.12,z0+0.13,0.010,T.kante); }
+        break; }
+      case 'festung': {
+        schattenQuader(-0.21,-0.21,0.42,0.42,0.13); quader(-0.21,-0.21,z0,0.42,0.42,0.13,ST);
+        saum(-0.21,0.21,z0+0.13,0.21,0.21,z0+0.13,T.kante,1.0,0.9);
+        const z1 = z0+0.13; schattenQuader(-0.12,-0.12,0.24,0.24,0.08); quader(-0.12,-0.12,z1,0.24,0.24,0.08,ST);
+        fensterreihe(-0.21,0.21,0.21,0.21,z0+0.065,st>=2?5:3,T.kante,0.011);
+        const kristall = (x,y,z,h,w) => {
+          const B = P(x,y,z), tp = P(x,y,z+h), R = w*S, ak = hexRgb('#e0a548');
+          c.beginPath(); c.moveTo(tp[0],tp[1]); c.lineTo(B[0]+R,B[1]-R*0.55); c.lineTo(B[0]+R*0.6,B[1]+R*0.45); c.lineTo(B[0]-R*0.6,B[1]+R*0.45); c.lineTo(B[0]-R,B[1]-R*0.55); c.closePath();
+          const g = c.createLinearGradient(B[0]-R,tp[1],B[0]+R,B[1]); g.addColorStop(0, css(misch(ak,WEISS,0.7),0.95)); g.addColorStop(0.45, css(ak,0.8)); g.addColorStop(1, css(misch(ak,DUNKEL,0.6),0.95));
+          c.fillStyle = g; c.fill(); c.strokeStyle = css(misch(ak,WEISS,0.6),0.7); c.lineWidth = lw*0.7; c.stroke();
+          seg(tp,[B[0],B[1]+R*0.45], css(WEISS,0.35), lw*0.6);
+          seg(tp,[B[0]-R,B[1]-R*0.55], css(WEISS,0.6), lw*0.7);
+        };
+        kristall(0,0,z1+0.08,0.28,0.075);
+        if (st>=1){ kristall(0.17,0.17,z1,0.10,0.035); kristall(-0.18,0.14,z1,0.09,0.03); kristall(0.14,-0.18,z1,0.09,0.03); }
+        if (st>=2){ leuchte(0,0,z1+0.08+0.29,0.012,'#fac775'); saum(-0.12,0.12,z1+0.08,0.12,0.12,z1+0.08,T.kante,0.9,0.9); }
+        break; }
+      case 'metamaterialwall': {
+        // Wall entlang der Bildwaagerechten (Welt-Richtung (1,-1)), Zinnen als Facettenkamm
+        const wall = (o, laenge, h, dicke) => {
+          const d = dicke/2, fp = [[-laenge+o,laenge+o],[laenge+o,-laenge+o],[laenge+o+d,-laenge+o+d],[-laenge+o+d,laenge+o+d]];
+          // Schatten: Fußabdruck nach +x verlängert
+          schatten(()=>{ [[-laenge+o,laenge+o],[laenge+o+h*LAM,-laenge+o],[laenge+o+h*LAM+d,-laenge+o+d],[-laenge+o+d,laenge+o+d]].map(p=>P(p[0],p[1],z0)).forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath(); });
+          prisma(fp, z0, h, ST);
+          // Facettenkamm oben: Dreiecke in Amber
+          const n = 5, ak = hexRgb('#e0a548');
+          for (let i=0;i<n;i++){ const t0=i/n, t1=(i+1)/n, tm=(t0+t1)/2;
+            const A = P(-laenge+o+(2*laenge)*t0+d*0.5, laenge+o-(2*laenge)*t0+d*0.5, z0+h);
+            const B = P(-laenge+o+(2*laenge)*t1+d*0.5, laenge+o-(2*laenge)*t1+d*0.5, z0+h);
+            const Sp = P(-laenge+o+(2*laenge)*tm+d*0.5, laenge+o-(2*laenge)*tm+d*0.5, z0+h+0.06);
+            c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(Sp[0],Sp[1]); c.lineTo(B[0],B[1]); c.closePath();
+            const g = c.createLinearGradient(A[0],0,B[0],0); g.addColorStop(0, css(misch(ak,WEISS,0.5))); g.addColorStop(0.5, css(ak)); g.addColorStop(1, css(misch(ak,DUNKEL,0.55)));
+            c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.6; c.stroke(); }
+          // Lichtsaum an der Vorderkante
+          saum(-laenge+o+d,laenge+o+d,z0+h,laenge+o+d,-laenge+o+d,z0+h,'#e0a548',0.9,0.85);
+          // Fensterpunkte auf der Front
+          fensterreihe(-laenge+o+d,laenge+o+d,laenge+o+d,-laenge+o+d,z0+h*0.45,6,'#e0a548',0.009);
+        };
+        wall(0,0.22,0.16,0.10);
+        if (st>=1){ quader(-0.24,0.12,z0,0.10,0.10,0.24,ST); quader(0.12,-0.24,z0,0.10,0.10,0.24,ST); leuchte(-0.19,0.17,z0+0.25,0.010,T.kante); leuchte(0.17,-0.19,z0+0.25,0.010,T.kante); }
+        if (st>=2){ wall(-0.11,0.14,0.10,0.07); }
+        break; }
+      case 'fusionsbastion': {
+        schattenQuader(-0.20,-0.20,0.40,0.40,0.10); quader(-0.20,-0.20,z0,0.40,0.40,0.10,ST);
+        saum(-0.20,0.20,z0+0.10,0.20,0.20,z0+0.10,T.kante,1.0,0.9);
+        const z1 = z0+0.10;
+        schattenQuader(-0.17,0.02,0.10,0.14,0.20); quader(-0.17,0.02,z1,0.10,0.14,0.20,ST);
+        schattenQuader(0.07,-0.16,0.10,0.14,0.20); quader(0.07,-0.16,z1,0.10,0.14,0.20,ST);
+        // Torus stehend zwischen den Türmen: Ring in der Bildebene
+        { const M = P(0,0,z1+0.13), R = S*0.10, ak = hexRgb('#e0a548');
+          c.strokeStyle = css(farbe(ST,0.5)); c.lineWidth = S*0.035; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.stroke();
+          c.strokeStyle = css(farbe(ST,1.5)); c.lineWidth = S*0.012; c.beginPath(); c.arc(M[0],M[1],R,Math.PI*0.95,Math.PI*1.7); c.stroke();
+          const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R*0.8); g.addColorStop(0, css(misch(ak,WEISS,0.8))); g.addColorStop(0.35, css(ak,0.9)); g.addColorStop(1, css(ak,0));
+          c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R*0.8,0,Math.PI*2); c.fill();
+          c.strokeStyle = css(ak,0.95); c.lineWidth = lw*0.9; c.beginPath(); c.arc(M[0],M[1],R*0.72,0,Math.PI*2); c.stroke(); }
+        if (st>=1){ zylinder(-0.12,-0.12,z1,0.035,0.16,ST,{naehte:2}); zylinder(-0.04,-0.14,z1,0.035,0.14,ST,{naehte:2}); leuchte(-0.12,-0.12,z1+0.17,0.008,'#ff7a6b'); }
+        if (st>=2){ fensterreihe(-0.20,0.20,0.20,0.20,z0+0.05,5,T.kante,0.011); fensterreihe(-0.17,0.16,-0.07,0.16,z1+0.12,2,T.kante,0.011); leuchte(0.12,-0.09,z1+0.21,0.010,T.kante); }
+        break; }
+      case 'nanoplattform': {
+        schattenQuader(-0.2,-0.2,0.40,0.40,0.04); prisma(oktogon(0,0,0.20,0.06),z0,0.04,ST);
+        const panel = (x,y,z,w,h) => {
+          schattenQuader(x,y,w,0.025,h); quader(x,y,z,w,0.025,h,ST);
+          const ak = hexRgb('#e0a548');
+          // Nanogitter auf der Lichtflanke (+y)
+          const nx = Math.round(w/0.03), nz = Math.round(h/0.03);
+          c.strokeStyle = css(ak,0.75); c.lineWidth = Math.max(0.5, lw*0.55);
+          for (let i=1;i<nx;i++){ const A = P(x+w*i/nx,y+0.025,z), B = P(x+w*i/nx,y+0.025,z+h); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); }
+          for (let j=1;j<nz;j++){ const A = P(x,y+0.025,z+h*j/nz), B = P(x+w,y+0.025,z+h*j/nz); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); }
+          saum(x,y+0.025,z+h,x+w,y+0.025,z+h,'#e0a548',1.0,0.9);
+        };
+        const zb = z0+0.04;
+        panel(-0.12,-0.04,zb,0.24,0.18);
+        if (st>=1) panel(-0.16,0.10,zb,0.16,0.12);
+        if (st>=2){ panel(0.08,-0.18,zb,0.14,0.24); leuchte(0.15,-0.15,zb+0.25,0.010,T.kante); }
+        leuchte(-0.17,0.17,zb+0.01,0.010,T.kante); leuchte(0.17,-0.17,zb+0.01,0.010,T.kante);
+        break; }
+    }
+    }
+
+    function zeichneGebaeude(c, S, key, stand){
+      const def = BUILDING_DEFS.find(d => d.key === key);
+      const T = isoTon(GEBAEUDE_FAMILIE[key] || 'lager');
+      // Die Leuchtfarbe kommt aus der Def, nicht aus einer zweiten Tabelle - sonst laufen
+      // Kachel und Karte auseinander.
+      T.glut = (def && def.fg) || T.akzent;
+      const W = isoWerkzeug(c, S, T);
+      const { P, lw, kontur, farbe, poly, seg, z0, a, cut, LAM, K, KY, RX, RY, cx, cy, prisma, rechteck, quader, oktogon, schatten, schattenQuader, schattenZylinder, block, zylinder, schlot, kuppel, kugel, rohr, ring, leuchte, fensterreihe, saum, flaeche, wandY, kreisY, kegel, kristall, panel, saegezahn, halle, energieWand } = W;
+      W.buehne();
+    const ST = T.stahl, BAU = T.bau, BE = T.beton;
+    const st = stand|0;
+    const silo = (x,y,r,h,ton,band) => { schattenZylinder(x,y,r,h); zylinder(x,y,z0,r,h,ton,{naehte:2}); kuppel(x,y,z0+h,r*0.98,ton);
+      if (band) fensterreihe(x-r*0.7,y+r*0.9,x+r*0.7,y+r*0.9,z0+h*0.45,2,band,0.010); };
+    const tank = (x,y,r,h,band) => { schattenZylinder(x,y,r,h); zylinder(x,y,z0+0.02,r,h,ST,{naehte:1}); kuppel(x,y,z0+0.02+h,r*0.98,ST);
+      quader(x-r*0.9,y-r*0.9,z0,r*1.8,r*1.8,0.02,BE,{top:0.8});
+      if (band){ saum(x-r*0.85,y+r*0.75,z0+0.02+h*0.55,x+r*0.85,y-r*0.75,z0+0.02+h*0.55,band,0.9,0.8); } };
+    const mast = (x,y,h,r) => { zylinder(x,y,z0,r||0.012,h,ST); };
+
+    switch (key){
+      /* -------- Produktion -------- */
+      case 'solar': {
+        /* Runde 1 las sich bei 64 px als grauer Flachklotz: Panele zu niedrig (hb 0.075), zu dunkel,
+           zu wenige. Jetzt: hoch aufgeständerte Glasfelder (hb 0.10), 2×2 / 3×2 / 3×3, helleres Glas,
+           goldene Sammelschiene vorn - das Feld muss auch als Daumennagel "blau auf gold" sein. */
+        block(-0.21,-0.19,z0,0.42,0.38,0.014,BE,{top:0.85});
+        const zb = z0+0.014;
+        const spalten = st>=1 ? 3 : 2, reihen = st>=2 ? 3 : 2, pw = 0.10, pd = 0.085, gx = 0.03, gy = 0.045, hb = 0.075;
+        const x0 = -(spalten*pw + (spalten-1)*gx)/2, y0 = -(reihen*pd + (reihen-1)*gy)/2 - 0.02;
+        // hintere Reihen (kleines y) zuerst, dann nach vorn - die Reihe davor verdeckt den Fuß der dahinter
+        for (let r=0;r<reihen;r++) for (let s=0;s<spalten;s++){
+          const px = x0 + s*(pw+gx), py = y0 + r*(pd+gy);
+          schattenQuader(px,py,pw,pd,hb*0.6); panel(px,py,zb,pw,pd,hb,T.glut);
+        }
+        // Sammelschiene mit Wechselrichter an der Vorderkante, Betriebsleuchten in Gold
+        block(-0.19,0.15,z0,0.30,0.03,0.03,ST,{top:1.0});
+        saum(-0.19,0.18,z0+0.03,0.11,0.18,z0+0.03,T.glut,0.9,0.85);
+        block(0.12,0.13,z0,0.08,0.06,0.05,ST); leuchte(0.16,0.19,z0+0.055,0.010,T.glut);
+        leuchte(-0.17,0.185,z0+0.032,0.008,T.glut,0.9);
+        if (st>=2){ mast(-0.19,-0.20,0.16,0.010); leuchte(-0.19,-0.20,z0+0.165,0.010,T.glut); }
+        break; }
+      case 'mine': {
+        // Halde (Erz, mit Körnern), Förderturm mit Rad, Winde, Förderband
+        const hr = 0.09 + st*0.025, hh = 0.08 + st*0.025;
+        schattenZylinder(0.10,-0.06,hr,hh*0.6);
+        kegel(0.10,-0.06,z0,hr,hh,{mitte:[132,122,104],hell:[236,224,200],dunkel:DUNKEL},{koerner:'#fac775',n:8+st*4});
+        block(-0.19,0.04,z0,0.15,0.11,0.07,BAU,{top:0.9});
+        wandY(-0.16,-0.08,0.15,z0+0.004,z0+0.045,'#0a0d16',css(BAU.hell,0.5));
+        const th = 0.24 + st*0.05;
+        block(-0.09,-0.02,z0,0.055,0.055,th,ST,{top:0.9});
+        // Seilscheibe oben (im Bild ein Kreis), Achsstumpf
+        { const M = P(-0.062,0.0075,z0+th+0.03), R = S*0.032;
+          c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fillStyle = css(farbe(ST,0.9)); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
+          c.strokeStyle = css(ST.hell,0.75); c.lineWidth = lw*0.7; c.beginPath(); c.arc(M[0],M[1],R*0.7,0,Math.PI*2); c.stroke();
+          for (let i=0;i<4;i++){ const t=i*Math.PI/4; seg([M[0]-Math.cos(t)*R*0.7,M[1]-Math.sin(t)*R*0.7],[M[0]+Math.cos(t)*R*0.7,M[1]+Math.sin(t)*R*0.7], css(ST.hell,0.6), lw*0.55); }
+          // Seil vom Rad zur Winde und in den Schacht
+          seg([M[0],M[1]+R], P(-0.062,0.0075,z0+0.02), 'rgba(230,236,250,0.55)', lw*0.55);
+          seg([M[0]-R,M[1]], P(-0.12,0.10,z0+0.07), 'rgba(230,236,250,0.55)', lw*0.55); }
+        // Förderband vom Turm zur Halde
+        { const A = P(-0.05,0.02,z0+th*0.55), B = P(0.10,-0.06,z0+hh+0.01);
+          const n = [-(B[1]-A[1]),(B[0]-A[0])], nl = Math.hypot(n[0],n[1])||1, w = S*0.014;
+          poly([[A[0]+n[0]/nl*w,A[1]+n[1]/nl*w],[B[0]+n[0]/nl*w,B[1]+n[1]/nl*w],[B[0]-n[0]/nl*w,B[1]-n[1]/nl*w],[A[0]-n[0]/nl*w,A[1]-n[1]/nl*w]]);
+          c.fillStyle = css(farbe(ST,0.8)); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          seg([A[0]+n[0]/nl*w,A[1]+n[1]/nl*w],[B[0]+n[0]/nl*w,B[1]+n[1]/nl*w], css(ST.hell,0.7), lw*0.8); }
+        if (st>=1){ block(0.02,0.12,z0,0.07,0.07,0.05,ST); leuchte(0.055,0.19,z0+0.055,0.010,T.glut); }
+        if (st>=2){ leuchte(-0.062,0.0075,z0+th+0.07,0.010,'#ff7a6b'); fensterreihe(-0.16,0.15,-0.08,0.15,z0+0.058,2,T.glut); }
+        break; }
+      case 'raffinerie': {
+        schattenZylinder(0,0,0.15,0.06); zylinder(0,0,z0,0.15,0.06,BAU,{naehte:1});
+        const zb = z0+0.06;
+        if (st>=2) ring(0,0,zb+0.11,0.13,0.010,ST,{glut:T.glut});
+        zylinder(0,0,zb,0.075,0.03,ST);
+        if (st>=1){ zylinder(0.14,-0.11,z0,0.045,0.03,ST); kristall(0.14,-0.11,z0+0.03,0.04,0.15,T.glut); }
+        kristall(0,0,zb+0.03,0.075,0.30+st*0.03,T.glut);
+        if (st>=2){ zylinder(-0.13,0.13,z0,0.05,0.03,ST); kristall(-0.13,0.13,z0+0.03,0.045,0.17,T.glut); }
+        fensterreihe(-0.11,0.11,0.03,0.15,zb-0.035,3,T.glut);
+        break; }
+      case 'synth': {
+        const band = '#a9cdf5';
+        block(-0.20,0.06,z0,0.13,0.12,0.06,BAU); wandY(-0.18,-0.10,0.18,z0+0.004,z0+0.04,'#0a0d16',css(BAU.hell,0.5));
+        tank(0.05,-0.08,0.075,0.14,band);
+        if (st>=1) tank(-0.10,-0.12,0.06,0.11,band);
+        if (st>=2) tank(0.12,0.10,0.06,0.11,band);
+        // Leitungen vom Pumpenhaus zum Tank
+        rohr([-0.09,0.10,z0+0.05],[0.02,-0.02,z0+0.09],0.012,ST,{ringe:[0.5],ringR:1.4,ohneMuendung:true});
+        if (st>=1) rohr([-0.10,-0.12,z0+0.13],[0.03,-0.08,z0+0.16],0.010,ST,{ohneMuendung:true});
+        if (st>=2){ mast(-0.16,-0.02,0.24,0.012); leuchte(-0.16,-0.02,z0+0.245,0.010,band); }
+        leuchte(-0.14,0.18,z0+0.065,0.010,T.glut);
+        break; }
+      case 'fusionsreaktor': {
+        schattenZylinder(0,0,0.165,0.09); zylinder(0,0,z0,0.165,0.09,BAU,{naehte:2});
+        const zb = z0+0.09;
+        ring(0,0,zb+0.03,0.135,0.020,ST,{glut:T.glut});
+        zylinder(0,0,zb,0.05,0.05,ST);
+        kugel(0,0,zb+0.075,0.045,ST,{energie:true,farbe:T.glut});
+        if (st>=1) ring(0,0,zb+0.075,0.135,0.012,ST,{glut:T.glut});
+        if (st>=2) ring(0,0,zb+0.12,0.11,0.010,ST,{glut:T.glut});
+        if (st>=1){ schlot(-0.17,0.17,z0,0.030,0.15,ST); }
+        if (st>=2){ schlot(0.18,-0.16,z0,0.030,0.15,ST); }
+        fensterreihe(-0.12,0.12,0.02,0.17,z0+0.05,4,T.glut,0.010);
+        break; }
+      case 'bergungswerft': {
+        // Schienen, Wrackteil, Kranmast mit Ausleger
+        for (const yy of [-0.10,0.02]) block(-0.22,yy,z0,0.44,0.012,0.008,ST);
+        const wrack = (x,y,l,r) => { schattenZylinder(x,y,r,r*0.6); rohr([x,y,z0+r],[x+l,y-l*0.3,z0+r*1.1],r,{mitte:[74,70,78],hell:[150,146,154],dunkel:DUNKEL},{kappe:true});
+          fensterreihe(x+l*0.2,y-l*0.06+r*0.8,x+l*0.8,y-l*0.24+r*0.8,z0+r*1.0,2,'#ff7a6b',0.009); };
+        wrack(-0.14,-0.02,0.20,0.045);
+        if (st>=1) wrack(0.02,0.14,0.14,0.035);
+        const kx = -0.16, ky = 0.14, kh = 0.28 + st*0.02;
+        block(kx-0.035,ky-0.035,z0,0.07,0.07,0.04,BAU);
+        zylinder(kx,ky,z0+0.04,0.022,kh,ST,{naehte:3});
+        rohr([kx,ky,z0+0.04+kh],[0.12,-0.06,z0+0.04+kh+0.01],0.014,ST,{ringe:[0.3,0.65],ringR:1.3,kappe:true});
+        seg(P(0.06,-0.02,z0+0.04+kh), P(0.06,-0.02,z0+0.10), 'rgba(230,236,250,0.6)', lw*0.55);
+        leuchte(0.06,-0.02,z0+0.10,0.010,T.glut);
+        if (st>=2){ rohr([kx,ky,z0+0.04+kh*0.8],[-0.02,0.18,z0+0.04+kh*0.82],0.012,ST,{kappe:true}); leuchte(kx,ky,z0+0.05+kh,0.010,'#ff7a6b'); }
+        break; }
+      case 'urmateriereaktor': {
+        prisma(oktogon(0,0,0.17,0.05), z0, 0.035, BAU, {top:0.9});
+        const zb = z0+0.035, ph = 0.22+st*0.02;
+        [[-0.12,-0.12],[0.12,-0.12],[-0.12,0.12],[0.12,0.12]].forEach((p,i)=>{ if (i<2) block(p[0]-0.022,p[1]-0.022,zb,0.044,0.044,ph,ST); });
+        if (st>=1) ring(0,0,zb+0.14,0.11,0.010,ST,{glut:T.glut});
+        { const M = P(0,0,zb+0.13), R = S*0.11; const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R);
+          g.addColorStop(0, css(hexRgb(T.glut),0.45)); g.addColorStop(1, css(hexRgb(T.glut),0)); c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fill(); }
+        kugel(0,0,zb+0.13,0.06,ST,{schwarz:true});
+        c.strokeStyle = css(hexRgb(T.glut),0.9); c.lineWidth = lw*0.9; { const M = P(0,0,zb+0.13); c.beginPath(); c.arc(M[0],M[1],0.06*RX*S,0,Math.PI*2); c.stroke(); }
+        [[-0.12,0.12],[0.12,0.12]].forEach(p=> block(p[0]-0.022,p[1]-0.022,zb,0.044,0.044,ph,ST));
+        if (st>=2){ ring(0,0,zb+ph+0.01,0.155,0.012,ST,{glut:T.glut}); }
+        [[-0.12,-0.12],[0.12,-0.12],[-0.12,0.12],[0.12,0.12]].forEach(p=> leuchte(p[0],p[1],zb+ph+0.004,0.009,T.glut,0.9));
+        break; }
+      case 'aufbereitung': {
+        halle(-0.20,-0.10,0.30,0.20,0.09,{tor:true,fenster:3});
+        // Trichter (Kegel auf der Spitze stehend als Zylinderstumpf) + Sieb-Trommel auf dem Dach
+        zylinder(-0.08,-0.02,z0+0.09,0.06,0.09,ST,{naehte:1});
+        rohr([0.00,0.06,z0+0.13],[0.09,-0.04,z0+0.15],0.03,ST,{ringe:[0.25,0.75],ringR:1.25,kappe:true});
+        // Förderband von außen auf das Dach
+        { const A = P(0.20,0.14,z0+0.01), B = P(0.06,0.06,z0+0.14);
+          const n=[-(B[1]-A[1]),(B[0]-A[0])], nl=Math.hypot(n[0],n[1])||1, w=S*0.014;
+          poly([[A[0]+n[0]/nl*w,A[1]+n[1]/nl*w],[B[0]+n[0]/nl*w,B[1]+n[1]/nl*w],[B[0]-n[0]/nl*w,B[1]-n[1]/nl*w],[A[0]-n[0]/nl*w,A[1]-n[1]/nl*w]]);
+          c.fillStyle = css(farbe(ST,0.8)); c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          seg([A[0]+n[0]/nl*w,A[1]+n[1]/nl*w],[B[0]+n[0]/nl*w,B[1]+n[1]/nl*w], css(ST.hell,0.7), lw*0.8); }
+        if (st>=1) silo(0.16,-0.14,0.045,0.12,ST);
+        if (st>=2){ silo(0.18,-0.02,0.045,0.12,ST); leuchte(-0.08,-0.02,z0+0.19,0.010,T.glut); }
+        break; }
+      /* -------- Lager -------- */
+      case 'lager': {
+        const n = 2+st, r = 0.05, h = 0.15;
+        block(-0.21,0.08,z0,0.42,0.09,0.02,BE,{top:0.85});
+        const x0 = -(n-1)*0.10/2;
+        for (let i=0;i<n;i++) silo(x0+i*0.10-0.02, -0.06+i*0.0, r, h, ST, null);
+        for (let i=0;i<n-1;i++) rohr([x0+i*0.10-0.02,-0.06,z0+h+0.02],[x0+(i+1)*0.10-0.02,-0.06,z0+h+0.02],0.008,ST,{ohneMuendung:true});
+        block(-0.06,0.09,z0+0.02,0.12,0.07,0.05,BAU); wandY(-0.04,0.04,0.16,z0+0.024,z0+0.055,'#0a0d16',css(BAU.hell,0.5));
+        leuchte(0.02,0.16,z0+0.075,0.010,T.glut);
+        if (st>=2) fensterreihe(-0.20,0.17,-0.08,0.17,z0+0.03,3,T.glut,0.009);
+        break; }
+      case 'hochsicherheitslager': {
+        block(-0.18,-0.12,z0,0.30,0.24,0.10,BE,{top:0.85});
+        quader(-0.19,-0.13,z0+0.10,0.32,0.26,0.022,ST,{top:0.9});
+        // Panzertor über fast die volle Höhe der Lichtflanke, zwei Stahlriegel, goldene Warnkante
+        wandY(-0.12,0.04,0.12,z0+0.004,z0+0.088,'#0a0d16',css(ST.hell,0.6),0.8);
+        wandY(-0.11,0.03,0.12,z0+0.012,z0+0.080,css(farbe(ST,0.95)),css(ST.hell,0.4),0.5);
+        saum(-0.12,0.125,z0+0.035,0.04,0.125,z0+0.035,'#d8d5c9',1.3,0.95);
+        saum(-0.12,0.125,z0+0.062,0.04,0.125,z0+0.062,'#d8d5c9',1.3,0.95);
+        leuchte(-0.04,0.126,z0+0.048,0.009,T.glut,0.95);
+        saum(-0.19,0.125,z0+0.10,0.13,0.125,z0+0.10,'#fac775',1.0,0.9);
+        if (st>=1){ zylinder(0.16,-0.15,z0,0.028,0.20,ST,{naehte:2}); kuppel(0.16,-0.15,z0+0.20,0.04,ST); leuchte(0.16,-0.15,z0+0.245,0.010,'#ff7a6b'); }
+        if (st>=2){ block(-0.21,0.15,z0,0.13,0.07,0.05,ST); for (const p of [[-0.22,-0.18],[0.0,-0.20],[0.20,0.06],[0.20,0.17]]) { mast(p[0],p[1],0.07,0.008); leuchte(p[0],p[1],z0+0.075,0.008,T.glut); } }
+        break; }
+      case 'kryolager': {
+        const n = 2+st, band = '#85b7eb';
+        block(-0.21,0.08,z0,0.42,0.09,0.02,BE,{top:0.85});
+        const x0 = -(n-1)*0.10/2;
+        for (let i=0;i<n;i++) silo(x0+i*0.10-0.02, -0.06, 0.055, 0.12, ST, band);
+        for (let i=0;i<n;i++) leuchte(x0+i*0.10-0.02, -0.06, z0+0.12+0.055*0.98+0.006, 0.008, band, 0.9);
+        block(-0.05,0.09,z0+0.02,0.11,0.07,0.05,BAU);
+        rohr([0.00,0.10,z0+0.09],[0.00,-0.02,z0+0.10],0.010,ST,{ringe:[0.4,0.8],ringR:1.4,ohneMuendung:true});
+        wandY(-0.03,0.04,0.16,z0+0.024,z0+0.055,'#0a0d16',css(BAU.hell,0.5)); leuchte(0.02,0.16,z0+0.075,0.010,band);
+        break; }
+      case 'tresor': {
+        const w = 0.24+st*0.015, h = 0.18+st*0.015;
+        block(-w/2,-w/2,z0,w,w,h,BE,{top:0.85});
+        quader(-w/2-0.012,-w/2-0.012,z0+h,w+0.024,w+0.024,0.02,ST,{top:0.9});
+        // runde Tresortür auf der Lichtseite, Speichenrad und Riegel
+        kreisY(0,w/2,z0+h*0.48,h*0.36,css(farbe(ST,0.95)),css(ST.hell,0.8),0.9);
+        kreisY(0,w/2,z0+h*0.48,h*0.24,'#0e1220',css(ST.hell,0.5),0.6);
+        for (let i=0;i<3;i++){ const t=i*Math.PI/3; saum(-Math.cos(t)*h*0.22,w/2+0.004,z0+h*0.48-Math.sin(t)*h*0.22, Math.cos(t)*h*0.22,w/2+0.004,z0+h*0.48+Math.sin(t)*h*0.22, T.glut, 0.9, 0.9); }
+        leuchte(0,w/2+0.006,z0+h*0.48,0.010,T.glut);
+        if (st>=1){ for (const zz of [h*0.2,h*0.8]) saum(-w/2,w/2+0.003,z0+zz,w/2,w/2+0.003,z0+zz,'#fac775',0.8,0.75); }
+        if (st>=2){ [[-w/2-0.01,-w/2-0.01],[w/2+0.01,-w/2-0.01],[-w/2-0.01,w/2+0.01],[w/2+0.01,w/2+0.01]].forEach(p=>{ mast(p[0],p[1],h+0.06,0.007); leuchte(p[0],p[1],z0+h+0.065,0.008,T.glut); }); }
+        break; }
+      /* -------- Forschung -------- */
+      case 'labor': {
+        schattenZylinder(0.01,0.02,0.15,0.08); zylinder(0.01,0.02,z0,0.15,0.08,BAU,{naehte:1});
+        const zb = z0+0.08;
+        if (st>=1) block(-0.22,-0.02,z0,0.10,0.14,0.06,BAU);
+        // Innenleben vor die Glaskuppel zeichnen, damit es durchscheint
+        zylinder(0.01,0.02,zb,0.05,0.06,ST); leuchte(0.01,0.02,zb+0.07,0.014,T.glut);
+        kuppel(0.01,0.02,zb,0.135,BAU,{energie:true,farbe:T.glut,alpha:1.4,rippen:4});
+        if (st>=2) ring(0.01,0.02,zb+0.01,0.155,0.010,ST,{glut:T.glut});
+        // Antennenmast mit Schüssel
+        const ax = 0.16, ay = -0.15, ah = 0.26+st*0.03;
+        mast(ax,ay,ah,0.012);
+        { const M = P(ax,ay,z0+ah); c.beginPath(); c.ellipse(M[0]-S*0.018,M[1]-S*0.014,S*0.055,S*0.026,-0.7,0,Math.PI*2);
+          const dg = c.createLinearGradient(M[0]-S*0.06,M[1]-S*0.04,M[0]+S*0.02,M[1]+S*0.02); dg.addColorStop(0, css(farbe(ST,1.7))); dg.addColorStop(1, css(farbe(ST,0.6)));
+          c.fillStyle = dg; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.7; c.stroke();
+          c.strokeStyle = css(ST.hell,0.7); c.lineWidth = lw*0.6; c.beginPath(); c.ellipse(M[0]-S*0.018,M[1]-S*0.014,S*0.032,S*0.015,-0.7,0,Math.PI*2); c.stroke();
+          leuchte(ax,ay,z0+ah+0.02,0.008,'#ff7a6b',0.8); }
+        if (st>=1) fensterreihe(-0.20,0.12,-0.14,0.12,z0+0.035,2,T.glut,0.010);
+        if (st>=2){ mast(-0.16,-0.16,0.16,0.009); leuchte(-0.16,-0.16,z0+0.165,0.009,T.glut); }
+        fensterreihe(-0.09,0.14,0.08,0.16,z0+0.04,4,T.glut,0.010);
+        break; }
+      case 'kryoarchiv': {
+        const band = '#a9cdf5';
+        if (st>=1) block(-0.06,-0.20,z0,0.24,0.10,0.09,BAU,{top:0.9});
+        block(-0.20,-0.08,z0,0.34,0.15,0.09,BAU,{top:0.9});
+        // Frostband auf der Lichtseite
+        wandY(-0.17,0.11,0.07,z0+0.035,z0+0.06,'rgba(140,190,240,0.30)',css(hexRgb(band),0.7),0.6);
+        fensterreihe(-0.16,0.07,0.10,0.07,z0+0.047,6,band,0.010);
+        kuppel(0.08,0.0,z0+0.09,0.05,ST);
+        rohr([-0.16,-0.06,z0+0.09],[-0.16,-0.06,z0+0.18],0.012,ST,{ringe:[0.6],ringR:1.4,kappe:true});
+        if (st>=2){ rohr([-0.06,-0.06,z0+0.09],[-0.06,-0.06,z0+0.18],0.012,ST,{ringe:[0.6],ringR:1.4,kappe:true}); leuchte(0.08,0.0,z0+0.145,0.010,band); }
+        leuchte(-0.19,0.07,z0+0.095,0.009,band,0.9);
+        break; }
+      case 'autonomiekern': {
+        prisma(oktogon(0,0,0.16,0.05), z0, 0.03, BAU, {top:0.9});
+        const zb = z0+0.03, h = 0.16+st*0.03;
+        schattenZylinder(0,0,0.10,h);
+        prisma(oktogon(0,0,0.10,0.03), zb, h, ST, {top:0.9});
+        if (st>=1) ring(0,0,zb+h*0.5,0.125,0.010,ST,{glut:T.glut});
+        if (st>=2) ring(0,0,zb+h*0.85,0.125,0.010,ST,{glut:T.glut});
+        zylinder(0,0,zb+h,0.045,0.02,ST);
+        kugel(0,0,zb+h+0.045,0.04,ST,{energie:true,farbe:T.glut});
+        [[-0.13,0.13],[0.13,0.13],[0.13,-0.13],[-0.13,-0.13]].forEach((p,i)=>{ if (i<2 || st>=1){ zylinder(p[0],p[1],zb,0.03,0.05,BAU); leuchte(p[0],p[1],zb+0.055,0.008,T.glut); } });
+        fensterreihe(-0.07,0.10,0.07,0.10,zb+h*0.3,3,T.glut,0.010);
+        break; }
+      case 'gravkompressor': {
+        block(-0.20,-0.05,z0,0.40,0.10,0.03,BAU,{top:0.9});
+        const zb = z0+0.03, ph = 0.22+st*0.02;
+        block(-0.18,-0.03,zb,0.06,0.06,ph,ST,{top:0.9});
+        const M = P(0,0,zb+0.13), R = S*0.10;
+        { const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R); g.addColorStop(0, css(hexRgb(T.glut),0.40)); g.addColorStop(1, css(hexRgb(T.glut),0));
+          c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fill(); }
+        for (let i=0;i<=st;i++) ring(0,0,zb+0.08+i*0.05,0.09-i*0.012,0.008,ST,{glut:T.glut});
+        kugel(0,0,zb+0.13,0.04,ST,{schwarz:true});
+        c.strokeStyle = css(hexRgb(T.glut),0.9); c.lineWidth = lw*0.8; c.beginPath(); c.arc(M[0],M[1],0.04*RX*S,0,Math.PI*2); c.stroke();
+        block(0.12,-0.03,zb,0.06,0.06,ph,ST,{top:0.9});
+        // Emitter-Köpfe oben, Verbindungsbalken
+        rohr([-0.15,0.0,zb+ph],[0.15,0.0,zb+ph],0.012,ST,{ringe:[0.5],ringR:1.3,ohneMuendung:true});
+        leuchte(-0.15,0.0,zb+ph+0.005,0.009,T.glut); leuchte(0.15,0.0,zb+ph+0.005,0.009,T.glut);
+        break; }
+      /* -------- Fabriken (Tier 2/3) -------- */
+      case 'nanolegierungsfabrik': {
+        halle(-0.20,-0.12,0.30,0.22,0.10,{zaehne:3,schlote:1+st,tor:true});
+        // Nanogitter auf der Lichtflanke
+        { const ak = hexRgb(T.glut); c.strokeStyle = css(ak,0.6); c.lineWidth = Math.max(0.4, lw*0.5);
+          for (let i=1;i<5;i++){ const A = P(-0.20+0.30*0.72*i/5,0.10+0.002,z0), B = P(-0.20+0.30*0.72*i/5,0.10+0.002,z0+0.10); c.beginPath(); c.moveTo(A[0],A[1]); c.lineTo(B[0],B[1]); c.stroke(); } }
+        if (st>=1) silo(0.17,-0.15,0.045,0.13,ST,T.glut);
+        if (st>=2) silo(0.17,-0.03,0.045,0.17,ST,T.glut);
+        break; }
+      case 'quantenchipfabrik': {
+        halle(-0.20,-0.12,0.30,0.22,0.09,{tor:true,fenster:3,schlote:st>=2?1:0});
+        // Reinraum-Aufsatz mit Leiterbahnen auf dem Dach
+        block(-0.14,-0.08,z0+0.09,0.16,0.14,0.05,ST,{top:1.0});
+        { const ak = hexRgb(T.glut); c.strokeStyle = css(ak,0.85); c.lineWidth = Math.max(0.5, lw*0.6);
+          const zz = z0+0.14+0.002;
+          [[[-0.12,-0.06],[-0.02,-0.06],[-0.02,0.0]],[[-0.12,0.04],[0.0,0.04],[0.0,-0.02]],[[-0.06,0.02],[-0.06,-0.04]]].forEach(pf=>{ c.beginPath(); pf.forEach((p,i)=>{ const q=P(p[0],p[1],zz); i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]); }); c.stroke(); }); }
+        leuchte(-0.02,0.0,z0+0.142,0.009,T.glut); leuchte(0.0,-0.02,z0+0.142,0.009,T.glut);
+        if (st>=1) block(0.06,-0.16,z0,0.10,0.10,0.06,BAU);
+        if (st>=2) fensterreihe(0.07,-0.06,0.15,-0.06,z0+0.035,2,T.glut,0.009);
+        break; }
+      case 'kristalllabor': {
+        halle(-0.20,-0.10,0.28,0.20,0.10,{zaehne:2,tor:true,schlote:st>=1?1:0});
+        zylinder(0.12,-0.12,z0,0.055,0.03,ST);
+        kristall(0.12,-0.12,z0+0.03,0.05,0.20+st*0.03,T.glut);
+        if (st>=2){ zylinder(0.16,0.06,z0,0.04,0.03,ST); kristall(0.16,0.06,z0+0.03,0.035,0.13,T.glut); }
+        break; }
+      case 'fusionsschmiede': {
+        halle(-0.20,-0.12,0.30,0.22,0.11,{zaehne:2,schlote:1+st,schlotGlut:T.glut});
+        // offenes Ofenmaul auf der Lichtseite, glühend
+        wandY(-0.12,0.00,0.10,z0+0.004,z0+0.06,'#1a0c0a',css(ST.hell,0.5),0.6);
+        { const M = P(-0.06,0.10,z0+0.03), R = S*0.06; const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R);
+          g.addColorStop(0, 'rgba(255,190,120,0.95)'); g.addColorStop(0.5, 'rgba(240,120,80,0.55)'); g.addColorStop(1, 'rgba(240,120,80,0)');
+          c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fill(); }
+        if (st>=1) block(0.09,0.11,z0,0.13,0.08,0.07,BAU);
+        if (st>=2){ schattenZylinder(0.15,-0.14,0.055,0.16); zylinder(0.15,-0.14,z0,0.055,0.16,BAU,{naehte:2});
+          kuppel(0.15,-0.14,z0+0.16,0.054,BAU); leuchte(0.15,-0.14,z0+0.19,0.010,T.glut,0.9); }
+        break; }
+      case 'kilabor': {
+        halle(-0.20,-0.04,0.26,0.16,0.09,{tor:true,fenster:3});
+        // Rechenturm mit gestapelten Leuchtreihen
+        const th = 0.22+st*0.04;
+        block(0.04,-0.18,z0,0.13,0.13,th,ST,{top:0.9});
+        for (let i=0;i<3+st;i++) fensterreihe(0.05,-0.05,0.16,-0.05,z0+0.03+i*0.05,3,T.glut,0.009);
+        leuchte(0.105,-0.115,z0+th+0.004,0.010,T.glut);
+        if (st>=2) ring(0.105,-0.115,z0+th+0.03,0.07,0.007,ST,{glut:T.glut});
+        break; }
+      case 'metamaterialweberei': {
+        halle(-0.20,-0.12,0.30,0.22,0.09,{zaehne:3,tor:true,schlote:st>=2?1:0});
+        // Webrahmen auf dem Dach: zwei Pfosten, Fäden dazwischen
+        const zb = z0+0.09+0.03;
+        block(-0.02,-0.08,z0+0.09,0.03,0.03,0.14,ST); block(-0.02,0.04,z0+0.09,0.03,0.03,0.14,ST);
+        rohr([-0.005,-0.065,zb+0.11],[-0.005,0.055,zb+0.11],0.008,ST,{ohneMuendung:true});
+        { const ak = hexRgb(T.glut); for (let i=0;i<4+st*2;i++){ const t=(i+0.5)/(4+st*2); saum(-0.005,-0.065+0.12*t,zb+0.11,-0.005,-0.065+0.12*t,z0+0.09+0.002,T.glut,0.55,0.75); } void ak; }
+        // Zweiter Rahmen ab Stand 1: mehr Faeden allein waren auf 64 Pixeln nicht zu sehen.
+        if (st>=1){ block(0.12,-0.08,z0+0.09,0.03,0.03,0.11,ST); block(0.12,0.04,z0+0.09,0.03,0.03,0.11,ST);
+          rohr([0.135,-0.065,z0+0.09+0.11],[0.135,0.055,z0+0.09+0.11],0.008,ST,{ohneMuendung:true});
+          for (let i=0;i<4;i++){ const t=(i+0.5)/4; saum(0.135,-0.065+0.12*t,z0+0.09+0.11,0.135,-0.065+0.12*t,z0+0.09+0.002,T.glut,0.55,0.7); } }
+        break; }
+      case 'singularitaetsreaktor': {
+        halle(-0.20,0.0,0.30,0.14,0.08,{tor:true,fenster:3,schlote:st>=1?1:0});
+        const bx = 0.04, by = -0.12;
+        prisma(oktogon(bx,by,0.11,0.035), z0, 0.03, BAU, {top:0.9});
+        [[-0.07,-0.07],[0.07,-0.07]].forEach(p=> block(bx+p[0]-0.015,by+p[1]-0.015,z0+0.03,0.03,0.03,0.18,ST));
+        { const M = P(bx,by,z0+0.14), R = S*0.09; const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R);
+          g.addColorStop(0, css(hexRgb(T.glut),0.45)); g.addColorStop(1, css(hexRgb(T.glut),0)); c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fill(); }
+        kugel(bx,by,z0+0.14,0.045,ST,{schwarz:true});
+        { const M = P(bx,by,z0+0.14); c.strokeStyle = css(hexRgb(T.glut),0.9); c.lineWidth = lw*0.8; c.beginPath(); c.arc(M[0],M[1],0.045*RX*S,0,Math.PI*2); c.stroke(); }
+        if (st>=1) ring(bx,by,z0+0.14,0.085,0.008,ST,{glut:T.glut});
+        [[-0.07,0.07],[0.07,0.07]].forEach(p=> block(bx+p[0]-0.015,by+p[1]-0.015,z0+0.03,0.03,0.03,0.18,ST));
+        if (st>=2) ring(bx,by,z0+0.22,0.10,0.008,ST,{glut:T.glut});
+        break; }
+      case 'hohlraumweberei': {
+        halle(-0.20,-0.12,0.30,0.22,0.09,{zaehne:2,tor:true,schlote:st>=1?1:0});
+        // Hohlraumgitter: Würfelrahmen aus 12 Kanten auf dem Dach, innen Leuchtpunkt
+        const k = 0.05+st*0.01, kx = 0.05, ky = -0.02, kz = z0+0.09+0.02;
+        const E = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]].map(v=>[kx+(v[0]-0.5)*2*k, ky+(v[1]-0.5)*2*k, kz+v[2]*2*k]);
+        const kanten = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+        leuchte(kx,ky,kz+k,0.014,T.glut);
+        kanten.forEach(e=> saum(E[e[0]][0],E[e[0]][1],E[e[0]][2],E[e[1]][0],E[e[1]][1],E[e[1]][2],'#d6dbe6',0.9,0.9));
+        [[0,4],[3,7]].forEach(e=> saum(E[e[0]][0],E[e[0]][1],E[e[0]][2],E[e[1]][0],E[e[1]][1],E[e[1]][2],T.glut,0.9,0.9));
+        if (st>=2) block(-0.19,0.11,z0,0.10,0.06,0.05,BAU);
+        break; }
+      case 'kausalankerwerk': {
+        halle(-0.20,-0.04,0.28,0.16,0.09,{tor:true,fenster:3,schlote:st>=2?1:0});
+        // Ankerpylon: Mast mit Ring oben und gespannten Ankerseilen zur Platte
+        const ax = 0.10, ay = -0.14, ah = 0.30+st*0.03;
+        block(ax-0.03,ay-0.03,z0,0.06,0.06,0.03,ST);
+        zylinder(ax,ay,z0+0.03,0.018,ah,ST,{naehte:3});
+        ring(ax,ay,z0+0.03+ah,0.05,0.008,ST,{glut:T.glut});
+        [[0.22,-0.06],[0.16,0.16],[-0.04,-0.22]].forEach((p,i)=>{ if (i<=st) { saum(ax,ay,z0+0.03+ah,p[0],p[1],z0,'#d6dbe6',0.6,0.7); leuchte(p[0],p[1],z0+0.004,0.008,T.glut); } });
+        leuchte(ax,ay,z0+0.03+ah+0.02,0.011,T.glut);
+        break; }
+      case 'werftkern': {
+        // Dockportal: zwei Pylone, Querbalken, darunter der glühende Fusionskern
+        block(-0.20,-0.10,z0,0.40,0.20,0.025,BAU,{top:0.9});
+        const zb = z0+0.025, ph = 0.24+st*0.02;
+        block(-0.17,-0.03,zb,0.06,0.06,ph,ST,{top:0.9});
+        zylinder(0,0,zb,0.06,0.03,ST);
+        { const M = P(0,0,zb+0.09), R = S*0.09; const g = c.createRadialGradient(M[0],M[1],0,M[0],M[1],R);
+          g.addColorStop(0, css(hexRgb(T.glut),0.45)); g.addColorStop(1, css(hexRgb(T.glut),0)); c.fillStyle = g; c.beginPath(); c.arc(M[0],M[1],R,0,Math.PI*2); c.fill(); }
+        kugel(0,0,zb+0.09,0.045,ST,{energie:true,farbe:T.glut});
+        if (st>=1) ring(0,0,zb+0.09,0.08,0.008,ST,{glut:T.glut});
+        block(0.11,-0.03,zb,0.06,0.06,ph,ST,{top:0.9});
+        block(-0.17,-0.03,zb+ph,0.34,0.06,0.035,ST,{top:1.0});
+        fensterreihe(-0.15,0.03,0.15,0.03,zb+ph+0.017,st>=2?6:4,T.glut,0.009);
+        if (st>=2) block(-0.17,-0.03,zb+ph+0.035,0.34,0.06,0.03,ST,{top:1.0});
+        break; }
+      case 'quantenwerft': {
+        halle(-0.20,-0.10,0.30,0.20,0.10,{fenster:3});
+        // großes offenes Montagetor, innen ein Rumpf im Bau; Portalkran auf dem Dach
+        wandY(-0.15,0.05,0.10,z0+0.004,z0+0.08,'#0a0d16',css(BAU.hell,0.6),0.8);
+        rohr([-0.12,0.10,z0+0.035],[0.02,0.10,z0+0.04],0.018,{mitte:[74,80,96],hell:[150,158,176],dunkel:DUNKEL},{kappe:true});
+        fensterreihe(-0.10,0.103,0.0,0.103,z0+0.04,3,T.glut,0.008);
+        block(-0.12,-0.06,z0+0.10,0.03,0.03,0.10,ST); block(0.03,-0.06,z0+0.10,0.03,0.03,0.10,ST);
+        rohr([-0.105,-0.045,z0+0.20],[0.045,-0.045,z0+0.20],0.010,ST,{ohneMuendung:true});
+        seg(P(-0.03,-0.045,z0+0.20), P(-0.03,-0.045,z0+0.135), 'rgba(230,236,250,0.6)', lw*0.55); leuchte(-0.03,-0.045,z0+0.135,0.009,T.glut);
+        if (st>=1){ block(0.12,-0.16,z0,0.08,0.08,0.06,BAU); leuchte(0.16,-0.12,z0+0.065,0.009,T.glut); }
+        if (st>=2){ ring(-0.03,-0.045,z0+0.23,0.07,0.007,ST,{glut:T.glut}); }
+        break; }
+      /* -------- Siedlung -------- */
+      case 'habitat': {
+        const kx = 0.01, ky = 0.01, kr = 0.16+st*0.012;
+        schattenZylinder(kx,ky,kr,0.06);
+        zylinder(kx,ky,z0,kr,0.02,BE,{top:0.85});
+        // Wohnblöcke unter Glas (vor der Kuppel gezeichnet, scheinen durch)
+        const bl = [[-0.08,-0.05,0.06,0.06,0.07],[0.02,-0.06,0.05,0.05,0.10],[-0.06,0.05,0.05,0.05,0.05],[0.04,0.03,0.06,0.06,0.06]];
+        bl.forEach((b,i)=>{ if (i < 2+st) { quader(b[0],b[1],z0+0.02,b[2],b[3],b[4],BAU,{top:0.9}); fensterreihe(b[0]+0.005,b[1]+b[3],b[0]+b[2]-0.005,b[1]+b[3],z0+0.02+b[4]*0.5,2,T.glut,0.008); } });
+        kuppel(kx,ky,z0+0.02,kr,BAU,{energie:true,farbe:T.glut,alpha:1.2,rippen:5});
+        if (st>=1){ zylinder(-0.18,0.14,z0,0.05,0.02,BE,{top:0.85}); kuppel(-0.18,0.14,z0+0.02,0.05,BAU,{energie:true,farbe:T.glut,alpha:1.2});
+          rohr([-0.14,0.11,z0+0.03],[-0.08,0.08,z0+0.03],0.012,ST,{ohneMuendung:true}); }
+        if (st>=2){ zylinder(0.19,-0.13,z0,0.05,0.02,BE,{top:0.85}); kuppel(0.19,-0.13,z0+0.02,0.05,BAU,{energie:true,farbe:T.glut,alpha:1.2});
+          rohr([0.15,-0.10,z0+0.03],[0.09,-0.07,z0+0.03],0.012,ST,{ohneMuendung:true}); }
+        leuchte(kx,ky,z0+0.02+kr,0.008,T.glut,0.8);
+        break; }
+      case 'botschaft': {
+        block(-0.20,-0.10,z0,0.34,0.20,0.02,BE,{top:0.85});
+        const zb = z0+0.02;
+        block(-0.17,-0.08,zb,0.28,0.14,0.10,BAU,{top:0.9});
+        // Säulenreihe auf der Lichtseite, davor ein Vorplatz
+        for (let i=0;i<5;i++){ const x = -0.15+i*0.06; zylinder(x,0.075,zb,0.012,0.10,ST); }
+        quader(-0.18,-0.09,zb+0.10,0.30,0.16,0.02,ST,{top:1.0});
+        wandY(-0.03,0.05,0.06,zb+0.004,zb+0.07,'#0a0d16',css(BAU.hell,0.5)); leuchte(0.01,0.062,zb+0.05,0.009,T.glut,0.9);
+        // Seitenfluegel: das Viertel selbst waechst, nicht nur die Zahl der Fahnen.
+        if (st>=1){ block(-0.24,-0.05,z0,0.09,0.11,0.09,BAU,{top:0.9}); fensterreihe(-0.23,0.055,-0.16,0.055,z0+0.05,2,T.glut,0.009); }
+        if (st>=2){ block(0.07,-0.19,z0,0.11,0.09,0.13,BAU,{top:0.9}); fensterreihe(0.08,-0.11,0.17,-0.11,z0+0.07,3,T.glut,0.009); }
+        // Fahnenmasten (je Botschaftsplatz einer: 1 / 2 / 3) mit Fahnenblatt
+        const masten = [[0.16,-0.06,'#7f77dd'],[0.16,0.04,'#5dcaa5'],[0.16,-0.16,'#fac775']];
+        masten.forEach((m,i)=>{ if (i<=st){ const mh = 0.24; mast(m[0],m[1],mh,0.008);
+          flaeche([[m[0],m[1],z0+mh],[m[0]-0.055,m[1],z0+mh-0.012],[m[0]-0.055,m[1],z0+mh-0.045],[m[0],m[1],z0+mh-0.036]], css(hexRgb(m[2]),0.95), kontur, 0.5);
+          leuchte(m[0],m[1],z0+mh+0.004,0.007,T.glut,0.9); } });
+        fensterreihe(-0.16,-0.08,-0.16,0.04,zb+0.05,3,T.glut,0.009);
+        break; }
+      default: {
+        block(-0.12,-0.12,z0,0.24,0.24,0.12,BAU); }
+    }
+
+    }
+
+    /* Ein Bild je (Bausatz, Schlüssel, Ausbaustand, Kantenlänge) - als Offscreen-Canvas, nicht als
+       data-URL: ein <img> lädt asynchron, der erste Aufbau der Kachel bliebe damit leer. Gezeichnet
+       wird pro Eintrag genau einmal; danach kostet ein Rebuild nur noch ein drawImage. */
+    const ISO_BILD_CACHE = {};
+    function isoBild(art, key, stand, px){
+      const k = art + ':' + key + ':' + stand + ':' + px;
+      if (!(k in ISO_BILD_CACHE)){
+        let cv = null;
+        try {
+          cv = document.createElement('canvas');
+          cv.width = cv.height = px;
+          const c = cv.getContext('2d');
+          if (!c) cv = null;
+          else if (art === 'anlage') zeichneAnlage(c, px, key, stand);
+          else zeichneGebaeude(c, px, key, stand);
+        } catch(e){ cv = null; }
+        ISO_BILD_CACHE[k] = cv;
+      }
+      return ISO_BILD_CACHE[k];
+    }
+    // Welchen Bausatz nimmt ein Gebäudeschlüssel? Die Zugehörigkeit steht in genau einer Tabelle je
+    // Bausatz - so kann ein Schlüssel nicht in beiden oder in keinem landen.
+    function isoBausatz(key){
+      if (ANLAGE_FAMILIE[key]) return 'anlage';
+      if (GEBAEUDE_FAMILIE[key]) return 'gebaeude';
+      return null;
+    }
+    const DEFENSE_CANVAS_KEYS = Object.keys(ANLAGE_FAMILIE);
+    // Stufe eines Gebäudes am gerade angezeigten Standort. Dieselbe Quelle, aus der die Karte ihre
+    // Stufenpille schreibt - sonst zeigt das Bild einen anderen Ausbaustand als die Zeile daneben.
+    function isoStufe(key){
+      try { return (state && state.buildings && state.buildings[key]) || 0; } catch(e){ return 0; }
+    }
+    function isoStand(key, stufe){
+      const def = BUILDING_DEFS.find(d => d.key === key);
+      const max = def && def.maxLevel;
+      const lv = stufe == null ? isoStufe(key) : stufe;
+      return isoBausatz(key) === 'anlage' ? anlageAusbaustand(lv, max) : gebaeudeAusbaustand(lv, max);
+    }
+    /* Malt das Bild eines Bausatz-Gebäudes in ein Canvas. Einstiegspunkt für alle vier Aufrufer:
+       die Kachel im Basis- und Verteidigungs-Reiter, das gebackene Hintergrundbild der Klassen-
+       Übersicht, das Anlagenbild auf dem Planetenboden der Kampf-Wiedergabe und der Bauform-
+       Rückfall daneben. Die Signatur der alten Fassung bleibt erhalten; `stufe` ist freiwillig und
+       kommt sonst aus dem Spielstand. */
+    function drawDefenseMiniIcon(key, canvas, stufe){
       if (!canvas) return;
+      const art = isoBausatz(key);
+      if (!art) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      const t = Date.now();
-      // Retina-Fix (25.07.2026): ensureCanvasDpr vergrößert den Backing-Store um devicePixelRatio,
-      // diese Funktion zeichnet aber in festen 40er-Koordinaten (anders als drawShipMiniIcon/
-      // drawPlanetMiniIcon, die mit s = min(w,h)/100 relativ rechnen). Ohne die Transform landete
-      // die Zeichnung auf jedem Retina-Display halb so groß im oberen linken Viertel des Icons.
-      const s = Math.min(canvas.width, canvas.height) / 40;
-      ctx.setTransform(s,0,0,s,0,0);
-      ctx.clearRect(0,0,40,40);
-      if (key === 'turm'){
-        const swing = Math.sin(t*0.0006)*0.35;
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.ellipse(20,33,13,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,14,0,32); bg.addColorStop(0,'#5b6570'); bg.addColorStop(1,'#252b32');
-        ctx.beginPath(); ctx.moveTo(9,32); ctx.lineTo(14,18); ctx.lineTo(26,18); ctx.lineTo(31,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.8; ctx.stroke();
-        ctx.beginPath(); ctx.fillStyle='#3a424b'; ctx.arc(20,17,5,0,Math.PI*2); ctx.fill();
-        ctx.save(); ctx.translate(20+Math.cos(swing)*0.6,13); ctx.rotate(swing*0.3);
-        ctx.fillStyle='#2a2f36'; ctx.fillRect(-1.6,-9,3.2,9); ctx.restore();
-        const phase = (t+300)%2600;
-        if (phase<160){ const a=1-phase/160; ctx.save(); ctx.shadowColor='rgba(255,220,150,0.9)'; ctx.shadowBlur=6;
-          ctx.beginPath(); ctx.fillStyle=`rgba(255,225,165,${a})`; ctx.arc(20+Math.sin(swing)*8,3,1.6+a,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-      } else if (key === 'schild'){
-        const flicker = 0.5+0.3*Math.sin(t*0.0025);
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,11,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,20,0,32); bg.addColorStop(0,'#57616c'); bg.addColorStop(1,'#252b32');
-        ctx.beginPath(); ctx.moveTo(12,32); ctx.lineTo(14,22); ctx.lineTo(26,22); ctx.lineTo(28,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill();
-        ctx.save(); ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2); ctx.clip();
-        const domeGrad = ctx.createRadialGradient(20,16,1,20,22,11);
-        domeGrad.addColorStop(0,`rgba(150,215,255,${flicker*0.3})`); domeGrad.addColorStop(1,`rgba(150,215,255,${flicker*0.05})`);
-        ctx.fillStyle=domeGrad; ctx.fillRect(9,11,22,11);
-        ctx.restore();
-        ctx.beginPath(); ctx.arc(20,22,11,Math.PI,Math.PI*2);
-        ctx.strokeStyle=`rgba(170,220,255,${flicker*0.7})`; ctx.lineWidth=1.2; ctx.stroke();
-      } else if (key === 'raketen'){
-        ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.ellipse(20,34,10,3,0,0,Math.PI*2); ctx.fill();
-        const bg = ctx.createLinearGradient(0,13,0,32); bg.addColorStop(0,'#4c5661'); bg.addColorStop(1,'#242a31');
-        ctx.beginPath(); ctx.moveTo(14,32); ctx.lineTo(16,15); ctx.lineTo(24,15); ctx.lineTo(26,32); ctx.closePath();
-        ctx.fillStyle=bg; ctx.fill(); ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.7; ctx.stroke();
-        const phase = (t+900)%3600;
-        if (phase>280 && phase<1900){
-          const lp=(phase-280)/1620, my=17-lp*22;
-          ctx.beginPath(); ctx.fillStyle=`rgba(255,200,140,${(1-lp*0.4)*0.6})`; ctx.arc(20,my+2.4,1.1,0,Math.PI*2); ctx.fill();
-          ctx.fillStyle='#c7cbe0'; ctx.beginPath(); ctx.moveTo(20,my-2.4); ctx.lineTo(18.4,my); ctx.lineTo(21.6,my); ctx.closePath(); ctx.fill();
-        }
-      } else if (DEFENSE_ART[key]){
-        drawDefenseArt(key, ctx, t);
+      const px = Math.max(8, Math.round(Math.min(canvas.width, canvas.height)));
+      const bild = isoBild(art, key, isoStand(key, stufe), px);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (bild) ctx.drawImage(bild, 0, 0, px, px);
+    }
+    /* Frischt die Kacheln auf, die gerade im DOM stehen. Sucht die Canvas-Elemente über ihre
+       Markierung statt über eine Schlüsselliste: so trifft sie genau die Kacheln, die der letzte
+       Rebuild wirklich geschrieben hat - im Basis- wie im Verteidigungs-Reiter. */
+    function refreshBuildingIcons(wurzel){
+      const feld = (wurzel || document).querySelectorAll('canvas[data-bicon]');
+      for (let i = 0; i < feld.length; i++){
+        const cv = feld[i];
+        ensureCanvasDpr(cv);
+        drawDefenseMiniIcon(cv.getAttribute('data-bicon'), cv);
       }
     }
-    // Zeichner für die 18 nachgerüsteten Anlagen. Gemeinsame Grundlage (Schatten, Sockel,
-    // Lichtkante), darauf ein typeigener Aufbau - dieselbe Idee wie beim Schiffs-Maler:
-    // eine Sprache, unterscheidbare Silhouetten.
-    function drawDefenseArt(key, ctx, t){
-      const a = DEFENSE_ART[key], col = a.col;
-      const puls = 0.55 + 0.45*Math.abs(Math.sin(t*0.0018));
-      ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,0.30)'; ctx.ellipse(20,34,12,3,0,0,Math.PI*2); ctx.fill();
-      // --- Sockel
-      const bodyGrad = ctx.createLinearGradient(0,18,0,33);
-      bodyGrad.addColorStop(0,'#5b6570'); bodyGrad.addColorStop(1,'#242a31');
-      ctx.fillStyle = bodyGrad; ctx.strokeStyle='rgba(6,9,14,0.8)'; ctx.lineWidth=0.8;
-      if (a.base === 'bunker'){
-        ctx.beginPath(); ctx.moveTo(8,33); ctx.lineTo(10,23); ctx.lineTo(30,23); ctx.lineTo(32,33); ctx.closePath();
-      } else if (a.base === 'wall'){
-        ctx.beginPath(); ctx.moveTo(9,33); ctx.lineTo(9,14); ctx.lineTo(31,14); ctx.lineTo(31,33); ctx.closePath();
-      } else { // platform
-        ctx.beginPath(); ctx.moveTo(10,33); ctx.lineTo(13,25); ctx.lineTo(27,25); ctx.lineTo(30,33); ctx.closePath();
-      }
-      ctx.fill(); ctx.stroke();
-      // Fugen auf dem Sockel
-      ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=0.5;
-      [16,20,24].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x, a.base==='wall'?15:26); ctx.lineTo(x,32); ctx.stroke(); });
-      const glow = (x,y,r,c,al) => { const g=ctx.createRadialGradient(x,y,0,x,y,r);
-        g.addColorStop(0,hexToRgba(c,Math.min(1,al))); g.addColorStop(1,hexToRgba(c,0));
-        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); };
-      const steel = (x,y,w,h) => { ctx.fillStyle='#4c5661'; ctx.fillRect(x,y,w,h);
-        ctx.strokeStyle='rgba(6,9,14,0.7)'; ctx.lineWidth=0.5; ctx.strokeRect(x,y,w,h); };
-      switch (a.top){
-        case 'twinup': // zwei kurze Rohre schräg nach oben, mit Mündungsfeuer (Flak)
-          ctx.save(); ctx.translate(20,24);
-          [[-4,-0.35],[4,0.35]].forEach(([dx,rot])=>{ ctx.save(); ctx.translate(dx,0); ctx.rotate(rot);
-            steel(-1.4,-13,2.8,13); ctx.restore(); });
-          ctx.restore();
-          // Mündungsfeuer statt eines diffusen Flecks über der Waffe: kurz aufblitzende Punkte
-          // genau an den beiden Rohrenden, damit die Silhouette der Flak scharf bleibt.
-          { const fl = (t%900) < 120 ? 1 - (t%900)/120 : 0;
-            if (fl > 0){ glow(20-4-Math.sin(0.35)*13, 24-Math.cos(0.35)*13, 3.4, col, 0.9*fl);
-                         glow(20+4+Math.sin(0.35)*13, 24-Math.cos(0.35)*13, 3.4, col, 0.9*fl); } }
-          break;
-        case 'ringdome': // Kuppel mit Energiering
-          ctx.beginPath(); ctx.arc(20,25,9,Math.PI,Math.PI*2);
-          ctx.strokeStyle=hexToRgba(col,0.85); ctx.lineWidth=1.4; ctx.stroke();
-          ctx.beginPath(); ctx.ellipse(20,25,12,3,0,0,Math.PI*2);
-          ctx.strokeStyle=hexToRgba(col,0.5*puls+0.2); ctx.lineWidth=1; ctx.stroke();
-          glow(20,21,8,col,0.28*puls); break;
-        case 'emitter': // schlanker Emitterstab mit leuchtender Spitze
-          steel(18.6,9,2.8,16); glow(20,8,5,col,0.75*puls);
-          ctx.fillStyle=hexToRgba(col,0.95); ctx.beginPath(); ctx.arc(20,8,1.7,0,Math.PI*2); ctx.fill(); break;
-        case 'orb': // Plasmakugel auf Halterung
-          steel(18.4,18,3.2,8);
-          glow(20,15,9,col,0.55*puls);
-          ctx.fillStyle=hexToRgba(col,0.9); ctx.beginPath(); ctx.arc(20,15,4.4,0,Math.PI*2); ctx.fill();
-          ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.arc(18.6,13.6,1.4,0,Math.PI*2); ctx.fill(); break;
-        case 'longgun': // langes waagerechtes Rohr auf Drehkranz
-          ctx.fillStyle='#3a424b'; ctx.beginPath(); ctx.arc(13,22,4.2,0,Math.PI*2); ctx.fill();
-          steel(13,20.4,20,3.2); glow(34.5,22,4,col,0.5*puls); break;
-        case 'rails': // zwei parallele Schienen
-          steel(10,19,20,2.2); steel(10,24,20,2.2);
-          ctx.strokeStyle=hexToRgba(col,0.75*puls); ctx.lineWidth=1;
-          ctx.beginPath(); ctx.moveTo(11,22.6); ctx.lineTo(29,22.6); ctx.stroke();
-          glow(32,22.6,4.5,col,0.6*puls); break;
-        case 'rift': // senkrechter Riss, endet auf der Plattform statt sie zu durchschneiden
-          glow(20,16,10,col,0.45*puls);
-          ctx.fillStyle='#0a0713'; ctx.beginPath();
-          ctx.moveTo(20,6); ctx.lineTo(23,16); ctx.lineTo(20,25); ctx.lineTo(17,16); ctx.closePath(); ctx.fill();
-          ctx.strokeStyle=hexToRgba(col,0.9); ctx.lineWidth=0.9; ctx.stroke(); break;
-        case 'crystal': // facettierte Kristallspitze
-          { const cg=ctx.createLinearGradient(14,6,26,23); cg.addColorStop(0,hexToRgba(col,0.95)); cg.addColorStop(1,hexToRgba(col,0.35));
-            ctx.fillStyle=cg; ctx.beginPath();
-            ctx.moveTo(20,5); ctx.lineTo(26,17); ctx.lineTo(23,23); ctx.lineTo(17,23); ctx.lineTo(14,17); ctx.closePath(); ctx.fill();
-            ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=0.7; ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(20,5); ctx.lineTo(20,23); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.stroke(); }
-          break;
-        case 'slab': // flache Panzerplatte
-          steel(11,17,18,7);
-          ctx.strokeStyle=hexToRgba(col,0.6); ctx.lineWidth=1;
-          ctx.beginPath(); ctx.moveTo(12,20.5); ctx.lineTo(28,20.5); ctx.stroke(); break;
-        case 'lattice': // Nano-Gitterpanel
-          steel(11,14,18,11);
-          ctx.strokeStyle=hexToRgba(col,0.55*puls+0.25); ctx.lineWidth=0.6;
-          [15,19,23,27].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,15); ctx.lineTo(x,24); ctx.stroke(); });
-          [17,20.5,24].forEach(y=>{ ctx.beginPath(); ctx.moveTo(12,y); ctx.lineTo(28,y); ctx.stroke(); }); break;
-        case 'dish': // Parabolschüssel auf Mast
-          steel(19,16,2,9);
-          ctx.save(); ctx.translate(20,14); ctx.rotate(-0.4);
-          ctx.fillStyle=hexToRgba(col,0.30); ctx.beginPath(); ctx.ellipse(0,0,9,4.6,0,0,Math.PI*2); ctx.fill();
-          ctx.strokeStyle=hexToRgba(col,0.95); ctx.lineWidth=1.1; ctx.stroke();
-          ctx.fillStyle=hexToRgba(col,0.9); ctx.beginPath(); ctx.arc(0,0,1.3,0,Math.PI*2); ctx.fill();
-          ctx.restore(); break;
-        case 'bigdome': // große Energiekuppel
-          { const dg=ctx.createRadialGradient(20,20,1,20,25,14);
-            dg.addColorStop(0,hexToRgba(col,0.42*puls+0.12)); dg.addColorStop(1,hexToRgba(col,0.05));
-            ctx.save(); ctx.beginPath(); ctx.arc(20,25,13,Math.PI,Math.PI*2); ctx.clip();
-            ctx.fillStyle=dg; ctx.fillRect(7,12,26,13); ctx.restore();
-            ctx.beginPath(); ctx.arc(20,25,13,Math.PI,Math.PI*2);
-            ctx.strokeStyle=hexToRgba(col,0.55*puls+0.35); ctx.lineWidth=1.3; ctx.stroke(); }
-          break;
-        case 'core': // leuchtender Kern in Halterung
-          steel(15,18,10,7);
-          glow(20,21.5,8,col,0.6*puls);
-          ctx.fillStyle=hexToRgba(col,0.95); ctx.beginPath(); ctx.arc(20,21.5,3,0,Math.PI*2); ctx.fill();
-          ctx.strokeStyle=hexToRgba(col,0.7); ctx.lineWidth=0.8;
-          ctx.beginPath(); ctx.ellipse(20,21.5,7,2.6,0,0,Math.PI*2); ctx.stroke(); break;
-        case 'reactor': // Fusionstorus zwischen zwei Kühlrippen
-          steel(10.5,14,3,9); steel(26.5,14,3,9);
-          glow(20,18,8,col,0.5*puls);
-          ctx.strokeStyle=hexToRgba(col,0.85); ctx.lineWidth=1.9;
-          ctx.beginPath(); ctx.arc(20,18,6.4,0,Math.PI*2); ctx.stroke();
-          ctx.fillStyle=hexToRgba(col,0.9); ctx.beginPath(); ctx.arc(20,18,2.2,0,Math.PI*2); ctx.fill(); break;
-        case 'prism': // Facettenkamm auf der Mauerkrone + wandernder Schimmer über der Wand
-          { const pg = ctx.createLinearGradient(9,5,31,14);
-            pg.addColorStop(0,hexToRgba(col,0.85)); pg.addColorStop(0.5,'rgba(255,255,255,0.6)');
-            pg.addColorStop(1,hexToRgba(col,0.45));
-            ctx.fillStyle=pg; ctx.beginPath(); ctx.moveTo(9,14);
-            ctx.lineTo(13,6); ctx.lineTo(17,14); ctx.lineTo(21,6); ctx.lineTo(25,14); ctx.lineTo(29,6); ctx.lineTo(31,14);
-            ctx.closePath(); ctx.fill();
-            const sx = 10.5 + ((t*0.006)%20);
-            ctx.strokeStyle=hexToRgba(col,0.45*puls); ctx.lineWidth=1.4;
-            ctx.beginPath(); ctx.moveTo(sx,15.5); ctx.lineTo(sx,32); ctx.stroke(); }
-          break;
-        case 'singularity': // schwarzer Kern in geneigter Akkretionsscheibe
-          steel(19,17,2,8);
-          glow(20,16,11,col,0.45*puls);
-          ctx.save(); ctx.translate(20,16); ctx.rotate(-0.34);
-          ctx.strokeStyle=hexToRgba(col,0.9); ctx.lineWidth=1.5;
-          ctx.beginPath(); ctx.ellipse(0,0,10,3.1,0,0,Math.PI*2); ctx.stroke();
-          ctx.strokeStyle=hexToRgba(col,0.4); ctx.lineWidth=0.9;
-          ctx.beginPath(); ctx.ellipse(0,0,6.4,2,0,0,Math.PI*2); ctx.stroke();
-          ctx.restore();
-          ctx.fillStyle='#05040a'; ctx.beginPath(); ctx.arc(20,16,3.3,0,Math.PI*2); ctx.fill();
-          ctx.strokeStyle=hexToRgba(col,0.85); ctx.lineWidth=0.8; ctx.stroke(); break;
-        case 'moondome': // Schildkuppel mit Mondsichel darüber (Mond-Standort)
-          { const mg=ctx.createRadialGradient(20,21,1,20,25,11);
-            mg.addColorStop(0,hexToRgba(col,0.38*puls+0.12)); mg.addColorStop(1,hexToRgba(col,0.05));
-            ctx.save(); ctx.beginPath(); ctx.arc(20,25,10.5,Math.PI,Math.PI*2); ctx.clip();
-            ctx.fillStyle=mg; ctx.fillRect(9,14,22,11); ctx.restore();
-            ctx.beginPath(); ctx.arc(20,25,10.5,Math.PI,Math.PI*2);
-            ctx.strokeStyle=hexToRgba(col,0.5*puls+0.35); ctx.lineWidth=1.2; ctx.stroke();
-            ctx.fillStyle=hexToRgba(col,0.9); ctx.beginPath();
-            ctx.arc(29,9,4.2,Math.PI*0.38,Math.PI*1.62);
-            ctx.arc(31.4,9,4.4,Math.PI*1.58,Math.PI*0.42,true);
-            ctx.closePath(); ctx.fill(); }
-          break;
-        case 'antenna': // Mast mit kleiner Schüssel und Blinklicht
-          steel(19.2,8,1.6,17);
-          ctx.strokeStyle='#4c5661'; ctx.lineWidth=0.8;
-          ctx.beginPath(); ctx.moveTo(15,25); ctx.lineTo(20,17); ctx.lineTo(25,25); ctx.stroke();
-          ctx.fillStyle=hexToRgba(col,0.35); ctx.beginPath(); ctx.ellipse(20,10,5,2.4,0,0,Math.PI*2); ctx.fill();
-          ctx.strokeStyle=hexToRgba(col,0.9); ctx.lineWidth=0.9; ctx.stroke();
-          glow(20,7,3.5,'#ff6b6b',0.9*puls); break;
-      }
-      // Lichtkante auf der Sockel-Oberkante
-      ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=0.8;
-      const topY = a.base==='bunker' ? 23 : (a.base==='wall' ? 14 : 25);
-      ctx.beginPath(); ctx.moveTo(a.base==='wall'?9:(a.base==='bunker'?10:13), topY);
-      ctx.lineTo(a.base==='wall'?31:(a.base==='bunker'?30:27), topY); ctx.stroke();
-    }
+    function refreshDefenseMiniIcons(){ refreshBuildingIcons(); }
     // Zeichnet alle gerade im DOM vorhandenen Mini-Icons neu (nach jedem Rebuild von defenseBuildings
     // aufzurufen, da innerHTML die vorherigen Canvas-Elemente komplett ersetzt).
     // Grafik-Runde "High-End", Vorschlag 30 "Schärfere Canvas-Icons auf Retina-Displays": vorher
@@ -6481,20 +7459,22 @@
       canvas.width = Math.round(cssW*dpr);
       canvas.height = Math.round(cssH*dpr);
     }
-    function refreshDefenseMiniIcons(){
-      DEFENSE_CANVAS_KEYS.forEach(key => { const c = document.getElementById('defIcon_'+key); ensureCanvasDpr(c); drawDefenseMiniIcon(key, c); });
-    }
-    // Icon-Kachel einer Gebäudekarte. Anlagen mit gezeichneter Grafik bekommen die große .bicon-def-
-    // Kachel mit Canvas, alle übrigen Gebäude unverändert das generische 42px-Badge. Gesperrte Anlagen
-    // zeigen dieselbe Grafik entsättigt mit Schloss-Abzeichen statt eines nichtssagenden Schlosses -
-    // die Karte verrät damit, worauf man hinarbeitet. Die Canvas-ID bleibt pro Gebäude eindeutig, weil
-    // immer nur EIN Karten-Zweig (gesperrt ODER baubar) für ein Gebäude gerendert wird.
+    // Icon-Kachel einer Gebäudekarte. Seit Bündel C haben BEIDE Bausätze - die 23 Verteidigungs-
+    // anlagen und die 29 Basis-Gebäude - die große .bicon-def-Kachel mit einem gezeichneten Bauwerk;
+    // vorher zeigte der Basis-Reiter ein 24px-Piktogramm und bei gesperrten Gebäuden nur ein graues
+    // Schloss, also auf der Hälfte der Startseite gar kein Bild. Gesperrte Karten zeigen jetzt
+    // überall dieselbe Grafik entsättigt mit Schloss-Abzeichen - die Karte verrät damit, worauf man
+    // hinarbeitet. Ein Gebäude ohne Bausatz (falls je eines dazukommt) fällt auf das alte Badge
+    // zurück, statt eine leere Kachel zu hinterlassen.
+    // Die Canvas-Markierung (data-bicon) ist der Anker, über den refreshBuildingIcons die Bilder
+    // nach jedem Rebuild setzt; die ID bleibt pro Gebäude eindeutig, weil immer nur EIN Karten-Zweig
+    // (gesperrt ODER baubar) für ein Gebäude gerendert wird.
     function buildingIconHtml(def, opts){
       const locked = !!(opts && opts.locked);
       const t2 = !!(opts && opts.tier2);
-      if (DEFENSE_CANVAS_KEYS.includes(def.key)){
+      if (isoBausatz(def.key)){
         return `<div class="bicon bicon-def${t2?' bicon-t2':''}${locked?' bicon-locked':''}" style="background:${def.bg};">`
-             + `<canvas id="defIcon_${def.key}" width="64" height="64" style="display:block;"></canvas>`
+             + `<canvas id="defIcon_${def.key}" data-bicon="${def.key}" width="64" height="64" style="display:block;"></canvas>`
              + (locked ? `<span class="lock-badge"><i class="ti ti-lock" aria-hidden="true"></i></span>` : '')
              + `</div>`;
       }
@@ -38514,39 +39494,16 @@ async function claimPendingRewards(){
           gg.drawImage(fleck(F.ver), -16*f, -30*f, 32*f, 32*f);
           gg.globalAlpha = 1;
           gg.globalCompositeOperation = 'source-over';
-          /* --- Das Rohr folgt dem Ziel (05.08.2026) ------------------------------------
+          /* --- Wohin das Rohr zeigt (05.08.2026, umgebaut mit Buendel C) ---------------
              Die Ausrichtung war schon immer da: anlagenSchritt() sucht ein Ziel, rechnet
              sollRicht und fuehrt an.richt mit 1,6 rad/s nach, gedeckelt auf +-1,15 rad.
-             Gezeichnet wurde sie nur in den ALTEN Notsilhouetten - seit die Wiedergabe das
-             echte Gebaeudebild stempelt, kehrt dieser Zweig vorher zurueck und der
-             Schwenkzweig lief praktisch nie. Gemessen standen dauerhaft 9-10 Stellungen mit
-             bis zu 61,8 Grad Schwenk, und auf dem Boden zeigte jedes Rohr stur geradeaus.
-             Wieder der wiederkehrende Fehler des Projekts: die Mechanik stimmte, die zweite
-             Anzeigestelle behielt die alte Annahme.
-
-             Gedreht wird KEIN eigenes Bild: derselbe gebackene Sockel wird zweimal
-             gestempelt - unten unveraendert, oben mit gg.rotate um den Drehkranz. Das kostet
-             keinen Byte zusaetzlichen Bildspeicher (ein Winkelatlas wie bei den Schiffen
-             waere bei 16 Stufen rund 26 MB).
-
-             Innerhalb von mitBoden ist die lokale Senkrechte bereits die Bodennormale, und
-             an.richt ist ausdruecklich gegen sie definiert (sollRicht wird um lot(an.u)
-             bereinigt) - eine Neigungskorrektur fuer die Planetenkruemmung braucht es
-             deshalb nicht. */
-          var dreh = SCHWENK[an.geb];
-          if (dreh && Math.abs(an.richt) > 0.01){
-            var kn = bild.width, pT = kn * dreh.yT / 40;
-            gg.drawImage(bild, 0, pT, kn, kn - pT,
-                         -20*f, (dreh.yT - 34)*f, 40*f, (40 - dreh.yT)*f);
-            gg.save();
-            gg.translate((dreh.dx - 20)*f, (dreh.dy - 34)*f);
-            gg.rotate(an.richt);
-            gg.translate(-(dreh.dx - 20)*f, -(dreh.dy - 34)*f);
-            gg.drawImage(bild, 0, 0, kn, pT, -20*f, -34*f, 40*f, dreh.yT*f);
-            gg.restore();
-          } else {
-            gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);
-          }
+             Bis zum 05.08.2026 wurde sie nur in den alten Notsilhouetten gezeichnet; danach
+             drehte dieser Zweig den oberen Teil des gebackenen Bildes mit.
+             Seit den isometrischen Bausaetzen steht das Bauwerk fest - warum, steht bei der
+             ausgebauten SCHWENK-Tabelle weiter unten. an.richt bleibt trotzdem sichtbar: der
+             Muendungsblitz gleich darunter und der Schussursprung in den Feuerfunktionen
+             benutzen ihn weiter, der Strahl kommt also aus der richtigen Richtung. */
+          gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);
           if (an.glut > 0 || an.klappe > 0.1 || an.salve > 0){
             var st = Math.max(an.glut, an.klappe, an.salve);
             /* Der Blitz sitzt jetzt dort, wo der Schuss wirklich herauskommt - dieselbe
@@ -39455,26 +40412,19 @@ async function claimPendingRewards(){
        waehrend der Laserstrahl 11 Einheiten entfernt und bis zu 62 Grad davon weggedreht
        startete). Silo und Generator bleiben bei 0: die Rakete steigt senkrecht. */
     var MUENDUNG_LAENGE = { laser: 11, plasma: 7, gauss: 15, silo: 0, gen: 0 };
-    /* Welche Anlagen duerfen ihren Aufsatz schwenken, und wo liegt die Trennlinie?
-       yT = Hoehe des drehbaren Ausschnitts im 40er-Raster des Icons, dx/dy = Drehkranz.
-       Die Werte stammen aus drawDefenseMiniIcon, nicht aus dem Gefuehl.
-
-       BEWUSST NUR DREI. Von den 22 Verteidigungsgebaeuden tragen ueberhaupt nur fuenf ein
-       Rohr im gebackenen Bild, und von denen liegen gauss (longgun) und railgun (rails)
-       WAAGERECHT und reichen bis Icon-y 26,2, also unter das Plattformdach bei y=25: Jede
-       waagerechte Trennlinie schneidet dort entweder das Rohr an oder nimmt einen Streifen
-       Dachkante mit, der sichtbar mitkippt. Alle uebrigen Anlagen sind Kuppeln, Kristalle,
-       Raumrisse, Gitterpanele, Torusreaktoren und Akkretionsscheiben - die zu drehen waere
-       ein Fehler, kein Fortschritt.
-
-       Der Schluessel ist der GEBAEUDEschluessel, nicht DEFENSE_ART[geb].top: `turm` ist
-       handgezeichnet und steht gar nicht in DEFENSE_ART - er waere sonst still
-       herausgefallen, ausgerechnet einer der drei. */
-    var SCHWENK = {
-      flak:  { yT: 24, dx: 20, dy: 24 },
-      laser: { yT: 25, dx: 20, dy: 25 },
-      turm:  { yT: 13, dx: 20, dy: 13 }
-    };
+    /* HIER STAND die Tabelle SCHWENK: drei Anlagen (turm, flak, laser) durften ihren Aufsatz
+       drehen, indem das gebackene Bild an einer waagerechten Linie geteilt und die obere Haelfte
+       um einen Drehkranz gekippt wurde. Mit den isometrischen Bausaetzen (Buendel C) geht das
+       nicht mehr, und zwar nachweisbar: Die Anlagen stehen jetzt auf einer achteckigen Platte,
+       deren HINTERE Ecke bei Bildanteil y = 0,368 liegt - hoeher als der Fuss jedes Aufsatzes
+       (Turmkuppel 0,56, Flak-Kranz 0,51) und sogar hoeher als die Muendung des Turmrohrs (0,42).
+       Jede waagerechte Trennlinie, die den Aufsatz erfasst, nimmt deshalb ein Stueck Platte mit,
+       das sichtbar mitkippt (gemessen und als Bild belegt: derselbe Fehler, den der alte Kommentar
+       fuer gauss und railgun beschrieb, gilt jetzt fuer alle).
+       Die Ausrichtung geht damit NICHT verloren: an.richt steuert weiterhin Muendungsblitz
+       (MUENDUNG_LAENGE unten) und Schussursprung, der Strahl kommt also aus der richtigen
+       Richtung - nur das Rohr selbst steht fest. Wer die Drehung zurueckhaben will, braucht ein
+       zweites gebackenes Bild je Anlage OHNE den Aufsatz; ein waagerechter Schnitt reicht nicht. */
     function muendung(an, laenge){
       var p = px(an.u, 0);
       var w = lot(an.u) + an.richt;
@@ -42186,10 +43136,11 @@ async function claimPendingRewards(){
     return '<span class="schiffreihe">' + Object.entries(defenseBefore).map(([k,v]) => {
       const hit = k === destroyedKey;
       const farbe = hit ? '#e24b4a' : '#5dcaa5';
-      // Reihenfolge wie in defIconHtml(): erst die animierte Canvas-Grafik, sonst das
-      // handgezeichnete SVG aus ICONS. Der Resonanzschild-Emitter ist die einzige Anlage im
-      // zweiten Fall - hier geht das SVG problemlos, weil es im Dokument steht und seine
-      // Verlaufs-Definitionen findet (in der Kampf-Wiedergabe auf der Leinwand ginge das nicht).
+      // Reihenfolge wie in der Gebäudekachel: erst die gezeichnete Grafik, sonst das
+      // handgezeichnete SVG aus ICONS. Seit Bündel C hat JEDE der 23 Anlagen ein eigenes Bauwerk
+      // - auch der Resonanzschild-Emitter und der Signaturscanner, die vorher als einzige durch
+      // dieses SVG liefen. Der zweite Zweig bleibt als Sicherung: fiele je eine Anlage aus dem
+      // Bausatz, stünde hier ein Bild statt einer Lücke.
       const geb = BUILDING_DEFS.find(b2 => b2.key === k);
       const kl = anlageBildKlasse(k);
       const bild = kl ? `<i class="gbi gbi-anlage ${kl}" aria-hidden="true"></i>`
@@ -66814,9 +67765,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (activeTab === 'basis'){
       const basisDefs = BUILDING_DEFS.filter(d=>d.category!=='defense');
       const basisFertig = basisDefs.filter(buildingIstMax).length;
-      setBoxHtml(document.getElementById('buildings'), 'buildings', leerlaufKarte('basis')
+      // Wie im Verteidigungs-Reiter: die gezeichneten Kacheln nur setzen, wenn setBoxHtml die
+      // Karten wirklich neu geschrieben hat - innerHTML ersetzt dabei alle Canvas-Elemente.
+      const basisNeu = setBoxHtml(document.getElementById('buildings'), 'buildings', leerlaufKarte('basis')
         + ((basisFertig>0 || state.uiHideMaxed) ? hideMaxedChip(basisFertig) : '')
         + basisDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
+      if (basisNeu) refreshBuildingIcons(document.getElementById('buildings'));
       const roleBox = document.getElementById('planetRoleBox');
       if (roleBox){
         /* Die Sektor-Eigenschaft des AKTUELLEN Standorts. Sie steht bewusst auch im Mond-Zweig:
