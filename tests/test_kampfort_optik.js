@@ -198,6 +198,52 @@ const abstand = (a, b) => Math.abs(a.r-b.r) + Math.abs(a.g-b.g) + Math.abs(a.b-b
       echt >= Math.max(12, rauschen * 4), { unterschied: echt, rauschen });
   }
 
+  /* ---- Buendel B: der Boden liest die Planetentextur, der Saum die Typfarbe ----------------
+     Gemessen am alten Bild: ein dreistufiger Farbverlauf mit weichen Flecken; der
+     Atmosphaerensaum war IMMER lila, auch ueber einem Asteroiden, und Stadtlichter lagen auf
+     jeder Welt - auch auf einem Gasriesen ohne feste Oberflaeche. Geprueft werden die Regeln,
+     nicht das Bild. */
+  {
+    /* `src` steht im Quelltext-Block oben und ist hier nicht sichtbar - die Datei wird deshalb
+       noch einmal gelesen. Ein Test, der eine Variable aus einem fremden Block greift, faellt mit
+       ReferenceError statt mit einem Befund (gemessen 05.09.2026). */
+    const quelle = fs.readFileSync(require('./lib/spieldatei').SPIELDATEI, 'utf8');
+    const stilVon = quelle.indexOf('var ORT_STIL = {');
+    const stilBis = stilVon < 0 ? -1 : quelle.indexOf('\n    };', stilVon);
+    check('B-anker: die Stiltabelle ist auffindbar', stilVon > 0 && stilBis > stilVon);
+    const stil = stilVon > 0 && stilBis > stilVon ? quelle.slice(stilVon, stilBis) : '';
+    const zeilen = [...stil.matchAll(/^\s{6}([a-z]+):\s*\{([^}]*)\}/gm)].map(m => ({ typ: m[1], inhalt: m[2] }));
+    check('B1: jede Weltensorte nennt Saumfarbe, Saumstaerke und ihre Textur',
+      zeilen.length >= 12 && zeilen.every(z => /saum:\s*'#/.test(z.inhalt) && /saumKraft:/.test(z.inhalt) && /tex:\s*'/.test(z.inhalt)),
+      { ohne: zeilen.filter(z => !/saum:\s*'#/.test(z.inhalt) || !/tex:\s*'/.test(z.inhalt)).map(z => z.typ) });
+    /* Die Saumstaerke ist keine Zierde, sondern das Erkennungszeichen: Asteroid und Mond haben
+       keine Atmosphaere und muessen deutlich unter den Welten mit Lufthuelle liegen. */
+    const kraft = {};
+    zeilen.forEach(z => { const m = z.inhalt.match(/saumKraft:\s*([0-9.]+)/); if (m) kraft[z.typ] = parseFloat(m[1]); });
+    check('B2: Welten ohne Atmosphaere tragen deutlich weniger Saum als Welten mit',
+      kraft.asteroid < 0.3 && kraft.mond < 0.3 && kraft.erdaehnlich >= 0.8 && kraft.wasserwelt >= 0.8,
+      kraft);
+    /* Die Textur ist dieselbe wie auf der Karte - keine zweite Tabelle, die veralten koennte. */
+    check('B3: jede genannte Textur gibt es wirklich als Planeten-Builder',
+      (() => {
+        const bVon = quelle.indexOf('const PLANET_TEXTURE_BUILDERS = {');
+        if (bVon < 0) return false;
+        const keys = [...quelle.slice(bVon).matchAll(/^\s{6}([a-z]+):/gm)].map(m => m[1]);
+        return zeilen.every(z => { const m = z.inhalt.match(/tex:\s*'([a-z]+)'/); return m && keys.includes(m[1]); });
+      })(),
+      { texturen: zeilen.map(z => (z.inhalt.match(/tex:\s*'([a-z]+)'/) || [])[1]) });
+    check('B4: der Saum kommt aus der Typfarbe, nicht mehr fest aus dem Lila des Spiels',
+      /var saumF = STsaum\.saum/.test(quelle) && !/strokeStyle = 'rgba\(127,119,221,' \+ \(0\.035/.test(quelle));
+    check('B5: der Boden zeichnet die Planetentextur',
+      /getPlanetTexture\(ST\.tex\)/.test(quelle) && /ST\.texAlpha/.test(quelle));
+    /* Staedte nur, wo jemand wohnt: gemessen an der planetaren Abwehr oder der eigenen Heimat,
+       und nie auf einem Gasriesen - der hat keine feste Oberflaeche. */
+    check('B6: Stadtlichter haengen am Bewohntsein und an einer festen Oberflaeche',
+      /var bewohnt = \(DATEN && DATEN\.abwehr && DATEN\.abwehr\.gesamt > 0\)/.test(quelle)
+      && /traegtStaedte = bewohnt && ST\.tex !== 'gasriese'/.test(quelle)
+      && /var staedte = traegtStaedte \? \[/.test(quelle));
+  }
+
   await browser.close();
   console.log(fail ? '\nFEHLGESCHLAGEN' : '\nAlles gruen');
   process.exit(fail ? 1 : 0);

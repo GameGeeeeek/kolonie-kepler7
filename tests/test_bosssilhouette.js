@@ -272,5 +272,30 @@ function backend(){ return async r => {
     abStand.tafelD && abStand.tafelD.slice(0, 120));
   check('4l: auch die Waechter-Wiedergabe laeuft ohne JS-Fehler', errs.length === 0, errs.slice(0, 3));
 
+  /* ---- Buendel B: der Boss ist ein Koerper, kein Umriss -------------------------------------
+     Gemessen am alten Bild: die Fuellung war #150a12 auf einem Grund von #060812, also praktisch
+     unsichtbar. Was man sah, war eine ein bis zwei Pixel starke rote Kontur - kein Volumen, keine
+     Panzerung, kein Kern. Geprueft wird die Regel, nicht das Aussehen. */
+  check('5a: die unsichtbare Flachfuellung ist weg', !/g\.fillStyle = '#150a12';/.test(HTML));
+  check('5b: jede Gestalt bekommt denselben Koerperverlauf (oben links hell, unten rechts dunkel)',
+    /var bkg = g\.createRadialGradient\(x - s \* 0\.45, y - s \* 0\.45/.test(HTML)
+    && /bkg\.addColorStop\(0,\s*'#3a2440'\)/.test(HTML)
+    && /g\.fillStyle = bkg;/.test(HTML));
+  /* Der Kern ist das, was einen Koerper lebendig macht - und er haengt am Zustand: ein schwer
+     getroffener Boss glimmt nur noch. Beide Haelften werden geprueft, sonst waere "es gibt einen
+     Kern" auch bei einem konstanten Fleck erfuellt. */
+  check('5c: es gibt einen glühenden Kern mit hellem Zentrum',
+    /glut\(g, x, y, s \* 0\.42 \* puls, F\.ver/.test(HTML)
+    && /glut\(g, x, y, s \* 0\.16 \* puls, '#ffffff'/.test(HTML));
+  check('5d: die Staerke des Kerns haengt am Zustand des Bosses, nicht an einer festen Zahl',
+    /\(0\.30 \+ 0\.45 \* anteil\) \* puls/.test(HTML) && /\(0\.18 \+ 0\.30 \* anteil\) \* puls/.test(HTML));
+  /* Und die Silhouetten bleiben: derselbe Boss, nur mit Masse. Ein Umbau, der die Gestalten
+     mitnimmt, waere ein anderer Auftrag - der Test haelt fest, dass sie noch da sind. */
+  check('5e: alle Gestalten sind erhalten geblieben',
+    ['sternenfresser','panzerhuelle','schwarmmutter','phasenwandler','gluthorn','abgrund']
+      .every(k => HTML.includes("BOSS.key === '" + k + "'")),
+    ['sternenfresser','panzerhuelle','schwarmmutter','phasenwandler','gluthorn','abgrund']
+      .filter(k => !HTML.includes("BOSS.key === '" + k + "'")));
+
   await ende(async () => { await ctx.close(); await browser.close(); });
 })();
