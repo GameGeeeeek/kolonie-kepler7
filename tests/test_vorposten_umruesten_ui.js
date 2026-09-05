@@ -15,7 +15,7 @@
 //
 // Gegenprobe: siehe Fuss der Datei.
 const fs = require('fs');
-const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
@@ -41,6 +41,27 @@ check('0a: das Spiel haelt KEINE eigenen Umruest-Zahlen - Kosten, Dauer und Stuf
   check('0c: die Bestaetigung nennt Dauer, Unumkehrbarkeit und das schlafende Projekt',
     /abbrechen geht nicht/.test(rumpf) && /wirkt wieder, wenn du zurückrüstest/.test(rumpf)
     && /Die Werte wechseln erst am Ende/.test(rumpf), {});
+  /* 0d: WER BUCHT AB. Seit der Backend-Durchsicht (05.09.2026) zieht der SERVER die Rohstoffe ab
+     und meldet `newResources` zurueck; `pay(kosten)` ist nur noch der Rueckfall fuer ein Backend,
+     das das noch nicht tut. Ohne diese Verzweigung waere in der Deploy-Luecke entweder doppelt
+     gezahlt oder gar nicht - und beides sieht im Spiel wie Normalbetrieb aus. */
+  check('0d: der Serverstand wird uebernommen, `pay` ist nur der Rueckfall',
+    /daten\.newResources/.test(rumpf) && /daten\.saveVersion/.test(rumpf)
+    && /\} else \{\s*pay\(kosten\);/.test(rumpf)
+    && rumpf.indexOf('daten.newResources') < rumpf.indexOf('pay(kosten)'), {});
+}
+{
+  /* 0e: DIE SCHIFFE, DIE NICHT MEHR HINEINPASSEN. Der Garnisonsdeckel kann mit dem Zweig SINKEN;
+     was herausfaellt, kommt ueber die Belohnungsmeldung zurueck. `shipDefOrSuper` - NICHT
+     `SHIP_DEFS.find`: Sonst verfaellt ausgerechnet das Superschlachtschiff, derselbe Fehler, der
+     den Abbau-Zweig schon einmal getroffen hat. */
+  const vonB = src.indexOf("if (r.type === 'vorposten-umruestung'){");
+  const zweig = vonB < 0 ? '' : ohneKommentar(src.slice(vonB, src.indexOf('        if (r.type ===', vonB + 40)));
+  check('0e-anker: der Belohnungszweig ist lesbar (sonst misst 0e nichts)', vonB > 0 && zweig.length > 400,
+    { laenge: zweig.length });
+  check('0e: der Zweig bucht `garnisonZurueck` mit shipDefOrSuper auf den aktiven Standort',
+    /garnisonZurueck/.test(zweig) && /shipDefOrSuper\(k\)/.test(zweig) && /currentFleet\(\)/.test(zweig)
+    && /alsVerbuendeter/.test(zweig) && !/SHIP_DEFS\[/.test(zweig), { laenge: zweig.length });
 }
 
 const now = Date.now();
@@ -82,6 +103,7 @@ function spielstand(reich){
     const o = opt || {};
     const ctx = await browser.newContext({ viewport:{ width:1280, height:1000 } });
     const page = await ctx.newPage();
+    await logMitschnitt(page);
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
     const gesendet = [];
     const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }),
@@ -91,6 +113,7 @@ function spielstand(reich){
          faellt es nicht auf, weil sie nichts davon lesen. */
       'kepler7-save-v3': spielstand(o.reich !== false) };
     const doc = vp(o.vp || {});
+    let belohnungRaus = false;
     await page.route('**/api/**', async r => {
       const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
       const j = (x, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(x) });
@@ -120,7 +143,10 @@ function spielstand(reich){
       if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
       if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
       if (p === 'players-map') return j({ players:[] });
-      if (p === 'pending-rewards/claim') return j({ reward:null });
+      /* Genau EINE Belohnung, dann nichts mehr - so misst der Lauf den Zweig und laeuft nicht in
+         eine Endlosschleife aus derselben Meldung. */
+      if (p === 'pending-rewards/claim'){ const b = o.belohnung && !belohnungRaus; belohnungRaus = true;
+        return j({ reward: b ? o.belohnung : null }); }
       if (p === 'chat/global' || p === 'chat/allianz') return j({ ok:true, nachrichten:[], neuesteTs:0 });
       if (p === 'storage-list'){ const pref = decodeURIComponent((u.split('prefix=')[1] || '').split('&')[0]);
         return j({ keys: Object.keys(st).filter(k => k.startsWith(pref)) }); }
@@ -162,13 +188,21 @@ function spielstand(reich){
         gruende: [...m.querySelectorAll('.kmenu-grund')].map(x => (x.textContent||'').replace(/\s+/g,' ').trim()),
         umruesten: z ? { ab: Number(z.getAttribute('data-vp-umruesten')), ziel: z.getAttribute('data-vp-umruesten-ziel') } : null };
     });
+    /* DIE KARTE, nicht das Menue: Das Zeichen der laufenden Umruestung sieht JEDER, ohne ein Menue
+       zu oeffnen - genau wie das Demontagegeruest des Abbaus. Gemessen wird sein Datenattribut
+       samt Zielzweig, nicht seine Geometrie. */
+    const karte = await page.evaluate(() => {
+      const u = document.querySelector('[data-vp-umbau]'), a = document.querySelector('[data-vp-abbau]');
+      return { umbauZiel: u ? u.getAttribute('data-vp-umbau') : null, abbau: !!a };
+    });
     if (o.klick !== false){
       await page.evaluate(() => { const b = [...document.querySelectorAll('.kmenu button')].find(x => /Ausrichtung umrüsten/.test(x.textContent)); if (b && !b.disabled) b.click(); });
       await page.waitForTimeout(900);
     }
     const dialoge = await page.evaluate(() => ({ prompts: window.__prompts || [], confirms: window.__confirms || [] }));
+    const meldungen = await logZeilen(page);
     await ctx.close();
-    return { menue, dialoge, gesendet, errs };
+    return { menue, karte, dialoge, gesendet, errs, meldungen };
   }
 
   // 1: der Normalfall - Endstufe, bezahlbare Kosten, keine Module
@@ -218,6 +252,60 @@ function spielstand(reich){
     && /Wird umgerüstet zum Handelsknoten/.test(laeuft.menue.text)
     && /Bis dahin gelten die alten Werte/.test(laeuft.menue.text),
     { zeile: laeuft.menue.umruesten, auszug: (laeuft.menue.text.match(/Wird umgerüstet[^·]*/) || [])[0] });
+  /* 3c: DER RIEGEL IN DIE ANDERE RICHTUNG. Der Server weist den Abbau waehrend einer Umruestung ab
+     (Backend-Durchsicht 05.09.2026) - ein Eintrag, der nur eine Fehlermeldung erzeugt, ist ein
+     Versprechen ohne Gegenstand. Und der GRUND steht dran, nicht nur die Ausgrauung. */
+  check('3c: waehrend der Umruestung ist der Abbau gesperrt und nennt den Grund',
+    laeuft.menue.knoepfe.some(k => /Vorposten abbauen/.test(k.label) && k.disabled)
+    && laeuft.menue.gruende.some(g => /Erst nach der Umrüstung/.test(g)),
+    { knopf: laeuft.menue.knoepfe.find(k => /abbauen/.test(k.label)),
+      gruende: laeuft.menue.gruende.filter(g => /Umrüstung/.test(g)) });
+  /* 3d: AUF DER KARTE, ohne Menue. Fuer einen Angreifer ist die laufende Umruestung die wertvollere
+     Information: 24 Stunden lang gelten noch die alten Werte, danach andere. Der Abbau hatte sein
+     Zeichen von Anfang an, die Umruestung nicht. */
+  check('3d: die laufende Umruestung hat ein eigenes Zeichen auf der Karte, mit dem Zielzweig',
+    laeuft.karte.umbauZiel === 'handel' && laeuft.karte.abbau === false,
+    { karte: laeuft.karte });
+
+  // 6-8: die drei Sperrgruende, die bisher niemand gemessen hat
+  const jung = await messe({ kosten: BILLIG, klick:false, vp: { stufe:7, name:'Doppelring' } });
+  check('6a: unter der Mindeststufe ist der Eintrag gesperrt und nennt die Stufe',
+    jung.menue.knoepfe.some(k => /Ausrichtung umrüsten/.test(k.label) && k.disabled)
+    && jung.menue.gruende.some(g => /Geht erst ab Stufe 8/.test(g)),
+    { gruende: jung.menue.gruende.filter(g => /Stufe/.test(g)) });
+  const ohne = await messe({ kosten: BILLIG, klick:false, vp: { zweig:null, zweigName:null, slots:0 } });
+  check('7a: ohne Ausrichtung gibt es nichts umzuruesten - gesperrt, mit dem Grund',
+    ohne.menue.knoepfe.some(k => /Ausrichtung umrüsten/.test(k.label) && k.disabled)
+    && ohne.menue.gruende.some(g => /noch keine Ausrichtung/.test(g)),
+    { gruende: ohne.menue.gruende.filter(g => /Ausrichtung/.test(g)) });
+  const weg = await messe({ kosten: BILLIG, klick:false, vp: { abbauAb: now + 3600000 } });
+  check('8a: waehrend eines laufenden Abbaus ist der Wechsel gesperrt',
+    weg.menue.knoepfe.some(k => /Ausrichtung umrüsten/.test(k.label) && k.disabled)
+    && weg.menue.gruende.some(g => /wird abgebaut/.test(g)),
+    { gruende: weg.menue.gruende.filter(g => /abgebaut/.test(g)) });
+  check('8b: und das Demontagegeruest steht dann auf der Karte, das Umbauzeichen nicht',
+    weg.karte.abbau === true && weg.karte.umbauZiel === null, { karte: weg.karte });
+
+  // 9: die Schiffe, die nicht mehr hineinpassen, kommen zurueck
+  /* DIE VORLAGE IST AM SENDER ABGELESEN (Backend `vorpostenUmruestenTick`): `garnisonMax` ist der
+     NEUE Deckel, `garnisonZurueck` die Schiffe je Typ, `alsVerbuendeter` unterscheidet die beiden
+     Empfaenger. Ein erfundenes Feld belegt nur sich selbst. */
+  const MELDUNG = { type:'vorposten-umruestung', system:SYS, stufe:8, name:'Sternenmarkt',
+    vonZweig:'festung', vonZweigName:'Festungsring', zweig:'handel', zweigName:'Handelsknoten',
+    garnisonMax:11900, garnisonZurueck:{ cruisers:8100 }, alsVerbuendeter:false, zeit:now };
+  const zurueck = await messe({ kosten: BILLIG, klick:false, belohnung: MELDUNG });
+  check('9a: die fertige Umruestung nennt den neuen Deckel und die Schiffe, die zurueckkommen',
+    zurueck.meldungen.some(z => /Die Umrüstung bei .* ist fertig/.test(z)
+      /* Die Zahlenform ist GEMESSEN, nicht geraten: `fmt` schreibt 11900 als „11.9k" und laesst
+         8100 unveraendert. Die erste Fassung tippte „11.90K" ein und fiel genau daran. */
+      && /hält jetzt nur noch 11\.9k Schiffe/.test(z) && /8100× Kreuzer/.test(z)),
+    { meldungen: zurueck.meldungen.filter(z => /Umrüstung/.test(z)) });
+  const verb = await messe({ kosten: BILLIG, klick:false,
+    belohnung: Object.assign({}, MELDUNG, { alsVerbuendeter:true, garnisonZurueck:{ jaeger:1200 } }) });
+  check('9b: der Verbuendete bekommt seine eigene Meldung - er hat den Umbau nicht bestellt',
+    verb.meldungen.some(z => /weniger Garnisonsplätze/.test(z) && /Jäger/.test(z))
+    && !verb.meldungen.some(z => /Die Umrüstung bei .* ist fertig/.test(z)),
+    { meldungen: verb.meldungen.filter(z => /Garnisonsplätze|Umrüstung/.test(z)) });
 
   // 4: zu viele Module fuer den kleineren Zielzweig - gesperrt, mit dem Grund
   const voll = await messe({ kosten: BILLIG, vp: { module: ['a:selten','b:selten','c:selten','d:selten','e:selten','f:selten'] } });
@@ -234,8 +322,9 @@ function spielstand(reich){
     && !/Ausrichtung umrüsten/.test(aus.menue.text),
     { knoepfe: aus.menue.knoepfe.map(k => k.label) });
 
-  const alle = [...gut.errs, ...arm.errs, ...laeuft.errs, ...voll.errs, ...aus.errs];
-  check('6a: kein JavaScript-Fehler in den fuenf Durchlaeufen', alle.length === 0, alle.slice(0, 3));
+  const alle = [...gut.errs, ...arm.errs, ...laeuft.errs, ...voll.errs, ...aus.errs,
+    ...jung.errs, ...ohne.errs, ...weg.errs, ...zurueck.errs, ...verb.errs];
+  check('10a: kein JavaScript-Fehler in den zehn Durchlaeufen', alle.length === 0, alle.slice(0, 3));
 
   await browser.close();
   ende();
@@ -256,6 +345,24 @@ function spielstand(reich){
      F  Die Steckplatz-Sperre entfernt                                   -> 4a und 4b (der Eintrag
         ist dann bedienbar, der Klick geht durch, und es wird eine Anfrage geschickt, die der
         Server ablehnen wuerde)
+
+   NACH DER ADVERSARISCHEN DURCHSICHT (05.09.2026) kamen zwei weitere Laeufe dazu. Beide
+   Vorhersagen wurden VOR dem Lauf aufgeschrieben und trafen genau zu:
+
+   Lauf 3: 3c, 3d, 9a, 9b FALLEN, sonst nichts.
+     H  Die Abbau-Sperre waehrend der Umruestung entfernt                -> 3c
+     I  `vorpostenUmruestZeichen` aus der Silhouette entfernt            -> 3d
+     J  `garnisonZurueck` wird nicht mehr gebucht                        -> 9a und 9b
+   Lauf 4: 0d, 0e, 6a, 7a, 8a FALLEN - und 9a, 9b als Folge, sonst nichts.
+     L  Der `newResources`-Zweig entfernt, es bleibt `pay(kosten)`       -> 0d
+     M  `garnisonZurueck` VOLLSTAENDIG aus dem Belohnungszweig           -> 0e (und 9a, 9b)
+     N  Die drei Sperrgruende Stufe/Ausrichtung/Abbau entfernt           -> 6a, 7a, 8a
+
+   WARUM ZWEI LAEUFE UND NICHT EINER: In Lauf 3 blieben 0d und 0e gruen, obwohl die Mechanik
+   sabotiert war - beide sind QUELLTEXT-Waechter, und ein `if (false && ...)` bzw. ein leeres
+   `Object.entries({})` laesst die gesuchten Namen im Text stehen. Das ist die Grenze eines
+   Textwaechters, und sie gehoert hierher geschrieben statt uebersehen: Erst Lauf 4, der die
+   Zeilen wirklich entfernt, laesst sie fallen.
 
    ZWEI EIGENE FEHLER, beide vom Test gefangen, bevor irgendetwas ausgeliefert war:
 
