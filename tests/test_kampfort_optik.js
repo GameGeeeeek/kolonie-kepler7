@@ -35,7 +35,23 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
   check('Stiltabelle ORT_STIL gefunden', a >= 0 && b > a);
   const tabelle = src.slice(a, b);
   const zeilen = [...tabelle.matchAll(/^\s{6}([a-z]+):\s*\{([^}]*)\}/gm)].map(m => ({ typ: m[1], inhalt: m[2] }));
-  check('alle zwoelf Weltensorten in der Tabelle', zeilen.length === 12, zeilen.map(z => z.typ));
+  /* KEINE FESTE ANZAHL MEHR (mitgezogen 05.09.2026, GR-9): Die Tabelle waechst, sobald ortTyp eine
+     neue Sorte liefern kann - zuletzt um erdwelt und leerenwelt, die beiden Terraform-Ziele, die
+     vorher still auf 'heimat' zurueckfielen. Eine eingetippte 12 haette das als Fehler gemeldet,
+     obwohl es die Behebung war. Geprueft wird jetzt die REGEL: jede Sorte, die das Spiel als
+     Kampfort kennt, hat einen Eintrag - die Liste dafuer kommt aus dem Spielquelltext selbst
+     (PLANET_TYPE_INFO plus TERRAFORM_TARGET_TYPES plus die beiden Sonderorte heimat und mond). */
+  const infoBlock = (() => { const i = src.indexOf('const PLANET_TYPE_INFO = {'); const e = src.indexOf('\n  };', i); return i >= 0 && e > i ? src.slice(i, e) : ''; })();
+  const erwartet = [...new Set([
+    'heimat', 'mond',
+    ...[...infoBlock.matchAll(/^\s{4}([a-z]+):\s*\{\s*label:/gm)].map(m => m[1]),
+    ...(((src.match(/const TERRAFORM_TARGET_TYPES = \[([^\]]*)\]/) || ['', ''])[1].match(/'([a-z]+)'/g) || []).map(x => x.replace(/'/g, '')))
+  ])];
+  const habe = zeilen.map(z => z.typ);
+  check('die Liste der erwarteten Weltensorten liess sich aus dem Spiel lesen (sonst misst die naechste Pruefung nichts)',
+    erwartet.length >= 12, erwartet);
+  check('jede Weltensorte, die das Spiel als Kampfort kennt, hat einen Eintrag in ORT_STIL',
+    erwartet.every(t => habe.includes(t)), { fehlt: erwartet.filter(t => !habe.includes(t)), habe });
 
   // 1a) Jede Farbe ist eine gültige Farbe.
   const kaputt = [];

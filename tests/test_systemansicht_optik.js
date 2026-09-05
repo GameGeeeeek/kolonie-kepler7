@@ -226,7 +226,13 @@ const abstand = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
       ohneSchatten.length === 0 && falscheSeite.length === 0, { ohneSchatten, falscheSeite: falscheSeite.slice(0, 3) });
 
     // Halo und Abdunklung als PAAR.
-    check('1d: erforschte Welten tragen den Atmosphaeren-Halo', ERFORSCHT.every(id => m.planeten[id].halo === 1),
+    /* GEZAEHLT WIRD NICHT, SONDERN GEPRUEFT, DASS ER DA IST (mitgezogen 05.09.2026, GR-9):
+       Bis dahin trug nur der innere der beiden Halo-Ringe die Kennung, und die Pruefung verglich
+       mit genau 1. Seit der aeussere Ring ebenfalls messbar ist (data-sys-halo="2", damit ein
+       Waechter die sichtbare Aussenkante messen kann), waeren es 2 - die feste Zahl war eine
+       Momentaufnahme des Markups, nicht die Regel. Die Regel ist "erforscht hat einen, unerforscht
+       hat keinen", und sie steht als Paar mit 1d2 daneben. */
+    check('1d: erforschte Welten tragen den Atmosphaeren-Halo', ERFORSCHT.every(id => m.planeten[id].halo >= 1),
       ERFORSCHT.map(id => [id, m.planeten[id].halo]));
     check('1d2: unerforschte Welten tragen KEINEN Halo (die Gegenrichtung des Paars)', UNERFORSCHT.every(id => m.planeten[id].halo === 0),
       UNERFORSCHT.map(id => [id, m.planeten[id].halo]));

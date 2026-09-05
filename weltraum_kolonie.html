@@ -1339,7 +1339,12 @@
        Kopfbereich bei rund 400px, und das Banner ist das EINZIGE Bild der eigenen Welt im ganzen
        Spiel - ein Handyspieler bekam es nie zu sehen.
        Der Ausschnitt (56px statt 190px) zeigt den Planeten samt Ring am rechten Rand: preserveAspectRatio ist
-       im Markup auf "xMidYMid slice" gesetzt, das Bild wird also beschnitten statt gestaucht. Kein
+       im Markup auf "xMaxYMid slice" gesetzt, das Bild wird also beschnitten statt gestaucht - und
+       RECHTSBUENDIG: Bei voller Bannerhoehe in einem Fenster unter rund 760 px Breite (Banner
+       schmaler als seine viewBox) skaliert slice auf die Hoehe und schneidet seitlich; mit xMid war
+       das genau der Planet (cx 590 von 720), gemessen 05.09.2026 bei 480 px (GR-9). xMax haelt den
+       rechten Rand und damit den Planeten im Bild. Der 56-px-Streifen schneidet senkrecht, dort
+       war er nie betroffen. Kein
        Textelement liegt darin - Titel und Knopfleiste stehen im Kompaktmodus ohnehin statisch
        darunter (hero-bottom/hero-stats weiter unten), nicht absolut im Banner. */
     body.compact-head .hero { height:auto; margin-bottom:0.6rem; }
@@ -2197,7 +2202,11 @@
       #karteEbenenLeiste .planet-pill { flex:0 0 auto; }
     }
     .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
-    .map-wrap svg { width:100%; height:100%; }
+    /* NUR das Karten-svg selbst (direktes Kind), nicht jedes svg IM Kasten: Das Fraktionswappen am
+       Knoten ist ein verschachteltes <svg width="14" height="14"> (sektorAnsichtBauen, Systemebene) -
+       mit der alten Regel `.map-wrap svg` wurde es auf Kastengroesse gezogen und legte sich als
+       halbtransparenter Riesen-Helm ueber ein Viertel der Karte (gemessen 05.09.2026, GR-9). */
+    .map-wrap > svg { width:100%; height:100%; }
     /* Zoomstapel waagerecht, sobald der Kartenkasten schmal ist (KB-11): Senkrecht belegt er
        120 px Hoehe - im kompakten Systemkasten (~230 px) lag er damit unter dem ›-Blaetterknopf
        und fing dessen Taps ab. Waagerecht braucht er nur 34 px Hoehe, und die Blaetterknoepfe
@@ -3369,7 +3378,7 @@
     <div class="shell-inner">
 
       <div class="hero">
-        <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
+        <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMaxYMid slice" role="img" aria-hidden="true">
           <defs>
             <radialGradient id="planetGrad" cx="35%" cy="35%" r="70%">
               <stop offset="0%" stop-color="#9d95f2"/>
@@ -7435,8 +7444,21 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.682.0';
+  const VERSION = '8.683.0';
   const PATCHNOTES = [
+  { version:'8.683.0', date:'05.09.2026', changes:[
+    '<strong>Das Fraktionswappen lag als Riesenhelm \u00fcber der Sektorkarte.</strong> Ein System einer Fraktion trug sein Wappen eigentlich 14 Bildpunkte gro\u00df am Knoten \u2013 tats\u00e4chlich wurde es auf Kastengr\u00f6\u00dfe gezogen und lag halbdurchsichtig \u00fcber einem Viertel der Karte. Jetzt sitzt es wieder da, wo es hingeh\u00f6rt.',
+    '<strong>Ein Asteroid sa\u00df auf einem Planeten.</strong> Der sechste G\u00fcrtelplatz lag im Heimatsystem genau auf der Bahn von Aion \u2013 Fels und Welt \u00fcberdeckten sich. Betroffene Pl\u00e4tze weichen jetzt auf ihrer eigenen Bahn ein St\u00fcck aus, immer nach oben, damit sie nicht unter das Namensschild rutschen. Der G\u00fcrtel selbst bleibt, wo er war.',
+    '<strong>Terraformte Welten k\u00e4mpften auf ihrer alten Oberfl\u00e4che.</strong> Wer eine Todeswelt zur Erdwelt umgebaut hatte, sah in der Kampf-Wiedergabe weiter die W\u00fcste von fr\u00fcher. Jetzt zeigt der Kampfort den Zustand, den der Standort wirklich hat.',
+    '<strong>Wracks waren rote Drahtgitter.</strong> Ein zerst\u00f6rtes Schiff verlor beim Untergang sein Aussehen und fiel auf eine Notzeichnung zur\u00fcck. Jetzt beh\u00e4lt das Wrack den Rumpf, den das Schiff zu Lebzeiten hatte.',
+    '<strong>Drei Kleinigkeiten, die man erst sieht, wenn sie da sind:</strong> Der Planet im Kopfbanner wurde in schmalen Fenstern genau weggeschnitten. Der Nebel im Orbitalglas war mit 5 % Deckkraft schlicht nicht vorhanden. Und die Umlaufbahnen der Systemkarte waren am Handy unsichtbar \u2013 dort sind sie jetzt kr\u00e4ftiger, am gro\u00dfen Bildschirm bleiben sie so zur\u00fcckhaltend wie bisher.',
+    '<strong>Und f\u00fcnf Fehler, die erst Pr\u00fcflauf und Durchsicht fanden:</strong> Die neue Ausweich-Rechnung schob den Asteroiden auf die <em>falsche</em> Seite \u2013 nach oben blieben 20 Bildpunkte Abstand, nach unten 26. In der breiten Kartenansicht war der Platz sogar vorher frei und wurde erst durch das Ausweichen zum Problem. Jetzt wird der Abstand wirklich gemessen, in beide Richtungen gepr\u00fcft und nur so weit ger\u00fcckt wie n\u00f6tig \u2013 und der Freiraum reicht auch f\u00fcr den gr\u00f6\u00dften Brocken samt Schürfrecht-Ring.',
+    '<strong>Die Trefferfl\u00e4che aller Asteroiden war zu klein geworden.</strong> Weil ein Platz enger an seinem Nachbarn sa\u00df, schrumpfte das Antippfeld <em>aller zehn</em> Vorkommen mit \u2013 auch in G\u00fcrteln ohne Planeten an der Stelle. Der Deckel gilt jetzt je Platz.',
+    '<strong>Fremde Welten trugen deine Oberfl\u00e4che.</strong> Wer eine eigene Welt terraformt hatte, sah beim Angriff auf einen anderen Spieler dessen Basis in <em>seiner eigenen</em> neuen Oberfl\u00e4che. Der Umbau gilt jetzt nur noch am eigenen Standort.',
+    '<strong>Erdwelt und Leerenwelt hatten gar kein Kampfbild.</strong> Beide fielen auf den neutralen Heimat-Hintergrund zur\u00fcck \u2013 nach dem teuersten Umbau des Spiels sah es also unscheinbarer aus als vorher. Beide haben jetzt ein eigenes: \u00fcppiges Gr\u00fcn und Violett-Schwarz.',
+    '<strong>Und ein ung\u00fcltiger Ort bleibt ung\u00fcltig:</strong> Eine Asteroidenfestung ohne G\u00fcrtelplatz w\u00e4re sichtbar neben Aion aufgetaucht, statt wie bisher gar nicht gezeichnet zu werden. Ebenso beh\u00e4lt ein Wrack jetzt immer ein Bild \u2013 vorher konnte es ganz verschwinden.',
+    'W\u00e4chter: <code>test_grafik_einzeiler</code> (31 Pr\u00fcfungen). Der G\u00fcrtel-Ausweicher ist reine Geometrie und wird deshalb aus der Spieldatei geschnitten und in <em>beiden</em> Kartenformen einzeln nachgerechnet: Das Ausweichen darf den Abstand nirgends verkleinern, der zu nahe Platz muss weichen, ein ung\u00fcltiger Ort darf nicht g\u00fcltig werden, und kein Platz darf auf einem anderen landen.'
+  ] },
   { version:'8.682.0', date:'05.09.2026', changes:[
     '<strong>Das Logbuch des Kommandanten schreibt jetzt auch die gro\u00dfen Momente.</strong> Bisher bekam nur der gew\u00f6hnliche Angriff auf ein NPC-Ziel einen Erz\u00e4hltext. Neu dabei sind <strong>Weltboss-Schl\u00e4ge</strong>, <strong>gefallene Asteroidenfestungen</strong>, <strong>gefallene Alien-K\u00f6niginnen</strong> und <strong>Spielerk\u00e4mpfe</strong> \u2013 dort sogar zwei Texte aus einem Kampf: einer aus Sicht des Angreifers, einer aus Sicht der Verteidiger. Beide h\u00e4ngen an dem Bericht, den ihr jeweils seht.',
     '<strong>Steht die Festung oder lebt die K\u00f6nigin noch, gibt es keinen Text.</strong> Das Logbuch erz\u00e4hlt den Moment, nicht jeden Schlag daf\u00fcr \u2013 sonst w\u00e4re die kleine Tagesgrenze nach drei Anl\u00e4ufen weg, bevor der Moment \u00fcberhaupt eintritt.',
@@ -7564,16 +7586,11 @@
       '<strong>Wenn dich jemand ausspäht, erfährst du es jetzt wirklich.</strong> Die Einstellung „Spionage-Warnungen – wenn dich jemand ausspäht" steht seit jeher auf an, die Meldung dafür war fertig gebaut, und der Server hatte sogar einen eigenen, gegen Fälschung abgesicherten Weg dafür – angekommen ist trotzdem nie eine. Die Warnung wurde ohne die Kennzeichnung „geteilt" verschickt und landete deshalb im <em>eigenen</em> Speicher des Spähers statt beim Ziel: zwei Hälften, die fertig waren und nur nicht verbunden. Nebenbei aufgeräumt: Dort sammelte sich seither je geflogener Spionage ein Eintrag an, den niemand je gelesen hat.',
       '<strong>Das 🎯 auf der Sektorkarte zeigt keine Gegner mehr, die du gar nicht erreichen kannst.</strong> Die drei Leere-Gegner werden laut Hilfe erst mit <em>Leerentechnologie Stufe 1</em> sichtbar – vier Stellen im Spiel hielten sich daran, das Landmarken-Abzeichen der Karte war die fünfte und einzige ohne die Regel. Weil in allen drei Systemen außerdem ein regulärer Gegner steht, war das nicht bloß ein Name zu viel: In Nyra stand „2 Gegner, stärkster: Das Herz der Leere (Stufe 40)", wo für dich „Nyra, die Verschlingerin – Stufe 25" richtig gewesen wäre. Anzahl und stärkster Gegner stimmen jetzt, auf allen Kartenebenen.'
     ]},
-    { version:'8.663.0', date:'04.09.2026', changes:[
-      '<strong>Ein gesperrter Forschungsknopf sagt jetzt, was dir fehlt.</strong> Gemessen über alle 13 Reiter: 201 von 206 sichtbaren gesperrten Knöpfen trugen keinerlei Erklärung – kein Hinweistext, nichts. Die Forschung war mit 62 der größte Block. Man sah grau und erfuhr nicht, ob Ressourcen, eine Voraussetzung oder nur Geduld fehlten. Der Fund war ein anderer als erwartet und macht die Änderung klein: Das Spiel prüfte längst <em>jeden</em> Sperrgrund und hatte für jeden eine Meldung – laufende Forschung, fehlende Allianz, Voraussetzung, Höchststufe, Kosten. Sie waren nur unerreichbar, weil der Knopf gesperrt war und ein Tippen darauf nie ankam. Jetzt ist er antippbar und nennt den Grund, genau wie der Vorposten-Knopf es schon tut. Am Handy ist das die einzige Auskunft, die es überhaupt geben kann – ein Hinweis beim Darüberfahren nützt dort nichts, weil es kein Darüberfahren gibt. Die Optik bleibt unverändert: Was ein Knopf kostet und ob du es hast, zeigt weiterhin die Färbung.',
-      '<strong>Zwei dieser Meldungen waren zu dünn und nennen jetzt Menge und Namen.</strong> Aus „Voraussetzung nicht erfüllt" wurde „Dafür fehlt noch: Minentechnik Stufe 1.", aus „Nicht genug Ressourcen" wurde „Dafür fehlt noch: 11 Forschungspunkte." Die Fehlmenge rechnet das Baustellen-Konto korrekt mit, zählt also nur, was wirklich noch fehlt.',
-      'Wächter: <code>test_forschung_sperrgrund</code> hält fest, dass kein gesperrter Forschungsknopf mehr unantippbar ist und dass die Antwort Menge <em>und</em> Namen nennt. Eine Voraussetzung steht in den Tabellen in <strong>zwei</strong> Schreibweisen – als bloßer Schlüssel und mit eigener Stufenangabe. Die erste Fassung der neuen Meldung las nur die zweite und schwieg bei der ersten; betroffen waren ausgerechnet die drei Bergbau-Forschungen, denen sie helfen sollte. Behoben ist das an der Wurzel: Beide Leser gehen jetzt durch dieselbe Normalisierung und können die Schreibweise nicht mehr unterschiedlich verstehen. Gefunden hat es die automatische Durchsicht am Änderungssatz – der eigene Wächter nicht, weil er den <em>ersten</em> gesperrten Knopf antippte und der an den Kosten scheitert, der Voraussetzungs-Zweig also nie betreten wurde. Er tippt jetzt gezielt eine Forschung mit der anderen Schreibweise an. Und <code>test_allianzforschung</code> hat die Umstellung selbst gefunden: Die Prüfung hieß „kein Erforschen-Knopf ist bedienbar" und maß damit die Optik der Sperre statt der Regel dahinter. Sie prüft jetzt, dass ein Tippen ohne Allianz nachweislich <em>keine</em> Allianzforschung startet – das ist strenger als vorher, denn die alte Fassung wäre auch dann grün geblieben, wenn ein Tippen an der Sperre vorbei etwas ausgelöst hätte.'
-    ]},
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1085;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1086;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -36519,7 +36536,7 @@ async function claimPendingRewards(){
         u.gebaeudeName  = u.gebaeudeName  || function(k){ return k; };
         u.schiffGewicht = u.schiffGewicht || function(){ return 20; };
         u.ortName       = u.ortName       || function(k){ return k || 'Unbekannt'; };
-        u.ortTyp        = u.ortTyp        || function(){ return null; };
+        u.ortTyp        = u.ortTyp        || function(){ return null; };   // Stellvertreter: (k, eigenerOrt)
 
         var d = {
           art: r.type,
@@ -36551,7 +36568,8 @@ async function claimPendingRewards(){
              result:'win' heisst hier, die VERTEIDIGUNG (also der Spieler) gewann. */
           d.ergebnis = (r.result === 'win') ? 'sieg' : 'niederlage';
           d.ortName = u.ortName(r.targetPlanet);
-          d.ortTyp  = u.ortTyp(r.targetPlanet);
+          // Eingehender Ueberfall: das Ziel ist der EIGENE Standort, der Ueberschreiber gilt.
+          d.ortTyp  = u.ortTyp(r.targetPlanet, true);
           d.angreifer   = seiteBauen(r.faction || 'Angreifer', 'gegner',
                                      r.fleet, r.result === 'win' ? r.destroyedShips : null, u);
           d.verteidiger = seiteBauen('Deine Verteidigung', 'du',
@@ -36614,7 +36632,8 @@ async function claimPendingRewards(){
           d.blick = 'angriff';
           d.ergebnis = (r.result === 'win' || r.result === 'defended') ? 'sieg' : 'niederlage';
           d.ortName = u.ortName(r.targetPlanet || r.debrisPlanet);
-          d.ortTyp  = u.ortTyp(r.targetPlanet || r.debrisPlanet);
+          // Eigener Angriff: das Ziel gehoert jemand anderem, der eigene Ueberschreiber gilt nicht.
+          d.ortTyp  = u.ortTyp(r.targetPlanet || r.debrisPlanet, false);
           d.angreifer = seiteBauen('Deine Flotte', 'du', r.fleet, r.ownLostShips, u);
 
           var gegnerName = r.npcName || r.targetName || r.faction ||
@@ -36717,10 +36736,28 @@ async function claimPendingRewards(){
           /* Weltentyp fuer das Hintergrundbild. Kommt aus PLANETS, wo er ohnehin fuer jeden der
              499 Planeten steht - keine zweite Tabelle, die veralten koennte. Heimatbasis und
              Monde haben dort keinen Eintrag und bekommen ihre eigenen Kennungen. */
-          ortTyp:        function(k){
+          /* Terraformte Welten (planetTypeOverride) kaempfen auf ihrer NEUEN Oberflaeche -
+             effectivePlanetType ist die eine Stelle, die den Ueberschreiber kennt (GR-9,
+             05.09.2026: vorher las diese Funktion PLANETS[].type, die alte Oberflaeche).
+
+             NUR AM EIGENEN ORT (zweite Fassung, nach der adversarischen Durchsicht): Der
+             Ueberschreiber steht im EIGENEN Spielstand. Ein Angriffsbericht traegt den Schluessel
+             des VERTEIDIGERS - ohne das Kennzeichen zeichnete das Spiel die fremde Heimatbasis in
+             der Oberflaeche, die der Angreifer SICH SELBST terraformt hat, und 'home' waere sogar
+             der haeufigste Fall. Wo der Ort nicht sicher der eigene ist, gilt weiter der Basistyp
+             aus PLANETS - also genau das Aussehen von vor GR-9, kein Rueckschritt. */
+          ortTyp:        function(k, eigenerOrt){
             if (!k) return null;
-            if (k === 'home') return 'heimat';
+            if (k === 'home'){
+              var ovH = (eigenerOrt && typeof state !== 'undefined' && state && state.planetTypeOverride)
+                ? state.planetTypeOverride.home : null;
+              return ovH || 'heimat';
+            }
             if (typeof isMoonKey === 'function' && isMoonKey(k)) return 'mond';
+            if (eigenerOrt && typeof effectivePlanetType === 'function'){
+              var eff = effectivePlanetType(k);
+              if (eff) return eff;
+            }
             var p = (typeof PLANETS !== 'undefined') ? PLANETS.find(function(x){ return x.id === k; }) : null;
             return (p && p.type) || null;
           },
@@ -37428,7 +37465,14 @@ async function claimPendingRewards(){
       asteroid:    { a:'#2e2e33', b:'#1f1f23', c:'#101013', land:'rgba(70,70,78,', flecken:7, krater:true },
       todeswelt:   { a:'#33302a', b:'#22201c', c:'#111010', land:'rgba(66,60,50,', flecken:9 },
       super:       { a:'#2b1c36', b:'#1c1224', c:'#0d0812', land:'rgba(64,44,80,', flecken:12 },
-      mond:        { a:'#33363c', b:'#232529', c:'#111214', land:'rgba(84,88,96,', flecken:6, krater:true }
+      mond:        { a:'#33363c', b:'#232529', c:'#111214', land:'rgba(84,88,96,', flecken:6, krater:true },
+      /* Die beiden Terraform-Ziele. Sie fehlten hier, solange ortTyp den Basistyp aus PLANETS las -
+         seit die Funktion effectivePlanetType nimmt, koennen sie ankommen, und ohne Eintrag fielen
+         sie auf 'heimat' zurueck: der Spieler haette nach dem teuersten Umbau des Spiels einen
+         NEUTRALEREN Hintergrund gesehen als vorher (gemessen 05.09.2026). Farben aus derselben
+         Familie wie die Planeten-Texturen: Erdwelt uepppig gruen, Leerenwelt violett-schwarz. */
+      erdwelt:     { a:'#14402c', b:'#0d2b1d', c:'#061510', land:'rgba(42,96,58,', flecken:12 },
+      leerenwelt:  { a:'#1c1436', b:'#120c24', c:'#080512', land:'rgba(72,58,150,', flecken:7 }
     };
     function ortStil(){
       return ORT_STIL[(DATEN && DATEN.ortTyp) || ''] || ORT_STIL.heimat;
@@ -38136,7 +38180,10 @@ async function claimPendingRewards(){
       }
       if (wracks.length < MAXW){
         wracks.push({
-          k: s.k, seite: s.atlasSeite, u: s.u, a: s.a,
+          /* s.modell ist der Atlas-Schluessel des LEBENDEN Schiffs (Spielbild oder Stellvertreter);
+             s.k nur die Klasse. Mit s.k fiel jedes Wrack als roter Polygon-Rueckfall - ein
+             Drahtgitter neben vollen Rumpfbildern (GR-9, 05.09.2026). */
+          k: s.modell || s.k, kKlasse: s.k, seite: s.atlasSeite, u: s.u, a: s.a,
           vu: s.vu * 0.5 + (Math.random()-0.5)*0.06,
           va: Math.min(-0.02, s.va * 0.4) - Math.random()*0.05,
           w: s.w, dreh: (Math.random()-0.5) * 3.2, t: 0, brennt: 0, gross: gross
@@ -38986,7 +39033,12 @@ async function claimPendingRewards(){
       for (var i = 0; i < wracks.length; i++){
         var wk = wracks[i];
         var p = px(wk.u, wk.a);
-        var atlas = atlanten[atlasSchluessel(wk.k, wk.seite)];
+        /* Rueckfall auf die KLASSE: Seit das Wrack den Rumpf des lebenden Schiffs traegt
+           (wk.k = s.modell), kann sein Atlas fehlen - gebacken wird nur, was auf der Buehne stand.
+           Ohne diese Zeile verschwaende ein Wrack ganz, waehrend es vorher (mit s.k) immer eines
+           gab. Der Rueckfall zeigt lieber den Klassen-Rumpf als gar nichts. */
+        var atlas = atlanten[atlasSchluessel(wk.k, wk.seite)]
+                 || (wk.kKlasse ? atlanten[atlasSchluessel(wk.kKlasse, wk.seite)] : null);
         if (!atlas) continue;
         if (wk.brennt > 0.02){
           /* Wiedereintrittsspur */
@@ -57337,7 +57389,9 @@ async function claimPendingRewards(){
         kachel.width = kachel.height = Math.max(2, Math.ceil(neb.r*2));
         const kctx = kachel.getContext('2d');
         const kg = kctx.createRadialGradient(neb.r, neb.r, 0, neb.r, neb.r, neb.r);
-        kg.addColorStop(0, `rgba(${neb.color},0.05)`);
+        /* 0,14 statt 0,05: Mit 5 % waren beide Nebel auf dem Schirm nicht vorhanden (gemessen
+           05.09.2026, GR-9). Die Kachel ist gecacht, die Deckkraft kostet nichts. */
+        kg.addColorStop(0, `rgba(${neb.color},0.14)`);
         kg.addColorStop(1, `rgba(${neb.color},0)`);
         kctx.fillStyle = kg;
         kctx.fillRect(0, 0, kachel.width, kachel.height);
@@ -57438,7 +57492,7 @@ async function claimPendingRewards(){
     resize();
     const ctx = canvas.getContext('2d');
     // Malt die Nebel-Leinwand GENAU DANN neu, wenn sich der quantisierte Drift-Versatz
-    // geändert hat. Quantisierung 6 px: Bei einem hunderte Pixel weichen Verlauf mit Alpha 0,05
+    // geändert hat. Quantisierung 6 px: Bei einem hunderte Pixel weichen Verlauf mit Alpha 0,14
     // ist ein 6-px-Schritt unsichtbar, und die Leinwand wird nur noch alle paar Sekunden gemalt
     // (2 px ergaben je nach Driftphase bis zu ~3 Malvorgänge je Sekunde - nachgemessen).
     function nebelZeichnen(t){
@@ -60257,15 +60311,98 @@ async function claimPendingRewards(){
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
   /* Die Guertelbahn liegt zwischen dem 3. und 4. Orbit - dieselbe Ellipsen-Formel wie oben, nur mit
-     halbem Orbit-Schritt. Die zehn Plaetze sitzen gleichmaessig darauf und sind um 18 Grad versetzt,
-     damit sie nicht auf denselben Winkeln landen wie die Planeten (ORBIT_ANGLES). */
+     halbem Orbit-Schritt. Die zehn Plaetze sitzen gleichmaessig darauf, um 18 Grad versetzt.
+     GEMESSEN (05.09.2026, GR-9): Der Versatz allein haelt die Plaetze NICHT von den Planeten fern.
+     Platz 5 liegt bei 198 Grad, der Planet auf Orbit 3 bei -160 = 200 Grad. Im runden Kasten (seit
+     KB-20 auch am Desktop: Orbit-Schritt 18 Einheiten) ist der radiale Abstand eines halben Schritts
+     9 Einheiten, die Planetenscheibe allein hat 11 - Aion lag in Kepler auf dem Vorkommen. Ein
+     radialer Ausweicher hilft dort nicht: selbst 0,4 Schritte weiter aussen klebten beide noch
+     aneinander (gemessen 31 px Abstand bei 34 px Radiensumme), und ein ganzer Schritt laege auf dem
+     vierten Orbit. Zehn gleichverteilte Plaetze koennen den Planetenwinkeln von Orbit 3 UND 4 auch
+     mit keinem anderen Versatz alle fernbleiben (20 und 2 modulo 36 lassen keine Luecke von je 12
+     Grad). Deshalb rueckt ein Platz, der einem Planeten zu nahe kommt, AUF SEINER BAHN weiter -
+     das Vorkommen bleibt auf der Guertelbahn, nur dieser eine Platz sitzt nicht mehr im 36-Grad-Raster.
+
+     ZWEITE FASSUNG (05.09.2026, nach der adversarischen Durchsicht). Die erste verschob jeden Platz,
+     der im WINKEL naeher als 14 Grad an einem Bahnwinkel lag, immer auf dieselbe Seite (die obere).
+     Zwei Fehler, beide nachgerechnet:
+       - Die obere Seite ist die SCHLECHTERE. Aion liegt bei 200 Grad; von 198 Grad aus gemessen
+         betraegt der Abstand nach 214 Grad im runden Kasten 19,9 Einheiten, nach 182 Grad dagegen
+         25,8. Im flachen Kasten (Orbit-Schritt 43, ry 0,30) noch deutlicher: 14,8 gegen 35,3.
+       - Im flachen Kasten war Platz 5 gar nicht zu nah (22,4 Einheiten). Das Verschieben hat den
+         Fehler dort ERST GEMACHT - der Platz landete auf der Scheibe, in jeder Brockengroesse.
+     Der Ausweicher rechnet deshalb jetzt den tatsaechlichen Abstand zur Planetenscheibe in der
+     AKTUELLEN Kastenform, weicht nur aus, wenn der Platz wirklich zu nah ist, probiert beide
+     Richtungen und nimmt die bessere - und rueckt nur so weit, wie noetig. Damit gilt dieselbe
+     Regel in beiden Kastenformen, ohne dass eine von beiden sie eintippen muss. */
   // Die Gürtelbahn liegt zwischen dem 3. und 4. Orbit - deshalb dieselbe Quelle wie die Planeten
   // (KB-12: am Handy enger und runder, sonst unverändert).
   function guertelRx(){ return kbOrbitRx(3.5); }
   function asteroidPlatzXY(platz){
     const rx = guertelRx(), ry = rx * kbOrbitMass().ry;
-    const rad = (((platz * 36) + 18) % 360) * Math.PI / 180;
+    const rad = guertelWinkelFuer(((platz * 36) + 18) % 360) * Math.PI / 180;
     return { x: SUN_X + rx * Math.cos(rad), y: SUN_Y + ry * Math.sin(rad) };
+  }
+  /* Der Ausweicher AUF der Guertelbahn: Liegt der Rasterwinkel naeher als GUERTEL_FREIWINKEL Grad am
+     Bahnwinkel des dritten oder vierten Orbits (die beiden Nachbarbahnen des Guertels), rueckt er
+     auf der Bahn weiter, bis genau dieser Abstand erreicht ist - und zwar auf die Seite, die im
+     Bild OBEN liegt (kleinerer Sinus): Das Namensschild eines Planeten haengt unter seiner Scheibe,
+     ein Vorkommen unterhalb sass auf dem Schild (gemessen an Kepler mit 186 Grad), eines oberhalb
+     ist frei. Eine reine Winkelfrage, unabhaengig davon, ob in diesem System dort wirklich ein
+     Planet steht - so bleibt jeder Platz systemuebergreifend an derselben Stelle. Gemessen an
+     Kepler: Platz 5 wandert von 198 auf 214 Grad und steht damit ueber Aion (-160 = 200 Grad). */
+  /* Der Freiraum, den ein Vorkommen zur Planetenmitte braucht: Scheibe 11 (Superplanet 14) plus
+     der aeussere Atmosphaeren-Halo 2,8 (sysHalo) plus der groesste Brocken 9,5 (Koloss). 23,5 deckt
+     den Regelfall ab; ein Superplanet auf Orbit 3 oder 4 braeuchte 26,3, das erreicht der Ausweicher
+     im runden Kasten nicht mehr ohne den Nachbarplatz zu bedraengen - dort bleibt es beim
+     bestmoeglichen Abstand. Die erste Fassung war an einem Brocken (6) geeicht und liess Koloss und
+     Schuerfrecht-Ring weiter auf der Scheibe liegen. */
+  const GUERTEL_FREIRAUM = 23.5;
+  /* Wie weit ein Platz hoechstens rueckt. Bei 36 Grad Raster bleiben dann 20 Grad zum Nachbarn -
+     genug, dass der Trefferflaechen-Deckel dieses Platzes nicht unter die Markergroesse faellt. */
+  const GUERTEL_MAXVERSATZ = 16;
+  /* Warum nur Orbit 3 und 4: Von den sechs Bahnen haben vier einen Platz nahe im WINKEL (Orbit 1
+     Platz 8 mit 6 Grad, Orbit 3 Platz 5 mit 2, Orbit 5 Platz 9 mit 3, Orbit 6 Platz 4 mit 3).
+     Beruehren kann sich aber nur, was auch RADIAL nah ist: Der Guertel liegt auf kbOrbitRx(3.5),
+     also einen halben Schritt von Orbit 3 und 4 - Orbit 1, 5 und 6 sind anderthalb bis zweieinhalb
+     Schritte entfernt. Die Abstandsrechnung unten wuerde das von selbst merken; die kurze Liste
+     spart nur die Rechnung fuer vier Bahnen, die nie in Frage kommen. */
+  function guertelBahnPunkt(grad, rx, ry){
+    const r = grad * Math.PI / 180;
+    return { x: SUN_X + rx * Math.cos(r), y: SUN_Y + ry * Math.sin(r) };
+  }
+  function guertelWinkelFuer(grad){
+    // Ein ungueltiger Ort darf nicht zu einem gueltigen werden. Eine Asteroidenfestung ohne Platz
+    // ergibt NaN; ohne diese Zeile lieferte die Funktion einen gueltigen Winkel und die Bastion
+    // erschiene sichtbar neben Aion, statt wie bisher gar nicht gezeichnet zu werden.
+    if (!Number.isFinite(grad)) return grad;
+    const mass = kbOrbitMass();
+    const rxG = guertelRx(), ryG = rxG * mass.ry;
+    // Abstand eines Guertelwinkels zur Planetenscheibe auf einer Bahn - in der Form, die der
+    // Kasten GERADE hat. Es ist eine reine Winkel-/Bahnfrage, unabhaengig davon, ob in diesem
+    // System dort wirklich ein Planet steht: so bleibt jeder Platz systemuebergreifend gleich.
+    const engster = (g) => {
+      let min = Infinity;
+      for (const orbit of [3, 4]){
+        const rxP = kbOrbitRx(orbit), ryP = rxP * mass.ry;
+        const a = guertelBahnPunkt(g, rxG, ryG);
+        const b = guertelBahnPunkt(ORBIT_ANGLES[(orbit - 1) % ORBIT_ANGLES.length], rxP, ryP);
+        min = Math.min(min, Math.hypot(a.x - b.x, a.y - b.y));
+      }
+      return min;
+    };
+    const norm = a => ((a % 360) + 360) % 360;
+    let bestD = engster(grad);
+    if (bestD >= GUERTEL_FREIRAUM) return grad;   // schon frei - dieser Platz bleibt, wo er ist
+    let best = grad;
+    for (let v = 2; v <= GUERTEL_MAXVERSATZ; v += 2){
+      for (const kandidat of [grad - v, grad + v]){
+        const d = engster(kandidat);
+        if (d > bestD){ bestD = d; best = norm(kandidat); }
+        if (bestD >= GUERTEL_FREIRAUM) return best;
+      }
+    }
+    return best;   // reicht nicht ganz - dann wenigstens der groesste erreichbare Abstand
   }
   function asteroidMarkerR(groesseKey){
     return ({ splitter:4.5, brocken:6, kern:7.5, koloss:9.5 })[groesseKey] || 5;
@@ -60310,17 +60447,27 @@ async function claimPendingRewards(){
     const pxJeEinheit = (r && r.width > 1 && galaxyMapViewBox.w > 0) ? r.width / galaxyMapViewBox.w : 0;
     return pxJeEinheit > 0 ? KB_TAP_PX / pxJeEinheit : KB_TAP_PX;
   }
-  function kbGuertelEngsterAbstand(){
+  /* Der Abstand zu den beiden Nachbarplaetzen - JE PLATZ, nicht als Minimum ueber alle.
+     Seit ein Platz einem Planeten ausweichen kann, sitzt genau einer enger an seinen Nachbarn; ein
+     globales Minimum zoege die Trefferflaeche aller zehn Vorkommen darauf herunter, auch in
+     Guertelsystemen ohne Planeten an der Stelle (gemessen: 41 % Kantenlaenge, 66 % Flaeche).
+     Ohne Platzangabe weiterhin das Minimum ueber alle - dann ist die Antwort eine Obergrenze. */
+  function kbGuertelEngsterAbstand(platz){
+    const nachbarn = (i) => {
+      const a = asteroidPlatzXY(i);
+      const vor  = asteroidPlatzXY((i + PLAETZE_JE_GUERTEL - 1) % PLAETZE_JE_GUERTEL);
+      const nach = asteroidPlatzXY((i + 1) % PLAETZE_JE_GUERTEL);
+      return Math.min(Math.hypot(a.x - vor.x,  a.y - vor.y),
+                      Math.hypot(a.x - nach.x, a.y - nach.y));
+    };
+    if (Number.isFinite(platz)) return nachbarn(platz);
     let min = Infinity;
-    for (let i = 0; i < PLAETZE_JE_GUERTEL; i++){
-      const a = asteroidPlatzXY(i), b = asteroidPlatzXY((i + 1) % PLAETZE_JE_GUERTEL);
-      min = Math.min(min, Math.hypot(a.x - b.x, a.y - b.y));
-    }
+    for (let i = 0; i < PLAETZE_JE_GUERTEL; i++) min = Math.min(min, nachbarn(i));
     return min;
   }
   // Halbe Kantenlaenge des quadratischen Trefferfeldes, in Systemeinheiten.
-  function asteroidTrefferHalb(groesseKey){
-    const deckel = kbGuertelEngsterAbstand() / 2 - KB_TREFFER_LUFT;
+  function asteroidTrefferHalb(groesseKey, platz){
+    const deckel = kbGuertelEngsterAbstand(platz) / 2 - KB_TREFFER_LUFT;
     return Math.max(asteroidMarkerR(groesseKey), Math.min(kbTrefferEinheiten() / 2, deckel));
   }
   // Mindestabstand und Schrittweite des Kollisionsschiebers hängen an der Bahn-Geometrie (KB-13):
@@ -60754,7 +60901,7 @@ async function claimPendingRewards(){
   }
   // Atmosphären-Halo in der Typfarbe, nur für ERFORSCHTE Welten (zwei Ringe statt eines Weichzeichners).
   function sysHalo(x, y, r, farbe){
-    return `<circle data-sys-halo="1" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+1.3).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.4" stroke-opacity="0.55"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+2.8).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.6" stroke-opacity="0.18"/>`;
+    return `<circle data-sys-halo="1" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+1.3).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.4" stroke-opacity="0.55"/><circle data-sys-halo="2" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r+2.8).toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.6" stroke-opacity="0.18"/>`;
   }
   // Gasriesen-Ring in zwei Hälften: die hintere VOR der Scheibe gezeichnet, die vordere DANACH
   // (untere Hälfte im gekippten Koordinatensystem, per clipPath) - sonst läge der Ring flach auf
@@ -61006,7 +61153,11 @@ async function claimPendingRewards(){
     // Orbit-Ringe
     for (const orbit of orbitsPresent){
       const rx = kbOrbitRx(orbit), ry = rx*kbOrbitMass().ry;
-      inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#dfe6ff" stroke-opacity="0.10" stroke-width="0.6"/>`;
+      // Am Handy (schmaler Kasten, innerWidth <= 700) 0,18 statt 0,10: bei 0,6 px Strich waren die
+      // Bahnen dort praktisch weg, und sie tragen die Ordnung des Systems (gemessen 05.09.2026, GR-9).
+      // Bewusst kbSchmalerKasten und nicht kbRunderKasten: der runde Kasten gilt seit KB-20 auch am
+      // Desktop, dort sollen die Bahnen so leise bleiben wie am 01.09.2026 gewaehlt.
+      inner += `<ellipse data-sys-bahn="${orbit}" cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#dfe6ff" stroke-opacity="${kbSchmalerKasten() ? '0.18' : '0.10'}" stroke-width="0.6"/>`;
     }
     // Bahnspur: ein kurzer Bogen in der Typfarbe, der hinter jedem Planeten auf seiner Bahn liegt -
     // dieselbe Ellipsen-Formel wie planetOrbitXY, damit der Bogen exakt an der Scheibe endet.
@@ -61026,7 +61177,7 @@ async function claimPendingRewards(){
       for (const a of asteroidenImSystem(activeSystem)){
         const pos = asteroidPlatzXY(a.platz);
         const g = asteroidGroesse(a.groesse), so = asteroidSorte(a.sorte);
-        const tHalb = asteroidTrefferHalb(a.groesse);
+        const tHalb = asteroidTrefferHalb(a.groesse, a.platz);
         const r = asteroidMarkerR(a.groesse);
         const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
         const ecken = [[-1,-0.35],[-0.45,-1],[0.55,-0.85],[1,0.1],[0.45,0.95],[-0.5,0.9]]
