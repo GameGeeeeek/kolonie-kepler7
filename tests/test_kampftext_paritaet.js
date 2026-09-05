@@ -163,6 +163,24 @@ const regelnPY = e2Text(PY, 'E2_REGELN = (', 'KAMPFDATEN:', 'STRIKTE REGELN');
 check('6-regeln: die gemeinsamen E2-Regeln sind wortgleich und verbieten Stueckzahlen auch als Wort',
   !!regelnBE && !!regelnPY && regelnBE === regelnPY && /auch nicht als Wort/.test(regelnBE), { backend: regelnBE, aiCore: regelnPY });
 
+// Der Verlust-Satz gehoert NUR in die zwei PvP-Einleitungen (dritte Messung, 05.09.2026): In den
+// gemeinsamen Regeln erreichte er auch Weltboss, Festung und Koenigin, die das Datum
+// "verluste: nicht bekannt" gar nicht haben - der Koeniginnen-Text schrieb ihn woertlich ab und
+// behauptete damit das Gegenteil der Daten. Geprueft wird die STELLE, nicht der Wortlaut: dass er
+// in den gemeinsamen Regeln FEHLT ist die Haelfte, die den Fehler gefunden haette.
+const VERLUSTSATZ = /NICHTS ueber Verluste/;
+check('6-verlustsatz-regeln: der Verlust-Satz steht in KEINEM der beiden gemeinsamen Regelbloecke',
+  !VERLUSTSATZ.test(regelnBE) && !VERLUSTSATZ.test(regelnPY), { backend: VERLUSTSATZ.test(regelnBE), aiCore: VERLUSTSATZ.test(regelnPY) });
+for (const art of ARTEN) {
+  const naechste = ARTEN[ARTEN.indexOf(art) + 1];
+  const be = e2Text(BE.slice(iEinBE), (art.indexOf('-') >= 0 ? "'" + art + "':" : art + ':'), naechste ? (naechste.indexOf('-') >= 0 ? "'" + naechste + "':" : '\n  ' + naechste + ':') : '\n};', 'Du bist');
+  const py = e2Text(PY.slice(iEinPY), '"' + art + '": (', naechste ? '"' + naechste + '": (' : '\n}', 'Du bist');
+  const soll = art.indexOf('pvp') === 0;
+  check('6-verlustsatz-' + art + ': der Satz steht ' + (soll ? 'in' : 'NICHT in') + ' dieser Einleitung, in beiden Repos',
+    VERLUSTSATZ.test(be || '') === soll && VERLUSTSATZ.test(py || '') === soll,
+    { backend: VERLUSTSATZ.test(be || ''), aiCore: VERLUSTSATZ.test(py || '') });
+}
+
 console.log('');
 console.log(fail ? 'FEHLGESCHLAGEN' : 'Alles gruen.');
 process.exit(fail ? 1 : 0);
