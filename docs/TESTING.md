@@ -649,3 +649,30 @@ Zwei Konsequenzen, beide gemessen:
 Die übertragbare Form: **Wo zwei Seiten sich auf Feldnamen einigen, gehört der Abgleich in einen
 Test, nicht in ein Konzeptpapier.** Ein Konzeptpapier beschreibt die Absicht; welche Felder wirklich
 über die Leitung gehen, weiß nur der Sender.
+
+## Eine Vermutung, die in einen Kommentar wandert, wird als Messung gelesen (05.09.2026)
+
+Aufgabe #52 lautete: *„Der Spielstand der Vorposten-Browsertests lädt nicht."* Der Satz stand
+wörtlich in zwei Testdateien und in `docs/vorposten-konzept.md`, jeweils als Begründung dafür,
+warum ein Test bestimmten Werten aus der Vorlage ausweicht. **Er war falsch.**
+
+Nachgemessen mit einer Sonde, die den Bootvorgang mitschneidet: Das Spiel holt
+`GET storage/kepler7-save-v3`, die Rohstoffe der Vorlage stehen danach im DOM, im Kartenmenü ist
+„Vorposten angreifen" bedienbar mit dem Grund „Öffnet die Flottenwahl." Der Spielstand lädt.
+
+Die echte Ursache war schmaler und schlimmer: **Vier Tests trugen den Schlüssel
+`kepler7-save-v1`,** das Spiel liest `kepler7-save-v3`. Bei ihnen kam die Vorlage nie an, und jede
+Prüfung darin, die an Rohstoffen, Flotte oder Gebäuden hängt, maß den **Startzustand** statt der
+Vorlage — still grün aus dem falschen Grund. Das ist schlimmer als ein roter Test: Ein roter meldet
+sich.
+
+**Zwei Regeln daraus:**
+
+1. **Ein Kommentar, der eine Ursache benennt, muss sagen, ob sie gemessen oder vermutet ist.**
+   Eine Vermutung ohne dieses Wort wird von der nächsten Sitzung als Tatsache gelesen — und dann
+   nicht mehr geprüft, sondern umgangen. Genau das ist hier über mehrere Etappen passiert.
+2. **Wo dieselbe Zeichenkette an zwei Stellen stehen muss, gehört ein Wächter hin, keine
+   Erinnerung.** `tests/test_spielstand_schluessel.js` liest `STORE_KEY` aus dem Spiel und
+   vergleicht ihn mit **jeder** Testvorlage, die einen Spielstand ablegt (gemessen: 136 von 384
+   Dateien tragen eine). Ein künftiger Schlüsselwechsel fällt dort auf, statt sich über Monate als
+   „grün aus dem falschen Grund" zu verteilen.
