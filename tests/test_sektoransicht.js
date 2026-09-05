@@ -94,10 +94,17 @@ function backend(store) {
 
   // ---- 2) REGEL: kein Knotenpaar näher als 60px -----------------------------------------------
   const abstaende = await page.evaluate(() => {
+    /* Die Knotenmitte: seit Buendel A zeichnet der Stern ein <use> auf den Symbolsatz, und ein
+       Knoten ohne Ringe hat gar keinen <circle> mehr - der alte Selektor lief dort auf null und
+       riss den ganzen Test ab. Gelesen wird deshalb zuerst das <use> (Mitte = x + Breite/2), der
+       Kreis bleibt als Rueckfall. */
     const mitten = [...document.querySelectorAll('#galaxyMapSvg [data-sektor-sys]')].map(g => {
+      const u = g.querySelector('use[href^="#sekStern-"]');
+      if (u) return [+u.getAttribute('x') + +u.getAttribute('width') / 2,
+                     +u.getAttribute('y') + +u.getAttribute('height') / 2];
       const c = g.querySelector('circle');
-      return [+c.getAttribute('cx'), +c.getAttribute('cy')];
-    });
+      return c ? [+c.getAttribute('cx'), +c.getAttribute('cy')] : null;
+    }).filter(Boolean);
     let min = Infinity, paar = null;
     for (let i = 0; i < mitten.length; i++) for (let j = i+1; j < mitten.length; j++){
       const d = Math.hypot(mitten[i][0]-mitten[j][0], mitten[i][1]-mitten[j][1]);

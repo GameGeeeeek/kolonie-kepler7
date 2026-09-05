@@ -2207,6 +2207,11 @@
        mit der alten Regel `.map-wrap svg` wurde es auf Kastengroesse gezogen und legte sich als
        halbtransparenter Riesen-Helm ueber ein Viertel der Karte (gemessen 05.09.2026, GR-9). */
     .map-wrap > svg { width:100%; height:100%; }
+    /* Ein unentdecktes System: gedaempft wird die SCHRIFT, nicht der Stern. Bis Buendel A lag
+       opacity 0.6 auf dem ganzen Knoten - der Stern, das einzige Zeichen fuer den Systemtyp, war
+       damit der Hauptleidtragende (Grafik-Aufnahme: 17 von 20 Knoten wirkten matt). Den Halo
+       daempft der Zeichner selbst ueber --sek-halo. */
+    .sektor-sys[data-unentdeckt] text { opacity: 0.62; }
     /* Zoomstapel waagerecht, sobald der Kartenkasten schmal ist (KB-11): Senkrecht belegt er
        120 px Hoehe - im kompakten Systemkasten (~230 px) lag er damit unter dem ›-Blaetterknopf
        und fing dessen Taps ab. Waagerecht braucht er nur 34 px Hoehe, und die Blaetterknoepfe
@@ -7099,85 +7104,413 @@
     // Phase 2 der Grafik-Umstellung, Fortsetzung: Planeten bekommen eine kleine gerenderte Kugel statt
     // des flachen ti-planet-Icons. Texturen werden PRO TYP nur einmal berechnet (Rauschen ist teuer)
     // und danach für jede Instanz dieses Typs wiederverwendet - PLANET_TEXTURE_CACHE hält sie fest.
-    // Farbrampen an die tatsächlichen PLANET_TYPE_INFO-Farben angelehnt (siehe Vorschau-Datei).
-    function makeNoise2D(seed){
-      function hash(x,y){ const h = Math.sin(x*127.1 + y*311.7 + seed*57.31) * 43758.5453123; return h - Math.floor(h); }
-      function smooth(t){ return t*t*(3-2*t); }
-      return function(x,y){
-        const xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
-        const a=hash(xi,yi), b=hash(xi+1,yi), c=hash(xi,yi+1), d=hash(xi+1,yi+1);
-        const u=smooth(xf), v=smooth(yf);
-        const top=a+(b-a)*u, bot=c+(d-c)*u;
-        return top+(bot-top)*v;
+    /* PLANETEN-TEXTUREN (GR-10, 05.09.2026, Grafik-Aufnahme "Kepler-7 in neuem Licht").
+       Gemessen am alten Zeichner: Alle zehn Typen trugen dasselbe V-Schlierenmuster - es entstand
+       aus rowShiftX/rowShiftY (die Rauschkoordinate wanderte linear mit der Zeile) - und
+       unterschieden sich nur in der Farbrampe; mond, erdwelt und leerenwelt hatten keinen eigenen
+       Builder und lieferten Byte fuer Byte die Erdtextur. Jetzt:
+         - Rauschen auf KUGELKOORDINATEN: Laengen-/Breitengrad -> Punkt der Einheitskugel ->
+           3D-Wertrauschen. Der Streifen ist an der Naht x=0/x=B nahtlos, das V-Muster ist weg.
+         - Jeder Typ liefert Albedo UND Hoehe; ein zweiter Durchgang schattiert das Hoehenfeld mit
+           festem Licht von oben links (passend zum Rand-/Kantenlicht in drawPlanetMiniIcon).
+         - 13 Typen mit eigener Geologie: Kontinente mit Kuestenlinie und Eiskappen, Inselwelt,
+           Duenenbaender, Eisschild mit Rissen, Lavaadern (Grat-Rauschen), Kristallfacetten
+           (Zellrauschen), Gasriesenbaender mit Sturm, Krater mit Wall (Hoehenprofil), Maria,
+           Narbenwelt, Aurora, Leerenwelt.
+         - 128x64 statt 90x45: gezeigt werden bis 82 Geraetepixel (Desktop DPR 2) bzw. 78 (Handy
+           DPR 3); der 45er-Ausschnitt war 1,3- bis 1,8-fach hochskaliert. Gemessen 267 ms fuer
+           alle 13 Streifen zusammen, einmal je Typ (Cache unten unveraendert).
+       Schnittstelle unveraendert: PLANET_TEXTURE_BUILDERS[typ]() liefert einen 2:1-Canvas-Streifen,
+       getPlanetTexture cacht ihn, drawPlanetMiniIcon und getPlanetTextureDataUrl lesen Breite und
+       Hoehe vom Streifen. Entwurf und Messung: Sitzungs-Scratchpad grafik/soll/planeten_texturen_A. */
+    const PLANET_TEXTUR_B = 128, PLANET_TEXTUR_H = 64;
+    // ---- Rauschen --------------------------------------------------------------------------
+    function makeNoise3D(seed){
+      function hash(x,y,z){ const h=Math.sin(x*127.1 + y*311.7 + z*74.7 + seed*57.31)*43758.5453123; return h-Math.floor(h); }
+      const sm = t => t*t*(3-2*t);
+      return function(x,y,z){
+        const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+        const u=sm(x-xi), v=sm(y-yi), w=sm(z-zi);
+        const c000=hash(xi,yi,zi),   c100=hash(xi+1,yi,zi),   c010=hash(xi,yi+1,zi),   c110=hash(xi+1,yi+1,zi);
+        const c001=hash(xi,yi,zi+1), c101=hash(xi+1,yi,zi+1), c011=hash(xi,yi+1,zi+1), c111=hash(xi+1,yi+1,zi+1);
+        const x00=c000+(c100-c000)*u, x10=c010+(c110-c010)*u, x01=c001+(c101-c001)*u, x11=c011+(c111-c011)*u;
+        const y0=x00+(x10-x00)*v, y1=x01+(x11-x01)*v;
+        return y0+(y1-y0)*w;
       };
     }
-    function fbm2(noiseFn,x,y,octaves,lac,gain){
-      let sum=0, amp=1, freq=1, norm=0;
-      for(let i=0;i<octaves;i++){ sum+=noiseFn(x*freq,y*freq)*amp; norm+=amp; amp*=gain; freq*=lac; }
-      return sum/norm;
+    function fbm3(n, x,y,z, oct, lac, gain){
+      let s=0, a=1, f=1, norm=0;
+      for(let i=0;i<oct;i++){ s+=n(x*f,y*f,z*f)*a; norm+=a; a*=gain; f*=lac; }
+      return s/norm;
     }
-    function rampColorP(v, stops){
-      for(let i=0;i<stops.length-1;i++){
-        const s0=stops[i], s1=stops[i+1];
-        if(v>=s0[0] && v<=s1[0]){
-          const t=(v-s0[0])/((s1[0]-s0[0])||1);
-          return [ s0[1][0]+(s1[1][0]-s0[1][0])*t, s0[1][1]+(s1[1][1]-s0[1][1])*t, s0[1][2]+(s1[1][2]-s0[1][2])*t ];
+    // Grat-Rauschen: 1-|2n-1| je Oktave -> dünne helle Linien (Risse, Adern, Lava)
+    function ridge3(n, x,y,z, oct, lac, gain){
+      let s=0, a=1, f=1, norm=0;
+      for(let i=0;i<oct;i++){ const r=1-Math.abs(2*n(x*f,y*f,z*f)-1); s+=r*r*a; norm+=a; a*=gain; f*=lac; }
+      return s/norm;
+    }
+    // Zellrauschen (Voronoi) in 3D: F1, F2 und Zellkennung
+    function makeCell3D(seed){
+      function h3(x,y,z,k){ const h=Math.sin(x*127.1 + y*311.7 + z*74.7 + k*19.19 + seed*57.31)*43758.5453123; return h-Math.floor(h); }
+      return function(x,y,z){
+        const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+        let f1=9, f2=9, id=0;
+        for(let dz=-1;dz<=1;dz++) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+          const cx=xi+dx, cy=yi+dy, cz=zi+dz;
+          const px=cx+h3(cx,cy,cz,1), py=cy+h3(cx,cy,cz,2), pz=cz+h3(cx,cy,cz,3);
+          const d=Math.sqrt((px-x)*(px-x)+(py-y)*(py-y)+(pz-z)*(pz-z));
+          if(d<f1){ f2=f1; f1=d; id=h3(cx,cy,cz,4); } else if(d<f2){ f2=d; }
         }
-      }
+        return [f1,f2,id];
+      };
+    }
+    const clamp01 = v => v<0?0:(v>1?1:v);
+    const smooth = (a,b,v) => { const t=clamp01((v-a)/(b-a)); return t*t*(3-2*t); };
+    const mix = (c0,c1,t) => [c0[0]+(c1[0]-c0[0])*t, c0[1]+(c1[1]-c0[1])*t, c0[2]+(c1[2]-c0[2])*t];
+    function ramp(v, stops){
+      if(v<=stops[0][0]) return stops[0][1];
+      for(let i=0;i<stops.length-1;i++){ const s0=stops[i], s1=stops[i+1]; if(v<=s1[0]) return mix(s0[1], s1[1], (v-s0[0])/((s1[0]-s0[0])||1)); }
       return stops[stops.length-1][1];
     }
-    function buildPlanetTexture(width,height,seed,opts){
+    // Winkelabstand zweier Kugelpunkte (Radiant)
+    const angDist = (p,q) => Math.acos(Math.max(-1,Math.min(1, p[0]*q[0]+p[1]*q[1]+p[2]*q[2])));
+    const sph = (lon,lat) => [Math.cos(lat)*Math.cos(lon), Math.sin(lat), Math.cos(lat)*Math.sin(lon)];
+    // Krater als Höhenprofil: Schüssel + Wall. d = Abstand/Radius
+    function craterHeight(d, depth, rimH){
+      if(d>1.6) return 0;
+      const bowl = -depth*(1-smooth(0.35,1.0,d));
+      const rim  = rimH*Math.exp(-((d-1.0)*(d-1.0))/(2*0.13*0.13));
+      return bowl+rim;
+    }
+    // deterministische Kraterliste je Seed, gleichmäßig auf der Kugel, Hauptmasse nahe der Streifenmitte
+    function craterList(seed, n, rMin, rMax){
+      const rnd = (k) => { const h=Math.sin(seed*91.7 + k*57.13)*43758.5453; return h-Math.floor(h); };
+      const list=[];
+      for(let i=0;i<n;i++){
+        const lon = Math.PI + (rnd(i*3)-0.5)*Math.PI*1.6;      // um lon=pi (sichtbarer Mittelausschnitt) streuen
+        const lat = (rnd(i*3+1)-0.5)*Math.PI*0.9;
+        const r = rMin + (rMax-rMin)*Math.pow(rnd(i*3+2), 1.6);
+        list.push({ q: sph(lon,lat), r, k: rnd(i*7+5) });
+      }
+      return list;
+    }
+
+    // ---- Gemeinsamer Streifen-Aufbau ----------------------------------------------------------
+    // spec.albedo(p,lat,lon) -> [r,g,b,hoehe]; spec.relief = Stärke der Reliefschattierung;
+    // spec.clouds(p,lat,lon) -> Deckkraft 0..1 (optional), spec.cloudColor
+    function buildPlanetStrip(width, height, spec){
       const off=document.createElement('canvas'); off.width=width; off.height=height;
-      const octx=off.getContext('2d');
-      if (!octx) return off;
+      const octx=off.getContext('2d'); if(!octx) return off;
       const img=octx.createImageData(width,height);
-      const noiseA=makeNoise2D(seed), noiseB=makeNoise2D(seed+53.7), detailNoise=makeNoise2D(seed+191.3);
-      const wrapR=opts.wrapR||3, rowShiftX=opts.rowShiftX||0.28, rowShiftY=opts.rowShiftY||0.06;
-      const stretchX=opts.stretchX||1, stretchY=opts.stretchY||1;
-      const octaves=opts.octaves||4, lac=opts.lac||2.1, gain=opts.gain||0.52;
+      const N=width*height, col=new Float32Array(N*3), hgt=new Float32Array(N), cosLat=new Float32Array(height);
+      const pts=new Array(N);
       for(let y=0;y<height;y++){
-        const rowN=y/height;
+        const lat=((y+0.5)/height-0.5)*Math.PI; cosLat[y]=Math.cos(lat);
         for(let x=0;x<width;x++){
-          const angle=x/width*Math.PI*2;
-          const nx=Math.cos(angle)*wrapR*stretchX + rowN*rowShiftX*10;
-          const ny=Math.sin(angle)*wrapR*stretchY + rowN*rowShiftY*10;
-          let v=fbm2(noiseA,nx,ny,octaves,lac,gain); v=Math.min(1,Math.max(0,v));
-          let v2=fbm2(noiseB,nx*1.7,ny*1.7,3,2.3,0.5); v2=Math.min(1,Math.max(0,v2));
-          const jitter=(detailNoise(x*0.4,y*0.4)-0.5)*0.06;
-          const vv=Math.min(1,Math.max(0,v+jitter));
-          const rgb = opts.colorize ? opts.colorize(vv,v2,rowN) : rampColorP(vv, opts.ramp);
-          const idx=(y*width+x)*4;
-          img.data[idx]=rgb[0]; img.data[idx+1]=rgb[1]; img.data[idx+2]=rgb[2]; img.data[idx+3]=255;
+          const lon=(x+0.5)/width*Math.PI*2;
+          const p=sph(lon,lat); const i=y*width+x; pts[i]=p;
+          const c=spec.albedo(p,lat,lon);
+          col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2]; hgt[i]=c[3]||0;
+        }
+      }
+      const k=spec.relief||0;
+      for(let y=0;y<height;y++){
+        const lat=((y+0.5)/height-0.5)*Math.PI;
+        for(let x=0;x<width;x++){
+          const i=y*width+x;
+          let r=col[i*3], g=col[i*3+1], b=col[i*3+2];
+          if(k>0){
+            const xl=y*width+((x-1+width)%width), xr=y*width+((x+1)%width);
+            const yu=(y>0?y-1:y)*width+x, yd=(y<height-1?y+1:y)*width+x;
+            const dhdx=(hgt[xr]-hgt[xl])*0.5*Math.max(0.15,cosLat[y]);   // Streifen ist am Pol gestreckt
+            const dhdy=(hgt[yd]-hgt[yu])*0.5;
+            // Licht von oben links: Hänge, die nach links/oben zeigen (Höhe fällt nach rechts/unten), werden hell.
+            let lit=1 + k*(-dhdx*0.78 - dhdy*0.62);
+            lit=Math.max(0.35, Math.min(1.55, lit));
+            r*=lit; g*=lit; b*=lit;
+          }
+          if(spec.clouds){
+            const a=clamp01(spec.clouds(pts[i],lat,(x+0.5)/width*Math.PI*2));
+            if(a>0){ const cc=spec.cloudColor||[250,252,255]; r+=(cc[0]-r)*a; g+=(cc[1]-g)*a; b+=(cc[2]-b)*a; }
+          }
+          const o=i*4; img.data[o]=r<0?0:(r>255?255:r); img.data[o+1]=g<0?0:(g>255?255:g); img.data[o+2]=b<0?0:(b>255?255:b); img.data[o+3]=255;
         }
       }
       octx.putImageData(img,0,0);
       return off;
     }
+
+    // ---- Wolken (gemeinsam für die bewohnbaren Typen) ----------------------------------------
+    function makeClouds(seed, freq, stretch, lo, hi, maxA, warpAmt){
+      const nC=makeNoise3D(seed), nW=makeNoise3D(seed+11.3);
+      return function(p){
+        const wx=(fbm3(nW,p[0]*1.3+7,p[1]*1.3,p[2]*1.3,3,2.0,0.5)-0.5)*warpAmt;
+        const wy=(fbm3(nW,p[0]*1.3,p[1]*1.3+3,p[2]*1.3,3,2.0,0.5)-0.5)*warpAmt;
+        const v=fbm3(nC,(p[0]+wx)*freq,(p[1]+wy)*freq*stretch,(p[2]-wx)*freq,4,2.2,0.55);
+        return smooth(lo,hi,v)*maxA;
+      };
+    }
+
+    // ---- Typen ----------------------------------------------------------------------------------
+    function erdTyp(seed, opts){
+      const nA=makeNoise3D(seed), nW=makeNoise3D(seed+53.7), nM=makeNoise3D(seed+91.1), nCap=makeNoise3D(seed+17.2);
+      const thr=opts.thr, capLat=opts.capLat;
+      const ocean=opts.ocean, shelf=opts.shelf, land=opts.land;
+      return {
+        relief: opts.relief,
+        albedo(p,lat){
+          const wx=(fbm3(nW,p[0]*2.1,p[1]*2.1,p[2]*2.1,3,2.0,0.5)-0.5)*0.25;
+          const wy=(fbm3(nW,p[0]*2.1+5,p[1]*2.1,p[2]*2.1,3,2.0,0.5)-0.5)*0.25;
+          const c=fbm3(nA,(p[0]+wx)*opts.freq,(p[1]+wy)*opts.freq,(p[2]-wx)*opts.freq,4,2.2,0.48);
+          const mtn=fbm3(nM,p[0]*5,p[1]*5,p[2]*5,3,2.3,0.5);
+          const capEdge=capLat+(fbm3(nCap,p[0]*3,p[1]*3,p[2]*3,3,2,0.5)-0.5)*0.22;
+          let rgb, h=0;
+          if(c<thr){
+            const dep=(thr-c)/0.14;                          // 0 an der Küste, 1 tief
+            rgb = dep<0.3 ? mix(shelf, ocean[0], dep/0.3) : mix(ocean[0], ocean[1], clamp01((dep-0.3)/0.7));
+            h=-0.02;
+          } else {
+            const t=(c-thr)/opts.span;                       // Höhe über Meer
+            rgb=ramp(t+(mtn-0.5)*0.35, land);
+            h=0.25+t*1.4+(mtn-0.5)*0.35;
+          }
+          const cap=smooth(-0.04,0.05,Math.abs(lat)-capEdge);
+          if(cap>0){ rgb=mix(rgb,[238,243,248],cap); h+=cap*0.3; }
+          return [rgb[0],rgb[1],rgb[2],h];
+        },
+        clouds: makeClouds(seed+300, opts.cloudFreq, opts.cloudStretch, opts.cloudLo, opts.cloudHi, opts.cloudA, opts.cloudWarp)
+      };
+    }
+
     const PLANET_TEXTURE_BUILDERS = {
-      erdaehnlich: () => buildPlanetTexture(90,45,4.21,{ wrapR:2.6, rowShiftX:0.3, rowShiftY:0.08, octaves:5, lac:2.15, gain:0.52,
-        ramp:[[0,[6,20,42]],[0.40,[9,48,84]],[0.48,[22,95,140]],[0.52,[64,150,150]],[0.56,[70,150,90]],[0.64,[110,150,70]],[0.74,[140,120,85]],[0.85,[165,150,130]],[0.93,[225,230,235]],[1,[255,255,255]]] }),
-      wueste: () => buildPlanetTexture(90,45,101.4,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.1,octaves:4,
-        ramp:[[0,[110,78,44]],[0.4,[162,126,76]],[0.55,[212,180,90]],[0.7,[224,180,90]],[0.85,[176,132,80]],[1,[134,90,48]]]}),
-      vulkan: () => buildPlanetTexture(90,45,404.5,{wrapR:2.2,rowShiftX:0.3,rowShiftY:0.09,octaves:4,
-        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[10,4,2]],[0.5,[60,20,10]],[1,[224,80,63]]]); const ridge=1-Math.abs(v2*2-1);
-          if(ridge>0.76){ const gl=(ridge-0.76)/0.24; return [base[0]+(255-base[0])*gl*0.9, base[1]+(160-base[1])*gl*0.9, base[2]+(60-base[2])*gl*0.9]; } return base; }}),
-      eis: () => buildPlanetTexture(90,45,303.7,{wrapR:2.4,rowShiftX:0.25,rowShiftY:0.08,octaves:4,
-        ramp:[[0,[110,150,180]],[0.4,[160,196,215]],[0.62,[191,230,245]],[0.82,[240,248,252]],[1,[210,236,246]]]}),
-      kristall: () => buildPlanetTexture(90,45,512.9,{wrapR:2.3,rowShiftX:0.27,rowShiftY:0.09,octaves:4,
-        ramp:[[0,[38,20,64]],[0.42,[90,60,150]],[0.6,[140,105,210]],[0.78,[179,158,240]],[0.92,[220,205,250]],[1,[245,240,255]]]}),
-      wasserwelt: () => buildPlanetTexture(90,45,617.2,{wrapR:2.5,rowShiftX:0.3,rowShiftY:0.09,octaves:5,
-        ramp:[[0,[6,26,52]],[0.55,[16,60,110]],[0.72,[35,100,168]],[0.85,[74,159,224]],[0.94,[150,205,240]],[1,[230,245,252]]]}),
-      gasriese: () => buildPlanetTexture(90,45,202.9,{wrapR:1.6,stretchX:0.4,stretchY:1.6,rowShiftX:0.05,rowShiftY:0.02,octaves:3,lac:2.4,gain:0.5,
-        colorize:(v,v2,rowN)=>{ const bandV=Math.sin(rowN*Math.PI*8+v*2.4)*0.5+0.5;
-          const hue=rampColorP(bandV,[[0,[230,210,180]],[0.33,[217,151,90]],[0.66,[178,110,60]],[1,[130,80,45]]]);
-          const dark=0.55+v*0.45; return [hue[0]*dark,hue[1]*dark,hue[2]*dark]; }}),
-      todeswelt: () => buildPlanetTexture(90,45,808.6,{wrapR:2.2,rowShiftX:0.28,rowShiftY:0.09,octaves:4,
-        colorize:(v,v2)=>{ const base=rampColorP(v,[[0,[8,4,4]],[0.5,[50,24,24]],[1,[107,42,42]]]); const ridge=1-Math.abs(v2*2-1);
-          if(ridge>0.8){ const gl=(ridge-0.8)/0.2; return [base[0]+(160-base[0])*gl*0.6, base[1]*(1-gl*0.4), base[2]*(1-gl*0.4)]; } return base; }}),
-      asteroid: () => buildPlanetTexture(90,45,919.4,{wrapR:2.8,rowShiftX:0.32,rowShiftY:0.1,octaves:4,
-        ramp:[[0,[40,38,35]],[0.4,[85,82,76]],[0.62,[125,121,112]],[0.8,[155,151,141]],[1,[180,176,166]]]}),
-      super: () => buildPlanetTexture(90,45,1077.3,{wrapR:2.4,rowShiftX:0.26,rowShiftY:0.09,octaves:4,
-        ramp:[[0,[70,20,50]],[0.4,[180,80,140]],[0.6,[230,140,190]],[0.8,[245,190,220]],[1,[255,235,245]]]})
+      erdaehnlich: () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, erdTyp(4.21,{
+        thr:0.585, capLat:1.22, relief:0.9, freq:1.35, span:0.24,
+        ocean:[[14,52,112],[6,26,70]], shelf:[46,128,158],
+        land:[[0,[70,130,64]],[0.3,[104,138,60]],[0.55,[138,124,74]],[0.8,[150,140,118]],[1.15,[226,230,234]]],
+        cloudFreq:3.2, cloudStretch:2.2, cloudLo:0.55, cloudHi:0.72, cloudA:0.42, cloudWarp:0.6 })),
+
+      erdwelt: () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, erdTyp(7.77,{
+        thr:0.465, capLat:1.3, relief:0.8, freq:1.5, span:0.3,
+        ocean:[[18,70,120],[10,42,90]], shelf:[60,150,150],
+        land:[[0,[52,120,56]],[0.3,[70,146,60]],[0.6,[94,158,66]],[0.85,[128,150,84]],[1.1,[200,200,190]]],
+        cloudFreq:2.4, cloudStretch:1.3, cloudLo:0.54, cloudHi:0.72, cloudA:0.5, cloudWarp:1.6 })),
+
+      wasserwelt: (() => { const seed=617.2, nS=makeNoise3D(seed), nW=makeNoise3D(seed+31), nI=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.5,
+          albedo(p){
+            const wx=(fbm3(nW,p[0]*1.6,p[1]*1.6,p[2]*1.6,3,2,0.5)-0.5)*0.9, wy=(fbm3(nW,p[0]*1.6+4,p[1]*1.6,p[2]*1.6,3,2,0.5)-0.5)*0.9;
+            const s=fbm3(nS,(p[0]+wx)*2.4,(p[1]+wy)*2.4*2.2,(p[2]-wx)*2.4,4,2.1,0.55);
+            let rgb=mix([8,36,96],[18,70,140],smooth(0.35,0.6,s));
+            rgb=mix(rgb,[48,140,196],smooth(0.58,0.74,s)*0.8);
+            const isl=fbm3(nI,p[0]*6.5,p[1]*6.5,p[2]*6.5,3,2.2,0.5);
+            let h=(s-0.5)*0.3;
+            if(isl>0.745){ const t=smooth(0.745,0.78,isl); rgb=mix(rgb,[150,140,100],t); rgb=mix(rgb,[70,120,60],smooth(0.775,0.81,isl)); h+=t*1.2; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          },
+          clouds: makeClouds(seed+300, 3.4, 2.6, 0.58, 0.74, 0.32, 0.5)
+        }); })(),
+
+      wueste: (() => { const seed=101.4, nD=makeNoise3D(seed), nW=makeNoise3D(seed+31), nG=makeNoise3D(seed+77), nB=makeNoise3D(seed+99);
+        const becken=sph(Math.PI+0.35,-0.18);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.9,
+          albedo(p,lat){
+            const w=(fbm3(nW,p[0]*1.4,p[1]*1.4,p[2]*1.4,3,2,0.5)-0.5)*2.2;
+            const band=Math.sin(lat*13+w+Math.sin(lat*4+w*0.5)*0.8)*0.5+0.5;       // Dünenbänder, niedrige Frequenz
+            const grain=fbm3(nG,p[0]*9,p[1]*9,p[2]*9,2,2.2,0.5)-0.5;
+            const broad=fbm3(nD,p[0]*1.8,p[1]*1.8,p[2]*1.8,3,2,0.5);
+            let rgb=mix([214,170,92],[158,112,58],Math.pow(band,1.6)*0.7);
+            rgb=mix(rgb,[228,196,128],smooth(0.55,0.7,broad)*0.5);
+            rgb=mix(rgb,rgb.map(v=>v*0.86),clamp01(grain*3+0.5)*0.35);
+            let h=Math.pow(band,1.4)*0.6+(broad-0.5)*0.8+grain*0.2;
+            const d=angDist(p,becken)/(0.62+(fbm3(nB,p[0]*3,p[1]*3,p[2]*3,3,2,0.5)-0.5)*0.35);
+            if(d<1.3){ const t=1-smooth(0.55,1.15,d); rgb=mix(rgb,[118,80,48],t*0.85); h-=t*0.5; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      eis: (() => { const seed=303.7, nR=makeNoise3D(seed), nS=makeNoise3D(seed+31), nT=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.7,
+          albedo(p){
+            const tone=fbm3(nT,p[0]*2.5,p[1]*2.5,p[2]*2.5,3,2.1,0.5);
+            let rgb=mix([200,222,238],[240,247,252],smooth(0.35,0.65,tone));
+            let h=(tone-0.5)*0.5;
+            const sea=fbm3(nS,p[0]*1.7,p[1]*1.7,p[2]*1.7,4,2.1,0.5);
+            const st=1-smooth(0.42,0.47,sea);
+            if(st>0){ rgb=mix(rgb,[112,146,176],st*0.95); h-=st*0.5; }
+            const r=ridge3(nR,p[0]*3.0,p[1]*3.0,p[2]*3.0,2,2.6,0.5);                 // Risse: Grate invertiert
+            const crack=smooth(0.66,0.8,r);
+            if(crack>0){ rgb=mix(rgb,[80,110,146],crack*0.9*(1-st*0.7)); h-=crack*1.1; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      vulkan: (() => { const seed=404.5, nR=makeNoise3D(seed), nG=makeNoise3D(seed+31), nH=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.7,
+          albedo(p){
+            const g=fbm3(nG,p[0]*7,p[1]*7,p[2]*7,3,2.2,0.5);
+            const broad=fbm3(nH,p[0]*1.8,p[1]*1.8,p[2]*1.8,3,2,0.5);
+            let rgb=mix([16,12,12],[46,36,34],g);
+            rgb=mix(rgb,[30,22,22],smooth(0.5,0.7,broad)*0.5);
+            let h=(g-0.5)*0.6+(broad-0.5)*1.2;
+            const r=ridge3(nR,p[0]*2.4,p[1]*2.4,p[2]*2.4,3,2.3,0.5);
+            const glow=smooth(0.6,0.78,r), core=smooth(0.76,0.88,r);
+            if(glow>0){ rgb=mix(rgb,[176,44,16],glow*0.8); h-=glow*0.7; }
+            if(core>0){ rgb=mix(rgb,[255,176,60],core); }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      kristall: (() => { const seed=512.9, cell=makeCell3D(seed), nT=makeNoise3D(seed+31);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.4,
+          albedo(p){
+            const [f1,f2,id]=cell(p[0]*2.2,p[1]*2.2,p[2]*2.2);
+            const tone=fbm3(nT,p[0]*3,p[1]*3,p[2]*3,2,2,0.5);
+            let rgb=mix([38,18,78],[96,62,170],id*0.75+tone*0.25);            // Facette: eigene Helligkeit je Zelle
+            const edge=1-smooth(0.02,0.09,f2-f1);
+            rgb=mix(rgb,[195,190,245],edge*0.9);
+            const h=-f1*1.5+id*0.3;                                             // Facettenflächen fallen zur Zellkante hin
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      gasriese: (() => { const seed=202.9, nW=makeNoise3D(seed), nT=makeNoise3D(seed+31), nS=makeNoise3D(seed+77);
+        const sturm=sph(Math.PI+0.45,-0.36);
+        const farben=[[0,[128,80,46]],[0.22,[176,108,62]],[0.45,[222,158,96]],[0.62,[238,220,186]],[0.8,[214,150,88]],[1,[150,92,52]]];
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.25,
+          albedo(p,lat,lon){
+            const w=(fbm3(nW,p[0]*1.6,p[1]*4.5,p[2]*1.6,4,2.2,0.55)-0.5)*0.34;       // Domain-Warp: wellige Bandkanten
+            const la=lat+w;
+            const bv=Math.sin(la*10.5+Math.sin(la*3.2)*1.4)*0.5+0.5;
+            const fine=fbm3(nT,p[0]*3,p[1]*12,p[2]*3,3,2.2,0.5);
+            let rgb=ramp(clamp01(bv*0.8+fine*0.25-0.05), farben);
+            let h=bv*0.5+fine*0.3;
+            // ovaler Sturm: Ellipse in Längen-/Breitenrichtung
+            let dl=lon-(Math.PI+0.45); dl=Math.atan2(Math.sin(dl),Math.cos(dl));
+            const ex=dl*Math.cos(lat)/0.5, ey=(lat+0.36)/0.24, d=Math.sqrt(ex*ex+ey*ey);
+            if(d<1.5){
+              const ang=Math.atan2(ey,ex);
+              const sw=Math.sin(d*11-ang*1.5+fbm3(nS,p[0]*6,p[1]*6,p[2]*6,2,2,0.5)*2)*0.5+0.5;
+              const inside=1-smooth(0.85,1.2,d);
+              let sc=mix([236,214,176],[176,96,54],sw*0.8);
+              sc=mix(sc,[248,236,210],1-smooth(0,0.35,d));
+              rgb=mix(rgb,sc,inside);
+              h+=inside*(0.5-sw*0.4)+ (1-smooth(0.9,1.15,d))*0.2;
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      asteroid: (() => { const seed=919.4, nG=makeNoise3D(seed), nB=makeNoise3D(seed+31);
+        const krater=craterList(seed, 11, 0.13, 0.36);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.6,
+          albedo(p){
+            const g=fbm3(nG,p[0]*11,p[1]*11,p[2]*11,3,2.2,0.5);
+            const broad=fbm3(nB,p[0]*1.6,p[1]*1.6,p[2]*1.6,4,2.1,0.5);
+            let rgb=mix([92,84,74],[128,118,104],broad);
+            rgb=mix(rgb,rgb.map(v=>v*0.8),clamp01((g-0.5)*4+0.5)*0.35);
+            let h=(broad-0.5)*1.2+(g-0.5)*0.35;
+            for(const k of krater){
+              const d=angDist(p,k.q)/k.r; if(d>1.6) continue;
+              h+=craterHeight(d,0.9+k.k*0.5,0.35)*k.r*3.2;
+              const floor=1-smooth(0.5,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.2*0.2));
+              rgb=mix(rgb,[58,52,46],floor*0.55); rgb=mix(rgb,[150,140,126],ej*0.35);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      mond: (() => { const seed=733.1, nG=makeNoise3D(seed), nM=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        const krater=craterList(seed, 9, 0.1, 0.3);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.5,
+          albedo(p){
+            const g=fbm3(nG,p[0]*10,p[1]*10,p[2]*10,3,2.2,0.5);
+            const wx=(fbm3(nW,p[0]*2,p[1]*2,p[2]*2,2,2,0.5)-0.5)*0.5;
+            const m=fbm3(nM,(p[0]+wx)*1.5,(p[1]-wx)*1.5,(p[2]+wx)*1.5,4,2.1,0.5);
+            let rgb=mix([150,148,142],[178,176,170],g);
+            const mare=smooth(0.53,0.6,m);                                       // Maria: große dunkle Flecken
+            rgb=mix(rgb,[92,94,102],mare*0.9);
+            let h=(g-0.5)*0.3+(1-mare)*0.5;
+            for(const k of krater){
+              const d=angDist(p,k.q)/k.r; if(d>1.6) continue;
+              h+=craterHeight(d,0.9+k.k*0.6,0.4)*k.r*3.4;
+              const floor=1-smooth(0.5,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.22*0.22));
+              rgb=mix(rgb,[112,112,112],floor*0.4); rgb=mix(rgb,[210,208,202],ej*0.45);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      todeswelt: (() => { const seed=808.6, nG=makeNoise3D(seed), nR=makeNoise3D(seed+31), nB=makeNoise3D(seed+77);
+        const narbe={ q:sph(Math.PI-0.35,0.12), r:0.62 };
+        const klein=craterList(seed+4, 5, 0.09, 0.2);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:1.2,
+          albedo(p){
+            const g=fbm3(nG,p[0]*8,p[1]*8,p[2]*8,3,2.2,0.5);
+            const broad=fbm3(nB,p[0]*1.7,p[1]*1.7,p[2]*1.7,4,2.1,0.5);
+            let rgb=mix([72,62,56],[110,98,88],broad);
+            rgb=mix(rgb,rgb.map(v=>v*0.82),clamp01((g-0.5)*4+0.5)*0.35);
+            let h=(broad-0.5)*1.0;
+            const r=ridge3(nR,p[0]*2.0,p[1]*2.0,p[2]*2.0,3,2.3,0.5);
+            const glow=smooth(0.62,0.8,r), core=smooth(0.78,0.9,r);
+            if(glow>0){ rgb=mix(rgb,[120,30,24],glow*0.8); h-=glow*0.6; }
+            if(core>0){ rgb=mix(rgb,[210,66,56],core*0.9); }
+            const d=angDist(p,narbe.q)/narbe.r;
+            if(d<1.6){
+              h+=craterHeight(d,1.1,0.45)*narbe.r*3.0;
+              const floor=1-smooth(0.55,0.95,d), ej=Math.exp(-((d-1.05)*(d-1.05))/(2*0.18*0.18));
+              rgb=mix(rgb,[34,26,26],floor*0.8); rgb=mix(rgb,[130,116,104],ej*0.5);
+            }
+            for(const k of klein){
+              const d2=angDist(p,k.q)/k.r; if(d2>1.6) continue;
+              h+=craterHeight(d2,0.9,0.35)*k.r*3.0; rgb=mix(rgb,[40,32,30],(1-smooth(0.5,0.95,d2))*0.5);
+            }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      super: (() => { const seed=1077.3, nT=makeNoise3D(seed), nA=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.35,
+          albedo(p,lat,lon){
+            const tone=fbm3(nT,p[0]*2.2,p[1]*2.2,p[2]*2.2,4,2.1,0.5);
+            let rgb=mix([226,168,204],[250,236,246],smooth(0.35,0.7,tone));
+            rgb=mix(rgb,[196,118,170],(1-smooth(0.3,0.45,tone))*0.6);
+            let h=(tone-0.5)*0.6;
+            // Aurora-Bänder in Gold über den höheren Breiten, wellig durch Domain-Warp
+            const w=(fbm3(nW,p[0]*2,p[1]*2,p[2]*2,3,2,0.5)-0.5)*1.6;
+            const mask=smooth(0.3,0.7,Math.abs(lat))*(1-smooth(1.25,1.45,Math.abs(lat)));
+            const wave=Math.sin(lat*22+w*3.0+Math.sin(lon*5+w)*1.2)*0.5+0.5;          // Vorhaenge quer zur Breite
+            const a=fbm3(nA,p[0]*3,p[1]*3,p[2]*3,3,2.2,0.5);
+            const au=mask*smooth(0.55,0.92,wave)*smooth(0.3,0.55,a);
+            if(au>0){ rgb=mix(rgb,[250,199,117],au); rgb=mix(rgb,[255,236,196],au*au*0.6); h+=au*0.25; }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })(),
+
+      leerenwelt: (() => { const seed=1313.7, nT=makeNoise3D(seed), nR=makeNoise3D(seed+31), nW=makeNoise3D(seed+77);
+        return () => buildPlanetStrip(PLANET_TEXTUR_B,PLANET_TEXTUR_H, {
+          relief:0.6,
+          albedo(p){
+            const tone=fbm3(nT,p[0]*2.4,p[1]*2.4,p[2]*2.4,4,2.1,0.5);
+            let rgb=mix([12,7,22],[46,22,74],smooth(0.3,0.7,tone));
+            let h=(tone-0.5)*0.9;
+            const wx=(fbm3(nW,p[0]*1.5,p[1]*1.5,p[2]*1.5,2,2,0.5)-0.5)*0.5;
+            const r=ridge3(nR,(p[0]+wx)*2.5,(p[1]-wx)*2.5,(p[2]+wx)*2.5,3,2.3,0.5);
+            const glow=smooth(0.54,0.76,r), core=smooth(0.72,0.86,r);
+            if(glow>0){ rgb=mix(rgb,[82,66,170],glow*0.8); h+=glow*0.5; }
+            if(core>0){ rgb=mix(rgb,[127,119,221],core); rgb=mix(rgb,[205,200,255],core*core*0.6); }
+            return [rgb[0],rgb[1],rgb[2],h];
+          }
+        }); })()
     };
     const PLANET_TEXTURE_CACHE = {};
     function getPlanetTexture(typeKey){
@@ -7444,8 +7777,18 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.684.0';
+  const VERSION = '8.685.0';
   const PATCHNOTES = [
+  { version:'8.685.0', date:'05.09.2026', changes:[
+    '<strong>Jede Welt sieht jetzt aus wie ihr Typ.</strong> Die Planetenkugeln in Planetenliste, Kolonieliste und Systemkarte tragen neue Oberfl\u00e4chen: Kontinente mit K\u00fcsten und Eiskappen, Inselwelten, D\u00fcnenb\u00e4nder, ein Eisschild mit Rissen, Lavaadern, Kristallfacetten, Gasriesenb\u00e4nder mit Sturm, Krater mit Wall, Mondmeere, Narben, Aurora und die Leuchtadern der Leerenwelt \u2013 dreizehn Typen, jeder mit eigener Geologie und Relief.',
+    '<strong>Was vorher zu sehen war:</strong> alle Typen trugen dasselbe V-Schlierenmuster und unterschieden sich nur in der Farbe. Mond, Erdwelt und Leerenwelt hatten gar keine eigene Oberfl\u00e4che und zeigten still die Erdtextur. Die Bilder waren au\u00dferdem 45 Bildpunkte hoch und wurden bis 1,8-fach hochgezogen \u2013 jetzt 64, in der Gr\u00f6\u00dfe, in der du sie siehst.',
+    '<strong>Und der Mond ist endlich ein Mond.</strong> Seine Textur war zwar gebaut, wurde aber von keiner Stelle angefordert \u2013 \u00fcberall stand fest \u201eAsteroid". Jetzt zeigt er seine dunklen Mare und Krater.',
+    '<strong>Die sechs Sternarten sehen endlich verschieden aus.</strong> Auf der Sektorkarte waren sie sechs gleiche Glanzmurmeln, die sich nur in Farbe und Gr\u00f6\u00dfe unterschieden \u2013 obwohl Doppelstern und Pulsar im Spiel l\u00e4ngst als solche vermerkt sind. Jetzt hat jeder eine eigene Gestalt: der gelbe Stern Protuberanzen, der rote Zwerg einen k\u00f6rnigen Fleckenrand, der blaue Riese Beugungsstrahlen, der wei\u00dfe Zwerg eine harte Scheibe in leuchtender Schale, der Doppelstern zwei K\u00f6rper mit Gasstrom, der Pulsar einen gekippten Ring mit Strahlkegeln.',
+    '<strong>Unerforschte Systeme waren zu blass.</strong> Sie lagen komplett auf 60 % Deckkraft, wodurch ausgerechnet der Stern verschwand \u2013 das Einzige, was die Systemart zeigt. Jetzt ist nur die Schrift ged\u00e4mpft, der Stern leuchtet.',
+    '<strong>Die Sonne der Systemansicht war eine wei\u00dfe LED.</strong> Eine flache Scheibe mit hartem Rand. Jetzt hat sie Randverdunklung, eine feine K\u00f6rnung, Sonnenflecken und einen wei\u00dfgl\u00fchenden Saum \u2013 und der Doppelstern zeigt beide K\u00f6rper samt Materiebr\u00fccke, der Pulsar seine Strahlkegel. Korona und Strahlenkranz bleiben, wie sie waren.',
+    'Nichts wird langsamer: Jede Oberfl\u00e4che und jede Sonne entsteht <em>einmal je Typ</em> und wird danach wiederverwendet \u2013 zusammen rund eine Drittelsekunde beim ersten Blick auf die Karte.',
+    'W\u00e4chter: <code>test_planeten_texturen</code> (20 Pr\u00fcfungen) und <code>test_sonnen</code> (33). Beide schneiden die Zeichner aus der Spieldatei und rechnen sie einzeln nach \u2013 gepr\u00fcft werden Regeln statt Bilder: jeder Typ hat einen eigenen Zeichner, die Streifen sind nahtlos und deterministisch, die Sternformen unterscheiden sich in der <em>Gestalt</em>, jede Sonnenkachel bleibt unter 15 KB, und keine Stelle darf einem Mond mehr die Asteroiden-Textur geben.'
+  ] },
   { version:'8.684.0', date:'05.09.2026', changes:[
     '<strong>Auf der Endstufe darfst du die Ausrichtung deines Vorpostens noch einmal wählen.</strong> Die <strong>Umrüstung</strong> ist das teuerste Vorhaben, das ein Vorposten kennt – sie kostet in jedem Rohstoff mehr als der Ausbau auf die Endstufe und dauert 24 Stunden. In dieser Zeit bleibt die Station angreifbar und hat noch die <em>alten</em> Werte: Wer sie sieht, weiß, dass sein Zeitfenster läuft. Abbrechen geht nicht.',
     '<strong>Ein Projekt der alten Ausrichtung schläft, es stirbt nicht.</strong> Es wirkt nach dem Wechsel nicht mehr – rüstest du zurück, wirkt es wieder. Und hat der Zielzweig weniger Steckplätze als deiner, musst du erst Module ausbauen; sonst läge eines wirkungslos in der Station.',
@@ -7586,16 +7929,11 @@
       '<strong>Der Vorposten liest seine Ausbauleiter jetzt vom Server, statt sie eingetippt zu haben</strong> – eine neunte Stufe hätte sonst dasselbe Bild bekommen wie die achte. Und die Zahl der Bänder unterscheidet die drei Zweige ab sofort auf <em>jeder</em> Stufe: Bisher trugen Werft, Handel und Festung auf den Stufen 4 und 5 nur ein einziges Band – ausgerechnet dort, wo man den Zweig gerade gewählt hat.',
       'Wächter: <code>test_baukorb_gegenstaende</code> hält fest, dass der Korb beim Einreihen abzieht und ein Abbruch genau auf den Ausgangsstand zurückführt, nicht darüber. Gemessen an der Gegenprobe stieg der Vorrat vorher von 3 auf 5. Gefunden hat das eine <strong>adversarische Durchsicht des eigenen Änderungssatzes</strong>, die es ab jetzt vor jeder Auslieferung gibt: Der grüne Prüflauf beweist nur, dass nichts Bekanntes gebrochen ist – er kennt keine Regel, die noch niemand aufgeschrieben hat. Von elf Befunden waren sieben echt; einer der übrigen beschrieb einen Weg, den es so nicht gibt.'
     ]},
-    { version:'8.665.0', date:'04.09.2026', changes:[
-      '<strong>Der Vorposten ist jetzt gezeichnet, nicht gezeichnet-angedeutet.</strong> Bisher bestand er aus einfarbigen Strichen und sah damit aus wie ein Symbol zwischen echten Himmelskörpern – die Planeten derselben Karte werden längst prozedural gerendert. Ab der Wahlstufe steht dort jetzt ein <strong>Körper</strong>: eine Kapsel mit gewölbtem Rumpf, Panelnähten, Fensterbändern, die der Wölbung folgen, und Ringen, die als echte Röhren um sie laufen. Die Form ist nicht aus Bauteilen zusammengesetzt, sondern aus einem Profil gedreht wie auf einer Drehbank – jede waagerechte Scheibe bekommt ihre Helligkeit aus der Neigung der Mantelfläche an dieser Stelle, deshalb wölbt sie sich sichtbar. Jedes Detail liegt <em>in</em> der Oberfläche; es steht nichts ab. Der Zweig bleibt auf einen Blick erkennbar: eigener Farbton und eigene Zahl von Bändern – Handel drei, Werft zwei, Festung eines breites. Und der Ausbau ist zu sehen: Von Stufe 4 bis 8 wird die Kapsel länger und bauchiger, bekommt Fensterreihen und Panelnähte dazu, statt Anbauten angesetzt zu bekommen. Unterhalb der Wahlstufe steht weiterhin das Bodenlager.',
-      '<strong>Ein gesperrter Werft-Knopf sagt jetzt, was fehlt – und „zu teuer" ist gar keine Sperre mehr.</strong> Gemessen: 34 von 38 sichtbaren Werft-Knöpfen waren unantippbar, und der Klickpfad brach für fehlende Voraussetzungen sogar <em>stumm</em> ab, ganz ohne Meldung. Jetzt nennt er den Grund beim Namen: fehlende Forschung mit Name und Stufe, das Allianztor, die Abgrund-Tiefe, die Allianzwerft. Der zweite Fund war größer: Ein Bauauftrag <em>darf</em> längst eingereiht werden, auch wenn er noch nicht bezahlbar ist – er startet automatisch, sobald es reicht. Der Baukorb-Knopf daneben sagt das auch offen („Baukorb einreihen"), der Einzelknopf sperrte bei genau derselben Lage. Das war keine Balance-Regel, sondern eine Inkonsistenz: dieselbe Handlung über den Baukorb erlaubt, über den Knopf nicht. Er heißt jetzt „Einreihen", wenn dir die Mittel noch fehlen, und tut es auch.',
-      'Wächter: <code>test_werft_sperrgrund</code> steuert jeden Sperrgrund einzeln an und liest die dafür nötigen Schiffe aus der Spieldatei, statt sie einzutippen. <code>test_vorposten_station</code> ist auf die neue Zeichenweise gezogen und dabei <strong>strenger</strong> geworden: Es suchte vorher nach Dockklammern, Containern und Geschütztürmen – also nach der Schreibweise der alten Striche. Geprüft wird jetzt die Regel dahinter, dass jeder Zweig eine eigene Station hat und die drei sich <em>unterscheiden</em>; drei identische Bilder hätte die alte Fassung nie bemerkt. Zwei weitere Tests fielen, weil sie die Sperrbedingungen aus der Funktion lasen, die sie seit dieser Version nicht mehr enthält – einer davon an seiner eigenen Gegenprobe, die damit genau das getan hat, wofür sie da ist.'
-    ]},
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1087;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1088;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -59362,6 +59700,361 @@ async function claimPendingRewards(){
      haerteste ist. Der Fraktionswert bleibt deshalb unveraendert, alles darueber wird lauter -
      die Zahlen sind die vorhandenen Bestandswerte der eigenen Kontrolle (2 / 0,9) als Obergrenze
      und der Fraktion (1,2 / 0,55) als Untergrenze, dazwischen linear nach Rang. */
+  /* DER SONNENKERN DER SYSTEMEBENE (Buendel A, 05.09.2026, Grafik-Aufnahme).
+     Gemessen am alten Bild: eine einfarbige, hart begrenzte Scheibe mit duennem weissem Ring - am
+     Desktop wie eine weisse LED, am Handy wie ein Punkt. Keine Randverdunklung, keine Oberflaeche,
+     kein Uebergang von Kern zu Glut; die sechs Typen unterschieden sich nur in Farbe und Radius.
+     Jetzt ein gebackenes Bild je Typ (128-px-Kachel, als Data-URL gecacht, unter 15 KB):
+     Randverdunklung statt flacher Fuellung, ein Chromosphaeren-Saum als Kante gegen den Halo,
+     feine Granulation als Material, Flecken bei gelb und rot, ein glatteres kaelteres Zentrum beim
+     blauen Riesen, eine harte fast reinweisse Scheibe beim weissen Zwerg, beim Doppelstern beide
+     Koerper samt Materiebruecke, beim Pulsar zwei Strahlkegel.
+     KORONA, STRAHLEN UND GLUT BLEIBEN - sie sind die gewaehlte Variante vom 01.09.2026; ersetzt
+     wird nur der Kern. Der weisse 0,8-px-Ring entfaellt.
+     Lichtmodell: Es gibt KEINE Fremdlichtquelle, ein Stern leuchtet selbst. Volumen entsteht allein
+     aus der Randverdunklung, die Kante aus dem hellen Saum, das Material aus Koernung und Flecken.
+     Das Rauschen kommt aus makeNoise3D des Texturblocks, mit fester z-Ebene: zwei Generatoren
+     nebeneinander waeren beim naechsten Umbau sofort auseinandergelaufen. */
+  function sonneRausch2D(seed){
+    const n = makeNoise3D(seed);
+    return (x, y) => n(x, y, 0.5);
+  }
+  function fbm2(n, x, y, oct, lac, gain){
+    let s = 0, a = 1, f = 1, norm = 0;
+    for (let i = 0; i < oct; i++){ s += n(x*f, y*f)*a; norm += a; a *= gain; f *= lac; }
+    return s / norm;
+  }
+const sonneHex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const sonneMix = (a,b,t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const sonneRgba = (c,a) => `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+const sonneKlemm = v => v<0?0:v>1?1:v;
+const sonneSstep = (a,b,x) => { const t = sonneKlemm((x-a)/(b-a)); return t*t*(3-2*t); };
+
+/* ---- DIE STERNSCHEIBE -------------------------------------------------------------------------
+   c: Kontext, cx/cy/R in Kachel-px. core/glow als [r,g,b]. o:
+     limb   : Restlicht am Rand (0..1). Physik: I(mu) ~ 0.4+0.6*mu; hier 0.42 gelb, 0.62 blau, 0.85 weiss
+     koern  : Amplitude der Granulation (0 = keine)
+     flecken: [{x,y,ru,rp}] in Einheiten des Scheibenradius, ru/rp in px
+     saum   : Breite des Chromosphaeren-Saums in px (Kachel)
+     seed   : Rauschsaat, damit jeder Typ eine andere Oberflaeche hat
+   Lichtmodell: Es gibt KEINE Fremdlichtquelle - der Stern leuchtet selbst. Volumen entsteht allein
+   aus der Randverdunklung (Photosphaere), Kante aus dem hellen Saum (Chromosphaere), Material aus
+   der Koernung (Granulen) und den Flecken (Umbra/Penumbra, zum Rand hin perspektivisch gestaucht). */
+function sonneScheibe(c, cx, cy, R, core, glow, o){
+  const limb = o.limb, koern = o.koern||0, flecken = o.flecken||[], saum = o.saum==null?4:o.saum;
+  const nA = sonneRausch2D(o.seed||1), nB = sonneRausch2D((o.seed||1)+41.3);
+  const rand = [glow[0]*0.80, glow[1]*0.72, glow[2]*0.64];          // Randton: Glut, waermer und dunkler
+  const Q = o.quant||6;                                             // Farbstufen: weniger Entropie, kleinere PNG
+  const x0 = Math.max(0, Math.floor(cx-R-2)), y0 = Math.max(0, Math.floor(cy-R-2));
+  const w = Math.min(c.canvas.width - x0, Math.ceil(R*2+5)), h = Math.min(c.canvas.height - y0, Math.ceil(R*2+5));
+  const img = c.getImageData(x0, y0, w, h);
+  const d = img.data;
+  const fleckVor = flecken.map(f => { const l = Math.hypot(f.x,f.y)||1e-6; return { px:cx+f.x*R, py:cy+f.y*R, ux:f.x/l, uy:f.y/l, mu:Math.sqrt(Math.max(0.15,1-f.x*f.x-f.y*f.y)), ru:f.ru, rp:f.rp }; });
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const px = x0+x+0.5, py = y0+y+0.5;
+    const dx = px-cx, dy = py-cy, dist = Math.hypot(dx,dy);
+    const a = sonneKlemm((R+0.6-dist)/1.4);                            // weicher Rand, 1,4 px
+    if (a<=0) continue;
+    const dn = Math.min(1, dist/R);
+    const mu = Math.sqrt(Math.max(0, 1-dn*dn));                     // cos des Blickwinkels auf die Oberflaeche
+    // Randverdunklung: Mitte core, ab der Haelfte in die Glutfarbe, am Rand deutlich dunkler.
+    let col = sonneMix(core, glow, sonneSstep(o.kern==null?0.42:o.kern, 0.97, dn));
+    const mu2 = Math.pow(mu, 0.75);                                 // Kurve: Mitte flach, aussen zuegig dunkler
+    col = sonneMix(rand, col, limb + (1-limb)*mu2);
+    // Granulation: feine Zellen (~3,5 px), am Rand durch die Perspektive schwaecher; dazu eine
+    // grobe Welle (~20 px), damit die Flaeche nicht wie ein Verlauf aussieht.
+    if (koern>0){
+      const FQ = 4.2, LEV = 0, KM = 1;
+      let g = fbm2(nA, px/FQ, py/FQ, 2, 2.1, 0.5) - 0.5;
+      let g2 = fbm2(nB, px/22, py/22, 1, 2.0, 0.5) - 0.5;
+      if (LEV){ g = Math.round(g*LEV)/LEV; g2 = Math.round(g2*LEV)/LEV; }
+      const kr = 1 + (o.koernRand||0)*(1-mu);                       // Koernung zum Rand hin staerker (blau)
+      const f = 1 + (g*koern*kr*2.2*(0.35+0.65*mu) + g2*koern*0.8)*KM;
+      col = [col[0]*f, col[1]*f, col[2]*f];
+    }
+    // Flecken: Umbra fast schwarz-warm, Penumbra halbdunkel, um die Penumbra ein Hauch Fackel.
+    for (const s of fleckVor){
+      const vx = px-s.px, vy = py-s.py;
+      const dr = (vx*s.ux+vy*s.uy)/s.mu, dt = -vx*s.uy+vy*s.ux;
+      const fd = Math.hypot(dr, dt);
+      if (fd < s.rp*1.6){
+        const umb = 1-sonneSstep(s.ru*0.7, s.ru*1.15, fd);
+        const pen = 1-sonneSstep(s.ru, s.rp, fd);
+        const fack = sonneSstep(s.rp*0.9, s.rp*1.15, fd) * (1-sonneSstep(s.rp*1.2, s.rp*1.6, fd));
+        const dark = 0.27*umb + 0.34*pen*(1-umb);
+        const fac = (1-dark) * (1 + fack*0.045);
+        col = [col[0]*fac, col[1]*fac*(1-umb*0.08), col[2]*fac*(1-umb*0.18)];
+      }
+    }
+    const i = (y*w+x)*4;
+    const bg = a;   // ueber Transparenz: einfach setzen
+    const q = v => Math.min(255, Math.round(v/Q)*Q);
+    d[i]   = q(col[0]*bg + d[i]*(1-bg));
+    d[i+1] = q(col[1]*bg + d[i+1]*(1-bg));
+    d[i+2] = q(col[2]*bg + d[i+2]*(1-bg));
+    d[i+3] = Math.max(d[i+3], a*255);
+  }
+  c.putImageData(img, x0, y0);
+  // Chromosphaeren-Saum: ein duenner heller Ring genau auf der Kante, nach aussen weich auslaufend.
+  if (saum>0){
+    const sg = c.createRadialGradient(cx,cy,Math.max(0,R-1.2), cx,cy,R+saum);
+    sg.addColorStop(0,   sonneRgba(glow,0));
+    sg.addColorStop(0.22, sonneRgba(sonneMix(glow,core,0.55),0.92));
+    sg.addColorStop(0.45, sonneRgba(glow,0.40));
+    sg.addColorStop(1,   sonneRgba(glow,0));
+    c.fillStyle = sg; c.beginPath(); c.arc(cx,cy,R+saum,0,Math.PI*2); c.fill();
+  }
+}
+
+/* ---- Der Kern je Typ. S = Kachel (128), 1 Spiel-Einheit = S/30 px. ---- */
+function sonneKernZeichnen(c, S, typ){
+  const cx=S/2, cy=S/2, E=S/30, core=sonneHex(typ.core), glow=sonneHex(typ.glow);
+  const R = 13*E;                                                    // 55,5 px bei S=128
+  c.clearRect(0,0,S,S);
+  switch (typ.key){
+    case 'gelb':
+      sonneScheibe(c,cx,cy,R,core,glow,{ limb:0.50, koern:0.05, seed:7.3, saum:3.6,
+        flecken:[{x:-0.36,y:-0.18,ru:2.2,rp:4.8},{x:-0.22,y:-0.06,ru:1.4,rp:3.2},{x:0.44,y:0.30,ru:1.8,rp:4.0}] });
+      break;
+    case 'rot':
+      sonneScheibe(c,cx,cy,R,core,glow,{ limb:0.46, koern:0.065, seed:19.1, saum:3.6,
+        flecken:[{x:0.30,y:-0.26,ru:2.6,rp:5.6},{x:0.46,y:-0.08,ru:1.7,rp:3.8},{x:-0.40,y:0.34,ru:2.0,rp:4.4}] });
+      break;
+    case 'blau':
+      // Kein Fleck, kaelteres und glatteres Zentrum: hoeheres Restlicht, halbe Koernung, weiter Kern.
+      sonneScheibe(c,cx,cy,R,sonneMix(core,[255,255,255],0.4),glow,{ limb:0.58, koern:0.014, koernRand:3.5, seed:3.9, saum:4, kern:0.18 });
+      break;
+    case 'weiss':
+      // Kleinere, sehr harte, fast reinweisse Scheibe: kaum Randverdunklung, kein Korn, 1-px-Saum.
+      sonneScheibe(c,cx,cy,R*0.80,core,sonneMix(core,glow,0.6),{ limb:0.84, koern:0, saum:1.8, quant:2 });
+      break;
+    case 'doppel': {
+      const ax=cx-10*E/4.27, ay=cy+9*E/4.27, aR=R*0.74;              // Hauptstern, leicht nach unten links
+      const bx=cx+38*E/4.27, by=cy-31*E/4.27, bR=R*0.30;             // Begleiter rechts oben
+      // Helle Bruecke: Materie auf dem Weg vom Haupt- zum Begleitstern, entlang der Verbindungslinie.
+      const ang = Math.atan2(by-ay, bx-ax), len = Math.hypot(bx-ax, by-ay);
+      c.save(); c.translate(ax,ay); c.rotate(ang);
+      const bg = c.createLinearGradient(aR*0.6,0,len-bR*0.5,0);
+      bg.addColorStop(0, sonneRgba(core,0.0)); bg.addColorStop(0.35, sonneRgba(sonneMix(core,glow,0.25),0.95));
+      bg.addColorStop(0.65, sonneRgba(sonneMix(core,glow,0.35),0.85)); bg.addColorStop(1, sonneRgba(glow,0.0));
+      c.fillStyle = bg;
+      c.beginPath(); c.moveTo(aR*0.6,-6); c.quadraticCurveTo(aR*1.05,-2.6,len-bR*0.5,-2.6); c.lineTo(len-bR*0.5,2.6); c.quadraticCurveTo(aR*1.05,2.6,aR*0.6,6); c.closePath(); c.fill();
+      const bh = c.createLinearGradient(aR*0.6,0,len-bR*0.5,0);
+      bh.addColorStop(0, sonneRgba(glow,0)); bh.addColorStop(0.5, sonneRgba(glow,0.35)); bh.addColorStop(1, sonneRgba(glow,0));
+      c.fillStyle = bh; c.beginPath(); c.ellipse(len/2,0,len/2,7,0,0,Math.PI*2); c.fill();
+      c.restore();
+      sonneScheibe(c,ax,ay,aR,core,glow,{ limb:0.50, koern:0.05, seed:11.7, saum:3.4,
+        flecken:[{x:0.34,y:0.28,ru:1.8,rp:3.8},{x:-0.30,y:-0.10,ru:1.4,rp:3.0}] });
+      sonneScheibe(c,bx,by,bR,sonneMix(core,glow,0.30),glow,{ limb:0.46, koern:0.04, seed:5.2, saum:2.4 });
+      break; }
+    case 'pulsar': {
+      const pR = R*0.58;
+      // Zwei gegenueberliegende schmale Strahlenkegel, Achse gekippt; drei Lagen, innen hart, aussen weich.
+      const ang = -Math.PI*0.31;
+      for (const dir of [1,-1]){
+        c.save(); c.translate(cx,cy); c.rotate(ang + (dir<0?Math.PI:0));
+        const L = S*0.47;
+        for (const [wf,alp] of [[2.4,0.30],[1.5,0.55],[0.8,1.0],[0.35,1.0]]){
+          const kg = c.createLinearGradient(pR*0.7,0,L,0);
+          kg.addColorStop(0, sonneRgba(core,alp)); kg.addColorStop(0.55, sonneRgba(sonneMix(core,glow,0.3),alp*0.8)); kg.addColorStop(1, sonneRgba(glow,0));
+          c.fillStyle = kg;
+          c.beginPath(); c.moveTo(pR*0.7,-2.4*wf); c.lineTo(L,-7.5*wf); c.lineTo(L,7.5*wf); c.lineTo(pR*0.7,2.4*wf); c.closePath(); c.fill();
+        }
+        c.restore();
+      }
+      sonneScheibe(c,cx,cy,pR,sonneMix(core,[255,255,255],0.5),sonneMix(core,glow,0.55),{ limb:0.82, koern:0.012, koernRand:2, seed:2.6, saum:2.2, quant:3, kern:0.3 });
+      break; }
+  }
+  // Stufen je Typ: die gekoernten Typen dithern sich selbst (16 Stufen reichen), die glatten
+  // brauchen feinere Stufen gegen Ringe - sie sind klein oder einfarbig und bleiben trotzdem klein.
+  sonneQuantisieren(c, S, ({gelb:16, rot:16, doppel:16, blau:12, weiss:6, pulsar:8})[typ.key], 0);
+}
+
+/* Schlusspass: alle Kanaele auf Q-Stufen runden. Canvas-Verlaeufe kommen bei Chromium gedithert
+   aus Skia, und die toDataURL-PNG ist schwach komprimiert - ohne diesen Pass kostet allein der
+   glatte Verlauf 15-19 KB (gemessen). Die Koernung wirkt dabei als Dither gegen Banding. */
+const BAYER = [0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5];
+function sonneQuantisieren(c, S, Q, dither){
+  const img = c.getImageData(0,0,S,S), d = img.data;
+  for (let i=0;i<d.length;i++){
+    // Dither je Pixel (deterministisch): verteilt die Stufen, statt Ringe zu ziehen. Kostet PNG-
+    // Bytes, deshalb je Typ dosiert - die gekoernten Typen dithern sich ueber ihre Granulation selbst.
+    // Geordnetes Bayer-4x4-Muster statt Zufall: Zufall kostete 3-10 KB je Kachel (gemessen),
+    // das Muster wiederholt sich und faellt in der Deflate-Stufe fast weg.
+    const pix = i>>2, bx = pix & 3, by = (pix>>7) & 3;
+    const rnd = (BAYER[by*4+bx] + 0.5)/16;
+    d[i] = Math.max(0, Math.min(255, Math.round((d[i] + (rnd-0.5)*Q*dither)/Q)*Q));
+  }
+  c.putImageData(img,0,0);
+}
+/* ---- Cache wie im Spiel: einmal zeichnen, data-URL merken ---- */
+
+  /* Je Sonnentyp EIN gebackenes Bild, als Data-URL gecacht - dieselbe Regel wie bei den
+     Planeten-Texturen: einmal zeichnen, dann wiederverwenden. Die Kachel ist 128 px, damit auch der
+     blaue Riese (35 px am Desktop) nicht pixelig wird. */
+  const SONNE_BILD_CACHE = {};
+  function sonneBildUrl(typ){
+    if (!(typ.key in SONNE_BILD_CACHE)){
+      try {
+        const S = 128;
+        const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+        const ctx = cv.getContext('2d');
+        if (!ctx) throw new Error('kein 2D-Context');
+        sonneKernZeichnen(ctx, S, typ);
+        SONNE_BILD_CACHE[typ.key] = cv.toDataURL();
+      } catch (e) { SONNE_BILD_CACHE[typ.key] = null; }
+    }
+    return SONNE_BILD_CACHE[typ.key];
+  }
+  /* DIE SECHS STERNTYPEN DER SEKTORANSICHT (Buendel A, 05.09.2026, Grafik-Aufnahme).
+     Gemessen am alten Bild: Die sechs Typen unterschieden sich nur in Farbe und Radius - jeder war
+     dieselbe Glanz-Murmel mit festem Highlight bei 35%/35%, also ein BELEUCHTETER Koerper. Ein Stern
+     ist aber selbst das Licht. Die Flags binary und pulsar aus SUN_TYPES wurden gar nicht gezeichnet.
+     Jetzt bekommt jeder Typ eine eigene FORM, denn bei 14 bis 33 Bildpunkten entscheidet die
+     Silhouette, nicht die Oberflaeche:
+       gelb    sechs kurze Protuberanz-Zungen am Rand, heller Kern
+       rot     koerniger Fleckenrand mit harter dunkler Kante, kaum Halo
+       blau    groesste Scheibe, zwei zarte Beugungsstrahlen, weiter Halo
+       weiss   winzige harte Scheibe in einer leuchtenden Schale bei 1,4 r
+       doppel  zwei Koerper auf der Diagonale, gemeinsamer Halo, Gasstrom dazwischen
+       pulsar  geneigter Ring in zwei Tiefenhaelften (hinten blass, vorne hell) plus zwei Strahlkegel
+     Alle Farben kommen per sekMix/sekDunkel aus core und glow von SUN_TYPES - nichts ist eingetippt.
+     Gebaut wird EIN <symbol>-Satz je Aufbau, gezeichnet je Knoten ein <use>: das Markup bleibt so
+     statisch wie vorher, es gibt kein Neuzeichnen je Bild.
+     UNENTDECKT senkt nur den Halo (--sek-halo), nicht den ganzen Knoten - vorher lag opacity 0.6
+     ueber allem, und 17 von 20 Knoten wirkten matt. */
+function sekRg(id, stops, o){
+  o = o || {};
+  return '<radialGradient id="' + id + '" cx="' + (o.cx||'50%') + '" cy="' + (o.cy||'50%') + '" r="' + (o.r||'50%') + '">'
+    + stops.map(s => '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] !== undefined ? ' stop-opacity="' + s[2] + '"' : '') + '/>').join('')
+    + '</radialGradient>';
+}
+function sekLg(id, stops, x1, y1, x2, y2){
+  return '<linearGradient id="' + id + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '">'
+    + stops.map(s => '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] !== undefined ? ' stop-opacity="' + s[2] + '"' : '') + '/>').join('')
+    + '</linearGradient>';
+}
+const sekF1 = n => Math.round(n*100)/100;
+function sekKreis(r, fill, extra){ return '<circle cx="32" cy="32" r="' + sekF1(r) + '" fill="' + fill + '"' + (extra||'') + '/>'; }
+// Abdunkeln einer Hex-Farbe (Randverdunkelung = Masse)
+function sekDunkel(hex, k){
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n>>16, (n>>8)&255, n&255].map(v => Math.round(v*k));
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function sekMix(a, b, t){
+  const A = parseInt(a.slice(1),16), B = parseInt(b.slice(1),16);
+  const c = [16,8,0].map(s => Math.round(((A>>s)&255)*(1-t) + ((B>>s)&255)*t));
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function sekSternSymbole(types){
+  let defs = '', sym = '';
+  for (const t of types){
+    const r = 11 * (t.r || 1), id = 'sekG-' + t.key;
+    const limb = sekDunkel(t.glow, 0.58);                       // dunkler Rand: drei Helligkeitsebenen Kern/Körper/Rand
+    let halo = '', stern = '';
+    if (t.key === 'gelb'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.40],[.38,t.glow,.15],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,t.core,1],[.42,sekMix(t.core,t.glow,.45),1],[.82,t.glow,1],[1,limb,1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.9],[1,'#ffffff',0]]);
+      halo = sekKreis(2.4*r, 'url(#'+id+'-halo)');
+      // Protuberanzen: sechs kurze Zacken ungleicher Länge, dicht am Rand - bei 25 px noch 4-5 px hoch.
+      const zack = [[22,1.38,1],[74,1.28,-1],[133,1.44,1],[196,1.30,1],[251,1.40,-1],[309,1.32,1]];
+      let z = '';
+      const zungenTon = sekMix(t.glow, '#e0a548', .55);
+      for (const [a,l,kipp] of zack){
+        const w = 10 * Math.PI/180, m = a*Math.PI/180;
+        const p = (ang, rr) => sekF1(32 + Math.cos(ang)*rr) + ',' + sekF1(32 + Math.sin(ang)*rr);
+        // Zunge: breiter Fuß am Rand, geneigte Spitze - Feuer, keine Warze
+        z += '<path d="M' + p(m-w, r*0.9) + ' Q' + p(m - w*0.2, r*(l*0.92)) + ' ' + p(m + kipp*0.55*w, r*l)
+           + ' Q' + p(m + w*1.1, r*1.06) + ' ' + p(m+w, r*0.9) + 'Z" fill="' + zungenTon + '" opacity=".95"/>';
+      }
+      stern = z + sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r*0.55, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'rot'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.26],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,t.core,1],[.30,t.glow,1],[.70,sekDunkel(t.glow,.72),1],[1,'#7a2416',1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.55],[1,'#ffffff',0]]);
+      halo = sekKreis(1.5*r, 'url(#'+id+'-halo)');
+      // Körniger Rand: Flecken im äußeren Drittel, tangential gestreckt, plus harte dunkle Kante.
+      let fl = '';
+      const flecken = [[15,.80,1.9,.7],[58,.64,.9,.6],[104,.84,1.3,1.0],[151,.72,2.2,.8],[196,.86,1.0,.5],[236,.66,1.6,.9],[281,.80,.8,.8],[326,.74,1.5,.6],
+                       [40,.30,2.4,1.3],[190,.28,1.8,1.4],[300,.42,2.0,1.1]];
+      for (const [a,d,rx,ry] of flecken){
+        const m = a*Math.PI/180;
+        fl += '<ellipse cx="' + sekF1(32+Math.cos(m)*r*d) + '" cy="' + sekF1(32+Math.sin(m)*r*d) + '" rx="' + rx + '" ry="' + ry + '" transform="rotate(' + (a+90) + ' ' + sekF1(32+Math.cos(m)*r*d) + ' ' + sekF1(32+Math.sin(m)*r*d) + ')" fill="#4a140c" opacity="' + (d < .5 ? '.28' : '.62') + '"/>';
+      }
+      stern = sekKreis(r, 'url(#'+id+'-disc)') + fl + sekKreis(r, 'none', ' stroke="#5c1a10" stroke-width="1"') + sekKreis(r*0.4, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'blau'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.42],[.40,t.glow,.15],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.34,t.core,1],[.76,sekMix(t.core,t.glow,.7),1],[1,sekDunkel(t.glow,.62),1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.85],[1,'#ffffff',0]])
+            + sekLg(id+'-strahl', [[0,t.core,0],[.30,t.core,.28],[.5,'#ffffff',.45],[.70,t.core,.28],[1,t.core,0]], '0','0','1','0');
+      const L = 2.6*r;
+      halo = sekKreis(2.0*r, 'url(#'+id+'-halo)')
+        // zwei Beugungsstrahlen, senkrecht/waagerecht, 15 % Deckkraft über die Länge gemittelt
+        + '<g opacity=".55"><rect x="' + sekF1(32-L) + '" y="31.2" width="' + sekF1(2*L) + '" height="1.6" fill="url(#'+id+'-strahl)"/>'
+        + '<rect x="' + sekF1(32-L) + '" y="31.2" width="' + sekF1(2*L) + '" height="1.6" fill="url(#'+id+'-strahl)" transform="rotate(90 32 32)"/></g>';
+      stern = sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r, 'none', ' stroke="' + sekDunkel(t.glow,.55) + '" stroke-width=".8" stroke-opacity=".7"') + sekKreis(r*0.5, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'weiss'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.34],[.5,t.glow,.11],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.62,'#ffffff',1],[.9,'#e9edfb',1],[1,'#b7c1e4',1]]);
+      halo = sekKreis(2.2*r, 'url(#'+id+'-halo)');
+      stern = sekKreis(1.4*r, 'none', ' stroke="#ffffff" stroke-width=".9" stroke-opacity=".8"')
+            + sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r, 'none', ' stroke="#f4f6ff" stroke-width=".7"');
+    }
+    else if (t.key === 'doppel'){
+      // Hauptstern rosa unten links, Begleiter creme (0,6·R) oben rechts, auf der Diagonale.
+      const R1 = 7.6, R2 = 4.6, d = 12.4, e = d/2/Math.SQRT2;
+      const mx = 32-e, my = 32+e, cx = 32+e, cy = 32-e;
+      defs += sekRg(id+'-halo', [[0,t.glow,.36],[.42,t.glow,.14],[1,t.glow,0]])
+            + sekRg(id+'-haupt', [[0,t.core,1],[.40,t.glow,1],[.80,sekMix(t.glow,limb,.45),1],[1,limb,1]])
+            + sekRg(id+'-begl',  [[0,'#ffffff',1],[.45,t.core,1],[1,'#cfa45e',1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.85],[1,'#ffffff',0]]);
+      halo = '<ellipse cx="32" cy="32" rx="' + sekF1(2.2*r) + '" ry="' + sekF1(1.45*r) + '" transform="rotate(-45 32 32)" fill="url(#'+id+'-halo)"/>';
+      // Verbindungsbogen: Gasstrom vom Hauptstern zum Begleiter, nach oben links ausgebaucht.
+      const a1 = -45-52, a2 = 135+52;
+      const p0x = mx + Math.cos(a1*Math.PI/180)*R1*1.02, p0y = my + Math.sin(a1*Math.PI/180)*R1*1.02;
+      const p1x = cx + Math.cos(a2*Math.PI/180)*R2*1.05, p1y = cy + Math.sin(a2*Math.PI/180)*R2*1.05;
+      const qx = 32 - 3.6, qy = 32 - 3.6;
+      defs += sekLg(id+'-strom', [[0,t.glow,.25],[.5,t.core,.7],[1,t.core,.35]], '0','1','1','0');
+      const bogen = '<path d="M' + sekF1(p0x) + ',' + sekF1(p0y) + ' Q' + sekF1(qx) + ',' + sekF1(qy) + ' ' + sekF1(p1x) + ',' + sekF1(p1y) + '" fill="none" stroke="url(#'+id+'-strom)" stroke-width=".8" stroke-linecap="round"/>';
+      stern = bogen
+        + '<circle cx="' + sekF1(mx) + '" cy="' + sekF1(my) + '" r="' + R1 + '" fill="url(#'+id+'-haupt)"/>'
+        + '<circle cx="' + sekF1(mx) + '" cy="' + sekF1(my) + '" r="' + sekF1(R1*0.5) + '" fill="url(#'+id+'-kern)"/>'
+        + '<circle cx="' + sekF1(cx) + '" cy="' + sekF1(cy) + '" r="' + R2 + '" fill="url(#'+id+'-begl)"/>'
+        + '<circle cx="' + sekF1(cx) + '" cy="' + sekF1(cy) + '" r="' + R2 + '" fill="none" stroke="#fff6dc" stroke-width=".5" stroke-opacity=".7"/>';
+    }
+    else if (t.key === 'pulsar'){
+      const R = 0.85*r, rx = 2.0*r, ry = 0.7*r, L = 2.5*r;
+      defs += sekRg(id+'-halo', [[0,t.glow,.34],[.5,t.glow,.12],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.30,t.core,1],[.72,t.glow,1],[1,sekDunkel(t.glow,.55),1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.9],[1,'#ffffff',0]])
+            + sekLg(id+'-kegel', [[0,'#c3bef5',.55],[1,'#c3bef5',0]], '0','0','0','1');
+      // Strahlkegel entlang der Ringachse (lokale y-Achse nach rotate(-30)); je 2,5·r lang.
+      const kegelPfad = sekF1(32-1.0) + ',' + sekF1(32+R*0.55) + ' ' + sekF1(32+1.0) + ',' + sekF1(32+R*0.55) + ' ' + sekF1(32+3.6) + ',' + sekF1(32+L) + ' ' + sekF1(32-3.6) + ',' + sekF1(32+L);
+      const kegel = (drehen) => '<polygon points="' + kegelPfad + '" fill="url(#'+id+'-kegel)"' + (drehen ? ' transform="rotate(180 32 32)"' : '') + '/>';
+      halo = sekKreis(1.7*r, 'url(#'+id+'-halo)')
+        + '<g transform="rotate(-30 32 32)" opacity=".5">' + kegel(false) + kegel(true) + '</g>';
+      // Ring: hintere Hälfte vor dem Kern (matt), vordere Hälfte danach (hell) - der Ring läuft
+      // sichtbar UM den Kern, das ist die Tiefe.
+      const ringHinten = '<path d="M' + sekF1(32-rx) + ',32 A' + sekF1(rx) + ' ' + sekF1(ry) + ' 0 0 1 ' + sekF1(32+rx) + ',32" fill="none" stroke="#c3bef5" stroke-width="1.5" stroke-opacity=".38" transform="rotate(-30 32 32)"/>';
+      const ringVorn   = '<path d="M' + sekF1(32-rx) + ',32 A' + sekF1(rx) + ' ' + sekF1(ry) + ' 0 0 0 ' + sekF1(32+rx) + ',32" fill="none" stroke="#dcd8ff" stroke-width="1.5" stroke-opacity=".95" transform="rotate(-30 32 32)"/>';
+      stern = ringHinten + sekKreis(R, 'url(#'+id+'-disc)') + sekKreis(R*0.45, 'url(#'+id+'-kern)') + ringVorn;
+    }
+    sym += '<symbol id="sekStern-' + t.key + '" viewBox="0 0 64 64" overflow="visible">'
+         + '<g style="opacity:var(--sek-halo,1)">' + halo + '</g>' + stern + '</symbol>';
+  }
+  return defs + sym;
+}
+// Einbau-Aufruf für die Sektoransicht: ersetzt die beiden <circle> in sektorAnsichtBauen.
+
+function sekSternUse(key, x, y, k, unentdeckt){
+  return '<use href="#sekStern-' + key + '" x="' + sekF1(x-32*k) + '" y="' + sekF1(y-32*k) + '" width="' + sekF1(64*k) + '" height="' + sekF1(64*k) + '"' + (unentdeckt ? ' style="--sek-halo:.35"' : '') + '/>';
+}
   const DOMINANZ_BETONUNG = {
     kollabiert:      { breite: 1.5, deckkraft: 0.85 },
     'erobert-eigen': { breite: 2.0, deckkraft: 0.95 },
@@ -59371,6 +60064,10 @@ async function claimPendingRewards(){
     fraktion:        { breite: 1.2, deckkraft: 0.55 },
     nest:            { breite: 1.4, deckkraft: 0.70 }
   };
+  /* UNENTDECKT: nicht mehr der ganze Knoten auf 60 % (Grafik-Aufnahme: 17 von 20 Knoten wirkten
+     dadurch matt, und der Stern - das Einzige, was den Systemtyp zeigt - war der Hauptleidtragende).
+     Gedaempft werden jetzt die Schrift und der Halo; der Stern selbst bleibt hell. Der Unterschied
+     zu einem entdeckten System bleibt damit sichtbar, ohne dass die Karte grau wird. */
   const DOMINANZ_FARBE_EIGEN = '#5dcaa5';   // wie die Chip-Zeile und renderTerritoryBox
   const DOMINANZ_FARBE_FEIND = '#e24b4a';   // wie "★ Erobert (fremder Spieler)"
   const DOMINANZ_FARBE_FREMD = '#f4c0d1';   // wie die fremde Zeile in renderTerritoryBox
@@ -59583,10 +60280,7 @@ async function claimPendingRewards(){
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     const kbFront = karteFrontStand();
     let defs = '';
-    for (const t of SUN_TYPES){
-      defs += '<radialGradient id="sekSun-' + t.key + '" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="' + t.core + '"/><stop offset="60%" stop-color="' + t.glow + '"/><stop offset="100%" stop-color="#20263f"/></radialGradient>'
-            + '<radialGradient id="sekGlow-' + t.key + '" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="' + t.glow + '" stop-opacity=".45"/><stop offset="100%" stop-color="' + t.glow + '" stop-opacity="0"/></radialGradient>';
-    }
+    defs += sekSternSymbole(SUN_TYPES);
     defs += '<radialGradient id="sekTerrit" cx="50%" cy="45%" r="62%"><stop offset="0%" stop-color="' + sk.tint + '" stop-opacity=".09"/><stop offset="100%" stop-color="' + sk.tint + '" stop-opacity="0"/></radialGradient>';
     // Sternenfeld deterministisch aus hashStringToFloat - dieselben Sterne bleiben, wo sie sind
     // (dieselbe Regel wie beim Freiflug seit v8.498.0, sonst wäre das Markup nie zweimal gleich).
@@ -59682,10 +60376,9 @@ async function claimPendingRewards(){
           + '<title>' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ' ' + fsr.kp + ' : ' + (1000-fsr.kp) + ' ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + ' – umkämpft zwischen 300 und 700'
           + '\nKommandanten dahinter: ' + fsr.bA + ' für ' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ', ' + fsr.bB + ' für ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + (fsr.dabei ? ' · du bist dabei' : '') + '</title>';
       }
-      knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' opacity="0.6"' : '') + '>'
+      knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' data-unentdeckt="1"' : '') + '>'
         + '<title>' + sy.name + (kollabiert ? ' – Supernova-Kollaps, 48h unzugänglich' : (eigner ? ' – ' + eigner.name + ' (NPC-Territorium)' : '')) + '</title>'
-        + '<circle cx="' + x + '" cy="' + y + '" r="26" fill="url(#sekGlow-' + st.key + ')"/>'
-        + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="url(#sekSun-' + st.key + ')"/>'
+        + sekSternUse(st.key, x, y, 1, entdeckt === 0 && !heim)
         + ringe + wappen + abzeichen
         + (kollabiert ? '<text x="' + x + '" y="' + (y+4) + '" text-anchor="middle" style="font-size:10px;">💥</text>' : '')
         + '<text x="' + x + '" y="' + (y+r+16) + '" text-anchor="middle" style="font:600 11px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name + '</text>'
@@ -61698,9 +62391,20 @@ async function claimPendingRewards(){
     if (activeSunType.pulsar){
       inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(24*activeSunType.r).toFixed(1)}" fill="none" stroke="${activeSunType.glow}" stroke-width="1.4" stroke-dasharray="3 7" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${SUN_X} ${SUN_Y}" to="360 ${SUN_X} ${SUN_Y}" dur="2.6s" repeatCount="indefinite"/></circle>`;
     }
-    inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/><circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r+1.2).toFixed(1)}" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="0.8"/>`;
-    if (activeSunType.binary){
-      inner += `<circle cx="${(SUN_X+9*activeSunType.r).toFixed(1)}" cy="${(SUN_Y-7*activeSunType.r).toFixed(1)}" r="${(6*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}" opacity="0.85"/>`;
+    /* Der Kern als gebackenes Bild (Buendel A). Die Kachel ist 30 Einheiten breit angelegt
+       (E = S/30), der Kern darin 13 E - deshalb deckt sich eine 30-Einheiten-Kante genau mit dem
+       bisherigen Radius 13. Doppelstern und Pulsar tragen ihre Zweitkoerper und Strahlen IM Bild,
+       also entfaellt der frühere Extra-Kreis fuer den Begleiter. Faellt das Backen aus, bleibt der
+       alte Kreis stehen - ein Kartenbild ohne Sonne waere schlimmer als ein schlichtes. */
+    const sonneUrl = sonneBildUrl(activeSunType);
+    if (sonneUrl){
+      const kante = (30 * activeSunType.r).toFixed(1);
+      inner += `<image href="${sonneUrl}" x="${(SUN_X - 15*activeSunType.r).toFixed(1)}" y="${(SUN_Y - 15*activeSunType.r).toFixed(1)}" width="${kante}" height="${kante}" pointer-events="none"/>`;
+    } else {
+      inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/>`;
+      if (activeSunType.binary){
+        inner += `<circle cx="${(SUN_X+9*activeSunType.r).toFixed(1)}" cy="${(SUN_Y-7*activeSunType.r).toFixed(1)}" r="${(6*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}" opacity="0.85"/>`;
+      }
     }
     if (state.debrisFields.home && Object.keys(state.debrisFields.home).length && activeSystem === myHomeSystem){
       inner += `<g data-map-debris="home"><circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="6" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>`;
@@ -65440,7 +66144,7 @@ async function claimPendingRewards(){
               ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
               ${hasDebris ? `<span class="dash-debris-badge" data-debris-info="${debrisTitle.replace(/"/g,'&quot;')}" title="${debrisTitle}"><i class="ti ti-recycle" aria-hidden="true"></i></span>` : ''}
               <div class="dash-colony-icon" style="position:relative;">
-                <canvas data-planet-icon="${isMoonKey(d.id) ? 'asteroid' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
+                <canvas data-planet-icon="${isMoonKey(d.id) ? 'mond' : (effectivePlanetType(d.id) || 'erdaehnlich')}" width="26" height="26" style="display:block;"></canvas>
                 ${role ? `<span class="dash-role-badge" style="background:${role.color};" title="Rolle: ${role.name}"><i class="ti ${role.icon}" aria-hidden="true"></i></span>` : ''}
               </div>
               <div class="dash-colony-info">
@@ -67872,7 +68576,10 @@ async function claimPendingRewards(){
       return `
         <div class="card-row"${nested?' style="margin-left:1.25rem; border-left:var(--bw-rail) solid rgba(255,255,255,0.15); padding-left:0.6rem;"':''}>
           <div class="left">
-            <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd; border-radius:50%;"><canvas data-planet-icon="asteroid" width="26" height="26" style="display:block;"></canvas></div>
+            <!-- Ein Mond ist kein Asteroid: eigener Builder mit Maria und Kratern (Buendel A, 05.09.2026).
+                 Bis dahin stand hier fest 'asteroid', und der mond-Builder war von KEINER Stelle
+                 erreichbar - gemessen an allen drei Anforderern der Textur. -->
+            <div class="bicon" style="background:rgba(200,200,210,0.18); color:#c9c7bd; border-radius:50%;"><canvas data-planet-icon="mond" width="26" height="26" style="display:block;"></canvas></div>
             <div>
               <div class="bname"><i class="ti ti-planet" aria-hidden="true" style="font-size:12px; opacity:0.7;"></i> ${planetDisplayName(moonKey)}${colonized?' <span class="colonized-badge"><i class="ti ti-home" aria-hidden="true"></i>kolonisiert</span>':''}</div>
               <div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Mond: eigenständiges Ziel mit eigenen Gebäuden, eigener Flotte und eigener Verteidigung (unabhängig vom Planeten) - produziert, verteidigt und lagert dafür nur ${Math.round(MOON_PENALTY*100)}% eines normalen Planeten</div>
