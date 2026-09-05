@@ -15630,7 +15630,7 @@
            Server urteilt weiter ueber den alten Stand, und beim KAUF ueberschreibt seine
            Antwort obendrein die seither getickten Kredite. Lieber ein ehrliches "gleich
            nochmal" als ein stiller Verlust. */
-        const gespeichert = await save();
+        const gespeichert = await save({ nurSpielstand: true });
         if (!gespeichert){
           marktLetzteAbsage = { status: 0, fehler: 'Speichern' };
           if (!opts.viaLimit) log('Handel abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
@@ -15793,6 +15793,30 @@
     const def = defs.find(d => d.key === typ);
     return !!def && def.quelle === HERKUNFT_ABGRUND;
   }
+  /* EINE Stelle fuer alle drei Modulboersen-Aufrufe (05.09.2026) - dieselbe Ursache wie beim
+     Markt, gemessen an drei Routen:
+       /modulemarket/list   prueft `moduleInvOf(save)` gegen den GESPEICHERTEN Spielstand
+       /modulemarket/buy    prueft `save.credits` gegen den GESPEICHERTEN Spielstand
+       /modulemarket/cancel liest ihn und schreibt ihn zurueck
+     Der Client speichert im 10-Sekunden-Takt, und drei der vier Modul-Vergabestellen
+     (grantRandomModule, grantRandomShipModule, grantBossSetModule) schreiben `state.modules`
+     OHNE eigenes Speichern - nur gibModul tut es. Wer ein frisch gefundenes Modul in diesem
+     Fenster einstellt, bekommt „Dieses Modul liegt nicht (mehr) in deinem Inventar" fuer eines,
+     das seine Sammlung anzeigt. Dasselbe beim Kauf mit Krediten, die eine Handelsroute gerade
+     eingebracht hat.
+     Und weil `cancel` und `buy` serverseitig SCHREIBEN, ginge ohne das Speichern zusaetzlich
+     alles verloren, was der Takt seit dem letzten Speichern gutgeschrieben hat: Der Server
+     rechnet auf dem alten Stand weiter, und der Client uebernimmt dessen Antwort.
+     Rueckgabe false heisst: nicht anfragen. Ein Handel auf veralteter Grundlage waere genau der
+     Fehler, den das hier verhindern soll - nur ohne die Chance, ihn zu bemerken. */
+  async function moduleMarketSpielstandSichern(was){
+    const gespeichert = await save({ nurSpielstand: true });
+    if (!gespeichert){
+      log(was + ' abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
+      return false;
+    }
+    return true;
+  }
   async function listModuleOnMarket(isShip, instKey, price){
     if (!useBackend()){ log('Die Modulbörse braucht eine Serververbindung.', 'ti-alert-triangle'); return; }
     if (istAbgrundModul(isShip, instKey)){
@@ -15811,6 +15835,7 @@
     }
     moduleMarketInFlight = true;
     try {
+      if (!(await moduleMarketSpielstandSichern('Einstellen'))) return;
       const res = await backendFetch('/modulemarket/list', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ isShip: !!isShip, instKey, price: p }) });
       const data = await res.json();
@@ -15832,6 +15857,7 @@
     if (!useBackend() || moduleMarketInFlight) return;
     moduleMarketInFlight = true;
     try {
+      if (!(await moduleMarketSpielstandSichern('Zurückziehen'))) return;
       const res = await backendFetch('/modulemarket/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.ok){ log('Zurückziehen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
@@ -15880,6 +15906,7 @@
     if (!useBackend() || moduleMarketInFlight) return;
     moduleMarketInFlight = true;
     try {
+      if (!(await moduleMarketSpielstandSichern('Kauf'))) return;
       const res = await backendFetch('/modulemarket/buy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.ok){ log('Kauf fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
@@ -15941,7 +15968,7 @@
        Bewusst NACH dem Setzen von marketBulkRun: Der Riegel drueber wird synchron geprueft; ein
        `await` davor oeffnete ein Fenster, in dem zwei schnelle Klicks BEIDE durchkaemen und zwei
        Sammelauftraege nebeneinander liefen. */
-    const gespeichert = await save();
+    const gespeichert = await save({ nurSpielstand: true });
     if (!gespeichert){
       // Dieselbe Begruendung wie in doMarketTrade - hier zusaetzlich den Riegel wieder loesen,
       // der oben schon gesetzt wurde, sonst blockierte ein gescheiterter Start den Markt.
@@ -49513,11 +49540,18 @@ async function claimPendingRewards(){
   // doSave() gibt seit dem Bugfix unten trotzdem das echte Ergebnis zurück (Erfolg = das Objekt aus
   // saveGameStateVersioned, Fehlschlag = null/undefined) - Aufrufer, denen eine bestätigte
   // Persistenz wichtig ist (siehe claimArtifactSet), können `await save()` darauf prüfen.
-  function save(){
-    saveChain = saveChain.then(() => doSave()).catch(()=>null);
+  /* opts.nurSpielstand: NUR den eigenen Spielstand schreiben, ohne die drei Rundfunk-Schluessel
+     (leaderboard/missions/moondefense), die andere Spieler lesen. Gebraucht von den Routen, die
+     VOR ihrer Anfrage speichern muessen, damit der Server den aktuellen Stand sieht (Markt,
+     Modulboerse): Dort ist ein Speichervorgang die Wartezeit des Spielers, und vier
+     nacheinander abgewartete Schreibvorgaenge statt einem sind dafuer der falsche Preis - die
+     Rundfunk-Schluessel interessieren dabei niemanden, der reguläre 10-s-Takt schreibt sie
+     ohnehin gleich wieder. */
+  function save(opts){
+    saveChain = saveChain.then(() => doSave(opts)).catch(()=>null);
     return saveChain;
   }
-  async function doSave(){
+  async function doSave(opts){
     if (saveConflictDetected) return null;
     if (!bootDataReady) return null;
     /* HIER STAND `state.lastTick = Date.now();` - und das war der eigentliche Fehler (05.08.2026).
@@ -49534,6 +49568,11 @@ async function claimPendingRewards(){
     try {
       saveResult = await saveGameStateVersioned(JSON.stringify(state));
     } catch(e){ console.error(e); }
+    /* Hier endet der schmale Pfad. Bewusst NACH dem Spielstand und VOR den Rundfunk-Schluesseln:
+       Der Spielstand ist das Einzige, was ein wartender Aufrufer braucht; alles darunter ist
+       Auskunft an andere Spieler und darf auf den naechsten Takt warten. Der Rueckgabewert ist
+       derselbe wie beim vollen Lauf, damit die Erfolgspruefung der Aufrufer sich nicht aendert. */
+    if (opts && opts.nurSpielstand) return saveResult;
     try {
       if (state.player.id){
         // Spionageabwehr: Stufen von rspyshield verschleiern die für fremde Spione sichtbaren Werte mit
