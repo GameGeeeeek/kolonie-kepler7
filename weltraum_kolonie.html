@@ -2207,6 +2207,11 @@
        mit der alten Regel `.map-wrap svg` wurde es auf Kastengroesse gezogen und legte sich als
        halbtransparenter Riesen-Helm ueber ein Viertel der Karte (gemessen 05.09.2026, GR-9). */
     .map-wrap > svg { width:100%; height:100%; }
+    /* Ein unentdecktes System: gedaempft wird die SCHRIFT, nicht der Stern. Bis Buendel A lag
+       opacity 0.6 auf dem ganzen Knoten - der Stern, das einzige Zeichen fuer den Systemtyp, war
+       damit der Hauptleidtragende (Grafik-Aufnahme: 17 von 20 Knoten wirkten matt). Den Halo
+       daempft der Zeichner selbst ueber --sek-halo. */
+    .sektor-sys[data-unentdeckt] text { opacity: 0.62; }
     /* Zoomstapel waagerecht, sobald der Kartenkasten schmal ist (KB-11): Senkrecht belegt er
        120 px Hoehe - im kompakten Systemkasten (~230 px) lag er damit unter dem ›-Blaetterknopf
        und fing dessen Taps ab. Waagerecht braucht er nur 34 px Hoehe, und die Blaetterknoepfe
@@ -59507,6 +59512,361 @@ async function claimPendingRewards(){
      haerteste ist. Der Fraktionswert bleibt deshalb unveraendert, alles darueber wird lauter -
      die Zahlen sind die vorhandenen Bestandswerte der eigenen Kontrolle (2 / 0,9) als Obergrenze
      und der Fraktion (1,2 / 0,55) als Untergrenze, dazwischen linear nach Rang. */
+  /* DER SONNENKERN DER SYSTEMEBENE (Buendel A, 05.09.2026, Grafik-Aufnahme).
+     Gemessen am alten Bild: eine einfarbige, hart begrenzte Scheibe mit duennem weissem Ring - am
+     Desktop wie eine weisse LED, am Handy wie ein Punkt. Keine Randverdunklung, keine Oberflaeche,
+     kein Uebergang von Kern zu Glut; die sechs Typen unterschieden sich nur in Farbe und Radius.
+     Jetzt ein gebackenes Bild je Typ (128-px-Kachel, als Data-URL gecacht, unter 15 KB):
+     Randverdunklung statt flacher Fuellung, ein Chromosphaeren-Saum als Kante gegen den Halo,
+     feine Granulation als Material, Flecken bei gelb und rot, ein glatteres kaelteres Zentrum beim
+     blauen Riesen, eine harte fast reinweisse Scheibe beim weissen Zwerg, beim Doppelstern beide
+     Koerper samt Materiebruecke, beim Pulsar zwei Strahlkegel.
+     KORONA, STRAHLEN UND GLUT BLEIBEN - sie sind die gewaehlte Variante vom 01.09.2026; ersetzt
+     wird nur der Kern. Der weisse 0,8-px-Ring entfaellt.
+     Lichtmodell: Es gibt KEINE Fremdlichtquelle, ein Stern leuchtet selbst. Volumen entsteht allein
+     aus der Randverdunklung, die Kante aus dem hellen Saum, das Material aus Koernung und Flecken.
+     Das Rauschen kommt aus makeNoise3D des Texturblocks, mit fester z-Ebene: zwei Generatoren
+     nebeneinander waeren beim naechsten Umbau sofort auseinandergelaufen. */
+  function sonneRausch2D(seed){
+    const n = makeNoise3D(seed);
+    return (x, y) => n(x, y, 0.5);
+  }
+  function fbm2(n, x, y, oct, lac, gain){
+    let s = 0, a = 1, f = 1, norm = 0;
+    for (let i = 0; i < oct; i++){ s += n(x*f, y*f)*a; norm += a; a *= gain; f *= lac; }
+    return s / norm;
+  }
+const sonneHex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const sonneMix = (a,b,t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const sonneRgba = (c,a) => `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+const sonneKlemm = v => v<0?0:v>1?1:v;
+const sonneSstep = (a,b,x) => { const t = sonneKlemm((x-a)/(b-a)); return t*t*(3-2*t); };
+
+/* ---- DIE STERNSCHEIBE -------------------------------------------------------------------------
+   c: Kontext, cx/cy/R in Kachel-px. core/glow als [r,g,b]. o:
+     limb   : Restlicht am Rand (0..1). Physik: I(mu) ~ 0.4+0.6*mu; hier 0.42 gelb, 0.62 blau, 0.85 weiss
+     koern  : Amplitude der Granulation (0 = keine)
+     flecken: [{x,y,ru,rp}] in Einheiten des Scheibenradius, ru/rp in px
+     saum   : Breite des Chromosphaeren-Saums in px (Kachel)
+     seed   : Rauschsaat, damit jeder Typ eine andere Oberflaeche hat
+   Lichtmodell: Es gibt KEINE Fremdlichtquelle - der Stern leuchtet selbst. Volumen entsteht allein
+   aus der Randverdunklung (Photosphaere), Kante aus dem hellen Saum (Chromosphaere), Material aus
+   der Koernung (Granulen) und den Flecken (Umbra/Penumbra, zum Rand hin perspektivisch gestaucht). */
+function sonneScheibe(c, cx, cy, R, core, glow, o){
+  const limb = o.limb, koern = o.koern||0, flecken = o.flecken||[], saum = o.saum==null?4:o.saum;
+  const nA = sonneRausch2D(o.seed||1), nB = sonneRausch2D((o.seed||1)+41.3);
+  const rand = [glow[0]*0.80, glow[1]*0.72, glow[2]*0.64];          // Randton: Glut, waermer und dunkler
+  const Q = o.quant||6;                                             // Farbstufen: weniger Entropie, kleinere PNG
+  const x0 = Math.max(0, Math.floor(cx-R-2)), y0 = Math.max(0, Math.floor(cy-R-2));
+  const w = Math.min(c.canvas.width - x0, Math.ceil(R*2+5)), h = Math.min(c.canvas.height - y0, Math.ceil(R*2+5));
+  const img = c.getImageData(x0, y0, w, h);
+  const d = img.data;
+  const fleckVor = flecken.map(f => { const l = Math.hypot(f.x,f.y)||1e-6; return { px:cx+f.x*R, py:cy+f.y*R, ux:f.x/l, uy:f.y/l, mu:Math.sqrt(Math.max(0.15,1-f.x*f.x-f.y*f.y)), ru:f.ru, rp:f.rp }; });
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const px = x0+x+0.5, py = y0+y+0.5;
+    const dx = px-cx, dy = py-cy, dist = Math.hypot(dx,dy);
+    const a = sonneKlemm((R+0.6-dist)/1.4);                            // weicher Rand, 1,4 px
+    if (a<=0) continue;
+    const dn = Math.min(1, dist/R);
+    const mu = Math.sqrt(Math.max(0, 1-dn*dn));                     // cos des Blickwinkels auf die Oberflaeche
+    // Randverdunklung: Mitte core, ab der Haelfte in die Glutfarbe, am Rand deutlich dunkler.
+    let col = sonneMix(core, glow, sonneSstep(o.kern==null?0.42:o.kern, 0.97, dn));
+    const mu2 = Math.pow(mu, 0.75);                                 // Kurve: Mitte flach, aussen zuegig dunkler
+    col = sonneMix(rand, col, limb + (1-limb)*mu2);
+    // Granulation: feine Zellen (~3,5 px), am Rand durch die Perspektive schwaecher; dazu eine
+    // grobe Welle (~20 px), damit die Flaeche nicht wie ein Verlauf aussieht.
+    if (koern>0){
+      const FQ = 4.2, LEV = 0, KM = 1;
+      let g = fbm2(nA, px/FQ, py/FQ, 2, 2.1, 0.5) - 0.5;
+      let g2 = fbm2(nB, px/22, py/22, 1, 2.0, 0.5) - 0.5;
+      if (LEV){ g = Math.round(g*LEV)/LEV; g2 = Math.round(g2*LEV)/LEV; }
+      const kr = 1 + (o.koernRand||0)*(1-mu);                       // Koernung zum Rand hin staerker (blau)
+      const f = 1 + (g*koern*kr*2.2*(0.35+0.65*mu) + g2*koern*0.8)*KM;
+      col = [col[0]*f, col[1]*f, col[2]*f];
+    }
+    // Flecken: Umbra fast schwarz-warm, Penumbra halbdunkel, um die Penumbra ein Hauch Fackel.
+    for (const s of fleckVor){
+      const vx = px-s.px, vy = py-s.py;
+      const dr = (vx*s.ux+vy*s.uy)/s.mu, dt = -vx*s.uy+vy*s.ux;
+      const fd = Math.hypot(dr, dt);
+      if (fd < s.rp*1.6){
+        const umb = 1-sonneSstep(s.ru*0.7, s.ru*1.15, fd);
+        const pen = 1-sonneSstep(s.ru, s.rp, fd);
+        const fack = sonneSstep(s.rp*0.9, s.rp*1.15, fd) * (1-sonneSstep(s.rp*1.2, s.rp*1.6, fd));
+        const dark = 0.27*umb + 0.34*pen*(1-umb);
+        const fac = (1-dark) * (1 + fack*0.045);
+        col = [col[0]*fac, col[1]*fac*(1-umb*0.08), col[2]*fac*(1-umb*0.18)];
+      }
+    }
+    const i = (y*w+x)*4;
+    const bg = a;   // ueber Transparenz: einfach setzen
+    const q = v => Math.min(255, Math.round(v/Q)*Q);
+    d[i]   = q(col[0]*bg + d[i]*(1-bg));
+    d[i+1] = q(col[1]*bg + d[i+1]*(1-bg));
+    d[i+2] = q(col[2]*bg + d[i+2]*(1-bg));
+    d[i+3] = Math.max(d[i+3], a*255);
+  }
+  c.putImageData(img, x0, y0);
+  // Chromosphaeren-Saum: ein duenner heller Ring genau auf der Kante, nach aussen weich auslaufend.
+  if (saum>0){
+    const sg = c.createRadialGradient(cx,cy,Math.max(0,R-1.2), cx,cy,R+saum);
+    sg.addColorStop(0,   sonneRgba(glow,0));
+    sg.addColorStop(0.22, sonneRgba(sonneMix(glow,core,0.55),0.92));
+    sg.addColorStop(0.45, sonneRgba(glow,0.40));
+    sg.addColorStop(1,   sonneRgba(glow,0));
+    c.fillStyle = sg; c.beginPath(); c.arc(cx,cy,R+saum,0,Math.PI*2); c.fill();
+  }
+}
+
+/* ---- Der Kern je Typ. S = Kachel (128), 1 Spiel-Einheit = S/30 px. ---- */
+function sonneKernZeichnen(c, S, typ){
+  const cx=S/2, cy=S/2, E=S/30, core=sonneHex(typ.core), glow=sonneHex(typ.glow);
+  const R = 13*E;                                                    // 55,5 px bei S=128
+  c.clearRect(0,0,S,S);
+  switch (typ.key){
+    case 'gelb':
+      sonneScheibe(c,cx,cy,R,core,glow,{ limb:0.50, koern:0.05, seed:7.3, saum:3.6,
+        flecken:[{x:-0.36,y:-0.18,ru:2.2,rp:4.8},{x:-0.22,y:-0.06,ru:1.4,rp:3.2},{x:0.44,y:0.30,ru:1.8,rp:4.0}] });
+      break;
+    case 'rot':
+      sonneScheibe(c,cx,cy,R,core,glow,{ limb:0.46, koern:0.065, seed:19.1, saum:3.6,
+        flecken:[{x:0.30,y:-0.26,ru:2.6,rp:5.6},{x:0.46,y:-0.08,ru:1.7,rp:3.8},{x:-0.40,y:0.34,ru:2.0,rp:4.4}] });
+      break;
+    case 'blau':
+      // Kein Fleck, kaelteres und glatteres Zentrum: hoeheres Restlicht, halbe Koernung, weiter Kern.
+      sonneScheibe(c,cx,cy,R,sonneMix(core,[255,255,255],0.4),glow,{ limb:0.58, koern:0.014, koernRand:3.5, seed:3.9, saum:4, kern:0.18 });
+      break;
+    case 'weiss':
+      // Kleinere, sehr harte, fast reinweisse Scheibe: kaum Randverdunklung, kein Korn, 1-px-Saum.
+      sonneScheibe(c,cx,cy,R*0.80,core,sonneMix(core,glow,0.6),{ limb:0.84, koern:0, saum:1.8, quant:2 });
+      break;
+    case 'doppel': {
+      const ax=cx-10*E/4.27, ay=cy+9*E/4.27, aR=R*0.74;              // Hauptstern, leicht nach unten links
+      const bx=cx+38*E/4.27, by=cy-31*E/4.27, bR=R*0.30;             // Begleiter rechts oben
+      // Helle Bruecke: Materie auf dem Weg vom Haupt- zum Begleitstern, entlang der Verbindungslinie.
+      const ang = Math.atan2(by-ay, bx-ax), len = Math.hypot(bx-ax, by-ay);
+      c.save(); c.translate(ax,ay); c.rotate(ang);
+      const bg = c.createLinearGradient(aR*0.6,0,len-bR*0.5,0);
+      bg.addColorStop(0, sonneRgba(core,0.0)); bg.addColorStop(0.35, sonneRgba(sonneMix(core,glow,0.25),0.95));
+      bg.addColorStop(0.65, sonneRgba(sonneMix(core,glow,0.35),0.85)); bg.addColorStop(1, sonneRgba(glow,0.0));
+      c.fillStyle = bg;
+      c.beginPath(); c.moveTo(aR*0.6,-6); c.quadraticCurveTo(aR*1.05,-2.6,len-bR*0.5,-2.6); c.lineTo(len-bR*0.5,2.6); c.quadraticCurveTo(aR*1.05,2.6,aR*0.6,6); c.closePath(); c.fill();
+      const bh = c.createLinearGradient(aR*0.6,0,len-bR*0.5,0);
+      bh.addColorStop(0, sonneRgba(glow,0)); bh.addColorStop(0.5, sonneRgba(glow,0.35)); bh.addColorStop(1, sonneRgba(glow,0));
+      c.fillStyle = bh; c.beginPath(); c.ellipse(len/2,0,len/2,7,0,0,Math.PI*2); c.fill();
+      c.restore();
+      sonneScheibe(c,ax,ay,aR,core,glow,{ limb:0.50, koern:0.05, seed:11.7, saum:3.4,
+        flecken:[{x:0.34,y:0.28,ru:1.8,rp:3.8},{x:-0.30,y:-0.10,ru:1.4,rp:3.0}] });
+      sonneScheibe(c,bx,by,bR,sonneMix(core,glow,0.30),glow,{ limb:0.46, koern:0.04, seed:5.2, saum:2.4 });
+      break; }
+    case 'pulsar': {
+      const pR = R*0.58;
+      // Zwei gegenueberliegende schmale Strahlenkegel, Achse gekippt; drei Lagen, innen hart, aussen weich.
+      const ang = -Math.PI*0.31;
+      for (const dir of [1,-1]){
+        c.save(); c.translate(cx,cy); c.rotate(ang + (dir<0?Math.PI:0));
+        const L = S*0.47;
+        for (const [wf,alp] of [[2.4,0.30],[1.5,0.55],[0.8,1.0],[0.35,1.0]]){
+          const kg = c.createLinearGradient(pR*0.7,0,L,0);
+          kg.addColorStop(0, sonneRgba(core,alp)); kg.addColorStop(0.55, sonneRgba(sonneMix(core,glow,0.3),alp*0.8)); kg.addColorStop(1, sonneRgba(glow,0));
+          c.fillStyle = kg;
+          c.beginPath(); c.moveTo(pR*0.7,-2.4*wf); c.lineTo(L,-7.5*wf); c.lineTo(L,7.5*wf); c.lineTo(pR*0.7,2.4*wf); c.closePath(); c.fill();
+        }
+        c.restore();
+      }
+      sonneScheibe(c,cx,cy,pR,sonneMix(core,[255,255,255],0.5),sonneMix(core,glow,0.55),{ limb:0.82, koern:0.012, koernRand:2, seed:2.6, saum:2.2, quant:3, kern:0.3 });
+      break; }
+  }
+  // Stufen je Typ: die gekoernten Typen dithern sich selbst (16 Stufen reichen), die glatten
+  // brauchen feinere Stufen gegen Ringe - sie sind klein oder einfarbig und bleiben trotzdem klein.
+  sonneQuantisieren(c, S, ({gelb:16, rot:16, doppel:16, blau:12, weiss:6, pulsar:8})[typ.key], 0);
+}
+
+/* Schlusspass: alle Kanaele auf Q-Stufen runden. Canvas-Verlaeufe kommen bei Chromium gedithert
+   aus Skia, und die toDataURL-PNG ist schwach komprimiert - ohne diesen Pass kostet allein der
+   glatte Verlauf 15-19 KB (gemessen). Die Koernung wirkt dabei als Dither gegen Banding. */
+const BAYER = [0,8,2,10, 12,4,14,6, 3,11,1,9, 15,7,13,5];
+function sonneQuantisieren(c, S, Q, dither){
+  const img = c.getImageData(0,0,S,S), d = img.data;
+  for (let i=0;i<d.length;i++){
+    // Dither je Pixel (deterministisch): verteilt die Stufen, statt Ringe zu ziehen. Kostet PNG-
+    // Bytes, deshalb je Typ dosiert - die gekoernten Typen dithern sich ueber ihre Granulation selbst.
+    // Geordnetes Bayer-4x4-Muster statt Zufall: Zufall kostete 3-10 KB je Kachel (gemessen),
+    // das Muster wiederholt sich und faellt in der Deflate-Stufe fast weg.
+    const pix = i>>2, bx = pix & 3, by = (pix>>7) & 3;
+    const rnd = (BAYER[by*4+bx] + 0.5)/16;
+    d[i] = Math.max(0, Math.min(255, Math.round((d[i] + (rnd-0.5)*Q*dither)/Q)*Q));
+  }
+  c.putImageData(img,0,0);
+}
+/* ---- Cache wie im Spiel: einmal zeichnen, data-URL merken ---- */
+
+  /* Je Sonnentyp EIN gebackenes Bild, als Data-URL gecacht - dieselbe Regel wie bei den
+     Planeten-Texturen: einmal zeichnen, dann wiederverwenden. Die Kachel ist 128 px, damit auch der
+     blaue Riese (35 px am Desktop) nicht pixelig wird. */
+  const SONNE_BILD_CACHE = {};
+  function sonneBildUrl(typ){
+    if (!(typ.key in SONNE_BILD_CACHE)){
+      try {
+        const S = 128;
+        const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+        const ctx = cv.getContext('2d');
+        if (!ctx) throw new Error('kein 2D-Context');
+        sonneKernZeichnen(ctx, S, typ);
+        SONNE_BILD_CACHE[typ.key] = cv.toDataURL();
+      } catch (e) { SONNE_BILD_CACHE[typ.key] = null; }
+    }
+    return SONNE_BILD_CACHE[typ.key];
+  }
+  /* DIE SECHS STERNTYPEN DER SEKTORANSICHT (Buendel A, 05.09.2026, Grafik-Aufnahme).
+     Gemessen am alten Bild: Die sechs Typen unterschieden sich nur in Farbe und Radius - jeder war
+     dieselbe Glanz-Murmel mit festem Highlight bei 35%/35%, also ein BELEUCHTETER Koerper. Ein Stern
+     ist aber selbst das Licht. Die Flags binary und pulsar aus SUN_TYPES wurden gar nicht gezeichnet.
+     Jetzt bekommt jeder Typ eine eigene FORM, denn bei 14 bis 33 Bildpunkten entscheidet die
+     Silhouette, nicht die Oberflaeche:
+       gelb    sechs kurze Protuberanz-Zungen am Rand, heller Kern
+       rot     koerniger Fleckenrand mit harter dunkler Kante, kaum Halo
+       blau    groesste Scheibe, zwei zarte Beugungsstrahlen, weiter Halo
+       weiss   winzige harte Scheibe in einer leuchtenden Schale bei 1,4 r
+       doppel  zwei Koerper auf der Diagonale, gemeinsamer Halo, Gasstrom dazwischen
+       pulsar  geneigter Ring in zwei Tiefenhaelften (hinten blass, vorne hell) plus zwei Strahlkegel
+     Alle Farben kommen per sekMix/sekDunkel aus core und glow von SUN_TYPES - nichts ist eingetippt.
+     Gebaut wird EIN <symbol>-Satz je Aufbau, gezeichnet je Knoten ein <use>: das Markup bleibt so
+     statisch wie vorher, es gibt kein Neuzeichnen je Bild.
+     UNENTDECKT senkt nur den Halo (--sek-halo), nicht den ganzen Knoten - vorher lag opacity 0.6
+     ueber allem, und 17 von 20 Knoten wirkten matt. */
+function sekRg(id, stops, o){
+  o = o || {};
+  return '<radialGradient id="' + id + '" cx="' + (o.cx||'50%') + '" cy="' + (o.cy||'50%') + '" r="' + (o.r||'50%') + '">'
+    + stops.map(s => '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] !== undefined ? ' stop-opacity="' + s[2] + '"' : '') + '/>').join('')
+    + '</radialGradient>';
+}
+function sekLg(id, stops, x1, y1, x2, y2){
+  return '<linearGradient id="' + id + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '">'
+    + stops.map(s => '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"' + (s[2] !== undefined ? ' stop-opacity="' + s[2] + '"' : '') + '/>').join('')
+    + '</linearGradient>';
+}
+const sekF1 = n => Math.round(n*100)/100;
+function sekKreis(r, fill, extra){ return '<circle cx="32" cy="32" r="' + sekF1(r) + '" fill="' + fill + '"' + (extra||'') + '/>'; }
+// Abdunkeln einer Hex-Farbe (Randverdunkelung = Masse)
+function sekDunkel(hex, k){
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n>>16, (n>>8)&255, n&255].map(v => Math.round(v*k));
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+function sekMix(a, b, t){
+  const A = parseInt(a.slice(1),16), B = parseInt(b.slice(1),16);
+  const c = [16,8,0].map(s => Math.round(((A>>s)&255)*(1-t) + ((B>>s)&255)*t));
+  return '#' + c.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function sekSternSymbole(types){
+  let defs = '', sym = '';
+  for (const t of types){
+    const r = 11 * (t.r || 1), id = 'sekG-' + t.key;
+    const limb = sekDunkel(t.glow, 0.58);                       // dunkler Rand: drei Helligkeitsebenen Kern/Körper/Rand
+    let halo = '', stern = '';
+    if (t.key === 'gelb'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.40],[.38,t.glow,.15],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,t.core,1],[.42,sekMix(t.core,t.glow,.45),1],[.82,t.glow,1],[1,limb,1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.9],[1,'#ffffff',0]]);
+      halo = sekKreis(2.4*r, 'url(#'+id+'-halo)');
+      // Protuberanzen: sechs kurze Zacken ungleicher Länge, dicht am Rand - bei 25 px noch 4-5 px hoch.
+      const zack = [[22,1.38,1],[74,1.28,-1],[133,1.44,1],[196,1.30,1],[251,1.40,-1],[309,1.32,1]];
+      let z = '';
+      const zungenTon = sekMix(t.glow, '#e0a548', .55);
+      for (const [a,l,kipp] of zack){
+        const w = 10 * Math.PI/180, m = a*Math.PI/180;
+        const p = (ang, rr) => sekF1(32 + Math.cos(ang)*rr) + ',' + sekF1(32 + Math.sin(ang)*rr);
+        // Zunge: breiter Fuß am Rand, geneigte Spitze - Feuer, keine Warze
+        z += '<path d="M' + p(m-w, r*0.9) + ' Q' + p(m - w*0.2, r*(l*0.92)) + ' ' + p(m + kipp*0.55*w, r*l)
+           + ' Q' + p(m + w*1.1, r*1.06) + ' ' + p(m+w, r*0.9) + 'Z" fill="' + zungenTon + '" opacity=".95"/>';
+      }
+      stern = z + sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r*0.55, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'rot'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.26],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,t.core,1],[.30,t.glow,1],[.70,sekDunkel(t.glow,.72),1],[1,'#7a2416',1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.55],[1,'#ffffff',0]]);
+      halo = sekKreis(1.5*r, 'url(#'+id+'-halo)');
+      // Körniger Rand: Flecken im äußeren Drittel, tangential gestreckt, plus harte dunkle Kante.
+      let fl = '';
+      const flecken = [[15,.80,1.9,.7],[58,.64,.9,.6],[104,.84,1.3,1.0],[151,.72,2.2,.8],[196,.86,1.0,.5],[236,.66,1.6,.9],[281,.80,.8,.8],[326,.74,1.5,.6],
+                       [40,.30,2.4,1.3],[190,.28,1.8,1.4],[300,.42,2.0,1.1]];
+      for (const [a,d,rx,ry] of flecken){
+        const m = a*Math.PI/180;
+        fl += '<ellipse cx="' + sekF1(32+Math.cos(m)*r*d) + '" cy="' + sekF1(32+Math.sin(m)*r*d) + '" rx="' + rx + '" ry="' + ry + '" transform="rotate(' + (a+90) + ' ' + sekF1(32+Math.cos(m)*r*d) + ' ' + sekF1(32+Math.sin(m)*r*d) + ')" fill="#4a140c" opacity="' + (d < .5 ? '.28' : '.62') + '"/>';
+      }
+      stern = sekKreis(r, 'url(#'+id+'-disc)') + fl + sekKreis(r, 'none', ' stroke="#5c1a10" stroke-width="1"') + sekKreis(r*0.4, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'blau'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.42],[.40,t.glow,.15],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.34,t.core,1],[.76,sekMix(t.core,t.glow,.7),1],[1,sekDunkel(t.glow,.62),1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.85],[1,'#ffffff',0]])
+            + sekLg(id+'-strahl', [[0,t.core,0],[.30,t.core,.28],[.5,'#ffffff',.45],[.70,t.core,.28],[1,t.core,0]], '0','0','1','0');
+      const L = 2.6*r;
+      halo = sekKreis(2.0*r, 'url(#'+id+'-halo)')
+        // zwei Beugungsstrahlen, senkrecht/waagerecht, 15 % Deckkraft über die Länge gemittelt
+        + '<g opacity=".55"><rect x="' + sekF1(32-L) + '" y="31.2" width="' + sekF1(2*L) + '" height="1.6" fill="url(#'+id+'-strahl)"/>'
+        + '<rect x="' + sekF1(32-L) + '" y="31.2" width="' + sekF1(2*L) + '" height="1.6" fill="url(#'+id+'-strahl)" transform="rotate(90 32 32)"/></g>';
+      stern = sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r, 'none', ' stroke="' + sekDunkel(t.glow,.55) + '" stroke-width=".8" stroke-opacity=".7"') + sekKreis(r*0.5, 'url(#'+id+'-kern)');
+    }
+    else if (t.key === 'weiss'){
+      defs += sekRg(id+'-halo', [[0,t.glow,.34],[.5,t.glow,.11],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.62,'#ffffff',1],[.9,'#e9edfb',1],[1,'#b7c1e4',1]]);
+      halo = sekKreis(2.2*r, 'url(#'+id+'-halo)');
+      stern = sekKreis(1.4*r, 'none', ' stroke="#ffffff" stroke-width=".9" stroke-opacity=".8"')
+            + sekKreis(r, 'url(#'+id+'-disc)') + sekKreis(r, 'none', ' stroke="#f4f6ff" stroke-width=".7"');
+    }
+    else if (t.key === 'doppel'){
+      // Hauptstern rosa unten links, Begleiter creme (0,6·R) oben rechts, auf der Diagonale.
+      const R1 = 7.6, R2 = 4.6, d = 12.4, e = d/2/Math.SQRT2;
+      const mx = 32-e, my = 32+e, cx = 32+e, cy = 32-e;
+      defs += sekRg(id+'-halo', [[0,t.glow,.36],[.42,t.glow,.14],[1,t.glow,0]])
+            + sekRg(id+'-haupt', [[0,t.core,1],[.40,t.glow,1],[.80,sekMix(t.glow,limb,.45),1],[1,limb,1]])
+            + sekRg(id+'-begl',  [[0,'#ffffff',1],[.45,t.core,1],[1,'#cfa45e',1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.85],[1,'#ffffff',0]]);
+      halo = '<ellipse cx="32" cy="32" rx="' + sekF1(2.2*r) + '" ry="' + sekF1(1.45*r) + '" transform="rotate(-45 32 32)" fill="url(#'+id+'-halo)"/>';
+      // Verbindungsbogen: Gasstrom vom Hauptstern zum Begleiter, nach oben links ausgebaucht.
+      const a1 = -45-52, a2 = 135+52;
+      const p0x = mx + Math.cos(a1*Math.PI/180)*R1*1.02, p0y = my + Math.sin(a1*Math.PI/180)*R1*1.02;
+      const p1x = cx + Math.cos(a2*Math.PI/180)*R2*1.05, p1y = cy + Math.sin(a2*Math.PI/180)*R2*1.05;
+      const qx = 32 - 3.6, qy = 32 - 3.6;
+      defs += sekLg(id+'-strom', [[0,t.glow,.25],[.5,t.core,.7],[1,t.core,.35]], '0','1','1','0');
+      const bogen = '<path d="M' + sekF1(p0x) + ',' + sekF1(p0y) + ' Q' + sekF1(qx) + ',' + sekF1(qy) + ' ' + sekF1(p1x) + ',' + sekF1(p1y) + '" fill="none" stroke="url(#'+id+'-strom)" stroke-width=".8" stroke-linecap="round"/>';
+      stern = bogen
+        + '<circle cx="' + sekF1(mx) + '" cy="' + sekF1(my) + '" r="' + R1 + '" fill="url(#'+id+'-haupt)"/>'
+        + '<circle cx="' + sekF1(mx) + '" cy="' + sekF1(my) + '" r="' + sekF1(R1*0.5) + '" fill="url(#'+id+'-kern)"/>'
+        + '<circle cx="' + sekF1(cx) + '" cy="' + sekF1(cy) + '" r="' + R2 + '" fill="url(#'+id+'-begl)"/>'
+        + '<circle cx="' + sekF1(cx) + '" cy="' + sekF1(cy) + '" r="' + R2 + '" fill="none" stroke="#fff6dc" stroke-width=".5" stroke-opacity=".7"/>';
+    }
+    else if (t.key === 'pulsar'){
+      const R = 0.85*r, rx = 2.0*r, ry = 0.7*r, L = 2.5*r;
+      defs += sekRg(id+'-halo', [[0,t.glow,.34],[.5,t.glow,.12],[1,t.glow,0]])
+            + sekRg(id+'-disc', [[0,'#ffffff',1],[.30,t.core,1],[.72,t.glow,1],[1,sekDunkel(t.glow,.55),1]])
+            + sekRg(id+'-kern', [[0,'#ffffff',.9],[1,'#ffffff',0]])
+            + sekLg(id+'-kegel', [[0,'#c3bef5',.55],[1,'#c3bef5',0]], '0','0','0','1');
+      // Strahlkegel entlang der Ringachse (lokale y-Achse nach rotate(-30)); je 2,5·r lang.
+      const kegelPfad = sekF1(32-1.0) + ',' + sekF1(32+R*0.55) + ' ' + sekF1(32+1.0) + ',' + sekF1(32+R*0.55) + ' ' + sekF1(32+3.6) + ',' + sekF1(32+L) + ' ' + sekF1(32-3.6) + ',' + sekF1(32+L);
+      const kegel = (drehen) => '<polygon points="' + kegelPfad + '" fill="url(#'+id+'-kegel)"' + (drehen ? ' transform="rotate(180 32 32)"' : '') + '/>';
+      halo = sekKreis(1.7*r, 'url(#'+id+'-halo)')
+        + '<g transform="rotate(-30 32 32)" opacity=".5">' + kegel(false) + kegel(true) + '</g>';
+      // Ring: hintere Hälfte vor dem Kern (matt), vordere Hälfte danach (hell) - der Ring läuft
+      // sichtbar UM den Kern, das ist die Tiefe.
+      const ringHinten = '<path d="M' + sekF1(32-rx) + ',32 A' + sekF1(rx) + ' ' + sekF1(ry) + ' 0 0 1 ' + sekF1(32+rx) + ',32" fill="none" stroke="#c3bef5" stroke-width="1.5" stroke-opacity=".38" transform="rotate(-30 32 32)"/>';
+      const ringVorn   = '<path d="M' + sekF1(32-rx) + ',32 A' + sekF1(rx) + ' ' + sekF1(ry) + ' 0 0 0 ' + sekF1(32+rx) + ',32" fill="none" stroke="#dcd8ff" stroke-width="1.5" stroke-opacity=".95" transform="rotate(-30 32 32)"/>';
+      stern = ringHinten + sekKreis(R, 'url(#'+id+'-disc)') + sekKreis(R*0.45, 'url(#'+id+'-kern)') + ringVorn;
+    }
+    sym += '<symbol id="sekStern-' + t.key + '" viewBox="0 0 64 64" overflow="visible">'
+         + '<g style="opacity:var(--sek-halo,1)">' + halo + '</g>' + stern + '</symbol>';
+  }
+  return defs + sym;
+}
+// Einbau-Aufruf für die Sektoransicht: ersetzt die beiden <circle> in sektorAnsichtBauen.
+
+function sekSternUse(key, x, y, k, unentdeckt){
+  return '<use href="#sekStern-' + key + '" x="' + sekF1(x-32*k) + '" y="' + sekF1(y-32*k) + '" width="' + sekF1(64*k) + '" height="' + sekF1(64*k) + '"' + (unentdeckt ? ' style="--sek-halo:.35"' : '') + '/>';
+}
   const DOMINANZ_BETONUNG = {
     kollabiert:      { breite: 1.5, deckkraft: 0.85 },
     'erobert-eigen': { breite: 2.0, deckkraft: 0.95 },
@@ -59516,6 +59876,10 @@ async function claimPendingRewards(){
     fraktion:        { breite: 1.2, deckkraft: 0.55 },
     nest:            { breite: 1.4, deckkraft: 0.70 }
   };
+  /* UNENTDECKT: nicht mehr der ganze Knoten auf 60 % (Grafik-Aufnahme: 17 von 20 Knoten wirkten
+     dadurch matt, und der Stern - das Einzige, was den Systemtyp zeigt - war der Hauptleidtragende).
+     Gedaempft werden jetzt die Schrift und der Halo; der Stern selbst bleibt hell. Der Unterschied
+     zu einem entdeckten System bleibt damit sichtbar, ohne dass die Karte grau wird. */
   const DOMINANZ_FARBE_EIGEN = '#5dcaa5';   // wie die Chip-Zeile und renderTerritoryBox
   const DOMINANZ_FARBE_FEIND = '#e24b4a';   // wie "★ Erobert (fremder Spieler)"
   const DOMINANZ_FARBE_FREMD = '#f4c0d1';   // wie die fremde Zeile in renderTerritoryBox
@@ -59728,10 +60092,7 @@ async function claimPendingRewards(){
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
     const kbFront = karteFrontStand();
     let defs = '';
-    for (const t of SUN_TYPES){
-      defs += '<radialGradient id="sekSun-' + t.key + '" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="' + t.core + '"/><stop offset="60%" stop-color="' + t.glow + '"/><stop offset="100%" stop-color="#20263f"/></radialGradient>'
-            + '<radialGradient id="sekGlow-' + t.key + '" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="' + t.glow + '" stop-opacity=".45"/><stop offset="100%" stop-color="' + t.glow + '" stop-opacity="0"/></radialGradient>';
-    }
+    defs += sekSternSymbole(SUN_TYPES);
     defs += '<radialGradient id="sekTerrit" cx="50%" cy="45%" r="62%"><stop offset="0%" stop-color="' + sk.tint + '" stop-opacity=".09"/><stop offset="100%" stop-color="' + sk.tint + '" stop-opacity="0"/></radialGradient>';
     // Sternenfeld deterministisch aus hashStringToFloat - dieselben Sterne bleiben, wo sie sind
     // (dieselbe Regel wie beim Freiflug seit v8.498.0, sonst wäre das Markup nie zweimal gleich).
@@ -59827,10 +60188,9 @@ async function claimPendingRewards(){
           + '<title>' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ' ' + fsr.kp + ' : ' + (1000-fsr.kp) + ' ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + ' – umkämpft zwischen 300 und 700'
           + '\nKommandanten dahinter: ' + fsr.bA + ' für ' + (FACTION_DIPLOMACY[fsr.a]||{}).name + ', ' + fsr.bB + ' für ' + (FACTION_DIPLOMACY[fsr.b]||{}).name + (fsr.dabei ? ' · du bist dabei' : '') + '</title>';
       }
-      knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' opacity="0.6"' : '') + '>'
+      knoten += '<g class="sektor-sys" data-sektor-sys="' + sy.id + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + sy.name + ' öffnen"' + (entdeckt === 0 && !heim ? ' data-unentdeckt="1"' : '') + '>'
         + '<title>' + sy.name + (kollabiert ? ' – Supernova-Kollaps, 48h unzugänglich' : (eigner ? ' – ' + eigner.name + ' (NPC-Territorium)' : '')) + '</title>'
-        + '<circle cx="' + x + '" cy="' + y + '" r="26" fill="url(#sekGlow-' + st.key + ')"/>'
-        + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="url(#sekSun-' + st.key + ')"/>'
+        + sekSternUse(st.key, x, y, 1, entdeckt === 0 && !heim)
         + ringe + wappen + abzeichen
         + (kollabiert ? '<text x="' + x + '" y="' + (y+4) + '" text-anchor="middle" style="font-size:10px;">💥</text>' : '')
         + '<text x="' + x + '" y="' + (y+r+16) + '" text-anchor="middle" style="font:600 11px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:3px;">' + sy.name + '</text>'
@@ -61843,9 +62203,20 @@ async function claimPendingRewards(){
     if (activeSunType.pulsar){
       inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(24*activeSunType.r).toFixed(1)}" fill="none" stroke="${activeSunType.glow}" stroke-width="1.4" stroke-dasharray="3 7" opacity="0.7"><animateTransform attributeName="transform" type="rotate" from="0 ${SUN_X} ${SUN_Y}" to="360 ${SUN_X} ${SUN_Y}" dur="2.6s" repeatCount="indefinite"/></circle>`;
     }
-    inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/><circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r+1.2).toFixed(1)}" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="0.8"/>`;
-    if (activeSunType.binary){
-      inner += `<circle cx="${(SUN_X+9*activeSunType.r).toFixed(1)}" cy="${(SUN_Y-7*activeSunType.r).toFixed(1)}" r="${(6*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}" opacity="0.85"/>`;
+    /* Der Kern als gebackenes Bild (Buendel A). Die Kachel ist 30 Einheiten breit angelegt
+       (E = S/30), der Kern darin 13 E - deshalb deckt sich eine 30-Einheiten-Kante genau mit dem
+       bisherigen Radius 13. Doppelstern und Pulsar tragen ihre Zweitkoerper und Strahlen IM Bild,
+       also entfaellt der frühere Extra-Kreis fuer den Begleiter. Faellt das Backen aus, bleibt der
+       alte Kreis stehen - ein Kartenbild ohne Sonne waere schlimmer als ein schlichtes. */
+    const sonneUrl = sonneBildUrl(activeSunType);
+    if (sonneUrl){
+      const kante = (30 * activeSunType.r).toFixed(1);
+      inner += `<image href="${sonneUrl}" x="${(SUN_X - 15*activeSunType.r).toFixed(1)}" y="${(SUN_Y - 15*activeSunType.r).toFixed(1)}" width="${kante}" height="${kante}" pointer-events="none"/>`;
+    } else {
+      inner += `<circle cx="${SUN_X}" cy="${SUN_Y}" r="${(13*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}"/>`;
+      if (activeSunType.binary){
+        inner += `<circle cx="${(SUN_X+9*activeSunType.r).toFixed(1)}" cy="${(SUN_Y-7*activeSunType.r).toFixed(1)}" r="${(6*activeSunType.r).toFixed(1)}" fill="${activeSunType.core}" opacity="0.85"/>`;
+      }
     }
     if (state.debrisFields.home && Object.keys(state.debrisFields.home).length && activeSystem === myHomeSystem){
       inner += `<g data-map-debris="home"><circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="6" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>`;
