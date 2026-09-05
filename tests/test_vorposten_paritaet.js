@@ -447,6 +447,60 @@ if (SRV) {
     fremdeFelder.length === 0, { erfunden: fremdeFelder });
 }
 
+/* 11. DER HILFETEXT IST EINE HANDGETIPPTE KOPIE (05.09.2026, Befund der Durchsicht).
+   ---------------------------------------------------------------------------------------------
+   Etappe V7 hat dem Vorposten-Hilfetext einen Absatz ueber Steckplaetze, Module und Sets gegeben -
+   mit der ANZAHL der Module, ihren NAMEN und den ZUSAMMENSETZUNGEN der Sets. Das ist genau die
+   Sorte Kopie, die dieses Repo bei den Tabellen selbst vermeidet („Das Spiel haelt KEINE eigene
+   Modultabelle"): In Prosa laesst sie sich nicht zur Laufzeit fuellen, also altert sie still,
+   sobald jemand ein Modul umbenennt oder ein Set anders zusammensetzt.
+   Derselbe Mechanismus wie Abschnitt 7 fuer den Stufennamen - nur eine Etappe spaeter. */
+if (SRV) {
+  const hilfeVon = JS.indexOf('<strong>Steckplätze und Sets.</strong>');
+  const hilfe = hilfeVon < 0 ? '' : JS.slice(hilfeVon, JS.indexOf('<br><br><strong>Acht Stufen</strong>', hilfeVon));
+  check('11-anker: der Hilfe-Absatz ueber Steckplaetze und Sets ist auffindbar (sonst misst 11a-11c nichts)',
+    hilfeVon > 0 && hilfe.length > 400 && hilfe.length < 4000, { laenge: hilfe.length });
+
+  const modulNamen = [...SRV.matchAll(/\{ key: '[a-z]+',\s*name: '([^']+)',\s*icon: 'ti-[a-z0-9-]+',\s*wirkung:/g)].map(m => m[1]);
+  const setBlock = (SRV.match(/const VP_MODUL_SET_DEFS = \[[\s\S]*?\n\];/) || [''])[0];
+  const sets = [...setBlock.matchAll(/\{ key: '([a-z]+)', name: '([^']+)',[\s\S]*?teile: \[([^\]]*)\]/g)]
+    .map(m => ({ key: m[1], name: m[2], teile: m[3].split(',').map(x => x.trim().replace(/'/g, '')).filter(Boolean) }));
+  const modulKeyZuName = {};
+  for (const m of SRV.matchAll(/\{ key: '([a-z]+)',\s*name: '([^']+)',\s*icon: 'ti-[a-z0-9-]+',\s*wirkung:/g)) modulKeyZuName[m[1]] = m[2];
+  check('11-anker2: Modulnamen und Set-Tabelle sind im Server lesbar (sonst misst 11a-11c nichts)',
+    modulNamen.length >= 6 && sets.length >= 3 && sets.every(x => x.teile.length >= 2),
+    { module: modulNamen, sets: sets.map(x => x.key) });
+
+  // 11a: Die genannte ANZAHL stimmt - und jeder genannte Modulname existiert wirklich.
+  const zahlwort = { drei: 3, vier: 4, fuenf: 5, 'fünf': 5, sechs: 6, sieben: 7, acht: 8 };
+  const genannteZahl = (hilfe.match(/–\s*(\w+)\s+gibt es/) || [])[1];
+  check('11a: die im Hilfetext genannte Modul-Anzahl stimmt mit der Servertabelle ueberein',
+    zahlwort[genannteZahl] === modulNamen.length,
+    { imHilfetext: genannteZahl, alsZahl: zahlwort[genannteZahl], imServer: modulNamen.length });
+  const inKlammer = (hilfe.match(/gibt es \(([^)]*)\)/) || ['', ''])[1].split(',').map(x => x.trim()).filter(Boolean);
+  check('11b: und jeder dort aufgezaehlte Modulname existiert im Server, keiner fehlt',
+    inKlammer.length === modulNamen.length && inKlammer.every(n => modulNamen.includes(n))
+    && modulNamen.every(n => inKlammer.includes(n)),
+    { imHilfetext: inKlammer, imServer: modulNamen });
+
+  /* 11c: Jedes im Hilfetext genannte Set gibt es, heisst dort genauso, und seine Klammer nennt
+     GENAU die Module, aus denen der Server es zusammensetzt. Sets, die der Text gar nicht nennt
+     (die Sternwacht steht dort in Prosa), bleiben aussen vor - geprueft wird, was behauptet wird. */
+  const behauptet = [...hilfe.matchAll(/<em>([^<]+)<\/em> \(([^)]*)\)/g)]
+    .map(m => ({ name: m[1], teile: m[2].split('+').map(x => x.trim()).filter(Boolean) }));
+  const falsch = [];
+  for (const b of behauptet) {
+    const def = sets.find(x => x.name === b.name);
+    if (!def) { falsch.push(b.name + ': gibt es im Server nicht'); continue; }
+    const soll = def.teile.map(k => modulKeyZuName[k] || k);
+    if (soll.join('|') !== b.teile.join('|')) falsch.push(b.name + ': Text [' + b.teile.join(', ') + '] vs. Server [' + soll.join(', ') + ']');
+  }
+  check('11c-anker: der Hilfetext behauptet ueberhaupt Set-Zusammensetzungen (sonst misst 11c nichts)',
+    behauptet.length >= 3, { behauptet: behauptet.map(b => b.name) });
+  check('11c: jedes genannte Set heisst im Server genauso und besteht aus genau diesen Modulen',
+    falsch.length === 0, { falsch, behauptet: behauptet.map(b => b.name + ' (' + b.teile.join(' + ') + ')') });
+}
+
 ende();
 
 
