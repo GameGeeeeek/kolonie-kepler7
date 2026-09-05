@@ -581,3 +581,27 @@ Zwei Regeln daraus:
   auch den echten Fehler an niemanden mehr. Flattern ist ein Fehler des Tests, kein Schicksal.
 - **Ein `waitForSelector` auf einen Selektor, der mehrfach trifft, wartet auf das falsche Element.**
   Warten und Messen müssen dasselbe Element meinen.
+
+## Ein Selektor, der nicht trifft, misst die ganze Seite (05.09.2026)
+
+`test_vorposten_lager_ui.js` prüft das Kartenmenü eines Vorpostens. Der erste Entwurf suchte es
+unter `.map-menu, #mapMenu, [data-map-menu]` — **keiner dieser Selektoren existiert** — und wich
+auf `document.body` aus.
+
+`document.body.textContent` enthält den Inhalt des `<script>`-Blocks, also **den kompletten
+Quelltext des Spiels**. Die Prüfung „steht ‚Lager abholen' im Menü?" war damit grün, ohne dass ein
+Menü existierte: Der String stand ja im Code, als `label:'Lager abholen'`. Die Gegenprüfungen
+(„fehlt bei leerem Lager", „fehlt am fremden Vorposten") fielen aus demselben Grund — und *sie*
+waren es, die den Fehler aufgedeckt haben.
+
+Drei Regeln daraus:
+
+- **Kein Rückfall auf `document.body`.** Er ist kein Notnagel, sondern der sichere Weg zu einer
+  Prüfung, die nichts belegt. Trifft der Selektor nicht, soll die Messung `null` liefern und der
+  Anker fallen.
+- **Den Anker auch die Größenordnung messen lassen.** Ein Kartenmenü hat einige hundert Zeichen,
+  die ganze Seite 5,7 Millionen. Die Prüfung `länge > 40 && länge < 20000` hätte den Fehler sofort
+  gezeigt.
+- **Eine Positiv-Prüfung allein hätte es nie gefunden.** Erst die Gegenrichtung („dieser Text darf
+  *nicht* dastehen") macht einen zu weiten Container sichtbar. Das ist ein zusätzlicher Grund für
+  die Hausregel, jede Anzeige-Prüfung in beide Richtungen zu bauen.
