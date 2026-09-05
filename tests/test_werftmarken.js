@@ -456,7 +456,7 @@ check('die Werftmarken sind in den Patchnotes dokumentiert',
 // Spielers wurde dessen Flotte sonst mit den Marken des eigenen Kontos gezeichnet. Ohne
 // Uebersteuerung gilt weiterhin die eigene Stufe - genau das prueft die zweite Zeile.
 check('Maler nimmt eine Marken-Uebersteuerung entgegen',
-  /function drawShipMiniIcon\(key, canvas, markOverride(, \w+)?\)\{/.test(src));
+  /function drawShipMiniIcon\(key, canvas, markOverride(, \w+)*\)\{/.test(src));
 check('Maler liest ohne Uebersteuerung die Marke selbst aus dem Zustand',
   /\(typeof markOverride === 'number'\) \? markOverride[\s\S]{0,120}shipMarkOf\(key\)/.test(src));
 check('Zusatzturm wird gegen den Rumpf geprueft (nichts schwebt daneben)',

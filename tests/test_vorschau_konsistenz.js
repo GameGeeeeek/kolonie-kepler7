@@ -78,7 +78,7 @@ for (const modern of ['leerenjaeger', 'nanoklinge', 'fusionsdreadnought', 'singu
 // ---- D: fremde Flotte ohne eigene Marken --------------------------------------------------------
 // Der Maler hat seit v8.394.0 einen vierten Parameter (ohneAnstrich, fuer die Gegenseite in der
 // Kampf-Wiedergabe). Geprueft wird die Stellung von markOverride, nicht die Zahl der Parameter.
-check('drawShipMiniIcon nimmt eine Marken-Uebersteuerung', /function drawShipMiniIcon\(key, canvas, markOverride(, \w+)?\)\{/.test(src));
+check('drawShipMiniIcon nimmt eine Marken-Uebersteuerung', /function drawShipMiniIcon\(key, canvas, markOverride(, \w+)*\)\{/.test(src));
 check('und wertet sie vor der eigenen Stufe aus', /\(typeof markOverride === 'number'\) \? markOverride/.test(src));
 check('das Profil eines fremden Spielers nutzt sie',
   /profileModalStats[\s\S]{0,160}drawShipMiniIcon\(cv\.getAttribute\('data-ship'\), cv, 1\)/.test(src));
