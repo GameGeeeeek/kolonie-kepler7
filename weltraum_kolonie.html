@@ -11747,21 +11747,16 @@
       daten = await res.json().catch(() => null);
       if (!res.ok){ log((daten && daten.error) || 'Der Server hat die Umrüstung abgelehnt.', 'ti-alert-triangle', 'warn'); return; }
     } catch(e){ log('Der Server war nicht erreichbar.', 'ti-alert-triangle'); return; }
-    /* WER BUCHT AB? Seit der Durchsicht vom 05.09.2026 der SERVER - er prueft die Rohstoffe im
-       gespeicherten Spielstand, zieht sie ab und meldet den neuen Stand samt `saveVersion` zurueck
-       (Muster von /vorposten/modul/ausbauen). Der `pay`-Zweig darunter bleibt als RUECKFALL stehen,
-       solange ein Backend antwortet, das noch selbst nichts abbucht: Zwischen diesem Release und
-       dem Backend-Merge liegt genau ein Deploy, und in dieser Luecke waere entweder doppelt
-       gezahlt (beide buchen) oder gar nicht (keiner bucht). Die Antwort entscheidet, nicht dieses
-       Release. Ohne die Angleichung liefe der naechste Speicherversuch in einen Versionskonflikt. */
-    if (daten && daten.newResources && typeof daten.newResources === 'object'){
-      for (const [k, w] of Object.entries(daten.newResources)){
-        if (typeof w === 'number' && isFinite(w) && state.resources && k in state.resources) state.resources[k] = w;
-      }
-      if (typeof daten.saveVersion === 'number' && daten.saveVersion > gameSaveVersion) gameSaveVersion = daten.saveVersion;
-    } else {
-      pay(kosten);
-    }
+    /* HIER WIRD BEZAHLT, NICHT AUF DEM SERVER. Ein Zwischenstand dieser Etappe liess den Server
+       abbuchen und uebernahm hier seinen gemeldeten Rohstoffstand - das ist zurueckgenommen
+       (Durchsicht 05.09.2026). Der Grund steht im Backend bei /vorposten/stationieren und ist
+       aelter als diese Etappe: „Andersherum (Server zieht ab) liefe die Abbuchung gegen den
+       Autosave des Clients." Konkret: Der Autosave serialisiert seinen Wert VOR der Abbuchung,
+       faengt beim PUT ein 409, laedt in `saveGameStateVersioned` die neue Version nach - und
+       schickt DENSELBEN, noch unbezahlten Wert erneut. Die Abbuchung waere still erstattet.
+       Der Server zaehlt weiterhin nach und lehnt ab, wenn der gespeicherte Stand die Kosten nicht
+       hergibt; abgebucht wird hier, wie bei jeder Baukosten-Buchung dieses Spiels. */
+    pay(kosten);
     const sysN = (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name;
     /* `daten` KANN null SEIN: `res.json()` steht mit `.catch(() => null)` im try, und ein 200 mit
        kaputtem Rumpf faellt genau hier durch. Der Ausdruck stand vorher ungeschuetzt. */

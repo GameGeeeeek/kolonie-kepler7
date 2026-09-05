@@ -41,14 +41,19 @@ check('0a: das Spiel haelt KEINE eigenen Umruest-Zahlen - Kosten, Dauer und Stuf
   check('0c: die Bestaetigung nennt Dauer, Unumkehrbarkeit und das schlafende Projekt',
     /abbrechen geht nicht/.test(rumpf) && /wirkt wieder, wenn du zurückrüstest/.test(rumpf)
     && /Die Werte wechseln erst am Ende/.test(rumpf), {});
-  /* 0d: WER BUCHT AB. Seit der Backend-Durchsicht (05.09.2026) zieht der SERVER die Rohstoffe ab
-     und meldet `newResources` zurueck; `pay(kosten)` ist nur noch der Rueckfall fuer ein Backend,
-     das das noch nicht tut. Ohne diese Verzweigung waere in der Deploy-Luecke entweder doppelt
-     gezahlt oder gar nicht - und beides sieht im Spiel wie Normalbetrieb aus. */
-  check('0d: der Serverstand wird uebernommen, `pay` ist nur der Rueckfall',
-    /daten\.newResources/.test(rumpf) && /daten\.saveVersion/.test(rumpf)
-    && /\} else \{\s*pay\(kosten\);/.test(rumpf)
-    && rumpf.indexOf('daten.newResources') < rumpf.indexOf('pay(kosten)'), {});
+  /* 0d: HIER WIRD BEZAHLT, NICHT AUF DEM SERVER. Ein Zwischenstand dieser Etappe liess den Server
+     abbuchen und uebernahm hier den gemeldeten Rohstoffstand - zurueckgenommen am 05.09.2026, nach
+     einem Befund von Codex. Der Grund ist aelter als diese Etappe und steht im Backend bei
+     /vorposten/stationieren: „Andersherum (Server zieht ab) liefe die Abbuchung gegen den Autosave
+     des Clients." Konkret: Der Autosave serialisiert seinen Wert VOR der Abbuchung, faengt beim PUT
+     ein 409, laedt in `saveGameStateVersioned` die neue Version nach - und schickt DENSELBEN, noch
+     unbezahlten Wert erneut; die Abbuchung waere still erstattet.
+     Die Pruefung ist bewusst VERNEINEND: Sie ist der Waechter dagegen, dass jemand (ich, beim
+     naechsten Mal) den Serverstand wieder uebernimmt. `pay(kosten)` steht unbedingt da, ohne
+     Verzweigung - `0b` misst dazu, dass es NACH der Serverantwort kommt. */
+  check('0d: bezahlt wird im Spiel, ohne Verzweigung - kein Rohstoffstand vom Server',
+    /\n\s*pay\(kosten\);/.test(rumpf) && !/newResources/.test(rumpf)
+    && !/daten\.saveVersion/.test(rumpf) && (rumpf.match(/pay\(kosten\)/g) || []).length === 1, {});
 }
 {
   /* 0e: DIE SCHIFFE, DIE NICHT MEHR HINEINPASSEN. Der Garnisonsdeckel kann mit dem Zweig SINKEN;
@@ -353,16 +358,25 @@ function spielstand(reich){
      H  Die Abbau-Sperre waehrend der Umruestung entfernt                -> 3c
      I  `vorpostenUmruestZeichen` aus der Silhouette entfernt            -> 3d
      J  `garnisonZurueck` wird nicht mehr gebucht                        -> 9a und 9b
-   Lauf 4: 0d, 0e, 6a, 7a, 8a FALLEN - und 9a, 9b als Folge, sonst nichts.
-     L  Der `newResources`-Zweig entfernt, es bleibt `pay(kosten)`       -> 0d
+   Lauf 4: 0e, 6a, 7a, 8a FALLEN - und 9a, 9b als Folge, sonst nichts.
      M  `garnisonZurueck` VOLLSTAENDIG aus dem Belohnungszweig           -> 0e (und 9a, 9b)
      N  Die drei Sperrgruende Stufe/Ausrichtung/Abbau entfernt           -> 6a, 7a, 8a
+   Lauf 5: 0d FAELLT, sonst nichts.
+     O  Der Serverstand wird wieder uebernommen (`newResources`), `pay`
+        nur noch als Rueckfall                                           -> 0d
 
-   WARUM ZWEI LAEUFE UND NICHT EINER: In Lauf 3 blieben 0d und 0e gruen, obwohl die Mechanik
+   WARUM MEHRERE LAEUFE UND NICHT EINER: In Lauf 3 blieben 0d und 0e gruen, obwohl die Mechanik
    sabotiert war - beide sind QUELLTEXT-Waechter, und ein `if (false && ...)` bzw. ein leeres
    `Object.entries({})` laesst die gesuchten Namen im Text stehen. Das ist die Grenze eines
-   Textwaechters, und sie gehoert hierher geschrieben statt uebersehen: Erst Lauf 4, der die
-   Zeilen wirklich entfernt, laesst sie fallen.
+   Textwaechters, und sie gehoert hierher geschrieben statt uebersehen: Erst ein Lauf, der die
+   Zeilen wirklich entfernt (bzw. bei 0d wieder einfuegt), laesst sie fallen.
+
+   UND EIN FEHLER, DEN DIESER TEST NICHT GEFANGEN HAT. Der erste Anlauf dieser Etappe liess den
+   SERVER die Rohstoffe abbuchen und uebernahm hier `newResources`. Gefunden hat das eine
+   Codex-Durchsicht am 05.09.2026, nicht der Test - und die Begruendung dagegen stand seit V5
+   dreissig Zeilen ueber der geaenderten Stelle im Backend. Die Lehre steht in
+   docs/PROJECT_MEMORY.md: Ein Muster, das in diesem Projekt schon einmal weh getan hat, ist beim
+   naechsten Mal nicht neu. 0d ist der Waechter, den es seither gibt.
 
    ZWEI EIGENE FEHLER, beide vom Test gefangen, bevor irgendetwas ausgeliefert war:
 
