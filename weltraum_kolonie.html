@@ -9815,8 +9815,14 @@
      gemerkt, weil seine Vorlage das erfundene Feld selbst mitlieferte. Lehre: Ein Feldname wird am
      Sender abgelesen, und eine Vorlage, die ein Feld erfindet, prueft nur sich selbst. */
   function vpMeineGarnison(v){
-    const meine = (v && v.meineGarnison) || {};
-    return Object.values(meine).reduce((a, b) => a + (Number(b) > 0 ? Math.round(Number(b)) : 0), 0);
+    if (!v) return 0;
+    /* RUECKFALL fuer einen Serverstand VOR V5 (Deploy-Fenster, Durchsicht 05.09.2026): Dort gab es
+       gar keine fremden Beitraege - was an einem EIGENEN Vorposten steht, gehoert dem Besitzer.
+       Ohne diesen Zweig laese der Besitzer im Deploy-Fenster „Von den 900 Schiffen dort gehoert
+       dir keines" ueber seiner eigenen Garnison und koennte sie nicht zurueckrufen. Der Fall ist
+       unterscheidbar, weil der Server das Feld sonst IMMER schickt, notfalls als `{}`. */
+    if (!v.meineGarnison) return v.eigener ? Math.max(0, Math.round(Number(v.garnisonAnzahl) || 0)) : 0;
+    return Object.values(v.meineGarnison).reduce((a, b) => a + (Number(b) > 0 ? Math.round(Number(b)) : 0), 0);
   }
   function vorpostenFlugMult(sysId){
     if (!sysId) return 1;
@@ -11475,9 +11481,16 @@
       vorschau: (flotte) => {
         const n = ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0);
         const flug = missionDurationFor(asteroidFlugBasis(sysId), flotte, ATTACK_SHIP_KEYS, sysId);
-        return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Garnison: ${v.garnisonAnzahl||0} von ${grenze} Plätzen belegt – <strong>${frei}</strong> frei. Mehr als das nimmt der Vorposten nicht an; der Rest bleibt zu Hause.</div>`
+        /* FUER DEN VERBUENDETEN IST `frei` NUR EINE OBERGRENZE (Durchsicht 05.09.2026): Der Server
+           deckelt zusaetzlich die SUMME aller Nicht-Besitzer (VP_ALLIANZ_GARNISON_ANTEIL), und
+           weder der Anteil noch der schon belegte Fremdanteil stehen im Client. „14000 frei" waere
+           dort ein Versprechen ueber eine Zahl, die dieses Spiel nicht kennt - der Flug ginge
+           trotzdem los und der Treibstoff waere weg. Der Besitzer sieht die Zahl weiter; fuer ihn
+           gibt es den Deckel nicht. */
+        return `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Garnison: ${v.garnisonAnzahl||0} von ${grenze} Plätzen belegt${v.eigener ? ` – <strong>${frei}</strong> frei. Mehr als das nimmt der Vorposten nicht an; der Rest bleibt zu Hause.` : `. Wie viele davon der Vorposten von <strong>dir</strong> annimmt, entscheidet er: Der Anteil aller Verbündeten an einer Garnison ist begrenzt. Was er nicht annimmt, kommt zurück.`}</div>`
           + `<div class="bmeta"><i class="ti ti-clock" aria-hidden="true"></i> Hinflug ${fmtDuration(flug/2)} – die Schiffe bleiben dort, bis du sie zurückrufst. Sie verteidigen den Vorposten und verlieren dabei; fällt er, sind sie verloren.</div>`
           + (n > frei ? `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ${n - frei} Schiff(e) mehr als Platz – sie kämen unverrichtet zurück.</div>` : '');
+
       },
       startLabel: 'Garnison entsenden',
       sperre: (flotte) => ATTACK_SHIP_KEYS.reduce((sm, k) => sm + (flotte[k]||0), 0) < 1 ? 'Wähle mindestens ein Kampfschiff.' : (frei < 1 ? 'Die Garnison ist voll.' : null),
@@ -11525,9 +11538,18 @@
   async function vorpostenRueckruf(sysId, weg){
     const v = vorpostenAn(sysId);
     /* Der Verbuendete darf zurueckrufen - aber NUR seine eigenen Schiffe, und das entscheidet
-       der Server (V5). Aufgeben bleibt beim Besitzer. */
-    if (!vorpostenDarfMitwirken(v)) return;
+       der Server (V5). Aufgeben bleibt beim Besitzer.
+
+       DAS GATTER HAENGT AM BEITRAG, NICHT AM BUENDNIS (Durchsicht 05.09.2026, gemessen an
+       /api/vorposten/rueckruf): Der Server laesst JEDEN holen, von dem dort etwas steht - „Wer
+       die Allianz verlaesst oder hinausgeworfen wird, kam sonst nie wieder an seine Schiffe."
+       Ein Gatter auf `verbuendet` waere strenger als der Server, und zwar genau in dem Fall, fuer
+       den der Server die Ausnahme gebaut hat: Buendnis aufgeloest, `verbuendet` faellt auf false,
+       `meineGarnison` bleibt. Dasselbe gilt, wenn der Notausschalter VP_ALLIANZ_AKTIV faellt -
+       er darf keine Schiffe fressen. */
+    if (!v) return;
     if (weg === 'aufgeben' && !v.eigener) return;
+    if (weg !== 'aufgeben' && !v.eigener && vpMeineGarnison(v) < 1) return;
     let daten = null;
     try {
       const anfrage = { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) };
@@ -28438,8 +28460,14 @@ async function claimPendingRewards(){
             + (zurueck.length ? ', die Garnison ist zurück auf ' + planetDisplayName(state.activeBasePlanet) + ' (' + zurueck.join(', ') + ')' : '')
             + (modA ? ' und ' + modA + ' Modul' + (modA === 1 ? '' : 'e') + ' liegen wieder in deinem Bestand' : '') + '.',
             'ti-trash', 'wichtig');
+          /* WIE BEIM VERLUST-ZWEIG (Durchsicht 05.09.2026): Die `log`-Meldung darueber unterscheidet
+             Besitzer und Verbuendeten, der Bericht tat es nicht - dem Partner stand „Vorposten
+             aufgegeben" ueber einer Station, die er nie besass. Dieselbe Fehlerklasse, zweite
+             Stelle. */
           pushReport({ type:'vorposten-bau', erfolg:false, aufgegeben:true, system:r.system, systemName:sysNameA,
-            grund:'Abbau nach 24 Stunden abgeschlossen.' });
+            alsVerbuendeter: !!r.alsVerbuendeter,
+            grund: r.alsVerbuendeter ? 'Der Besitzer hat ihn abgetragen – deine Schiffe sind zurück.'
+                                     : 'Abbau nach 24 Stunden abgeschlossen.' });
           ladeVorposten();
           save();
           continue;
@@ -42545,7 +42573,9 @@ async function claimPendingRewards(){
         const nvs = eskorteSchiffssumme(r.eigeneVerluste);
         body += '<br><i class="ti ti-shield" aria-hidden="true"></i> Eigene Verluste: ' + (nvs ? fleetBreakdownHtml(r.eigeneVerluste) : 'keine');
       } else if (r.type === 'vorposten-bau'){
-        title = r.aufgegeben ? 'Vorposten aufgegeben' : r.erfolg ? 'Vorposten errichtet: ' + (r.stufeName||'Ankerkern') : 'Vorposten nicht errichtet';
+        title = r.aufgegeben
+          ? (r.alsVerbuendeter ? 'Vorposten deines Verbündeten abgetragen' : 'Vorposten aufgegeben')
+          : r.erfolg ? 'Vorposten errichtet: ' + (r.stufeName||'Ankerkern') : 'Vorposten nicht errichtet';
         body = '<i class="ti ti-building-community" aria-hidden="true" style="color:' + (r.erfolg ? VORPOSTEN_FARBE_EIGEN : '#e0a548') + ';"></i> ' + escapeHtml(r.systemName || r.system || '')
              + (r.erfolg ? ' · Bauschutz läuft – stationiere eine Garnison, bevor er endet.' : ' · ' + escapeHtml(r.grund || ''))
              + (r.kosten && !r.erfolg && !r.aufgegeben ? '<br>Die Baukosten (' + escapeHtml(kostenText(r.kosten)) + ') sind zurück im Lager.' : '');
@@ -62455,6 +62485,7 @@ async function claimPendingRewards(){
       if (meineEigenen) heimTeile.push('deine ' + meineEigenen + ' Schiffe');
       if (fremdeDa) heimTeile.push('die ' + fremdeDa + ' deiner Verbündeten an sie');
       const heimSatz = heimTeile.length ? 'Zurück gehen ' + heimTeile.join(' und ') + '.' : 'Dort steht keine Garnison.';
+
       eintraege.push({ icon:'ti-refresh', label:'Garnison zurückrufen',
         grund: meineEigenen
           ? 'Holt deine ' + meineEigenen + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '.'
@@ -62504,8 +62535,14 @@ async function claimPendingRewards(){
          Oberflaeche - zwischen diesem Release und dem Umlegen des Schalters liegt genau ein
          Deploy. Deshalb haengt der Wortlaut an der Serverangabe, nicht an diesem Release. */
       if (!vorpostenCache.abbauAktiv){
+        /* HIER STEHT BEWUSST DIE GESAMTZAHL, nicht `heimSatz` (Durchsicht 05.09.2026): In diesem
+           Zweig fuehrt der Server den Abbau noch nicht und gibt dem Besitzer beim Aufgeben die
+           GANZE Garnison zurueck - auch die Schiffe Verbuendeter, die dabei ersatzlos verloren
+           sind. Der Satz „Zurueck gehen deine 200" waere dort schlicht falsch. Der Zweig ist mit
+           dem gelegten Schalter unerreichbar; er faellt erst wieder an, wenn der Schalter faellt. */
         eintraege.push({ icon:'ti-trash', label:'Vorposten aufgeben', grund:'Keine Rückerstattung – die Garnison kommt zurück.',
-          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. ' + heimSatz)) vorpostenRueckruf(sysId, 'aufgeben'); } });
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. Die Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) fliegt zu dir nach Hause'
+            + (fremdeDa ? ' – auch die ' + fremdeDa + ' deiner Verbündeten; die bekommen sie NICHT zurück.' : '.'))) vorpostenRueckruf(sysId, 'aufgeben'); } });
       } else if (abbauBis > jetzt){
         eintraege.push({ icon:'ti-refresh', label:'Abbau abbrechen',
           grund:'Noch ' + fmtDuration((abbauBis - jetzt) / 1000) + ' – bis dahin steht der Vorposten und bleibt angreifbar.',
@@ -62513,7 +62550,7 @@ async function claimPendingRewards(){
       } else {
         eintraege.push({ icon:'ti-trash', label:'Vorposten abbauen',
           grund:'Dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + ' – so lange bleibt er angreifbar. Keine Rückerstattung.',
-          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbauen?\n\nDer Abbau dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + '. So lange steht der Vorposten weiter da und kann angegriffen werden.\n\nDie Baukosten werden NICHT erstattet. ' + heimSatz + ' Garnison und eingebaute Module kommen aber erst zurück, wenn der Abbau fertig ist.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbauen?\n\nDer Abbau dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + '. So lange steht der Vorposten weiter da und kann angegriffen werden.\n\nDie Baukosten werden NICHT erstattet. ' + heimSatz + ' Eingebaute Module und Garnison kommen aber erst zurück, wenn der Abbau fertig ist.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
       }
     } else {
       /* DER VERBUENDETE (V5, 05.09.2026). Bis hierher sah ein Allianzpartner an einem fremden
@@ -62530,19 +62567,29 @@ async function claimPendingRewards(){
          Ein Verbuendeter darf also angreifen, und ein Menue, das ihm das wegnimmt, naehme ihm
          eine Moeglichkeit, die der Server erlaubt. Ob er es DUERFEN SOLL, ist eine Spielfrage
          und nicht hier zu entscheiden. */
-      if (v.verbuendet){
       const meineAnzahl = vpMeineGarnison(v);
+      if (v.verbuendet){
       const freiV = Math.max(0, grenze - (v.garnisonAnzahl||0));
       const garnUnterwegsV = cf.missions.some(m => m.type === 'vorposten-defend' && m.targetId === sysId);
+      /* KEIN escapeHtml auf `grund`: openKarteMenu maskiert jeden Grund selbst
+         (`${escapeHtml(e.grund)}`). Ein zweites Mal hier machte aus „O'Brien" ein „O&#39;Brien"
+         (Durchsicht 05.09.2026). Alle anderen Eintraege geben den Namen ebenfalls roh weiter. */
       eintraege.push({ icon:'ti-shield', label:'Garnison beisteuern',
         grund: garnUnterwegsV ? 'Eine Garnison ist bereits unterwegs.'
           : !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.'
           : freiV < 1 ? 'Die Garnison ist voll.'
-          : 'Verstärkt den Vorposten von ' + escapeHtml(v.besitzerName || 'deinem Verbündeten') + '. Deine Schiffe bleiben deine.',
+          : 'Verstärkt den Vorposten von ' + (v.besitzerName || 'deinem Verbündeten') + '. Deine Schiffe bleiben deine; der Anteil aller Verbündeten an einer Garnison ist aber begrenzt.',
         disabled: garnUnterwegsV || !kampfschiffe || freiV < 1, fn: () => vorpostenGarnisonSenden(sysId) });
+      }
+      /* DER RUECKRUF STEHT AUSSERHALB DER BUENDNIS-BEDINGUNG (Durchsicht 05.09.2026). Wer die
+         Allianz verlassen hat, ist nicht mehr `verbuendet`, seine Schiffe stehen aber weiter dort
+         - und der Server gibt sie ihm heraus. Ein Menue, das den Eintrag an `verbuendet` haengt,
+         schliesst ihn genau dann aus, wenn er ihn braucht. */
+      if (v.verbuendet || meineAnzahl){
       eintraege.push({ icon:'ti-refresh', label:'Meine Schiffe zurückrufen',
         grund: meineAnzahl
           ? 'Holt deine ' + meineAnzahl + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '. Die des Besitzers bleiben stehen.'
+            + (v.verbuendet ? '' : ' Das Bündnis besteht nicht mehr – holen darfst du sie trotzdem.')
           : 'Du hast hier keine Schiffe stationiert.',
         disabled: !meineAnzahl, fn: () => vorpostenRueckruf(sysId, 'rueckruf') });
       }
@@ -62573,7 +62620,9 @@ async function claimPendingRewards(){
       /* V5: MEIN ANTEIL an einer fremden Garnison. Ohne diese Zeile sieht ein Verbuendeter nur
          die Gesamtzahl und weiss nicht, wie viele davon seine sind - und beim Fall verliert er
          Schiffe, von denen er nie wusste, dass sie noch dort stehen. */
-      + ((v.verbuendet && vpMeineGarnison(v)) ? `<div class="bmeta" data-vp-meine="${vpMeineGarnison(v)}"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i> Davon <strong>${vpMeineGarnison(v)}</strong> von dir – du darfst sie jederzeit zurückrufen.</div>` : '')
+      /* `!v.eigener` statt `v.verbuendet`: aus demselben Grund wie beim Rueckruf-Eintrag - ein
+         ehemaliger Verbuendeter soll seine Schiffe sehen, sonst sind sie im Spiel unsichtbar. */
+      + ((!v.eigener && vpMeineGarnison(v)) ? `<div class="bmeta" data-vp-meine="${vpMeineGarnison(v)}"><i class="ti ti-shield" aria-hidden="true" style="color:#5dcaa5;"></i> Davon <strong>${vpMeineGarnison(v)}</strong> von dir – du darfst sie jederzeit zurückrufen.</div>` : '')
       + zweigZeile
       + ((v.slots || 0) ? `<div class="bmeta" data-vp-module="${(v.module||[]).length}"><i class="ti ti-adjustments" aria-hidden="true"></i> Steckplätze: <strong>${(v.module||[]).length} von ${v.slots}</strong>${(v.module||[]).length ? ' – ' + (v.module||[]).map(m => escapeHtml(vpModulName(m))).join(', ') : ' (leer)'}</div>` : '')
       + ((v.projekte || []).length ? `<div class="bmeta" data-vp-projekte="${(v.projekte||[]).length}"><i class="ti ti-building-factory-2" aria-hidden="true"></i> Projekte: <strong>${(v.projekte||[]).map(k => escapeHtml(vpProjektName(k))).join(', ')}</strong></div>` : '')
@@ -62594,7 +62643,13 @@ async function claimPendingRewards(){
             + kartenFuellBalken(Math.min(vorpostenLagerSpanne(), vorpostenLagerSpanne() - Math.max(0, (v.lagerVollAb||0) - jetzt)),
                 vorpostenLagerSpanne(), '#e0a548', 'Wie voll das Lager ist - nach ' + (vorpostenCache.lagerStunden||12) + ' Stunden ist Schluss.')
           : '')
-      + `<div class="bmeta"><i class="ti ti-sparkles" aria-hidden="true"></i> Nutzen: −${Math.round((nutzen.flug||0)*100)}% Flugzeit für eigene Nicht-PvP-Missionen hierher · +${Math.round((nutzen.prod||0)*1000)/10}% Produktion aller Standorte${(nutzen.werft||0) > 0 ? ` · −${Math.round((nutzen.werft||0)*1000)/10}% Schiffsbauzeit überall` : ''}${(nutzen.markt||0) > 0 ? ` · −${Math.round((nutzen.markt||0)*1000)/10}% Börsengebühr` : ''} · Aufklärung Stufe ${nutzen.scan||0}</div>`;
+      + `<div class="bmeta"><i class="ti ti-sparkles" aria-hidden="true"></i> Nutzen: −${Math.round((nutzen.flug||0)*100)}% Flugzeit für eigene Nicht-PvP-Missionen hierher · +${Math.round((nutzen.prod||0)*1000)/10}% Produktion aller Standorte${(nutzen.werft||0) > 0 ? ` · −${Math.round((nutzen.werft||0)*1000)/10}% Schiffsbauzeit überall` : ''}${(nutzen.markt||0) > 0 ? ` · −${Math.round((nutzen.markt||0)*1000)/10}% Börsengebühr` : ''} · Aufklärung Stufe ${nutzen.scan||0}</div>`
+      /* WELCHER TEIL DAVON DEM VERBUENDETEN GILT (Durchsicht 05.09.2026): genau einer. Die Zeile
+         zaehlt auf, was die Station ihrem BESITZER bringt; seit V5 liest sie auch ein Partner, dem
+         nur der Flugzeit-Bonus zusteht (vorpostenFlugMult haengt am Gatter, alle anderen Kanaele
+         weiter an meineVorposten()). Ohne diesen Satz bewirbt die Zeile ihm vier Wirkungen, von
+         denen drei nie eintreten. */
+      + (v.verbuendet ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> Für dich als Verbündeten gilt davon der <strong>Flugzeit-Bonus</strong>; Produktion, Werft, Börse und Aufklärung wirken nur beim Besitzer.</div>` : '');
     /* DER ANFLUG STEHT GANZ OBEN im Info-Block und nicht bei den Kampfvermerken: Er ist das
        Einzige hier, wofuer die Zeit laeuft. Der Server schickt ihn NUR dem Besitzer, das Feld ist
        fuer alle anderen leer - hier wird deshalb nichts zusaetzlich geprueft, was dort schon

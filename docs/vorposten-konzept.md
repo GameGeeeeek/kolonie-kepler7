@@ -1316,7 +1316,33 @@ weist nur den **eigenen** Vorposten ab, eine Allianzsperre gibt es dort nicht. D
 jetzt dazu. Ob ein Verbündeter angreifen *dürfen soll*, ist eine Spielfrage — nicht im Menü zu
 entscheiden.
 
-Wächter: `tests/test_vorposten_verbuendet_ui.js` (21 Prüfungen, neun Gegenproben gemessen) und
+### Was die adversarische Durchsicht danach noch fand (05.09.2026)
+
+Sechs weitere Befunde, alle nachgemessen und behoben:
+
+- **Der Rückruf hing am Bündnis statt am Beitrag.** Der Server hängt ihn ausdrücklich am Beitrag:
+  „Wer die Allianz verlässt oder hinausgeworfen wird, kam sonst nie wieder an seine Schiffe."
+  `verbuendet` fällt bei aufgelöstem Bündnis auf `false`, `meineGarnison` bleibt — das Menü hätte
+  den Eintrag genau dann weggenommen, wenn er gebraucht wird. Dasselbe gälte, wenn der
+  Notausschalter `VP_ALLIANZ_AKTIV` fällt: Er darf keine Schiffe fressen. Rückruf-Eintrag und
+  Anteils-Zeile hängen jetzt an `vpMeineGarnison(v)`, „beisteuern" weiter am Bündnis (das verlangt
+  der Server).
+- **Der Abbau-Bericht erbte die Unterscheidung nicht** — dieselbe Fehlerklasse wie beim Verlust,
+  zweite Stelle: dem Partner stand „Vorposten aufgegeben" über einer Station, die er nie besaß.
+- **Die Flottenwahl versprach dem Verbündeten freie Plätze, die der Server nicht gibt.** Der
+  Fremdanteil ist auf 50 % gedeckelt (`VP_ALLIANZ_GARNISON_ANTEIL`); weder der Anteil noch der
+  belegte Fremdanteil stehen im Client. Der Flug wäre samt Treibstoff losgegangen und die Schiffe
+  wären zurückgekommen. Die Vorschau nennt die Zahl jetzt nur dem Besitzer. *Offen: Erst ein
+  Serverfeld (etwa `meinPlatz` in `vorpostenFuerClient`) könnte den Fehlflug ganz verhindern.*
+- **Doppelte HTML-Maskierung** im Menügrund — `openKarteMenu` maskiert jeden Grund selbst; aus
+  `O'Brien` wurde `O&#39;Brien`. Die Testvorlage trägt seitdem einen Namen mit Apostroph und `&`.
+- **Kein Rückfall, wenn `meineGarnison` fehlt** (Deploy-Fenster): Der Besitzer hätte „gehört dir
+  keines" über seiner eigenen Garnison gelesen. Vor V5 gab es keine fremden Beiträge, also gehört
+  ihm dort alles.
+- **Die Nutzen-Zeile bewarb dem Verbündeten vier Wirkungen, von denen ihm eine gilt** (Flugzeit).
+  Ein Satz sagt ihm jetzt, welche.
+
+Wächter: `tests/test_vorposten_verbuendet_ui.js` (40 Prüfungen, siebzehn Gegenproben gemessen) und
 `tests/test_vorposten_paritaet.js` Abschnitt 10. Prüfung `1b` hält genau die verhinderte Annahme
 fest; Gegenprobe `D` fällt, wenn jemand sie wieder einbaut. `1c`/`5b` fallen beim falschen
 Feldnamen, `5a` beim Rückruf-Versprechen des Besitzers, `0e`/`0f` beim Kampfbericht, der die

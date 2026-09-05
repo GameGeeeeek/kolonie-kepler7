@@ -26,7 +26,7 @@
 //      drei Endprojekte, das Sprungtor seit Etappe 4).
 //   9. Die *_DEFS-Listen sind Arrays und werden nirgends mit einem Schluessel indiziert (echter
 //      Fehler, 04.09.2026: der Abbau gab die Garnison nicht zurueck).
-//  10. Keine Vorlage der Vorposten-Browsertests setzt ein Feld, das vorpostenFuerClient gar nicht
+//  10. (nur mit Nachbar-Klon) Keine Vorlage der Vorposten-Browsertests setzt ein Feld, das vorpostenFuerClient gar nicht
 //      verschickt (echter Fehler, 05.09.2026: das Spiel las `garnisonVon` - so heisst die
 //      Aufschluesselung nur SERVERSEITIG; an den Client geht `meineGarnison`. Die Zahl war immer
 //      0, und der Browsertest blieb gruen, weil seine Vorlage das erfundene Feld selbst
@@ -375,7 +375,7 @@ check('9b: keine der sechs *_DEFS-Listen wird mit einem Schluessel indiziert (si
    falschen Feldnamen nicht fangen, egal wie gruendlich der Test danach misst.
    Hier wird deshalb die VORLAGE gegen den SENDER gehalten: Jeder Schluessel, den eine
    Vorposten-Vorlage setzt, muss ein Feld sein, das vorpostenFuerClient wirklich erzeugt. */
-{
+if (SRV) {
   const balanciert = (t, von) => {
     let d = 0;
     for (let i = von; i < t.length; i++) {

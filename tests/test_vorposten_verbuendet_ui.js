@@ -20,22 +20,36 @@
 //   0a  Ein Gatter fuer „darf mitwirken" statt dreier Kopien von `v.eigener || v.verbuendet`.
 //   0b  Der Flugzeit-Bonus haengt an diesem Gatter, nicht mehr an `v.eigener`.
 //   0c  „Aufgeben" bleibt beim Besitzer - der Verbuendete kann es nicht ausloesen.
+//   0k  ... und der Rueckruf haengt am BEITRAG, nicht am Buendnis (wie beim Server).
 //   0d  Die Verlust-Meldung liest `alsVerbuendeter`, statt „Dein Vorposten" zu behaupten.
 //   0e  ... und reicht das Feld an den KAMPFBERICHT weiter (er erbt die Unterscheidung nicht
 //       von selbst - er wird im selben Zweig gebaut).
 //   0f  battleCardData titelt dem Verbuendeten nicht „Dein Vorposten wurde geschleift".
+//   0g  Dasselbe beim ABBAU: der Bericht erbt `alsVerbuendeter` ...
+//   0h  ... und battleCardData titelt ihm nicht „Vorposten aufgegeben".
+//   0i  Die Flottenwahl verspricht dem Verbuendeten keine freie Platzzahl - der Server deckelt
+//       den Anteil aller Nicht-Besitzer, und der Client kennt den Deckel nicht.
+//   0j  KEIN Menueeintrag maskiert seinen `grund` selbst - openKarteMenu tut es bereits.
 //   1a  Der Verbuendete sieht beide Garnison-Eintraege ...
 //   1b  ... UND weiterhin „Vorposten angreifen". GEMESSEN am Server: /api/vorposten/angriff weist
 //       nur den EIGENEN Vorposten ab, eine Allianzsperre gibt es dort nicht. Ein Menue, das ihm
 //       das naehme, naehme ihm eine erlaubte Moeglichkeit.
 //   1c  Die Stationstafel nennt SEINEN Anteil an der Garnison.
+//   1d  Der Besitzername wird NICHT zweimal maskiert (Vorlage traegt Apostroph und „&").
+//   1e  Die Nutzen-Zeile sagt ihm, welche der aufgezaehlten Wirkungen ihm gilt (genau eine).
+//   3b  ... und ein Fremder ohne Buendnis bekommt diesen Hinweis nicht.
 //   2a  Ohne eigene Schiffe ist „zurueckrufen" gesperrt, mit Grund.
 //   3a  Ein Fremder OHNE Buendnis sieht die Eintraege nicht.
 //   5a  Der BESITZER, in dessen Garnison nur Schiffe Verbuendeter stehen, bekommt kein
 //       Versprechen, das der Server bricht („Holt alle 900 Schiffe" -> 400 `leer`).
 //   5b  ... und mit eigenen Schiffen nennt der Eintrag SEINE Zahl und sagt, was stehen bleibt.
-//   5c  Auch die zwei Bestaetigungsfelder zum Aufgeben/Abbauen versprechen nicht mehr die
-//       Gesamtzahl - beim Abbau bekommt JEDER Beitragende SEINE Schiffe zurueck.
+//   5c  Das Bestaetigungsfeld zum Abbauen nennt im WORTLAUT, was zu wem zurueckgeht - beim
+//       Abbau bekommt JEDER Beitragende SEINE Schiffe zurueck, nicht der Besitzer alle.
+//   6a  Ein AUFGELOESTES Buendnis nimmt niemandem seine Schiffe: Der Server haengt den Rueckruf
+//       am Beitrag, nicht an der Mitgliedschaft - das Menue jetzt auch.
+//   6b  ... beisteuern darf er dann aber nicht mehr.
+//   7a  Fehlt `meineGarnison` (Serverstand vor V5), gilt beim Besitzer die ganze Garnison als
+//       seine - sonst saehe er im Deploy-Fenster „gehoert dir keines" ueber seiner eigenen.
 //
 // Gegenprobe: siehe Fuss der Datei.
 const fs = require('fs');
@@ -61,6 +75,7 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
     /vorpostenDarfMitwirken\(v\)/.test(rumpf) && !/!v\.eigener/.test(rumpf), {});
 }
 {
+  const ohneK = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
   const von = JS.indexOf('async function vorpostenRueckruf(');
   const rumpf = von < 0 ? '' : JS.slice(von, JS.indexOf('\n  }', von));
   check('0-anker2: vorpostenRueckruf ist lesbar (sonst misst 0c nichts)', von > 0, { laenge: rumpf.length });
@@ -68,6 +83,14 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
      ohne die zweite Bedingung koennte ein Verbuendeter den Vorposten seines Partners abreissen. */
   check('0c: „aufgeben" bleibt beim Besitzer, auch wenn der Verbuendete zurueckrufen darf',
     /weg === 'aufgeben' && !v\.eigener/.test(rumpf), {});
+  /* 0k: DER RUECKRUF HAENGT AM BEITRAG, NICHT AM BUENDNIS - gemessen am Server
+     (/api/vorposten/rueckruf laesst jeden holen, von dem dort etwas steht; die Ausnahme ist
+     ausdruecklich fuer den gebaut, der die Allianz verlaesst). Ein Gatter auf
+     `vorpostenDarfMitwirken` waere hier STRENGER als der Server und spraeche genau dem die
+     Schiffe ab, fuer den die Ausnahme existiert. */
+  check('0k: das Gatter fragt nach dem BEITRAG, nicht nach dem Buendnis',
+    /vpMeineGarnison\(v\)/.test(ohneK(rumpf)) && !/vorpostenDarfMitwirken/.test(ohneK(rumpf)),
+    { auszug: ohneK(rumpf).slice(0, 200).replace(/\s+/g, ' ') });
 }
 {
   /* OHNE KOMMENTARE messen - zum ZWEITEN Mal dieselbe Falle an einem Tag (siehe
@@ -103,30 +126,63 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
   check('0f: der Bericht unterscheidet Besitzer und Verbuendeten',
     /r\.alsVerbuendeter/.test(zweig) && /r\.besitzerName/.test(zweig), {});
 }
-
 {
-  /* Die zwei Bestaetigungsfelder des Besitzers (Aufgeben und Abbauen). Ein `confirm`-Text laesst
-     sich im Browser nur ueber einen Klick auf genau diesen Eintrag messen; hier genuegt der
-     Quelltext, weil die Regel eine reine Textregel ist: Die Gesamtzahl darf dort nicht mehr
-     stehen. Kommentare vorher streichen (Lehre 0d). */
+  /* DIESELBE FEHLERKLASSE, ZWEITE STELLE (Durchsicht 05.09.2026): Der Abbau-Zweig hatte die
+     `log`-Meldung differenziert, den Bericht nicht - dem Partner stand „Vorposten aufgegeben"
+     ueber einer Station, die er nie besass. Kommentare vorher streichen (Lehre 0d). */
   const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
-  const rufe = [];
-  const roh = ohneKommentar(JS);
-  for (const m of roh.matchAll(/confirm\('Vorposten in [\s\S]{0,900}?\)\)/g)) rufe.push(m[0]);
-  const aufgeben = rufe.filter(t => /'aufgeben'/.test(t) || /abbauen\?/.test(t) || /aufgeben\?/.test(t));
-  check('5c-anker: beide Bestaetigungsfelder zum Aufgeben/Abbauen sind auffindbar (sonst misst 5c nichts)',
-    aufgeben.length === 2, { gefunden: aufgeben.length, alle: rufe.length });
-  check('5c: sie versprechen nicht mehr die Gesamtzahl, sondern nennen, was zu WEM zurueckgeht',
-    aufgeben.length === 2 && aufgeben.every(t => /heimSatz/.test(t) && !/garnisonAnzahl/.test(t)),
-    { ohneHeimSatz: aufgeben.filter(t => !/heimSatz/.test(t)).map(t => t.slice(0, 120)),
-      mitGesamtzahl: aufgeben.filter(t => /garnisonAnzahl/.test(t)).map(t => t.slice(0, 120)) });
+  const von = JS.indexOf("r.type === 'vorposten-abbau'");
+  const zweig = von < 0 ? '' : ohneKommentar(JS.slice(von, JS.indexOf("r.type === 'vorposten-lager'", von) + 1 || von + 4000));
+  const pr = zweig.indexOf("pushReport({ type:'vorposten-bau'");
+  const prRuf = pr < 0 ? '' : zweig.slice(pr, zweig.indexOf('});', pr) + 3);
+  check('0g-anker: der pushReport-Ruf im Abbau-Zweig ist auffindbar (sonst misst 0g nichts)',
+    von > 0 && pr >= 0 && prRuf.length > 100, { laenge: prRuf.length });
+  check('0g: auch der Abbau-Bericht erbt alsVerbuendeter',
+    /alsVerbuendeter:/.test(prRuf) && /r\.alsVerbuendeter/.test(prRuf), { ruf: prRuf.slice(-160) });
+
+  const bauVon = JS.indexOf("} else if (r.type === 'vorposten-bau'){");
+  const bauZweig = bauVon < 0 ? '' : ohneKommentar(JS.slice(bauVon, JS.indexOf('} else if (', bauVon + 20)));
+  check('0h-anker: der Bau-/Aufgabe-Berichtszweig ist auffindbar (sonst misst 0h nichts)',
+    bauVon > 0 && /aufgegeben/.test(bauZweig) && bauZweig.length < 4000, { laenge: bauZweig.length });
+  check('0h: er titelt dem Verbuendeten nicht „Vorposten aufgegeben"',
+    /r\.alsVerbuendeter/.test(bauZweig), {});
+
+  const sendVon = JS.indexOf('function vorpostenGarnisonSenden(');
+  const sendRumpf = sendVon < 0 ? '' : ohneKommentar(JS.slice(sendVon, JS.indexOf('\n  async function vorpostenGarnisonAnkunft', sendVon)));
+  const vorschauVon = sendRumpf.indexOf('vorschau:');
+  const vorschau = vorschauVon < 0 ? '' : sendRumpf.slice(vorschauVon, sendRumpf.indexOf('startLabel:', vorschauVon));
+  check('0i-anker: die Vorschau der Flottenwahl ist auffindbar (sonst misst 0i nichts)',
+    sendVon > 0 && vorschau.length > 200 && vorschau.length < 3000, { laenge: vorschau.length });
+  /* Der Server deckelt die SUMME aller Nicht-Besitzer (VP_ALLIANZ_GARNISON_ANTEIL) und schickt
+     weder den Anteil noch den belegten Fremdanteil mit. „14000 frei" waere dort eine Zahl, die
+     dieses Spiel nicht kennt - und der Flug ginge samt Treibstoff trotzdem los. */
+  check('0i: sie nennt die freie Platzzahl nur dem BESITZER',
+    /v\.eigener/.test(vorschau), { auszug: vorschau.slice(0, 160) });
+
+  /* `openKarteMenu` maskiert JEDEN Grund selbst (`${escapeHtml(e.grund)}`). Wer hier ein zweites
+     Mal maskiert, macht aus „O'Brien" ein „O&#39;Brien" - im Menue sichtbar, sonst nirgends.
+     Geprueft wird der Bereich zwischen der Eintragsliste und dem Info-Block; im Info-Block ist
+     escapeHtml richtig, dort wird rohes HTML gebaut. */
+  const menueVon = JS.indexOf('function vorpostenMapMenu(');
+  const listeVon = menueVon < 0 ? -1 : JS.indexOf('const eintraege = [];', menueVon);
+  const infoVon = listeVon < 0 ? -1 : JS.indexOf('const nutzen = v.nutzen || {};', listeVon);
+  const eintragsTeil = infoVon < 0 ? '' : ohneKommentar(JS.slice(listeVon, infoVon));
+  check('0j-anker: der Eintragsteil des Kartenmenues ist abgegrenzt auffindbar (sonst misst 0j nichts)',
+    listeVon > 0 && infoVon > listeVon && eintragsTeil.length > 2000 && eintragsTeil.length < 20000,
+    { laenge: eintragsTeil.length });
+  check('0j: kein Menueeintrag maskiert seinen Grund selbst',
+    !/escapeHtml\(/.test(eintragsTeil),
+    { treffer: (eintragsTeil.match(/.{0,70}escapeHtml\(.{0,40}/g) || []).slice(0, 3) });
 }
 
 const now = Date.now();
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp:20000*s, verteidigung:2500*s,
   garnisonMax:300*s, flug:0.06, prod:0.015, scan:1, werft:0, markt:0, lager:0, kosten:{ erz:1000 } }));
 function vp(over){
-  return Object.assign({ id:'vp1', sys:SYS, besitzer:'u-partner', besitzerName:'Partner', seit: now-86400000,
+  /* DER NAME TRAEGT ABSICHT: Apostroph und Kaufmanns-Und decken die doppelte HTML-Maskierung auf
+     (Befund der Durchsicht, 05.09.2026 - openKarteMenu maskiert `grund` schon selbst, ein zweites
+     escapeHtml machte daraus „O&#39;Brien"). Ein harmloser Name haette den Fehler nie gezeigt. */
+  return Object.assign({ id:'vp1', sys:SYS, besitzer:'u-partner', besitzerName:"O'Brien & Co", seit: now-86400000,
     stufe:8, name:'Orbitalfeste', zweig:'festung', zweigName:'Festungsring', maxStufe:8,
     kern:{ lp:6000000, lpMax:6500000 }, verteidigung:850000, garnisonAnzahl:900, garnisonMax:14000,
     schutzBis:0, ausbauAb: now-1000, eigener:false, meinLetzterSchlag:0,
@@ -169,6 +225,10 @@ function spielstand(){
         zweigAb:4, maxStufe:8, modulDefs:[], modulSeltenheiten:{}, modulBaubar:['gewoehnlich'],
         modulAusbauKosten:250, modulBauAbklingMs:0, modulBestand:{}, modulBauAb:0,
         projektDefs:[], projekteAktiv:false, flugDeckel:0.5, lagerAktiv:false, lagerStunden:12,
+        /* OHNE `abbauAktiv` zeichnet das Menue den ALT-Zweig („Vorposten aufgeben") und der
+           Eintrag „Vorposten abbauen" existiert im Lauf gar nicht - der Test haette an ihm
+           vorbeigemessen (Befund der Durchsicht, 05.09.2026). */
+        abbauAktiv:true, abbauMs:86400000,
         allianzAktiv:true, liste:[vpDoc], eigene:0 });
       if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
       if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
@@ -182,7 +242,12 @@ function spielstand(){
         return st[k] === undefined ? j({ error:'nix' }, 404) : j({ value: st[k] }); }
       return j({ ok:true });
     });
-    await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); window.confirm = () => true; });
+    /* `confirm` wird MITGESCHNITTEN und verneint: 5c misst seit dem 05.09.2026 den WORTLAUT des
+       Bestaetigungsfeldes, nicht nur den Variablennamen im Quelltext. Verneinen, damit der Klick
+       nichts ausloest - gemessen wird der Text, nicht die Wirkung. */
+    await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok');
+      window.__confirmTexte = [];
+      window.confirm = (t) => { window.__confirmTexte.push(String(t)); return false; }; });
     await page.goto(SPIEL_URL); await page.waitForTimeout(6000);
     await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
       .forEach(id => { const n = document.getElementById(id); if (n) n.style.display = 'none'; }));
@@ -201,11 +266,16 @@ function spielstand(){
     await page.waitForTimeout(300);
     const g = await page.evaluate(() => {
       const m = document.querySelector('.kmenu');
-      if (!m) return { text: null, meine: null, gruende: [] };
+      if (!m) return { text: null, meine: null, gruende: [], confirmText: null };
       const anteil = m.querySelector('[data-vp-meine]');
+      /* Den Knopf „Vorposten abbauen" druecken: `confirm` ist mitgeschnitten und verneint, also
+         passiert nichts ausser dass sein Wortlaut in __confirmTexte landet. */
+      const knopf = [...m.querySelectorAll('button')].find(b => /Vorposten abbauen/.test(b.textContent||''));
+      if (knopf) knopf.click();
       return { text: (m.textContent || '').replace(/\s+/g, ' ').trim(),
         meine: anteil ? Number(anteil.getAttribute('data-vp-meine')) : null,
-        gruende: [...m.querySelectorAll('.kmenu-grund')].map(x => (x.textContent||'').replace(/\s+/g,' ').trim()) };
+        gruende: [...m.querySelectorAll('.kmenu-grund')].map(x => (x.textContent||'').replace(/\s+/g,' ').trim()),
+        confirmText: (window.__confirmTexte || []).join(' | ') || null };
     });
     await ctx.close();
     return { ...g, errs };
@@ -226,6 +296,12 @@ function spielstand(){
   check('1c: die Stationstafel nennt SEINEN Anteil an der Garnison',
     verb.meine === 200 && /Davon 200 von dir/.test(verb.text),
     { meine: verb.meine, erwartet: 200 });
+  check('1d: der Besitzername kommt genau EINMAL maskiert an (keine doppelte Maskierung)',
+    /Besitzer: O'Brien & Co/.test(verb.text) && !/&#39;|&amp;/.test(verb.text),
+    { auszug: verb.text.slice(0, 120) });
+  check('1e: die Nutzen-Zeile sagt ihm, welcher Teil davon IHM gilt',
+    /Für dich als Verbündeten gilt davon der Flugzeit-Bonus/.test(verb.text),
+    { auszug: verb.text.slice(-220) });
   check('2a: ohne eigene Schiffe ist „zurueckrufen" gesperrt und sagt warum',
     ohneSchiffe.meine === null
     && ohneSchiffe.gruende.some(g => /Du hast hier keine Schiffe stationiert/.test(g)),
@@ -234,6 +310,8 @@ function spielstand(){
     !/Garnison beisteuern/.test(fremd.text) && !/Meine Schiffe zurückrufen/.test(fremd.text)
     && /Vorposten angreifen/.test(fremd.text),
     { auszug: fremd.text.slice(0, 200) });
+  check('3b: und den Verbuendeten-Hinweis zur Nutzen-Zeile bekommt er nicht',
+    !/Für dich als Verbündeten/.test(fremd.text), { auszug: fremd.text.slice(-200) });
   /* DER BESITZER (Befund der Durchsicht, 05.09.2026). `/api/vorposten/rueckruf` gibt seit V5 nur
      zurueck, was DIESES Konto gestellt hat, und antwortet mit 400 (`leer`), wenn das nichts ist.
      Ein Eintrag, der dem Besitzer „Holt alle 900 Schiffe" verspricht, obwohl alle 900 dem Partner
@@ -263,14 +341,77 @@ function spielstand(){
     /Holt deine 200 Schiffe/.test(gemischt.text) && /Die 700 deiner Verbündeten bleiben stehen/.test(gemischt.text),
     { grund: rueckrufGrund(gemischt) });
 
-  const alle = [...verb.errs, ...ohneSchiffe.errs, ...fremd.errs, ...nurFremde.errs, ...gemischt.errs];
-  check('4a: kein JavaScript-Fehler in den fuenf Durchlaeufen', alle.length === 0, alle.slice(0, 3));
+  /* 5c misst jetzt den WORTLAUT (Befund der Durchsicht: die erste Fassung prueft nur, dass die
+     Zeichenkette `heimSatz` im Quelltext steht - ein falsch gerechneter heimSatz waere gruen
+     geblieben). Der Klick auf „Vorposten abbauen" steht in `messe`; `confirm` ist mitgeschnitten
+     und verneint. Das ZWEITE Bestaetigungsfeld („Vorposten aufgeben") nennt weiterhin bewusst die
+     Gesamtzahl - in jenem Zweig fuehrt der Server den Abbau nicht und gibt dem Besitzer wirklich
+     alles zurueck; es ist mit gelegtem Schalter unerreichbar und wird hier nicht gezeichnet. */
+  check('5c-anker: der Klick auf „Vorposten abbauen" hat ein Bestaetigungsfeld geoeffnet',
+    typeof gemischt.confirmText === 'string' && /abbauen\?/.test(gemischt.confirmText),
+    { text: (gemischt.confirmText || '').slice(0, 160) });
+  check('5c: das Bestaetigungsfeld nennt, was zu WEM zurueckgeht - nicht die Gesamtzahl',
+    /Zurück gehen deine 200 Schiffe und die 700 deiner Verbündeten an sie\./.test(gemischt.confirmText || '')
+    && !/900 Schiffe/.test(gemischt.confirmText || ''),
+    { text: (gemischt.confirmText || '').slice(-220) });
+
+  /* 6a: DAS AUFGELOESTE BUENDNIS (Befund der Durchsicht, 05.09.2026). Der Server haengt den
+     Rueckruf am BEITRAG, nicht an der Mitgliedschaft - ausdruecklich, damit niemand seine Schiffe
+     verliert, wenn er die Allianz verlaesst. Ein Menue, das den Eintrag an `verbuendet` haengt,
+     nimmt ihn genau dann weg. Beisteuern darf er dann NICHT mehr (das verlangt der Server). */
+  const exVerb = await messe(vp({ verbuendet:false, meineGarnison:{ jaeger:200 } }));
+  check('6-anker: auch der Ex-Verbuendeten-Lauf hat ein Menue gezeichnet',
+    typeof exVerb.text === 'string' && exVerb.text.length > 40 && exVerb.text.length < 20000,
+    { laenge: exVerb.text === null ? null : exVerb.text.length });
+  check('6a: ohne Buendnis, aber mit eigenen Schiffen bleibt der Rueckruf erreichbar',
+    /Meine Schiffe zurückrufen/.test(exVerb.text) && exVerb.meine === 200
+    && exVerb.gruende.some(g => /Holt deine 200 Schiffe/.test(g) && /Bündnis besteht nicht mehr/.test(g)),
+    { meine: exVerb.meine, gruende: exVerb.gruende.slice(0, 4) });
+  check('6b: beisteuern darf er dann nicht mehr - das verlangt der Server',
+    !/Garnison beisteuern/.test(exVerb.text), { auszug: exVerb.text.slice(0, 160) });
+
+  /* 7a: DER SERVERSTAND VOR V5 (Deploy-Fenster). `meineGarnison` fehlt ganz; dort gab es keine
+     fremden Beitraege, also gehoert dem Besitzer alles. Ohne Rueckfall laese er „gehoert dir
+     keines" ueber seiner eigenen Garnison und koennte sie nicht holen. */
+  const altServer = await messe(vp({ eigener:true, verbuendet:false, besitzer:ICH, besitzerName:'Ich',
+    garnisonAnzahl:900, garnison:{ jaeger:900 }, meineGarnison: undefined }));
+  check('7-anker: der Lauf ohne `meineGarnison` hat ein Menue gezeichnet',
+    typeof altServer.text === 'string' && /Garnison zurückrufen/.test(altServer.text),
+    { laenge: altServer.text === null ? null : altServer.text.length });
+  check('7a: fehlt das Feld, gilt beim Besitzer die ganze Garnison als seine',
+    /Holt deine 900 Schiffe/.test(altServer.text) && !/gehört dir keines/.test(altServer.text),
+    { gruende: altServer.gruende.slice(0, 4) });
+
+  const alle = [...verb.errs, ...ohneSchiffe.errs, ...fremd.errs, ...nurFremde.errs, ...gemischt.errs,
+    ...exVerb.errs, ...altServer.errs];
+  check('4a: kein JavaScript-Fehler in den sieben Durchlaeufen', alle.length === 0, alle.slice(0, 3));
 
   await browser.close();
   ende();
 })();
 
-/* GEGENPROBE, neun Richtungen gemessen am 05.09.2026 (Pruefnamen beider Laeufe per `diff`).
+/* GEGENPROBE, siebzehn Richtungen gemessen am 05.09.2026 (Pruefnamen beider Laeufe per `diff`).
+
+   Die zehn Richtungen der zweiten Runde (nach der adversarischen Durchsicht) wurden in DREI
+   Laeufen gemessen, jeder mit mehreren Sabotagen an NACHWEISLICH VERSCHIEDENEN Codestellen und
+   einer vorher aufgeschriebenen „was fallen MUSS"-Liste. Das ist zulaessig, weil jede der
+   Pruefungen einen anderen Ausschnitt liest - die Zuordnung bleibt eindeutig -, und es kostet
+   drei Browserlaeufe statt zehn. Alle drei Vorhersagen trafen genau zu:
+
+   Lauf A (fuenf Quelltext-Sabotagen): 0g, 0h, 0i, 0j, 0k FALLEN, sonst nichts.
+     0g `alsVerbuendeter` aus dem pushReport des Abbau-Zweigs
+     0h Berichtstitel wieder hart „Vorposten aufgegeben"
+     0i Vorschau der Flottenwahl wieder mit fester Platzzahl fuer alle
+     0j `escapeHtml` zurueck in den Menuegrund
+     0k Rueckruf-Gatter zurueck auf `vorpostenDarfMitwirken`
+   Lauf B: 1d, 1e FALLEN - und mit dem entfernten Rueckfall in `vpMeineGarnison` zusaetzlich
+     7-anker, 7a UND 4a: Ohne ihn wirft die Seite bei fehlendem Feld eine Ausnahme, statt eine
+     falsche Zahl zu zeigen. Genau davor schuetzt der Rueckfall.
+   Lauf C: 5c und 6a FALLEN, sonst nichts.
+     5c Bestaetigungsfeld zurueck auf die Gesamtzahl
+     6a Rueckruf-Eintrag und Anteils-Zeile zurueck an `v.verbuendet`
+
+   Die neun Richtungen der ersten Runde (je ein eigener Lauf):
 
    A) `vorpostenFlugMult` zurueck auf `!v.eigener`: 0b FAELLT.
    B) Den `aufgeben`-Riegel entfernt: 0c FAELLT - ohne ihn koennte ein Verbuendeter den Vorposten
