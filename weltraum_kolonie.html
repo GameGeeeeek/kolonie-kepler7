@@ -60122,7 +60122,17 @@ async function claimPendingRewards(){
      Planet steht - so bleibt jeder Platz systemuebergreifend an derselben Stelle. Gemessen an
      Kepler: Platz 5 wandert von 198 auf 214 Grad und steht damit ueber Aion (-160 = 200 Grad). */
   const GUERTEL_FREIWINKEL = 14;
+  /* Warum nur ORBIT_ANGLES[2] und [3]: Von den sechs Bahnen haben vier einen Platz naeher als
+     GUERTEL_FREIWINKEL (Orbit 1 Platz 8 mit 6 Grad, Orbit 3 Platz 5 mit 2, Orbit 5 Platz 9 mit 3,
+     Orbit 6 Platz 4 mit 3). Beruehren kann sich aber nur, was auch RADIAL nah ist: Der Guertel liegt
+     auf kbOrbitRx(3.5), also einen halben Schritt von Orbit 3 und 4 - Orbit 1, 5 und 6 sind
+     anderthalb bis zweieinhalb Schritte entfernt, dort ist der gleiche Winkel harmlos. */
   function guertelWinkelFuer(grad){
+    // Ein ungueltiger Ort darf nicht zu einem gueltigen werden. Eine Asteroidenfestung ohne Platz
+    // ergibt NaN, und `Math.abs(NaN) >= x` ist false - ohne diese Zeile faellt NaN durch das
+    // `continue` hindurch in den Ausweich-Rumpf und die Bastion erschiene sichtbar auf 214 Grad
+    // neben Aion, statt wie bisher gar nicht gezeichnet zu werden (gemessen 05.09.2026).
+    if (!Number.isFinite(grad)) return grad;
     const diff = (a, b) => ((a - b) % 360 + 540) % 360 - 180;   // -180..180
     const norm = a => ((a % 360) + 360) % 360;
     for (const bahn of [ORBIT_ANGLES[2], ORBIT_ANGLES[3]]){

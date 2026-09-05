@@ -6,7 +6,12 @@
 //      als halbtransparenter Helm ueber einem Viertel der Sektorkarte. Jetzt `.map-wrap > svg`.
 //   2  GUERTELPLATZ AUF DEM PLANETEN. Platz 5 (198 Grad) lag auf dem Bahnwinkel des dritten Orbits
 //      (-160 = 200 Grad); am flachen Ellipsenende sind das 21 px radialer Abstand - Aion sass in
-//      Kepler auf dem Vorkommen. Jetzt weicht ein Platz auf einem Planetenwinkel radial aus.
+//      Kepler auf dem Vorkommen. Jetzt weicht ein Platz auf einem Planetenwinkel AUF SEINER BAHN
+//      aus, um 14 Grad nach oben. Der Ausweicher hat zwei Haelften, und beide werden geprueft:
+//      er muss den betroffenen Platz verschieben (2d) und darf einen UNGUELTIGEN Ort nicht in
+//      einen gueltigen verwandeln (2e) - eine Asteroidenfestung ohne Platz ergibt NaN, und die
+//      erste Fassung machte daraus 214 Grad, wodurch die Bastion sichtbar neben Aion erschien
+//      (gefunden vom Prueflauf am 05.09.2026: test_kartenbeschriftung fiel vierfach).
 //   3  BANNERPLANET AM HANDY. preserveAspectRatio "xMidYMid slice" schnitt bei voller Bannerhoehe
 //      auf 348-390 px Breite genau den Planeten (cx 590 von 720) weg. Jetzt xMaxYMid.
 //   4  NEBEL DES ORBITALGLAS-HIMMELS mit 5 % Deckkraft: nicht vorhanden. Jetzt 14 %.
@@ -24,8 +29,15 @@
 //   gruen: node tests/test_grafik_einzeiler.js
 //   rot:   git show origin/main:weltraum_kolonie.html > /tmp/alt.html
 //          KEPLER_SPIELDATEI=/tmp/alt.html KEPLER_TESTDATEI=file:///tmp/alt.html node tests/test_grafik_einzeiler.js
-//   Am alten Stand fallen: 1b, 2b, 3b, 4b, 5a, 5b, 6b, 7b - 5a mit, weil die Bahnen dort noch keine
-//   data-sys-bahn-Kennung tragen (gemessen 05.09.2026). Die Anker 1a, 2a, 3a, 4a, 6a, 7a bleiben gruen.
+//   Am alten Stand fallen 10 von 24: 1b, 2b, 2d-anker, 2d-anker2, 3b, 4b, 5a, 5b, 6b, 7b - 5a mit,
+//   weil die Bahnen dort noch keine data-sys-bahn-Kennung tragen (gemessen 05.09.2026). Die Anker
+//   1a, 2a, 3a, 4a, 6a, 7a bleiben gruen.
+//   Die Prueflisten beider Laeufe sind bewusst NICHT deckungsgleich: 2d, 2e und 2f laufen am alten
+//   Stand gar nicht, weil es guertelWinkelFuer dort nicht gibt - genau das meldet 2d-anker. Eine
+//   Pruefung ueber einer fehlenden Funktion waere sonst still gruen (Hausregel: vacuous).
+//   ZWEITE GEGENPROBE, nur fuer 2e: dieselbe Datei mit entfernter Zeile
+//   `if (!Number.isFinite(grad)) return grad;` - dann faellt genau 2e mit {ausNaN: 214}, alles
+//   andere bleibt gruen (gemessen 05.09.2026).
 const fs = require('fs');
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, pruefer, versionAbfangen } = require('./lib/umgebung');
 const { oeffneSektorMitSystem, oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -48,6 +60,39 @@ const ortBlock = ortVon > 0 && ortBis > ortVon ? S.slice(ortVon, ortBis) : '';
 check('7b: der Kampfort einer terraformten Welt kommt aus effectivePlanetType, nicht aus PLANETS[].type',
   /effectivePlanetType\(k\)/.test(ortBlock) && !/^\s*return \(p && p\.type\) \|\| null;\s*$/m.test(ortBlock.split('effectivePlanetType')[0]),
   { auszug: ortBlock.replace(/\s+/g, ' ').slice(0, 160) });
+
+/* ---- Quelltext: der Guertel-Ausweicher, isoliert gerechnet -----------------------------------
+   Die Funktion ist reine Geometrie und haengt an nichts als ORBIT_ANGLES - deshalb wird sie hier
+   aus der Spieldatei geschnitten und ausgefuehrt, statt sie im Browser zu erraten. Beide Zahlen
+   (Bahnwinkel und Freiwinkel) kommen aus dem Quelltext, nicht aus dem Test: sonst pruefte der Test
+   seine eigenen Annahmen (Hausregel: gegen den gemessenen Stand, nicht gegen eingetippte Werte). */
+const gwVon = S.indexOf('const GUERTEL_FREIWINKEL =');
+const gwBis = gwVon < 0 ? -1 : S.indexOf('\n  function asteroidMarkerR(', gwVon);
+const oaTreffer = S.match(/const ORBIT_ANGLES = \[[^\]]*\]/);
+check('2d-anker: der Guertel-Ausweicher und ORBIT_ANGLES sind im Quelltext auffindbar',
+  gwVon > 0 && gwBis > gwVon && !!oaTreffer, { gwVon, gwBis, oa: !!oaTreffer });
+let gw = null;
+if (gwVon > 0 && gwBis > gwVon && oaTreffer) {
+  try { gw = new Function(oaTreffer[0] + ';' + S.slice(gwVon, gwBis) + ';return guertelWinkelFuer;')(); }
+  catch (e) { gw = null; }
+}
+check('2d-anker2: der geschnittene Block laeuft in sich geschlossen', typeof gw === 'function');
+if (typeof gw === 'function') {
+  const roh = p => ((p * 36) + 18) % 360;
+  // Der Zweck: Platz 5 liegt 2 Grad neben dem Bahnwinkel des dritten Orbits und muss weichen.
+  check('2d: der Platz auf einem Planetenwinkel weicht aus (Platz 5 wandert)', gw(roh(5)) !== roh(5),
+    { vorher: roh(5), nachher: gw(roh(5)) });
+  // Und die andere Haelfte: ein ungueltiger Ort darf nicht zu einem gueltigen werden. Eine Festung
+  // ohne Platz ergibt NaN; ohne die Finite-Pruefung lieferte die Funktion 214 Grad und die Bastion
+  // erschien sichtbar neben Aion (gemessen 05.09.2026, test_kartenbeschriftung fiel vierfach).
+  check('2e: ein ungueltiger Platz bleibt ungueltig (NaN wird nicht zu einem Winkel)',
+    Number.isNaN(gw(roh(undefined))) && Number.isNaN(gw(NaN)),
+    { ausUndefined: gw(roh(undefined)), ausNaN: gw(NaN) });
+  // Das Ausweichen darf keinen zweiten Platz treffen: zehn Plaetze, zehn verschiedene Endwinkel.
+  const ende10 = [...Array(10).keys()].map(i => gw(roh(i)));
+  check('2f: nach dem Ausweichen liegt kein Platz auf einem anderen',
+    new Set(ende10).size === 10, { endwinkel: ende10 });
+}
 
 /* ---- Browser ---------------------------------------------------------------------------------- */
 const saveMit = (zusatz) => JSON.stringify(Object.assign({
