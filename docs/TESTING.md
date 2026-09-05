@@ -563,6 +563,18 @@ Seitdem misst 9a den Ausschnitt **ohne Kommentare**. Zwei übertragbare Regeln:
 
 Gefunden hat es nur die Gegenprobe. Ohne sie wäre ein Test entstanden, der auf ewig grün ist.
 
+**Nachtrag vom 05.09.2026 — dieselbe Falle, einen Tag später, in `test_vorposten_verbuendet_ui.js`:**
+Eine Prüfung suchte `alsVerbuendeter` im ausgeschnittenen Quelltext und fand das Wort im
+erklärenden Kommentar; die Gegenprobe blieb grün, obwohl das Feld ausgehebelt war. **Die Regel
+oben stand längst geschrieben und hat es nicht verhindert.**
+
+Was hilft, ist keine Erinnerung, sondern eine Gewohnheit — zwei Handgriffe, die nichts kosten:
+
+1. **Kommentare zuerst streichen**, immer, sobald Quelltext für eine Prüfung ausgeschnitten wird.
+   Nicht erst, wenn eine Gegenprobe stolpert.
+2. **Den Feldzugriff prüfen, nicht das Wort.** `/r\.alsVerbuendeter/` statt `/alsVerbuendeter/`.
+   Ein Bezeichner mit seinem Punkt davor steht im Fließtext praktisch nie.
+
 ## Auf das gemessene Element warten, nicht auf die Uhr (04.09.2026)
 
 `test_vorposten_werft_ui.js` misst eine Bauzeit von einer Karte im Werft-Tab. Mit festen
@@ -605,3 +617,35 @@ Drei Regeln daraus:
 - **Eine Positiv-Prüfung allein hätte es nie gefunden.** Erst die Gegenrichtung („dieser Text darf
   *nicht* dastehen") macht einen zu weiten Container sichtbar. Das ist ein zusätzlicher Grund für
   die Hausregel, jede Anzeige-Prüfung in beide Richtungen zu bauen.
+
+## Eine Fixture, die ein Feld erfindet, prüft nur sich selbst (05.09.2026)
+
+Die Frontend-Hälfte von V5 (Verbündeter am Vorposten) las `v.garnisonVon[meineId]`. So heißt die
+Aufschlüsselung **serverseitig** in `doc`; `vorpostenFuerClient` verschickt sie ausdrücklich nicht
+(„die vollständige Aufschlüsselung sieht weiterhin nur der Besitzer") und schickt stattdessen
+`meineGarnison` — den eigenen Anteil, flach nach Schiffstyp. Im Spiel war die Zahl deshalb
+**immer 0**: „Davon 0 von dir", der Rückruf-Eintrag dauerhaft gesperrt.
+
+Der Browser-Test war grün. Seine Fixture lieferte `garnisonVon` gleich mit — genau das Feld, das
+der Server nie sendet. Code und Test lasen dieselbe Erfindung, also stimmten sie überein.
+
+Der Name kam aus dem Konzeptpapier, nicht aus dem Quelltext des Senders. Die vorhandene Regel
+(„Namen, Selektoren, IDs, Keys aus dem Code ablesen; nicht raten") war notiert und hat den Fehler
+nicht verhindert; die vorhandene Regel „Fixtures wie der echte Erzeuger bauen" ebenso wenig, weil
+sie sich bisher nur auf **fehlende** Felder bezog. Der Fall hier ist der umgekehrte: ein **zu
+viel** gesetztes Feld.
+
+Zwei Konsequenzen, beide gemessen:
+
+- **Eine Fixture darf nur Felder setzen, die der echte Erzeuger auch erzeugt.** Ein Feld zu viel
+  ist genauso falsch wie eines zu wenig — es macht jede Prüfung, die daran hängt, wertlos, ohne
+  dass irgendetwas rot wird.
+- **Aus der Regel wurde ein Wächter**: `tests/test_vorposten_paritaet.js`, Abschnitt 10, liest die
+  Feldnamen aus `vorpostenFuerClient` in `server.js` und gleicht jeden Schlüssel jeder
+  Vorposten-Fixture dagegen ab (zehn Testdateien, 40 gültige Felder). Gegenprobe: Fixture zurück
+  auf `garnisonVon` → **nur** 10a fällt. Mit korrigierter Fixture fallen bei der ursprünglichen
+  Code-Fassung zwei Verhaltensprüfungen (1c, 5b), die vorher blind waren.
+
+Die übertragbare Form: **Wo zwei Seiten sich auf Feldnamen einigen, gehört der Abgleich in einen
+Test, nicht in ein Konzeptpapier.** Ein Konzeptpapier beschreibt die Absicht; welche Felder wirklich
+über die Leitung gehen, weiß nur der Sender.
