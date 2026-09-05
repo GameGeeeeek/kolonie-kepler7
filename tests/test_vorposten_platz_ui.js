@@ -42,6 +42,8 @@
 //   2a  Die Flottenwahl nennt DIESELBE Zahl wie das Menue (Anzeige und Anzeige einig).
 //   2b  ... und die Warnung „zu viele" misst gegen SEINEN Platz, nicht gegen die Stationsgrenze.
 //       Gegen die Stationsgrenze gaebe es bei 260 Schiffen gar keine Warnung.
+//   2c  ... und die SPERRE des Dialogs liegt am selben Deckel. Diese Pruefung gibt es, weil die
+//       Gegenprobe gezeigt hat, dass die Sperre von keiner anderen gedeckt war.
 //   3a  #51: Der Kasten nennt Station, System, den EIGENEN Anteil und den Kernzustand.
 //   3b  ... und traegt das System als Sprungziel.
 //   3c  EIGENE Vorposten stehen nicht darin - dafuer gibt es den Kasten darueber.
@@ -296,6 +298,28 @@ function spielstand(){
       verb.fwahl.zuviel === 160 && /annimmt/.test(z), { zuviel: verb.fwahl.zuviel, zeile: z });
   }
 
+  /* 2c: DIE SPERRE DER FLOTTENWAHL - eine Luecke, die erst die Gegenprobe gezeigt hat.
+
+     Lauf B setzte diese Sperre zurueck auf `frei` und erwartete, dass 1c faellt. 1c blieb GRUEN,
+     und zu Recht: Sie misst den Eintrag im KARTENMENUE, der an einer anderen Rechnung haengt. Die
+     Sperre im Dialog war damit von KEINER Pruefung gedeckt.
+
+     Im Spiel erreicht man sie kaum - bei `meinPlatz:0` ist der Menueeintrag schon gesperrt, der
+     Dialog geht gar nicht auf. Sie greift erst, wenn die Vorposten-Daten sich waehrend des offenen
+     Dialogs erneuern. Genau deshalb ist sie eine Pruefung wert: Ungedeckter Code, der selten
+     laeuft, altert unbemerkt. Gemessen wird am Quelltext, weil der Weg dorthin im Browser von
+     einem Zufall abhinge. */
+  {
+    const sendVon = JS.indexOf('function vorpostenGarnisonSenden(');
+    const rumpf = sendVon < 0 ? '' : ohneKommentar(JS.slice(sendVon, JS.indexOf('\n  async function vorpostenGarnisonAnkunft', sendVon)));
+    const sperrVon = rumpf.indexOf('sperre:');
+    const sperre = sperrVon < 0 ? '' : rumpf.slice(sperrVon, rumpf.indexOf('start:', sperrVon));
+    check('2-anker2: die Sperre der Flottenwahl ist auffindbar (sonst misst 2c nichts)',
+      sendVon > 0 && sperre.length > 80 && sperre.length < 1200, { laenge: sperre.length });
+    check('2c: die Sperre liegt am selben Deckel wie Vorschau und Warnung, nicht an `frei`',
+      /deckel < 1/.test(sperre) && !/\bfrei < 1/.test(sperre), { sperre: sperre.replace(/\s+/g, ' ').slice(0, 220) });
+  }
+
   // ---- 3) #51: die Schiffe auswaerts --------------------------------------------------------
   check('3a: der Kasten nennt Station, System, den eigenen Anteil und den Kernzustand',
     verb.leiste.sichtbar === true && verb.leiste.anzahl === '(1)'
@@ -322,4 +346,56 @@ function spielstand(){
   ende();
 })();
 
-/* GEGENPROBE: siehe PR-Text und den Fuss dieser Datei nach der Messung. */
+/* GEGENPROBE, fuenf Laeufe am 05.09.2026 gemessen. Die Pruefnamen jedes Laufs wurden per `diff`
+   gegen den Basislauf verglichen - in allen fuenf Laeufen war die Liste identisch, es ist also
+   keine Pruefung verschwunden (die Schlusszeile mitzuzaehlen statt Namen zu vergleichen, hat in
+   diesem Repo schon einmal eine fehlende Pruefung verdeckt).
+
+   Jede Sabotage traf eine NACHWEISLICH andere Codestelle; die „was fallen MUSS"-Liste stand VOR
+   dem Lauf fest. Zwei Vorhersagen waren falsch - sie stehen unten, weil sie das Wertvollste an
+   dieser Gegenprobe sind.
+
+   LAUF A - vier Sabotagen. Vorhergesagt: 0d, 0e, 1a, 2b, 3e. Gefallen: genau diese fuenf.
+     s1  Kartenmenue-Grund wieder ohne die Zahl                    -> 1a
+     s3  Flottenwahl-Deckel zurueck auf `frei`                     -> 2b
+     s6  Fremd-Liste wieder an `verbuendet` gehaengt               -> 0d, 3e
+     s8  `kernProz` aus der Signatur genommen                      -> 0e
+
+   LAUF B - vier Sabotagen. Vorhergesagt: 1b, 1c, 2a, 3c, 3d. Gefallen: 1b, 2a, 3c, 3d.
+     s2  Tafel-Zeile abgeschaltet                                  -> 1b
+     s4  Vorschau-Text zurueck auf den alten Wortlaut              -> 2a
+     s5  Sperre der Flottenwahl zurueck auf `frei`                 -> NICHTS
+     s12 Kasten immer sichtbar                                     -> 3c, 3d
+
+     FEHLPROGNOSE 1, und die wichtigste Erkenntnis dieser Gegenprobe: Ich erwartete, dass s5 die
+     Pruefung 1c faellt. 1c blieb GRUEN, und das ist richtig - sie misst den Eintrag im
+     KARTENMENUE, der an `freiV` haengt, nicht an `deckel`. Die Sperre im Dialog war damit von
+     KEINER Pruefung gedeckt. Haette ich hier nur „fuenf vorhergesagt, vier gefallen, nah genug"
+     notiert, waere die Luecke offen geblieben. Pruefung 2c und Lauf E sind die Antwort darauf.
+
+   LAUF C - eine Sabotage: `vpMeinPlatz` liest das Serverfeld nicht mehr.
+     Vorhergesagt: 0a, 1a, 1b, 1c, 2a, 2b. Gefallen: diese sechs UND 0b, 1d.
+
+     FEHLPROGNOSE 2, beide Zusatztreffer sind richtig: Die Sabotage ersetzte den Feldzugriff SAMT
+     der Zeile `if (v.eigener){` durch `if (true){`. Damit verschwand `v.eigener` aus dem Rumpf
+     (0b prueft genau dessen Stellung) und der Rueckfall galt auch fuer Nicht-Besitzer - im
+     „alter Server"-Lauf stand dann die alte Zahl 13100 in der Tafel, was 1d faellt. Eine
+     Sabotage, die zwei Regeln zugleich aufhebt, faellt zwei Pruefungen; das ist kein Fehler der
+     Pruefungen, sondern eine ungenaue Vorhersage.
+
+   LAUF D - drei Sabotagen. Vorhergesagt: 0b, 0d, 1d, 1e, 3c. Gefallen: genau diese fuenf.
+     s10 Rueckfall gilt auch dem Verbuendeten                      -> 0b, 1d
+     s11 Tafel-Zeile ohne `v.verbuendet`                           -> 1e
+     s7  Fremd-Liste ohne `!v.eigener`                             -> 0d, 3c
+
+   LAUF E - zwei Sabotagen, nach der Luecke aus Lauf B. Vorhergesagt: 1c, 2c. Gefallen: genau
+   diese zwei.
+     s13 Kartenmenue rechnet wieder mit der Grenze der STATION     -> 1c
+     s5  Sperre der Flottenwahl zurueck auf `frei`                 -> 2c
+
+   NICHT GEDECKT, bewusst: Die Farbe des Kernbalkens (`kernFarbe`) und die Reihenfolge der drei
+   Angaben in der Zeile. Beides ist Darstellung ohne Regel dahinter - eine Pruefung darauf waere
+   eine Momentaufnahme, kein Verhalten, und stuende jeder kuenftigen Umgestaltung im Weg.
+
+   Die Bauplan-Seite derselben Aenderung steht in tests/test_vorposten_verbuendet_ui.js (Pruefung
+   0i, eigene Gegenprobe im Fuss dort). Diese Datei prueft, was der Spieler wirklich liest. */
