@@ -200,8 +200,14 @@ check('0f: ein Mond bekommt die Mond-Textur, nicht die eines Asteroiden',
   const auf = await oeffneSystemUeberSektoren(page, 'kepler');
   check('2-anker: das Heimatsystem laesst sich ueber die Sektoren oeffnen', auf === true, auf);
   const karte = await page.evaluate(async () => {
-    const imgs = [...document.querySelectorAll('#galaxyMapSvg image')].map(i => i.getAttribute('href') || i.getAttribute('xlink:href')).filter(h => h && h.startsWith('data:image/png'));
-    const groessen = await Promise.all(imgs.slice(0, 6).map(h => new Promise(res => { const im = new Image(); im.onload = () => res([im.naturalWidth, im.naturalHeight]); im.onerror = () => res([0, 0]); im.src = h; })));
+    /* NUR die Bilder AN EINEM PLANETENKNOTEN. Bis Buendel A war jedes PNG im Kartenbild eine
+       Planetentextur, und der Selektor durfte grob sein; seit die Sonne ein eigenes 128er-Bild
+       traegt, faengt er auch das ein und die Pruefung faellt aus dem falschen Grund. Genau das
+       hatte die adversarische Durchsicht gemeldet - die Gegenpruefung hat es damals verworfen,
+       und der naechste Einbau hat ihr widersprochen (gemessen 05.09.2026). */
+    const imgs = [...document.querySelectorAll('#galaxyMapSvg [data-planet] image, #galaxyMapSvg image[href^="data:"][clip-path^="url(#pclip"]')]
+      .map(i => i.getAttribute('href') || i.getAttribute('xlink:href')).filter(h => h && h.startsWith('data:image/png'));
+    const groessen = await Promise.all([...new Set(imgs)].slice(0, 6).map(h => new Promise(res => { const im = new Image(); im.onload = () => res([im.naturalWidth, im.naturalHeight]); im.onerror = () => res([0, 0]); im.src = h; })));
     return { anzahl: imgs.length, groessen };
   });
   check('2b: die Systemkarte bettet den quadratischen 64er-Mittelausschnitt der Streifen ein',
