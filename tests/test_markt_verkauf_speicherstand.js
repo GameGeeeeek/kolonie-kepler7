@@ -28,8 +28,13 @@
 //      Stand versorgen. Und die zweite Hälfte desselben Befunds: Ein Sammelauftrag speichert
 //      bewusst nur EINMAL, seine Folgetranchen dürfen deshalb nicht die inzwischen produzierte
 //      Menge mitanbieten (sonst stoppt er mitten im Lauf mit "Nicht genug ...").
-//   4. Ein KAUF löst keinen zusätzlichen Speichervorgang aus - beim Kauf prüft der Server die
-//      Kredite, und die ändert kein Tick.
+//   4. Ein KAUF ist genauso geschützt - und zwar mit GENAU EINEM Speichervorgang. Hier stand
+//      zuerst das Gegenteil ("ein Kauf speichert nicht mit, denn die Kredite ändert kein Tick").
+//      Das war gemessen falsch: Handelsrouten und eroberte Systeme schreiben `state.credits` im
+//      Takt ohne sofortiges Speichern. Ohne den Schutz überschreibt die Antwort des Servers
+//      (`state.credits = data.newCredits`) diese Kredite mit einem Wert, der aus dem veralteten
+//      Stand gerechnet ist - sie wären still weg. Die Zahl 1 ist die Gegenrichtung: nicht null
+//      (ungeschützt) und nicht mehr (ein Speichervorgang je Tranche hat schon einmal ausgeloggt).
 //
 // MESSMETHODE: Der Mock-Server verhält sich wie server.js - er urteilt über den bei ihm
 // GESPEICHERTEN Spielstand und schreibt den geänderten zurück. Ein Mock, der einfach jeden
@@ -45,19 +50,40 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
 
 // ---- 1) Quelltext ----------------------------------------------------------------------------
 {
+  /* Der Anker endet am eigenen `finally` der Funktion, NICHT am Beginn der naechsten:
+     Dazwischen liegt die Modulboerse mit drei eigenen save()-Aufrufen (Durchsicht 05.09.2026).
+     Mit dem weiten Anker haette ein spaeteres `await save()` dort die Zaehlung unten
+     fehlschlagen lassen - mit einer Meldung, die auf eine ganz andere Stelle zeigt. */
   const von = JS.indexOf('async function doMarketTrade(');
-  const bis = von < 0 ? -1 : JS.indexOf('async function doMarketTradeChunked(', von);
-  check('1-anker: doMarketTrade ist auffindbar', von > 0 && bis > von, { von, bis });
+  const bisRoh = von < 0 ? -1 : JS.indexOf('finally { marketTradeInFlight = false; }', von);
+  const bis = bisRoh < 0 ? -1 : bisRoh + 40;
+  check('1-anker: doMarketTrade ist auffindbar und endet an seinem finally', von > 0 && bis > von, { von, bis });
   const block = (von > 0 && bis > von) ? JS.slice(von, bis) : '';
   // Kommentare leeren, bevor gesucht wird: die Begründung im Code nennt save() wörtlich.
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  check('1a: vor einem Verkauf wird gespeichert, damit der Server den aktuellen Stand sieht',
-    /action === 'sell' && !marketBulkRun\) await save\(\)/.test(ohneKommentar));
+  check('1a: vor einem Handel wird gespeichert, damit der Server den aktuellen Stand sieht',
+    /if \(!opts\.imSammelauftrag\) await save\(\)/.test(ohneKommentar));
+  /* Der Riegel haengt an der HERKUNFT des Aufrufs, nicht an `!marketBulkRun` (Durchsicht
+     05.09.2026): Waehrend eines laufenden Sammelauftrags kann der Spieler in einer
+     Tranchenpause einen normalen Verkauf ausloesen - kleine Mengen gehen am Sammel-Riegel
+     vorbei direkt in doMarketTrade. Der ist keine Tranche und braucht den Schutz. */
+  check('1a2: der Riegel fragt die Herkunft ab, nicht den laufenden Sammelauftrag',
+    !/!marketBulkRun\) await save\(\)/.test(ohneKommentar));
+  /* Und er gilt fuer den KAUF genauso: Hier stand zuerst "beim Kauf prueft der Server die
+     Kredite, und die aendert kein Tick". Gemessen falsch - Handelsrouten (Z. ~14877/14916) und
+     eroberte Systeme (~16973) schreiben state.credits im Takt ohne sofortiges Speichern. */
+  check('1a3: der Schutz ist nicht auf den Verkauf eingeschraenkt',
+    !/action === 'sell'[^\n]*await save\(\)/.test(ohneKommentar));
   check('1b: und zwar VOR der Handelsanfrage, nicht danach',
     ohneKommentar.indexOf('await save()') > 0 &&
     ohneKommentar.indexOf('await save()') < ohneKommentar.indexOf("backendFetch('/market/trade'"),
     { save: ohneKommentar.indexOf('await save()'), trade: ohneKommentar.indexOf("backendFetch('/market/trade'") });
-  check('1c: der Kauf-Zweig speichert NICHT mit (dort prüft der Server die Kredite)',
+  /* Ein aelterer Server ohne das Feld haette Math.floor(undefined) = NaN ergeben - und NaN
+     faellt durch jede `< 1`-Abbruchpruefung hindurch bis in die Anfrage. Dieselbe Vorsicht,
+     die data.tagesRest daneben schon laenger hat. */
+  check('1g: die Bestandsauskunft wird nur uebernommen, wenn wirklich eine Zahl kam',
+    /typeof data\.newResourceAmount === 'number'/.test(ohneKommentar));
+  check('1c: genau EIN Speichervorgang im Handelspfad - nicht mehrere',
     (ohneKommentar.match(/await save\(\)/g) || []).length === 1,
     { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
 }
@@ -70,6 +96,12 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   check('1d: der Sammelauftrag speichert EINMAL, nicht je Tranche',
     (ohneKommentar.match(/await save\(\)/g) || []).length === 1,
     { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
+  check('1d2: seine Tranchen weisen sich als solche aus, damit sie den Schutz auslassen',
+    /imSammelauftrag: true/.test(ohneKommentar));
+  /* Die Bestandsauskunft traegt ihre Ressource mit - als blosse Zahl wurde sie von jedem
+     Handel einer ANDEREN Ressource ueberschrieben und kappte die naechste Tranche falsch. */
+  check('1f: die Serverauskunft wird nur fuer DIESELBE Ressource benutzt',
+    /marktServerBestand\.resource === resource/.test(ohneKommentar));
   /* Die Reihenfolge ist hier zweifach heikel, deshalb beide Seiten:
      - NACH dem Riegel `marketBulkRun = {...}`: Der Riegel darüber wird synchron geprüft. Stünde
        das `await` davor, kämen zwei schnelle Klicks BEIDE durch und zwei Sammelaufträge liefen
@@ -317,8 +349,8 @@ const marktOeffnen = async (page) => {
     await t.page.waitForTimeout(1500);
     const kaeufe = t.store.__handel.filter(h => h.action === 'buy').length;
     check('4-vorab: der Kauf hat stattgefunden', kaeufe >= 1, { kaeufe });
-    check('4: ein Kauf speichert nicht zusätzlich (der 10-s-Takt bleibt der einzige Schreiber)',
-      t.store.__saves - savesVorher === 0, { zusaetzlicheSaves: t.store.__saves - savesVorher });
+    check('4: ein Kauf speichert GENAU EINMAL vorher - nicht null und nicht mehrfach',
+      t.store.__saves - savesVorher === 1, { speichervorgaenge: t.store.__saves - savesVorher });
     await t.ctx.close();
   }
 
@@ -327,16 +359,19 @@ const marktOeffnen = async (page) => {
 })();
 
 /* GEGENPROBE, GEMESSEN am 05.09.2026 gegen origin/main (KEPLER_SPIELDATEI auf eine Kopie):
-   FAIL 1a, 1b, 1c, 1d, 1e - im Handelspfad wird nicht gespeichert.
-   FAIL 2c, 2d - und das ist der Befund selbst, mit Zahlen:
-       {"menge":76,"standBeimServer":0,"ok":false}, abgelehnt: 1.
-       Die Anzeige stand auf 76 Energie, der Server sah 0, der Verkauf prallte ab.
-   GRÜN bleiben dort 2a, 3a-3d und 4 - Absicht, nicht Schwäche: 2a belegt, dass der ERSTE
-   Verkauf nie das Problem war (genau deshalb klang der Report nach "mehrmals"), 3 und 4
-   belegen, dass die Änderung nichts gelockert hat. Ein Test, bei dem am alten Stand ALLES
-   fällt, verlöre diese Unterscheidung.
-   EHRLICHE EINSCHRÄNKUNG zu 3b/3d: Sie decken nebenbei die Tranchen-Drift ab, fielen am alten
-   Stand in diesem Lauf aber NICHT - dort kam nur eine einzige Tranche zustande. Ihr Fall ist
-   zeitabhängig; als Gegenrichtung ("nie mehr verkaufen als vorhanden") messen sie zuverlässig,
-   als Nachweis der Tranchen-Drift nicht. Diese hat der erste Lauf dieses Tests gezeigt
-   (Tranche 2 verlangte 19 Energie, der Server sah 0) - daraus entstand marktServerBestand. */
+   13 Pruefungen fallen (die Schlusszeile "FAIL" zaehlt NICHT mit - sie ist die Zusammenfassung):
+     1a, 1b, 1c, 1d, 1d2, 1e, 1f, 1g - im Handelspfad wird nicht gespeichert, es gibt weder
+       eine Tranchen-Kennzeichnung noch eine Serverauskunft.
+     2c, 2d - der Befund selbst, mit Zahlen: {"menge":76,"standBeimServer":0,"ok":false},
+       abgelehnt: 1. Die Anzeige stand auf 76 Energie, der Server sah 0.
+     3b, 3d - die zweite Haelfte: {"abgelehnt":1,"versuche":2}. Tranche 2 des Sammelauftrags bot
+       die inzwischen produzierte Menge mit an und prallte ab.
+     4 - der Kauf ist ungeschuetzt (0 Speichervorgaenge statt 1).
+   GRUEN bleiben dort 2a, 3a, 3c, alle -vorab und die drei Anker - Absicht, nicht Schwaeche:
+   2a belegt, dass der ERSTE Verkauf nie das Problem war (genau deshalb klang der Report nach
+   "mehrmals"), 3a und 3c belegen, dass die Aenderung nichts gelockert hat.
+   EHRLICH ZU 1a2 UND 1a3: Das sind VERNEINUNGEN ("der Riegel fragt nicht !marketBulkRun ab",
+   "der Schutz ist nicht auf 'sell' eingeschraenkt"). Am alten Stand gibt es beide Formen gar
+   nicht, sie sind dort also trivial gruen. Sie messen keinen Befund, sondern verhindern den
+   RUECKFALL in zwei Fassungen, die genau dieser PR schon einmal hatte und die die Durchsicht
+   verworfen hat. Das ist ihr ganzer Zweck - kein Beleg, eine Sperre. */

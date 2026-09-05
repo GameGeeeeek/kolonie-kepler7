@@ -7796,7 +7796,7 @@
     '<strong>Am Markt l\u00e4sst sich wieder verkaufen, was im Lager steht.</strong> Wer sein volles Energielager verkaufte und gleich danach die nachgewachsene Menge loswerden wollte, bekam \u201eNicht genug Energie zum Verkaufen" \u2013 obwohl die Ressourcenleiste sie anzeigte. Der Grund lag nicht am Markt: \u00dcber einen Verkauf entscheidet der Server, und der sah bis zu zehn Sekunden lang noch den vorherigen Spielstand. Vor einem Verkauf wird jetzt einmal gespeichert, damit er denselben Bestand sieht wie du. Danke an <strong>Hanson</strong> f\u00fcr den Bericht.',
     '<strong>Warum es ausgerechnet bei vollem Lager auffiel:</strong> Ist das Lager voll, ruht die Produktion \u2013 Anzeige und Server stimmen dann \u00fcberein, der erste Verkauf ging deshalb immer durch und setzte den Server auf null. Danach lief die Produktion wieder an, und jeder weitere Verkauf in den n\u00e4chsten zehn Sekunden prallte an dieser Null ab. Einmal ging, mehrmals nicht.',
     '<strong>Gro\u00dfe Sammelauftr\u00e4ge stoppen nicht mehr mittendrin.</strong> Ein Auftrag \u00fcber mehrere Tranchen bot ab der zweiten die inzwischen nachproduzierte Menge mit an und lief an derselben Meldung auf. Jede Tranche bietet jetzt nur noch an, was der Server auch kennt \u2013 der Rest bleibt im Lager und geht beim n\u00e4chsten Auftrag mit.',
-    'W\u00e4chter: <code>test_markt_verkauf_speicherstand</code> (22 Pr\u00fcfungen). Der Nachbau urteilt wie der echte Server \u00fcber den bei ihm gespeicherten Stand \u2013 einer, der jeden Verkauf best\u00e4tigt, h\u00e4tte den Fehler gar nicht zeigen k\u00f6nnen.'
+    'W\u00e4chter: <code>test_markt_verkauf_speicherstand</code> (28 Pr\u00fcfungen). Der Nachbau urteilt wie der echte Server \u00fcber den bei ihm gespeicherten Stand \u2013 einer, der jeden Verkauf best\u00e4tigt, h\u00e4tte den Fehler gar nicht zeigen k\u00f6nnen.'
   ] },
   { version:'8.688.0', date:'05.09.2026', changes:[
     '<strong>Wer einem Verbündeten Schiffe schickt, sieht jetzt, wie viele die Station überhaupt annimmt.</strong> Bisher stand dort „13100 frei" – die Grenze der <em>Station</em>. Für dich gilt aber zusätzlich ein Deckel: Der Anteil aller Verbündeten an einer Garnison ist begrenzt. Wer die große Zahl las und losflog, bekam die Schiffe zurück, den Treibstoff nicht, und den Grund erfuhr er nirgends. Menü, Flottenwahl und Stationstafel nennen jetzt <strong>deine</strong> Zahl.',
@@ -15609,12 +15609,19 @@
          Verkauf geht durch und leert den Serverstand auf 0. Danach laeuft die Produktion wieder -
          und jeder weitere Verkauf innerhalb der naechsten 10 s prallt an einer 0 ab, obwohl die
          Ressourcenleiste laengst wieder etwas anzeigt.
-         Nur beim VERKAUF: Beim Kauf prueft der Server die Kredite, und die aendert kein Tick.
-         Nur wenn KEIN Sammelauftrag laeuft: Der speichert einmal fuer alle Tranchen (siehe
-         doMarketTradeChunked). Ein Speichervorgang je Tranche war schon einmal die Ursache
-         dafuer, dass ein grosser Auftrag den Spieler ausgeloggt hat - siehe die Begruendung am
-         Ende dieser Funktion und test_marktlimit_abmeldung.js. */
-      if (action === 'sell' && !marketBulkRun) await save();
+         GILT FUER KAUF UND VERKAUF. Hier stand zuerst "nur beim Verkauf, beim Kauf prueft der
+         Server die Kredite, und die aendert kein Tick" - das war schlicht falsch (Durchsicht
+         05.09.2026): Handelsrouten und eroberte Systeme schreiben state.credits im Takt, ohne
+         sofort zu speichern. Der Kauf hat dadurch dieselbe Luecke UND eine zweite Wirkung: Die
+         Antwort wird mit state.credits = data.newCredits uebernommen, also mit einem Wert, der
+         aus dem VERALTETEN Stand gerechnet ist - die seither getickten Kredite waeren still weg.
+         Nicht in den Tranchen eines Sammelauftrags (opts.imSammelauftrag): Der speichert einmal
+         am Anfang. Ein Speichervorgang je Tranche war die Ursache dafuer, dass ein grosser
+         Auftrag den Spieler ausgeloggt hat - siehe test_marktlimit_abmeldung.js.
+         Bewusst NICHT `!marketBulkRun`: Waehrend eines laufenden Sammelauftrags kann der Spieler
+         in einer Tranchenpause einen normalen Verkauf ausloesen (kleine Mengen gehen an dem
+         Riegel vorbei direkt hierher). Der ist keine Tranche und braucht den Schutz. */
+      if (!opts.imSammelauftrag) await save();
       const res = await backendFetch('/market/trade', {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
@@ -15634,7 +15641,15 @@
         return false;
       }
       marktLetzteAbsage = null;
-      marktServerBestand = data.newResourceAmount;
+      /* Die Zahl traegt IHRE Ressource mit (Durchsicht 05.09.2026). Als blosse Zahl wurde sie
+         von jedem Handel einer anderen Ressource ueberschrieben: Waehrend eines Erz-Sammelauftrags
+         genuegte ein Kristall-Verkauf in einer Tranchenpause, und die naechste Erz-Tranche kappte
+         auf den Kristall-Rest - bei 0 brach der Auftrag ab und meldete trotzdem "fertig".
+         Und nur, wenn wirklich eine Zahl kam: Ein aelterer Server ohne dieses Feld haette sonst
+         Math.floor(undefined) = NaN ergeben, und NaN faellt durch jede `< 1`-Abbruchpruefung
+         hindurch bis in die Anfrage. Dieselbe Vorsicht wie bei data.tagesRest daneben. */
+      marktServerBestand = typeof data.newResourceAmount === 'number'
+        ? { resource, menge: data.newResourceAmount } : null;
       const label = resDefFor(resource).label;
       // Server ist jetzt die Autorität: neue Gesamtwerte direkt übernehmen statt selbst nachzurechnen.
       state.credits = data.newCredits;
@@ -15894,13 +15909,14 @@
     const chunks = Math.ceil(amount / MARKET_MAX_PER_TRADE);
     marketBulkRun = { abort:false, done:0, total:chunks, resource, action };
     /* EINMAL fuer den ganzen Sammelauftrag speichern, damit der Server den aktuellen Bestand
-       kennt (Begruendung ausfuehrlich in doMarketTrade) - nicht je Tranche: ein Speichervorgang
+       kennt (Begruendung ausfuehrlich in doMarketTrade; gilt fuer Kauf wie Verkauf) - nicht je
+       Tranche: ein Speichervorgang
        je Tranche war die Ursache der Abmeldung aus test_marktlimit_abmeldung.js, und innerhalb
        des Auftrags laesst doMarketTrade seinen eigenen deshalb aus (`!marketBulkRun`).
        Bewusst NACH dem Setzen von marketBulkRun: Der Riegel drueber wird synchron geprueft; ein
        `await` davor oeffnete ein Fenster, in dem zwei schnelle Klicks BEIDE durchkaemen und zwei
        Sammelauftraege nebeneinander liefen. */
-    if (action === 'sell') await save();
+    await save();
     // Nach dem Speichern sind Anzeige und Serverstand deckungsgleich - die Auskunft eines
     // FRÜHEREN Auftrags wäre hier veraltet und würde die erste Tranche unnötig kappen.
     marktServerBestand = null;
@@ -15922,10 +15938,13 @@
            die nach einem Fehler des Spielers aussieht. */
       if (action === 'sell'){
         part = Math.min(part, Math.floor(state.resources[resource]||0));
-        if (marktServerBestand !== null) part = Math.min(part, Math.floor(marktServerBestand));
+        if (marktServerBestand && marktServerBestand.resource === resource){
+          part = Math.min(part, Math.floor(marktServerBestand.menge));
+        }
       }
       if (part < 1) break;
-      let ok = await doMarketTrade(action, resource, part, opts);
+      const tranchenOpts = Object.assign({}, opts, { imSammelauftrag: true });
+      let ok = await doMarketTrade(action, resource, part, tranchenOpts);
       /* Rate-Limit abwarten statt aufgeben (17.08.2026). Der Server deckelt ALLE /api-Anfragen
          einer Verbindung auf 240 je Minute; ein grosser Auftrag kann das trotz der Drosselung
          unten reissen, wenn nebenher viel laeuft. Ein 429 heisst "gleich wieder" und nicht
@@ -15936,7 +15955,7 @@
         renderMarket();
         await new Promise(r => setTimeout(r, MARKET_BULK_LIMIT_WAIT_MS));
         if (marketBulkRun.abort) break;
-        ok = await doMarketTrade(action, resource, part, opts);
+        ok = await doMarketTrade(action, resource, part, tranchenOpts);
       }
       if (!ok){ failed = true; break; }
       moved += part;
@@ -15952,6 +15971,7 @@
       if (i < chunks - 1) await new Promise(r => setTimeout(r, MARKET_BULK_PAUSE_MS));
     }
     const aborted = marketBulkRun.abort;
+    const gelaufeneTranchen = marketBulkRun.done;
     marketBulkRun = null;
     // Ein am TAGESKONTINGENT gestoppter Auftrag ist kein Fehler, sondern eine Regel - die
     // Abschlussmeldung nennt sie beim Namen, statt ein nacktes "gestoppt" zu hinterlassen, bei
@@ -15961,7 +15981,15 @@
     if (aborted) log('Sammelauftrag abgebrochen – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden gehandelt.', 'ti-info-circle');
     else if (amKontingent) log('Sammelauftrag am Tageskontingent gestoppt – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden verkauft. Der Rest wartet auf morgen'+(typeof marktTagesRest === 'number' && marktTagesRest > 0 ? ' (heute sind noch '+fmt(marktTagesRest)+' Credits Erlös frei – kleinere Mengen gehen noch durch)' : '')+'.', 'ti-clock', 'warn');
     else if (failed) log('Sammelauftrag gestoppt – '+fmt(moved)+' von '+fmt(amount)+' '+label+' wurden gehandelt.', 'ti-alert-triangle');
-    else log('Sammelauftrag fertig: '+fmt(moved)+' '+label+' in '+chunks+' Tranchen gehandelt.', 'ti-check', 'ok');
+    /* "Fertig" heisst: nichts ist schiefgegangen - NICHT zwangslaeufig, dass die bestellte
+       Menge zusammenkam. Die Schleife kappt jede Tranche auf den tatsaechlichen Bestand und
+       hoert auf, wenn nichts mehr da ist; gemeldet wurden bis zur Durchsicht am 05.09.2026
+       trotzdem die GEPLANTE Tranchenzahl und kein Wort zum Rest. Wer 3 Mio bestellte und
+       2,5 Mio hatte, las einen gruenen Haken ueber einem halb erledigten Auftrag. Jetzt stehen
+       die wirklich gelaufenen Tranchen da, und der Fehlbetrag wird benannt - dieselbe
+       Ehrlichkeits-Linie wie bei der Kontingent-Meldung darueber. */
+    else if (moved < amount) log('Sammelauftrag fertig: '+fmt(moved)+' von '+fmt(amount)+' '+label+' in '+gelaufeneTranchen+' Tranchen gehandelt – mehr war nicht im Lager. Der Rest bleibt liegen.', 'ti-check', 'ok');
+    else log('Sammelauftrag fertig: '+fmt(moved)+' '+label+' in '+gelaufeneTranchen+' Tranchen gehandelt.', 'ti-check', 'ok');
     renderMarket();
     save();
     return !failed && !aborted;
