@@ -1,21 +1,30 @@
-// Die Geschütztürme führen ihr Ziel sichtbar nach (05.08.2026).
+// Die Ausrichtung der Geschütze kommt im Bild an (05.08.2026, umgebaut mit Bündel C).
 //
 // AUSGANGSLAGE - und der Grund, warum dieser Test so gebaut ist, wie er gebaut ist:
 // Die Ausrichtung war IMMER schon da. anlagenSchritt() sucht ein Ziel, rechnet sollRicht und
 // führt an.richt mit 1,6 rad/s nach, gedeckelt auf ±1,15 rad. Gezeichnet wurde sie nur in den
-// ALTEN Notsilhouetten - seit die Wiedergabe (v8.394.0) das echte Gebäudebild stempelt, kehrt
-// dieser Zweig vorher zurück, und der Schwenkzweig lief praktisch nie. Gemessen standen dauerhaft
-// 9-10 Stellungen mit bis zu 61,8 Grad Schwenk, während auf dem Boden jedes Rohr stur geradeaus zeigte.
+// ALTEN Notsilhouetten - seit die Wiedergabe (v8.394.0) das echte Gebäudebild stempelt, kehrte
+// dieser Zweig vorher zurück, und die Rohre zeigten stur geradeaus. Gemessen standen dauerhaft
+// 9-10 Stellungen mit bis zu 61,8 Grad Schwenk.
 //
-// EIN TEST, DER NUR DEN WINKEL PRÜFT, HÄTTE DAS NICHT GEFUNDEN - die Winkel stimmten ja die ganze
-// Zeit. Geprüft werden muss, dass das BILD ihnen folgt. Dafür baut dieser Test zwei gepatchte
-// Kopien der Spieldatei im Systemtemp (das Repo bleibt unangetastet), in denen der Rohrwinkel
-// fest auf 0 bzw. 0,9 rad steht, und vergleicht die Bildpunkte des Bodenbands. Alles andere -
-// Funken, Explosionen, Schüsse - ist in beiden Kopien gleich verteilt; der einzige gewollte
-// Unterschied ist der Winkel.
+// WAS SICH MIT BÜNDEL C GEÄNDERT HAT: Die Anlagen stehen jetzt auf einer achteckigen Sockelplatte,
+// deren HINTERE Ecke bei Bildanteil y = 0,368 liegt - höher als der Fuß jedes Aufsatzes und sogar
+// höher als die Mündung des Turmrohrs (0,42). Der alte Trick (Bild an einer waagerechten Linie
+// teilen, obere Hälfte kippen) nimmt damit immer ein Stück Platte mit, das sichtbar mitkippt.
+// Die SCHWENK-Tabelle ist deshalb ausgebaut; die Begründung steht im Spiel an ihrer Stelle.
+//
+// DIE REGEL BLEIBT, DIE STELLE WECHSELT: an.richt muss weiterhin im BILD ankommen - jetzt über
+// den Mündungsblitz (MUENDUNG_LAENGE) und den Schussursprung, nicht mehr über das Rohr. Ein Test,
+// der nur den Winkel prüft, hätte den alten Fehler nicht gefunden (die Winkel stimmten ja die
+// ganze Zeit); deshalb misst dieser Test weiter das Bild.
+//
+// Dafür baut er zwei gepatchte Kopien der Spieldatei im Systemtemp (das Repo bleibt unangetastet),
+// in denen der Winkel fest auf 0 bzw. 0,9 rad steht UND die Mündungsglut dauerhaft brennt - sonst
+// entschiede der Zufall, ob im Foto gerade ein Blitz zu sehen ist. Alles andere - Funken,
+// Explosionen, Schüsse - ist in beiden Kopien gleich verteilt.
 //
 // Warum nicht einfach zwei Momente desselben Laufs vergleichen: Im Bodenband regnet es Funken und
-// Trümmer. Ein Vergleich über die Zeit misst überwiegend die, nicht die Rohre - beim Bau dieses
+// Trümmer. Ein Vergleich über die Zeit misst überwiegend die, nicht die Anlagen - beim Bau dieses
 // Tests gemessen: 27.394 gegenüber 31.194 veränderten Bildpunkten mit und OHNE Schwenktabelle,
 // also genau die falsche Richtung. Erst der deterministische Vergleich trennt die Wirkung sauber.
 const fs = require('fs');
@@ -56,13 +65,15 @@ const save = () => JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
 // Die Spieldatei liegt neben tests/ - SPIEL_URL ist eine file://-Adresse darauf.
 const SPIELDATEI = decodeURIComponent(String(SPIEL_URL).replace(/^file:\/\//, '').split('?')[0]);
 
-// Zwei Kopien mit FESTEM Rohrwinkel. Der Anker ist der Schwenkzweig in zeichneAnlage; findet er
-// sich nicht, ist der Test kaputt und sagt das, statt still grün zu werden.
+// Zwei Kopien mit FESTEM Winkel und dauerhaft brennender Mündungsglut. Der Anker ist die Stelle,
+// an der die Wiedergabe das Gebäudebild stempelt; findet er sich nicht, ist der Test kaputt und
+// sagt das, statt still grün zu werden (Hausregel: Anker vor Benutzung prüfen).
 function kopieMitWinkel(quelle, winkel, ziel){
-  const anker = 'var dreh = SCHWENK[an.geb];';
+  const anker = '          gg.drawImage(bild, -20*f, -34*f, 40*f, 40*f);\n'
+              + '          if (an.glut > 0 || an.klappe > 0.1 || an.salve > 0){';
   if (!quelle.includes(anker)) return null;
-  const neu = quelle.replace(anker + '\n          if (dreh && Math.abs(an.richt) > 0.01){',
-    anker + '\n          an.richt = ' + winkel + ';\n          if (dreh && Math.abs(an.richt) > 0.001){');
+  const neu = quelle.replace(anker,
+    '          an.richt = ' + winkel + '; an.glut = 1;\n' + anker);
   if (neu === quelle) return null;
   fs.writeFileSync(ziel, neu);
   return ziel;
@@ -95,7 +106,7 @@ async function bodenband(browser, datei){
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kepler-schwenk-'));
   const a0 = kopieMitWinkel(quelle, '0',   path.join(tmp, 'richt0.html'));
   const a9 = kopieMitWinkel(quelle, '0.9', path.join(tmp, 'richt9.html'));
-  check('der Schwenkzweig ist in der Spieldatei auffindbar', !!(a0 && a9));
+  check('die Stempelstelle der Wiedergabe ist auffindbar', !!(a0 && a9));
   if (!a0 || !a9){ console.log('\nFEHLGESCHLAGEN'); process.exit(1); }
 
   const browser = await starteBrowser();
@@ -113,13 +124,15 @@ async function bodenband(browser, datei){
   const anteil = 100 * anders / (gesamt || 1);
 
   check('es wurden überhaupt Bildpunkte des Bodenbands gelesen', gesamt > 20000, { gesamt });
-  // DER Punkt: Ein anderer Rohrwinkel MUSS ein anderes Bild ergeben. Vor dieser Änderung war
-  // der Unterschied exakt 0 - das Bild kannte den Winkel nicht.
-  check('ein anderer Rohrwinkel ergibt ein anderes Bild (die Rohre folgen wirklich)',
+  // DER Punkt: Ein anderer Winkel MUSS ein anderes Bild ergeben. Vor der Änderung vom 05.08.2026
+  // war der Unterschied exakt 0 - das Bild kannte den Winkel gar nicht. Seit Bündel C trägt ihn
+  // der Mündungsblitz statt des Rohres; die Regel ist dieselbe geblieben.
+  check('ein anderer Winkel ergibt ein anderes Bild (die Ausrichtung kommt an)',
     anders > 300, { andersPunkte: anders, anteilProzent: Number(anteil.toFixed(2)) });
-  // Und die Sockel bleiben stehen: Würde das GANZE Gebäude mitkippen, wäre der Unterschied
-  // ein Vielfaches. Gemessen sind es rund 1 % des Bandes - die Rohre, nicht die Häuser.
-  check('aber nur die Rohre, nicht die ganzen Gebäude', anteil < 8,
+  // Und die Bauwerke bleiben stehen: Würde das GANZE Gebäude mitkippen, wäre der Unterschied
+  // ein Vielfaches. Das ist seit Bündel C ausdrücklich so gewollt - die Sockelplatte lässt sich
+  // nicht schneiden, ohne dass ein Stück von ihr mitkippt.
+  check('aber nur die Mündungen, nicht die ganzen Gebäude', anteil < 8,
     { anteilProzent: Number(anteil.toFixed(2)) });
   check('die Anlagen werden dabei weiterhin alle gezeichnet',
     r9.z && r9.z.anlagenMitBild >= (r9.z.anlagen - 1),
