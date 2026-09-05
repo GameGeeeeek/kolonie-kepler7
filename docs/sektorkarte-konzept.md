@@ -865,3 +865,26 @@ Zwei Befunde aus dem Bau der Messvorrichtung, beide als Kommentar im Test:
 2. Der Kartenreiter öffnet die **Regionsübersicht**; aus dem aufgeklappten System führt kein
    einzelner Heimweg-Knopf dorthin zurück. Der erste Entwurf maß beide Kartenebenen im selben
    Reiter wie das Kartenmenü und hatte vier rote Prüfungen bei richtigem Code.
+
+## GR-9: Vier Fehler, gemessen in der Grafik-Aufnahme (05.09.2026)
+
+Die Grafik-Aufnahme vom 04./05.09.2026 (Bericht „Kepler-7 in neuem Licht") hat nebenbei vier
+Fehler und drei Einzeiler an der Karte und ihrer Umgebung gefunden. Alle sind in
+`tests/test_grafik_einzeiler.js` mit Gegenprobe festgehalten.
+
+| Was | Ursache | Behebung |
+|---|---|---|
+| Fraktionswappen als Riesen-Helm über der Sektorkarte | `.map-wrap svg { width:100%; height:100% }` traf auch das **verschachtelte** 14×14-Wappen-svg am Knoten | `.map-wrap > svg` – nur das direkte Kind |
+| Gürtelplatz 5 lag auf Aion (Orbit 3) | Rasterwinkel 198° gegen Bahnwinkel 200°; im runden Kasten ist ein halber Orbit-Schritt nur 9 Einheiten | `guertelWinkelFuer`: ein Platz näher als 14° am Bahnwinkel von Orbit 3 oder 4 rückt **auf der Bahn** weiter, nach oben (weg vom Namensschild) |
+| Bannerplanet fehlte bei schmalem Fenster mit vollem Kopf | `preserveAspectRatio="xMidYMid slice"` schneidet seitlich genau den Planeten (cx 590) | `xMaxYMid slice` |
+| Terraformte Welt kämpfte auf ihrer alten Oberfläche | `ortTyp` der Wiedergabe las `PLANETS[].type` | `effectivePlanetType` |
+| Nebel des Orbitalglas-Himmels unsichtbar | 5 % Deckkraft | 14 % |
+| Orbit-Bahnen am Handy weg | 0,10 bei 0,6 px | 0,18, wenn `kbSchmalerKasten()` |
+| Wracks als rotes Drahtgitter | `k: s.k` statt des Atlas-Schlüssels `s.modell` | `s.modell \|\| s.k` |
+
+**Warum der Gürtel nicht anders versetzt werden kann.** Zehn gleichverteilte Plätze (36°) können
+den Bahnwinkeln von Orbit 3 (200°) und Orbit 4 (110°) nicht beide mit 12° Abstand fernbleiben:
+20 und 2 modulo 36 lassen keine gemeinsame Lücke. Ein radialer Ausweicher hilft im runden Kasten
+nicht (gemessen: 0,4 Schritte weiter außen klebten Scheibe und Brocken noch aneinander, ein ganzer
+Schritt läge auf Orbit 4). Deshalb wandert genau der eine betroffene Platz auf seiner Bahn – in
+Kepler Platz 5 von 198° auf 214°, über Aion.

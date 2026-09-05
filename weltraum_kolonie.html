@@ -1339,7 +1339,12 @@
        Kopfbereich bei rund 400px, und das Banner ist das EINZIGE Bild der eigenen Welt im ganzen
        Spiel - ein Handyspieler bekam es nie zu sehen.
        Der Ausschnitt (56px statt 190px) zeigt den Planeten samt Ring am rechten Rand: preserveAspectRatio ist
-       im Markup auf "xMidYMid slice" gesetzt, das Bild wird also beschnitten statt gestaucht. Kein
+       im Markup auf "xMaxYMid slice" gesetzt, das Bild wird also beschnitten statt gestaucht - und
+       RECHTSBUENDIG: Bei voller Bannerhoehe in einem Fenster unter rund 760 px Breite (Banner
+       schmaler als seine viewBox) skaliert slice auf die Hoehe und schneidet seitlich; mit xMid war
+       das genau der Planet (cx 590 von 720), gemessen 05.09.2026 bei 480 px (GR-9). xMax haelt den
+       rechten Rand und damit den Planeten im Bild. Der 56-px-Streifen schneidet senkrecht, dort
+       war er nie betroffen. Kein
        Textelement liegt darin - Titel und Knopfleiste stehen im Kompaktmodus ohnehin statisch
        darunter (hero-bottom/hero-stats weiter unten), nicht absolut im Banner. */
     body.compact-head .hero { height:auto; margin-bottom:0.6rem; }
@@ -2197,7 +2202,11 @@
       #karteEbenenLeiste .planet-pill { flex:0 0 auto; }
     }
     .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
-    .map-wrap svg { width:100%; height:100%; }
+    /* NUR das Karten-svg selbst (direktes Kind), nicht jedes svg IM Kasten: Das Fraktionswappen am
+       Knoten ist ein verschachteltes <svg width="14" height="14"> (sektorAnsichtBauen, Systemebene) -
+       mit der alten Regel `.map-wrap svg` wurde es auf Kastengroesse gezogen und legte sich als
+       halbtransparenter Riesen-Helm ueber ein Viertel der Karte (gemessen 05.09.2026, GR-9). */
+    .map-wrap > svg { width:100%; height:100%; }
     /* Zoomstapel waagerecht, sobald der Kartenkasten schmal ist (KB-11): Senkrecht belegt er
        120 px Hoehe - im kompakten Systemkasten (~230 px) lag er damit unter dem ›-Blaetterknopf
        und fing dessen Taps ab. Waagerecht braucht er nur 34 px Hoehe, und die Blaetterknoepfe
@@ -3369,7 +3378,7 @@
     <div class="shell-inner">
 
       <div class="hero">
-        <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" role="img" aria-hidden="true">
+        <svg viewBox="0 0 720 190" width="100%" height="100%" preserveAspectRatio="xMaxYMid slice" role="img" aria-hidden="true">
           <defs>
             <radialGradient id="planetGrad" cx="35%" cy="35%" r="70%">
               <stop offset="0%" stop-color="#9d95f2"/>
@@ -36547,8 +36556,19 @@ async function claimPendingRewards(){
              Monde haben dort keinen Eintrag und bekommen ihre eigenen Kennungen. */
           ortTyp:        function(k){
             if (!k) return null;
-            if (k === 'home') return 'heimat';
+            /* Terraformte Welten (planetTypeOverride) kaempfen auf ihrer NEUEN Oberflaeche -
+               effectivePlanetType ist die eine Stelle, die den Ueberschreiber kennt (GR-9,
+               05.09.2026: vorher las diese Funktion PLANETS[].type, die alte Oberflaeche). Die
+               Heimat bleibt 'heimat', solange sie nicht umgewandelt wurde. */
+            if (k === 'home'){
+              var ovH = (typeof state !== 'undefined' && state && state.planetTypeOverride) ? state.planetTypeOverride.home : null;
+              return ovH || 'heimat';
+            }
             if (typeof isMoonKey === 'function' && isMoonKey(k)) return 'mond';
+            if (typeof effectivePlanetType === 'function'){
+              var eff = effectivePlanetType(k);
+              if (eff) return eff;
+            }
             var p = (typeof PLANETS !== 'undefined') ? PLANETS.find(function(x){ return x.id === k; }) : null;
             return (p && p.type) || null;
           },
@@ -37964,7 +37984,10 @@ async function claimPendingRewards(){
       }
       if (wracks.length < MAXW){
         wracks.push({
-          k: s.k, seite: s.atlasSeite, u: s.u, a: s.a,
+          /* s.modell ist der Atlas-Schluessel des LEBENDEN Schiffs (Spielbild oder Stellvertreter);
+             s.k nur die Klasse. Mit s.k fiel jedes Wrack als roter Polygon-Rueckfall - ein
+             Drahtgitter neben vollen Rumpfbildern (GR-9, 05.09.2026). */
+          k: s.modell || s.k, seite: s.atlasSeite, u: s.u, a: s.a,
           vu: s.vu * 0.5 + (Math.random()-0.5)*0.06,
           va: Math.min(-0.02, s.va * 0.4) - Math.random()*0.05,
           w: s.w, dreh: (Math.random()-0.5) * 3.2, t: 0, brennt: 0, gross: gross
@@ -57147,7 +57170,9 @@ async function claimPendingRewards(){
         kachel.width = kachel.height = Math.max(2, Math.ceil(neb.r*2));
         const kctx = kachel.getContext('2d');
         const kg = kctx.createRadialGradient(neb.r, neb.r, 0, neb.r, neb.r, neb.r);
-        kg.addColorStop(0, `rgba(${neb.color},0.05)`);
+        /* 0,14 statt 0,05: Mit 5 % waren beide Nebel auf dem Schirm nicht vorhanden (gemessen
+           05.09.2026, GR-9). Die Kachel ist gecacht, die Deckkraft kostet nichts. */
+        kg.addColorStop(0, `rgba(${neb.color},0.14)`);
         kg.addColorStop(1, `rgba(${neb.color},0)`);
         kctx.fillStyle = kg;
         kctx.fillRect(0, 0, kachel.width, kachel.height);
@@ -60067,15 +60092,45 @@ async function claimPendingRewards(){
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
   /* Die Guertelbahn liegt zwischen dem 3. und 4. Orbit - dieselbe Ellipsen-Formel wie oben, nur mit
-     halbem Orbit-Schritt. Die zehn Plaetze sitzen gleichmaessig darauf und sind um 18 Grad versetzt,
-     damit sie nicht auf denselben Winkeln landen wie die Planeten (ORBIT_ANGLES). */
+     halbem Orbit-Schritt. Die zehn Plaetze sitzen gleichmaessig darauf, um 18 Grad versetzt.
+     GEMESSEN (05.09.2026, GR-9): Der Versatz allein haelt die Plaetze NICHT von den Planeten fern.
+     Platz 5 liegt bei 198 Grad, der Planet auf Orbit 3 bei -160 = 200 Grad. Im runden Kasten (seit
+     KB-20 auch am Desktop: Orbit-Schritt 18 Einheiten) ist der radiale Abstand eines halben Schritts
+     9 Einheiten, die Planetenscheibe allein hat 11 - Aion lag in Kepler auf dem Vorkommen. Ein
+     radialer Ausweicher hilft dort nicht: selbst 0,4 Schritte weiter aussen klebten beide noch
+     aneinander (gemessen 31 px Abstand bei 34 px Radiensumme), und ein ganzer Schritt laege auf dem
+     vierten Orbit. Zehn gleichverteilte Plaetze koennen den Planetenwinkeln von Orbit 3 UND 4 auch
+     mit keinem anderen Versatz alle fernbleiben (20 und 2 modulo 36 lassen keine Luecke von je 12
+     Grad). Deshalb rueckt ein Platz, der naeher als GUERTEL_FREIWINKEL (14 Grad) an einem dieser
+     Bahnwinkel liegt, AUF SEINER BAHN weiter, bis er genau diesen Abstand hat - das Vorkommen bleibt auf der Guertelbahn, nur
+     dieser eine Platz sitzt nicht mehr im 36-Grad-Raster. Gemessen: bei 12 Grad lagen Scheibe samt
+     Halo und Brocken noch 1 px auseinander, bei 14 Grad sind es 6 px. */
   // Die Gürtelbahn liegt zwischen dem 3. und 4. Orbit - deshalb dieselbe Quelle wie die Planeten
   // (KB-12: am Handy enger und runder, sonst unverändert).
   function guertelRx(){ return kbOrbitRx(3.5); }
   function asteroidPlatzXY(platz){
     const rx = guertelRx(), ry = rx * kbOrbitMass().ry;
-    const rad = (((platz * 36) + 18) % 360) * Math.PI / 180;
+    const rad = guertelWinkelFuer(((platz * 36) + 18) % 360) * Math.PI / 180;
     return { x: SUN_X + rx * Math.cos(rad), y: SUN_Y + ry * Math.sin(rad) };
+  }
+  /* Der Ausweicher AUF der Guertelbahn: Liegt der Rasterwinkel naeher als GUERTEL_FREIWINKEL Grad am
+     Bahnwinkel des dritten oder vierten Orbits (die beiden Nachbarbahnen des Guertels), rueckt er
+     auf der Bahn weiter, bis genau dieser Abstand erreicht ist - und zwar auf die Seite, die im
+     Bild OBEN liegt (kleinerer Sinus): Das Namensschild eines Planeten haengt unter seiner Scheibe,
+     ein Vorkommen unterhalb sass auf dem Schild (gemessen an Kepler mit 186 Grad), eines oberhalb
+     ist frei. Eine reine Winkelfrage, unabhaengig davon, ob in diesem System dort wirklich ein
+     Planet steht - so bleibt jeder Platz systemuebergreifend an derselben Stelle. Gemessen an
+     Kepler: Platz 5 wandert von 198 auf 214 Grad und steht damit ueber Aion (-160 = 200 Grad). */
+  const GUERTEL_FREIWINKEL = 14;
+  function guertelWinkelFuer(grad){
+    const diff = (a, b) => ((a - b) % 360 + 540) % 360 - 180;   // -180..180
+    const norm = a => ((a % 360) + 360) % 360;
+    for (const bahn of [ORBIT_ANGLES[2], ORBIT_ANGLES[3]]){
+      if (Math.abs(diff(grad, bahn)) >= GUERTEL_FREIWINKEL) continue;
+      const a = norm(bahn - GUERTEL_FREIWINKEL), b = norm(bahn + GUERTEL_FREIWINKEL);
+      return Math.sin(a * Math.PI / 180) <= Math.sin(b * Math.PI / 180) ? a : b;
+    }
+    return grad;
   }
   function asteroidMarkerR(groesseKey){
     return ({ splitter:4.5, brocken:6, kern:7.5, koloss:9.5 })[groesseKey] || 5;
@@ -60816,7 +60871,11 @@ async function claimPendingRewards(){
     // Orbit-Ringe
     for (const orbit of orbitsPresent){
       const rx = kbOrbitRx(orbit), ry = rx*kbOrbitMass().ry;
-      inner += `<ellipse cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#dfe6ff" stroke-opacity="0.10" stroke-width="0.6"/>`;
+      // Am Handy (schmaler Kasten, innerWidth <= 700) 0,18 statt 0,10: bei 0,6 px Strich waren die
+      // Bahnen dort praktisch weg, und sie tragen die Ordnung des Systems (gemessen 05.09.2026, GR-9).
+      // Bewusst kbSchmalerKasten und nicht kbRunderKasten: der runde Kasten gilt seit KB-20 auch am
+      // Desktop, dort sollen die Bahnen so leise bleiben wie am 01.09.2026 gewaehlt.
+      inner += `<ellipse data-sys-bahn="${orbit}" cx="${SUN_X}" cy="${SUN_Y}" rx="${rx}" ry="${ry}" fill="none" stroke="#dfe6ff" stroke-opacity="${kbSchmalerKasten() ? '0.18' : '0.10'}" stroke-width="0.6"/>`;
     }
     // Bahnspur: ein kurzer Bogen in der Typfarbe, der hinter jedem Planeten auf seiner Bahn liegt -
     // dieselbe Ellipsen-Formel wie planetOrbitXY, damit der Bogen exakt an der Scheibe endet.
