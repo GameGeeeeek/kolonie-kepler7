@@ -212,7 +212,11 @@ function spielstand(){
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
     const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }),
-      'kepler7-save-v1': spielstand() };
+      /* `kepler7-save-v3` - der Schluessel, den das Spiel wirklich liest (`STORE_KEY`). Hier stand
+         `v1`: Die Vorlage kam damit NIE an, und jede Pruefung, die an Rohstoffen, Flotte oder
+         Gebaeuden haengt, mass den Startzustand statt der Vorlage - still gruen aus dem falschen
+         Grund. Gemessen und behoben am 05.09.2026. */
+      'kepler7-save-v3': spielstand() };
     await page.route('**/api/**', async r => {
       const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
       const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });

@@ -133,12 +133,16 @@ function spielstand(reich){
         projektDefs:[], projekteAktiv:false, flugDeckel:0.5, lagerAktiv:false, lagerStunden:12,
         abbauAktiv:true, abbauMs:86400000, allianzAktiv:false,
         /* DIE KOSTEN KOMMEN AUS DER VORLAGE, weil sie beim echten Server auch von dort kommen -
-           und weil der Spielstand in dieser Testfamilie nicht laedt (die Flotte bleibt leer, obwohl
-           die Vorlage 80 Jaeger fuehrt; dieselbe Beobachtung in test_vorposten_verbuendet_ui und
-           test_vorposten_lager_ui). Das ist hier kein Mangel, sondern die saubere Trennung: Ob das
-           Spiel `canAfford` richtig anwendet, misst der TEURE Lauf (2a); ob Wahl, Bestaetigung und
-           Anfrage stimmen, misst der BILLIGE (1a-1e). Beides an einer Vorlage zu messen, die
-           zufaellig gerade reicht, waere die schlechtere Messung. */
+           und weil die Trennung sauberer ist: Ob das Spiel `canAfford` richtig anwendet, misst der
+           TEURE Lauf (2a); ob Wahl, Bestaetigung und Anfrage stimmen, misst der BILLIGE (1a-1e).
+           Beides an einer Vorlage zu messen, die zufaellig gerade reicht, waere die schlechtere
+           Messung.
+           HIER STAND EINE FALSCHE BEGRUENDUNG (bis 05.09.2026): „der Spielstand dieser Testfamilie
+           laedt nicht". Er laedt. Nachgemessen mit einer Sonde, die den Boot mitschneidet: Das
+           Spiel holt `GET storage/kepler7-save-v3`, die 20 Mio Erz der Vorlage stehen danach im
+           DOM, und der Angriffseintrag im Kartenmenue ist bedienbar („Oeffnet die Flottenwahl.")
+           statt „Keine Kampfschiffe auf Heimatbasis". Die Beobachtung stammte aus Tests mit dem
+           falschen Schluessel `kepler7-save-v1`; die sind seither umgestellt. */
         umruestenAktiv: o.aktiv !== false, umruestenAbStufe:8, umruestenMs:86400000,
         umruestenKosten: o.kosten || KOSTEN,
         liste:[doc], eigene:1 });
@@ -387,11 +391,25 @@ function spielstand(reich){
       `node --check` findet das nicht, der Browser schon („Cannot access 'abbauBis' before
       initialization"). Dieselbe Falle, vor der die Backend-CLAUDE.md wegen `galaxyTick` warnt.
 
-   UND EINE BEOBACHTUNG, die ueber diesen Test hinausgeht: Der Spielstand dieser Testfamilie LAEDT
-   NICHT. Die Vorlage fuehrt 80 Jaeger, das Menue sagt trotzdem „Keine Kampfschiffe auf
-   Heimatbasis". Ursache war hier der Schluessel `kepler7-save-v1`; das Spiel liest `STORE_KEY =
-   'kepler7-save-v3'`. Umgestellt - es reicht aber immer noch nicht, der Stand kommt weiterhin
-   nicht an. Deshalb misst dieser Test die Kostenpruefung mit einer EIGENEN, teuren Vorlage (2a)
-   und den Ablauf mit einer billigen (1a-1e), statt sich auf Rohstoffe aus dem Spielstand zu
-   verlassen. Zwei aeltere Vorposten-Tests tragen denselben falschen Schluessel; dort faellt es
-   nicht auf, weil sie nichts davon lesen. */
+   EINE BEOBACHTUNG, DIE FALSCH WAR - und deshalb hier stehen bleibt, korrigiert (05.09.2026):
+   Hier stand „Der Spielstand dieser Testfamilie LAEDT NICHT … umgestellt auf v3, es reicht aber
+   immer noch nicht". Der zweite Halbsatz war eine Vermutung, keine Messung, und er war falsch.
+
+   NACHGEMESSEN mit einer Sonde, die den Boot mitschneidet: Das Spiel holt
+   `GET storage/kepler7-save-v3`, die 20 Mio Erz der Vorlage stehen danach im DOM, und im
+   Kartenmenue eines FREMDEN Vorpostens ist „Vorposten angreifen" bedienbar mit dem Grund
+   „Oeffnet die Flottenwahl." - nicht „Keine Kampfschiffe auf Heimatbasis". Der Spielstand laedt
+   also, und die Flotte kommt an.
+
+   Die urspruengliche Beobachtung stammte aus den vier Tests, die den Schluessel `kepler7-save-v1`
+   trugen (lager, markt, verbuendet, werft). Bei DENEN kam die Vorlage wirklich nie an - jede
+   Pruefung darin, die an Rohstoffen, Flotte oder Gebaeuden haengt, mass den Startzustand statt
+   der Vorlage. Alle vier sind umgestellt.
+
+   DIE UEBERTRAGBARE LEHRE: Eine Ursache, die nach der ersten Korrektur nicht ERNEUT gemessen
+   wird, ist eine Vermutung - und sie wandert als Tatsache in den naechsten Test, der von hier
+   abgeschrieben wird. Genau das ist zweimal passiert.
+
+   Dass dieser Test die Kostenpruefung trotzdem mit einer EIGENEN, teuren Vorlage misst (2a) und
+   den Ablauf mit einer billigen (1a-1e), bleibt richtig: Beides an einer Vorlage zu messen, die
+   zufaellig gerade reicht, waere die schlechtere Messung. */
