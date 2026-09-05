@@ -1244,3 +1244,36 @@ die Zeile nicht Wort für Wort liest.
 Wächter: `tests/test_vorposten_markt_ui.js` (14 Prüfungen, sechs Gegenproben gemessen). `E` wiederholt
 die Lehre aus V2: Addiert man die Platzzahl selbst, fällt **nur** die Quelltextprüfung — die
 Wirkungsprüfung sieht es nicht, weil die Zahl heute dieselbe ist.
+
+## Etappe V4 im Spiel: Das Lager war unerreichbar (05.09.2026)
+
+Der Belohnungszweig `vorposten-lager` stand seit dem 03.09.2026 im Spiel — sorgfältig gebaut, mit
+Lagerdeckel über `gainResources` und einer Meldung, die zwischen „nichts geschickt" und „nichts
+angekommen" unterscheidet. Aber **keine einzige Stelle rief den Endpunkt**
+`/api/vorposten/lager/holen`. `grep -c` war 0. Das Lager konnte nie abgeholt werden, der Zweig nie
+auslösen.
+
+**Diese Fehlerklasse fängt kein Testverfahren, das die Enden prüft**, denn beide Enden waren
+stimmig: Der Server bot den Endpunkt an, das Spiel konnte die Antwort verarbeiten — es fragte nur
+nie. Abschnitt 0 des Wächters misst deshalb die **Verbindung**: dass es genau eine rufende Stelle
+gibt, dass sie den Ertrag *nicht* selbst bucht (das täte sie doppelt und am Deckel vorbei) und dass
+sie den Claim auslöst.
+
+**Zwei Dinge im Backend fielen beim Vorbereiten auf**, beide behoben (PR #240):
+
+- `vorpostenLagerStand()` und `vorpostenLagerVoll()` rechneten dasselbe `seit` getrennt, und nur der
+  Stand kannte `VP_LAGER_AB`. Am Tag der Aktivierung hätte die neue Anzeige **„Lager voll" über ein
+  leeres Lager** geschrieben — für jeden Spieler mit Vorposten.
+- Der HTTP-Test hing am *ausgelieferten* Wert von `VP_LAGER_AB`: Er datiert `lagerSeit` zurück, und
+  gegen eine echte Untergrenze fielen neun Prüfungen. Er nullt die Konstante jetzt in seiner Kopie
+  und setzt sie in Abschnitt 6 selbst.
+
+**Angezeigt wird das Lager auch an fremden Vorposten** — das ist Absicht: Wer stürmt, soll riechen
+können, wo sich der Flug lohnt.
+
+Wächter: `tests/test_vorposten_lager_ui.js` (12 Prüfungen, vier Gegenproben gemessen) und
+`tests/test_vorposten_lager_http.js` Abschnitt 6 (Gegenprobe `vollab`).
+
+**Der eigene Testfehler dabei** steht in `docs/TESTING.md`: Der erste Entwurf suchte das Kartenmenü
+unter Selektoren, die es nicht gibt, wich auf `document.body` aus und maß damit den Quelltext des
+`<script>`-Blocks mit.
