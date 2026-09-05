@@ -563,6 +563,18 @@ Seitdem misst 9a den Ausschnitt **ohne Kommentare**. Zwei übertragbare Regeln:
 
 Gefunden hat es nur die Gegenprobe. Ohne sie wäre ein Test entstanden, der auf ewig grün ist.
 
+**Nachtrag vom 05.09.2026 — dieselbe Falle, einen Tag später, in `test_vorposten_verbuendet_ui.js`:**
+Eine Prüfung suchte `alsVerbuendeter` im ausgeschnittenen Quelltext und fand das Wort im
+erklärenden Kommentar; die Gegenprobe blieb grün, obwohl das Feld ausgehebelt war. **Die Regel
+oben stand längst geschrieben und hat es nicht verhindert.**
+
+Was hilft, ist keine Erinnerung, sondern eine Gewohnheit — zwei Handgriffe, die nichts kosten:
+
+1. **Kommentare zuerst streichen**, immer, sobald Quelltext für eine Prüfung ausgeschnitten wird.
+   Nicht erst, wenn eine Gegenprobe stolpert.
+2. **Den Feldzugriff prüfen, nicht das Wort.** `/r\.alsVerbuendeter/` statt `/alsVerbuendeter/`.
+   Ein Bezeichner mit seinem Punkt davor steht im Fließtext praktisch nie.
+
 ## Auf das gemessene Element warten, nicht auf die Uhr (04.09.2026)
 
 `test_vorposten_werft_ui.js` misst eine Bauzeit von einer Karte im Werft-Tab. Mit festen

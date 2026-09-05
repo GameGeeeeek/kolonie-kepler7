@@ -1277,3 +1277,30 @@ Wächter: `tests/test_vorposten_lager_ui.js` (12 Prüfungen, vier Gegenproben ge
 **Der eigene Testfehler dabei** steht in `docs/TESTING.md`: Der erste Entwurf suchte das Kartenmenü
 unter Selektoren, die es nicht gibt, wich auf `document.body` aus und maß damit den Quelltext des
 `<script>`-Blocks mit.
+
+## Etappe V5 im Spiel: Der Verbündete darf mitwirken (05.09.2026)
+
+Der Server kennt den Allianzpartner seit dem 03.09.2026 (`verbuendet`, `garnisonVon`,
+`alsVerbuendeter`); das Spiel las **keines** dieser Felder. Ein Partner sah an einem fremden
+Vorposten genau einen Eintrag: „angreifen".
+
+**Jetzt sieht er zwei mehr** — Garnison beisteuern und *seine eigenen* Schiffe zurückrufen —, die
+Stationstafel nennt **seinen Anteil** an der Garnison, der Flugzeit-Bonus gilt auch ihm, und beim
+Fall wie beim Abbau bekommt er **seine eigene Meldung** statt „Dein Vorposten wurde geschleift"
+über fremdes Eigentum.
+
+**Die Zahl ist die gefährlichste Stelle.** Ein Verbündeter sieht die *gesamte* Garnison; wie viele
+davon seine sind, steht nur in `garnisonVon`. Ohne diese Aufschlüsselung stünde „meine Schiffe
+zurückrufen" über einer Zahl, von der ihm vielleicht kein einziges Schiff gehört — und beim Fall
+verlöre er Schiffe, von denen er nicht wusste, dass sie noch dort stehen.
+
+**Eine Messung hat eine Annahme verhindert.** Der erste Entwurf gab dem Verbündeten die
+Garnison-Einträge *anstelle* des Angriffs — es schien selbstverständlich, dass man den Vorposten
+der eigenen Allianz nicht angreift. Gemessen am Server stimmt das nicht: `/api/vorposten/angriff`
+weist nur den **eigenen** Vorposten ab, eine Allianzsperre gibt es dort nicht. Die Einträge kommen
+jetzt dazu. Ob ein Verbündeter angreifen *dürfen soll*, ist eine Spielfrage — nicht im Menü zu
+entscheiden.
+
+Wächter: `tests/test_vorposten_verbuendet_ui.js` (14 Prüfungen, fünf Gegenproben gemessen).
+Prüfung `1b` hält genau die verhinderte Annahme fest; Gegenprobe `D` fällt, wenn jemand sie wieder
+einbaut.
