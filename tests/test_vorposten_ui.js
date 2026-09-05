@@ -368,6 +368,37 @@ async function anfechtungHinflug(t){
     check('7d: keine Seitenfehler', tEigen.errs.length === 0, tEigen.errs.slice(0, 2));
     await tEigen.ctx.close();
 
+    /* 7h: DIE UMRUESTUNG STEHT IN DER ZEILE (Durchsicht 05.09.2026). Die Leiste kannte den Abbau
+       und das Vorhaben, aber nicht den Umbau - dabei ist er von den dreien derjenige, der die
+       WERTE der ganzen Station aendert.
+       DIE SIGNATUR IST DIE ZWEITE HAELFTE, und sie wird bewusst am QUELLTEXT geprueft (7j): Ein
+       fehlendes Feld in `vpSig` friert die Restzeit ein, ohne dass etwas kaputt aussieht - und in
+       EINER Momentaufnahme ist das gar nicht sichtbar. Ein Browserlauf muesste dafuer eine Minute
+       warten, bis `vpRestMin` umspringt; der Quelltext-Waechter kostet nichts und trifft dieselbe
+       Aussage. Dieselbe Falle wie bei `lpMax`/`garnisonMax` einen Tag zuvor. */
+    const tUmbau = await tab(browser, fixture(), { eigener: true,
+      felder: { umruestenAb: Date.now() + 5*3600*1000, umruestenZiel: 'handel' } });
+    await tUmbau.page.waitForTimeout(3000);
+    const lUmbau = await leiste(tUmbau);
+    check('7h: eine laufende Umruestung steht mit ihrer Restzeit in der Leiste',
+      /Umbau\s*4h|Umbau\s*5h/.test(lUmbau.text) && !/Abbau/.test(lUmbau.text),
+      { text: lUmbau.text });
+    check('7i: keine Seitenfehler im Umbau-Durchlauf', tUmbau.errs.length === 0, tUmbau.errs.slice(0, 2));
+    await tUmbau.ctx.close();
+    {
+      const von = HTML.indexOf('const vpSig = meine.map(');
+      /* OHNE KOMMENTARE. Die erste Fassung las den Rohtext - und der Kommentar ueber der Zeile
+         nennt `umruestenAb` beim Namen. Die Gegenprobe (das Feld aus der Signatur entfernt) blieb
+         deshalb gruen: Der Waechter mass seine eigene Begruendung. */
+      const sig = von < 0 ? '' : HTML.slice(von, HTML.indexOf(".join('|')", von))
+        .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
+      check('7j-anker: die Signatur der Leiste ist lesbar (sonst misst 7j nichts)', von > 0 && sig.length > 200,
+        { laenge: sig.length });
+      check('7j: jede Groesse, die in der Zeile steht, steht auch in der Signatur',
+        /umruestenAb/.test(sig) && /abbauAb/.test(sig) && /lpMax/.test(sig) && /garnisonMax/.test(sig),
+        { fehlend: ['umruestenAb','abbauAb','lpMax','garnisonMax'].filter(k => !new RegExp(k).test(sig)) });
+    }
+
     const tFremd = await tab(browser, fixture(), {});
     await tFremd.page.waitForTimeout(3000);
     const lFremd = await leiste(tFremd);
