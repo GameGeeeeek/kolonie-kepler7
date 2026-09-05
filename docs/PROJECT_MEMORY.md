@@ -456,3 +456,41 @@ und 9) und lesen ihren gültigen Vorrat aus dem Code, statt ihn zu tippen.
 **Wo sonst noch suchen:** Überall, wo ein Name aus einer Tabelle als Schlüssel in eine *andere*
 Datenstruktur greift, ohne dass jemand das Ergebnis auf `undefined` prüft. Ein `|| 0`, ein `||
 false` und ein `if (x[k])` sind dort keine Robustheit, sondern die Tarnung.
+
+## Wer über einen gespeicherten Stand urteilt, muss ihn vorher bekommen (05.09.2026)
+
+Spieler-Report Hanson im Global-Chat: „warum kann man Energie volles Lager mehrmals verkaufen
+FEHLER". Dahinter steckte keine Marktlogik, sondern eine Zeitlücke.
+
+**Die Kette.** `/api/market/trade` ist bewusst serverautoritativ und prüft den Bestand gegen
+`getSaveValue(userId)` — also gegen den Spielstand, der zuletzt *gespeichert* wurde. Der Client
+speichert im 10-Sekunden-Takt. Alles, was in diesen zehn Sekunden produziert wurde, kennt der
+Server nicht; er lehnt mit „Nicht genug &lt;Ressource&gt; zum Verkaufen" ab, während die
+Ressourcenleiste sichtbar etwas anderes zeigt.
+
+**Warum es ausgerechnet bei vollem Lager auffiel.** Bei vollem Lager steht die Produktion
+(`SOFT_CAP_OVERFLOW_RATE = 0`), Anzeige und Serverstand sind deckungsgleich — der *erste* Verkauf
+geht deshalb immer durch und setzt den Serverstand auf 0. Danach läuft die Produktion wieder, und
+jeder *weitere* Verkauf innerhalb der nächsten zehn Sekunden prallt an dieser 0 ab. Genau die
+Reihenfolge, die der Spieler beschrieb: einmal geht, mehrmals gibt FEHLER. Gemessen in der
+Gegenprobe: Anzeige 76 Energie, Serverstand 0, Ablehnung.
+
+**Die übertragbare Frage für jede serverautoritative Prüfung: Über welchen Stand urteilt sie —
+über den, den der Spieler sieht, oder über einen älteren?** Sind das zwei verschiedene Dinge, ist
+die Prüfung nicht falsch, aber ihre Ablehnung ist eine Falschaussage. Entweder der aktuelle Stand
+geht der Prüfung voraus (hier: einmal speichern vor dem Verkauf), oder die Ablehnung muss den
+Grund benennen statt „nicht genug" zu behaupten.
+
+**Der Fehler hat eine zweite Ebene, und die fand erst der Wächter.** Der Sammelauftrag speichert
+bewusst nur *einmal* am Anfang (ein Speichervorgang je Tranche war 2026 die Ursache einer
+Abmeldung, siehe `tests/test_marktlimit_abmeldung.js`). Seine Folgetranchen kappten aber auf
+`state.resources[...]` — also inklusive der seither produzierten Menge, die der Server nicht kennt.
+Gemessen: Tranche 2 verlangte 19 Energie, der Server sah 0, der Auftrag stoppte mitten im Lauf.
+Gekappt wird jetzt zusätzlich gegen `marktServerBestand` (die letzte Auskunft des Servers).
+**Lehre daraus: Wer eine Schleife von einer einmaligen Vorbedingung abhängig macht, muss prüfen,
+ob sie ab dem zweiten Durchlauf noch gilt.**
+
+**Und einmal in eigener Sache:** Der erste Entwurf setzte das `await save()` *vor* den synchronen
+Riegel `if (marketBulkRun) return` — zwei schnelle Klicks wären damit beide durchgekommen. Ein
+`await` in eine geprüfte-dann-gesetzte Sperre einzuschieben öffnet genau das Fenster, das die
+Sperre schließen soll; es gehört hinter das Setzen, nicht davor.

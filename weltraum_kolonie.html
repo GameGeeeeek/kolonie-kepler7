@@ -15535,6 +15535,14 @@
   // gelesen, um ein Rate-Limit (429) von einem echten Fehler zu unterscheiden. Wird bei jedem
   // erfolgreichen Handel wieder auf null gesetzt.
   let marktLetzteAbsage = null;
+  /* Der Bestand, den der SERVER nach dem letzten erfolgreichen Handel kannte
+     (data.newResourceAmount) - vom Sammelauftrag gelesen, `null` heißt "noch keine Auskunft".
+     Er ist nicht dasselbe wie state.resources[...]: Zwischen zwei Tranchen produziert das Spiel
+     weiter, der Server erfährt davon aber erst beim nächsten Speichern. Ohne diese Zahl bot die
+     zweite Tranche genau diese Produktion mit an und prallte am Serverstand ab - derselbe Fehler
+     wie der von Hanson gemeldete, nur eine Ebene tiefer (gemessen mit
+     test_markt_verkauf_speicherstand.js: Tranche 2 verlangte 19 Energie, der Server sah 0). */
+  let marktServerBestand = null;
   // opts.viaLimit: Ausführung durch eine Limit-Order (v8.166.0) - unterdrückt die "läuft-noch"-/
   // "nicht-genug"-Hinweise (die Order wird einfach im nächsten Zyklus erneut geprüft) und protokolliert
   // mit eigenem Text. Rückgabe true bei erfolgreichem Handel, sonst false - damit processLimitOrders
@@ -15556,6 +15564,25 @@
     }
     marketTradeInFlight = true;
     try {
+      /* VOR dem Verkauf einmal speichern (Spieler-Report Hanson, 05.09.2026: "warum kann man
+         Energie volles Lager mehrmals verkaufen FEHLER").
+         Der Markt ist serverautoritativ - /api/market/trade prueft den Bestand gegen den
+         GESPEICHERTEN Spielstand (getSaveValue), nicht gegen den, den der Spieler vor sich sieht.
+         Der Client speichert aber nur alle 10 s (setInterval(save, 10000)); alles, was seit dem
+         letzten Speichern produziert wurde, kennt der Server nicht. Er antwortet dann mit
+         "Nicht genug <Ressource> zum Verkaufen", waehrend das Lager im Spiel sichtbar gefuellt
+         ist - eine Ablehnung, die wie ein Fehler des Spielers aussieht und keiner ist.
+         Am haertesten trifft es genau den gemeldeten Fall: Bei VOLLEM Lager steht die Produktion
+         (SOFT_CAP_OVERFLOW_RATE = 0), Anzeige und Serverstand sind deckungsgleich, der erste
+         Verkauf geht durch und leert den Serverstand auf 0. Danach laeuft die Produktion wieder -
+         und jeder weitere Verkauf innerhalb der naechsten 10 s prallt an einer 0 ab, obwohl die
+         Ressourcenleiste laengst wieder etwas anzeigt.
+         Nur beim VERKAUF: Beim Kauf prueft der Server die Kredite, und die aendert kein Tick.
+         Nur wenn KEIN Sammelauftrag laeuft: Der speichert einmal fuer alle Tranchen (siehe
+         doMarketTradeChunked). Ein Speichervorgang je Tranche war schon einmal die Ursache
+         dafuer, dass ein grosser Auftrag den Spieler ausgeloggt hat - siehe die Begruendung am
+         Ende dieser Funktion und test_marktlimit_abmeldung.js. */
+      if (action === 'sell' && !marketBulkRun) await save();
       const res = await backendFetch('/market/trade', {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
@@ -15575,6 +15602,7 @@
         return false;
       }
       marktLetzteAbsage = null;
+      marktServerBestand = data.newResourceAmount;
       const label = resDefFor(resource).label;
       // Server ist jetzt die Autorität: neue Gesamtwerte direkt übernehmen statt selbst nachzurechnen.
       state.credits = data.newCredits;
@@ -15833,15 +15861,37 @@
     const label = resDefFor(resource).label;
     const chunks = Math.ceil(amount / MARKET_MAX_PER_TRADE);
     marketBulkRun = { abort:false, done:0, total:chunks, resource, action };
+    /* EINMAL fuer den ganzen Sammelauftrag speichern, damit der Server den aktuellen Bestand
+       kennt (Begruendung ausfuehrlich in doMarketTrade) - nicht je Tranche: ein Speichervorgang
+       je Tranche war die Ursache der Abmeldung aus test_marktlimit_abmeldung.js, und innerhalb
+       des Auftrags laesst doMarketTrade seinen eigenen deshalb aus (`!marketBulkRun`).
+       Bewusst NACH dem Setzen von marketBulkRun: Der Riegel drueber wird synchron geprueft; ein
+       `await` davor oeffnete ein Fenster, in dem zwei schnelle Klicks BEIDE durchkaemen und zwei
+       Sammelauftraege nebeneinander liefen. */
+    if (action === 'sell') await save();
+    // Nach dem Speichern sind Anzeige und Serverstand deckungsgleich - die Auskunft eines
+    // FRÜHEREN Auftrags wäre hier veraltet und würde die erste Tranche unnötig kappen.
+    marktServerBestand = null;
     log('Sammelauftrag gestartet: '+(action==='sell'?'Verkauf':'Kauf')+' von '+fmt(amount)+' '+label+' in '+chunks+' Tranchen à max. '+fmt(MARKET_MAX_PER_TRADE)+'.', 'ti-truck');
     renderMarket();
     let moved = 0, failed = false;
     for (let i=0; i<chunks; i++){
       if (marketBulkRun.abort) break;
       let part = Math.min(MARKET_MAX_PER_TRADE, amount - moved);
-      // Beim Verkauf gegen den AKTUELLEN Bestand prüfen: zwischen den Tranchen laufen Produktion,
-      // Bauaufträge und Handelsrouten weiter, der Vorrat kann sich also verschoben haben.
-      if (action === 'sell') part = Math.min(part, Math.floor(state.resources[resource]||0));
+      /* Beim Verkauf gegen den AKTUELLEN Bestand prüfen: zwischen den Tranchen laufen Produktion,
+         Bauaufträge und Handelsrouten weiter, der Vorrat kann sich also verschoben haben.
+         Gekappt wird gegen BEIDE Zahlen, und das aus je eigenem Grund:
+         - state.resources: was der Spieler wirklich noch hat (ein Bauauftrag dazwischen kann den
+           Vorrat gesenkt haben) - der ursprüngliche Grund dieser Zeile;
+         - marktServerBestand: was der SERVER davon weiß. Er prüft gegen den gespeicherten
+           Spielstand, und der Sammelauftrag speichert bewusst nur EINMAL am Anfang. Ohne diese
+           Kappung böte jede Folgetranche die seither produzierte Menge mit an, der Server lehnte
+           sie ab ("Nicht genug ..."), und der Auftrag stoppte mitten im Lauf mit einer Meldung,
+           die nach einem Fehler des Spielers aussieht. */
+      if (action === 'sell'){
+        part = Math.min(part, Math.floor(state.resources[resource]||0));
+        if (marktServerBestand !== null) part = Math.min(part, Math.floor(marktServerBestand));
+      }
       if (part < 1) break;
       let ok = await doMarketTrade(action, resource, part, opts);
       /* Rate-Limit abwarten statt aufgeben (17.08.2026). Der Server deckelt ALLE /api-Anfragen
