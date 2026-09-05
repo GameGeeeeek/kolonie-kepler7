@@ -29,6 +29,16 @@ const ICH = 'u-ich';
 const SYS = 'vega';
 const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
 
+/* 0c: DIE ZWEIGWAHL NENNT DEN STECKPLATZ. Sie laeuft ueber `prompt`, laesst sich also im Browser
+   nur ueber einen Klick auf „Ausbauen" auf genau der Wahlstufe messen; die Regel ist eine reine
+   Textregel, deshalb hier am Quelltext. Die Wahl gilt fuer immer - und seit V7 entscheidet sie
+   mit, wie viele Module die Station traegt (Befund der Durchsicht 05.09.2026, dieselbe Luecke wie
+   bei der Schiffsbauzeit in V2). */
+check('0c: die einmalige Ausrichtungswahl nennt den Steckplatz-Zuschlag',
+  /vorpostenCache\.modulSetsAktiv && \(\(vorpostenCache\.zweigSlots \|\| \{\}\)\[va\.zweig\] \|\| 0\) > 0/.test(src)
+  && /Steckplatz – nur hier ist die Sternwacht/.test(src));
+check('0d: der Zusatzplatz wird aus `v.slots` gerechnet, nicht aus der Tabelle daneben',
+  /const zusatzPlatz = Math\.max\(0, slots - leiterPlatz\);/.test(src));
 check('0a: das Spiel haelt KEINE eigene Set-Tabelle - sie kommt vom Server',
   /function vpSetDefs\(\)\{ return vorpostenCache\.modulSetsAktiv \? \(vorpostenCache\.modulSetDefs \|\| \[\]\)/.test(src)
   && !/const VP_MODUL_SET_DEFS = \[/.test(src) && !/const VP_ZWEIG_SLOTS = /.test(src));
@@ -48,13 +58,20 @@ const MODUL_DEFS = [
   { key:'kernpanzer', name:'Kernpanzerung', icon:'ti-shield', wirkung:'kern', basis:0.08, desc:'Verstärkt den Kern der Station.' },
   { key:'geschuetz', name:'Geschützbank', icon:'ti-sword', wirkung:'verteidigung', basis:0.10, desc:'Zusätzliche Geschütze.' },
   { key:'hangar', name:'Hangarerweiterung', icon:'ti-rocket', wirkung:'garnison', basis:0.12, desc:'Mehr Liegeplätze.' },
-  { key:'sprungrechner', name:'Sprungrechner', icon:'ti-atom-2', wirkung:'flug', basis:0.15, desc:'Rechnet Sprungbahnen vor.' }
+  { key:'sprungrechner', name:'Sprungrechner', icon:'ti-atom-2', wirkung:'flug', basis:0.15, desc:'Rechnet Sprungbahnen vor.' },
+  { key:'raffinerie', name:'Umlaufraffinerie', icon:'ti-building-factory-2', wirkung:'prod', basis:0.15, desc:'Verarbeitet im Orbit.' },
+  { key:'horchposten', name:'Horchposten', icon:'ti-antenna-bars-5', wirkung:'scan', basis:1, desc:'Lauscht weiter ins System.' }
 ];
 const SET_DEFS = [
-  { key:'bollwerk', name:'Bollwerk', icon:'ti-shield', teile:['kernpanzer','geschuetz'],
+  { key:'trutzring', name:'Trutzring', icon:'ti-shield', teile:['kernpanzer','geschuetz'],
     boni:{ kern:0.10, verteidigung:0.10 }, desc:'Kernpanzerung und Geschützbank greifen ineinander.' },
   { key:'flottenbasis', name:'Flottenbasis', icon:'ti-rocket', teile:['hangar','sprungrechner'],
-    boni:{ garnison:0.10, flug:0.03 }, desc:'Liegeplätze und Sprungbahnen aus einer Hand.' }
+    boni:{ garnison:0.10, flug:0.03 }, desc:'Liegeplätze und Sprungbahnen aus einer Hand.' },
+  /* SECHS TEILE - das Set, das mehr Steckplaetze verlangt, als die meisten Stationen haben. Ohne
+     eines dieser Art koennte 2d („nennt den Grund statt einer Fehlliste") gar nicht messen. */
+  { key:'sternwacht', name:'Sternwacht', icon:'ti-antenna-bars-5',
+    teile:['kernpanzer','geschuetz','hangar','sprungrechner','raffinerie','horchposten'],
+    boni:{ kern:0.10, verteidigung:0.10, garnison:0.10 }, desc:'Alle sechs Systeme laufen zusammen.' }
 ];
 const SELTENHEITEN = { gewoehnlich:{ label:'Gewöhnlich', mult:1.0 }, ungewoehnlich:{ label:'Ungewöhnlich', mult:1.4 }, selten:{ label:'Selten', mult:2.0 }, episch:{ label:'Episch', mult:2.8 }, legendaer:{ label:'Legendär', mult:4.0 } };
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp:20000*s, verteidigung:2500*s, garnisonMax:300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
@@ -67,7 +84,7 @@ const vp = { id:'vp1', sys:SYS, besitzer:ICH, besitzerName:'Ich', seit: now-8640
   nutzen:{ flug:0.15, prod:0.04, scan:4 }, eigener:true, meinLetzterSchlag:0, letzterKampf:null,
   slots:6, module:['kernpanzer:selten','geschuetz:episch','hangar:gewoehnlich'],
   modulBoni:{ kern:0.16, verteidigung:0.28, garnison:0.12, flug:0, prod:0, scan:0 },
-  sets:['bollwerk'], setBoni:{ kern:0.10, verteidigung:0.10, garnison:0, flug:0, prod:0, scan:0, werft:0, markt:0 },
+  sets:['trutzring'], setBoni:{ kern:0.10, verteidigung:0.10, garnison:0, flug:0, prod:0, scan:0, werft:0, markt:0 },
   naechsteStufe:null };
 function spielstand(){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
@@ -98,6 +115,7 @@ function spielstand(){
         garnisonFaktor:0.5, stufen:STUFEN, zweige:[{ key:'festung', name:'Festungsring', kurz:'Hält Systeme.', namen:{8:'Sternenfestung'}, mult:{} }],
         zweigAb:4, maxStufe:8, modulDefs:MODUL_DEFS, modulSeltenheiten:SELTENHEITEN, modulBaubar:['gewoehnlich','ungewoehnlich'],
         modulAusbauKosten:250, modulBauAbklingMs:21600000, modulBestand:{ 'sprungrechner:selten':1 }, modulBauAb:0,
+        zweigAb:4,
         /* DIE TABELLE REIST IMMER MIT - auch bei liegendem Schalter. So macht es der Server
            (`modulSetDefs: VP_MODUL_SET_DEFS` steht dort unbedingt, nur `modulSetsAktiv` haengt am
            Schalter). Die erste Fassung liess sie bei ausgeschaltetem Schalter weg; damit konnte
@@ -144,9 +162,12 @@ function spielstand(){
     }, null, { timeout: 20000 }).catch(() => {});
     const fenster = await page.evaluate(() => {
       const o = document.getElementById('vorpostenModulOverlay');
-      if (!o) return { offen:false, text:null, sets:[] };
+      if (!o) return { offen:false, text:null, sets:[], ohnePlatz:0, raus:[] };
       return { offen: o.classList.contains('open'), text: (o.textContent || '').replace(/\s+/g, ' ').trim(),
-        sets: [...o.querySelectorAll('[data-vp-set]')].map(n => ({ key: n.getAttribute('data-vp-set'), voll: n.getAttribute('data-vp-set-voll') === '1' })) };
+        sets: [...o.querySelectorAll('[data-vp-set]')].map(n => ({ key: n.getAttribute('data-vp-set'),
+          voll: n.getAttribute('data-vp-set-voll') === '1', zugross: n.getAttribute('data-vp-set-zugross') === '1' })),
+        ohnePlatz: o.querySelectorAll('[data-vp-ohne-platz]').length,
+        raus: [...o.querySelectorAll('[data-vp-modul-raus]')].map(b => b.getAttribute('data-vp-modul-raus')) };
     });
     await ctx.close();
     return { menue, fenster, errs };
@@ -158,28 +179,56 @@ function spielstand(){
     && an.menue.text.length < 20000 && an.fenster.offen === true,
     { errs: an.errs.slice(0, 2), laenge: an.menue.text === null ? null : an.menue.text.length });
   check('1a: die Stationstafel nennt die stehenden Sets beim Namen',
-    an.menue.sets === 1 && /Sets: Bollwerk/.test(an.menue.text) && !/Flottenbasis/.test(an.menue.text),
+    an.menue.sets === 1 && /Sets: Trutzring/.test(an.menue.text) && !/Flottenbasis/.test(an.menue.text),
     { sets: an.menue.sets, auszug: (an.menue.text.match(/Sets:[^·]*/) || [])[0] });
   check('1b: und den sechsten Steckplatz samt seiner Herkunft',
     /3 von 6 Steckplätzen belegt/.test(an.fenster.text) && /dazu 1 durch deine Ausrichtung/.test(an.fenster.text),
     { auszug: (an.fenster.text.match(/\d von \d Steckplätzen[^.]*\./) || [])[0] });
-  check('2-anker: beide Sets stehen im Fenster', an.fenster.sets.length === 2,
-    { sets: an.fenster.sets });
+  check('2-anker: alle drei Sets der Tabelle stehen im Fenster', an.fenster.sets.length === SET_DEFS.length,
+    { sets: an.fenster.sets, erwartet: SET_DEFS.length });
   check('2a: das stehende Set ist als solches gekennzeichnet und nennt seinen Bonus',
-    an.fenster.sets.some(x => x.key === 'bollwerk' && x.voll)
-    && /Bollwerk steht/.test(an.fenster.text) && /\+10% Kern · \+10% Verteidigung/.test(an.fenster.text),
-    { auszug: (an.fenster.text.match(/Bollwerk[^·]*·[^–]*/) || [])[0] });
+    an.fenster.sets.some(x => x.key === 'trutzring' && x.voll)
+    && /Trutzring steht/.test(an.fenster.text) && /\+10% Kern · \+10% Verteidigung/.test(an.fenster.text),
+    { auszug: (an.fenster.text.match(/Trutzring[^·]*·[^–]*/) || [])[0] });
   check('2b: das offene Set nennt, WELCHES Stueck noch fehlt',
     an.fenster.sets.some(x => x.key === 'flottenbasis' && !x.voll)
-    && /es fehlt noch Sprungrechner/.test(an.fenster.text) && !/Flottenbasis steht/.test(an.fenster.text),
-    { auszug: (an.fenster.text.match(/Flottenbasis[\s\S]{0,120}/) || [])[0] });
+    && /Es fehlt noch Sprungrechner\./.test(an.fenster.text) && !/Flottenbasis steht/.test(an.fenster.text),
+    { auszug: (an.fenster.text.match(/Flottenbasis[\s\S]{0,140}/) || [])[0] });
+  check('2c: jedes Set zeigt seine Beschreibung - sonst reist sie umsonst mit',
+    /Kernpanzerung und Geschützbank greifen ineinander/.test(an.fenster.text)
+    && /Liegeplätze und Sprungbahnen aus einer Hand/.test(an.fenster.text),
+    { auszug: (an.fenster.text.match(/Trutzring[\s\S]{0,180}/) || [])[0] });
+  /* 2d: DIE STATION HAT SECHS PLAETZE, die Sternwacht ist also erreichbar - hier wird nur die
+     Fehlliste geprueft, den Grund-Zweig misst 6a am Vorposten mit fuenf Plaetzen. */
+  check('2d: ein erreichbares Set zaehlt seine fehlenden Stuecke mit Komma auf, nicht mit „und und"',
+    /Es fehlt noch Sprungrechner, Umlaufraffinerie und Horchposten\./.test(an.fenster.text)
+    && !/und Umlaufraffinerie und/.test(an.fenster.text),
+    { auszug: (an.fenster.text.match(/Sternwacht[\s\S]{0,200}/) || [])[0] });
   /* 3a: Der Server ist Autoritaet. Steht ein Set in `v.sets`, ohne dass die eingebauten Module es
      hergeben, zeigt das Spiel es TROTZDEM - es rechnet nicht nach. Das ist die Probe darauf, dass
      hier keine zweite Rechenstelle entstanden ist. */
-  const fremd = await messe({ vp: { sets: ['bollwerk', 'flottenbasis'] } });
+  const fremd = await messe({ vp: { sets: ['trutzring', 'flottenbasis'] } });
   check('3a: das Spiel folgt `v.sets` und rechnet nicht selbst nach',
-    fremd.fenster.sets.filter(x => x.voll).length === 2 && /Sets: Bollwerk, Flottenbasis/.test(fremd.menue.text),
+    fremd.fenster.sets.filter(x => x.voll).length === 2 && /Sets: Trutzring, Flottenbasis/.test(fremd.menue.text),
     { sets: fremd.fenster.sets, auszug: (fremd.menue.text.match(/Sets:[^·]*/) || [])[0] });
+  /* 6: EINE STATION MIT ZU WENIG PLAETZEN. Zwei Dinge auf einmal, beide aus der Durchsicht:
+     Die Sternwacht darf ihr keine Fehlliste vorhalten (sie kann sie nie erreichen), und das
+     sechste Modul, fuer das es keinen Steckplatz gibt, muss trotzdem sichtbar und ausbaubar
+     bleiben - es gehoert dem Besitzer, und der Server gibt es heraus. */
+  const eng = await messe({ vp: { slots: 5, sets: ['trutzring', 'flottenbasis'],
+    module: ['kernpanzer:selten','geschuetz:episch','hangar:gewoehnlich','sprungrechner:selten','raffinerie:selten','horchposten:selten'] } });
+  check('6-anker: auch der Lauf mit zu wenig Plaetzen hat das Fenster geoeffnet', eng.fenster.offen === true,
+    { offen: eng.fenster.offen });
+  check('6a: ein Set, das mehr Plaetze braucht, nennt den GRUND statt einer Fehlliste',
+    eng.fenster.sets.some(x => x.key === 'sternwacht' && x.zugross)
+    && /Braucht 6 Steckplätze – du hast 5\./.test(eng.fenster.text)
+    && !/Es fehlt noch Horchposten/.test(eng.fenster.text),
+    { sets: eng.fenster.sets, auszug: (eng.fenster.text.match(/Sternwacht[\s\S]{0,140}/) || [])[0] });
+  check('6b: das Modul ohne Steckplatz bleibt sichtbar, sagt warum es nicht wirkt, und ist ausbaubar',
+    eng.fenster.ohnePlatz === 1 && /Kein Steckplatz mehr dafür/.test(eng.fenster.text)
+    && eng.fenster.raus.includes('5'),
+    { ohnePlatz: eng.fenster.ohnePlatz, raus: eng.fenster.raus });
+
   // 4: liegt der Schalter, gibt es die Anzeige nicht - und der Zusatzplatz wird nicht behauptet.
   const aus = await messe({ setsAktiv: false, vp: { slots: 5, sets: [] } });
   check('4-anker: auch der Lauf mit liegendem Schalter hat das Fenster geoeffnet', aus.fenster.offen === true,
@@ -188,8 +237,8 @@ function spielstand(){
     aus.fenster.sets.length === 0 && aus.menue.sets === null && !/Sets:/.test(aus.menue.text)
     && !/durch deine Ausrichtung/.test(aus.fenster.text),
     { sets: aus.fenster.sets, zeile: aus.menue.sets, auszug: aus.fenster.text.slice(0, 120) });
-  const alle = [...an.errs, ...fremd.errs, ...aus.errs];
-  check('5a: kein JavaScript-Fehler in den drei Durchlaeufen', alle.length === 0, alle.slice(0, 3));
+  const alle = [...an.errs, ...fremd.errs, ...aus.errs, ...eng.errs];
+  check('5a: kein JavaScript-Fehler in den vier Durchlaeufen', alle.length === 0, alle.slice(0, 3));
 
   await browser.close();
   ende();
