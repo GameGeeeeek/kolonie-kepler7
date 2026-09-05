@@ -244,6 +244,50 @@ const mkSave = () => JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbi
     gesperrt.length > 0 && gesperrt.every(z => z.canvas && z.bemalt >= 400 && z.schlossAbzeichen),
     { gesperrt: gesperrt.length, ohne: gesperrt.filter(z => !z.schlossAbzeichen).map(z => z.name.trim()).slice(0,5) });
 
+  /* ---- 3) Die Befunde der adversarischen Durchsicht ----------------------------------------
+     Vier bestätigte Befunde, jeder mit einer eigenen Prüfung. Alle vier sind Fehlerklassen, die
+     dieses Projekt kennt: dieselbe Größe aus zwei Quellen, und ein Zwischenspeicher, dessen
+     Schlüssel nicht mitträgt, was das Bild verändert. */
+  /* 3a: Die Kachel und die Stufenpille daneben müssen aus DERSELBEN Quelle lesen. state.buildings
+     ist immer die Heimat; auf einer Kolonie stünde sonst ein Bauwerk im Heimat-Ausbaustand neben
+     einer Zeile mit der Kolonie-Stufe. Geprüft wird die Quelle, nicht ein Bild: buildingRowHtml
+     liest currentBuildings() (als `activeB`), also muss isoStufe dasselbe tun - und im ganzen
+     Bausatz-Block darf state.buildings gar nicht mehr vorkommen. */
+  const blockVon = JS.indexOf('    const ANLAGE_FAMILIE = {');
+  const blockBis = JS.indexOf('    function refreshDefenseMiniIcons(){');
+  const block = blockVon > 0 && blockBis > blockVon ? JS.slice(blockVon, blockBis) : '';
+  check('3-anker: der Bausatz-Block ist abgegrenzt', block.length > 1000, block.length);
+  check('3a: die Kachel liest die Stufe aus derselben Quelle wie die Karte',
+    /const b = typeof currentBuildings === 'function' \? currentBuildings\(\)/.test(block)
+    && !/state\.buildings\[/.test(block)
+    && /const activeB = currentBuildings\(\);/.test(JS),
+    { imBlock: (block.match(/state\.buildings/g)||[]).length });
+  /* 3b: Das gebackene Berichtsbild hing bisher nur am Schlüssel. Seit das Bild vom Ausbaustand
+     abhängt, veraltete es nach dem nächsten Ausbau für den Rest der Sitzung. schiffBildKlasse
+     macht es eine Funktion höher richtig vor - der Schlüssel trägt mit, was das Bild verändert. */
+  check('3b: das gebackene Anlagenbild trägt den Ausbaustand im Schlüssel',
+    /function anlageBildKlasse\(key, stufe\)\{/.test(JS)
+    && /const merk = 'anlage\|' \+ key \+ '\|' \+ stand;/.test(JS)
+    && /drawDefenseMiniIcon\(key, cv, stufe\);/.test(JS)
+    && /const kl = anlageBildKlasse\(k, v\);/.test(JS));
+  /* 3c: Auf dem Planetenboden steht oft eine FREMDE Verteidigung. Ohne durchgereichte Stufe
+     stempelte sie den eigenen Ausbaustand - und der Zwischenspeicher hätte der zweiten Anlage
+     desselben Typs das Bild der ersten gegeben. */
+  check('3c: der Planetenboden nimmt den Ausbaustand der jeweiligen Stellung',
+    /function anlagenBild\(geb, stufe\)\{/.test(JS)
+    && /var merk = geb \+ '\|' \+ stand;/.test(JS)
+    && /var bild = anlagenBild\(an\.geb, an\.stufe\);/.test(JS)
+    && /stufe: stufe, nr: j/.test(JS)
+    && /return \{ key:x\.key, form:x\.form, stufe:x\.anzahl,/.test(JS)
+    && /z\.appendChild\(abwehrBild\(a\.form, a\.key, a\.anzahl\)\);/.test(JS));
+  /* 3d: Der Bildspeicher ist nach Pixelkante geschlüsselt, und die Wiedergabe rechnet sie aus
+     Fenstergröße und Bildschirmdichte - ohne Deckel legt jede neue Größe einen weiteren Satz an.
+     Die Wiedergabe räumt ihre eigenen Zwischenspeicher beim Schließen; dieser muss mit. */
+  check('3d: der Bildspeicher hat einen Deckel und wird mitgeräumt',
+    /const ISO_CACHE_DECKEL = \d+;/.test(JS)
+    && /Object\.keys\(ISO_BILD_CACHE\)\.length >= ISO_CACHE_DECKEL\) ISO_BILD_CACHE = \{\};/.test(JS)
+    && (JS.match(/if \(typeof isoBildSpeicherLeeren === 'function'\) isoBildSpeicherLeeren\(\);/g)||[]).length === 2);
+
   await browser.close();
   ende();
 })();

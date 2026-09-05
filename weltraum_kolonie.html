@@ -6513,7 +6513,7 @@
         c.fillStyle = g; c.fill(); c.strokeStyle = kontur; c.lineWidth = lw*0.8; c.stroke();
         if (opt.koerner){ // Erzkörner: helle Sprenkel auf der Lichtseite
           const ak = hexRgb(opt.koerner); c.fillStyle = css(ak, 0.85);
-          for (let i=0;i<opt.n||i<7;i++){ const t = (i*0.618)%1, u = ((i*0.381)+0.2)%1;
+          for (let i=0;i<(opt.n||7);i++){ const t = (i*0.618)%1, u = ((i*0.381)+0.2)%1;
             const px = B[0]-rx*0.75 + rx*1.0*t, py = Sp[1] + (B[1]-Sp[1])*(0.35+u*0.6);
             c.fillRect(px, py, Math.max(0.8,S*0.018), Math.max(0.8,S*0.018)); }
         }
@@ -7373,9 +7373,19 @@
     /* Ein Bild je (Bausatz, Schlüssel, Ausbaustand, Kantenlänge) - als Offscreen-Canvas, nicht als
        data-URL: ein <img> lädt asynchron, der erste Aufbau der Kachel bliebe damit leer. Gezeichnet
        wird pro Eintrag genau einmal; danach kostet ein Rebuild nur noch ein drawImage. */
-    const ISO_BILD_CACHE = {};
+    /* Deckel. Der Schlüssel trägt die Pixelkante, und die Kampf-Wiedergabe rechnet sie aus
+       Fenstergröße und Bildschirmdichte - jede neue Fenstergröße legt also einen weiteren Satz
+       Leinwände an. 52 Bauwerke mal drei Stände sind bei 192 Pixeln schon rund 23 MB; ohne Deckel
+       wüchse das über eine lange Sitzung weiter. Bei Überschreitung wird ganz geleert statt
+       einzeln verdrängt: die Bilder sind billig nachgezeichnet (0,2-3 ms), eine Verdrängungsliste
+       wäre mehr Code als Nutzen. isoBildSpeicherLeeren() hängt zusätzlich am Ende der
+       Kampf-Wiedergabe, die ihre eigenen Zwischenspeicher dort schon räumt. */
+    const ISO_CACHE_DECKEL = 240;
+    let ISO_BILD_CACHE = {};
+    function isoBildSpeicherLeeren(){ ISO_BILD_CACHE = {}; }
     function isoBild(art, key, stand, px){
       const k = art + ':' + key + ':' + stand + ':' + px;
+      if (!(k in ISO_BILD_CACHE) && Object.keys(ISO_BILD_CACHE).length >= ISO_CACHE_DECKEL) ISO_BILD_CACHE = {};
       if (!(k in ISO_BILD_CACHE)){
         let cv = null;
         try {
@@ -7398,10 +7408,16 @@
       return null;
     }
     const DEFENSE_CANVAS_KEYS = Object.keys(ANLAGE_FAMILIE);
-    // Stufe eines Gebäudes am gerade angezeigten Standort. Dieselbe Quelle, aus der die Karte ihre
-    // Stufenpille schreibt - sonst zeigt das Bild einen anderen Ausbaustand als die Zeile daneben.
+    // Stufe eines Gebäudes am gerade angezeigten Standort. currentBuildings() ist dieselbe Quelle,
+    // aus der buildingRowHtml seine Stufenpille schreibt (`activeB`) - state.buildings wäre IMMER
+    // die Heimat, und auf einer Kolonie stünde dann ein Bauwerk im Heimat-Ausbaustand neben einer
+    // Zeile mit der Kolonie-Stufe. Genau die Fehlerklasse, die dieses Projekt kennt: zwei
+    // Anzeigestellen derselben Größe, eine davon mit der alten Annahme.
     function isoStufe(key){
-      try { return (state && state.buildings && state.buildings[key]) || 0; } catch(e){ return 0; }
+      try {
+        const b = typeof currentBuildings === 'function' ? currentBuildings() : (state && state.buildings);
+        return (b && b[key]) || 0;
+      } catch(e){ return 0; }
     }
     function isoStand(key, stufe){
       const def = BUILDING_DEFS.find(d => d.key === key);
@@ -37728,8 +37744,13 @@ async function claimPendingRewards(){
     gebackeneBilder[merk] = klasse;
     return klasse;
   }
-  function anlageBildKlasse(key){
-    const merk = 'anlage|' + key;
+  /* Wie schiffBildKlasse traegt der Schluessel mit, was das Bild veraendert - seit Buendel C ist
+     das der Ausbaustand. Ohne ihn zeigte ein Bericht nach dem naechsten Ausbau fuer den Rest der
+     Sitzung noch das alte Bauwerk: genau die stille Veraltung, gegen die der Schiffs-Zwischen-
+     speicher eine Zeile hoeher schon abgesichert ist. */
+  function anlageBildKlasse(key, stufe){
+    const stand = typeof isoStand === 'function' ? isoStand(key, stufe) : 0;
+    const merk = 'anlage|' + key + '|' + stand;
     if (gebackeneBilder[merk] !== undefined) return gebackeneBilder[merk];
     let klasse = null;
     try {
@@ -37737,8 +37758,8 @@ async function claimPendingRewards(){
           && DEFENSE_CANVAS_KEYS.includes(key)){
         const cv = document.createElement('canvas');
         cv.width = cv.height = BILD_BACKGROESSE;
-        drawDefenseMiniIcon(key, cv);
-        klasse = 'gbi-a-' + key.replace(/[^a-z0-9]/gi,'');
+        drawDefenseMiniIcon(key, cv, stufe);
+        klasse = 'gbi-a-' + key.replace(/[^a-z0-9]/gi,'') + '-' + stand;
         bildStilAnhaengen('.'+klasse+'{background-image:url('+cv.toDataURL('image/png')+')}');
       }
     } catch(e){ klasse = null; }
@@ -38960,8 +38981,11 @@ async function claimPendingRewards(){
       spielAtlasZahl = 0;
       /* Die Gebaeudebilder haengen an bodenSkala/dpr - nach einer Groessenaenderung
          waeren die alten zu grob hochskaliert. Sie werden beim naechsten Zeichnen
-         von selbst neu gebacken. */
+         von selbst neu gebacken. Dasselbe gilt fuer die Bausatz-Bilder: ihr Schluessel traegt
+         die Pixelkante zwar mit, aber der alte Satz wird nach der Groessenaenderung nie wieder
+         gebraucht und soll nicht bis zum Deckel liegen bleiben. */
       anlagenBilder = {};
+      if (typeof isoBildSpeicherLeeren === 'function') isoBildSpeicherLeeren();
       for (var i = 0; i < ALLE_K.length; i++){
         var k = ALLE_K[i], d = KLASSEN[k];
         atlanten[atlasSchluessel(k, d.seite)] = backeAtlas(k, d.farbe, schiffSkala * d.gr);
@@ -39359,9 +39383,10 @@ async function claimPendingRewards(){
       anlagen = [];
       for (var i = 0; i < ABWEHR_PLAN.length; i++){
         var typ = ABWEHR_PLAN[i][0], us = ABWEHR_PLAN[i][1], geb = ABWEHR_PLAN[i][2] || null;
+        var stufe = ABWEHR_PLAN[i][3] || 0;
         for (var j = 0; j < us.length; j++){
           anlagen.push({
-            typ: typ, geb: geb, nr: j, u: us[j], lebt: true, ziel: null, zielZeit: 0,
+            typ: typ, geb: geb, stufe: stufe, nr: j, u: us[j], lebt: true, ziel: null, zielZeit: 0,
             richt: 0, sollRicht: 0, lade: 0.6 + Math.random()*2.2, glut: 0,
             rueck: 0, klappe: 0, salve: 0, salveTakt: 0, ph: Math.random()*TAU
           });
@@ -39415,18 +39440,23 @@ async function claimPendingRewards(){
        ohnehin die Muendungsglut daneben. */
     var anlagenBilder = {};
     function anlagenBildKante(){ return Math.max(48, Math.round(90 * bodenSkala * dpr)); }
-    function anlagenBild(geb){
+    /* `stufe` ist der Ausbaustand DIESER Stellung, nicht der eigene: die Wiedergabe zeigt oft
+       eine fremde Verteidigung. Der Zwischenspeicher schluesselt deshalb nach beidem - sonst
+       traegt die zweite Anlage desselben Typs das Bild der ersten. */
+    function anlagenBild(geb, stufe){
       if (!geb || typeof drawDefenseMiniIcon !== 'function') return null;
       if (typeof DEFENSE_CANVAS_KEYS !== 'undefined' && DEFENSE_CANVAS_KEYS.indexOf(geb) < 0) return null;
-      if (anlagenBilder[geb] !== undefined) return anlagenBilder[geb];
+      var stand = typeof isoStand === 'function' ? isoStand(geb, stufe || 0) : 0;
+      var merk = geb + '|' + stand;
+      if (anlagenBilder[merk] !== undefined) return anlagenBilder[merk];
       var nc = null;
       try {
         var kn = anlagenBildKante();
         nc = document.createElement('canvas');
         nc.width = nc.height = kn;
-        drawDefenseMiniIcon(geb, nc);   // rechnet selbst auf min(w,h)/40 hoch
+        drawDefenseMiniIcon(geb, nc, stufe || 0);   // rechnet selbst auf min(w,h)/40 hoch
       } catch(e){ nc = null; }
-      anlagenBilder[geb] = nc;
+      anlagenBilder[merk] = nc;
       return nc;
     }
     /* Wie hoch steht die Anlage auf dem Boden? Der alte Wert (rund 11-16 px auf dem
@@ -39475,7 +39505,7 @@ async function claimPendingRewards(){
          auf einer 40x40-Flaeche - genau das wird hier verwendet, gebacken und dann
          nur noch gestempelt. Die beweglichen Teile (Muendungsglut, Rauch, Trichter)
          bleiben davor bzw. dahinter, weil ein gebackenes Bild sie nicht mitbringt. */
-      var bild = anlagenBild(an.geb);
+      var bild = anlagenBild(an.geb, an.stufe);
       if (bild){
         anlagenGemalt++;
         var hoehe = anlagenHoehe(an.typ);
@@ -41085,7 +41115,7 @@ async function claimPendingRewards(){
        flach in einem 15-Pixel-Kaestchen stehen. Gezeichnet wird auf einem eigenen
        Canvas je Zeile, damit es scharf bleibt (devicePixelRatio) und ohne eine
        einzige externe Datei auskommt. */
-    function abwehrBild(typ, geb){
+    function abwehrBild(typ, geb, stufe){
       var S = 15, q = Math.min(2, window.devicePixelRatio || 1);
       var cn = document.createElement('canvas');
       cn.className = 'zeile-bild';
@@ -41095,8 +41125,8 @@ async function claimPendingRewards(){
       /* Dasselbe Bild wie auf dem Boden und wie im Verteidigungs-Tab. Nur wenn es
          das nicht gibt (Vorfuehrbild ohne echte Berichtsdaten), bleibt es bei der
          gezeichneten Bauform-Silhouette darunter. */
-      if (geb && anlagenBild(geb)){
-        try { drawDefenseMiniIcon(geb, cn); return cn; } catch(e){ /* weiter unten */ }
+      if (geb && anlagenBild(geb, stufe)){
+        try { drawDefenseMiniIcon(geb, cn, stufe); return cn; } catch(e){ /* weiter unten */ }
       }
       g.setTransform(q, 0, 0, q, 0, 0);
       g.translate(S / 2, S - 1.5);
@@ -42327,7 +42357,10 @@ async function claimPendingRewards(){
            der Liste. Dieselbe Regel gilt bei den Schiffen (modellVerteilung). */
         var teile = DATEN.abwehr.arten.map(function(x){
           var exakt = x.anzahl / anlagenMassstab;
-          return { key:x.key, form:x.form, n: Math.floor(exakt), r: exakt - Math.floor(exakt) };
+          // `stufe` reist mit: seit Buendel C haengt das Gebaeudebild am Ausbaustand, und der
+          // Verteidiger ist nicht zwangslaeufig man selbst. Ohne diese Zahl stempelte der Boden
+          // fremde Stellungen im EIGENEN Ausbaustand.
+          return { key:x.key, form:x.form, stufe:x.anzahl, n: Math.floor(exakt), r: exakt - Math.floor(exakt) };
         });
         var summeA = 0;
         for (var s2 = 0; s2 < teile.length; s2++) summeA += teile[s2].n;
@@ -42347,11 +42380,11 @@ async function claimPendingRewards(){
         for (var p2 = 0; p2 < N; p2++){
           var st = stellungen[p2];
           var u2 = -0.95 + (N > 1 ? (p2 / (N - 1)) * 1.9 : 0.95);
-          if (!proGeb[st.key]) proGeb[st.key] = { form: st.form, u: [] };
+          if (!proGeb[st.key]) proGeb[st.key] = { form: st.form, stufe: st.stufe || 0, u: [] };
           proGeb[st.key].u.push(u2 + ((rang[st.form]||0) - 2) * 0.02);
         }
         for (var gk in proGeb) if (Object.prototype.hasOwnProperty.call(proGeb, gk)){
-          ABWEHR_PLAN.push([proGeb[gk].form, proGeb[gk].u, gk]);
+          ABWEHR_PLAN.push([proGeb[gk].form, proGeb[gk].u, gk, proGeb[gk].stufe]);
         }
       }
       var kenn = '';
@@ -42603,7 +42636,9 @@ async function claimPendingRewards(){
            Boden. Vorher stand hier abwehrBild(a.form) - eine von fuenf Bauform-
            Silhouetten fuer 22 Anlagen, sodass Flak, Laserturm und Nanoplattform in
            der Liste als dasselbe Ding erschienen. */
-        z.appendChild(abwehrBild(a.form, a.key));
+        // a.anzahl ist die Stufe dieser Anlage beim Verteidiger - dieselbe Zahl, die rechts
+        // in der Zeile steht. Ohne sie zeigte das Bild den eigenen Ausbaustand.
+        z.appendChild(abwehrBild(a.form, a.key, a.anzahl));
         z.appendChild(neu('span', 'zeile-name', a.name));
         var zz = neu('span', 'zeile-zahl');
         zz.appendChild(neu('b', null, String(a.anzahl)));
@@ -42774,6 +42809,9 @@ async function claimPendingRewards(){
       spielSprites = {};
       plaketteMass = undefined;
       anlagenBilder = {};
+      // Auch die isometrischen Bausatz-Bilder: sie haengen an derselben Pixelkante wie
+      // anlagenBilder und wuerden sonst nach dem Schliessen liegen bleiben.
+      if (typeof isoBildSpeicherLeeren === 'function') isoBildSpeicherLeeren();
       hgBild = null;
       glockeBild = null;
       glockeNeu = true;
@@ -43142,7 +43180,9 @@ async function claimPendingRewards(){
       // dieses SVG liefen. Der zweite Zweig bleibt als Sicherung: fiele je eine Anlage aus dem
       // Bausatz, stünde hier ein Bild statt einer Lücke.
       const geb = BUILDING_DEFS.find(b2 => b2.key === k);
-      const kl = anlageBildKlasse(k);
+      // v ist die Stufe der Anlage vor dem Kampf - dieselbe Zahl, die rechts im Chip steht.
+      // Ohne sie zeigte das Bild den Ausbaustand der EIGENEN Anlage, auch beim fremden Verteidiger.
+      const kl = anlageBildKlasse(k, v);
       const bild = kl ? `<i class="gbi gbi-anlage ${kl}" aria-hidden="true"></i>`
         : (geb ? `<span class="anlagensvg">${iconHtmlFor(k, geb.icon, farbe)}</span>` : '');
       return `<span class="schiffchip" style="color:${farbe};" title="${escapeHtml(buildingDisplayName(k))}">${bild}<i class="ti ${hit?'ti-x':'ti-check'}" aria-hidden="true"></i><b>${fmt(v)}</b>&nbsp;${escapeHtml(buildingDisplayName(k))}</span>`;
