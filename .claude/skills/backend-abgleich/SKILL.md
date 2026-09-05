@@ -48,3 +48,32 @@ die es im laufenden Backend-Prozess gibt, antwortet ohne Token mit **401**, eine
 mit **404**. `/api/health` mit 200 beweist nur, dass irgendein Backend läuft — nicht, welcher
 Stand. Immer eine Gegenprobe mit einer ALTEN, sicher vorhandenen Route mitführen, sonst misst man
 nur die eigene Messmethode.
+
+## Der Klon ist aktuell — und *deshalb* fällt der Test (05.09.2026)
+
+Der umgekehrte Fall zu allem oben: Nicht der veraltete Klon bricht den Test, sondern ein **frischer**.
+
+`tests/test_randkriege_front.js` baut `rkTick` aus dem Serverquelltext per `new Function` nach und
+reicht dabei eine Handvoll Funktionen als Umgebung hinein (`pushGalaxyNews`, `loadOrInitFactions`,
+…). Backend-PR #242 (Galaxie-Chronik) fügte in `rkTick` einen Aufruf von `chronikVermerken` ein.
+Diese Funktion gab es in der Testumgebung nicht — der Lauf brach mit `ReferenceError` ab, mitten in
+einem Prüflauf, der mit Randkriegen nichts zu tun hatte, und in einem PR, der die Datei nicht
+anfasst.
+
+Erkennungsmerkmal: **`ReferenceError: <name> is not defined`** aus einem `<anonymous_script>` unter
+`eval at baueUmgebung`. Der Name steht dann im Backend, nicht im Frontend.
+
+Messung, die es in zwei Minuten klärt — den Klon auf den Stand VOR dem verdächtigen Merge stellen
+und denselben Test noch einmal fahren:
+
+```
+cd ../kolonie-kepler7-backend && git checkout <commit-davor>
+cd ../kolonie-kepler7 && node tests/<test>.js      # grün -> die Ursache liegt im Backend-Merge
+cd ../kolonie-kepler7-backend && git checkout master
+```
+
+Die Reparatur gehört ins **Frontend**, in die Umgebung des Tests. Und sie ist keine stumme
+Attrappe: `chronikVermerken` schreibt jetzt mit (wie `pushGalaxyNews`), die Umgebung gibt die Liste
+heraus, und Abschnitt 7 prüft, dass der Durchbruch mit Sieger und Verlierer im Ereignisbuch landet.
+Eine Attrappe, die nur schweigt, hätte den Aufruf zwar überlebt, aber nichts belegt.
+Gegenprobe: den `chronikVermerken`-Aufruf im Klon entfernen → genau diese eine Prüfung fällt.
