@@ -865,3 +865,62 @@ Zwei Befunde aus dem Bau der Messvorrichtung, beide als Kommentar im Test:
 2. Der Kartenreiter öffnet die **Regionsübersicht**; aus dem aufgeklappten System führt kein
    einzelner Heimweg-Knopf dorthin zurück. Der erste Entwurf maß beide Kartenebenen im selben
    Reiter wie das Kartenmenü und hatte vier rote Prüfungen bei richtigem Code.
+
+## GR-9: Vier Fehler, gemessen in der Grafik-Aufnahme (05.09.2026)
+
+Die Grafik-Aufnahme vom 04./05.09.2026 (Bericht „Kepler-7 in neuem Licht") hat nebenbei vier
+Fehler und drei Einzeiler an der Karte und ihrer Umgebung gefunden. Alle sind in
+`tests/test_grafik_einzeiler.js` mit Gegenprobe festgehalten.
+
+| Was | Ursache | Behebung |
+|---|---|---|
+| Fraktionswappen als Riesen-Helm über der Sektorkarte | `.map-wrap svg { width:100%; height:100% }` traf auch das **verschachtelte** 14×14-Wappen-svg am Knoten | `.map-wrap > svg` – nur das direkte Kind |
+| Gürtelplatz 5 lag auf Aion (Orbit 3) | Rasterwinkel 198° gegen Bahnwinkel 200°; im runden Kasten ist ein halber Orbit-Schritt nur 9 Einheiten | `guertelWinkelFuer`: ein Platz näher als 14° am Bahnwinkel von Orbit 3 oder 4 rückt **auf der Bahn** weiter, nach oben (weg vom Namensschild) |
+| Bannerplanet fehlte bei schmalem Fenster mit vollem Kopf | `preserveAspectRatio="xMidYMid slice"` schneidet seitlich genau den Planeten (cx 590) | `xMaxYMid slice` |
+| Terraformte Welt kämpfte auf ihrer alten Oberfläche | `ortTyp` der Wiedergabe las `PLANETS[].type` | `effectivePlanetType` |
+| Nebel des Orbitalglas-Himmels unsichtbar | 5 % Deckkraft | 14 % |
+| Orbit-Bahnen am Handy weg | 0,10 bei 0,6 px | 0,18, wenn `kbSchmalerKasten()` |
+| Wracks als rotes Drahtgitter | `k: s.k` statt des Atlas-Schlüssels `s.modell` | `s.modell \|\| s.k` |
+
+**Warum der Gürtel nicht anders versetzt werden kann.** Zehn gleichverteilte Plätze (36°) können
+den Bahnwinkeln von Orbit 3 (200°) und Orbit 4 (110°) nicht beide mit 12° Abstand fernbleiben:
+20 und 2 modulo 36 lassen keine gemeinsame Lücke. Ein radialer Ausweicher hilft im runden Kasten
+nicht (gemessen: 0,4 Schritte weiter außen klebten Scheibe und Brocken noch aneinander, ein ganzer
+Schritt läge auf Orbit 4). Deshalb wandert genau der eine betroffene Platz auf seiner Bahn – in
+Kepler Platz 5 von 198° auf 214°, über Aion.
+
+
+## GR-9, zweite Fassung: der Ausweicher misst, statt zu raten (05.09.2026)
+
+Die erste Fassung des Gürtel-Ausweichers hatte zwei Fehler, beide von der adversarischen Durchsicht
+gefunden und nachgerechnet, keiner vermutet.
+
+**Die gewählte Seite war die schlechtere.** Aion liegt auf 200 Grad, Platz 5 auf 198. Die erste
+Fassung rückte immer nach oben, also auf 214 Grad. Gemessen vom Planetenmittelpunkt:
+
+| Kastenform | roh (198°) | nach oben (214°) | nach unten (182°) |
+|---|---|---|---|
+| rund (Schritt 18, ry 0,85) | 9,5 | 19,9 | **25,8** |
+| flach (Schritt 43, ry 0,30) | 22,4 | 14,8 | **35,3** |
+
+**Und im flachen Kasten war der Platz vorher gar nicht zu nah.** Dort liegt der Gürtel radial
+21,5 Einheiten von Orbit 3 entfernt statt 9 - eine Winkelnähe berührt sich dort nicht. Das
+Verschieben hat den Fehler in dieser Kastenform also erst gemacht, und zwar in jeder Brockengröße.
+
+Deshalb rechnet `guertelWinkelFuer` jetzt den tatsächlichen Abstand in der Form, die der Kasten
+gerade hat: Es weicht nur aus, wenn der Platz wirklich zu nah ist, probiert beide Richtungen, nimmt
+die bessere und rückt nur so weit wie nötig. `GUERTEL_FREIRAUM` ist 23,5 - Scheibe 11 plus äußerer
+Halo 2,8 plus größter Brocken 9,5. Die erste Fassung war mit 14 Grad an einem *mittleren* Brocken
+geeicht und ließ Koloss und Schürfrecht-Ring weiter auf der Scheibe liegen.
+
+Zwei Folgen, die dabei mitkamen:
+
+- **Der Trefferflächen-Deckel gilt je Platz.** `kbGuertelEngsterAbstand` nahm das Minimum über alle
+  zehn Plätze; ein ausgewichener Platz zog die Antippfläche aller Vorkommen mit herunter, auch in
+  Gürtelsystemen ohne Planeten an der Stelle. Gemessen: 41 Prozent Kantenlänge, 66 Prozent Fläche.
+- **Der äußere Atmosphären-Halo trägt jetzt `data-sys-halo="2"`.** Ohne Kennung maß der Wächter den
+  inneren Ring und damit den Planeten 1,5 Einheiten zu klein.
+
+Der Wächter misst seitdem beide Kastenformen, indem er die Funktion samt Bahnmaßen aus der
+Spieldatei schneidet und isoliert rechnet. Die Regel, die er hält, ist nicht „Platz 5 steht bei
+182 Grad", sondern **„das Ausweichen macht den Abstand in keiner Kastenform kleiner"**.
