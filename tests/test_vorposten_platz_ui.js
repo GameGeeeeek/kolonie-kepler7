@@ -103,9 +103,16 @@ const SYS = 'vega';
      ein, ohne dass etwas kaputt aussieht - dreimal gemessen in der Liste darueber. */
   const sigVon = block.indexOf('const fremdSig =');
   const sig = sigVon < 0 ? '' : block.slice(sigVon, block.indexOf('.join(', sigVon));
-  check('0e: die Signatur traegt jede Groesse der Zeile (Anteil, Kern, Besitzer, Name, System)',
+  /* BEIDE NAMEN, nicht nur der angezeigte (Codex-Befund am PR, 05.09.2026): Die Zeile zeigt
+     `eigenName || name`, der TOOLTIP nennt ueber `vpTitel(v)` beide. Steht ein eigener Name,
+     veraendert ein Ausbau nur `v.name` - mit `(eigenName || name)` in der Signatur bliebe sie
+     gleich und der Tooltip nennte weiter die alte Stufe. `v.name` muss also EIGENSTAENDIG darin
+     stehen, nicht als Rueckfall hinter dem eigenen Namen; deshalb wird hier auf das ODER geprueft,
+     nicht nur auf das Vorkommen der beiden Woerter. */
+  check('0e: die Signatur traegt jede Groesse der Zeile - beide Namen einzeln, Anteil, Kern, Besitzer, System',
     /vpMeineGarnison\(v\)/.test(sig) && /kernProz\(v\)/.test(sig) && /besitzerName/.test(sig)
-    && /eigenName/.test(sig) && /v\.sys/.test(sig), { signatur: sig.replace(/\s+/g, ' ') });
+    && /eigenName/.test(sig) && /v\.name/.test(sig) && !/eigenName \|\| v\.name/.test(sig)
+    && /v\.sys/.test(sig), { signatur: sig.replace(/\s+/g, ' ') });
 }
 
 const now = Date.now();
@@ -392,6 +399,19 @@ function spielstand(){
    diese zwei.
      s13 Kartenmenue rechnet wieder mit der Grenze der STATION     -> 1c
      s5  Sperre der Flottenwahl zurueck auf `frei`                 -> 2c
+
+   LAUF G - eine Sabotage, nach einem Befund der Durchsicht am PR (Codex, P2). Vorhergesagt: 0e.
+   Gefallen: genau 0e.
+     s14 Signatur zurueck auf `(v.eigenName || v.name)`                -> 0e
+
+     DER BEFUND WAR RICHTIG UND MEINE EIGENE REGEL HAETTE IHN FANGEN MUESSEN. Die Zeile zeigt
+     `eigenName || name`, der TOOLTIP aber `vpTitel(v)` - und der nennt BEIDE. Steht ein eigener
+     Name, aendert ein Ausbau nur `v.name`; die Signatur blieb gleich, die Zeile wurde nicht neu
+     gebaut, und der Tooltip nannte weiter die alte Stufe. Ich hatte „jede Groesse, die in der
+     Zeile steht" als „jede Groesse, die im sichtbaren Text steht" gelesen - der Tooltip gehoert
+     aber genauso dazu. 0e prueft seither, dass `v.name` EIGENSTAENDIG in der Signatur steht und
+     nicht als Rueckfall hinter dem eigenen Namen (`!/eigenName \|\| v\.name/`), sonst waere die
+     alte Fassung wieder gruen.
 
    NICHT GEDECKT, bewusst: Die Farbe des Kernbalkens (`kernFarbe`) und die Reihenfolge der drei
    Angaben in der Zeile. Beides ist Darstellung ohne Regel dahinter - eine Pruefung darauf waere

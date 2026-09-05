@@ -66377,7 +66377,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
          dreimal zugeschlagen (Anflug-Countdown, `lpMax`/`garnisonMax`, `umruestenAb`). Hier stehen
          deshalb Kernprozent, eigener Anteil, Besitzername und Stationsname mit drin. */
       const kernProz = (v) => Math.round(Math.max(0, Math.min(1, ((v.kern||{}).lp||0) / Math.max(1, (v.kern||{}).lpMax||1))) * 100);
-      const fremdSig = fremde.map(v => v.sys + ':' + (v.eigenName || v.name || '-') + ':' + vpMeineGarnison(v)
+      /* BEIDE NAMEN, nicht nur der angezeigte (Codex-Befund, 05.09.2026). Die Zeile zeigt
+         `eigenName || name`, der TOOLTIP aber `vpTitel(v)` - und der nennt beide. Steht ein eigener
+         Name, veraendert ein Ausbau nur `v.name`; mit `(eigenName || name)` bliebe die Signatur
+         gleich, die Zeile wuerde nicht neu gebaut, und der Tooltip nennte weiter die alte Stufe.
+         Genau die Falle, vor der die Regel drei Zeilen darueber warnt - nur eine Ebene tiefer, weil
+         der Tooltip auch zur Zeile gehoert. */
+      const fremdSig = fremde.map(v => v.sys + ':' + (v.eigenName || '-') + ':' + (v.name || '-') + ':' + vpMeineGarnison(v)
         + ':' + kernProz(v) + ':' + (v.besitzerName || '?')).join('|');
       if (fremdSig !== lastVpFremdSig){
         setBoxText(document.getElementById('fpVorpostenFremdCount'), fremde.length ? '(' + fremde.length + ')' : '');
