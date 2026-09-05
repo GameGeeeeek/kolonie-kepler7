@@ -62448,6 +62448,13 @@ async function claimPendingRewards(){
          Versprechen, das der Server bricht. */
       const meineEigenen = vpMeineGarnison(v);
       const fremdeDa = Math.max(0, (v.garnisonAnzahl||0) - meineEigenen);
+      /* DERSELBE GRUND EINE ZEILE WEITER: Beim Abbau schickt der Server JEDEM Beitragenden SEINE
+         Schiffe zurueck, nicht dem Besitzer alle. „Die Garnison (900 Schiffe) fliegt nach Hause"
+         versprach ihm im Bestaetigungsfeld genau die Zahl, die er NICHT bekommt. */
+      const heimTeile = [];
+      if (meineEigenen) heimTeile.push('deine ' + meineEigenen + ' Schiffe');
+      if (fremdeDa) heimTeile.push('die ' + fremdeDa + ' deiner Verbündeten an sie');
+      const heimSatz = heimTeile.length ? 'Zurück gehen ' + heimTeile.join(' und ') + '.' : 'Dort steht keine Garnison.';
       eintraege.push({ icon:'ti-refresh', label:'Garnison zurückrufen',
         grund: meineEigenen
           ? 'Holt deine ' + meineEigenen + ' Schiffe nach ' + planetDisplayName(state.activeBasePlanet) + '.'
@@ -62498,7 +62505,7 @@ async function claimPendingRewards(){
          Deploy. Deshalb haengt der Wortlaut an der Serverangabe, nicht an diesem Release. */
       if (!vorpostenCache.abbauAktiv){
         eintraege.push({ icon:'ti-trash', label:'Vorposten aufgeben', grund:'Keine Rückerstattung – die Garnison kommt zurück.',
-          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. Die Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) fliegt nach Hause.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' wirklich aufgeben?\n\nDie Baukosten werden NICHT erstattet. ' + heimSatz)) vorpostenRueckruf(sysId, 'aufgeben'); } });
       } else if (abbauBis > jetzt){
         eintraege.push({ icon:'ti-refresh', label:'Abbau abbrechen',
           grund:'Noch ' + fmtDuration((abbauBis - jetzt) / 1000) + ' – bis dahin steht der Vorposten und bleibt angreifbar.',
@@ -62506,7 +62513,7 @@ async function claimPendingRewards(){
       } else {
         eintraege.push({ icon:'ti-trash', label:'Vorposten abbauen',
           grund:'Dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + ' – so lange bleibt er angreifbar. Keine Rückerstattung.',
-          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbauen?\n\nDer Abbau dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + '. So lange steht der Vorposten weiter da und kann angegriffen werden.\n\nDie Baukosten werden NICHT erstattet. Garnison (' + (v.garnisonAnzahl||0) + ' Schiffe) und eingebaute Module kommen erst zurück, wenn der Abbau fertig ist.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
+          fn: () => { if (confirm('Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId)||{name:sysId}).name) + ' abbauen?\n\nDer Abbau dauert ' + fmtDuration((vorpostenCache.abbauMs || 86400000) / 1000) + '. So lange steht der Vorposten weiter da und kann angegriffen werden.\n\nDie Baukosten werden NICHT erstattet. ' + heimSatz + ' Garnison und eingebaute Module kommen aber erst zurück, wenn der Abbau fertig ist.')) vorpostenRueckruf(sysId, 'aufgeben'); } });
       }
     } else {
       /* DER VERBUENDETE (V5, 05.09.2026). Bis hierher sah ein Allianzpartner an einem fremden

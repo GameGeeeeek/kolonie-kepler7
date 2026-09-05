@@ -34,6 +34,8 @@
 //   5a  Der BESITZER, in dessen Garnison nur Schiffe Verbuendeter stehen, bekommt kein
 //       Versprechen, das der Server bricht („Holt alle 900 Schiffe" -> 400 `leer`).
 //   5b  ... und mit eigenen Schiffen nennt der Eintrag SEINE Zahl und sagt, was stehen bleibt.
+//   5c  Auch die zwei Bestaetigungsfelder zum Aufgeben/Abbauen versprechen nicht mehr die
+//       Gesamtzahl - beim Abbau bekommt JEDER Beitragende SEINE Schiffe zurueck.
 //
 // Gegenprobe: siehe Fuss der Datei.
 const fs = require('fs');
@@ -100,6 +102,24 @@ check('0a: es gibt EIN Gatter fuer „darf mitwirken", nicht drei Kopien der Bed
     von > 0 && /geschleift/.test(zweig) && zweig.length < 4000, { laenge: zweig.length });
   check('0f: der Bericht unterscheidet Besitzer und Verbuendeten',
     /r\.alsVerbuendeter/.test(zweig) && /r\.besitzerName/.test(zweig), {});
+}
+
+{
+  /* Die zwei Bestaetigungsfelder des Besitzers (Aufgeben und Abbauen). Ein `confirm`-Text laesst
+     sich im Browser nur ueber einen Klick auf genau diesen Eintrag messen; hier genuegt der
+     Quelltext, weil die Regel eine reine Textregel ist: Die Gesamtzahl darf dort nicht mehr
+     stehen. Kommentare vorher streichen (Lehre 0d). */
+  const ohneKommentar = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '');
+  const rufe = [];
+  const roh = ohneKommentar(JS);
+  for (const m of roh.matchAll(/confirm\('Vorposten in [\s\S]{0,900}?\)\)/g)) rufe.push(m[0]);
+  const aufgeben = rufe.filter(t => /'aufgeben'/.test(t) || /abbauen\?/.test(t) || /aufgeben\?/.test(t));
+  check('5c-anker: beide Bestaetigungsfelder zum Aufgeben/Abbauen sind auffindbar (sonst misst 5c nichts)',
+    aufgeben.length === 2, { gefunden: aufgeben.length, alle: rufe.length });
+  check('5c: sie versprechen nicht mehr die Gesamtzahl, sondern nennen, was zu WEM zurueckgeht',
+    aufgeben.length === 2 && aufgeben.every(t => /heimSatz/.test(t) && !/garnisonAnzahl/.test(t)),
+    { ohneHeimSatz: aufgeben.filter(t => !/heimSatz/.test(t)).map(t => t.slice(0, 120)),
+      mitGesamtzahl: aufgeben.filter(t => /garnisonAnzahl/.test(t)).map(t => t.slice(0, 120)) });
 }
 
 const now = Date.now();
@@ -268,6 +288,8 @@ function spielstand(){
       am 05.09.2026 vormittags vollstaendig gruen.
    I) Der Rueckruf-Eintrag des Besitzers wieder auf `v.garnisonAnzahl`: 5a UND 5b FALLEN - 5b,
       weil der Eintrag dann „Holt deine 900 Schiffe" saehe statt der eigenen 200.
+   J) Die zwei Bestaetigungsfelder zurueck auf „Die Garnison (900 Schiffe) fliegt nach Hause":
+      5c FAELLT.
 
    DREI EIGENE MESSFEHLER, alle hier festgehalten:
 
