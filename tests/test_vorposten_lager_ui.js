@@ -50,6 +50,14 @@ check('0a: es gibt GENAU EINE Stelle, die den Abhol-Endpunkt ruft',
     { rumpfAuszug: rumpf.slice(0, 0) || undefined });
   check('0c: sie loest den Claim aus, statt auf den naechsten Takt zu warten',
     /claimPendingRewards\(\)/.test(rumpf), {});
+  /* 0d: backendFetch faengt NICHTS ab - `await fetch(...)` wirft bei einem Netzfehler. Ohne
+     `.catch` flaege die Rueckweisung ungefangen aus der Funktion: keine Meldung, kein Neuladen,
+     und das Kartenmenue ist beim Klick schon geschlossen. Der Spieler saehe gar nichts.
+     GEMESSEN am 05.09.2026: ALLE zwoelf Vorposten-Aktionen behandeln das - acht per `try`, vier
+     per `.catch(() => null)`. Diese hier war die einzige Ausnahme, gefunden von der Durchsicht. */
+  check('0d: der Netzfehler wird gefangen - wie an jeder anderen Vorposten-Aktion',
+    /backendFetch\('\/vorposten\/lager\/holen'[^\n]*\.catch\(/.test(rumpf) || /try\s*\{/.test(rumpf),
+    { auszug: (rumpf.match(/backendFetch\([^\n]{0,40}/) || [])[0] });
 }
 
 const now = Date.now();
@@ -192,6 +200,7 @@ function spielstand(){
       der Warteschlange) und umginge dabei den Lagerdeckel.
    G) Den Endpunkt-Pfad verbogen: 0a FAELLT - und mit ihm der 0-Anker, der dann sagt, dass 0b und
       0c nichts mehr messen. Genau dafuer steht er da.
+   H) Das `.catch(() => null)` am Abhol-Aufruf entfernt: 0d FAELLT.
 
    DER EIGENE TESTFEHLER, der diese Datei fast wertlos gemacht haette: Der erste Entwurf suchte das
    Kartenmenue unter `.map-menu, #mapMenu, [data-map-menu]` - keiner dieser Selektoren existiert -
@@ -201,4 +210,12 @@ function spielstand(){
    Der Container heisst `.kmenu` (openKarteMenu haengt genau ihn an document.body). Der Anker
    misst seitdem auch die LAENGE: ein Kartenmenue hat einige hundert Zeichen, die ganze Seite
    5,7 Millionen. Ein Rueckfall auf document.body ist kein Notnagel, sondern der sichere Weg zu
-   einer Pruefung, die nichts belegt - deshalb gibt es ihn nicht mehr. */
+   einer Pruefung, die nichts belegt - deshalb gibt es ihn nicht mehr.
+
+   UND EIN ZWEITER MESSFEHLER, diesmal beim Nachpruefen eines fremden Befunds: Die Durchsicht
+   meldete die ungefangene Rueckweisung „wie es die Nachbar-Aktionen machen". Meine erste
+   Gegenmessung suchte nur nach `try {` und meldete FUENF weitere Funktionen mit derselben Luecke -
+   also keinen Praezedenzfall. Das war falsch: Die zweite Form ist `.catch(() => null)` direkt am
+   Aufruf, und mit ihr behandeln ALLE zwoelf Vorposten-Aktionen den Fall (acht per `try`, vier per
+   `.catch`). Meine neue war die einzige Ausnahme. Wer eine Regel misst, muss BEIDE Schreibweisen
+   kennen, sonst widerlegt er einen richtigen Befund mit einer zu engen Suche. */

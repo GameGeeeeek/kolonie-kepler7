@@ -11730,7 +11730,13 @@
   async function vorpostenLagerHolen(sysId){
     const v = vorpostenAn(sysId);
     if (!v || !v.eigener){ log('Dort steht kein eigener Vorposten.', 'ti-alert-triangle', 'warn'); return; }
-    const res = await backendFetch('/vorposten/lager/holen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) });
+    /* `.catch(() => null)` wie an jeder anderen Vorposten-Aktion (Befund der Durchsicht von
+       PR #583). backendFetch faengt NICHTS ab - `await fetch(...)` wirft bei einem Netzfehler, und
+       die Rueckweisung waere hier ungefangen aus der Funktion geflogen: keine Meldung, kein
+       Neuladen, und das Kartenmenue ist beim Klick schon geschlossen. Der Spieler saehe gar
+       nichts und wuesste nicht, ob abgeholt wurde. Der `!res`-Zweig darunter gibt es genau
+       dafuer - er stand hier von Anfang an und konnte ohne dieses `.catch` nie greifen. */
+    const res = await backendFetch('/vorposten/lager/holen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) }).catch(() => null);
     const daten = res ? await res.json().catch(() => null) : null;
     if (!res || !res.ok){ log((daten && daten.error) || 'Der Server hat die Abholung abgelehnt.', 'ti-alert-triangle', 'warn'); return; }
     /* GEMELDET WIRD HIER NUR DER AUFBRUCH, nicht der Ertrag: Was wirklich ankommt, entscheidet der
