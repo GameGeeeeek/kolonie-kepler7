@@ -6773,7 +6773,16 @@
     // Fuer die Gegenseite muss der eigene Flotten-Anstrich draussen bleiben - sonst flaege die
     // feindliche Flotte in meiner Lackierung, was genauso erfunden waere wie meine Werftmarken
     // an fremden Schiffen (siehe markOverride).
-    function drawShipMiniIcon(key, canvas, markOverride, ohneAnstrich){
+    /* GEFECHT_STAHL (Buendel B): Ein Anstrich fuer ALLE Ruempfe der Kampf-Wiedergabe. Die
+       Spielbilder tragen je Klasse eigene Farben (Tuerkis, Lachs, Gold), und die sagen nichts
+       ueber die SEITE. Bisher wurde deshalb der ganze Rumpf zu 62 % in der Parteifarbe
+       eingefaerbt - aus jedem Schiff wurde eine gruene oder rote Flaeche, Fenster und Tuerme
+       blieben nur als Schleier. Jetzt kommen alle Ruempfe in demselben Stahl, und die Partei
+       sitzt an Kante, Kennungsstreifen und Glut. Wer welche Seite ist, entscheidet damit die
+       KANTE - und die ist kraeftig genug, dass der alte Fehler ("die eigene Flotte flog in
+       Gegnerrot") nicht wiederkommt. */
+    const GEFECHT_STAHL = ['#d0d6e2','#9aa2b6','#2f3650'];
+    function drawShipMiniIcon(key, canvas, markOverride, ohneAnstrich, stopsOverride){
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -6791,7 +6800,7 @@
       const stil = markStil(key);
       const s = Math.min(w,h)/100;
       const P = (x,y) => [x*s, y*s];
-      const stops = (ohneAnstrich ? null : activeShipSkinStops()) || SHIP_GRAD_STOPS[cfg.grad]; // aktiver Flotten-Anstrich überschreibt die Rumpffarbe (rein kosmetisch)
+      const stops = stopsOverride || (ohneAnstrich ? null : activeShipSkinStops()) || SHIP_GRAD_STOPS[cfg.grad];
       const pts = cfg.pts.map(p=>P(p[0],p[1]));
       const xs = pts.map(p=>p[0]);
       // --- Triebwerksfahnen: ZUERST, damit sie hinter dem Rumpf liegen. Radiale Verläufe statt
@@ -37649,7 +37658,115 @@ async function claimPendingRewards(){
       }
       return mischCache[op];
     }
+    /* DAS LICHT DER KAMPF-WIEDERGABE (Buendel B, 05.09.2026, Grafik-Aufnahme).
+       Gemessen am alten Bild: Die Umrisse kamen aus SHIP_HULL_DEFS, aber die 62-%-Einfaerbung im
+       Mischmodus 'color' machte aus jedem Schiff eine mintgruene oder lachsrote Farbflaeche -
+       Fenster, Tuerme und Verlauf waren nur noch als Schleier da, es gab kein Licht und keine
+       Trennkante zum Hintergrund. Jetzt traegt das Spielbild seinen eigenen (stahlgrauen) Anstrich,
+       und die Partei sitzt an drei Stellen, die die Form NICHT zudecken:
+         - eine kraeftige Leuchtkante (1,5 px, am Handy 1,2) mit dunkler Trennkante nach aussen
+         - ein Kennungsstreifen quer ueber den Rumpf, 12 % der Laenge, an einer turmfreien Stelle
+         - die Triebwerksglut am Heck
+       Unter 10 px (Jaeger) traegt zusaetzlich ein 30-%-Schleier, weil dort weder Streifen noch
+       Tuerme aufloesen - dort ist die Silhouette alles.
+       Ein Licht fuer alle Ruempfe: Hauptlicht 45 Grad von oben links in BILDkoordinaten (nicht im
+       Rumpfsystem - sonst wanderte die Sonne mit dem Schiff), kalter Gegensaum unten rechts, quer
+       zur Achse der Koerperverlauf eines Zylinders. Alles in den Atlas gebacken, je Drehlage
+       einmal - im Bild bleibt es beim drawImage, kein Mischmodus mehr zur Laufzeit. */
+    function rumpfPfadWg(g, r, s){ g.beginPath(); pfadZug(g, r.punkte, s); g.closePath(); }
+    function rumpfPunktWg(r, s, x, y){ return [(y - r.mitteY)*r.mass*s, -(x - r.mitteX)*r.mass*s]; }
+    function streifenLage(cfg){
+      var xs = cfg.pts.map(function(p){return p[0];}), x0 = Math.min.apply(null,xs), len = Math.max.apply(null,xs)-x0;
+      var sperr = (cfg.turrets||[]).map(function(t){ var c=(t[0]-x0)/len, r=t[2]*0.9/len; return [c-r,c+r]; });
+      if (!cfg.noCanopy) sperr.push([0.61,0.79]);
+      var kand = [0.50,0.44,0.56,0.38,0.62,0.32];
+      for (var i=0;i<kand.length;i++){
+        var a=kand[i]-0.06, b=kand[i]+0.06, frei=true;
+        for (var j=0;j<sperr.length;j++) if (a < sperr[j][1] && sperr[j][0] < b){ frei=false; break; }
+        if (frei) return kand[i];
+      }
+      return 0.50;
+    }
+    /* Kantenstaerken je Groesse. Unter 10 px (Jaeger) schmaler, sonst frisst die Kante die Form. */
+    function kantenMass(L, klein){
+      var gross = L >= 10;
+      return { gross:gross, leucht: gross ? (klein?1.2:1.5) : (klein?0.75:0.9), dunkel: gross ? 0.8 : 0.6 };
+    }
+    /* Das Licht in BILDkoordinaten. Wird innerhalb des Rumpf-Clips gerufen, im Lagen-gedrehten
+       Koordinatensystem; dreht sich selbst zurueck. Hauptlicht oben links, Schatten unten rechts,
+       Lichtsaum in Flieder an den Kanten, die zum Licht zeigen, kalter Saum an den abgewandten.
+       Davor, im RUMPFsystem, der Koerperverlauf quer zur Achse: Mitte hell, Bordwaende dunkel -
+       das ist die Rundung, die ein Zylinder aus jeder Lage hat. */
+
+    function lichtAuftragen(g, r, s, ang, L, gross, klein, staerke){
+      staerke = staerke || 1;
+      var B = 0; for (var q=0;q<r.punkte.length;q+=2) B = Math.max(B, Math.abs(r.punkte[q]*s));
+      B = Math.max(2, 2*B);                                          // Rumpfbreite in px (auch fuer die Silhouette)
+      var kg = g.createLinearGradient(-B/2, 0, B/2, 0);
+      kg.addColorStop(0,   'rgba(0,0,0,'+(0.30*staerke)+')');
+      kg.addColorStop(0.30,'rgba(255,255,255,'+(0.06*staerke)+')');
+      kg.addColorStop(0.50,'rgba(255,255,255,'+(0.12*staerke)+')');
+      kg.addColorStop(0.72,'rgba(0,0,0,0)');
+      kg.addColorStop(1,   'rgba(0,0,0,'+(0.34*staerke)+')');
+      g.fillStyle = kg; g.fillRect(-L*2,-L*2,L*4,L*4);
+      g.save(); g.rotate(-ang);
+      var R = L*0.62, lg = g.createLinearGradient(-R,-R,R,R);
+      lg.addColorStop(0,   'rgba(255,255,255,'+(0.36*staerke)+')');
+      lg.addColorStop(0.40,'rgba(255,255,255,0)');
+      lg.addColorStop(0.56,'rgba(0,0,0,0)');
+      lg.addColorStop(1,   'rgba(0,0,0,'+(0.52*staerke)+')');
+      g.fillStyle = lg; g.fillRect(-L*2,-L*2,L*4,L*4);
+      if (gross){
+        var v = klein ? 0.45 : 0.55, lw = klein ? 1.0 : 1.2;
+        g.save(); g.translate(v,v); g.rotate(ang); rumpfPfadWg(g,r,s);
+        g.lineWidth = lw; g.strokeStyle = 'rgba(195,190,245,'+(0.45*staerke)+')'; g.stroke(); g.restore();
+        g.save(); g.translate(-v*0.8,-v*0.8); g.rotate(ang); rumpfPfadWg(g,r,s);
+        g.lineWidth = lw*0.85; g.strokeStyle = 'rgba(127,162,200,'+(0.22*staerke)+')'; g.stroke(); g.restore();
+      }
+      g.restore();
+    }
+    /* =====================================================================================
+       NEU 1b: Turmlichter. Die Tuerme kommen zwar mit dem Spielbild, aber bei 14 px ist ein
+       Turm ein grauer Punkt von einem Geraetepixel - er hat keinen Kontrast zum Rumpf. Hier
+       bekommt jeder Turm im selben Bildlicht wie der Rumpf einen dunklen Fuss, einen Glanzpunkt
+       oben links und einen Kernschatten unten rechts. Mindestgroesse 0,6 CSS-px, damit er am
+       Handy (dpr 2) wenigstens ein volles Geraetepixel misst. Die Position kommt aus
+       SHIP_HULL_DEFS.turrets, es wird nichts erfunden.
+       ===================================================================================== */
+
+    function turmLichter(g, def, r, s, ang, klein){
+      var ts = def.turrets || [];
+      for (var i=0;i<ts.length;i++){
+        var t = ts[i], p = rumpfPunktWg(r, s, t[0], t[1]);
+        var rr = Math.max(klein ? 0.6 : 0.7, t[2]*r.mass*s);
+        g.save(); g.translate(p[0], p[1]); g.rotate(-ang);
+        g.fillStyle = 'rgba(5,7,15,0.62)'; g.beginPath(); g.arc(0.14*rr, 0.14*rr, rr*1.25, 0, TAU); g.fill();
+        var tg = g.createRadialGradient(-rr*0.38, -rr*0.38, rr*0.05, 0, 0, rr*1.05);
+        tg.addColorStop(0, 'rgba(240,243,255,0.98)'); tg.addColorStop(0.35, 'rgba(146,150,172,0.92)');
+        tg.addColorStop(0.8, 'rgba(50,58,86,0.96)'); tg.addColorStop(1, 'rgba(10,13,28,0.92)');
+        g.fillStyle = tg; g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.fill();
+        g.restore();
+      }
+    }
+    /* Triebwerksglut in Parteifarbe, hinter dem Heck (additiv). Kurz gehalten: die
+       Antriebsfahnen je Antriebsart kommen im Spiel als eigener Durchlauf dazu. */
+
+    function glutAuftragen(g, motoren, farbe, L){
+      g.globalCompositeOperation = 'lighter';
+      motoren.forEach(function(m){
+        var rr = Math.max(1.2, m[2]*1.6), fl = L*0.22;
+        var wg = g.createLinearGradient(m[0], m[1], m[0], m[1]+fl);
+        wg.addColorStop(0, rgba(farbe,0.55)); wg.addColorStop(1, rgba(farbe,0));
+        g.fillStyle = wg; g.beginPath(); g.moveTo(m[0]-rr*0.7,m[1]); g.lineTo(m[0],m[1]+fl); g.lineTo(m[0]+rr*0.7,m[1]); g.closePath(); g.fill();
+        var gr = g.createRadialGradient(m[0],m[1],0,m[0],m[1],rr);
+        gr.addColorStop(0, rgba(farbe,0.9)); gr.addColorStop(0.45, rgba(farbe,0.32)); gr.addColorStop(1, rgba(farbe,0));
+        g.fillStyle = gr; g.beginPath(); g.arc(m[0],m[1],rr,0,TAU); g.fill();
+      });
+      g.globalCompositeOperation = 'source-over';
+    }
+
     function spielSprite(shipKey, eigen){
+      /* Beide Seiten in demselben Stahl - die Partei traegt die Kante, nicht die Fuellung. */
       var merk = shipKey + (eigen ? '|m' : '|f');
       if (spielSprites[merk] !== undefined) return spielSprites[merk];
       var nc = null;
@@ -37665,7 +37782,7 @@ async function claimPendingRewards(){
           var w = 100 + 2*SPRITE_RAND;
           var k = 100 / w, t = SPRITE_RAND * SPRITE_KANTE / w;
           g.setTransform(k, 0, 0, k, t, t);
-          drawShipMiniIcon(shipKey, nc, eigen ? undefined : 1, !eigen);
+          drawShipMiniIcon(shipKey, nc, eigen ? undefined : 1, !eigen, GEFECHT_STAHL);
           g.setTransform(1, 0, 0, 1, 0, 0);
         }
       } catch(e){ nc = null; }
@@ -37683,61 +37800,61 @@ async function claimPendingRewards(){
       var sp = spielSprite(r.schiff, eigen);
       if (!sp) return null;
       /* Rechenweg der Groesse, damit sie nicht geraten ist: die Sprite-Leinwand deckt
-         (100 + 2*RAND) Spieleinheiten ab. r.mass rechnet Spieleinheiten in
-         Rumpfeinheiten um, s skaliert Rumpfeinheiten in Pixel. Das ganze Sprite ist
-         also (100 + 2*RAND) * r.mass * s Pixel breit - dann ist der Rumpf darin
-         exakt r.spanne * s Pixel lang, genau wie beim gezeichneten Umriss. */
+         (100 + 2*RAND) Spieleinheiten ab. r.mass rechnet Spieleinheiten in Rumpfeinheiten um,
+         s skaliert Rumpfeinheiten in Pixel. */
       var voll = (100 + 2*SPRITE_RAND) * r.mass * s;
-      var kante = Math.ceil(r.spanne * s * 1.42) + 6;
+      var L = r.spanne * s;
+      var kante = Math.ceil(L * 1.42) + 6;
       var nc = document.createElement('canvas');
       nc.width  = Math.max(8, Math.round(kante * SPALTEN * dpr));
       nc.height = Math.max(8, Math.round(kante * (LAGEN/SPALTEN) * dpr));
       var g = nc.getContext('2d');
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.lineJoin = 'round'; g.lineCap = 'round';
-      // Mittelpunkt des Rumpfes innerhalb des Sprites, in Sprite-Pixeln
       var cxs = spritePx(r.mitteX), cys = spritePx(r.mitteY);
       var f = voll / SPRITE_KANTE;
+      var klein = dpr > 2 || s < 0.5;
+      var K = kantenMass(L, klein);
+      var def = SHIP_HULL_DEFS[r.schiff] || { pts: [] };
+      var motoren = hullEngines(def).map(function(e){
+        var pt = rumpfPunktWg(r, s, e[0], e[1]); return [pt[0], pt[1], e[2]*r.mass*s];
+      });
+      /* Der Kennungsstreifen liegt quer zur Achse an einer Stelle ohne Turm und ohne Kanzel -
+         streifenLage sucht sie aus SHIP_HULL_DEFS.turrets, es wird nichts geraten. */
+      var yBand = -((r.minX + (r.maxX - r.minX) * streifenLage(def)) - r.mitteX) * r.mass * s;
+      var hBand = L * 0.12;
       for (var i = 0; i < LAGEN; i++){
+        var ang = i / LAGEN * TAU;
         g.save();
         g.translate((i % SPALTEN)*kante + kante/2, ((i / SPALTEN)|0)*kante + kante/2);
-        g.rotate(i / LAGEN * TAU);
-        g.save();
-        /* Das Spielbild schaut nach RECHTS, die Wiedergabe fliegt nach OBEN. */
-        g.rotate(-Math.PI/2);
-        g.drawImage(sp, -cxs*f, -cys*f, voll, voll);
-        g.restore();
-        /* PARTEIFARBE. Sie muss gewinnen, und das ist nicht selbstverstaendlich:
-           die Spielbilder tragen ihre eigenen Klassenfarben (Tuerkis, Lachs, Gold),
-           und beim ersten Versuch mit einer duennen Kante plus 16 % Farbschleier
-           war auf dem Bildschirmfoto nicht mehr zu erkennen, welche Seite welche
-           war - genau der Fehler, der einen Tag zuvor schon einmal auftrat
-           ("die eigene Flotte flog in Gegnerrot"). Deshalb wird der Rumpf
-           EINGEFAERBT: der Mischmodus 'color' nimmt Farbton und Saettigung vom
-           Fuellwert und die Helligkeit vom Bild darunter - die Schattierung, die
-           Fenster, die Hangartore bleiben also erhalten, nur der Farbton wird der
-           der Partei. Kann der Browser das nicht, bleibt es beim Schleier; ein
-           unerkanntes 'color' wuerde sonst als 'source-over' den Rumpf zudecken. */
-        g.beginPath(); pfadZug(g, r.punkte, s); g.closePath();
-        g.save(); g.clip();
-        if (mischmodusKann('color')){
-          /* 0,62 statt 0,85 (04.08.2026): Bei voller Einfaerbung verschwanden auf dem
-             Telefon die Aufbauten im Farbton - aus den Schiffen wurden gruene und rote
-             Blaetter (Spieler-Report Sascha). Die Seite muss erkennbar bleiben, das
-             Schiff aber auch; die kraeftige Kante darunter traegt den groesseren Teil
-             der Unterscheidung. */
-          g.globalCompositeOperation = 'color';
-          g.globalAlpha = 0.62; g.fillStyle = farbe; g.fill();
-          g.globalCompositeOperation = 'source-over';
-          g.globalAlpha = 0.10; g.fill();
+        g.rotate(ang);
+        /* 1 dunkle Trennkante nach aussen - sie loest den Rumpf vom Sternenhintergrund */
+        rumpfPfadWg(g, r, s); g.lineWidth = 2*(K.leucht + K.dunkel); g.strokeStyle = '#05070f'; g.stroke();
+        /* 2 Glut am Heck, additiv, in der Parteifarbe */
+        glutAuftragen(g, motoren, farbe, L);
+        /* 3 die Leuchtkante: der groesste Teil der Seitenunterscheidung */
+        rumpfPfadWg(g, r, s); g.lineWidth = 2*K.leucht; g.strokeStyle = farbe;
+        g.globalAlpha = 0.95; g.stroke(); g.globalAlpha = 1;
+        g.save(); rumpfPfadWg(g, r, s); g.clip();
+        /* 4 das Spielbild, ungefaerbt */
+        g.save(); g.rotate(-Math.PI/2); g.drawImage(sp, -cxs*f, -cys*f, voll, voll); g.restore();
+        if (K.gross){
+          /* 5a Kennungsstreifen mit Dunkelsaum */
+          g.fillStyle = farbe; g.fillRect(-L, yBand - hBand/2, 2*L, hBand);
+          g.strokeStyle = 'rgba(5,7,15,0.8)'; g.lineWidth = klein ? 0.8 : 1;
+          g.beginPath();
+          g.moveTo(-L, yBand - hBand/2); g.lineTo(L, yBand - hBand/2);
+          g.moveTo(-L, yBand + hBand/2); g.lineTo(L, yBand + hBand/2);
+          g.stroke();
         } else {
-          g.globalAlpha = 0.30; g.fillStyle = farbe; g.fill();
+          /* 5b unter 10 px loest kein Streifen auf - dort traegt ein Schleier mit */
+          rumpfPfadWg(g, r, s); g.globalAlpha = 0.30; g.fillStyle = farbe; g.fill(); g.globalAlpha = 1;
         }
-        g.globalAlpha = 1;
+        /* 6 das Licht */
+        lichtAuftragen(g, r, s, ang, L, K.gross, klein, 1);
+        /* 7 die Tuerme im selben Licht */
+        if (K.gross) turmLichter(g, def, r, s, ang, klein);
         g.restore();
-        g.lineWidth = Math.max(0.9, 0.75*s);
-        g.strokeStyle = farbe; g.globalAlpha = 0.95; g.stroke();
-        g.globalAlpha = 1;
         g.restore();
       }
       return { bild: nc, kante: kante };
