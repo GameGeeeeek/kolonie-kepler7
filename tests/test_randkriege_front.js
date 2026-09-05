@@ -101,6 +101,13 @@ function baueUmgebung(opt) {
   const o = opt || {};
   const NACHBARN = { s1:['s2'], s2:['s1','s3'], s3:['s2','s4'], s4:['s3','s5'], s5:['s4','s6'], s6:['s5','s7'], s7:['s6'] };
   const nachrichten = [];
+  /* `chronikVermerken` kam mit Backend-PR #242 (Galaxie-Chronik C1, 05.09.2026) in `rkTick`.
+     Diese Umgebung baut den Serverquelltext per `new Function` nach; jede dort gerufene Funktion,
+     die hier fehlt, laesst den Testlauf mit ReferenceError abbrechen - genau das ist am
+     05.09.2026 passiert, und zwar in einem Prueflauf, der mit dieser Datei nichts zu tun hatte.
+     Wie `pushGalaxyNews` wird sie deshalb MITGESCHRIEBEN und nicht verschluckt: Eine Attrappe,
+     die nur schweigt, waere eine Stelle weniger, an der ein kuenftiger Fehler auffaellt. */
+  const chronik = [];
   const factions = o.factions || {
     kartell:  { id:'kartell',  name:'Aschen-Kartell', systems:['s1','s2','s3','s4'], strength: o.strA !== undefined ? o.strA : 2 },
     schatten: { id:'schatten', name:'Schattenbund',   systems:['s5','s6','s7'],      strength: o.strB !== undefined ? o.strB : 2 },
@@ -113,6 +120,7 @@ function baueUmgebung(opt) {
     occupiedSystems: () => new Set(o.spielerHeimat || []),
     loadOrInitFactions: () => factions,
     pushGalaxyNews: (icon, text) => nachrichten.push({ icon, text }),
+    chronikVermerken: (art, felder) => { const e = { art, felder }; chronik.push(e); return e; },
     db: baueDb(o.users),
     Math: o.mathe || Math,
     Date: o.datum || Date
@@ -121,7 +129,7 @@ function baueUmgebung(opt) {
   const koerper = kQ.map(x => x.q).join('\n') + '\n' + fnQ.map(x => x.q).join('\n\n')
     + '\nreturn { rkTick, rkGrenzsysteme, loadOrInitRandkriege, rkAktiveSpieler, RK_OBEN, RK_UNTEN, RK_TICK_DECKEL, RK_MAX };';
   const api = new Function(...namen, koerper)(...namen.map(k => kontext[k]));
-  return { api, galaxie, factions, nachrichten };
+  return { api, galaxie, factions, nachrichten, chronik };
 }
 const jetzt = 1786000000000;
 const festeUhr = Object.assign(Object.create(Date), { now: () => jetzt });
@@ -246,6 +254,14 @@ function frontVon(u, aId) { return (u.galaxie.randkriege.fronten || []).find(f =
   u.api.rkTick(u.galaxie);
   check('7: mit drei Beitragenden fällt sie', !u.factions.schatten.systems.includes('s5'),
     { kp: Math.round(e.kp), beitragende: Object.keys(e.beitragende) });
+  /* Der Durchbruch gehoert seit Backend-PR #242 ins Ereignisbuch. Die Attrappe oben schreibt mit,
+     damit hier ueberhaupt etwas zu pruefen ist - eine Attrappe, die nur schweigt, haette den
+     Aufruf zwar ueberlebt, aber nichts belegt. */
+  const durchbruch = u.chronik.filter(x => x.art === 'front-durchbrochen');
+  check('7: der Durchbruch steht im Ereignisbuch, mit Sieger und Verlierer',
+    durchbruch.length === 1 && durchbruch[0].felder.system === 's5'
+    && durchbruch[0].felder.sieger === 'Aschen-Kartell' && durchbruch[0].felder.verlierer === 'Schattenbund',
+    durchbruch);
 }
 
 // ---- 8. Ein Gegner kann die Front nicht durch einen Minimalbeitrag einfrieren --------------------

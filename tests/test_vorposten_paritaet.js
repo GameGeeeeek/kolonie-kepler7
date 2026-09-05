@@ -26,6 +26,11 @@
 //      drei Endprojekte, das Sprungtor seit Etappe 4).
 //   9. Die *_DEFS-Listen sind Arrays und werden nirgends mit einem Schluessel indiziert (echter
 //      Fehler, 04.09.2026: der Abbau gab die Garnison nicht zurueck).
+//  10. (nur mit Nachbar-Klon) Keine Vorlage der Vorposten-Browsertests setzt ein Feld, das vorpostenFuerClient gar nicht
+//      verschickt (echter Fehler, 05.09.2026: das Spiel las `garnisonVon` - so heisst die
+//      Aufschluesselung nur SERVERSEITIG; an den Client geht `meineGarnison`. Die Zahl war immer
+//      0, und der Browsertest blieb gruen, weil seine Vorlage das erfundene Feld selbst
+//      mitlieferte. Eine Vorlage, die ein Feld erfindet, prueft nur sich selbst).
 //
 // GEGENPROBE: einen Belohnungs-Zweig umbenennen -> 3 faellt; vorpostenFlug in die Anfechtung
 // einhaengen -> 5b faellt; 'vorposten-defend' aus EINWEGIG_ERLAUBT nehmen -> 4a faellt.
@@ -358,11 +363,100 @@ for (const name of LISTEN) {
 check('9b: keine der sechs *_DEFS-Listen wird mit einem Schluessel indiziert (sie sind Arrays)',
   schluesselZugriffe.length === 0, { gefunden: schluesselZugriffe });
 
+/* 10. KEINE TESTVORLAGE DARF EIN FELD ERFINDEN (05.09.2026, echter Fehler).
+   ---------------------------------------------------------------------------------------------
+   Die Frontend-Haelfte von V5 las `v.garnisonVon[meineId]`. So heisst die Aufschluesselung
+   SERVERSEITIG in `doc` - vorpostenFuerClient verschickt sie bewusst NICHT („die vollstaendige
+   Aufschluesselung sieht weiterhin nur der Besitzer") und schickt stattdessen `meineGarnison`,
+   den eigenen Anteil, flach nach Schiffstyp. Der Name stammte aus dem Konzeptpapier statt aus dem
+   Quelltext des Senders; im Spiel war die Zahl deshalb IMMER 0.
+   AUFGEFALLEN IST ES NICHT, weil die Vorlage des Browser-Tests das erfundene Feld selbst
+   mitlieferte. Eine Vorlage, die ein Feld erfindet, prueft nur sich selbst - sie kann einen
+   falschen Feldnamen nicht fangen, egal wie gruendlich der Test danach misst.
+   Hier wird deshalb die VORLAGE gegen den SENDER gehalten: Jeder Schluessel, den eine
+   Vorposten-Vorlage setzt, muss ein Feld sein, das vorpostenFuerClient wirklich erzeugt. */
+if (SRV) {
+  const balanciert = (t, von) => {
+    let d = 0;
+    for (let i = von; i < t.length; i++) {
+      const c = t[i];
+      if (c === '{') d++;
+      else if (c === '}') { d--; if (!d) return t.slice(von, i + 1); }
+    }
+    return '';
+  };
+  const kommentarfrei = t => t
+    .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:'"\\])\/\/[^\n]*/g, (m, a) => a + ' '.repeat(m.length - a.length));
+  /* Schluessel auf der OBERSTEN Ebene eines Objektliterals. Zwei Feinheiten, beide gemessen:
+     Ein Wert, der ein blosser Bezeichner ist (`besitzer: ICH`), sieht wie eine Kurzschreibweise
+     aus - deshalb muss das Zeichen VOR dem Namen `{` oder `,` sein, also Schluesselposition.
+     Und Klammern jeder Art zaehlen in die Tiefe, sonst gaelte `(doc.seit || 0) + X` als Feld. */
+  const tiefe1 = lit => {
+    const t = kommentarfrei(lit); const out = []; let d = 0;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (c === '{' || c === '(' || c === '[') { d++; continue; }
+      if (c === '}' || c === ')' || c === ']') { d--; continue; }
+      if (d !== 1 || !/[A-Za-z_$]/.test(c)) continue;
+      let j = i - 1; while (j >= 0 && /\s/.test(t[j])) j--;
+      if (!(t[j] === '{' || t[j] === ',')) continue;
+      const m = /^([A-Za-z_$][\w$]*)\s*(:|,|\})/.exec(t.slice(i));
+      if (m) { out.push(m[1]); i += m[1].length - 1; }
+    }
+    return [...new Set(out)];
+  };
+
+  const fnVon = SRV.indexOf('function vorpostenFuerClient(');
+  const fnRumpf = fnVon < 0 ? '' : SRV.slice(fnVon, SRV.indexOf('\n}\n', fnVon));
+  const outVon = fnRumpf.indexOf('{', fnRumpf.indexOf('const out ='));
+  const felder = new Set(fnRumpf ? tiefe1(balanciert(fnRumpf, outVon)) : []);
+  // Was NUR der Besitzer sieht, steht als `out.x = ...` unter dem Literal - es sind Felder wie
+  // jedes andere, nur enger verteilt; eine Vorlage darf sie setzen.
+  for (const m of fnRumpf.matchAll(/\bout\.([A-Za-z_$][\w$]*)\s*=/g)) felder.add(m[1]);
+  check('10-anker1: die Felderliste stammt wirklich aus vorpostenFuerClient (sonst misst 10a nichts)',
+    felder.size >= 30 && felder.has('meineGarnison') && felder.has('garnison') && felder.has('eigener')
+    && !felder.has('garnisonVon'),
+    { anzahl: felder.size, meineGarnison: felder.has('meineGarnison'), garnisonVon: felder.has('garnisonVon') });
+
+  /* Die Vorlagen werden am FINGERABDRUCK erkannt, nicht am Variablennamen: Sie heissen je nach
+     Datei `vp`, `doc` oder stehen anonym in `liste:[...]`. Ein Objektliteral, das `garnisonAnzahl`
+     UND `kern` auf oberster Ebene setzt, ist ein Vorposten - sonst nichts in diesen Dateien.
+     Dazu die Ueberschreibungen an den Aufrufstellen `vp({ ... })`; die tragen den Fingerabdruck
+     naturgemaess nicht. */
+  const testDir = path.join(__dirname);
+  const dateien = fs.readdirSync(testDir).filter(n => /^test_vorposten_.*\.js$/.test(n) && n !== 'test_vorposten_paritaet.js');
+  const fremdeFelder = []; const mitVorlage = [];
+  for (const name of dateien) {
+    const t = fs.readFileSync(path.join(testDir, name), 'utf8');
+    const keys = new Set(); let bis = -1;
+    for (let i = 0; i < t.length; i++) {
+      if (t[i] !== '{' || i < bis) continue;
+      const lit = balanciert(t, i); if (!lit) continue;
+      const k = tiefe1(lit);
+      if (k.includes('garnisonAnzahl') && k.includes('kern')) { k.forEach(x => keys.add(x)); bis = i + lit.length; }
+    }
+    for (const m of t.matchAll(/\bvp\(\s*\{/g)) tiefe1(balanciert(t, m.index + m[0].length - 1)).forEach(x => keys.add(x));
+    if (!keys.size) continue;
+    mitVorlage.push(name);
+    for (const k of keys) if (!felder.has(k)) fremdeFelder.push(name + ' -> ' + k);
+  }
+  check('10-anker2: es wurden ueberhaupt Vorlagen gefunden (sonst misst 10a nichts)',
+    mitVorlage.length >= 8, { dateien: mitVorlage.length, namen: mitVorlage });
+  check('10a: keine Vorposten-Vorlage setzt ein Feld, das vorpostenFuerClient nie schickt',
+    fremdeFelder.length === 0, { erfunden: fremdeFelder });
+}
+
 ende();
 
 
-/* GEGENPROBE, sechs Richtungen gemessen am 04.09.2026 (jeweils NUR die eine Datei angefasst,
-   die Testdatei blieb neu):
+/* GEGENPROBE, sieben Richtungen (jeweils NUR die eine Datei angefasst, die Testdatei blieb neu).
+   Zu Abschnitt 10, gemessen am 05.09.2026:
+   G) Die Vorlage in test_vorposten_verbuendet_ui.js zurueck auf `garnisonVon`: 10a FAELLT, und
+      NUR 10a (Pruefnamen beider Laeufe per `diff`). Das ist genau der Stand, an dem der Fehler
+      vier Stunden unbemerkt blieb.
+
+   Die sechs Richtungen vom 04.09.2026:
 
    Zum Rueckfallnamen (Abschnitt 6):
    A) Spieldatei auf origin/main (Rueckfall noch "Feldlager"), Server "Ankerkern": 6b FAELLT.
