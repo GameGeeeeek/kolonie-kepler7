@@ -61,6 +61,20 @@ check('0a: das Spiel haelt KEINE eigenen Namensregeln - Muster, Laenge und Stufe
     .map(m => m[2]);
   check('0e: die Berichte tragen BEIDE Namen (vpTitel), nicht nur den eigenen',
     berichte.length === 2 && berichte.every(f => f === 'vpTitel'), { gefunden: berichte });
+  /* 0f: KEINE ANZEIGESTELLE DARF DEN EIGENEN NAMEN GAR NICHT KENNEN. Genau das war der Befund
+     (Codex, 05.09.2026): Kartenbeschriftung, Karten-Tooltip und der Schnappschuss der
+     Angriffsmission trugen nur den Stufennamen - auf der Karte, im Flugkaertchen und im
+     dauerhaften Bericht fehlte der Name also vollstaendig. Gemessen wird an den vier Stellen, die
+     eine Station BESCHRIFTEN; welche davon beide Namen traegt und welche nur den eigenen, sagt die
+     Regel ueber vpTitel im Spiel (eng vs. weit). */
+  const stellen = {
+    kartenTooltip: /<title>\$\{escapeHtml\(vpTitel\(vp\)\)\}/.test(src),
+    kartenLabel: /planet-label[\s\S]{0,400}?vp\.eigenName \|\| vp\.name/.test(src),
+    angriffsmission: /type:'vorposten-angriff'[^}]*stufeName: vpTitel\(v\)/.test(src),
+    schnellzugriff: /data-vorposten-menu[\s\S]{0,400}?vpHier\.eigenName \|\| vpHier\.name/.test(src)
+  };
+  check('0f: jede Beschriftung einer Station kennt den eigenen Namen - Karte, Tooltip, Angriffsmission, Schnellzugriff',
+    Object.values(stellen).every(Boolean), stellen);
 }
 
 const now = Date.now();

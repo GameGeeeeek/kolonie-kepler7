@@ -12140,6 +12140,16 @@
     const eigen = vpNameVon(v), stufe = (v && v.name) || 'Vorposten';
     return eigen ? eigen + ' · ' + stufe : stufe;
   }
+  /* WELCHE ANZEIGESTELLE WELCHEN NAMEN TRAEGT (Durchsicht 05.09.2026, Befund von Codex - drei
+     Stellen hatten den eigenen Namen gar nicht). Die Regel, damit die naechste nicht geraten wird:
+       ENG (Knopf, Kartenbeschriftung, Zeile in einer Liste)  -> `eigenName || name`.
+           Dort ist Platz fuer EINEN Namen, und der eigene ist der, an dem man die Station
+           wiedererkennt. Die Stufe steht in derselben Ansicht ohnehin daneben (Kern, Garnison).
+       WEIT (Menuekopf, Stationstafel, Tooltip, Bericht)      -> `vpTitel` (BEIDE).
+           Dort ist Platz, und dort wird nachgeschlagen: Der Stufenname sagt einem Angreifer, wie
+           stark die Station ist, und das Protokoll soll in einem Jahr noch sagen, was da stand.
+       SATZ (Meldung im Spielverlauf)                          -> `vpMeldName` (nur der eigene).
+           Ein Satz nennt die Station beim Namen, nicht bei ihrer Bauart. */
   /* Im BERICHT stehen beide Namen, in der MELDUNG nur der eigene. Der Unterschied ist Absicht:
      Die Meldung ist ein Satz („Dein Vorposten Roter Hafen wurde geschleift") und braucht die
      Stufe nicht; der Bericht ist das Protokoll und soll in einem Jahr noch sagen, WAS da stand.
@@ -12499,7 +12509,10 @@
     pay(fuel);
     const jetzt = Date.now();
     const fleetName = resolveFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'vorposten-angriff', targetId: sysId, system: sysId, vorpostenId: String(v.id), besitzerName: v.besitzerName||'', stufeName: v.name||'Vorposten',
+    /* Der Name wird beim ABFLUG festgehalten, nicht beim Einschlag: Bis die Flotte ankommt, kann
+       der Besitzer umbenannt haben - und faellt die Station, gibt es sie beim Bericht gar nicht
+       mehr. `vpTitel` traegt beide Namen, weil der Bericht das Protokoll ist. */
+    cf.missions.push({ id: nextMissionId(), type:'vorposten-angriff', targetId: sysId, system: sysId, vorpostenId: String(v.id), besitzerName: v.besitzerName||'', stufeName: vpTitel(v),
       startTime: jetzt, endTime: jetzt + flug*1000, fleetName, composition: flotte });
     log(fleetName + ' fliegt zum Vorposten von ' + (v.besitzerName||'?') + ' in ' + (STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name + '. Ankunft in ' + fmtDuration(flug/2) + ', zurück in ' + fmtDuration(flug) + '.', 'ti-sword');
     render(); save();
@@ -62251,7 +62264,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           : '';
         inner += `
           <g class="planet-node" data-map-vorposten="${escapeHtml(String(vp.id))}" style="cursor:pointer;">
-            <title>${escapeHtml(vp.name||'Vorposten')} von ${escapeHtml(vp.besitzerName||'?')} – Kern ${Math.round(anteilV*100)}%, ${vp.garnisonAnzahl||0} Schiffe Garnison (antippen für das Menü)</title>
+            <title>${escapeHtml(vpTitel(vp))} von ${escapeHtml(vp.besitzerName||'?')} – Kern ${Math.round(anteilV*100)}%, ${vp.garnisonAnzahl||0} Schiffe Garnison (antippen für das Menü)</title>
             <!-- Trefferflaeche: GEMESSEN war die Palisade auf dem Handy 22x13 CSS-Pixel, die
                  Silhouette der Station stellenweise 7x7 - beides unter dem Mindestmass von 24 px
                  (WCAG 2.2 AA), das derselbe Befund bei den Asteroiden gerade gesetzt hat. Der
@@ -62266,7 +62279,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             ${vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV)}
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2*anteilV).toFixed(1)}" height="2.6" fill="${farbeV}"/>
-            <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(posV.y - rV - 8).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.name||'Vorposten') : (vp.name||'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>
+            <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(posV.y - rV - 8).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.eigenName || vp.name || 'Vorposten') : (vp.eigenName || vp.name || 'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>
           </g>`;
       }
     }
