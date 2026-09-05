@@ -11802,6 +11802,10 @@
     const eigen = vpNameVon(v), stufe = (v && v.name) || 'Vorposten';
     return eigen ? eigen + ' · ' + stufe : stufe;
   }
+  /* Im BERICHT stehen beide Namen, in der MELDUNG nur der eigene. Der Unterschied ist Absicht:
+     Die Meldung ist ein Satz („Dein Vorposten Roter Hafen wurde geschleift") und braucht die
+     Stufe nicht; der Bericht ist das Protokoll und soll in einem Jahr noch sagen, WAS da stand.
+     `vpTitel` liest dieselben zwei Felder, die eine Meldung fuehrt - `eigenName` und `name`. */
   async function vorpostenBenennen(sysId){
     const v = vorpostenAn(sysId);
     if (!v || !v.eigener) return;
@@ -28763,7 +28767,7 @@ async function claimPendingRewards(){
              nicht und titelte dem Partner „Dein Vorposten wurde geschleift" ueber eine Station,
              die ihm nie gehoerte. Beide Felder werden deshalb durchgereicht - `battleCardData`
              liest sie. */
-          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName: vpMeldName(r), angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{},
+          pushReport({ type:'vorposten-verteidigung', gefallen:true, system:r.system, systemName:sysNameV, stufeName: vpTitel(r), angreiferName:r.angreiferName||'', teilnehmer:r.teilnehmer||1, garnisonVerloren:r.garnisonVerloren||{},
             alsVerbuendeter: alsVerbV, besitzerName: alsVerbV ? (r.besitzerName||'') : '' });
           playSound('lose');
           ladeVorposten();
@@ -28811,7 +28815,7 @@ async function claimPendingRewards(){
             + (zurueckU.length ? ' Die Station hält jetzt nur noch ' + fmt(r.garnisonMax || 0)
                + ' Schiffe – zurück geflogen sind ' + zurueckU.join(', ') + '.' : ''), 'ti-target', 'wichtig');
           pushReport({ type:'vorposten-bau', erfolg:true, umgeruestet:true, system:r.system, systemName:sysNameU,
-            stufeName: vpMeldName(r), vonZweigName:r.vonZweigName || '', zweigName:r.zweigName || '',
+            stufeName: vpTitel(r), vonZweigName:r.vonZweigName || '', zweigName:r.zweigName || '',
             garnisonZurueck: zurueckU.join(', '), garnisonMax: r.garnisonMax || 0 });
           ladeVorposten();
           save();

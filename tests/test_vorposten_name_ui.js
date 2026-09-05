@@ -53,6 +53,14 @@ check('0a: das Spiel haelt KEINE eigenen Namensregeln - Muster, Laenge und Stufe
   const rumpfM = vonM < 0 ? '' : src.slice(vonM, src.indexOf('\n', vonM));
   check('0d: vpMeldName nimmt den eigenen Namen und faellt auf den Stufennamen zurueck',
     vonM > 0 && /r\.eigenName/.test(rumpfM) && /r\.name/.test(rumpfM), { zeile: rumpfM.trim().slice(0, 120) });
+  /* 0e: MELDUNG UND BERICHT SIND NICHT DASSELBE. Die Meldung ist ein Satz und braucht die Stufe
+     nicht; der BERICHT ist das Protokoll und soll in einem Jahr noch sagen, was da stand - dort
+     stehen deshalb beide Namen (`vpTitel`), nicht nur der eigene. Gemessen an den beiden
+     Berichten, die eine Station beim Namen nennen. */
+  const berichte = [...src.matchAll(/pushReport\(\{ type:'vorposten-(verteidigung|bau)'[^}]*stufeName: (\w+)\(r\)/g)]
+    .map(m => m[2]);
+  check('0e: die Berichte tragen BEIDE Namen (vpTitel), nicht nur den eigenen',
+    berichte.length === 2 && berichte.every(f => f === 'vpTitel'), { gefunden: berichte });
 }
 
 const now = Date.now();
