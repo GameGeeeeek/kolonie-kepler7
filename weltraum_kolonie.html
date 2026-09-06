@@ -12231,7 +12231,7 @@
       return false;
     }
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/asteroid/claim', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: sysId, platz: String(platz) })
@@ -12875,7 +12875,7 @@
     let daten = null, status = 0;
     const sysN = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/vorposten/bauen', { method:'POST', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ system: m.system, missionId: String(m.id) }) });
       status = res.status;
@@ -12971,7 +12971,7 @@
     let daten = null;
     const sysN = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/vorposten/stationieren', { method:'POST', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ system: m.system, planetKey, composition: m.composition || {} }) });
       daten = await res.json().catch(() => null);
@@ -13776,7 +13776,7 @@
   async function anfechtungAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/asteroid/contest', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: m.system, platz: String(m.platz), missionId: String(m.id) })
@@ -13844,7 +13844,7 @@
   async function nestAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/alien/nest-angriff', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nestId: String(m.nestId||''), missionId: String(m.id) })
@@ -13917,7 +13917,7 @@
   async function konvoiAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/konvoi/angriff', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ zielId: String(m.zielId||''), missionId: String(m.id) })
@@ -13973,7 +13973,7 @@
   async function vorpostenAngriffAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/vorposten/angriff', { method:'POST', headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ system: m.system, missionId: String(m.id), vorpostenId: String(m.vorpostenId||'') }) });
       status = res.status;
@@ -14020,7 +14020,7 @@
   async function festungAufloesen(m, planetKey, fleet){
     let daten = null, status = 0, serverFehler = '';
     try {
-      await save();
+      await save({ nurSpielstand: true });   // nur der Spielstand: siehe spielstandVorAnfrageSichern
       const res = await backendFetch('/festung/angriff', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ system: m.system, missionId: String(m.id), festungId: String(m.festungId||'') })
@@ -16626,10 +16626,8 @@
            Server urteilt weiter ueber den alten Stand, und beim KAUF ueberschreibt seine
            Antwort obendrein die seither getickten Kredite. Lieber ein ehrliches "gleich
            nochmal" als ein stiller Verlust. */
-        const gespeichert = await save({ nurSpielstand: true });
-        if (!gespeichert){
+        if (!(await spielstandVorAnfrageSichern('Handel', opts.viaLimit))){
           marktLetzteAbsage = { status: 0, fehler: 'Speichern' };
-          if (!opts.viaLimit) log('Handel abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
           return false;
         }
       }
@@ -16789,8 +16787,15 @@
     const def = defs.find(d => d.key === typ);
     return !!def && def.quelle === HERKUNFT_ABGRUND;
   }
-  /* EINE Stelle fuer alle drei Modulboersen-Aufrufe (05.09.2026) - dieselbe Ursache wie beim
-     Markt, gemessen an drei Routen:
+  /* EINE Stelle fuer JEDEN Aufruf, dessen Endpunkt ueber den GESPEICHERTEN Spielstand urteilt -
+     Markt wie Modulboerse (zusammengefasst 06.09.2026; vorher stand dieselbe Logik samt
+     derselben 120-Zeichen-Meldung in drei Kopien, und eine Umformulierung haette an drei
+     Stellen nachgezogen werden muessen).
+     `still` unterdrueckt die Meldung fuer Aufrufer, die ihre Absagen selbst protokollieren
+     (Limit-Orders). Die abweichende Buchfuehrung der Aufrufer - marktLetzteAbsage,
+     marketBulkRun zuruecksetzen - bleibt bei ihnen; nur das Speichern und seine Begruendung
+     sind gemeinsam.
+     Die Modulboerse war der Anlass, gemessen an drei Routen:
        /modulemarket/list   prueft `moduleInvOf(save)` gegen den GESPEICHERTEN Spielstand
        /modulemarket/buy    prueft `save.credits` gegen den GESPEICHERTEN Spielstand
        /modulemarket/cancel liest ihn und schreibt ihn zurueck
@@ -16805,10 +16810,10 @@
      rechnet auf dem alten Stand weiter, und der Client uebernimmt dessen Antwort.
      Rueckgabe false heisst: nicht anfragen. Ein Handel auf veralteter Grundlage waere genau der
      Fehler, den das hier verhindern soll - nur ohne die Chance, ihn zu bemerken. */
-  async function moduleMarketSpielstandSichern(was){
+  async function spielstandVorAnfrageSichern(was, still){
     const gespeichert = await save({ nurSpielstand: true });
     if (!gespeichert){
-      log(was + ' abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
+      if (!still) log(was + ' abgebrochen: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
       return false;
     }
     return true;
@@ -16831,7 +16836,7 @@
     }
     moduleMarketInFlight = true;
     try {
-      if (!(await moduleMarketSpielstandSichern('Einstellen'))) return;
+      if (!(await spielstandVorAnfrageSichern('Einstellen'))) return;
       const res = await backendFetch('/modulemarket/list', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ isShip: !!isShip, instKey, price: p }) });
       const data = await res.json();
@@ -16853,7 +16858,7 @@
     if (!useBackend() || moduleMarketInFlight) return;
     moduleMarketInFlight = true;
     try {
-      if (!(await moduleMarketSpielstandSichern('Zurückziehen'))) return;
+      if (!(await spielstandVorAnfrageSichern('Zurückziehen'))) return;
       const res = await backendFetch('/modulemarket/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.ok){ log('Zurückziehen fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
@@ -16902,7 +16907,7 @@
     if (!useBackend() || moduleMarketInFlight) return;
     moduleMarketInFlight = true;
     try {
-      if (!(await moduleMarketSpielstandSichern('Kauf'))) return;
+      if (!(await spielstandVorAnfrageSichern('Kauf'))) return;
       const res = await backendFetch('/modulemarket/buy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) });
       const data = await res.json();
       if (!res.ok || !data.ok){ log('Kauf fehlgeschlagen: '+(data.error||'unbekannt'), 'ti-alert-triangle'); await loadModuleMarket(true); return; }
@@ -16964,12 +16969,10 @@
        Bewusst NACH dem Setzen von marketBulkRun: Der Riegel drueber wird synchron geprueft; ein
        `await` davor oeffnete ein Fenster, in dem zwei schnelle Klicks BEIDE durchkaemen und zwei
        Sammelauftraege nebeneinander liefen. */
-    const gespeichert = await save({ nurSpielstand: true });
-    if (!gespeichert){
-      // Dieselbe Begruendung wie in doMarketTrade - hier zusaetzlich den Riegel wieder loesen,
-      // der oben schon gesetzt wurde, sonst blockierte ein gescheiterter Start den Markt.
+    if (!(await spielstandVorAnfrageSichern('Sammelauftrag'))){
+      // Hier zusaetzlich den Riegel wieder loesen, der oben schon gesetzt wurde - sonst
+      // blockierte ein gescheiterter Start den Markt dauerhaft.
       marketBulkRun = null;
-      log('Sammelauftrag nicht gestartet: Dein Spielstand ließ sich gerade nicht speichern – der Server würde über einen veralteten Stand entscheiden. Gleich noch einmal versuchen.', 'ti-alert-triangle', 'warn');
       renderMarket();
       return false;
     }
@@ -73377,8 +73380,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const pwEl = document.getElementById('logoutAllPasswordInput');
       const password = pwEl ? pwEl.value : '';
       if (!password){ log('Bitte zur Bestätigung dein aktuelles Passwort eingeben.', 'ti-alert-triangle'); return; }
-      // Letzter Stand noch schnell weg, bevor die Sitzung endet - sonst ginge der Fortschritt seit
-      // dem letzten Auto-Save verloren, und genau das soll dieser Knopf ja NICHT auslösen.
+      /* Letzter Stand noch schnell weg, bevor die Sitzung endet - sonst ginge der Fortschritt seit
+         dem letzten Auto-Save verloren, und genau das soll dieser Knopf ja NICHT auslösen.
+         BEWUSST der VOLLE Speichervorgang, nicht der schmale (06.09.2026): Hier kommt kein Takt
+         mehr, der die Rundfunk-Schluessel nachholt. Andere Spieler saehen Bestenliste, Missionen
+         und Mondverteidigung sonst auf dem Stand von vor bis zu zehn Sekunden - dauerhaft. Genau
+         darin unterscheidet sich diese Stelle von den acht Missions-Aufloesungen darueber. */
       try { await save(); } catch(e){}
       try {
         const res = await backendFetch('/logout-all', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password }) });

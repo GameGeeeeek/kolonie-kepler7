@@ -72,27 +72,59 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
     /function save\(opts\)\{[\s\S]{0,200}?doSave\(opts\)/.test(JS.replace(/\/\*[\s\S]*?\*\//g, '')));
   const ohneK = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   /* JE FUNKTION pruefen, nicht ueber die ganze Datei (Durchsicht 06.09.2026). Ein Zaehler mit
-     Schwelle ">= 2" ueber drei Vorkommen kann nicht sehen, wenn AUSGERECHNET der Sammelauftrag
-     auf den vollen Speichervorgang zurueckfaellt - etwa beim Aufloesen eines Merge-Konflikts
-     gegen den Text vor 8.690.0. Genau diese Regression soll die Aenderung verhindern. */
+     Schwelle ">= 2" ueber mehrere Vorkommen kann nicht sehen, wenn AUSGERECHNET der Sammelauftrag
+     zurueckfaellt - etwa beim Aufloesen eines Merge-Konflikts gegen aelteren Text. */
   for (const fn of ['doMarketTrade(', 'doMarketTradeChunked(']){
     const i = ohneK.indexOf('async function ' + fn);
     const j = i < 0 ? -1 : ohneK.indexOf('\n  async function ', i + 10);
     const block = (i >= 0) ? ohneK.slice(i, j > i ? j : i + 6000) : '';
-    check('1e-' + fn.replace('(', '') + ': benutzt den schmalen Pfad',
-      i >= 0 && /save\(\{ nurSpielstand: true \}\)/.test(block), { gefunden: i >= 0 });
+    check('1e-' + fn.replace('(', '') + ': sichert den Spielstand über die gemeinsame Stelle',
+      i >= 0 && /await spielstandVorAnfrageSichern\(/.test(block), { gefunden: i >= 0 });
   }
-  /* EINE Stelle für alle drei Börsen-Aufrufe, nicht drei Kopien - und alle drei benutzen sie.
-     Ein vierter Aufruf, der sie vergisst, fällt hier auf. */
-  check('1f: es gibt EINE gemeinsame Sicherung für die Börse',
-    /async function moduleMarketSpielstandSichern\(/.test(ohneK));
-  const nutzer = (ohneK.match(/await moduleMarketSpielstandSichern\(/g) || []).length;
-  check('1g: und alle DREI Börsen-Aufrufe benutzen sie', nutzer === 3, { nutzer });
+  /* EINE Stelle für ALLE fünf Aufrufer (Markt, Sammelauftrag, drei Börsen-Routen), nicht fünf
+     Kopien derselben Meldung. Ein sechster Aufruf, der sie vergisst, fällt bei 1h auf. */
+  check('1f: es gibt EINE gemeinsame Sicherung',
+    /async function spielstandVorAnfrageSichern\(/.test(ohneK));
+  const nutzer = (ohneK.match(/await spielstandVorAnfrageSichern\(/g) || []).length;
+  check('1g: und alle FÜNF Aufrufer benutzen sie', nutzer === 5, { nutzer });
+  /* Die Meldung darf es genau EINMAL geben - sie war bis zum 06.09.2026 in drei Kopien im
+     Umlauf, und eine Umformulierung hätte an drei Stellen nachgezogen werden müssen. */
+  const meldungen = (ohneK.match(/ließ sich gerade nicht speichern/g) || []).length;
+  check('1f2: die Begründung steht genau einmal im Code', meldungen === 1, { meldungen });
   for (const route of ['list', 'cancel', 'buy']){
     const i = ohneK.indexOf("backendFetch('/modulemarket/" + route + "'");
     const davor = i > 0 ? ohneK.slice(Math.max(0, i - 400), i) : '';
     check('1h-' + route + ': die Sicherung steht VOR der Anfrage',
-      i > 0 && /moduleMarketSpielstandSichern\(/.test(davor), { i });
+      i > 0 && /spielstandVorAnfrageSichern\(/.test(davor), { i });
+  }
+  /* DIE ACHT MISSIONS-AUFLOESUNGEN speichern ebenfalls direkt vor einer Anfrage, deren Endpunkt
+     den GESPEICHERTEN Stand liest - sie zahlten bis 06.09.2026 vier Schreibvorgaenge statt
+     einem. Bei vier gleichzeitig ankommenden Flotten waren das 16 statt 4, gegen dasselbe
+     240-Anfragen-Limit, das die Abmeldung aus test_marktlimit_abmeldung.js verursacht hat.
+     Ihr `await save()` hat dort einen ZWEITEN Zweck (die dauerhafte Marke gegen doppelte
+     Einreichung, siehe serverAufloesungStarten) - die Marke liegt im Spielstand, den der
+     schmale Pfad genau schreibt, der Zweck bleibt also erhalten. */
+  const AUFLOESER = ['/asteroid/claim', '/vorposten/bauen', '/vorposten/stationieren',
+    '/asteroid/contest', '/alien/nest-angriff', '/konvoi/angriff', '/vorposten/angriff',
+    '/festung/angriff'];
+  let schmal = 0;
+  for (const route of AUFLOESER){
+    const i = ohneK.indexOf("backendFetch('" + route + "'");
+    const davor = i > 0 ? ohneK.slice(Math.max(0, i - 300), i) : '';
+    if (i > 0 && /await save\(\{ nurSpielstand: true \}\)/.test(davor)) schmal++;
+  }
+  check('1i: alle ACHT Missions-Auflösungen benutzen den schmalen Pfad',
+    schmal === AUFLOESER.length, { schmal, erwartet: AUFLOESER.length });
+  /* UND DIE AUSNAHME, die eine bleiben muss: /logout-all ist der LETZTE Speichervorgang vor
+     dem Sitzungsende. Hier kommt kein Takt mehr, der die Rundfunk-Schlüssel nachholt - andere
+     Spieler sähen Bestenliste, Missionen und Mondverteidigung sonst dauerhaft veraltet.
+     Ohne diese Prüfung wäre der schmale Pfad "überall anwenden" eine naheliegende und falsche
+     Vereinheitlichung. */
+  {
+    const i = ohneK.indexOf("backendFetch('/logout-all'");
+    const davor = i > 0 ? ohneK.slice(Math.max(0, i - 300), i) : '';
+    check('1j: /logout-all behält bewusst den VOLLEN Speichervorgang',
+      i > 0 && /await save\(\)/.test(davor) && !/nurSpielstand/.test(davor), { i });
   }
 }
 
@@ -323,19 +355,19 @@ const RUNDFUNK = new RegExp('^(' + RUNDFUNK_ARTEN.join('|') + '):');
   ende();
 })();
 
-/* GEGENPROBE, GEMESSEN am 05.09.2026 gegen origin/main (6e58ba6, also MIT v8.689.0)
-   via KEPLER_SPIELDATEI auf eine Kopie: 14 Pruefungen fallen (gemessen nach der Durchsicht vom
-   06.09.2026, die 1e in zwei je Funktion gescopte Pruefungen aufgeteilt hat - vorher 13).
-     1a-1h - weder Optionen noch schmaler Pfad noch gemeinsame Sicherung existieren dort.
+/* GEGENPROBE, GEMESSEN am 06.09.2026 gegen origin/main (f2eb163) via KEPLER_SPIELDATEI:
+   16 Pruefungen fallen.
+     1a-1h - weder Optionen noch schmaler Pfad noch die gemeinsame Sicherung existieren dort.
+     1f2   - die Begruendung steht dort in drei Kopien statt einmal.
+     1i    - die acht Missions-Aufloesungen zahlen dort vier Schreibvorgaenge statt einem.
      3     - der volle doSave schreibt drei Rundfunk-Schluessel ins Fenster vor dem Handel.
      4a/4b - die Boerse fragt dort ohne jede Sicherung an, auch bei abgelehntem Speichern.
-   GRUEN bleiben dort die beiden Anker, 2-vorab, 2a, 2b, 2c, 5 und die drei 4-vorab-Kontrollen.
-   Das ist Absicht und der eigentliche Wert dieser Auswahl:
-     2b bleibt gruen, weil v8.689.0 schon VOR dem Handel speichert - Pruefung 3 misst also
-       wirklich nur den Unterschied zwischen "einem" und "vier" Schreibvorgaengen, nicht das,
-       was der vorige PR bereits gebracht hat.
-     5 bleibt gruen, weil der reguläre Takt die Rundfunk-Schluessel nie verloren hat.
-     4-vorab0 bleibt gruen und ist der Grund, warum 4a etwas belegt: Der Knopf ist da und
-       feuert bei gesundem Speichern. Ohne diese Kontrolle waere 4a auch dann gruen, wenn gar
-       nichts zu klicken gewesen waere - genau so ist der erste Anlauf hereingefallen (zweimal:
-       erst ohne Angebot in der Boerse, dann im falschen Tab). */
+   GRUEN bleiben dort die Anker, 2-vorab, 2a, 2b, 2c, 5, die drei 4-vorab-Kontrollen - UND 1j.
+   1j IST ABSICHTLICH KEIN AENDERUNGSBELEG: /logout-all hatte auch vorher den vollen
+   Speichervorgang. Diese Pruefung haelt eine AUSNAHME fest, statt eine Aenderung zu belegen -
+   sie soll verhindern, dass jemand den schmalen Pfad spaeter als "ueberall anwenden"
+   vereinheitlicht. Dort kommt kein Takt mehr, der die Rundfunk-Schluessel nachholt.
+   Ebenso 2b (v8.689.0 speichert schon vor dem Handel) und 5 (die Rundfunk-Schluessel waren nie
+   weg): Pruefung 3 misst dadurch wirklich nur den Unterschied "einer statt vier".
+   1a2/1a3 im Schwestertest sind Verneinungen und dort trivial gruen - sie sperren einen
+   Rueckfall, sie belegen keinen Befund. */

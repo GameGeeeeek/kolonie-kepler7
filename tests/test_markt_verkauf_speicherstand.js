@@ -56,6 +56,13 @@ const { check, ende } = pruefer();
 
 const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
 
+/* Auf Modulebene, nicht im ersten Block: Beide Quelltext-Bloecke brauchen sie (der zweite
+   pruefte im ersten Anlauf mit einer Funktion aus dem ersten Block und starb an
+   "iSicherung is not defined"). */
+const SICHERUNG = /await (save\(|spielstandVorAnfrageSichern\()/;
+const SICHERUNG_G = /await (save\(|spielstandVorAnfrageSichern\()/g;
+const iSicherung = (t) => { const m = SICHERUNG.exec(t); return m ? m.index : -1; };
+
 // ---- 1) Quelltext ----------------------------------------------------------------------------
 {
   /* Der Anker endet am eigenen `finally` der Funktion, NICHT am Beginn der naechsten:
@@ -69,38 +76,45 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   const block = (von > 0 && bis > von) ? JS.slice(von, bis) : '';
   // Kommentare leeren, bevor gesucht wird: die Begründung im Code nennt save() wörtlich.
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  /* Die Muster suchen `await save(` OHNE die Klammer zu schliessen - die Aufrufform hat sich
-     seit dem Zuschnitt schon einmal geaendert (v8.690.0 gibt dem Speichern eine Option mit:
-     `await save({ nurSpielstand: true })`), und der ganze Volllauf fiel daran, obwohl die
-     EIGENSCHAFT unveraendert erfuellt war. Geprueft wird "es wird auf einen Speichervorgang
-     gewartet", nicht seine heutige Schreibweise. */
-  check('1a: vor einem Handel wird gespeichert, damit der Server den aktuellen Stand sieht',
-    /if \(!opts\.imSammelauftrag\)\{[\s\S]{0,400}?await save\(/.test(ohneKommentar));
+  /* GEPRUEFT WIRD DIE EIGENSCHAFT, NICHT DIE SCHREIBWEISE. Die Aufrufform hat sich seit dem
+     Zuschnitt ZWEIMAL geaendert und beide Male diesen Abschnitt rot gemacht, obwohl die
+     Eigenschaft unveraendert erfuellt war:
+       v8.690.0  `await save()` -> `await save({ nurSpielstand: true })`
+       v8.691.0  -> `await spielstandVorAnfrageSichern(...)`, eine gemeinsame Stelle fuer alle
+                 fuenf Aufrufer statt drei Kopien derselben Meldung
+     Der erste Fall kostete einen ganzen Volllauf. SICHERUNG akzeptiert deshalb beide Formen:
+     Die Frage lautet "wird der Spielstand VOR der Anfrage gesichert?", nicht "wie heisst die
+     Funktion heute?". Wer die Sicherung ganz entfernt, faellt hier trotzdem auf. */
+  check('1a: vor einem Handel wird der Spielstand gesichert, damit der Server ihn sieht',
+    /if \(!opts\.imSammelauftrag\)\{[\s\S]{0,400}?await (save\(|spielstandVorAnfrageSichern\()/.test(ohneKommentar));
   /* Der Riegel haengt an der HERKUNFT des Aufrufs, nicht an `!marketBulkRun` (Durchsicht
      05.09.2026): Waehrend eines laufenden Sammelauftrags kann der Spieler in einer
      Tranchenpause einen normalen Verkauf ausloesen - kleine Mengen gehen am Sammel-Riegel
      vorbei direkt in doMarketTrade. Der ist keine Tranche und braucht den Schutz. */
   check('1a2: der Riegel fragt die Herkunft ab, nicht den laufenden Sammelauftrag',
-    !/!marketBulkRun\) await save\(/.test(ohneKommentar));
+    !/!marketBulkRun\) await (save\(|spielstandVorAnfrageSichern\()/.test(ohneKommentar));
   /* Und er gilt fuer den KAUF genauso: Hier stand zuerst "beim Kauf prueft der Server die
      Kredite, und die aendert kein Tick". Gemessen falsch - Handelsrouten (Z. ~14877/14916) und
      eroberte Systeme (~16973) schreiben state.credits im Takt ohne sofortiges Speichern. */
   check('1a3: der Schutz ist nicht auf den Verkauf eingeschraenkt',
-    !/action === 'sell'[^\n]*await save\(/.test(ohneKommentar));
+    !/action === 'sell'[^\n]*await (save\(|spielstandVorAnfrageSichern\()/.test(ohneKommentar));
   check('1b: und zwar VOR der Handelsanfrage, nicht danach',
-    ohneKommentar.indexOf('await save(') > 0 &&
-    ohneKommentar.indexOf('await save(') < ohneKommentar.indexOf("backendFetch('/market/trade'"),
-    { save: ohneKommentar.indexOf('await save('), trade: ohneKommentar.indexOf("backendFetch('/market/trade'") });
+    iSicherung(ohneKommentar) > 0 &&
+    iSicherung(ohneKommentar) < ohneKommentar.indexOf("backendFetch('/market/trade'"),
+    { sicherung: iSicherung(ohneKommentar), trade: ohneKommentar.indexOf("backendFetch('/market/trade'") });
   /* Ein aelterer Server ohne das Feld haette Math.floor(undefined) = NaN ergeben - und NaN
      faellt durch jede `< 1`-Abbruchpruefung hindurch bis in die Anfrage. Dieselbe Vorsicht,
      die data.tagesRest daneben schon laenger hat. */
   check('1g: die Bestandsauskunft wird nur uebernommen, wenn wirklich eine Zahl kam',
     /typeof data\.newResourceAmount === 'number'/.test(ohneKommentar));
+  /* Der Abbruch bei gescheitertem Speichern - in beiden Formen: frueher eine eigene
+     `if (!gespeichert)`-Abfrage, seit der Zusammenfassung die verneinte Sicherung. */
   check('1h: scheitert das Speichern, wird NICHT gehandelt',
+    /if \(!\(await spielstandVorAnfrageSichern\([\s\S]{0,200}?return false;/.test(ohneKommentar) ||
     /const gespeichert = await save\([\s\S]{0,400}?if \(!gespeichert\)\{[\s\S]{0,400}?return false;/.test(ohneKommentar));
-  check('1c: genau EIN Speichervorgang im Handelspfad - nicht mehrere',
-    (ohneKommentar.match(/await save\(/g) || []).length === 1,
-    { treffer: (ohneKommentar.match(/await save\(/g) || []).length });
+  check('1c: genau EINE Sicherung im Handelspfad - nicht mehrere',
+    (ohneKommentar.match(SICHERUNG_G) || []).length === 1,
+    { treffer: (ohneKommentar.match(SICHERUNG_G) || []).length });
 }
 {
   const von = JS.indexOf('async function doMarketTradeChunked(');
@@ -108,12 +122,13 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   check('1-anker2: doMarketTradeChunked ist auffindbar', von > 0 && bis > von, { von, bis });
   const block = (von > 0 && bis > von) ? JS.slice(von, bis) : '';
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  check('1d: der Sammelauftrag speichert EINMAL, nicht je Tranche',
-    (ohneKommentar.match(/await save\(/g) || []).length === 1,
-    { treffer: (ohneKommentar.match(/await save\(/g) || []).length });
+  check('1d: der Sammelauftrag sichert EINMAL, nicht je Tranche',
+    (ohneKommentar.match(SICHERUNG_G) || []).length === 1,
+    { treffer: (ohneKommentar.match(SICHERUNG_G) || []).length });
   check('1d2: seine Tranchen weisen sich als solche aus, damit sie den Schutz auslassen',
     /imSammelauftrag: true/.test(ohneKommentar));
   check('1h2: auch der Sammelauftrag startet nicht ohne gelungenes Speichern',
+    /if \(!\(await spielstandVorAnfrageSichern\([\s\S]{0,300}?marketBulkRun = null;/.test(ohneKommentar) ||
     /if \(!gespeichert\)\{[\s\S]{0,300}?marketBulkRun = null;/.test(ohneKommentar));
   /* Der Riegel muss VOR der Kleinmengen-Abkuerzung stehen, sonst ist er wirkungslos:
      Eine Menge unter MARKET_MAX_PER_TRADE ginge direkt an doMarketTrade vorbei. */
@@ -130,7 +145,7 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
        das `await` davor, kämen zwei schnelle Klicks BEIDE durch und zwei Sammelaufträge liefen
        nebeneinander (der erste Anlauf dieser Änderung hatte genau dieses Fenster).
      - VOR der Tranchen-Schleife: sonst käme der Speichervorgang zu spät für die erste Tranche. */
-  const iSave = ohneKommentar.indexOf('await save(');
+  const iSave = iSicherung(ohneKommentar);
   const iBulk = ohneKommentar.indexOf('marketBulkRun = {');
   const iLoop = ohneKommentar.indexOf('for (let i=0; i<chunks; i++)');
   check('1e-anker: Riegel und Schleife sind auffindbar', iBulk > 0 && iLoop > 0, { iBulk, iLoop });
@@ -425,19 +440,19 @@ const marktOeffnen = async (page) => {
   ende();
 })();
 
-/* GEGENPROBE, GEMESSEN am 05.09.2026 gegen origin/main (KEPLER_SPIELDATEI auf eine Kopie):
-   18 der 35 Pruefungen fallen (die Schlusszeile "FAIL" zaehlt NICHT mit):
-     1a, 1b, 1c, 1d, 1d2, 1e, 1f, 1g, 1h, 1h2, 1i - im Handelspfad wird nicht gespeichert, es
-       gibt weder Tranchen-Kennzeichnung noch Serverauskunft noch einen wirksamen Sammel-Riegel.
-     2c, 2d - der Befund selbst: {"menge":76,"standBeimServer":0,"ok":false}, abgelehnt: 1.
-       Die Anzeige stand auf 76 Energie, der Server sah 0.
-     3b, 3d - die Tranchen-Drift: {"abgelehnt":1,"versuche":2}.
-     4 - der Kauf ist ungeschuetzt (0 Speichervorgaenge statt 1).
-     5a, 5b - bei abgelehntem Speichern wird trotzdem gehandelt, und niemand sagt es dem Spieler.
-   GRUEN bleiben dort 2a, 3a, 3c, alle -vorab und die Anker - Absicht, nicht Schwaeche: 2a
-   belegt, dass der ERSTE Verkauf nie das Problem war (genau deshalb klang der Report nach
-   "mehrmals"), 3a und 3c belegen, dass die Aenderung nichts gelockert hat.
-   EHRLICH ZU 1a2 UND 1a3: Das sind VERNEINUNGEN ("der Riegel fragt nicht !marketBulkRun ab",
-   "der Schutz ist nicht auf 'sell' eingeschraenkt"). Am alten Stand gibt es beide Formen gar
-   nicht, sie sind dort also trivial gruen. Sie belegen keinen Befund, sie sperren den Rueckfall
-   in zwei Fassungen, die dieser PR selbst schon hatte und die die Durchsicht verworfen hat. */
+/* GEGENPROBE. Zwei Staende, zwei verschiedene Ergebnisse - und beide sind richtig:
+
+   (a) GEGEN DEN STAND VOR v8.689.0, gemessen am 05.09.2026: 13 der 28 Pruefungen fallen,
+       darunter der Befund selbst ({"menge":76,"standBeimServer":0,"ok":false}, abgelehnt: 1)
+       und die Tranchen-Drift ({"abgelehnt":1,"versuche":2}). Das ist die Gegenprobe DIESER
+       Datei: Sie bewacht die Eigenschaft, die v8.689.0 gebracht hat.
+
+   (b) GEGEN origin/main f2eb163, gemessen am 06.09.2026: NULL Pruefungen fallen.
+       Das ist kein Mangel, sondern die richtige Auskunft: v8.689.0 ist dort laengst gemergt,
+       die bewachte Eigenschaft also erfuellt. Diese Datei ist NICHT die Gegenprobe fuer
+       v8.691.0 (schmaler Pfad, gemeinsame Sicherung) - dafuer ist
+       test_boerse_speicherstand.js zustaendig, dort fallen 16.
+       Hier wurden nur die MUSTER an die neue Aufrufform angepasst, nicht die Aussage.
+
+   Wer diese Datei kuenftig anfasst, sollte (b) kennen, bevor er "0 fallend" fuer eine kaputte
+   Gegenprobe haelt. */
