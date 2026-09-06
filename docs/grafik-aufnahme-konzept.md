@@ -168,3 +168,60 @@ Bildpixel änderte - bei 64 Pixeln praktisch unsichtbar. Betroffen: `railgun`, `
 `abhorchposten`, `nanolegierungsfabrik`, `fusionsschmiede`, `metamaterialweberei`, `botschaft`.
 Sie haben jetzt echte Anbauten statt nur einer Leuchtlinie oder eines zweiten Schlots. Genau diese
 Schwäche hatte die Selbstkritik des Entwurfs vorhergesagt; der Wächter hat sie messbar gemacht.
+
+## Bündel D: Alien-Nester als Brutkörper (06.09.2026, v8.691.0)
+
+**Befund der Aufnahme.** Der Kartenmarker war ein dunkler Kreis mit sechs Punkten in Volksfarbe auf
+einem leicht versetzten Radius - er las sich als Blume, nicht als Nest. Die fünf Stufen
+unterschieden sich nur im Radius (11 bzw. 15 Einheiten) und im Namen, die vier Völker nur in der
+Farbe; die Königin bekam einen weißen Punkt in die Mitte. Am Handy blieben davon 20 Pixel mit ein
+paar Punkten. Neben der gerenderten Vorposten-Station wirkte das wie ein Platzhalter.
+
+**Was gebaut ist** (Block `NEST_BILD` … `nestBildUrl` in der Spieldatei):
+
+- Ein organischer Brutkörper je (Volk, Stufe): polare Grundform mit Streckung und Kippung,
+  Randtabelle über 720 Winkelschritte, Beleuchtung mit Hauptlicht und Gegenlicht, halbdurchsichtige
+  Brutblasen mit Innenleuchten, Ausläufer mit dunkler Wurzel und hellem Ende.
+- **Je Volk ein eigenes Formmerkmal**, damit man es ohne Beschriftung erkennt: Kryll viele kleine
+  Blasen, Xantheer segmentierte Haut mit dunklen Nähten, Vex ein länglicher Tropfen mit Schweif,
+  die Verglühten glimmende Risse. Die Königin bekommt einen leuchtenden Schlund, einen
+  Tentakelkranz und einen Sporenschleier.
+- **Kein Zufall zur Laufzeit:** der Formgenerator hängt an einem Seed aus Volk und Stufe.
+- Gecacht als data-URL je (Volk, Stufe); gemessen 15-29 kB je Bild, Ziel waren unter 40.
+- Die Volksfarbe kommt über `nestVolk` aus `ALIEN_VOELKER` - **keine zweite Tabelle**.
+- Hof-Ring, Lebensbalken und Beschriftung bleiben; der dunkle Grundkreis entfällt, wo ein Bild
+  steht (der Körper überragt ihn je nach Volk).
+
+**Drei Dinge, die der Entwurf nicht mitbrachte und die beim Einbau gemessen wurden:**
+
+1. **Der Körper wuchs mit der Stufe** (Faktor 0,70 bis 1,16) - auf Stufe 1 war er am Handy nur
+   15 statt der geforderten 20 Pixel. Der Kernradius steht im Spiel aber fest (r = 11, Königin 15).
+   Die Reihe ist auf 0,92 bis 1,16 angehoben; das Wachstum trägt die Zahl der Blasen und
+   Ausläufer, nicht die Körpergröße. Gemessen: deckende Fläche auf Stufe 1 plus 73 %.
+2. **Lebensbalken und Beschriftung** saßen am alten Kernradius, das Bild reicht bis 1,5 r - der
+   Balken lief quer durch den Körper. Im Foto gesehen, nicht im Test.
+3. **Der Nachbartest `test_kartenbeschriftung` fand die Folge davon:** mit dem Bezug auf die
+   Bildkante saßen Balken und Text eine halbe Kachelbreite zu weit außen und kollidierten mit den
+   Nachbarmarkern. Zwei Auswege wurden gemessen und verworfen - eine kleinere Messfläche für den
+   Entflechter ließ Text auf dem sichtbaren Bild zu, ein größerer Markerabstand (`sichtR` 2,4)
+   drückte „Draconis" auf die Heimatscheibe. Der richtige Bezug ist der **Körper** (1,32 r;
+   gemessen reicht der höchste bis 1,28 r), nicht die quadratische Kachel.
+
+**Wächter:** `tests/test_nestkoerper.js`, 22 Prüfungen. Abschnitt 1 schneidet den Zeichner aus der
+Spieldatei und führt ihn isoliert aus: 20 Bilder ohne Fehler, jedes trägt einen Körper, der Körper
+füllt die Kachel auf jeder Stufe, nichts stößt deckend an den Rand, zwei Aufrufe liefern dasselbe
+Bild, keine data-URL über 40 kB. Abschnitt 2 misst auf der **echten Karte**: beide Nester tragen
+ein Bild, es ist auf dem Schirm zu sehen, die Bilder unterscheiden sich, die Punkteblume ist weg,
+und Balken wie Beschriftung liegen nicht auf dem Körper. Gegenprobe am alten Stand: 9 von 11 dort
+laufenden Prüfungen fallen.
+
+**Die Prüfung, die die Reihe trägt, ist 1f:** Unterscheiden sich die Völker in *Form und Haut* -
+oder nur in der Farbe? Verglichen wird eine farbnormierte Helligkeitsrasterung. Gemessener Bereich
+über alle 18 Paarungen: **26 bis 78** von 256 Feldern. Die Kontrolle daneben rendert **dieselbe
+Form in fremder Farbe** und misst dort nur 3 bis 5 Felder - Faktor fünf, und darauf beruht die
+Aussagekraft. Ein erster Anlauf dieser Kontrolle verglich dasselbe Objekt mit sich selbst; das ist
+für jede Eingabe 0 und hätte auch eine Rasterung durchgehen lassen, die schlicht die Farbe misst.
+
+**Zweimal in dieser Reihe habe ich eine Schwelle geraten statt gemessen** (1f hier, 1d in Bündel C).
+Beide Male stand die Zahl danach im Testkopf. Die Regel steht in `CLAUDE.md` - sie gilt auch für
+die eigene Prüfung, nicht nur für den Erwartungswert des Spiels.
