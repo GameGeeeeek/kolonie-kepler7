@@ -291,3 +291,141 @@ dokumentiert ist. **Und sie korrigiert eine Annahme des Konzepts:** dort stand, 
 **Das ist der dritte Fall dieser Reihe, in dem eine Schwelle geraten statt gemessen war.** Die
 Hausregel „gegen den gemessenen Ausgangsstand vergleichen, nie gegen eingetippte Zahlen" gilt auch
 dann, wenn die Zahl aus dem eigenen Konzeptpapier stammt.
+
+## Bündel F: HUD und Rest (06.09.2026)
+
+Das letzte Bündel. Fünf Stellen, die einzeln zu klein für eine eigene Etappe waren, aber alle
+dieselbe Klasse von Befund tragen: **eine Zeichnung behauptet etwas, das sie nicht zeigt.**
+
+### F1 Die Vorposten-Zweige bekommen eine eigene Bauform
+
+Befund der Aufnahme: „Handel und Festung lagen farblich so nah beieinander, dass sie nicht zu
+trennen waren." Die Messung ist härter als der Bericht: Auf Stufe 8 rasterten Werft, Handel und
+Festung in **allen 256 Feldern gleich** – dieselbe Zeichnung in drei Farbtönen. Der Bestandstest
+`test_vorposten_station` 2d bemerkte das nicht: Drei verschiedene Data-URLs sind ihm genug, auch
+wenn nur die Palette wechselt.
+
+Jeder Zweig trägt jetzt einen eigenen Aufbau am äußeren Ring – Werft Dockarme mit Rumpf im Bau,
+Handel Frachtcontainer, Festung einen Panzerring statt des Rohrrings plus roten Schild-Emitter.
+Die Zahl der Aufbauten wächst mit der Stufe (1 bis 3). Die Ringlichter sind aus `vpRing` nach
+`vpRingLichter` ausgelagert, damit Rohr- und Panzerring dieselbe Quelle benutzen.
+
+Der großflächige Halo aus dem Entwurf wurde **nicht** übernommen: GR-6 hatte ihn gemessen
+abgeschafft (123 kB gegen 17 kB je PNG).
+
+**Wächter:** `test_vorposten_station` 2e – farbnormierte 16×16-Rasterung, paarweise über die drei
+Zweige auf **derselben** Stufe (2a bis 2c messen dafür jetzt alle Stufe 8, sonst verglichen 2d/2e
+Stufe und Zweig zugleich). Gemessen: Zweigwechsel bewegt 37 bis 49 Felder, ein Farbdreher auf
+dasselbe Bild nur 1.
+
+### F2 Der Banner-Planet wird eine beleuchtete Kugel
+
+`bannerPlanet` malte eine gefüllte Scheibe und legte eine weiße Linse fester Deckkraft darüber.
+Gemessen entlang der Lichtachse: **28 von 33 Messpunkten exakt derselbe Wert**, dann ein Schritt,
+dann wieder flach – 92 % des gesamten Abfalls in einer Kante. Der Ring lag komplett vor dem Körper
+(innerhalb der Scheibe oben 305, unten 316 Bildpunkte sichtbar).
+
+Jetzt: radialer Verlauf, weicher Terminator, Lichtsaum nur auf der beleuchteten Kante, zwei
+Wolkenbänder ab r ≥ 12. Der Ring läuft hinter dem Körper vorbei und kommt vor ihm hervor. Alle 13
+Banner-Definitionen bleiben unverändert – die Etappe ändert die Zeichnung, nicht die Auswahl.
+
+**Wächter:** `tests/test_bannerplanet.js`, 10 Prüfungen. Sein Anker beginnt bewusst bei
+`bannerRand` statt bei den neuen Farbhelfern, damit die Gegenprobe am alten Stand denselben Block
+findet und die Bildprüfungen dort **wirklich laufen** statt sich still zu überspringen.
+
+**Eine Prüfung wurde verworfen, weil sie aus dem falschen Grund grün gewesen wäre:** „keine harte
+Kante im Körper" – eine flache Scheibe hat gar keine Kante (alter größter Sprung 11, neuer 21, die
+absolute Sprunghöhe trennt die Zustände also nicht). Gemessen wird stattdessen der **Anteil** des
+größten Schritts am Gesamtabfall: alt 92 %, neu 16 %.
+
+### F3 Die Sektorregionen werden Gebiete statt Flurstücke
+
+Acht konvexe Polygone aus geraden Kanten mit flacher 10-%-Füllung; die Ecken lagen sichtbar auf den
+äußersten Systemen. Jetzt läuft der Umriss als geschlossene Kurve durch **dieselben** Hüllpunkte
+(Catmull-Rom → kubische Bézier), und die Fläche ist ein radialer Verlauf je Region, dessen Radius
+aus dem gemessenen äußersten Hüllpunkt kommt.
+
+**Der Kurvenbauch musste nachgemessen werden.** Eine Kurve durch dieselben Punkte liegt zwischen
+ihnen weiter außen als die Sehne. Mit der ersten Spannung (1/6) und dem alten Abstand (22) wuchsen
+die Regionen so weit, dass Nachbargebiete im Bild ineinanderliefen – Bauch bis **34 px** gegen
+20 bis 22 px beim alten Polygon. Ausgeliefert ist 1/8 mit Abstand 16: **16 bis 23 px**, also im
+Bereich des Polygons davor.
+
+**Wächter:** `tests/test_sektorregionen.js`, 7 Prüfungen. 1a lässt den Browser über innen/außen
+entscheiden (`isPointInFill`), statt eine zweite Punkt-in-Kurve-Rechnung neben die gezeichnete zu
+stellen. 1a und 1d bleiben am alten Stand grün, und das ist kein Mangel, sondern die Aussage: Sie
+sichern, was der Umbau **nicht verlieren durfte**.
+
+### F4 Der Kulissenplanet zeigt die Oberfläche seines Weltentyps
+
+Der Planet hinter der Oberfläche trug nur die Grundfarbe seines Typs. Seit Bündel A hat jeder
+Weltentyp eine echte Textur – der Ort, an dem man **steht**, war damit die einzige Stelle im Spiel,
+an der eine Eiswelt aussah wie eine Lavawelt in anderer Farbe. Die Textur liegt jetzt auf die Kugel
+geschnitten zwischen Füllung und Terminator (quadratischer Mittelausschnitt des 2:1-Streifens).
+
+Der Zwischenspeicher merkt sich **mit**, ob die Textur da war (`key + '|textur'`). Ohne das bliebe
+ein Planet, dessen Textur beim ersten Bild noch fehlte, für den Rest der Sitzung flach.
+
+**Wächter:** `tests/test_kulissenplanet.js`, 7 Prüfungen – er **liest ein Merkmal** (`data-standort`
+an der Leinwand), statt ein Bild zu messen, und das ist gemessen begründet: Eine Rauheitsmessung auf
+`#bgstars` wurde versucht und verworfen, sie lieferte am alten wie am neuen Stand 3 bis 7 und am
+neuen sogar weniger – gemessen wurden Sterne und Farbbänderung, nicht die Oberfläche.
+Arbeitsteilung: dass sich die Texturen unterscheiden, sichert weiter `test_planeten_texturen` 1f;
+dieser Test sichert, dass die Kulisse sie auch benutzt.
+
+### F5 Der Rahmen der Kanzel (Freigabe Sascha nach Bildvergleich)
+
+**Zwei Fassungen wurden am Bild gemessen und verworfen**, und beide Gründe stehen als Regel im
+Wächter:
+
+1. Am Fenster in voller Breite – die Spielspalte ist mittig und 780 px breit, die Fensterecken
+   liegen weit daneben. Die Streben saßen im leeren Hintergrund und rahmten den Browser.
+2. An der Hülle (`.shell::after`) – `.shell` ist die ganze scrollende Seite und mehrere tausend
+   Pixel hoch. Die unteren Streben lagen am Seitenende, der Randabfall war über die volle
+   Scrollhöhe gezogen und unsichtbar. Ein Rahmen, den man nur oben sieht, ist keiner.
+
+Ausgeliefert: am Fenster festgeklebt, aber genau so breit wie der Inhalt. Beide lesen dafür die
+neue Größe `--spielbreite`. Kein `backdrop-filter`, keine Animation – der Energiesparmodus hat hier
+nichts abzuschalten.
+
+**Wächter:** `tests/test_kanzelrahmen.js`, 9 Prüfungen, Gegenprobe in **zwei** Richtungen. Die
+Sabotage ist die wichtigere: Mit `pointer-events:auto` statt `none` treffen gemessen **1216** der
+abgerasterten Bildschirmpunkte den Rahmen statt das, was darunter liegt, und der Sektorkarte-Reiter
+ist nicht mehr der oberste Treffer an seiner eigenen Stelle. Deshalb rastert 1c den ganzen
+Bildschirm ab und prüft nicht einen Punkt.
+
+### Was dieses Bündel über das Prüfen gelehrt hat
+
+Drei der fünf Etappen haben eine Prüfung hervorgebracht, die **aus dem falschen Grund grün** gewesen
+wäre (F2 die Kantenhöhe, F4 die Rauheit, und in F3 wäre eine Bauchschwelle ohne Nachmessen zu lasch
+gewesen). Die Hausregel „erst messen, dann setzen" gilt für die eigene Prüfung genauso wie für die
+Erwartungswerte des Spiels – und der Test, der die verworfene Messung im Kopf nennt, ist der
+einzige Ort, an dem diese Arbeit nicht verloren geht.
+
+### Die adversarische Durchsicht des Bündels (06.09.2026)
+
+Drei Befunde, **zwei bestätigt, einer nicht reproduzierbar** – und der Unterschied wurde gemessen,
+nicht geglaubt:
+
+1. **Bestätigt: Der Ladeausleger des Handelszweigs lief aus der Kachel.** `maxLaenge` deckelte ihn
+   nur nach unten, waagerecht war er ungedeckelt. Gemessen auf Stufe 8: **27 deckende Randzeilen
+   rechts gegen 4 beim Rumpf ohne Zweig**, auf Stufe 7 zwei. Die 4 stammen vom Ring selbst und
+   stehen genauso in `origin/main` – sie sind älter als dieses Bündel. Behoben durch einen
+   gemessenen Platzdeckel, der den ganzen Anbau proportional verkleinert statt ihn abzuschneiden.
+   **Der erste Anlauf der Behebung war zu kurz gerechnet** (27 → 11 Randzeilen): Der äußerste Punkt
+   ist nicht die Bugspitze des Frachters, sondern der Schein der Bugleuchte, den `vpLeuchte` bis
+   `r*3.2` malt – und dieser Schein hängt an `R`, wächst also beim Verkleinern nicht mit und gehört
+   in den festen Teil der Rechnung. Wächter `test_vorposten_station` 2f, und er misst gegen den
+   **Rumpf ohne Zweig** statt gegen eine eingetippte Zahl.
+2. **Bestätigt: Der Mond bekam seine Textur nicht.** Der erste Wurf schloss neben `vorgabe` auch
+   `mond` aus – dabei hat der Mond einen eigenen Builder, den Kartenminiatur und Planetenboden
+   längst benutzen. Eine Mondkolonie behielt damit genau die flache Kulisse, die die Etappe
+   abschaffen wollte. Wächter `test_kulissenplanet` 0c-mond.
+3. **Nicht reproduzierbar: der Kurvenbauch der Regionen.** Der Befund gab für `rand` 26 statt 18 an
+   und leitete daraus einen Sicherheitsabstand von nur 1 ab. Zwei aufeinanderfolgende Läufe liefern
+   identisch 16 bis 23, und eine Kontrolle mit **4000 statt 240 Stützstellen** auf der Kurve ändert
+   keine einzige Zahl – die Abtastung unterschätzt also nicht. Der Abstand beträgt 4. Die Messung
+   steht jetzt im Testkopf, damit der nächste Leser sie nicht wiederholen muss.
+
+Zwei von drei ist eine gute Quote für eine Durchsicht; die Regel „Befunde werden geprüft, nicht
+geglaubt" hat sich beim dritten aber genauso bewährt wie bei den ersten beiden.

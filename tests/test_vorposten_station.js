@@ -189,18 +189,24 @@ async function lauf(browser, vp){
      selbst, nicht an ihren Bauteilen. Das ist strenger als vorher: Der alte Test haette drei
      identische Bilder nie bemerkt, solange nur die richtigen Polygone darin vorkamen. */
   const bildVon = (html) => (String(html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null;
-  const w = await lauf(browser, doc(6, 'werft', 'Schiffsschmiede'));
+  const w = await lauf(browser, doc(8, 'werft', 'Sternenwerft'));
   const bildW = bildVon(w.mark.html);
   check('2a: die Station ist ein gerendertes Bild, kein Strichhaufen mehr',
     !!bildW && bildW.length > 2000, { hatBild: !!bildW, laenge: bildW ? bildW.length : 0 });
   await w.ctx.close();
-  const h = await lauf(browser, doc(7, 'handel', 'Handelsknoten'));
+  const h = await lauf(browser, doc(8, 'handel', 'Sternenmarkt'));
   const bildH = bildVon(h.mark.html);
   check('2b: der Handelsknoten liefert ebenfalls ein Bild', !!bildH && bildH.length > 2000,
     { laenge: bildH ? bildH.length : 0 });
   await h.ctx.close();
   const f = await lauf(browser, doc(8, 'festung', 'Sternenfestung'));
   const bildF = bildVon(f.mark.html);
+  /* Der Rumpf OHNE Zweig auf derselben Stufe. Er ist der Massstab fuer 2f: Ein Zweiganbau darf
+     die Kachel nicht weiter fuellen als der Rumpf, den es ohne ihn ohnehin schon gibt. Damit
+     braucht 2f keine eingetippte Schwelle - es misst gegen den eigenen Ausgangsstand. */
+  const o = await lauf(browser, doc(8, null, 'Ohne Zweig'));
+  const bildO = bildVon(o.mark.html);
+  await o.ctx.close();
   check('2c: und die Festung auch', !!bildF && bildF.length > 2000, { laenge: bildF ? bildF.length : 0 });
   // DIE EIGENTLICHE REGEL: drei Zweige, drei UNTERSCHIEDLICHE Stationen.
   check('2d: die drei Zweige sehen verschieden aus (kein geteiltes Bild)',
@@ -210,6 +216,113 @@ async function lauf(browser, vp){
        oder eines dreimal geliefert wurde (Befund der Durchsicht). */
     { laengen: [ (bildW||'').length, (bildH||'').length, (bildF||'').length ],
       paarweiseGleich: [ bildW===bildH, bildH===bildF, bildW===bildF ] });
+
+  /* ---- 2e) DIE ZWEIGE SIND AN DER FORM ZU UNTERSCHEIDEN, NICHT NUR AN DER FARBE (06.09.2026) --
+     Befund der Grafik-Aufnahme: "Handel und Festung lagen farblich so nah beieinander, dass sie
+     nicht zu trennen waren." 2d bemerkt das nicht - drei Bilder, die sich nur im Farbton des
+     Ringbands unterscheiden, sind drei verschiedene Data-URLs und damit fuer 2d in Ordnung.
+     Buendel F gibt jedem Zweig deshalb einen eigenen AUFBAU (Werft: Dockarme; Handel:
+     Frachtcontainer; Festung: Panzerring mit Schild-Emitter). Gemessen wird das wie bei den
+     Nestkoerpern: eine 16x16-Rasterung der Helligkeit INNERHALB des Koerpers, auf dessen eigenen
+     Mittelwert normiert - der Vergleich wird dadurch farbunabhaengig und misst das Muster.
+     Die Kontrollzeile darunter belegt, dass die Normierung wirklich die Farbe herausrechnet:
+     dasselbe Bild durch einen Farbdreher geschickt muss nahe 0 rastern. Ein erster Anlauf in
+     Buendel D verglich dafuer dasselbe Objekt mit sich selbst - das ist fuer jede Eingabe 0 und
+     haette auch eine Rasterung durchgehen lassen, die schlicht die Farbe misst. */
+  /* SCHWELLEN ERST GEMESSEN, DANN GESETZT (Hausregel, und sie gilt auch fuer die eigene Pruefung).
+     GEMESSEN am 06.09.2026 auf Stufe 8: werft/handel 32, werft/festung 49, handel/festung 43
+     Rasterfelder Unterschied - ein Farbdreher (hue-rotate 150 Grad, saturate 2,5) auf DASSELBE
+     Bild bewegt dagegen 1 Feld. Zwischen Farbe und Aufbau liegt damit Faktor 32, und darauf
+     beruht die Aussagekraft von 2e. (Erste Messung war 37/49/48; der Frachter des Handelszweigs
+     ist danach wegen 2f kuerzer geworden, das schwaechste Paar sank auf 32 - immer noch weit
+     ueber der Schwelle 25.) Die Formschwelle liegt unter dem gemessenen Minimum, die
+     Farbschwelle darueber: 2e soll das VERSCHWINDEN der Zweigmerkmale melden, keine Stilfrage
+     entscheiden, und 2e-kontrolle soll rot werden, sobald die Rasterung anfaengt, Farbe zu messen. */
+  const SCHWELLE_FARBE = 4, SCHWELLE_FORM = 25;
+  const zweigMass = await f.page.evaluate(async (urls) => {
+    const S = 256, FELD = 16;
+    const laden = url => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = url; });
+    const rastere = (img, filter) => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const c = cv.getContext('2d');
+      if (filter) c.filter = filter;
+      c.drawImage(img, 0, 0, S, S);
+      const d = c.getImageData(0, 0, S, S).data;
+      const summe = new Float64Array(FELD*FELD), zahl = new Float64Array(FELD*FELD);
+      let hellSumme = 0, n = 0;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++){
+        const i = (y*S+x)*4;
+        if (d[i+3] <= 40) continue;
+        n++;
+        const h = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+        hellSumme += h;
+        const q = ((y*FELD/S)|0)*FELD + ((x*FELD/S)|0);
+        summe[q] += h; zahl[q]++;
+      }
+      const mittel = n ? hellSumme / n : 1;
+      const out = [];
+      for (let q = 0; q < FELD*FELD; q++){
+        if (zahl[q] < 6){ out.push(0); continue; }
+        const rel = (summe[q]/zahl[q]) / (mittel || 1);
+        out.push(rel > 1.10 ? 1 : (rel < 0.90 ? -1 : 0));
+      }
+      /* Randspalten: Wie viele Zeilen der beiden aeussersten Spalten links und rechts sind
+         deckend belegt? Ein Anbau, der aus der Kachel laeuft, sieht auf der Karte aus wie ein
+         Zeichenfehler - und bei 256 Pixeln faellt er beim Zeichnen niemandem auf. */
+      let li = 0, re = 0;
+      for (let y = 0; y < S; y++){
+        for (const x of [0, 1])      if (d[(y*S+x)*4+3] > 20) li++;
+        for (const x of [S-1, S-2])  if (d[(y*S+x)*4+3] > 20) re++;
+      }
+      return { raster: out, belegt: n, li, re };
+    };
+    const bilder = {}, fehlend = [];
+    let bunt = null;
+    for (const z of Object.keys(urls)){
+      const im = urls[z] ? await laden(urls[z]) : null;
+      if (!im){ fehlend.push(z); continue; }
+      bilder[z] = rastere(im);
+      // Kontrolle: DASSELBE Bild, fremde Farbe - die Normierung muss das wegrechnen.
+      if (z === 'festung') bunt = rastere(im, 'hue-rotate(150deg) saturate(2.5)').raster;
+    }
+    return { bilder, fehlend, bunt };
+  }, { werft: bildW, handel: bildH, festung: bildF, ohne: bildO });
+  const rasterAbstand = (a, b) => { let d = 0; for (let q = 0; q < 256; q++) if (a[q] !== b[q]) d++; return d; };
+  check('2e-vorab: die drei Zweigbilder und der Rumpf ohne Zweig liegen zum Messen vor',
+    zweigMass.fehlend.length === 0 && Object.keys(zweigMass.bilder).length === 4 && !!zweigMass.bunt,
+    { fehlend: zweigMass.fehlend, da: Object.keys(zweigMass.bilder).length });
+  const buntAbstand = zweigMass.bunt && zweigMass.bilder.festung
+    ? rasterAbstand(zweigMass.bilder.festung.raster, zweigMass.bunt) : 999;
+  const zPaar = ['werft','handel','festung'];
+  const zweigPaare = [];
+  let minZweig = 999, schwaechstes = null;
+  for (let i = 0; i < 3; i++) for (let j = i+1; j < 3; j++){
+    const a = zweigMass.bilder[zPaar[i]], b = zweigMass.bilder[zPaar[j]];
+    if (!a || !b) continue;
+    const d = rasterAbstand(a.raster, b.raster);
+    zweigPaare.push(zPaar[i]+'/'+zPaar[j]+'='+d);
+    if (d < minZweig){ minZweig = d; schwaechstes = zPaar[i]+'/'+zPaar[j]; }
+  }
+  console.log('       (gemessene Zweig-Abstaende Stufe 8: ' + zweigPaare.join(' ') + '; Farbdreher: ' + buntAbstand + ')');
+  check('2e-kontrolle: derselbe Aufbau in fremder Farbe rastert fast gleich',
+    buntAbstand <= SCHWELLE_FARBE, { felderUnterschied: buntAbstand, schwelle: SCHWELLE_FARBE });
+  check('2e: die drei Zweige unterscheiden sich im AUFBAU, nicht nur im Farbton',
+    minZweig >= SCHWELLE_FORM, { schwaechstesPaar: schwaechstes, felderUnterschied: minZweig, schwelle: SCHWELLE_FORM });
+  /* 2f) DER ANBAU BLEIBT IN DER KACHEL (Befund der adversarischen Durchsicht, 06.09.2026).
+     Der Ladeausleger des Handelszweigs war waagerecht ungedeckelt - maxLaenge begrenzte ihn nur
+     nach unten. GEMESSEN lief er auf Stufe 8 rechts aus der 256er-Kachel: 27 deckende
+     Randzeilen gegen 4 beim Rumpf ohne Zweig, auf Stufe 7 zwei.
+     Gemessen wird gegen den Rumpf OHNE Zweig, nicht gegen eine eingetippte Zahl: Die 4 stammen
+     vom Ring selbst und sind aelter als dieses Buendel; die REGEL ist, dass ein Anbau nichts
+     hinzufuegt, was vorher nicht schon da war. */
+  const rand = zweigMass.bilder.ohne
+    ? { li: zweigMass.bilder.ohne.li, re: zweigMass.bilder.ohne.re } : null;
+  const ueber = rand ? zPaar.filter(z => zweigMass.bilder[z]
+      && (zweigMass.bilder[z].li > rand.li || zweigMass.bilder[z].re > rand.re))
+      .map(z => z + ' li=' + zweigMass.bilder[z].li + ' re=' + zweigMass.bilder[z].re) : ['kein Massstab'];
+  check('2f: kein Zweiganbau fuellt die Kachel weiter als der Rumpf ohne Zweig',
+    ueber.length === 0, { ueberstehend: ueber, ohneZweig: rand,
+      gemessen: zPaar.map(z => z + ':' + (zweigMass.bilder[z] ? zweigMass.bilder[z].li + '/' + zweigMass.bilder[z].re : '-')) });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
@@ -285,3 +398,12 @@ async function lauf(browser, vp){
 // dem Namen, und "Sternenfestung" ist laenger als "Stuetzpunkt". Die Pruefung war damit am alten Stand (fester
 // Radius 11) GRUEN und belegte nichts. Sie liest jetzt den Radius des pulsenden Hofs, die einzige Groesse, die
 // nur am Radius haengt. Gefunden hat das die Gegenprobe, nicht der gruene Lauf.
+//
+// Gegenprobe 2e GEMESSEN 06.09.2026 (KEPLER_SPIELDATEI = der Stand vor Buendel F): genau EINE
+// Pruefung faellt, 2e, mit dem Abstand 0 in ALLEN DREI Paarungen. Die Pruefnamen beider Laeufe
+// sind per diff verglichen und identisch (25 zu 25), es ging also keine Pruefung verloren.
+// Die Null ist der eigentliche Befund: Vor Buendel F waren Werft, Handel und Festung auf Stufe 8
+// dieselbe Zeichnung in drei Farbtoenen - kein einziges der 256 Rasterfelder unterschied sich.
+// Genau das meldete die Grafik-Aufnahme ("Handel und Festung lagen farblich so nah beieinander,
+// dass sie nicht zu trennen waren"), und genau das liess 2d durchgehen: drei verschiedene
+// Data-URLs sind fuer 2d in Ordnung, auch wenn nur die Palette wechselt. 2e schliesst die Luecke.
