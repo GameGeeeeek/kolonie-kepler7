@@ -73,6 +73,31 @@ function backend(){
     await page.route('**/api/**', backend());
     await page.goto(SPIEL_URL);
     await page.waitForTimeout(2600);
+    /* WAS DER SPIELER SIEHT, nicht was im Canvas steht: über dem Himmel liegen zwei Scrim-Lagen
+       (.ll-sky-scrim, linear und radial), die am oberen Rand zusammen rund 96 % Deckkraft
+       erreichen. Eine Messung direkt auf den Canvas-Pixeln überschätzt die Helligkeit deshalb um
+       ein Vielfaches. Gemessen wird darum ein Bildschirmfoto des oberen Bildbereichs - durch alle
+       Lagen hindurch, so wie es ankommt. Das Foto wird der Seite als Bild zurückgegeben und dort
+       auf einer Leinwand ausgewertet, weil im Test keine Bildbibliothek zur Verfügung steht. */
+    /* Der LINKE Randstreifen des oberen Bereichs: dort steht keine Schrift (die Schlagzeile ist
+       zentriert), also misst das Foto wirklich den Himmel und nicht die Überschrift. Ein erster
+       Anlauf fotografierte die volle Breite und zählte den weißen Text mit - die Zahl war hoch,
+       sagte aber nichts über den Himmel. */
+    const fotoOben = await page.screenshot({ clip: { x:0, y:0, width:Math.floor(breite*0.18), height:Math.floor(hoehe*0.4) } });
+    const sicht = await page.evaluate(async (b64) => {
+      const bild = new Image();
+      await new Promise(ok => { bild.onload = ok; bild.onerror = ok; bild.src = 'data:image/png;base64,' + b64; });
+      if (!bild.width) return null;
+      const cv = document.createElement('canvas'); cv.width = bild.width; cv.height = bild.height;
+      const c = cv.getContext('2d'); c.drawImage(bild, 0, 0);
+      const d = c.getImageData(0, 0, cv.width, cv.height).data;
+      let summe = 0, n = 0, hell = 0;
+      for (let i = 0; i < d.length; i += 8){
+        const l = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+        summe += l; n++; if (l > 18) hell++;
+      }
+      return { mittel: n ? summe/n : 0, anteilHell: n ? hell/n : 0 };
+    }, fotoOben.toString('base64'));
     const d = await page.evaluate(() => {
       const sky = document.getElementById('llSky');
       const art = document.querySelector('canvas[data-ll-art="flotte"]');
@@ -117,13 +142,24 @@ function backend(){
                skyBreite: sky ? sky.clientWidth : 0, artDa: !!art };
     });
     await ctx.close();
-    return { d, errs };
+    return { d, errs, sicht };
   };
 
   for (const [name, b, h, dpr] of [['Desktop', 1280, 800, 1], ['Handy', 390, 844, 2]]){
-    const { d, errs } = await messe(b, h, dpr);
+    const { d, errs, sicht } = await messe(b, h, dpr);
     check(name + ' – keine Skriptfehler', errs.length === 0, errs.slice(0, 3));
     check(name + ' – Himmel und Gefechtsbild sind da', !!d.sky && d.artDa, { sky: !!d.sky, art: d.artDa });
+    /* KEINE Prüfung, sondern eine gemessene Notiz - und zwar eine, die eine Annahme des Konzepts
+       korrigiert. Dort stand, die Nebel sollten "so kräftig sein, dass sie NACH dem Scrim noch
+       sichtbar sind". Am linken Randstreifen ist das nicht der Fall: gemessen 7,5 (neu) gegen
+       6,8-7,1 (alt) - der Scrim deckt dort fast alles. Der sichtbare Unterschied liegt in der
+       Bildmitte, wo die Galaxie steht; dort läuft aber die Schlagzeile darüber, ein Foto misst
+       also den Text mit. Eine Sichtprüfung an einer festen Stelle misst deshalb die Deckkraft des
+       Scrims, nicht die Arbeit des Zeichners - die Regel A wird darum am Canvas gemessen und
+       heißt ausdrücklich "im Canvas". Die Zahl steht hier, damit die Grenze der Messung
+       dokumentiert ist statt vergessen. */
+    if (sicht) console.log('INFO - ' + name + ' – durch den Scrim am linken Rand: Helligkeit '
+      + sicht.mittel.toFixed(2) + ' (alter Stand gemessen 6,8-7,1)');
     if (d.sky){
       /* A) DER Befund: der obere Bildteil war leer. Gemessen wird die mittlere Helligkeit des
          oberen Bilddrittels und der Anteil sichtbarer Pixel darin.
@@ -136,7 +172,7 @@ function backend(){
          Handy schon im oberen Bereich stand (Kern bei 0,48 H) und am Desktop nicht (0,90 H): die
          Verbesserung ist dort größer, die Schwelle darf niedriger liegen. */
       const grenzen = name === 'Handy' ? { mittel: 17, anteil: 0.45 } : { mittel: 11, anteil: 0.15 };
-      check(name + ' – der obere Bildteil ist nicht mehr leer',
+      check(name + ' – der obere Bildteil ist im Canvas nicht mehr leer',
         d.sky.oben.mittel > grenzen.mittel && d.sky.oben.anteilHell > grenzen.anteil,
         { mittel: +d.sky.oben.mittel.toFixed(2), anteilHell: +d.sky.oben.anteilHell.toFixed(3), grenzen });
       check(name + ' – die Bildmitte trägt die Galaxie',

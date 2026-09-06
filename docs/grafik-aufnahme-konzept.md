@@ -225,3 +225,69 @@ für jede Eingabe 0 und hätte auch eine Rasterung durchgehen lassen, die schlic
 **Zweimal in dieser Reihe habe ich eine Schwelle geraten statt gemessen** (1f hier, 1d in Bündel C).
 Beide Male stand die Zahl danach im Testkopf. Die Regel steht in `CLAUDE.md` - sie gilt auch für
 die eigene Prüfung, nicht nur für den Erwartungswert des Spiels.
+
+## Bündel E: Landeseite (06.09.2026, v8.692.0)
+
+**Befund der Aufnahme.** Der Himmel (`#llSky`) war ein Ring aus 3400 gleichförmigen Punkten mit
+gelbem Kernklecks, jeden Frame aus Einzelpfaden neu gezeichnet. Der Kern lag am Desktop bei
+y = 0,90 H, also unter der Live-Leiste; die oberen 80 % des Bildschirms waren schwarze Leere, weil
+die 26 Staubwolken bei 9-16 % Deckkraft unsichtbar blieben. Das Gefechtsbild daneben zeigte sieben
+18x10-Pfeildreiecke an einem pulsierenden Klecks - es bewarb das Kernfeature des Spiels und zeigte
+davon nichts.
+
+**Was gebaut ist.** Eine Balkenspirale in Schrägsicht, EINMAL in drei Offscreen-Leinwände gebacken
+(Himmel mit Nebeln, Scheibe mit Armen und Staubbändern, Deckung mit Kernglanz) und je Frame nur
+noch als drei `drawImage` geblittet, dazu höchstens 60 blinkende Vordergrundsterne. Das ist
+zugleich **billiger** als vorher: 3400 Pfade je Frame gegen drei Bilder plus 60 Pfade.
+Das Gefechtsbild ist eine Szene aus echten Rumpfformen: Spielerformation in Lilac, Gegner in Rot,
+Strahlen, Treffer, ein Wrack mit Trümmern, ein Planetenbogen. Die ruhende Ebene wird gebacken, nur
+Strahlen und Treffer laufen je Frame.
+
+**Beim Einbau gefunden:**
+
+1. **`TAU` fehlte** im äußeren Namensraum - das vorhandene liegt in der IIFE der Kampf-Wiedergabe.
+   Der Bestandstest `test_landeseite` meldete `ReferenceError` in sieben Prüfungen im selben Lauf.
+2. **Der gemeinsame Bildgrund lief doppelt:** der Gefechtszeichner beginnt selbst mit `clearRect`
+   und deckendem Verlauf. Für `'flotte'` wird der gemeinsame jetzt übersprungen.
+
+**Adversarische Durchsicht: vier Befunde.**
+
+1. `groesse()` buk die Galaxie bei **jedem** `resize` neu - ohne Entprellung und ohne Prüfung, ob
+   sich die Größe überhaupt geändert hat. Am Handy löst die einfahrende Adressleiste beim Scrollen
+   ein `resize` aus; jeder Backvorgang kostet rund 200 ms und legt bei 1440x900/dpr 2 etwa 63 MB
+   Leinwand an. Jetzt entprellt (180 ms) und nur bei echter Größenänderung.
+2. `sterne(n, seed)` war eingebaut, aber **nie aufgerufen** - die Sterne der Abschnittsbilder kamen
+   weiter aus `Math.random`. Der beabsichtigte Determinismus war damit nicht da.
+3. `RUMPF` **duplizierte drei Rumpfumrisse aus `SHIP_HULL_DEFS`** - eine Kopie-Familie ohne
+   Wächter. Der Entwurfskommentar begründete es mit „damit die Datei allein läuft"; im Spiel ist
+   das keine Begründung mehr. `RUMPF` liest die Punktlisten jetzt aus `SHIP_HULL_DEFS`, nur die
+   Aufbauten (Kanzel, Türme) bleiben lokal.
+4. Ein Befund **an meinem eigenen Wächter**: Regel A misst die Canvas-Pixel, der Spieler sieht sie
+   aber durch zwei Scrim-Lagen mit zusammen rund 96 % Deckkraft am oberen Rand.
+
+**Was Befund 4 beim Nachmessen ergab, und warum die Prüfung trotzdem am Canvas misst:** Ein Foto
+des linken Randstreifens - dort steht keine Schrift - liefert **7,5 (neu) gegen 6,8-7,1 (alt)**.
+Der Scrim deckt dort also fast alles, und eine Sichtprüfung an dieser Stelle misst seine Deckkraft
+statt der Arbeit des Zeichners. In der Bildmitte, wo die Galaxie steht, läuft die Schlagzeile
+darüber; ein Foto misst dort den weißen Text mit. Die Regel wird deshalb am Canvas gemessen und
+heißt ausdrücklich „im Canvas"; die Randmessung steht als Notiz im Testlauf, damit die Grenze
+dokumentiert ist. **Und sie korrigiert eine Annahme des Konzepts:** dort stand, die Nebel sollten
+„so kräftig sein, dass sie NACH dem Scrim noch sichtbar sind" - am Rand sind sie das nicht.
+
+**Wächter:** `tests/test_landeseite_bilder.js`, 18 Prüfungen. Am alten Stand fallen 10.
+
+**Zwei Schwellen mussten nachgemessen werden, beide waren zuerst zu lasch:**
+
+- „Der obere Bildteil ist nicht mehr leer" war mit 2,5 auch am ALTEN Stand grün. Der alte Himmel
+  zeichnete mit `Math.random`, seine Werte schwanken - dreimal gemessen: Desktop 4,9-7,7
+  Helligkeit / 1,6-6,8 % helle Pixel, Handy 7,3-13,1 / 10,8-31,4 %. Neu: 14,2 / 27,5 % und
+  22,9 / 63,8 %. Die Schwellen liegen jetzt über dem alten Maximum, je Formfaktor eine eigene -
+  die alte Galaxie stand am Handy schon im oberen Bereich, am Desktop nicht.
+- „Im Gefecht stehen Schiffe" nahm die **28 px aus dem Konzept**. Die sind eine Mindestforderung an
+  die Lesbarkeit, kein Trennwert: am alten Stand misst derselbe Lauf 27 px (Desktop) und 30 px
+  (Handy), die Prüfung wäre dort zur Hälfte grün gewesen. Neu sind es 182 und 153 px; die Schwelle
+  liegt bei 60.
+
+**Das ist der dritte Fall dieser Reihe, in dem eine Schwelle geraten statt gemessen war.** Die
+Hausregel „gegen den gemessenen Ausgangsstand vergleichen, nie gegen eingetippte Zahlen" gilt auch
+dann, wenn die Zahl aus dem eigenen Konzeptpapier stammt.
