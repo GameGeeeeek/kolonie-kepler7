@@ -8653,12 +8653,47 @@
     }
     return s;
   }
+  /* BANNER-PLANET (Grafik-Aufnahme, Buendel F, 06.09.2026)
+     Vorher war der Planet eine gefuellte Scheibe mit einer nach oben links versetzten weissen
+     Linse darauf. Die Linse ist KEIN Licht: Sie hat ueberall dieselbe Deckkraft und endet an
+     einer harten Kante mitten im Koerper, weshalb der Planet flach wirkte und die Kante bei
+     grossen Radien (34 px auf "gruen") deutlich zu sehen war.
+     Jetzt zeichnet dieselbe Funktion eine Kugel: ein radialer Verlauf mit dem Licht oben links,
+     ein weicher Terminator zur Nachtseite, ein duenner Lichtsaum auf der beleuchteten Kante und
+     zwei angedeutete Wolkenbaender. Der Ring laeuft HINTER dem Koerper vorbei und vor ihm wieder
+     hervor - vorher lag er komplett davor, was ihn wie einen aufgemalten Reifen aussehen liess.
+     Die Signatur bleibt (cx, cy, r, fill, glow, ringColor); alle 13 Banner-Definitionen sind
+     unveraendert. Die Verlaufs-Kennungen haengen an cx/cy/r, damit zwei Planeten im selben
+     Banner sich nicht gegenseitig ueberschreiben - "g" von bannerGradDefs bleibt frei. */
+  function bpKanal(hex, i){ const h = String(hex||'#888888').replace('#',''); return parseInt(h.length === 3 ? h[i]+h[i] : h.substr(i*2,2), 16) || 0; }
+  function bpTon(hex, f){
+    // f > 1 hellt zum Weiss hin auf, f < 1 dunkelt zum Schwarz hin ab.
+    const m = (v) => Math.max(0, Math.min(255, Math.round(f >= 1 ? v + (255-v)*(f-1) : v*f)));
+    return '#' + [0,1,2].map(i => m(bpKanal(hex, i)).toString(16).padStart(2,'0')).join('');
+  }
   function bannerPlanet(cx, cy, r, fill, glow, ringColor){
+    const id = 'bp' + Math.round(cx) + '_' + Math.round(cy) + '_' + Math.round(r);
+    const hell = bpTon(fill, 1.45), mittel = fill, dunkel = bpTon(fill, 0.42), nacht = bpTon(fill, 0.16);
     let s = glow ? `<circle cx="${cx}" cy="${cy}" r="${(r*1.5).toFixed(1)}" fill="${glow}" opacity="0.28"/>` : '';
-    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
-    s += `<circle cx="${(cx-r*0.28).toFixed(1)}" cy="${(cy-r*0.28).toFixed(1)}" r="${r}" fill="rgba(255,255,255,0.12)"/>`;
-    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="${Math.max(1,r*0.08).toFixed(1)}"/>`;
-    if (ringColor) s += `<ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.8" transform="rotate(-16 ${cx} ${cy})"/>`;
+    /* Der Verlauf sitzt bei 33/28 Prozent - das ist die Lichtquelle oben links, dieselbe Richtung,
+       aus der die alte Linse kam. Der letzte Stop ist die Nachtseite. */
+    s += `<defs><radialGradient id="${id}" cx="33%" cy="28%" r="78%">`
+      + `<stop offset="0%" stop-color="${hell}"/><stop offset="38%" stop-color="${mittel}"/>`
+      + `<stop offset="76%" stop-color="${dunkel}"/><stop offset="100%" stop-color="${nacht}"/>`
+      + `</radialGradient><clipPath id="${id}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>`;
+    // Hinter dem Koerper: die abgewandte Haelfte des Rings.
+    if (ringColor) s += `<g transform="rotate(-16 ${cx} ${cy})"><ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.55"/></g>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id})"/>`;
+    /* Zwei Wolkenbaender, auf den Koerper geschnitten. Sie sind der Unterschied zwischen einer
+       Kugel und einer Billardkugel; bei r unter 12 bleiben sie weg, dort waeren sie Rauschen. */
+    if (r >= 12) s += `<g clip-path="url(#${id}c)" opacity="0.22">`
+      + `<ellipse cx="${(cx-r*0.1).toFixed(1)}" cy="${(cy-r*0.34).toFixed(1)}" rx="${(r*0.95).toFixed(1)}" ry="${(r*0.13).toFixed(1)}" fill="${hell}"/>`
+      + `<ellipse cx="${(cx+r*0.06).toFixed(1)}" cy="${(cy+r*0.3).toFixed(1)}" rx="${(r*0.88).toFixed(1)}" ry="${(r*0.1).toFixed(1)}" fill="${dunkel}"/></g>`;
+    // Lichtsaum auf der beleuchteten Kante (oben links), nicht rundum - eine Kugel hat keinen Rahmen.
+    s += `<path d="M ${(cx-r*0.99).toFixed(1)} ${(cy+r*0.14).toFixed(1)} A ${r} ${r} 0 0 1 ${(cx+r*0.2).toFixed(1)} ${(cy-r*0.98).toFixed(1)}" fill="none" stroke="${hell}" stroke-width="${Math.max(0.8,r*0.075).toFixed(1)}" opacity="0.5" stroke-linecap="round"/>`;
+    // Vor dem Koerper: die zugewandte Haelfte, auf die untere Ringebene geschnitten.
+    if (ringColor) s += `<defs><clipPath id="${id}r"><rect x="${(cx-r*2.2).toFixed(1)}" y="${cy}" width="${(r*4.4).toFixed(1)}" height="${(r*1.2).toFixed(1)}"/></clipPath></defs>`
+      + `<g transform="rotate(-16 ${cx} ${cy})" clip-path="url(#${id}r)"><ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.9"/></g>`;
     return s;
   }
   function bannerNebula(cx, cy, rx, ry, color, rot){ return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${color}" opacity="0.3" transform="rotate(${rot||0} ${cx} ${cy})"/>`; }
