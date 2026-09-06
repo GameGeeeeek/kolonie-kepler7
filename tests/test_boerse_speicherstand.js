@@ -203,7 +203,10 @@ const marktOeffnen = async (page) => {
   await page.waitForTimeout(1200);
 };
 
-const RUNDFUNK = /^(leaderboard|missions|moondefense):/;
+/* EINE Quelle fuer die drei Rundfunk-Schluessel: Das Muster wird daraus GEBAUT, damit
+   Erkennung (Pruefung 3) und Behauptung (Pruefung 5) nicht auseinanderlaufen koennen. */
+const RUNDFUNK_ARTEN = ['leaderboard', 'missions', 'moondefense'];
+const RUNDFUNK = new RegExp('^(' + RUNDFUNK_ARTEN.join('|') + '):');
 
 (async () => {
   const browser = await starteBrowser();
@@ -255,13 +258,18 @@ const RUNDFUNK = /^(leaderboard|missions|moondefense):/;
        an korrektem Code (Durchsicht 06.09.2026). */
     const t1 = Date.now();
     const taktVoll = () => t.store.__ablauf.some(e => e.t > t1 && e.key === SAVE_KEY)
-      && t.store.__ablauf.some(e => e.t > t1 && RUNDFUNK.test(e.key || ''));
+      && RUNDFUNK_ARTEN.every(a => t.store.__ablauf.some(e => e.t > t1 && (e.key || '').startsWith(a + ':')));
     for (let i = 0; i < 40 && !taktVoll(); i++) await t.page.waitForTimeout(500);
     const spaeter = t.store.__ablauf.filter(e => e.t > t1 && e.typ === 'put');
     const arten = new Set(spaeter.map(e => (e.key || '').split(':')[0]));
-    check('5: der reguläre Takt schreibt weiterhin Spielstand UND Rundfunk-Schlüssel',
-      spaeter.some(e => e.key === SAVE_KEY) && arten.has('leaderboard'),
-      { geschrieben: [...arten] });
+    /* ALLE DREI verlangen, nicht nur leaderboard (Codex-Durchsicht 06.09.2026). Die Behauptung
+       dieser Pruefung ist "der Takt schreibt weiterhin alle vier Schluessel"; wer nur einen
+       davon abfragt, laesst genau den Fall durch, gegen den sie steht - dass der schmale Pfad
+       spaeter versehentlich auch im vollen Lauf greift und missions/moondefense wegfallen.
+       Die Liste kommt aus RUNDFUNK_ARTEN, damit Muster und Behauptung nicht auseinanderlaufen. */
+    check('5: der reguläre Takt schreibt weiterhin Spielstand UND ALLE Rundfunk-Schlüssel',
+      spaeter.some(e => e.key === SAVE_KEY) && RUNDFUNK_ARTEN.every(a => arten.has(a)),
+      { geschrieben: [...arten], erwartet: ['kepler7-save-v3', ...RUNDFUNK_ARTEN] });
     await t.ctx.close();
   }
 
