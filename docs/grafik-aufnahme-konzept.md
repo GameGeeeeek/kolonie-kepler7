@@ -401,3 +401,31 @@ wäre (F2 die Kantenhöhe, F4 die Rauheit, und in F3 wäre eine Bauchschwelle oh
 gewesen). Die Hausregel „erst messen, dann setzen" gilt für die eigene Prüfung genauso wie für die
 Erwartungswerte des Spiels – und der Test, der die verworfene Messung im Kopf nennt, ist der
 einzige Ort, an dem diese Arbeit nicht verloren geht.
+
+### Die adversarische Durchsicht des Bündels (06.09.2026)
+
+Drei Befunde, **zwei bestätigt, einer nicht reproduzierbar** – und der Unterschied wurde gemessen,
+nicht geglaubt:
+
+1. **Bestätigt: Der Ladeausleger des Handelszweigs lief aus der Kachel.** `maxLaenge` deckelte ihn
+   nur nach unten, waagerecht war er ungedeckelt. Gemessen auf Stufe 8: **27 deckende Randzeilen
+   rechts gegen 4 beim Rumpf ohne Zweig**, auf Stufe 7 zwei. Die 4 stammen vom Ring selbst und
+   stehen genauso in `origin/main` – sie sind älter als dieses Bündel. Behoben durch einen
+   gemessenen Platzdeckel, der den ganzen Anbau proportional verkleinert statt ihn abzuschneiden.
+   **Der erste Anlauf der Behebung war zu kurz gerechnet** (27 → 11 Randzeilen): Der äußerste Punkt
+   ist nicht die Bugspitze des Frachters, sondern der Schein der Bugleuchte, den `vpLeuchte` bis
+   `r*3.2` malt – und dieser Schein hängt an `R`, wächst also beim Verkleinern nicht mit und gehört
+   in den festen Teil der Rechnung. Wächter `test_vorposten_station` 2f, und er misst gegen den
+   **Rumpf ohne Zweig** statt gegen eine eingetippte Zahl.
+2. **Bestätigt: Der Mond bekam seine Textur nicht.** Der erste Wurf schloss neben `vorgabe` auch
+   `mond` aus – dabei hat der Mond einen eigenen Builder, den Kartenminiatur und Planetenboden
+   längst benutzen. Eine Mondkolonie behielt damit genau die flache Kulisse, die die Etappe
+   abschaffen wollte. Wächter `test_kulissenplanet` 0c-mond.
+3. **Nicht reproduzierbar: der Kurvenbauch der Regionen.** Der Befund gab für `rand` 26 statt 18 an
+   und leitete daraus einen Sicherheitsabstand von nur 1 ab. Zwei aufeinanderfolgende Läufe liefern
+   identisch 16 bis 23, und eine Kontrolle mit **4000 statt 240 Stützstellen** auf der Kurve ändert
+   keine einzige Zahl – die Abtastung unterschätzt also nicht. Der Abstand beträgt 4. Die Messung
+   steht jetzt im Testkopf, damit der nächste Leser sie nicht wiederholen muss.
+
+Zwei von drei ist eine gute Quote für eine Durchsicht; die Regel „Befunde werden geprüft, nicht
+geglaubt" hat sich beim dritten aber genauso bewährt wie bei den ersten beiden.

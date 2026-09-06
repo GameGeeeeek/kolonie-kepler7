@@ -30,7 +30,13 @@ const now = Date.now();
    Schwerpunkt entfernt als das äußerste System. Beim ersten Entwurf (Spannung 1/6, Abstand 22)
    waren es 22 bis 34 px, und drei Regionen liefen im Bild sichtbar ins Nachbargebiet.
    Die Schwelle liegt zwischen den beiden Höchstwerten (23 und 34); am ersten Entwurf fallen
-   damit gemessen wispern (28), obsidian (29) und meridian (34). */
+   damit gemessen wispern (28), obsidian (29) und meridian (34).
+   NACHGEMESSEN am 06.09.2026 nach einem Befund der adversarischen Durchsicht, der für rand 26
+   statt 18 angab und daraus einen Sicherheitsabstand von nur 1 ableitete: Der Befund
+   reproduziert NICHT. Zwei aufeinanderfolgende Läufe liefern identisch
+   kepler=17 wispern=19 solmark=16 obsidian=20 meridian=23 pulsar=16 ilyra=16 rand=18, und eine
+   Kontrolle mit 4000 statt 240 Stützstellen auf der Kurve ändert keine einzige Zahl - die
+   Abtastung unterschätzt also nicht. Der Abstand zur Schwelle beträgt 4, nicht 1. */
 const BAUCH_MAX = 27;
 
 function spielstand(){

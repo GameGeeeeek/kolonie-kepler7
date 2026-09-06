@@ -50,6 +50,16 @@ check('0b: der Zeichner nimmt den quadratischen Mittelausschnitt, nicht die voll
 /* Der Zwischenspeicher muss sich merken, OB die Textur da war. Sonst bliebe ein Planet, dessen
    Textur beim allerersten Bild noch nicht fertig war, für den Rest der Sitzung flach - der Sprite
    wird ja nur bei Schlüsselwechsel neu gebaut. */
+/* BEFUND DER ADVERSARISCHEN DURCHSICHT (06.09.2026): Der erste Wurf schloss neben 'vorgabe' auch
+   'mond' vom Texturzweig aus. Der Mond hat aber einen EIGENEN Builder
+   (PLANET_TEXTURE_BUILDERS.mond), den die Kartenminiatur und der Planetenboden der
+   Kampf-Wiedergabe längst benutzen - eine Mondkolonie behielt damit genau die flache Kulisse, die
+   diese Etappe abschaffen wollte. Ausgeschlossen bleibt nur 'vorgabe': Das ist der Stand vor dem
+   ersten geladenen Spielstand, und getPlanetTexture fällt für unbekannte Schlüssel auf
+   erdaehnlich zurück - eine Erdtextur auf dem Vorgabe-Blau wäre eine Falschaussage. */
+check('0c-mond: nur der Vorgabe-Stand bleibt ohne Textur, der Mond nicht',
+  /const tex = key === 'vorgabe' \? null : standortTextur\(key\);/.test(JS)
+  && /mond: \(\(\) => \{/.test(JS));
 check('0c: der Zwischenspeicher merkt sich, ob die Textur da war',
   /const merk = key \+ \(tex \? '\|textur' : '\|flach'\);/.test(JS)
   && /if \(planetSprite && planetSpriteKey === merk\) return planetSprite;/.test(JS)

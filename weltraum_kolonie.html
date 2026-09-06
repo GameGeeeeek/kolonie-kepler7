@@ -11088,7 +11088,7 @@
   /* (2) HANDEL – Frachtterminal. Drei flache Containerbloecke haengen als Stapel unter der
    Ringvorderseite; vom rechten Stapel laeuft ein Ladeausleger nach rechts, daran haengt ein
    gedrungener Frachter. Positionslichter amber. */
-  function vpFracht(c, cx, cy, R, rohr, kipp, ton, speiche, anzahl, maxLaenge){
+  function vpFracht(c, cx, cy, R, rohr, kipp, ton, speiche, anzahl, maxLaenge, xMax){
   const stapelB = anzahl >= 3 ? R*0.29 : R*0.42;
   const slabH = Math.min(R*0.13, maxLaenge*0.27), tiefe = rohr*0.75;
   const winkel = vpEinheitWinkel(anzahl);
@@ -11117,14 +11117,36 @@
     // Positionslichter an den Stapelecken
     vpLeuchte(c, px - stapelB/2 + stapelB*0.06, yUnten - slabH*0.3, Math.max(0.9, R*0.016), '#f0b94f', 0.5);
   });
-  // Ladeausleger mit Frachter
-  const auslegerL = R*0.36, kapL = Math.min(R*0.40, maxLaenge*0.9), kapR = kapL*0.30;
+  /* Ladeausleger mit Frachter. maxLaenge deckelte ihn bisher nur NACH UNTEN - waagerecht war er
+     ungedeckelt, und GEMESSEN (adversarische Durchsicht, 06.09.2026) lief er auf der letzten
+     Stufe rechts aus der 256er-Kachel: 27 deckende Randspalten-Zeilen gegen 4 beim Rumpf ohne
+     Zweig, auf Stufe 7 zwei. Auf der Karte sieht ein abgeschnittener Ausleger aus wie ein Fehler.
+     Der Platz wird deshalb gemessen und der ganze Anbau bei Bedarf proportional verkleinert -
+     nicht abgeschnitten, sonst waere der Frachter mal mit und mal ohne Bug zu sehen. */
   const ax0 = rechts - speiche, ay = rechtsY;
+  let auslegerL = R*0.36, kapL = Math.min(R*0.40, maxLaenge*0.9);
+  const bugLeuchte = Math.max(1.1, R*0.022);
+  if (isFinite(xMax)){
+    /* Der aeusserste Punkt ist NICHT die Bugspitze der Kapsel (ax0 + auslegerL + kapL*0.55),
+       sondern der Schein der Bugleuchte: vpLeuchte malt einen Verlauf bis r*3.2. Ein erster
+       Anlauf rechnete nur mit r und liess GEMESSEN 11 Randzeilen stehen statt 27 - besser, aber
+       immer noch aus der Kachel. Und der Schein waechst NICHT mit dem Verkleinerungsfaktor
+       (er haengt an R), er gehoert deshalb in den festen Teil der Rechnung, nicht in den
+       skalierten - sonst konvergiert die Verkleinerung nie auf den richtigen Wert. */
+    const fest = 3.2*bugLeuchte + speiche*0.4;            // Leuchtschein und Halteklaue
+    const variabel = auslegerL + kapL*0.55;               // was sich verkleinern laesst
+    const platz = Math.max(0, xMax - ax0);
+    if (variabel > 0 && variabel + fest > platz){
+      const f = Math.max(0, Math.min(1, (platz - fest) / variabel));
+      auslegerL *= f; kapL *= f;
+    }
+  }
+  const kapR = kapL*0.30;
   vpStab(c, ax0, ay, ax0 + auslegerL, ay, speiche*1.25, ton, 0.95);
   vpStab(c, ax0 + auslegerL, ay - speiche, ax0 + auslegerL, ay + kapR*0.55, speiche*0.8, ton, 0.85);   // Halteklaue
   const kx = ax0 + auslegerL - kapL*0.45, ky = ay + kapR*0.95;
   vpKapsel(c, kx, ky, kapL, kapR, ton, kipp);
-  vpLeuchte(c, kx + kapL*0.97, ky, Math.max(1.1, R*0.022), '#f0b94f', 1.0);
+  vpLeuchte(c, kx + kapL*0.97, ky, bugLeuchte, '#f0b94f', 1.0);
   vpLeuchte(c, kx + kapL*0.04, ky - kapR*0.55, Math.max(0.8, R*0.014), '#f0b94f', 0.5);
   }
 
@@ -11436,7 +11458,7 @@
     if (zweigAktiv){
       const sp = hatRing2 ? speiche*0.82 : speiche;
       if (zweig === 'werft')  vpDock(c, cx, tY, tR, tRohr, kipp, ton, sp, einheiten, frei);
-      if (zweig === 'handel') vpFracht(c, cx, tY, tR, tRohr, kipp, ton, sp, einheiten, frei);
+      if (zweig === 'handel') vpFracht(c, cx, tY, tR, tRohr, kipp, ton, sp, einheiten, frei, S - S*0.02);
     }
   }
   function vorpostenBildUrl(zweig, stufe){
@@ -59978,7 +60000,14 @@ async function claimPendingRewards(){
       /* Der Schlüssel merkt sich MIT, ob die Textur schon da war. Ohne das bliebe ein Planet, der
          beim allerersten Bild noch keine Textur hatte, für den Rest der Sitzung flach - der Sprite
          wird ja nur bei Schlüsselwechsel neu gebaut. */
-      const tex = (key === 'vorgabe' || key === 'mond') ? null : standortTextur(key);
+      /* NUR 'vorgabe' bleibt ohne Textur: Das ist der Stand vor dem ersten geladenen Spielstand,
+         und getPlanetTexture faellt fuer unbekannte Schluessel auf erdaehnlich zurueck - eine
+         Erdtextur auf dem Vorgabe-Blau waere eine Falschaussage. Der MOND hat dagegen einen
+         eigenen Builder (PLANET_TEXTURE_BUILDERS.mond), den die Kartenminiatur und der
+         Planetenboden der Kampf-Wiedergabe laengst benutzen; ihn hier auszusparen liess genau die
+         Kolonieart flach, die diese Etappe erklaertermassen beheben wollte (Befund der
+         adversarischen Durchsicht, 06.09.2026). */
+      const tex = key === 'vorgabe' ? null : standortTextur(key);
       const merk = key + (tex ? '|textur' : '|flach');
       if (planetSprite && planetSpriteKey === merk) return planetSprite;
       const w = canvas.width, h = canvas.height;

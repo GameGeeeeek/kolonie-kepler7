@@ -201,6 +201,12 @@ async function lauf(browser, vp){
   await h.ctx.close();
   const f = await lauf(browser, doc(8, 'festung', 'Sternenfestung'));
   const bildF = bildVon(f.mark.html);
+  /* Der Rumpf OHNE Zweig auf derselben Stufe. Er ist der Massstab fuer 2f: Ein Zweiganbau darf
+     die Kachel nicht weiter fuellen als der Rumpf, den es ohne ihn ohnehin schon gibt. Damit
+     braucht 2f keine eingetippte Schwelle - es misst gegen den eigenen Ausgangsstand. */
+  const o = await lauf(browser, doc(8, null, 'Ohne Zweig'));
+  const bildO = bildVon(o.mark.html);
+  await o.ctx.close();
   check('2c: und die Festung auch', !!bildF && bildF.length > 2000, { laenge: bildF ? bildF.length : 0 });
   // DIE EIGENTLICHE REGEL: drei Zweige, drei UNTERSCHIEDLICHE Stationen.
   check('2d: die drei Zweige sehen verschieden aus (kein geteiltes Bild)',
@@ -224,10 +230,12 @@ async function lauf(browser, vp){
      Buendel D verglich dafuer dasselbe Objekt mit sich selbst - das ist fuer jede Eingabe 0 und
      haette auch eine Rasterung durchgehen lassen, die schlicht die Farbe misst. */
   /* SCHWELLEN ERST GEMESSEN, DANN GESETZT (Hausregel, und sie gilt auch fuer die eigene Pruefung).
-     GEMESSEN am 06.09.2026 auf Stufe 8: werft/handel 37, werft/festung 49, handel/festung 48
+     GEMESSEN am 06.09.2026 auf Stufe 8: werft/handel 32, werft/festung 49, handel/festung 43
      Rasterfelder Unterschied - ein Farbdreher (hue-rotate 150 Grad, saturate 2,5) auf DASSELBE
-     Bild bewegt dagegen 1 Feld. Zwischen Farbe und Aufbau liegt damit Faktor 37, und darauf
-     beruht die Aussagekraft von 2e. Die Formschwelle liegt unter dem gemessenen Minimum, die
+     Bild bewegt dagegen 1 Feld. Zwischen Farbe und Aufbau liegt damit Faktor 32, und darauf
+     beruht die Aussagekraft von 2e. (Erste Messung war 37/49/48; der Frachter des Handelszweigs
+     ist danach wegen 2f kuerzer geworden, das schwaechste Paar sank auf 32 - immer noch weit
+     ueber der Schwelle 25.) Die Formschwelle liegt unter dem gemessenen Minimum, die
      Farbschwelle darueber: 2e soll das VERSCHWINDEN der Zweigmerkmale melden, keine Stilfrage
      entscheiden, und 2e-kontrolle soll rot werden, sobald die Rasterung anfaengt, Farbe zu messen. */
   const SCHWELLE_FARBE = 4, SCHWELLE_FORM = 25;
@@ -258,7 +266,15 @@ async function lauf(browser, vp){
         const rel = (summe[q]/zahl[q]) / (mittel || 1);
         out.push(rel > 1.10 ? 1 : (rel < 0.90 ? -1 : 0));
       }
-      return { raster: out, belegt: n };
+      /* Randspalten: Wie viele Zeilen der beiden aeussersten Spalten links und rechts sind
+         deckend belegt? Ein Anbau, der aus der Kachel laeuft, sieht auf der Karte aus wie ein
+         Zeichenfehler - und bei 256 Pixeln faellt er beim Zeichnen niemandem auf. */
+      let li = 0, re = 0;
+      for (let y = 0; y < S; y++){
+        for (const x of [0, 1])      if (d[(y*S+x)*4+3] > 20) li++;
+        for (const x of [S-1, S-2])  if (d[(y*S+x)*4+3] > 20) re++;
+      }
+      return { raster: out, belegt: n, li, re };
     };
     const bilder = {}, fehlend = [];
     let bunt = null;
@@ -270,10 +286,10 @@ async function lauf(browser, vp){
       if (z === 'festung') bunt = rastere(im, 'hue-rotate(150deg) saturate(2.5)').raster;
     }
     return { bilder, fehlend, bunt };
-  }, { werft: bildW, handel: bildH, festung: bildF });
+  }, { werft: bildW, handel: bildH, festung: bildF, ohne: bildO });
   const rasterAbstand = (a, b) => { let d = 0; for (let q = 0; q < 256; q++) if (a[q] !== b[q]) d++; return d; };
-  check('2e-vorab: alle drei Zweigbilder liegen zum Messen vor',
-    zweigMass.fehlend.length === 0 && Object.keys(zweigMass.bilder).length === 3 && !!zweigMass.bunt,
+  check('2e-vorab: die drei Zweigbilder und der Rumpf ohne Zweig liegen zum Messen vor',
+    zweigMass.fehlend.length === 0 && Object.keys(zweigMass.bilder).length === 4 && !!zweigMass.bunt,
     { fehlend: zweigMass.fehlend, da: Object.keys(zweigMass.bilder).length });
   const buntAbstand = zweigMass.bunt && zweigMass.bilder.festung
     ? rasterAbstand(zweigMass.bilder.festung.raster, zweigMass.bunt) : 999;
@@ -292,6 +308,21 @@ async function lauf(browser, vp){
     buntAbstand <= SCHWELLE_FARBE, { felderUnterschied: buntAbstand, schwelle: SCHWELLE_FARBE });
   check('2e: die drei Zweige unterscheiden sich im AUFBAU, nicht nur im Farbton',
     minZweig >= SCHWELLE_FORM, { schwaechstesPaar: schwaechstes, felderUnterschied: minZweig, schwelle: SCHWELLE_FORM });
+  /* 2f) DER ANBAU BLEIBT IN DER KACHEL (Befund der adversarischen Durchsicht, 06.09.2026).
+     Der Ladeausleger des Handelszweigs war waagerecht ungedeckelt - maxLaenge begrenzte ihn nur
+     nach unten. GEMESSEN lief er auf Stufe 8 rechts aus der 256er-Kachel: 27 deckende
+     Randzeilen gegen 4 beim Rumpf ohne Zweig, auf Stufe 7 zwei.
+     Gemessen wird gegen den Rumpf OHNE Zweig, nicht gegen eine eingetippte Zahl: Die 4 stammen
+     vom Ring selbst und sind aelter als dieses Buendel; die REGEL ist, dass ein Anbau nichts
+     hinzufuegt, was vorher nicht schon da war. */
+  const rand = zweigMass.bilder.ohne
+    ? { li: zweigMass.bilder.ohne.li, re: zweigMass.bilder.ohne.re } : null;
+  const ueber = rand ? zPaar.filter(z => zweigMass.bilder[z]
+      && (zweigMass.bilder[z].li > rand.li || zweigMass.bilder[z].re > rand.re))
+      .map(z => z + ' li=' + zweigMass.bilder[z].li + ' re=' + zweigMass.bilder[z].re) : ['kein Massstab'];
+  check('2f: kein Zweiganbau fuellt die Kachel weiter als der Rumpf ohne Zweig',
+    ueber.length === 0, { ueberstehend: ueber, ohneZweig: rand,
+      gemessen: zPaar.map(z => z + ':' + (zweigMass.bilder[z] ? zweigMass.bilder[z].li + '/' + zweigMass.bilder[z].re : '-')) });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
