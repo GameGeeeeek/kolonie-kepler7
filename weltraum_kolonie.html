@@ -349,7 +349,10 @@
         radial-gradient(ellipse 1100px 700px at 84% 0%, rgba(58,104,178,0.20), transparent 62%),
         linear-gradient(180deg,#04060e,#070b18 60%,#05070f);
     }
-    #game-root { position:relative; z-index:1; font-family: system-ui, sans-serif; color: #e9ecf5; max-width: 780px; margin: 0 auto; }
+    /* EINE Quelle fuer die Spielbreite. Der Kanzelrahmen (weiter unten) muss genau so breit sein
+       wie der Inhalt; zwei getippte 780 waeren die naechste Kopie-Familie, die auseinanderlaeuft. */
+    :root { --spielbreite: 780px; }
+    #game-root { position:relative; z-index:1; font-family: system-ui, sans-serif; color: #e9ecf5; max-width: var(--spielbreite); margin: 0 auto; }
     /* Desktop-Verbreiterung (Feature-Wunsch 13.07.2026): auf großen Monitoren blieb bisher viel
        Fläche links/rechts ungenutzt, da #game-root immer bei 780px gedeckelt war. Ab 1400px Viewport
        wächst der Hauptbereich jetzt mit, bis max. 1300px - "calc(100vw - 470px)" reserviert dabei
@@ -360,7 +363,7 @@
        Karten (SVG, viewBox+width:100%) und auto-fill/auto-fit-Grids skalieren dadurch automatisch
        mit, ohne dass ihr Code angepasst werden musste. */
     @media (min-width: 1400px) {
-      #game-root { max-width: min(1300px, calc(100vw - 470px)); }
+      :root { --spielbreite: min(1300px, calc(100vw - 470px)); }
     }
 
     /* overflow:CLIP, nicht hidden (01.08.2026) - und das ist kein Schönheitsfehler gewesen.
@@ -402,6 +405,50 @@
       background-size:38px 38px;
       mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 20%, transparent 88%);
       -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 20%, transparent 88%);
+    }
+    /* DER RAHMEN DER KANZEL (Grafik-Aufnahme, Buendel F, 06.09.2026)
+       Das Orbitalglas sagt "du siehst durch eine Scheibe" - aber die Scheibe hatte keinen Rahmen.
+       ZWEI FASSUNGEN WURDEN AM BILD GEMESSEN UND VERWORFEN, bevor diese hier stand:
+        1. Am FENSTER (position:fixed, ganze Breite). Die Spielflaeche ist mittig und 780 px breit,
+           die Fensterecken liegen also weit daneben - die Streben sassen im leeren Hintergrund und
+           rahmten den Browser, nicht das Spiel.
+        2. An der HUELLE (.shell::after). .shell ist die ganze scrollende Seite und mehrere tausend
+           Pixel hoch: Die unteren Streben lagen am Seitenende, der Randabfall war ueber die volle
+           Scrollhoehe gezogen und damit unsichtbar. Ein Rahmen, den man nur oben sieht, ist keiner.
+       Diese Fassung klebt am FENSTER (man sieht durch die Scheibe, und die scrollt nicht mit -
+       dieselbe Begruendung wie beim Sternenhimmel), ist aber genau so BREIT wie der Inhalt. Beide
+       lesen dafuer --spielbreite, es gibt also keine zweite Zahl, die veralten kann.
+       Drei Regeln, die den Rahmen harmlos halten:
+        (1) pointer-events:none auf der ganzen Ebene - er nimmt keinen Klick, auch nicht dort, wo
+            der Chat-Reiter und der Zurueck-Knopf der Karte sitzen.
+        (2) KEIN backdrop-filter und KEINE Animation. Der Energiesparmodus schaltet Weichzeichner
+            und Bewegung ab; hier hat er nichts abzuschalten.
+        (3) Nur ECKEN, keine durchgehenden Kanten: Lesetext steht in der Mitte, und eine Kante
+            haette am Handy Platz gekostet, den KB-21 gerade freigeraeumt hat. */
+    #kanzelrahmen {
+      position:fixed; top:0; bottom:0; left:50%; transform:translateX(-50%);
+      width:min(100vw, var(--spielbreite)); z-index:2; pointer-events:none;
+      background:
+        linear-gradient(135deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(225deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(45deg,  rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(315deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(135deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(225deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(45deg,  rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(315deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        radial-gradient(ellipse 128% 96% at 50% 50%, transparent 60%, rgba(3,5,12,0.22) 100%);
+      background-size:
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        100% 100%;
+      background-position:
+        left top, right top, left bottom, right bottom,
+        left top, right top, left bottom, right bottom,
+        center;
+      background-repeat:no-repeat;
     }
     /* Energiesparmodus (Einstellungen, auf Handy/Tablet automatisch an): schaltet die DAUERHAFT
        laufenden Deko-Animationen ab - Kauf-Puls auf allen leistbaren Buttons, Radar-Sweeps,
@@ -3382,6 +3429,7 @@
        Frame als Vollbild-Verläufe und belegte damit gemessen ~89% des Hauptthreads. -->
   <canvas id="bgnebel" aria-hidden="true"></canvas>
   <canvas id="bgstars" aria-hidden="true"></canvas>
+  <div id="kanzelrahmen" aria-hidden="true"></div>
 
   <div class="shell">
     <div class="shell-inner">
@@ -8653,12 +8701,47 @@
     }
     return s;
   }
+  /* BANNER-PLANET (Grafik-Aufnahme, Buendel F, 06.09.2026)
+     Vorher war der Planet eine gefuellte Scheibe mit einer nach oben links versetzten weissen
+     Linse darauf. Die Linse ist KEIN Licht: Sie hat ueberall dieselbe Deckkraft und endet an
+     einer harten Kante mitten im Koerper, weshalb der Planet flach wirkte und die Kante bei
+     grossen Radien (34 px auf "gruen") deutlich zu sehen war.
+     Jetzt zeichnet dieselbe Funktion eine Kugel: ein radialer Verlauf mit dem Licht oben links,
+     ein weicher Terminator zur Nachtseite, ein duenner Lichtsaum auf der beleuchteten Kante und
+     zwei angedeutete Wolkenbaender. Der Ring laeuft HINTER dem Koerper vorbei und vor ihm wieder
+     hervor - vorher lag er komplett davor, was ihn wie einen aufgemalten Reifen aussehen liess.
+     Die Signatur bleibt (cx, cy, r, fill, glow, ringColor); alle 13 Banner-Definitionen sind
+     unveraendert. Die Verlaufs-Kennungen haengen an cx/cy/r, damit zwei Planeten im selben
+     Banner sich nicht gegenseitig ueberschreiben - "g" von bannerGradDefs bleibt frei. */
+  function bpKanal(hex, i){ const h = String(hex||'#888888').replace('#',''); return parseInt(h.length === 3 ? h[i]+h[i] : h.substr(i*2,2), 16) || 0; }
+  function bpTon(hex, f){
+    // f > 1 hellt zum Weiss hin auf, f < 1 dunkelt zum Schwarz hin ab.
+    const m = (v) => Math.max(0, Math.min(255, Math.round(f >= 1 ? v + (255-v)*(f-1) : v*f)));
+    return '#' + [0,1,2].map(i => m(bpKanal(hex, i)).toString(16).padStart(2,'0')).join('');
+  }
   function bannerPlanet(cx, cy, r, fill, glow, ringColor){
+    const id = 'bp' + Math.round(cx) + '_' + Math.round(cy) + '_' + Math.round(r);
+    const hell = bpTon(fill, 1.45), mittel = fill, dunkel = bpTon(fill, 0.42), nacht = bpTon(fill, 0.16);
     let s = glow ? `<circle cx="${cx}" cy="${cy}" r="${(r*1.5).toFixed(1)}" fill="${glow}" opacity="0.28"/>` : '';
-    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>`;
-    s += `<circle cx="${(cx-r*0.28).toFixed(1)}" cy="${(cy-r*0.28).toFixed(1)}" r="${r}" fill="rgba(255,255,255,0.12)"/>`;
-    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,0.28)" stroke-width="${Math.max(1,r*0.08).toFixed(1)}"/>`;
-    if (ringColor) s += `<ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.8" transform="rotate(-16 ${cx} ${cy})"/>`;
+    /* Der Verlauf sitzt bei 33/28 Prozent - das ist die Lichtquelle oben links, dieselbe Richtung,
+       aus der die alte Linse kam. Der letzte Stop ist die Nachtseite. */
+    s += `<defs><radialGradient id="${id}" cx="33%" cy="28%" r="78%">`
+      + `<stop offset="0%" stop-color="${hell}"/><stop offset="38%" stop-color="${mittel}"/>`
+      + `<stop offset="76%" stop-color="${dunkel}"/><stop offset="100%" stop-color="${nacht}"/>`
+      + `</radialGradient><clipPath id="${id}c"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>`;
+    // Hinter dem Koerper: die abgewandte Haelfte des Rings.
+    if (ringColor) s += `<g transform="rotate(-16 ${cx} ${cy})"><ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.55"/></g>`;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id})"/>`;
+    /* Zwei Wolkenbaender, auf den Koerper geschnitten. Sie sind der Unterschied zwischen einer
+       Kugel und einer Billardkugel; bei r unter 12 bleiben sie weg, dort waeren sie Rauschen. */
+    if (r >= 12) s += `<g clip-path="url(#${id}c)" opacity="0.22">`
+      + `<ellipse cx="${(cx-r*0.1).toFixed(1)}" cy="${(cy-r*0.34).toFixed(1)}" rx="${(r*0.95).toFixed(1)}" ry="${(r*0.13).toFixed(1)}" fill="${hell}"/>`
+      + `<ellipse cx="${(cx+r*0.06).toFixed(1)}" cy="${(cy+r*0.3).toFixed(1)}" rx="${(r*0.88).toFixed(1)}" ry="${(r*0.1).toFixed(1)}" fill="${dunkel}"/></g>`;
+    // Lichtsaum auf der beleuchteten Kante (oben links), nicht rundum - eine Kugel hat keinen Rahmen.
+    s += `<path d="M ${(cx-r*0.99).toFixed(1)} ${(cy+r*0.14).toFixed(1)} A ${r} ${r} 0 0 1 ${(cx+r*0.2).toFixed(1)} ${(cy-r*0.98).toFixed(1)}" fill="none" stroke="${hell}" stroke-width="${Math.max(0.8,r*0.075).toFixed(1)}" opacity="0.5" stroke-linecap="round"/>`;
+    // Vor dem Koerper: die zugewandte Haelfte, auf die untere Ringebene geschnitten.
+    if (ringColor) s += `<defs><clipPath id="${id}r"><rect x="${(cx-r*2.2).toFixed(1)}" y="${cy}" width="${(r*4.4).toFixed(1)}" height="${(r*1.2).toFixed(1)}"/></clipPath></defs>`
+      + `<g transform="rotate(-16 ${cx} ${cy})" clip-path="url(#${id}r)"><ellipse cx="${cx}" cy="${cy}" rx="${(r*2).toFixed(1)}" ry="${(r*0.4).toFixed(1)}" fill="none" stroke="${ringColor}" stroke-width="2.5" opacity="0.9"/></g>`;
     return s;
   }
   function bannerNebula(cx, cy, rx, ry, color, rot){ return `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${color}" opacity="0.3" transform="rotate(${rot||0} ${cx} ${cy})"/>`; }
@@ -8786,13 +8869,21 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.693.0';
+  const VERSION = '8.694.0';
   const PATCHNOTES = [
-  { version:'8.693.0', date:'06.09.2026', changes:[
+  { version:'8.694.0', date:'06.09.2026', changes:[
     '<strong>Die Modulb\u00f6rse hatte dieselbe T\u00fccke wie der Markt \u2013 jetzt nicht mehr.</strong> Wer ein gerade gefundenes Modul sofort einstellte, bekam \u201eDieses Modul liegt nicht (mehr) in deinem Inventar" f\u00fcr eines, das seine Sammlung anzeigte. Grund war derselbe wie beim Verkauf: Der Server entscheidet \u00fcber deinen zuletzt gespeicherten Spielstand, und gespeichert wird alle zehn Sekunden. Einstellen, Zur\u00fcckziehen und Kaufen sichern den Stand jetzt vorher. Dasselbe galt f\u00fcr Kredite, die eine Handelsroute gerade eingebracht hatte.',
     '<strong>Und Handeln f\u00fchlt sich wieder fl\u00fcssig an.</strong> Seit Version 8.689.0 wartete jeder Handel auf einen vollen Speichervorgang \u2013 der schreibt neben deinem Spielstand auch drei Eintr\u00e4ge, die andere Spieler \u00fcber dich lesen. Vor einem Handel wird jetzt nur noch dein Spielstand geschrieben: einer statt vier. Die \u00fcbrigen holt der normale Zehn-Sekunden-Takt gleich wieder nach, es geht also nichts verloren.',
     '<strong>Dasselbe gilt jetzt f\u00fcr heimkehrende Flotten.</strong> Acht Aufl\u00f6sungen - Asteroid beanspruchen und anfechten, Vorposten bauen, bestationieren und angreifen, Nest-, Konvoi- und Festungsschlag - warteten ebenfalls auf vier Schreibvorg\u00e4nge. Kommen vier Flotten gleichzeitig an, sind das jetzt vier statt sechzehn. <strong>Eine Stelle bleibt bewusst beim vollen Speichern:</strong> das Abmelden aller Ger\u00e4te - danach kommt kein Takt mehr, der die Eintr\u00e4ge f\u00fcr andere Spieler nachholt.',
     'W\u00e4chter: <code>test_boerse_speicherstand</code> (27 Pr\u00fcfungen). Er misst nicht, wie oft gespeichert wird, sondern WAS zwischen deinem Klick und der Anfrage geschrieben wird \u2013 anders lie\u00dfe sich der normale Takt nicht davon trennen. Eine Pr\u00fcfung h\u00e4lt ausdr\u00fccklich die AUSNAHME fest, damit sie eine bleibt.',
+  ] },
+  { version:'8.693.0', date:'06.09.2026', changes:[
+    '<strong>Werft, Handelsknoten und Festungsring sehen endlich verschieden aus.</strong> Bisher war es dreimal dieselbe Station in drei Farbt\u00f6nen \u2013 nachgemessen: kein einziger von 256 Bildbereichen unterschied sich. Jetzt tr\u00e4gt die Werft Dockarme mit einem Rumpf im Bau, der Handelsknoten Frachtcontainer und einen Ausleger mit Frachter, und der Festungsring einen gepanzerten Ring mit rotem Schild-Emitter. Auch in Graustufen zu unterscheiden.',
+    '<strong>Die Planeten auf den Allianz-Bannern sind Kugeln geworden.</strong> Vorher lag eine wei\u00dfe Linse mit harter Kante auf einer flachen Scheibe. Jetzt f\u00e4llt das Licht \u00fcber den ganzen K\u00f6rper ab, die Nachtseite geht weich in den Schatten \u00fcber, und der Ring l\u00e4uft hinter dem Planeten vorbei und vor ihm wieder hervor. Deine Bannerauswahl bleibt unver\u00e4ndert \u2013 nur die Zeichnung ist neu.',
+    '<strong>Die acht Sektorregionen der \u00dcbersicht sind Gebiete statt Flurst\u00fccke.</strong> Aus geraden Kanten mit flacher F\u00fcllung sind geschwungene Umrisse mit einem nach au\u00dfen auslaufenden Nebel geworden. Die Grenzen liegen weiterhin genau dort, wo deine Systeme stehen.',
+    '<strong>Der Planet hinter der Oberfl\u00e4che zeigt jetzt, worauf du stehst.</strong> Er trug bisher nur die Grundfarbe seines Typs \u2013 eine Eiswelt sah aus wie eine Lavawelt in anderer Farbe. Jetzt liegt dort die echte Oberfl\u00e4che deiner Welt, Monde eingeschlossen.',
+    '<strong>Die Kanzel hat einen Rahmen bekommen.</strong> Vier Eckstreben fassen das Bild ein, genau so breit wie die Spielspalte und am Fenster festgeklebt. Sie nehmen keine Ber\u00fchrung an und schalten sich im Energiesparmodus nicht dazu \u2013 sie kosten dort nichts.',
+    'W\u00e4chter: vier neue Pr\u00fcfdateien und zwei neue Pr\u00fcfungen an der Vorposten-Station. Zwei Fehler einer Durchsicht sind noch vor der Auslieferung gefallen: Der Ladeausleger des Handelsknotens lief auf der letzten Stufe aus seiner Bildkachel, und der Mond bekam seine Oberfl\u00e4che nicht.'
   ] },
   { version:'8.692.0', date:'06.09.2026', changes:[
     '<strong>Die Startseite hat endlich eine Galaxie.</strong> Bisher lag dort ein Ring aus gleichf\u00f6rmigen Punkten am unteren Rand, und dar\u00fcber war schwarze Leere. Jetzt liegt eine Balkenspirale in Schr\u00e4gsicht hinter der Schlagzeile \u2013 mit Armen, Staubb\u00e4ndern, leuchtenden Sternentstehungsgebieten und Nebeln, die bis in die oberen Ecken reichen.',
@@ -8934,16 +9025,11 @@
     '<strong>Die Orbitalfeste (Stufe 8) und alle drei Endprojekte lassen sich wieder bauen.</strong> Der Server schrieb in ihren Kosten <em>Singularit\u00e4tskerne</em> in der Mehrzahl, das Spiel kennt den Rohstoff aber in der Einzahl \u2013 also z\u00e4hlte es deinen Vorrat als <em>null</em> und meldete dauerhaft „zu teuer", egal wie viele du hattest. Betroffen waren damit auch Sternendock, Sternenmarkt und Sperrfeuerleitstand \u2013 und das <strong>Sprungtor</strong>, das seit seiner Einf\u00fchrung angeboten wurde und sich nie starten lie\u00df. Diese H\u00e4lfte ist bereits live.',
     '<strong>Zwei neue W\u00e4chter, damit genau das nicht wiederkommt.</strong> Der eine h\u00e4lt jeden Rohstoffnamen in den Vorposten-Kosten gegen die Rohstoffe des Spiels; der andere verbietet den Griff ins Leere in der ganzen Spieldatei. Beide lesen, was es gibt, statt es abzutippen \u2013 ein neuer Rohstoff erweitert sie von selbst, ein Tippfehler nicht.'
   ] },
-  { version:'8.674.0', date:'04.09.2026', changes:[
-    '<strong>Das Logbuch des Kommandanten.</strong> Zu jedem Angriff auf ein NPC-Ziel erscheint im Kampfbericht nach ein bis zwei Minuten ein kurzer Erzähltext – geschrieben von einer KI auf dem eigenen Server des Spiels, nicht bei einem Anbieter im Internet. <strong>Der Text entscheidet nichts:</strong> Ausgang, Verluste und Beute kommen aus dem Spiel und stehen daneben in Zahlen, das Logbuch erzählt nur. Der Server prüft jeden Text gegen die Kampfdaten; erfundene Zahlen oder Schiffe fliegen raus, dann bleibt die Sektion einfach weg. Es gibt eine kleine Tagesgrenze je Konto, und die Maschine schreibt einen Text nach dem anderen.',
-    '<strong>Was dahinter steckt, in einem Satz:</strong> Das Spiel schickt nur fünf Felder (Gegner, Stufe, Ausgang, eigene und verlorene Schiffstypen) und die Berichts-ID, der Server hängt den fertigen Text an den Bericht. Er ist deshalb auf jedem Gerät da, ohne dass das Spiel nachfragen muss. Fehlt er einmal, ist der Bericht trotzdem vollständig. Wächter: <code>tests/test_kampfbericht_logbuch.js</code> mit 16 Prüfungen, im Backend <code>test_kampftext_http.js</code> mit 75.',
-    '<strong>Hilfe:</strong> neuer Abschnitt „Logbuch des Kommandanten".'
-  ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1096;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1097;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -10870,7 +10956,258 @@
       c.restore();
     }
     c.globalAlpha = 1;
-    // Fensterband auf der Aussenflanke
+    vpRingLichter(c, cx, cy, R, rohr, kipp, vorne, bandFarbe, luken);
+  }
+  /* ===== Zweigtypische Bauteile (Buendel F) =====================================
+     BEFUND DER AUFNAHME: Alle drei Zweige waren auf jeder Stufe dieselbe Silhouette; der Zweig
+     steckte nur im Farbton. Gemessene Mittelfarbe auf Stufe 8: Werft (70,82,100), Handel
+     (88,83,75), Festung (84,74,79) - Handel und Festung lagen so nah beieinander, dass sie in
+     der Kartenkachel nicht zu trennen waren.
+     JETZT bekommt jeder Zweig EIN eigenes Bauteil in derselben Technik wie der Rest der Station
+     (beleuchtete Ellipsenstapel, Licht aus vpLicht): die Werft Dockarme mit Schiffen im Bau,
+     der Handel Frachtcontainer am Ausleger, die Festung einen Panzerring mit Geschuetzkanzeln.
+     Kern, Ringe, Speichen, Wachstumsplan und Farbtoene bleiben unveraendert. */
+  const VP_DUNKEL = [15,20,33];
+  function vpHex(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+  function vpRgba(h, a){ const v = vpHex(h); return 'rgba(' + v[0] + ',' + v[1] + ',' + v[2] + ',' + a + ')'; }
+
+  /* Beleuchteter Stab (Schiene, Strebe, Rohr, Ausleger): Gradient quer zur Achse, Licht von
+   oben links wie bei den Speichen. dicke = halbe Breite, damit es zur Speichen-Konvention passt. */
+  function vpStab(c, x1, y1, x2, y2, dicke, ton, hell){
+  const dx = x2-x1, dy = y2-y1, L = Math.hypot(dx, dy) || 1;
+  let nx = -dy/L, ny = dx/L;
+  if (nx*-0.52 + ny*-0.66 < 0){ nx = -nx; ny = -ny; }      // Normale zeigt zum Licht
+  const f1 = vpLicht(nx*0.85, ny*0.85, 0.35), fc = vpLicht(0, 0, 1), f2 = vpLicht(-nx*0.85, -ny*0.85, 0.35);
+  const k = hell == null ? 1 : hell;
+  const g = c.createLinearGradient(x1 + nx*dicke, y1 + ny*dicke, x1 - nx*dicke, y1 - ny*dicke);
+  g.addColorStop(0.00, vpMisch(ton.mitte, ton.hell, Math.min(1, f1*1.25*k)));
+  g.addColorStop(0.45, vpMisch(VP_DUNKEL, ton.mitte, Math.min(1, fc*1.1*k)));
+  g.addColorStop(1.00, vpMisch(VP_DUNKEL, ton.mitte, Math.max(0, f2*0.45*k)));
+  c.strokeStyle = g; c.lineWidth = dicke*2; c.lineCap = 'butt';
+  c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+  }
+  /* Flacher Quader in der Kipp-Projektion: Deckflaeche (hell, verkuerzt), Frontflaeche mit
+   Quergradient, unten dunkel. Kantenlicht oben als eigener heller Saum. */
+  function vpQuader(c, x, y, b, h, tiefe, kipp, ton, hell){
+  const k = hell == null ? 1 : hell;
+  const td = tiefe*kipp;
+  // Deckflaeche
+  const fD = vpLicht(0, -0.95, 0.3);
+  c.fillStyle = vpMisch(ton.mitte, ton.hell, Math.min(1, fD*1.05*k));
+  c.fillRect(x, y - td, b, td);
+  // Frontflaeche
+  const fL = vpLicht(-0.35, -0.2, 0.9), fR = vpLicht(0.55, 0.1, 0.8);
+  const g = c.createLinearGradient(x, y, x + b, y);
+  g.addColorStop(0, vpMisch(VP_DUNKEL, ton.mitte, Math.min(1, fL*1.45*k)));
+  g.addColorStop(0.35, vpMisch(ton.mitte, ton.hell, Math.min(1, fL*0.55*k)));
+  g.addColorStop(1, vpMisch(VP_DUNKEL, ton.mitte, Math.max(0, fR*0.75*k)));
+  c.fillStyle = g; c.fillRect(x, y, b, h);
+  // Kantenlicht oben, Schattenkante unten
+  c.fillStyle = 'rgba(255,255,255,0.30)'; c.fillRect(x, y, b, Math.max(0.7, h*0.055));
+  c.fillStyle = 'rgba(0,0,0,0.35)';        c.fillRect(x, y + h*0.86, b, h*0.14);
+  }
+  /* Liegende Kapsel (Frachter): Querschnitte laengs der Achse, jeder mit senkrechtem Gradient. */
+  function vpKapsel(c, x, y, laenge, r, ton, kipp){
+  const n = Math.max(24, Math.round(laenge*1.4));
+  for (let i = 0; i <= n; i++){
+    const u = i/n;                                        // 0 = Heck (links), 1 = Bug (rechts)
+    const prof = u < 0.18 ? 0.55 + u/0.18*0.45 : u > 0.72 ? Math.sqrt(Math.max(0, 1 - Math.pow((u-0.72)/0.28, 2))) : 1;
+    const rz = r*prof; if (rz < 0.4) continue;
+    const px = x + u*laenge;
+    const dr = u > 0.72 ? -1.2 : u < 0.18 ? 0.8 : 0;     // Normale kippt an Bug und Heck
+    const nl = Math.hypot(1, dr) || 1;
+    const fO = vpLicht(dr/nl*0.5, -0.9, 0.4), fU = vpLicht(dr/nl*0.5, 0.9, 0.3);
+    const g = c.createLinearGradient(px, y - rz, px, y + rz);
+    g.addColorStop(0.00, vpMisch(ton.mitte, ton.hell, Math.min(1, fO*1.3)));
+    g.addColorStop(0.40, vpMisch(VP_DUNKEL, ton.mitte, Math.min(1, fO*1.2)));
+    g.addColorStop(1.00, vpMisch(VP_DUNKEL, ton.mitte, Math.max(0, fU*0.5)));
+    c.fillStyle = g;
+    c.beginPath(); c.ellipse(px, y, Math.max(1, laenge/n*0.9), rz, 0, 0, Math.PI*2); c.fill();
+  }
+  }
+  /* Leuchtpunkt mit Hof – der EINE Leuchtakzent je Bauteil. */
+  function vpLeuchte(c, x, y, r, farbe, staerke){
+  const s = staerke == null ? 1 : staerke;
+  const g = c.createRadialGradient(x, y, 0, x, y, r*3.2);
+  g.addColorStop(0, vpRgba(farbe, 0.55*s)); g.addColorStop(1, vpRgba(farbe, 0));
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r*3.2, 0, Math.PI*2); c.fill();
+  c.fillStyle = farbe; c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.arc(x - r*0.2, y - r*0.2, r*0.45, 0, Math.PI*2); c.fill();
+  }
+  /* Positionen der Einheiten auf der Vorderhaelfte (60-120 Grad, unten mittig vor dem Kern). */
+  function vpEinheitWinkel(n){
+  if (n <= 1) return [Math.PI/2];
+  const spann = n === 2 ? 0.42 : Math.PI/3;              // zwei Einheiten enger, drei ueber die volle Breite
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(Math.PI/2 - spann/2 + (i/(n-1))*spann);
+  return out;
+  }
+
+  /* (1) WERFT – offenes Trockendock. Zwei Geruestschienen haengen senkrecht unter der Ring-
+   vorderseite, dazwischen ein Schiffsrumpf im Bau: obere Haelfte beplankt, untere Haelfte nur
+   Spanten, an der Bugspitze das Schweisslicht. Ein Dockkopf klemmt das Ganze an die Roehre. */
+  function vpDock(c, cx, cy, R, rohr, kipp, ton, speiche, anzahl, maxLaenge){
+  /* 0,62 R statt 0,5 R: Bei 0,5 R mass das Dock auf Stufe 4 nur 7,3 CSS-px (gemessen), die
+     Bedingung verlangt 8. Der Deckel haelt es auf den hohen Stufen in der Kachel. */
+  const len = Math.min(R*0.62, maxLaenge - rohr*0.3);
+  const halb = R*0.125, hullR = R*0.075;
+  for (const t of vpEinheitWinkel(anzahl)){
+    const px = cx + Math.cos(t)*R, py = cy + Math.sin(t)*R*kipp;
+    const y0 = py + rohr*0.35;                           // Oberkante Dockkopf, greift in die Roehre
+    // Dockkopf: massiver Block, der die Schienen traegt
+    vpQuader(c, px - halb - speiche*1.6, y0, 2*halb + speiche*3.2, rohr*0.95, rohr*1.2, kipp, ton, 0.95);
+    const yS = y0 + rohr*0.9;
+    // Schienen
+    vpStab(c, px - halb, yS, px - halb, yS + len, speiche*1.05, ton);
+    vpStab(c, px + halb, yS, px + halb, yS + len, speiche*1.05, ton, 0.8);
+    // Querstreben (verbinden Schiene und Rumpf, laufen nicht durch)
+    for (const q of [0.34, 0.68]){
+      const yq = yS + len*q;
+      vpStab(c, px - halb, yq, px - hullR*0.9, yq, speiche*0.55, ton, 0.85);
+      vpStab(c, px + halb, yq, px + hullR*0.9, yq, speiche*0.55, ton, 0.7);
+    }
+    // Rumpf: Spindel mit Bug nach unten; z = 0 Bug, z = 1 Heck (am Dockkopf)
+    const hullH = len*0.92, hullCy = yS + hullH/2;
+    const spindel = (z) => z < 0.30 ? Math.pow(z/0.30, 0.7) : z < 0.82 ? 1 : 1 - (z-0.82)/0.18*0.45;
+    const neu = { hell: ton.hell, mitte: [Math.round(ton.mitte[0]*0.7+ton.hell[0]*0.3), Math.round(ton.mitte[1]*0.7+ton.hell[1]*0.3), Math.round(ton.mitte[2]*0.7+ton.hell[2]*0.3)] };
+    vpDrehkoerper(c, px, hullCy, hullR, hullH, (z) => z < 0.46 ? 0 : spindel(z), neu, kipp);
+    // Spanten der unfertigen Vorderhaelfte: schmale Ringe im Materialton, kein Umriss
+    for (const z of [0.10, 0.22, 0.34, 0.44]){
+      const rz = spindel(z)*hullR, y = hullCy + hullH/2 - z*hullH;
+      if (rz < 0.8) continue;
+      const g = c.createLinearGradient(px - rz, y, px + rz, y);
+      g.addColorStop(0, vpMisch(ton.mitte, ton.hell, 0.85)); g.addColorStop(1, vpMisch(VP_DUNKEL, ton.mitte, 0.5));
+      c.strokeStyle = g; c.lineWidth = Math.max(0.9, hullR*0.22);
+      c.beginPath(); c.ellipse(px, y, rz, Math.max(0.6, rz*kipp*1.4), 0, 0, Math.PI*2); c.stroke();
+    }
+    // Kiel durch die offenen Spanten
+    vpStab(c, px, hullCy + hullH/2 - hullH*0.46, px, hullCy + hullH/2 - hullH*0.06, Math.max(0.7, hullR*0.16), ton, 0.9);
+    // Schweisslicht an der Bugspitze
+    vpLeuchte(c, px, hullCy + hullH/2 - hullH*0.05, Math.max(1.2, R*0.024), '#8fd8ff', 1.1);
+  }
+  }
+
+  /* (2) HANDEL – Frachtterminal. Drei flache Containerbloecke haengen als Stapel unter der
+   Ringvorderseite; vom rechten Stapel laeuft ein Ladeausleger nach rechts, daran haengt ein
+   gedrungener Frachter. Positionslichter amber. */
+  function vpFracht(c, cx, cy, R, rohr, kipp, ton, speiche, anzahl, maxLaenge, xMax){
+  const stapelB = anzahl >= 3 ? R*0.29 : R*0.42;
+  const slabH = Math.min(R*0.13, maxLaenge*0.27), tiefe = rohr*0.75;
+  const winkel = vpEinheitWinkel(anzahl);
+  // Stapel sitzen etwas links, damit der Ausleger rechts noch in der Vorderhaelfte endet
+  const versatz = anzahl >= 3 ? -R*0.10 : -R*0.16;
+  let rechts = -Infinity, rechtsY = 0;
+  winkel.forEach((t, i) => {
+    const px = cx + Math.cos(t)*R + versatz, py = cy + Math.sin(t)*R*kipp;
+    const y0 = py + rohr*0.45;
+    // Traverse, die den Stapel an die Roehre bindet
+    vpStab(c, px - stapelB*0.36, y0, px - stapelB*0.36, y0 + slabH*0.4, speiche*0.9, ton, 0.9);
+    vpStab(c, px + stapelB*0.36, y0, px + stapelB*0.36, y0 + slabH*0.4, speiche*0.9, ton, 0.75);
+    for (let s = 0; s < 3; s++){
+      const jitter = ((s + i) % 3 - 1) * stapelB*0.05;   // versetzt gestapelt, wie Kisten
+      const y = y0 + slabH*0.4 + s*(slabH*1.08);
+      vpQuader(c, px - stapelB/2 + jitter, y, stapelB, slabH, s === 0 ? tiefe : tiefe*0.35, kipp, ton, s === 0 ? 1 : 1 - s*0.10);
+      // Zwei Fugen je Lage: drei Container nebeneinander
+      c.fillStyle = 'rgba(0,0,0,0.50)';
+      for (const q of [1/3, 2/3]) c.fillRect(px - stapelB/2 + jitter + stapelB*q - Math.max(0.5, stapelB*0.015), y, Math.max(1.0, stapelB*0.03), slabH);
+      // Sickenlinie: flache Rippe quer ueber die Containerfront (Wellblech), nur als Hell-Dunkel-Paar
+      c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(px - stapelB/2 + jitter, y + slabH*0.48, stapelB, Math.max(0.6, slabH*0.06));
+      c.fillStyle = 'rgba(0,0,0,0.22)';        c.fillRect(px - stapelB/2 + jitter, y + slabH*0.54, stapelB, Math.max(0.6, slabH*0.06));
+    }
+    const yUnten = y0 + slabH*0.4 + 3*slabH*1.08;
+    if (px + stapelB/2 > rechts){ rechts = px + stapelB/2; rechtsY = y0 + slabH*0.4 + slabH*1.5; }
+    // Positionslichter an den Stapelecken
+    vpLeuchte(c, px - stapelB/2 + stapelB*0.06, yUnten - slabH*0.3, Math.max(0.9, R*0.016), '#f0b94f', 0.5);
+  });
+  /* Ladeausleger mit Frachter. maxLaenge deckelte ihn bisher nur NACH UNTEN - waagerecht war er
+     ungedeckelt, und GEMESSEN (adversarische Durchsicht, 06.09.2026) lief er auf der letzten
+     Stufe rechts aus der 256er-Kachel: 27 deckende Randspalten-Zeilen gegen 4 beim Rumpf ohne
+     Zweig, auf Stufe 7 zwei. Auf der Karte sieht ein abgeschnittener Ausleger aus wie ein Fehler.
+     Der Platz wird deshalb gemessen und der ganze Anbau bei Bedarf proportional verkleinert -
+     nicht abgeschnitten, sonst waere der Frachter mal mit und mal ohne Bug zu sehen. */
+  const ax0 = rechts - speiche, ay = rechtsY;
+  let auslegerL = R*0.36, kapL = Math.min(R*0.40, maxLaenge*0.9);
+  const bugLeuchte = Math.max(1.1, R*0.022);
+  if (isFinite(xMax)){
+    /* Der aeusserste Punkt ist NICHT die Bugspitze der Kapsel (ax0 + auslegerL + kapL*0.55),
+       sondern der Schein der Bugleuchte: vpLeuchte malt einen Verlauf bis r*3.2. Ein erster
+       Anlauf rechnete nur mit r und liess GEMESSEN 11 Randzeilen stehen statt 27 - besser, aber
+       immer noch aus der Kachel. Und der Schein waechst NICHT mit dem Verkleinerungsfaktor
+       (er haengt an R), er gehoert deshalb in den festen Teil der Rechnung, nicht in den
+       skalierten - sonst konvergiert die Verkleinerung nie auf den richtigen Wert. */
+    const fest = 3.2*bugLeuchte + speiche*0.4;            // Leuchtschein und Halteklaue
+    const variabel = auslegerL + kapL*0.55;               // was sich verkleinern laesst
+    const platz = Math.max(0, xMax - ax0);
+    if (variabel > 0 && variabel + fest > platz){
+      const f = Math.max(0, Math.min(1, (platz - fest) / variabel));
+      auslegerL *= f; kapL *= f;
+    }
+  }
+  const kapR = kapL*0.30;
+  vpStab(c, ax0, ay, ax0 + auslegerL, ay, speiche*1.25, ton, 0.95);
+  vpStab(c, ax0 + auslegerL, ay - speiche, ax0 + auslegerL, ay + kapR*0.55, speiche*0.8, ton, 0.85);   // Halteklaue
+  const kx = ax0 + auslegerL - kapL*0.45, ky = ay + kapR*0.95;
+  vpKapsel(c, kx, ky, kapL, kapR, ton, kipp);
+  vpLeuchte(c, kx + kapL*0.97, ky, bugLeuchte, '#f0b94f', 1.0);
+  vpLeuchte(c, kx + kapL*0.04, ky - kapR*0.55, Math.max(0.8, R*0.014), '#f0b94f', 0.5);
+  }
+
+  /* (3) FESTUNG – Panzerring. Die Roehre bekommt flache Platten: acht Facetten je Haelfte, jede
+   mit eigenem Helligkeitswert und einer schmalen Fuge dazwischen, aussen etwas dicker als die
+   nackte Roehre. Oben auf der Vorderhaelfte Geschuetzkuppeln mit kurzem Rohr nach aussen,
+   Muendungsleuchte rot. Gezeichnet NACH dem jeweiligen Ring, Lichter danach wieder aufgelegt. */
+  function vpPanzer(c, cx, cy, R, rohr, kipp, vorne, ton, bandFarbe, luken){
+  const basis = vorne ? 0 : Math.PI;
+  const dick = rohr*(vorne ? 1.28 : 1.0);
+  const facetten = 8;
+  for (let k = 0; k < facetten; k++){
+    const t0 = basis + (k/facetten)*Math.PI + 0.014, t1 = basis + ((k+1)/facetten)*Math.PI - 0.014;
+    const tm = (t0+t1)/2, ct = Math.cos(tm), st = Math.sin(tm);
+    const nl = Math.hypot(ct, st*kipp, -st*(1-kipp)) || 1;
+    /* Eigener Wert je Platte: nicht zufaellig, sondern aus einer festen Reihe, damit die Kachel
+       bei jedem Rendern gleich ist (der Cache verlangt Determinismus). */
+    const reihe = [1.18, 0.78, 1.00, 0.86, 1.22, 0.92, 0.74, 1.08];
+    const f = vpLicht(ct/nl, st*kipp/nl, -st*(1-kipp)/nl) * reihe[k % 8];
+    const n = 8, innen = [];
+    for (let i = 0; i <= n; i++){
+      const t = t0 + (t1-t0)*i/n;
+      innen.push([cx + Math.cos(t)*R, cy + Math.sin(t)*R*kipp - dick*0.9]);
+    }
+    // Aussenkante als gerade Sehne zwischen den Plattenecken - das macht den Ring polygonal
+    const e0 = [cx + Math.cos(t0)*R, cy + Math.sin(t0)*R*kipp + dick], e1 = [cx + Math.cos(t1)*R, cy + Math.sin(t1)*R*kipp + dick];
+    const ym = cy + st*R*kipp;
+    const g = c.createLinearGradient(0, ym - dick, 0, ym + dick);
+    g.addColorStop(0.00, vpMisch(ton.mitte, ton.hell, Math.min(1, f*1.20)));
+    g.addColorStop(0.18, vpMisch(VP_DUNKEL, ton.mitte, Math.min(1, f*1.25)));
+    g.addColorStop(0.62, vpMisch(VP_DUNKEL, ton.mitte, Math.min(1, f*0.95)));
+    g.addColorStop(1.00, vpMisch(VP_DUNKEL, ton.mitte, Math.max(0, f*0.30)));
+    c.fillStyle = g; c.globalAlpha = vorne ? 1 : 0.8;
+    c.beginPath();
+    innen.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]));
+    c.lineTo(e1[0], e1[1]); c.lineTo(e0[0], e0[1]);
+    c.closePath(); c.fill();
+    // Kantenlicht auf der Oberkante der Platte (Licht von oben links) - ein Saum, keine Kontur
+    if (vorne){
+      c.globalAlpha = 0.22 + 0.25*Math.min(1, f);
+      c.fillStyle = 'rgb(255,255,255)';
+      c.beginPath();
+      innen.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]));
+      for (let i = innen.length-1; i >= 0; i--) c.lineTo(innen[i][0], innen[i][1] + Math.max(0.8, dick*0.16));
+      c.closePath(); c.fill();
+    }
+  }
+  c.globalAlpha = 1;
+  vpRingLichter(c, cx, cy, R, rohr, kipp, vorne, bandFarbe, luken);
+  }
+  /* Fensterband und Andockleuchten eines Rings. Ausgelagert mit Buendel F, weil der
+     Panzerring der Festung dieselben braucht - stuenden sie zweimal da, truege der eine Ring
+     nach der naechsten Aenderung ein anderes Band als der andere.
+     Die Leuchten sitzen bewusst AUF dem Ringrand und nicht daneben: alles, was neben dem
+     Koerper schwebt, liest sich als angesetztes Teil, und genau das sollte die Station nicht
+     haben. */
+  function vpRingLichter(c, cx, cy, R, rohr, kipp, vorne, bandFarbe, luken){
+    const schritte = Math.max(110, Math.round(R*2.4));
+    const basis = vorne ? 0 : Math.PI;
     if (bandFarbe){
       for (let k = 0; k <= schritte; k++){
         if (((k*5) % 8) <= 1) continue;
@@ -10882,9 +11219,6 @@
       }
       c.globalAlpha = 1;
     }
-    /* Andockleuchten am Aussenrand - nur auf der letzten Stufe. Sie sitzen bewusst AUF dem
-       Ringrand und nicht daneben: alles, was neben dem Koerper schwebt, liest sich als
-       angesetztes Teil, und genau das sollte die Station nicht haben. */
     if (luken){
       for (let k = 0; k < 16; k++){
         const t3 = basis + (k/15)*Math.PI;
@@ -11036,16 +11370,27 @@
        9,5 % statt der geforderten 15 %, test_vorposten_station 5b). Jetzt ist er kraeftig genug,
        um den Ausbau zu zeigen, und traegt ab seiner eigenen Stufe ein eigenes Fensterband. */
     const ring2R   = ringR*1.40, ring2Rohr = ringRohr*0.92, ring2Y = ringY + kernH*0.21;
+    /* Der Zweig-Anbau (Buendel F). Er sitzt auf dem AEUSSERSTEN Ring - ab der Stufe mit zweitem
+       Ring also auf diesem. Die Zahl der Einheiten waechst von 1 auf 3 ueber die Leiter ab der
+       Wahlstufe; `frei` ist der Platz, der nach unten bis zum Kachelrand bleibt, damit nichts
+       herausragt. Der Panzerring ersetzt die glatte Roehre des aeussersten Rings. */
+    const zweigAktiv = st >= B.ab && (zweig === 'werft' || zweig === 'handel' || zweig === 'festung');
+    const einheiten  = Math.max(1, Math.min(3, 1 + Math.round(((st - ringAb) / Math.max(1, B.max - ringAb)) * 2)));
+    const tR = hatRing2 ? ring2R : ringR, tRohr = hatRing2 ? ring2Rohr : ringRohr, tY = hatRing2 ? ring2Y : ringY;
+    const frei = S - (tY + tR*kipp + tRohr) - S*0.02;
+    const panzerAussen = zweigAktiv && zweig === 'festung';
     const speiche  = S*(0.008 + w*0.005);
     const speichen = 2 + Math.round(w*3);        // 2 je Haelfte unten, bis 5 auf der Endstufe
 
     // Von hinten nach vorne, damit der Kern wirklich zwischen den Ringhaelften liegt.
     if (hatRing2){
-      vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, ton.band, st>=lukenAb);
+      if (panzerAussen) vpPanzer(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, ton.band, st>=lukenAb);
+      else vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, false, ton, ton.band, st>=lukenAb);
       vpSpeichen(c, cx, ring2Y, ringR*0.96, ring2R, kipp, false, ton, speiche*0.82, speichen);
     }
     if (hatRing){
-      vpRing(c, cx, ringY, ringR, ringRohr, kipp, false, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      if (panzerAussen && !hatRing2) vpPanzer(c, cx, ringY, ringR, ringRohr, kipp, false, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      else vpRing(c, cx, ringY, ringR, ringRohr, kipp, false, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
       vpSpeichen(c, cx, ringY, kernR*0.66, ringR, kipp, false, ton, speiche, speichen);
     }
 
@@ -11070,16 +11415,33 @@
 
     // Die Kommandokuppel - ab der Bandstufe leuchtet sie.
     const ky = cy - kernH/2, kR = kernR*kuppelR;
+    /* Die Kommandokuppel traegt ab der Wahlstufe die Bandfarbe des Zweigs - vorher ist sie fuer
+       alle gleich, denn vor der Wahl GIBT es keinen Zweig. Die Festung macht daraus einen
+       Schildemitter mit rotem Hof; das ist das einzige Leuchten, das ueber den Koerper
+       hinausreicht, und es sagt auf einen Blick, womit man es zu tun hat. */
+    const kb = zweigAktiv ? vpHex(ton.band) : null;
+    if (zweigAktiv && zweig === 'festung'){
+      const sg = c.createRadialGradient(cx, ky, kR*0.6, cx, ky, kR*2.6);
+      sg.addColorStop(0, vpRgba(ton.band, 0.34)); sg.addColorStop(1, vpRgba(ton.band, 0));
+      c.fillStyle = sg; c.beginPath(); c.ellipse(cx, ky, kR*2.6, kR*1.9, 0, 0, Math.PI*2); c.fill();
+    }
     const kg = c.createRadialGradient(cx - kR*0.34, ky - kR*0.30, 0, cx, ky, kR*1.5);
-    kg.addColorStop(0, st>=bandAb ? 'rgba(226,244,255,0.98)' : 'rgba(206,226,244,0.85)');
-    kg.addColorStop(0.45, st>=bandAb ? 'rgba(140,205,255,0.55)' : 'rgba(120,150,180,0.35)');
+    if (kb){
+      const leucht = st >= bandAb;
+      kg.addColorStop(0, 'rgba(' + Math.min(255, kb[0]+60) + ',' + Math.min(255, kb[1]+60) + ',' + Math.min(255, kb[2]+60) + ',' + (leucht ? 0.98 : 0.9) + ')');
+      kg.addColorStop(0.45, 'rgba(' + kb[0] + ',' + kb[1] + ',' + kb[2] + ',' + (leucht ? 0.62 : 0.42) + ')');
+    } else {
+      kg.addColorStop(0, st>=bandAb ? 'rgba(226,244,255,0.98)' : 'rgba(206,226,244,0.85)');
+      kg.addColorStop(0.45, st>=bandAb ? 'rgba(140,205,255,0.55)' : 'rgba(120,150,180,0.35)');
+    }
     kg.addColorStop(1, 'rgba(30,44,64,0)');
     c.fillStyle = kg;
     c.beginPath(); c.ellipse(cx, ky, kR*1.20, kR*0.70, 0, 0, Math.PI*2); c.fill();
 
     if (hatRing){
       vpSpeichen(c, cx, ringY, kernR*0.66, ringR, kipp, true, ton, speiche, speichen);
-      vpRing(c, cx, ringY, ringR, ringRohr, kipp, true, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      if (panzerAussen && !hatRing2) vpPanzer(c, cx, ringY, ringR, ringRohr, kipp, true, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
+      else vpRing(c, cx, ringY, ringR, ringRohr, kipp, true, ton, st>=bandAb ? ton.band : null, st>=lukenAb);
       // Der Ring wirft seinen Schatten auf den Kern - ohne ihn schwebt er davor statt darum.
       c.save();
       c.beginPath(); c.ellipse(cx, cy, kernR*1.02, kernH*0.5, 0, 0, Math.PI*2); c.clip();
@@ -11089,7 +11451,16 @@
     }
     if (hatRing2){
       vpSpeichen(c, cx, ring2Y, ringR*0.96, ring2R, kipp, true, ton, speiche*0.82, speichen);
-      vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, ton.band, st>=lukenAb);
+      if (panzerAussen) vpPanzer(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, ton.band, st>=lukenAb);
+      else vpRing(c, cx, ring2Y, ring2R, ring2Rohr, kipp, true, ton, ton.band, st>=lukenAb);
+    }
+    /* Zuletzt der zweigtypische Anbau - er haengt UNTER dem aeussersten Ring und gehoert damit
+       vor alles andere. Die Festung braucht hier nichts mehr: ihr Panzerring ist oben schon an
+       die Stelle der glatten Roehre getreten. */
+    if (zweigAktiv){
+      const sp = hatRing2 ? speiche*0.82 : speiche;
+      if (zweig === 'werft')  vpDock(c, cx, tY, tR, tRohr, kipp, ton, sp, einheiten, frei);
+      if (zweig === 'handel') vpFracht(c, cx, tY, tR, tRohr, kipp, ton, sp, einheiten, frei, S - S*0.02);
     }
   }
   function vorpostenBildUrl(zweig, stufe){
@@ -59651,9 +60022,38 @@ async function claimPendingRewards(){
       const m = (a, z) => Math.round(a + (z - a) * anteil);
       return 'rgb(' + m(r,ziel[0]) + ',' + m(g,ziel[1]) + ',' + m(b,ziel[2]) + ')';
     }
+    /* DIE OBERFLÄCHE DES STANDORTS (Grafik-Aufnahme, Bündel F, 06.09.2026)
+       Der Kulissenplanet trug bisher nur die GRUNDFARBE seines Typs. Seit Bündel A gibt es für
+       jeden der 13 Weltentypen eine echte Textur (getPlanetTexture) - dieselbe, die auf der Karte,
+       im Kachelbild und auf dem Planetenboden der Kampf-Wiedergabe liegt. Sie hier nicht zu
+       benutzen hieß: Der Ort, an dem man gerade steht, ist die einzige Stelle im Spiel, an der
+       eine Eiswelt aussieht wie eine Lavawelt in anderer Farbe.
+       Die Textur ist ein 2:1-Streifen (voller Rundumblick). Wie bei drawPlanetMiniIcon und
+       getPlanetTextureDataUrl wird deshalb der quadratische MITTELAUSSCHNITT gezeigt - die
+       sichtbare Vorderseite -, nicht die volle Breite hineingezwängt; sonst entsteht dasselbe
+       strahlenförmige Artefakt wie im Fehlerbericht vom 16.07.2026.
+       Sie liegt UNTER dem Terminator und über der Kugelfüllung, damit die Nachtseite die Textur
+       verschluckt statt sie flach zu überdecken. Der Planet bleibt Kulisse: 0,55 innerhalb der
+       ohnehin gedämpften 0,42 Gesamtdeckkraft. */
+    function standortTextur(typ){
+      try { return (typeof getPlanetTexture === 'function') ? getPlanetTexture(typ) : null; }
+      catch (e) { return null; }
+    }
     function planetHolen(){
       const [farbe, key] = aktiverStandortTon();
-      if (planetSprite && planetSpriteKey === key) return planetSprite;
+      /* Der Schlüssel merkt sich MIT, ob die Textur schon da war. Ohne das bliebe ein Planet, der
+         beim allerersten Bild noch keine Textur hatte, für den Rest der Sitzung flach - der Sprite
+         wird ja nur bei Schlüsselwechsel neu gebaut. */
+      /* NUR 'vorgabe' bleibt ohne Textur: Das ist der Stand vor dem ersten geladenen Spielstand,
+         und getPlanetTexture faellt fuer unbekannte Schluessel auf erdaehnlich zurueck - eine
+         Erdtextur auf dem Vorgabe-Blau waere eine Falschaussage. Der MOND hat dagegen einen
+         eigenen Builder (PLANET_TEXTURE_BUILDERS.mond), den die Kartenminiatur und der
+         Planetenboden der Kampf-Wiedergabe laengst benutzen; ihn hier auszusparen liess genau die
+         Kolonieart flach, die diese Etappe erklaertermassen beheben wollte (Befund der
+         adversarischen Durchsicht, 06.09.2026). */
+      const tex = key === 'vorgabe' ? null : standortTextur(key);
+      const merk = key + (tex ? '|textur' : '|flach');
+      if (planetSprite && planetSpriteKey === merk) return planetSprite;
       const w = canvas.width, h = canvas.height;
       if (!w || !h) return null;
       const pr = Math.max(260, Math.min(w * 0.7, h * 0.78, 560)); // Radius, an das Fenster gekoppelt
@@ -59680,6 +60080,16 @@ async function claimPendingRewards(){
       kugel.addColorStop(1, mischen(farbe, [4,6,15], 0.94));
       c.fillStyle = kugel;
       c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.fill();
+      // Die Oberfläche des Weltentyps, auf die Kugel geschnitten.
+      if (tex && tex.width && tex.height){
+        const kante = tex.height;
+        c.save();
+        c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.clip();
+        c.globalAlpha = 0.42 * 0.55;
+        c.drawImage(tex, (tex.width - kante)/2, 0, kante, kante, px - pr, py - pr, pr*2, pr*2);
+        c.globalAlpha = 0.42;
+        c.restore();
+      }
       // Terminator: weicher Übergang zur Nachtseite, damit die Kugel rund wirkt statt flach.
       const nacht = c.createRadialGradient(px + pr*0.45, py - pr*0.45, pr*0.15, px, py, pr*1.02);
       nacht.addColorStop(0, 'rgba(0,0,0,0)');
@@ -59688,7 +60098,12 @@ async function claimPendingRewards(){
       c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.clip();
       c.fillStyle = nacht; c.fillRect(0, 0, s.width, s.height);
       c.restore();
-      planetSprite = s; planetSpriteKey = key;
+      planetSprite = s; planetSpriteKey = merk;
+      /* Der Zustand steht am Canvas, damit ein Waechter ihn LESEN kann statt ihn aus dem Bild zu
+         raten: Der Kulissenplanet ist bewusst gedaempft (0,42 mal 0,55), und eine Rauheitsmessung
+         auf der zusammengesetzten Leinwand misst gemessen vor allem Sterne und Farbbaenderung,
+         nicht die Oberflaeche. Dasselbe Muster wie die data-vp-*-Merkmale am Vorposten. */
+      try { canvas.dataset.standort = merk; } catch(e){}
       return s;
     }
     function planetZeichnen(){
@@ -61146,6 +61561,29 @@ async function claimPendingRewards(){
     unten.pop(); oben.pop();
     return unten.concat(oben);
   }
+  /* WEICHER UMRISS EINER SEKTORREGION (Grafik-Aufnahme, Buendel F, 06.09.2026)
+     Die Region war ein konvexes Polygon aus geraden Kanten mit einer flachen 10-Prozent-Fuellung.
+     Das las sich wie ein Flurstueck auf einer Katasterkarte, nicht wie ein Gebiet im All - und die
+     Ecken der konvexen Huelle lagen sichtbar auf den aeusseren Systemen, was den Eindruck
+     verstaerkte, hier sei etwas abgesteckt worden.
+     Der Umriss laeuft jetzt als geschlossene Kurve durch dieselben Huellpunkte (Catmull-Rom in
+     kubische Bezier umgerechnet, Spannung 1/8 - 1/6 bauchte gemessen zu weit). Die Geometrie ist unveraendert - es ist derselbe
+     Punktezug, nur ohne Knicke; Trefferflaeche und Lage der Beschriftungen bleiben damit gleich.
+     Unter drei Punkten gibt es keine Kurve, dann bleibt es beim geraden Zug. */
+  function weicherUmriss(pkt){
+    const n = pkt.length;
+    if (n < 3) return 'M' + pkt.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') + (n > 1 ? ' Z' : '');
+    const at = i => pkt[(i % n + n) % n];
+    let d = 'M' + at(0)[0].toFixed(1) + ',' + at(0)[1].toFixed(1);
+    for (let i = 0; i < n; i++){
+      const p0 = at(i-1), p1 = at(i), p2 = at(i+1), p3 = at(i+2);
+      const c1x = p1[0] + (p2[0]-p0[0])/8, c1y = p1[1] + (p2[1]-p0[1])/8;
+      const c2x = p2[0] - (p3[0]-p1[0])/8, c2y = p2[1] - (p3[1]-p1[1])/8;
+      d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1)
+         + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+    }
+    return d + ' Z';
+  }
   function sektorMitglieder(){
     const gruppen = new Map(SEKTOR_DEFS.map(sk => [sk.key, []]));
     for (const sy of STAR_SYSTEMS.filter(x => !x.hidden)) gruppen.get(sektorVon(sy).key).push(sy);
@@ -61221,8 +61659,24 @@ async function claimPendingRewards(){
       const huelle = konvexeHuelle(mg.map(p => [p.gx, p.gy]));
       const auf = huelle.map(function(q){
         const dx = q[0]-schwerX, dy = q[1]-schwerY, l = Math.hypot(dx,dy) || 1;
-        return (q[0] + dx/l*22).toFixed(1) + ',' + (q[1] + dy/l*22).toFixed(1);
+        /* Der Abstand war 22, solange der Umriss GERADE Kanten hatte. Die Kurve durch dieselben
+           Punkte baucht zwischen ihnen nach aussen, und am gerenderten Bild gemessen wuchsen die
+           Regionen dadurch so weit, dass benachbarte Gebiete sichtbar ineinanderliefen. 16 plus
+           Kurvenbauch deckt die aeusseren Systempunkte weiterhin - die Kurve laeuft exakt DURCH
+           diese Punkte, sie sind also nie ausserhalb. */
+        return [q[0] + dx/l*16, q[1] + dy/l*16];
       });
+      /* Die Fuellung ist ein radialer Verlauf statt einer flachen Platte: dicht am Schwerpunkt,
+         zum Rand hin auslaufend. Der Rand selbst bleibt die einzige harte Linie - er traegt die
+         Sektorlage und muss ablesbar bleiben. Der Radius kommt aus dem GEMESSENEN aeussersten
+         Huellpunkt, nicht aus einer Zahl im Kopf: Die acht Regionen sind verschieden gross. */
+      const weite = auf.reduce(function(a, q){ return Math.max(a, Math.hypot(q[0]-schwerX, q[1]-schwerY)); }, 1);
+      const verlaufId = 'skr-' + sk.key;
+      inner += '<defs><radialGradient id="' + verlaufId + '" gradientUnits="userSpaceOnUse" cx="' + schwerX.toFixed(0) + '" cy="' + schwerY.toFixed(0) + '" r="' + weite.toFixed(0) + '">'
+        + '<stop offset="0%" stop-color="' + sk.tint + '" stop-opacity="0.20"/>'
+        + '<stop offset="62%" stop-color="' + sk.tint + '" stop-opacity="0.10"/>'
+        + '<stop offset="100%" stop-color="' + sk.tint + '" stop-opacity="0.02"/>'
+        + '</radialGradient></defs>';
       const heimDrin = mg.some(p => p.id === myHomeSystem);
       // Aggregierte Ereignis-/Aufklaerungs-Hinweise der Mitgliedssysteme (KB-5): jedes Icon
       // einmal je Region, der Tooltip nennt je System den vollen Hinweis. Dieselbe Quelle wie
@@ -61264,7 +61718,7 @@ async function claimPendingRewards(){
       const lageZusatz = lageU ? '\n' + sektorLageLang(lageU) : '';
       inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + mg.length + ' Systeme. ' + eigenLang + (lageU ? ' ' + sektorLageLang(lageU) : '')) + '">'
         + '<title>' + escapeHtml(sk.name + ' – ' + mg.length + ' Systeme – ' + eigenLang + lageZusatz + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
-        + '<path data-sektor-lage="' + (lageU ? lageU.stufe : '') + '" d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="' + lageRand + '" stroke-width="' + (lageAktiv ? 2.2 : 1.4) + '" stroke-linejoin="round"/>'
+        + '<path data-sektor-lage="' + (lageU ? lageU.stufe : '') + '" d="' + weicherUmriss(auf) + '" fill="url(#' + verlaufId + ')" stroke="' + lageRand + '" stroke-width="' + (lageAktiv ? 2.2 : 1.4) + '" stroke-linejoin="round"/>'
         /* Die Systempunkte tragen die Farbe ihrer dominierenden Macht (29.08.2026). Bewusst KEINE
            fuenfte Textzeile und keine Regions-Aggregation: Der Knoten hat schon Name, Systemzahl,
            Eigenschaft und Abzeichenzeile, und KB-21 hat gemessen, dass am Handy alle
