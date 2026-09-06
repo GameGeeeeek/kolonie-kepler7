@@ -89,8 +89,14 @@ const messen = page => page.evaluate(() => {
   return {
     schiffe: schiffe.length, schiffeMitBild: schiffe.filter(mitBild).length,
     anlagen: anlagen.length, anlagenMitBild: anlagen.filter(mitBild).length,
-    // Ohne Canvas-Grafik greift der SVG-Rückfall (nur der Resonanzschild-Emitter).
+    // Der SVG-Rückfall greift, wenn eine Anlage kein gezeichnetes Bauwerk hat. Seit Bündel C
+    // hat jede eins; die Zahl muss also 0 sein, und der Rückfall bleibt nur als Sicherung.
     svgRueckfall: box.querySelectorAll('.schiffchip .anlagensvg svg').length,
+    // Alle Chips, die eine ANLAGE zeigen - gleich ob mit Bauwerk oder mit Rückfall-SVG.
+    // Ohne diese Zahl wäre "jeder Chip trägt ein Bild" nicht prüfbar: ein bildloser Chip
+    // taucht in keiner der beiden Listen oben auf und fiele still durch.
+    anlagenChips: Array.from(box.querySelectorAll('.schiffchip'))
+      .filter(ch => ch.querySelector('i.gbi-anlage, .anlagensvg')).length,
     gebacken: stil ? stil.childNodes.length : 0,
     klassen: schiffe.map(e => Array.from(e.classList).find(c => c.startsWith('gbi-s-'))).filter(Boolean),
     ueberlauf: box.scrollWidth - box.clientWidth,
@@ -111,10 +117,16 @@ const messen = page => page.evaluate(() => {
       { mitBild: m.schiffeMitBild, stellen: m.schiffe });
     check('1: die Verteidigungsanlagen ebenso', m.anlagen > 0 && m.anlagenMitBild === m.anlagen,
       { mitBild: m.anlagenMitBild, stellen: m.anlagen });
-    // Der Resonanzschild-Emitter ist die einzige Anlage mit SVG statt Canvas-Grafik. Er darf
-    // deshalb nicht bildlos dastehen - dafür gibt es den Rückfall auf sein ICONS-SVG.
-    check('1: die eine Anlage ohne Canvas-Grafik fällt auf ihr SVG zurück', m.svgRueckfall >= 1,
+    // HIER STAND: "die eine Anlage ohne Canvas-Grafik fällt auf ihr SVG zurück" - der
+    // Resonanzschild-Emitter war bis Bündel C die einzige Anlage mit SVG statt gezeichnetem Bild.
+    // Seit den isometrischen Bausätzen haben alle 23 Anlagen ein Bauwerk, der Rückfall ist nur
+    // noch Sicherung. Was die alte Prüfung schützen sollte - kein bildloser Chip im Bericht -
+    // prüft jetzt die Zeile darunter, und zwar für ALLE Anlagen statt nur für die eine.
+    check('1: keine Anlage braucht mehr den SVG-Rückfall', m.svgRueckfall === 0,
       { svgRueckfall: m.svgRueckfall });
+    check('1: jeder Anlagen-Chip im Bericht trägt ein Bild',
+      m.anlagenChips > 0 && m.anlagen === m.anlagenChips && m.anlagenMitBild === m.anlagenChips,
+      { chips: m.anlagenChips, mitBauwerk: m.anlagen, davonMitBild: m.anlagenMitBild });
     // Der Text darf NICHT verschwunden sein.
     check('1: die Stückzahlen und Namen stehen weiterhin da',
       /Zerstörer/.test(m.text) && /179/.test(m.text) && /Flak-Batterie/.test(m.text));
