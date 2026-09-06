@@ -63839,8 +63839,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
            auf einer Seite verdeckt und stand auf der anderen frei. Mit Bild entfaellt er: der
            pulsierende Hof traegt die Volksfarbe ohnehin, und die Fuellung deckt nichts mehr ab,
            was das Bild nicht selbst mitbringt. Ohne Bild (Rueckfall) bleibt alles wie zuvor. */
-        const randR = nestBild ? nk/2 : r;
-        const balkenY = coord.y + (nestBild ? nk/2 + 1.5 : r*0.95);
+        /* Bezug ist der KOERPER, nicht die Bildkante. Die Kachel ist quadratisch, der Koerper
+           darin rund - an der Bildkante saessen Balken und Beschriftung eine halbe Kachelbreite
+           zu weit aussen, und genau das erzeugte Kollisionen mit den Nachbarn (gemessen:
+           „Sporenherd" auf dem Nachbarnest). Gemessen reicht der hoechste Koerper bis 1,28 r
+           (Kryll, Stufe 5); 1,32 r deckt ihn und bleibt so nah wie moeglich. */
+        const randR = nestBild ? nk*0.44 : r;
+        const balkenY = coord.y + (nestBild ? nk*0.44 + 1.5 : r*0.95);
         const zellen = nestBild
           ? `<image href="${nestBild}" x="${(coord.x - nk/2).toFixed(1)}" y="${(coord.y - nk/2).toFixed(1)}" width="${nk.toFixed(1)}" height="${nk.toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
           : [0, 60, 120, 180, 240, 300].map(g => {
@@ -63854,7 +63859,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
               <animate attributeName="r" values="${(r*1.45).toFixed(1)};${(r*2.0).toFixed(1)};${(r*1.45).toFixed(1)}" dur="3.1s" repeatCount="indefinite"/>
               <animate attributeName="stroke-opacity" values="0.5;0.1;0.5" dur="3.1s" repeatCount="indefinite"/>
             </circle>
-            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="${v.farbe}" stroke-width="1.5"/>
+            ${nestBild ? '' : `<circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${r.toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="${v.farbe}" stroke-width="1.5"/>`}
             ${zellen}
             ${(koenigin && !nestBild) ? `<circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.34).toFixed(1)}" fill="#fff" fill-opacity="0.9"/>` : ''}
             <rect x="${(coord.x - b).toFixed(1)}" y="${balkenY.toFixed(1)}" width="${(b*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>

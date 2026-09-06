@@ -265,8 +265,8 @@ function backend(store){
       return {
         // Liegt der Balken UNTER und die Beschriftung ÜBER dem Bild? Gemessen in Bildschirm-
         // koordinaten, nicht am Attribut - eine Zahl im Markup sagt nicht, wo etwas landet.
-        balkenUnterBild: !!(r && rb) && rb.top >= r.bottom - 1,
-        textUeberBild: !!(r && rt) && rt.bottom <= r.top + 1,
+        top: r ? r.top : 0, hoehe: r ? r.height : 0,
+        balkenTop: rb ? rb.top : 0, textBottom: rt ? rt.bottom : 0,
         id: k.getAttribute('data-map-nest'),
         hatBild: !!bild,
         quelleLaenge: bild ? (bild.getAttribute('href') || '').length : 0,
@@ -296,11 +296,33 @@ function backend(store){
     karte.every(k => k.kreise <= 2 && !k.weisserPunkt), karte.map(k => k.id + ' Kreise:' + k.kreise + ' weiss:' + k.weisserPunkt));
   /* BEFUND AUS DEM FOTO: Balken und Beschriftung sassen am Kernradius, das Bild reicht aber
      bis r x 1,5 - der Lebensbalken lief quer durch den Koerper, und bei der Koenigin (r = 15)
-     stand die Beschriftung auf dem Bild. Beides sieht man nur, wenn man hinsieht; deshalb misst
-     diese Pruefung die tatsaechliche Lage auf dem Schirm. */
+     stand die Beschriftung auf dem Bild.
+     GEMESSEN WIRD GEGEN DEN KOERPER, NICHT GEGEN DIE KACHEL: Die Kachel ist quadratisch, der
+     Koerper darin rund - eine Pruefung gegen die Bildkante verlangte einen Abstand, den es gar
+     nicht braucht, und drueckte Balken und Text so weit nach aussen, dass sie den Nachbarmarker
+     trafen (genau das ist beim ersten Anlauf passiert). Die Koerperhoehe kommt aus der Messung
+     in Abschnitt 1, wird also nicht angenommen, sondern gerechnet. */
+  const anteilHoehe = k => {
+    const f = m && m.bilder[k]; return f ? f.hoehe / m.S : 1;
+  };
+  const koerperGrenzen = (k, art) => {
+    // Bildbox: 3 r hoch, in der Mitte des Markers. Der Körper füllt davon `anteil`.
+    const rG = k.hoehe / 3, mitte = k.top + k.hoehe / 2, halb = k.hoehe * anteilHoehe(art) / 2;
+    void rG;
+    return { oben: mitte - halb, unten: mitte + halb };
+  };
   check('2f: Balken und Beschriftung liegen nicht auf dem Körper',
-    karte.every(k => k.balkenUnterBild && k.textUeberBild),
-    karte.map(k => k.id + ' Balken unten:' + k.balkenUnterBild + ' Text oben:' + k.textUeberBild));
+    karte.every(k => {
+      const art = k.id === 'n1' ? 'kryll:3' : 'vex:5';
+      const g = koerperGrenzen(k, art);
+      return k.balkenTop >= g.unten - 1 && k.textBottom <= g.oben + 1;
+    }),
+    karte.map(k => {
+      const art = k.id === 'n1' ? 'kryll:3' : 'vex:5';
+      const g = koerperGrenzen(k, art);
+      return k.id + ' Körper ' + Math.round(g.oben) + '-' + Math.round(g.unten)
+           + ' | Balken ' + Math.round(k.balkenTop) + ' | Text bis ' + Math.round(k.textBottom);
+    }));
 
   await browser.close();
   ende();
