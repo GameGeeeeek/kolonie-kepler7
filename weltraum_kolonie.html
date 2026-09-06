@@ -59908,9 +59908,31 @@ async function claimPendingRewards(){
       const m = (a, z) => Math.round(a + (z - a) * anteil);
       return 'rgb(' + m(r,ziel[0]) + ',' + m(g,ziel[1]) + ',' + m(b,ziel[2]) + ')';
     }
+    /* DIE OBERFLÄCHE DES STANDORTS (Grafik-Aufnahme, Bündel F, 06.09.2026)
+       Der Kulissenplanet trug bisher nur die GRUNDFARBE seines Typs. Seit Bündel A gibt es für
+       jeden der 13 Weltentypen eine echte Textur (getPlanetTexture) - dieselbe, die auf der Karte,
+       im Kachelbild und auf dem Planetenboden der Kampf-Wiedergabe liegt. Sie hier nicht zu
+       benutzen hieß: Der Ort, an dem man gerade steht, ist die einzige Stelle im Spiel, an der
+       eine Eiswelt aussieht wie eine Lavawelt in anderer Farbe.
+       Die Textur ist ein 2:1-Streifen (voller Rundumblick). Wie bei drawPlanetMiniIcon und
+       getPlanetTextureDataUrl wird deshalb der quadratische MITTELAUSSCHNITT gezeigt - die
+       sichtbare Vorderseite -, nicht die volle Breite hineingezwängt; sonst entsteht dasselbe
+       strahlenförmige Artefakt wie im Fehlerbericht vom 16.07.2026.
+       Sie liegt UNTER dem Terminator und über der Kugelfüllung, damit die Nachtseite die Textur
+       verschluckt statt sie flach zu überdecken. Der Planet bleibt Kulisse: 0,55 innerhalb der
+       ohnehin gedämpften 0,42 Gesamtdeckkraft. */
+    function standortTextur(typ){
+      try { return (typeof getPlanetTexture === 'function') ? getPlanetTexture(typ) : null; }
+      catch (e) { return null; }
+    }
     function planetHolen(){
       const [farbe, key] = aktiverStandortTon();
-      if (planetSprite && planetSpriteKey === key) return planetSprite;
+      /* Der Schlüssel merkt sich MIT, ob die Textur schon da war. Ohne das bliebe ein Planet, der
+         beim allerersten Bild noch keine Textur hatte, für den Rest der Sitzung flach - der Sprite
+         wird ja nur bei Schlüsselwechsel neu gebaut. */
+      const tex = (key === 'vorgabe' || key === 'mond') ? null : standortTextur(key);
+      const merk = key + (tex ? '|textur' : '|flach');
+      if (planetSprite && planetSpriteKey === merk) return planetSprite;
       const w = canvas.width, h = canvas.height;
       if (!w || !h) return null;
       const pr = Math.max(260, Math.min(w * 0.7, h * 0.78, 560)); // Radius, an das Fenster gekoppelt
@@ -59937,6 +59959,16 @@ async function claimPendingRewards(){
       kugel.addColorStop(1, mischen(farbe, [4,6,15], 0.94));
       c.fillStyle = kugel;
       c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.fill();
+      // Die Oberfläche des Weltentyps, auf die Kugel geschnitten.
+      if (tex && tex.width && tex.height){
+        const kante = tex.height;
+        c.save();
+        c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.clip();
+        c.globalAlpha = 0.42 * 0.55;
+        c.drawImage(tex, (tex.width - kante)/2, 0, kante, kante, px - pr, py - pr, pr*2, pr*2);
+        c.globalAlpha = 0.42;
+        c.restore();
+      }
       // Terminator: weicher Übergang zur Nachtseite, damit die Kugel rund wirkt statt flach.
       const nacht = c.createRadialGradient(px + pr*0.45, py - pr*0.45, pr*0.15, px, py, pr*1.02);
       nacht.addColorStop(0, 'rgba(0,0,0,0)');
@@ -59945,7 +59977,12 @@ async function claimPendingRewards(){
       c.beginPath(); c.arc(px, py, pr, 0, Math.PI*2); c.clip();
       c.fillStyle = nacht; c.fillRect(0, 0, s.width, s.height);
       c.restore();
-      planetSprite = s; planetSpriteKey = key;
+      planetSprite = s; planetSpriteKey = merk;
+      /* Der Zustand steht am Canvas, damit ein Waechter ihn LESEN kann statt ihn aus dem Bild zu
+         raten: Der Kulissenplanet ist bewusst gedaempft (0,42 mal 0,55), und eine Rauheitsmessung
+         auf der zusammengesetzten Leinwand misst gemessen vor allem Sterne und Farbbaenderung,
+         nicht die Oberflaeche. Dasselbe Muster wie die data-vp-*-Merkmale am Vorposten. */
+      try { canvas.dataset.standort = merk; } catch(e){}
       return s;
     }
     function planetZeichnen(){
