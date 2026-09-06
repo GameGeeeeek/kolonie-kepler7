@@ -69,33 +69,38 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   const block = (von > 0 && bis > von) ? JS.slice(von, bis) : '';
   // Kommentare leeren, bevor gesucht wird: die Begründung im Code nennt save() wörtlich.
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  /* Die Muster suchen `await save(` OHNE die Klammer zu schliessen - die Aufrufform hat sich
+     seit dem Zuschnitt schon einmal geaendert (v8.689.1 gibt dem Speichern eine Option mit:
+     `await save({ nurSpielstand: true })`), und der ganze Volllauf fiel daran, obwohl die
+     EIGENSCHAFT unveraendert erfuellt war. Geprueft wird "es wird auf einen Speichervorgang
+     gewartet", nicht seine heutige Schreibweise. */
   check('1a: vor einem Handel wird gespeichert, damit der Server den aktuellen Stand sieht',
-    /if \(!opts\.imSammelauftrag\)\{[\s\S]{0,300}?await save\(\)/.test(ohneKommentar));
+    /if \(!opts\.imSammelauftrag\)\{[\s\S]{0,400}?await save\(/.test(ohneKommentar));
   /* Der Riegel haengt an der HERKUNFT des Aufrufs, nicht an `!marketBulkRun` (Durchsicht
      05.09.2026): Waehrend eines laufenden Sammelauftrags kann der Spieler in einer
      Tranchenpause einen normalen Verkauf ausloesen - kleine Mengen gehen am Sammel-Riegel
      vorbei direkt in doMarketTrade. Der ist keine Tranche und braucht den Schutz. */
   check('1a2: der Riegel fragt die Herkunft ab, nicht den laufenden Sammelauftrag',
-    !/!marketBulkRun\) await save\(\)/.test(ohneKommentar));
+    !/!marketBulkRun\) await save\(/.test(ohneKommentar));
   /* Und er gilt fuer den KAUF genauso: Hier stand zuerst "beim Kauf prueft der Server die
      Kredite, und die aendert kein Tick". Gemessen falsch - Handelsrouten (Z. ~14877/14916) und
      eroberte Systeme (~16973) schreiben state.credits im Takt ohne sofortiges Speichern. */
   check('1a3: der Schutz ist nicht auf den Verkauf eingeschraenkt',
-    !/action === 'sell'[^\n]*await save\(\)/.test(ohneKommentar));
+    !/action === 'sell'[^\n]*await save\(/.test(ohneKommentar));
   check('1b: und zwar VOR der Handelsanfrage, nicht danach',
-    ohneKommentar.indexOf('await save()') > 0 &&
-    ohneKommentar.indexOf('await save()') < ohneKommentar.indexOf("backendFetch('/market/trade'"),
-    { save: ohneKommentar.indexOf('await save()'), trade: ohneKommentar.indexOf("backendFetch('/market/trade'") });
+    ohneKommentar.indexOf('await save(') > 0 &&
+    ohneKommentar.indexOf('await save(') < ohneKommentar.indexOf("backendFetch('/market/trade'"),
+    { save: ohneKommentar.indexOf('await save('), trade: ohneKommentar.indexOf("backendFetch('/market/trade'") });
   /* Ein aelterer Server ohne das Feld haette Math.floor(undefined) = NaN ergeben - und NaN
      faellt durch jede `< 1`-Abbruchpruefung hindurch bis in die Anfrage. Dieselbe Vorsicht,
      die data.tagesRest daneben schon laenger hat. */
   check('1g: die Bestandsauskunft wird nur uebernommen, wenn wirklich eine Zahl kam',
     /typeof data\.newResourceAmount === 'number'/.test(ohneKommentar));
   check('1h: scheitert das Speichern, wird NICHT gehandelt',
-    /const gespeichert = await save\(\);[\s\S]{0,400}?if \(!gespeichert\)\{[\s\S]{0,400}?return false;/.test(ohneKommentar));
+    /const gespeichert = await save\([\s\S]{0,400}?if \(!gespeichert\)\{[\s\S]{0,400}?return false;/.test(ohneKommentar));
   check('1c: genau EIN Speichervorgang im Handelspfad - nicht mehrere',
-    (ohneKommentar.match(/await save\(\)/g) || []).length === 1,
-    { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
+    (ohneKommentar.match(/await save\(/g) || []).length === 1,
+    { treffer: (ohneKommentar.match(/await save\(/g) || []).length });
 }
 {
   const von = JS.indexOf('async function doMarketTradeChunked(');
@@ -104,8 +109,8 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   const block = (von > 0 && bis > von) ? JS.slice(von, bis) : '';
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   check('1d: der Sammelauftrag speichert EINMAL, nicht je Tranche',
-    (ohneKommentar.match(/await save\(\)/g) || []).length === 1,
-    { treffer: (ohneKommentar.match(/await save\(\)/g) || []).length });
+    (ohneKommentar.match(/await save\(/g) || []).length === 1,
+    { treffer: (ohneKommentar.match(/await save\(/g) || []).length });
   check('1d2: seine Tranchen weisen sich als solche aus, damit sie den Schutz auslassen',
     /imSammelauftrag: true/.test(ohneKommentar));
   check('1h2: auch der Sammelauftrag startet nicht ohne gelungenes Speichern',
@@ -125,7 +130,7 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
        das `await` davor, kämen zwei schnelle Klicks BEIDE durch und zwei Sammelaufträge liefen
        nebeneinander (der erste Anlauf dieser Änderung hatte genau dieses Fenster).
      - VOR der Tranchen-Schleife: sonst käme der Speichervorgang zu spät für die erste Tranche. */
-  const iSave = ohneKommentar.indexOf('await save()');
+  const iSave = ohneKommentar.indexOf('await save(');
   const iBulk = ohneKommentar.indexOf('marketBulkRun = {');
   const iLoop = ohneKommentar.indexOf('for (let i=0; i<chunks; i++)');
   check('1e-anker: Riegel und Schleife sind auffindbar', iBulk > 0 && iLoop > 0, { iBulk, iLoop });
