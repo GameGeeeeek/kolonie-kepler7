@@ -70,7 +70,7 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   // Kommentare leeren, bevor gesucht wird: die Begründung im Code nennt save() wörtlich.
   const ohneKommentar = block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   /* Die Muster suchen `await save(` OHNE die Klammer zu schliessen - die Aufrufform hat sich
-     seit dem Zuschnitt schon einmal geaendert (v8.689.1 gibt dem Speichern eine Option mit:
+     seit dem Zuschnitt schon einmal geaendert (v8.690.0 gibt dem Speichern eine Option mit:
      `await save({ nurSpielstand: true })`), und der ganze Volllauf fiel daran, obwohl die
      EIGENSCHAFT unveraendert erfuellt war. Geprueft wird "es wird auf einen Speichervorgang
      gewartet", nicht seine heutige Schreibweise. */

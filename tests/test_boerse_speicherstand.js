@@ -71,9 +71,17 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
   check('1d: save() reicht die Optionen an doSave durch',
     /function save\(opts\)\{[\s\S]{0,200}?doSave\(opts\)/.test(JS.replace(/\/\*[\s\S]*?\*\//g, '')));
   const ohneK = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  check('1e: der Markt benutzt den schmalen Pfad',
-    (ohneK.match(/save\(\{ nurSpielstand: true \}\)/g) || []).length >= 2,
-    { treffer: (ohneK.match(/save\(\{ nurSpielstand: true \}\)/g) || []).length });
+  /* JE FUNKTION pruefen, nicht ueber die ganze Datei (Durchsicht 06.09.2026). Ein Zaehler mit
+     Schwelle ">= 2" ueber drei Vorkommen kann nicht sehen, wenn AUSGERECHNET der Sammelauftrag
+     auf den vollen Speichervorgang zurueckfaellt - etwa beim Aufloesen eines Merge-Konflikts
+     gegen den Text vor 8.690.0. Genau diese Regression soll die Aenderung verhindern. */
+  for (const fn of ['doMarketTrade(', 'doMarketTradeChunked(']){
+    const i = ohneK.indexOf('async function ' + fn);
+    const j = i < 0 ? -1 : ohneK.indexOf('\n  async function ', i + 10);
+    const block = (i >= 0) ? ohneK.slice(i, j > i ? j : i + 6000) : '';
+    check('1e-' + fn.replace('(', '') + ': benutzt den schmalen Pfad',
+      i >= 0 && /save\(\{ nurSpielstand: true \}\)/.test(block), { gefunden: i >= 0 });
+  }
   /* EINE Stelle für alle drei Börsen-Aufrufe, nicht drei Kopien - und alle drei benutzen sie.
      Ein vierter Aufruf, der sie vergisst, fällt hier auf. */
   check('1f: es gibt EINE gemeinsame Sicherung für die Börse',
@@ -204,32 +212,51 @@ const RUNDFUNK = /^(leaderboard|missions|moondefense):/;
   {
     const t = await spiel(browser);
     await marktOeffnen(t.page);
-    // Auf einen regulaeren Takt warten, damit der Ausgangszustand sauber ist.
-    for (let i = 0; i < 40 && !t.store.__ablauf.some(e => e.typ === 'put'); i++) await t.page.waitForTimeout(500);
-    check('2-vorab: das Spiel hat regulär gespeichert',
-      t.store.__ablauf.some(e => e.typ === 'put' && e.key === SAVE_KEY));
+    /* Auf einen VOLLSTAENDIGEN Takt warten, nicht auf seinen ersten Schreibvorgang (Durchsicht
+       06.09.2026). Ein Takt schreibt vier Schluessel nacheinander, wenige Millisekunden
+       auseinander; diese Schleife prueft alle 500 ms. Faellt die Grenze zwischen den ersten und
+       den letzten Schreibvorgang, stuende t0 mitten im Takt - dessen drei Rundfunk-Schluessel
+       landeten dann IM Messfenster, und Pruefung 3 waere rot an korrektem Code. Der letzte
+       Schluessel des Takts ist ein Rundfunk-Schluessel, auf den wird gewartet. */
+    for (let i = 0; i < 40 && !t.store.__ablauf.some(e => e.typ === 'put' && RUNDFUNK.test(e.key || '')); i++) await t.page.waitForTimeout(500);
+    check('2-vorab: das Spiel hat einen vollständigen Takt geschrieben',
+      t.store.__ablauf.some(e => e.typ === 'put' && e.key === SAVE_KEY) &&
+      t.store.__ablauf.some(e => e.typ === 'put' && RUNDFUNK.test(e.key || '')),
+      { geschrieben: t.store.__ablauf.filter(e => e.typ === 'put').map(e => e.key) });
+    await t.page.waitForTimeout(300);   // Rest des Takts sicher abfliessen lassen
 
     const t0 = Date.now();
     await verkaufe(t.page);
     await t.page.waitForTimeout(2000);
     const handel = t.store.__ablauf.find(e => e.typ === 'handel' && e.t >= t0);
     check('2a: der Handel hat stattgefunden', !!handel, { ablauf: t.store.__ablauf.slice(-6) });
-    const fenster = t.store.__ablauf.filter(e => e.t >= t0 && handel && e.t <= handel.t);
+    /* OHNE `handel` gaebe es kein Fenster - und ein leeres Fenster enthaelt trivial keinen
+       Rundfunk-Schluessel. Pruefung 3 waere dann gruen, ohne etwas gemessen zu haben; genau die
+       Falle, vor der der Kopf dieser Datei bei 4a warnt. Deshalb haengt 3 ausdruecklich daran,
+       DASS gemessen wurde. */
+    const fenster = handel ? t.store.__ablauf.filter(e => e.t >= t0 && e.t <= handel.t) : [];
     check('2b: im Fenster vor der Anfrage steht ein Spielstand-Schreibvorgang',
       fenster.some(e => e.typ === 'put' && e.key === SAVE_KEY), fenster);
     /* DIE MESSUNG FUER DEN SCHMALEN PFAD: Im selben Fenster darf KEIN Rundfunk-Schluessel
        stehen. Mit dem vollen doSave() waeren es drei. */
     const rundfunk = fenster.filter(e => e.typ === 'put' && RUNDFUNK.test(e.key || ''));
     check('3: und KEIN Rundfunk-Schlüssel - der Handel wartet auf einen Schreibvorgang, nicht vier',
-      rundfunk.length === 0, { rundfunkImFenster: rundfunk.map(e => e.key), fenster: fenster.length });
+      !!handel && fenster.length > 0 && rundfunk.length === 0,
+      { gemessen: !!handel, rundfunkImFenster: rundfunk.map(e => e.key), fenster: fenster.length });
     check('2c: keine Skriptfehler', t.errs.length === 0, t.errs.slice(0, 3));
 
     // ---- 5) GEGENRICHTUNG: der regulaere Takt schreibt weiterhin ALLE vier -----------------
     /* Ohne diese Pruefung waere 3 auch dann gruen, wenn jemand die Rundfunk-Schluessel ganz
        entfernt - dann saehen andere Spieler die eigene Flotte und die eigenen Missionen nie
        wieder, und kein Test haette es gemerkt. */
+    /* Auf einen Takt warten, der NACH t1 vollstaendig ist: Erst den Spielstand, dann einen
+       Rundfunk-Schluessel abwarten. Nur auf den Rundfunk-Schluessel zu warten reichte nicht -
+       laege t1 mitten im Takt, fehlte der Spielstand in `spaeter`, und die Pruefung waere rot
+       an korrektem Code (Durchsicht 06.09.2026). */
     const t1 = Date.now();
-    for (let i = 0; i < 40 && !t.store.__ablauf.some(e => e.t > t1 && RUNDFUNK.test(e.key || '')); i++) await t.page.waitForTimeout(500);
+    const taktVoll = () => t.store.__ablauf.some(e => e.t > t1 && e.key === SAVE_KEY)
+      && t.store.__ablauf.some(e => e.t > t1 && RUNDFUNK.test(e.key || ''));
+    for (let i = 0; i < 40 && !taktVoll(); i++) await t.page.waitForTimeout(500);
     const spaeter = t.store.__ablauf.filter(e => e.t > t1 && e.typ === 'put');
     const arten = new Set(spaeter.map(e => (e.key || '').split(':')[0]));
     check('5: der reguläre Takt schreibt weiterhin Spielstand UND Rundfunk-Schlüssel',
@@ -289,7 +316,8 @@ const RUNDFUNK = /^(leaderboard|missions|moondefense):/;
 })();
 
 /* GEGENPROBE, GEMESSEN am 05.09.2026 gegen origin/main (6e58ba6, also MIT v8.689.0)
-   via KEPLER_SPIELDATEI auf eine Kopie: 13 Pruefungen fallen.
+   via KEPLER_SPIELDATEI auf eine Kopie: 14 Pruefungen fallen (gemessen nach der Durchsicht vom
+   06.09.2026, die 1e in zwei je Funktion gescopte Pruefungen aufgeteilt hat - vorher 13).
      1a-1h - weder Optionen noch schmaler Pfad noch gemeinsame Sicherung existieren dort.
      3     - der volle doSave schreibt drei Rundfunk-Schluessel ins Fenster vor dem Handel.
      4a/4b - die Boerse fragt dort ohne jede Sicherung an, auch bei abgelehntem Speichern.
