@@ -11689,14 +11689,22 @@
     }
 
     function nestBildUrl(volk, stufe){
-      const key = (volk||'kryll') + ':' + Math.max(1, Math.min(5, stufe||1));
+      /* Schluessel UND Zeichner bekommen denselben normalisierten Wert. Vorher stand im Schluessel
+         `volk||'kryll'`, gezeichnet wurde aber das rohe `volk`: bei einem Nest ohne Volksangabe
+         warf nbSeed(undefined), der Faenger legte `null` unter dem Schluessel `kryll:<stufe>` ab -
+         und alle echten Kryll-Nester dieser Stufe fielen fuer den Rest der Sitzung auf die alte
+         Punkteblume zurueck. Ein Zwischenspeicher, der unter einem FREMDEN Schluessel vergiftet
+         wird, ist schlimmer als gar keiner. */
+      const v = volk || 'kryll';
+      const st = Math.max(1, Math.min(5, stufe || 1));
+      const key = v + ':' + st;
       if (!(key in NEST_BILD_CACHE)){
-    try {
-      const cv = document.createElement('canvas'); cv.width = NEST_BILD; cv.height = NEST_BILD;
-      const c = cv.getContext('2d'); if (!c) throw new Error('kein 2D-Context');
-      nestZeichneBrutkoerper(c, NEST_BILD, volk, stufe);
-      NEST_BILD_CACHE[key] = cv.toDataURL();
-    } catch(e){ NEST_BILD_CACHE[key] = null; }
+        try {
+          const cv = document.createElement('canvas'); cv.width = NEST_BILD; cv.height = NEST_BILD;
+          const c = cv.getContext('2d'); if (!c) throw new Error('kein 2D-Context');
+          nestZeichneBrutkoerper(c, NEST_BILD, v, st);
+          NEST_BILD_CACHE[key] = cv.toDataURL();
+        } catch(e){ NEST_BILD_CACHE[key] = null; }
       }
       return NEST_BILD_CACHE[key];
     }
@@ -63826,6 +63834,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
            lief quer durch den Koerper). Beide gehen deshalb an den Bildrand, sobald ein Bild da
            ist; ohne Bild bleibt es beim alten Abstand. Der pulsierende Hof laeuft bis r x 2,0,
            beide liegen also weiterhin innerhalb des reservierten sichtR. */
+        /* Der dunkle Grundkreis mit dem Volksstrich sass am KERNradius. Der Koerper reicht je
+           nach Volk bis 1,40 r (Vex mit Schweif; die uebrigen 0,91-1,03 r) - der Ring wurde also
+           auf einer Seite verdeckt und stand auf der anderen frei. Mit Bild entfaellt er: der
+           pulsierende Hof traegt die Volksfarbe ohnehin, und die Fuellung deckt nichts mehr ab,
+           was das Bild nicht selbst mitbringt. Ohne Bild (Rueckfall) bleibt alles wie zuvor. */
         const randR = nestBild ? nk/2 : r;
         const balkenY = coord.y + (nestBild ? nk/2 + 1.5 : r*0.95);
         const zellen = nestBild

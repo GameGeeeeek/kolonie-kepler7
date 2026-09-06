@@ -109,14 +109,20 @@ function backend(store){
 
     m = await page.evaluate(({ code, voelker }) => {
       const tab = {}; voelker.forEach(v => { tab[v.key] = { farbe: v.farbe, name: v.key }; });
-      const api = new Function('nestVolk', code + '\nreturn { nestZeichneBrutkoerper, nestBildUrl, NEST_BILD };')
-        (k => tab[k] || { farbe:'#8fd694' });
+      const bauen = farbeVon => new Function('nestVolk', code + '\nreturn { nestZeichneBrutkoerper, nestBildUrl, NEST_BILD };')(farbeVon);
+      const api = bauen(k => tab[k] || { farbe:'#8fd694' });
+      /* ZWEITE Ausfertigung derselben Zeichner mit einer FREMDEN Farbe für jedes Volk. Damit
+         lässt sich prüfen, dass die Rasterung wirklich farbunabhängig ist: dieselbe Form in
+         Magenta muss denselben Abstand-0 ergeben wie in Volksfarbe. Der erste Anlauf verglich
+         dasselbe Objekt mit sich selbst - das ist für jede Eingabe 0 und belegt gar nichts. */
+      const apiBunt = bauen(() => ({ farbe:'#ff2fd0' }));
       const S = api.NEST_BILD;
-      const mal = (volk, st) => {
+      const malMit = (a, volk, st) => {
         const cv = document.createElement('canvas'); cv.width = cv.height = S;
-        const c = cv.getContext('2d'); api.nestZeichneBrutkoerper(c, S, volk, st);
+        const c = cv.getContext('2d'); a.nestZeichneBrutkoerper(c, S, volk, st);
         return c.getImageData(0, 0, S, S).data;
       };
+      const mal = (volk, st) => malMit(api, volk, st);
       /* Umriss als Maske (Kasten, Fläche, Rand) und - für den Volksvergleich - ein 16x16-Raster
          der HELLIGKEIT innerhalb des Körpers, auf seinen eigenen Mittelwert normiert.
          Warum nicht der Umriss: Kryll und Xantheer sind beide ein Klumpen; ihr Unterschied liegt
@@ -164,6 +170,9 @@ function backend(store){
         out.kb[v] = u ? Math.round(u.length * 0.75 / 1024) : -1;
       }
       out.S = S;
+      // Für die echte Farbkontrolle: dieselbe Form, fremde Farbe.
+      out.buntRaster = {};
+      for (const v of ['kryll','xantheer']) out.buntRaster[v] = form(malMit(apiBunt, v, 3)).raster;
       return out;
     }, { code, voelker });
   }
@@ -201,11 +210,19 @@ function backend(store){
       alleAbstaende.push(vk[i]+'/'+vk[j]+':'+st+'='+d);
       if (d < minAbstand){ minAbstand = d; paar = vk[i]+'/'+vk[j]+' St'+st; }
     }
-    /* KONTROLLE: Dasselbe Volk mit sich selbst muss 0 ergeben. Ohne diese Zeile wäre nicht
-       gesagt, dass die Messung überhaupt etwas misst - eine Rasterung, die immer irgendetwas
-       zählt, wäre auch bei vier gleichen Klumpen grün. */
-    check('1f-kontrolle: dasselbe Volk mit sich selbst hat Abstand 0',
-      abstand(m.bilder['kryll:3'], m.bilder['kryll:3']) === 0);
+    /* KONTROLLE, die wirklich etwas belegt: DIESELBE Form in einer fremden Farbe (Magenta) muss
+       denselben Rasterabstand nahe 0 ergeben. Ein erster Anlauf verglich dasselbe Objekt mit sich
+       selbst - das ist für jede Eingabe 0 und hätte auch eine Rasterung durchgehen lassen, die
+       schlicht die Farbe misst. Genau die Prüfung, die aus dem falschen Grund grün ist.
+       GEMESSEN: Ein Farbwechsel bewegt 3 (kryll) bis 5 (xantheer) Rasterfelder - die Normierung
+       fängt ihn also nicht vollständig ab, aber fast. Ein VOLKSwechsel bewegt 26 bis 78. Zwischen
+       beiden liegt Faktor fünf, und darauf beruht die Aussagekraft von 1f. Die Schwelle 8 liegt
+       über der gemessenen Farbwirkung und weit unter der Formwirkung. */
+    const buntAbstand = v => { let d = 0; const a = m.bilder[v+':3'].raster, b = m.buntRaster[v];
+      for (let q = 0; q < 256; q++) if (a[q] !== b[q]) d++; return d; };
+    check('1f-kontrolle: dieselbe Form in fremder Farbe rastert gleich',
+      buntAbstand('kryll') <= 8 && buntAbstand('xantheer') <= 8,
+      { kryll: buntAbstand('kryll'), xantheer: buntAbstand('xantheer') });
     console.log('       (gemessene Abstände: ' + alleAbstaende.join(' ') + ')');
     check('1f: die Völker unterscheiden sich in Form und Haut, nicht nur in der Farbe',
       minAbstand >= 20, { schwaechstesPaar: paar, felderUnterschied: minAbstand });
