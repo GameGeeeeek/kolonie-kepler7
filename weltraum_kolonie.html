@@ -349,7 +349,10 @@
         radial-gradient(ellipse 1100px 700px at 84% 0%, rgba(58,104,178,0.20), transparent 62%),
         linear-gradient(180deg,#04060e,#070b18 60%,#05070f);
     }
-    #game-root { position:relative; z-index:1; font-family: system-ui, sans-serif; color: #e9ecf5; max-width: 780px; margin: 0 auto; }
+    /* EINE Quelle fuer die Spielbreite. Der Kanzelrahmen (weiter unten) muss genau so breit sein
+       wie der Inhalt; zwei getippte 780 waeren die naechste Kopie-Familie, die auseinanderlaeuft. */
+    :root { --spielbreite: 780px; }
+    #game-root { position:relative; z-index:1; font-family: system-ui, sans-serif; color: #e9ecf5; max-width: var(--spielbreite); margin: 0 auto; }
     /* Desktop-Verbreiterung (Feature-Wunsch 13.07.2026): auf großen Monitoren blieb bisher viel
        Fläche links/rechts ungenutzt, da #game-root immer bei 780px gedeckelt war. Ab 1400px Viewport
        wächst der Hauptbereich jetzt mit, bis max. 1300px - "calc(100vw - 470px)" reserviert dabei
@@ -360,7 +363,7 @@
        Karten (SVG, viewBox+width:100%) und auto-fill/auto-fit-Grids skalieren dadurch automatisch
        mit, ohne dass ihr Code angepasst werden musste. */
     @media (min-width: 1400px) {
-      #game-root { max-width: min(1300px, calc(100vw - 470px)); }
+      :root { --spielbreite: min(1300px, calc(100vw - 470px)); }
     }
 
     /* overflow:CLIP, nicht hidden (01.08.2026) - und das ist kein Schönheitsfehler gewesen.
@@ -402,6 +405,50 @@
       background-size:38px 38px;
       mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 20%, transparent 88%);
       -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 15%, #000 20%, transparent 88%);
+    }
+    /* DER RAHMEN DER KANZEL (Grafik-Aufnahme, Buendel F, 06.09.2026)
+       Das Orbitalglas sagt "du siehst durch eine Scheibe" - aber die Scheibe hatte keinen Rahmen.
+       ZWEI FASSUNGEN WURDEN AM BILD GEMESSEN UND VERWORFEN, bevor diese hier stand:
+        1. Am FENSTER (position:fixed, ganze Breite). Die Spielflaeche ist mittig und 780 px breit,
+           die Fensterecken liegen also weit daneben - die Streben sassen im leeren Hintergrund und
+           rahmten den Browser, nicht das Spiel.
+        2. An der HUELLE (.shell::after). .shell ist die ganze scrollende Seite und mehrere tausend
+           Pixel hoch: Die unteren Streben lagen am Seitenende, der Randabfall war ueber die volle
+           Scrollhoehe gezogen und damit unsichtbar. Ein Rahmen, den man nur oben sieht, ist keiner.
+       Diese Fassung klebt am FENSTER (man sieht durch die Scheibe, und die scrollt nicht mit -
+       dieselbe Begruendung wie beim Sternenhimmel), ist aber genau so BREIT wie der Inhalt. Beide
+       lesen dafuer --spielbreite, es gibt also keine zweite Zahl, die veralten kann.
+       Drei Regeln, die den Rahmen harmlos halten:
+        (1) pointer-events:none auf der ganzen Ebene - er nimmt keinen Klick, auch nicht dort, wo
+            der Chat-Reiter und der Zurueck-Knopf der Karte sitzen.
+        (2) KEIN backdrop-filter und KEINE Animation. Der Energiesparmodus schaltet Weichzeichner
+            und Bewegung ab; hier hat er nichts abzuschalten.
+        (3) Nur ECKEN, keine durchgehenden Kanten: Lesetext steht in der Mitte, und eine Kante
+            haette am Handy Platz gekostet, den KB-21 gerade freigeraeumt hat. */
+    #kanzelrahmen {
+      position:fixed; top:0; bottom:0; left:50%; transform:translateX(-50%);
+      width:min(100vw, var(--spielbreite)); z-index:2; pointer-events:none;
+      background:
+        linear-gradient(135deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(225deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(45deg,  rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(315deg, rgba(120,150,190,0.20) 0, rgba(120,150,190,0.20) 1px, transparent 2px),
+        linear-gradient(135deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(225deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(45deg,  rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        linear-gradient(315deg, rgba(6,9,20,0.88) 0, rgba(6,9,20,0.88) clamp(15px,2.4vw,30px), transparent calc(clamp(15px,2.4vw,30px) + 1px)),
+        radial-gradient(ellipse 128% 96% at 50% 50%, transparent 60%, rgba(3,5,12,0.22) 100%);
+      background-size:
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px), clamp(44px,6.6vw,88px) clamp(44px,6.6vw,88px),
+        100% 100%;
+      background-position:
+        left top, right top, left bottom, right bottom,
+        left top, right top, left bottom, right bottom,
+        center;
+      background-repeat:no-repeat;
     }
     /* Energiesparmodus (Einstellungen, auf Handy/Tablet automatisch an): schaltet die DAUERHAFT
        laufenden Deko-Animationen ab - Kauf-Puls auf allen leistbaren Buttons, Radar-Sweeps,
@@ -3382,6 +3429,7 @@
        Frame als Vollbild-Verläufe und belegte damit gemessen ~89% des Hauptthreads. -->
   <canvas id="bgnebel" aria-hidden="true"></canvas>
   <canvas id="bgstars" aria-hidden="true"></canvas>
+  <div id="kanzelrahmen" aria-hidden="true"></div>
 
   <div class="shell">
     <div class="shell-inner">
