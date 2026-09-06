@@ -61403,6 +61403,29 @@ async function claimPendingRewards(){
     unten.pop(); oben.pop();
     return unten.concat(oben);
   }
+  /* WEICHER UMRISS EINER SEKTORREGION (Grafik-Aufnahme, Buendel F, 06.09.2026)
+     Die Region war ein konvexes Polygon aus geraden Kanten mit einer flachen 10-Prozent-Fuellung.
+     Das las sich wie ein Flurstueck auf einer Katasterkarte, nicht wie ein Gebiet im All - und die
+     Ecken der konvexen Huelle lagen sichtbar auf den aeusseren Systemen, was den Eindruck
+     verstaerkte, hier sei etwas abgesteckt worden.
+     Der Umriss laeuft jetzt als geschlossene Kurve durch dieselben Huellpunkte (Catmull-Rom in
+     kubische Bezier umgerechnet, Spannung 1/8 - 1/6 bauchte gemessen zu weit). Die Geometrie ist unveraendert - es ist derselbe
+     Punktezug, nur ohne Knicke; Trefferflaeche und Lage der Beschriftungen bleiben damit gleich.
+     Unter drei Punkten gibt es keine Kurve, dann bleibt es beim geraden Zug. */
+  function weicherUmriss(pkt){
+    const n = pkt.length;
+    if (n < 3) return 'M' + pkt.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') + (n > 1 ? ' Z' : '');
+    const at = i => pkt[(i % n + n) % n];
+    let d = 'M' + at(0)[0].toFixed(1) + ',' + at(0)[1].toFixed(1);
+    for (let i = 0; i < n; i++){
+      const p0 = at(i-1), p1 = at(i), p2 = at(i+1), p3 = at(i+2);
+      const c1x = p1[0] + (p2[0]-p0[0])/8, c1y = p1[1] + (p2[1]-p0[1])/8;
+      const c2x = p2[0] - (p3[0]-p1[0])/8, c2y = p2[1] - (p3[1]-p1[1])/8;
+      d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1)
+         + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+    }
+    return d + ' Z';
+  }
   function sektorMitglieder(){
     const gruppen = new Map(SEKTOR_DEFS.map(sk => [sk.key, []]));
     for (const sy of STAR_SYSTEMS.filter(x => !x.hidden)) gruppen.get(sektorVon(sy).key).push(sy);
@@ -61478,8 +61501,24 @@ async function claimPendingRewards(){
       const huelle = konvexeHuelle(mg.map(p => [p.gx, p.gy]));
       const auf = huelle.map(function(q){
         const dx = q[0]-schwerX, dy = q[1]-schwerY, l = Math.hypot(dx,dy) || 1;
-        return (q[0] + dx/l*22).toFixed(1) + ',' + (q[1] + dy/l*22).toFixed(1);
+        /* Der Abstand war 22, solange der Umriss GERADE Kanten hatte. Die Kurve durch dieselben
+           Punkte baucht zwischen ihnen nach aussen, und am gerenderten Bild gemessen wuchsen die
+           Regionen dadurch so weit, dass benachbarte Gebiete sichtbar ineinanderliefen. 16 plus
+           Kurvenbauch deckt die aeusseren Systempunkte weiterhin - die Kurve laeuft exakt DURCH
+           diese Punkte, sie sind also nie ausserhalb. */
+        return [q[0] + dx/l*16, q[1] + dy/l*16];
       });
+      /* Die Fuellung ist ein radialer Verlauf statt einer flachen Platte: dicht am Schwerpunkt,
+         zum Rand hin auslaufend. Der Rand selbst bleibt die einzige harte Linie - er traegt die
+         Sektorlage und muss ablesbar bleiben. Der Radius kommt aus dem GEMESSENEN aeussersten
+         Huellpunkt, nicht aus einer Zahl im Kopf: Die acht Regionen sind verschieden gross. */
+      const weite = auf.reduce(function(a, q){ return Math.max(a, Math.hypot(q[0]-schwerX, q[1]-schwerY)); }, 1);
+      const verlaufId = 'skr-' + sk.key;
+      inner += '<defs><radialGradient id="' + verlaufId + '" gradientUnits="userSpaceOnUse" cx="' + schwerX.toFixed(0) + '" cy="' + schwerY.toFixed(0) + '" r="' + weite.toFixed(0) + '">'
+        + '<stop offset="0%" stop-color="' + sk.tint + '" stop-opacity="0.20"/>'
+        + '<stop offset="62%" stop-color="' + sk.tint + '" stop-opacity="0.10"/>'
+        + '<stop offset="100%" stop-color="' + sk.tint + '" stop-opacity="0.02"/>'
+        + '</radialGradient></defs>';
       const heimDrin = mg.some(p => p.id === myHomeSystem);
       // Aggregierte Ereignis-/Aufklaerungs-Hinweise der Mitgliedssysteme (KB-5): jedes Icon
       // einmal je Region, der Tooltip nennt je System den vollen Hinweis. Dieselbe Quelle wie
@@ -61521,7 +61560,7 @@ async function claimPendingRewards(){
       const lageZusatz = lageU ? '\n' + sektorLageLang(lageU) : '';
       inner += '<g class="sektor-region" data-sektor="' + sk.key + '" data-anzahl="' + mg.length + '" data-sektor-eigenart="' + escapeHtml(eigenKurz) + '" role="button" tabindex="0" style="cursor:pointer;" aria-label="' + escapeHtml(sk.name + ' öffnen. ' + mg.length + ' Systeme. ' + eigenLang + (lageU ? ' ' + sektorLageLang(lageU) : '')) + '">'
         + '<title>' + escapeHtml(sk.name + ' – ' + mg.length + ' Systeme – ' + eigenLang + lageZusatz + (sk.desc ? '\n\n' + sk.desc : '')) + '</title>'
-        + '<path data-sektor-lage="' + (lageU ? lageU.stufe : '') + '" d="M' + auf.join(' L') + ' Z" fill="' + sk.tint + '" fill-opacity="0.10" stroke="' + lageRand + '" stroke-width="' + (lageAktiv ? 2.2 : 1.4) + '" stroke-linejoin="round"/>'
+        + '<path data-sektor-lage="' + (lageU ? lageU.stufe : '') + '" d="' + weicherUmriss(auf) + '" fill="url(#' + verlaufId + ')" stroke="' + lageRand + '" stroke-width="' + (lageAktiv ? 2.2 : 1.4) + '" stroke-linejoin="round"/>'
         /* Die Systempunkte tragen die Farbe ihrer dominierenden Macht (29.08.2026). Bewusst KEINE
            fuenfte Textzeile und keine Regions-Aggregation: Der Knoten hat schon Name, Systemzahl,
            Eigenschaft und Abzeichenzeile, und KB-21 hat gemessen, dass am Handy alle
