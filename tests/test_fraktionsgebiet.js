@@ -40,8 +40,17 @@ check('factionOwning liefert auch die Kartenfarbe', /mapColor: factionMapColorOf
 // ---- 2. Die Legion-Flächenfarbe kollidiert nicht mehr -------------------------------------------
 // #e24b4a ist --c-danger UND die Kernfarbe des eigenen Heimatsterns. Eine Legion-Fläche in genau
 // dieser Farbe läge auf derselben Karte wie der rote Heimatkern und die roten Kollaps-Ringe.
-const diploBlock = src.slice(src.indexOf('const FACTION_DIPLOMACY = {'),
-                             src.indexOf('const FACTION_DIPLOMACY = {') + 1200);
+// Der Ausschnitt endet am wirklichen Ende des Objekts, nicht nach einer festen Zeichenzahl.
+// Vorher standen hier 1200 Zeichen. Am 06.09.2026 bekam jede der vier Fraktionen ein lore-Feld
+// von rund 250 Zeichen (die Lore-Fabrik), und der Ausschnitt reichte nur noch bis in die zweite
+// Zeile - 'schatten:' lag ausserhalb, und ALLE Pruefungen dieses Abschnitts fielen. Der Test mass
+// weiterhin das Richtige; sein Fenster war der Datei nur nicht mitgewachsen. Eine feste Zeichenzahl
+// als Slice-Ende ist damit dasselbe wie eine gepflegte Liste: Sie veraltet, sobald die Datei
+// waechst. Abgeleitet statt gepflegt - und der Anker wird vor Gebrauch geprueft.
+const diploAnfang = src.indexOf('const FACTION_DIPLOMACY = {');
+const diploEnde = src.indexOf('\n  };', diploAnfang);
+if (diploAnfang < 0 || diploEnde < 0) { console.log('FAIL - FACTION_DIPLOMACY-Block nicht gefunden'); process.exit(1); }
+const diploBlock = src.slice(diploAnfang, diploEnde);
 check('FACTION_DIPLOMACY gefunden', diploBlock.includes('schatten:'));
 const legionZeile = diploBlock.split('\n').find(z => z.trim().startsWith('legion:')) || '';
 check('Legion hat eine eigene mapColor', /mapColor:'#[0-9a-f]{6}'/.test(legionZeile), legionZeile.trim().slice(0, 90));
