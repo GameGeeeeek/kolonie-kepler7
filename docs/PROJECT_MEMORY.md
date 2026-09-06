@@ -494,3 +494,27 @@ ob sie ab dem zweiten Durchlauf noch gilt.**
 Riegel `if (marketBulkRun) return` — zwei schnelle Klicks wären damit beide durchgekommen. Ein
 `await` in eine geprüfte-dann-gesetzte Sperre einzuschieben öffnet genau das Fenster, das die
 Sperre schließen soll; es gehört hinter das Setzen, nicht davor.
+
+## Nachtrag 05.09.2026: dieselbe Lücke nebenan — gemessen, nicht angenommen
+
+Der Eintrag darüber endet mit einer Frage für jede serverautoritative Prüfung. Beim Nachziehen
+kam die naheliegende Vermutung „die Modulbörse hat das auch". Solche abgeleiteten Aufgaben sind
+gefährlich: Das Nachbar-Repo hat am selben Tag einen Eintrag richtiggestellt, der eine Route
+ungeprüft verdächtigt hatte und die nächste Sitzung dazu gebracht hätte, **funktionierenden Code
+umzubauen**. Deshalb hier erst die Messung, dann der Code:
+
+| gemessen | Ergebnis |
+|---|---|
+| `/modulemarket/list` | prüft `moduleInvOf(save)` gegen den gespeicherten Stand — trägt die Lücke |
+| `/modulemarket/buy` | prüft `save.credits` gegen den gespeicherten Stand — trägt sie ebenfalls |
+| `/modulemarket/cancel` | liest und **schreibt** den Stand — verliert ohne Speichern das seither Getickte |
+| `grantRandomModule`, `grantRandomShipModule`, `grantBossSetModule` | schreiben `state.modules` **ohne** `save()` |
+| `gibModul` | speichert als einzige |
+
+Erst diese fünfte Zeile macht die Lücke real: Ohne eine Vergabestelle, die nicht speichert, gäbe
+es kein Fenster, in dem der Client dem Server voraus ist. **Die Vermutung war richtig — aber sie
+war es erst, nachdem drei von vier Vergabestellen nachgezählt waren.**
+
+**Übertragbar:** Eine aus einem Befund abgeleitete Aufgabe ist eine *Hypothese*, kein Auftrag. Sie
+gehört mit ihrer Messvorschrift notiert („prüfe, ob X gegen den gespeicherten Stand urteilt UND ob
+es eine Quelle gibt, die ohne Speichern schreibt"), nicht als Feststellung.
