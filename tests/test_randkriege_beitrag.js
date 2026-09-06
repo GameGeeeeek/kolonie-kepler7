@@ -62,10 +62,17 @@ function holeKonstante(name) {
 // nachzubauen - dafuer faellt hier auf, wenn rkBeitrag eine neue Abhaengigkeit bekommt.
 const FN = ['loadOrInitRandkriege', 'rkTagesSchluessel', 'rkTagesKonto', 'rkDegression',
   'rkZielEintrag', 'serverWeekKey', 'rkWochenKonto', 'rkGutschrift', 'rkBeitrag',
-  'galaxyFuerClient', 'getUserLastSeen', 'rkAktiveSpieler'];
+  'galaxyFuerClient', 'getUserLastSeen', 'rkAktiveSpieler',
+  // Seit der Galaxie-Chronik C3 (06.09.2026, Backend #261) nimmt galaxyFuerClient das
+  // Ereignisbuch aus dem Payload - ueber chronikAusClient(), das seinerseits
+  // chronikAusgabeFuerClient() und notAusGesetzt() ruft. Genau der Fall, den der Kommentar
+  // oben ankuendigt: Bekommt die geschnittene Funktion eine neue Abhaengigkeit, faellt es
+  // HIER auf ("chronikAusClient is not defined") - und zwar in einem Frontend-Test, waehrend
+  // die Backend-Tests gruen blieben. Das ist die Kopie-Familie ueber die Repo-Grenze.
+  'chronikAusClient', 'chronikAusgabeFuerClient', 'notAusGesetzt'];
 const KONST = ['FACTION_RIVALS', 'RK_FRONT_PAARE', 'RK_OBEN', 'RK_UNTEN', 'RK_TAGESSTUFEN',
   'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER', 'RK_HANDLUNGEN',
-  'RK_MARKE_JE_PUNKTE', 'RK_MARKEN_WOCHE', 'RK_DIENSTGRADE'];
+  'RK_MARKE_JE_PUNKTE', 'RK_MARKEN_WOCHE', 'RK_DIENSTGRADE', 'CHRONIK_AKTIV'];
 const fnQ = FN.map(n => ({ n, q: holeFunktion(n) }));
 const kQ = KONST.map(n => ({ n, q: holeKonstante(n) }));
 for (const { n, q } of fnQ) check(n + ' gefunden', !!q && q.length > 40, q ? q.length : 0);
@@ -319,10 +326,24 @@ const FRONT_KEY = 'kartell|schatten';
     rausB.randkriege.tagesBreite);
   check('E4: ein Fremder sieht seine eigene (leere) Summe',
     JSON.stringify(api.galaxyFuerClient(g, 'fremder').randkriege.meinTag) === '{}');
-  // Eine Galaxie ohne Front darf unverändert durchgehen - sonst bräche der erste Start.
-  const ohne = { controlledSystems: {} };
-  check('E5: eine Galaxie ohne Randkriege geht unverändert durch',
-    api.galaxyFuerClient(ohne, 'ich') === ohne);
+  /* Eine Galaxie ohne Front darf unveraendert durchgehen - sonst braeche der erste Start.
+     GEAENDERT AM 06.09.2026 (Chronik C3, Backend #261): Hier stand `=== ohne`, also
+     Objekt-IDENTITAET. Seit galaxyFuerClient das Ereignisbuch aus dem Payload nimmt, ist eine
+     Kopie unvermeidlich - und das gilt fuer BEIDE Wege, auch den ohne Front. Die Identitaet war
+     ohnehin nur ein bequemer Stellvertreter fuer die eigentliche Aussage; einziger Aufrufer im
+     Server ist `res.json(...)`, niemand schreibt ins Ergebnis zurueck (nachgemessen: kein
+     `galaxyFuerClient(...).x =` in server.js).
+     Geprueft wird deshalb jetzt die AUSSAGE statt des Stellvertreters: Alles bleibt erhalten -
+     ausser dem Buch, das seit C3 nie an einen Client geht. Das ist strenger als vorher, denn
+     `=== ohne` haette ein zusaetzlich mitgeschicktes Buch gar nicht bemerken koennen. */
+  const ohne = { controlledSystems: { s1: 'kartell' }, news: [{ id: 'n1', text: 'x' }], chronik: [{ art: 'hort-gefunden' }] };
+  const durch = api.galaxyFuerClient(ohne, 'ich');
+  check('E5a: eine Galaxie ohne Randkriege geht durch - alle Felder bleiben erhalten',
+    durch.controlledSystems === ohne.controlledSystems && durch.news === ohne.news && !durch.randkriege,
+    { keys: Object.keys(durch) });
+  check('E5b: ... nur das Ereignisbuch bleibt draussen, auch auf diesem Weg',
+    durch.chronik === undefined && ohne.chronik.length === 1,
+    { chronik: durch.chronik });
   check('E6: /api/galaxy nutzt wirklich den gefilterten Weg',
     /res\.json\(galaxyFuerClient\(loadOrInitGalaxy\(\), req\.userId\)\)/.test(src));
 }
