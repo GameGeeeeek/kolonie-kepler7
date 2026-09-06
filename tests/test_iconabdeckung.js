@@ -130,22 +130,36 @@ for (const k of modKeys){
 
 // ---------------------------------------------------------------- 6: Gebäude (v8.306.0)
 // KORREKTUR EINES EIGENEN FEHLBEFUNDS: Das Audit meldete "11 Gebäude noch flach". Es sind vier.
-// Sieben der elf haben längst eine ANIMIERTE CANVAS-Grafik (DEFENSE_ART bzw. DEFENSE_CANVAS_KEYS),
-// und defIconHtml() prüft die VOR dem ICONS-Objekt - ein SVG dafür wäre toter Code gewesen. Die
-// Zählung schaute nur ins ICONS-Objekt und übersah damit ein ganzes zweites Grafiksystem.
-// Die Canvas-Schlüssel gehören deshalb ab hier in JEDE Abdeckungsrechnung.
+// Sieben der elf hatten längst eine CANVAS-Grafik, und buildingIconHtml() prüft die VOR dem
+// ICONS-Objekt. Die Zählung schaute nur ins ICONS-Objekt und übersah ein zweites Grafiksystem.
+// UMGEBAUT MIT BÜNDEL C (isometrische Bausätze): Die Canvas-Grafik gibt es jetzt für BEIDE
+// Bausätze - die 23 Verteidigungsanlagen (ANLAGE_FAMILIE) und die 29 Basis-Gebäude
+// (GEBAEUDE_FAMILIE). Die alte Regel "ein SVG für einen Canvas-Schlüssel wäre toter Code" ist
+// damit hinfällig: die SVGs bleiben als Kleinformat-Vorrat für iconHtmlFor stehen. An ihre Stelle
+// tritt die stärkere Regel, dass KEIN Gebäude ohne Bild dasteht - genau der Fehler, den die alte
+// Regel verhindern sollte, nur von der anderen Seite gefasst.
 const dokKeysVorab = [...arrBlock('DOCTRINE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const formKeysVorab = [...arrBlock('DEFENSE_FORMATIONS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
-const artBlock = obj('DEFENSE_ART');
-const CANVAS = new Set(['turm','schild','raketen', ...[...artBlock.matchAll(/^\s+(\w+):\s*\{/gm)].map(m=>m[1])]);
-check('6: die Canvas-Anlagen sind gefunden', CANVAS.size >= 20, CANVAS.size);
+const anlBlock = obj('ANLAGE_FAMILIE'), gebFamBlock = obj('GEBAEUDE_FAMILIE');
+const anlKeys = [...anlBlock.matchAll(/(\w+):'/g)].map(m=>m[1]);
+const gebFamKeys = [...gebFamBlock.matchAll(/(\w+):'/g)].map(m=>m[1]);
+const CANVAS = new Set([...anlKeys, ...gebFamKeys]);
+check('6: beide Bausätze sind gefunden', anlKeys.length >= 23 && gebFamKeys.length >= 29,
+  { anlagen: anlKeys.length, gebaeude: gebFamKeys.length });
+// Kein Schlüssel darf in BEIDEN Bausätzen stehen - sonst entscheidet die Reihenfolge in
+// isoBausatz() darüber, welches Bauwerk erscheint, und das wäre ein stiller Zufall.
+const inBeiden = anlKeys.filter(k => gebFamKeys.includes(k));
+check('6: kein Schlüssel steht in beiden Bausätzen', inBeiden.length === 0, inBeiden);
 // Die Reihenfolge über Positionen statt über eine Regex mit Abstandsgrenze: der Abstand zwischen
-// beiden Stellen ist Umbauten ausgesetzt, die Reihenfolge nicht. Genau diese Reihenfolge ist der
-// Grund, warum ein SVG für eine Canvas-Anlage toter Code wäre.
-const iCanvas = src.indexOf('DEFENSE_CANVAS_KEYS.includes(def.key)');
+// beiden Stellen ist Umbauten ausgesetzt, die Reihenfolge nicht.
+const iCanvas = src.indexOf('if (isoBausatz(def.key)){');
 const iFallback = src.indexOf('iconHtmlFor(def.key, def.icon, def.fg)');
-check('6: defIconHtml prüft Canvas VOR dem ICONS-Objekt',
+check('6: buildingIconHtml prüft das Bauwerk VOR dem ICONS-Objekt',
   iCanvas > 0 && iFallback > iCanvas, { canvas:iCanvas, icons:iFallback });
+// Jedes Gebäude gehört zu genau einem Bausatz - vorher zeigten 17 von 30 Karten nur ein Schloss.
+const gebKeysVorab = [...arrBlock('BUILDING_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
+const ohneBausatz = gebKeysVorab.filter(k => !CANVAS.has(k));
+check('6: jedes Gebäude hat ein gezeichnetes Bauwerk', ohneBausatz.length === 0, ohneBausatz);
 const gebBlock = arrBlock('BUILDING_DEFS');
 const gebKeys = [...gebBlock.matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
 const gebFlach = gebKeys.filter(k => !ICONS.has(k) && !CANVAS.has(k));
@@ -159,21 +173,20 @@ for (const k of ['quantenwerft','resonanzschild','urmateriereaktor','botschaft']
     /viewBox="0 0 100 100" width="24" height="24"/.test(svg) && /<g filter="url\(#ig\)">/.test(svg)
     && striche.every(x=>x==='4'||x==='1.6'), striche);
 }
-// Kein Icon DIESER Runden darf in der Canvas-Liste stehen - sonst wäre es toter Code, weil
-// defIconHtml() die Canvas-Grafik zuerst nimmt. Bewusst über ALLE neu angelegten Schlüssel statt
-// über eine Handliste: Die Rot-Probe zeigte, dass eine Handliste ein neu eingeschleustes totes
-// Icon durchgehen lässt.
-// GRENZE dieser Prüfung, ausdrücklich festgehalten: Ein pauschales "kein ICONS-Schlüssel darf
-// Canvas-Schlüssel sein" wäre FALSCH. Rund vierzehn Altlasten (schild, turm, flak, laser, ...)
-// existieren in beiden Systemen, und sie sind nicht zwangsläufig tot - iconHtmlFor() wird an
-// anderen Stellen (Kompendium, Listen) auch ohne den Canvas-Vorrang aufgerufen. Geprüft wird
-// deshalb nur, was in diesen Runden dazugekommen ist.
+// HIER STAND: "kein neu angelegtes Icon darf in der Canvas-Liste stehen" - ein SVG für einen
+// Canvas-Schlüssel wäre toter Code gewesen, weil die Kachel die Grafik zuerst nimmt. Seit Bündel C
+// tragen ALLE Gebäude eine Canvas-Grafik; die Regel würde jetzt jedes Gebäude-SVG anschlagen und
+// verlangen, dass man handgezeichnete Bilder wegwirft. Was sie schützen sollte - kein Gebäude ohne
+// Bild - prüft oben "jedes Gebäude hat ein gezeichnetes Bauwerk", und zwar für alle statt nur für
+// die vier zuletzt hinzugekommenen.
+// Was von der alten Regel BLEIBT: Offiziere, Module, Doktrinen und Aufstellungen haben nach wie vor
+// keine Canvas-Grafik. Ein Schlüssel von dort in einem der beiden Bausätze wäre weiterhin ein
+// Fehler - dann hätte jemand einen Nicht-Gebäude-Schlüssel in eine Gebäudetabelle geschrieben.
 const smKeysVorab = [...arrBlock('SHIP_MODULE_DEFS').matchAll(/key:'([^']+)'/g)].map(m=>m[1]);
-const neueSchluessel = [...offKeys, ...modKeys.map(k=>'mod_'+k), ...dokKeysVorab,
-  ...formKeysVorab.map(k=>'form_'+k), ...smKeysVorab.map(k=>'sm_'+k),
-  'quantenwerft','resonanzschild','urmateriereaktor','botschaft'];
-const totesIcon = neueSchluessel.filter(k => CANVAS.has(k));
-check('6: kein neu angelegtes Icon wird von einer Canvas-Grafik verdeckt', totesIcon.length === 0, totesIcon);
+const fremdeSchluessel = [...offKeys, ...modKeys.map(k=>'mod_'+k), ...dokKeysVorab,
+  ...formKeysVorab.map(k=>'form_'+k), ...smKeysVorab.map(k=>'sm_'+k)];
+const fremdImBausatz = fremdeSchluessel.filter(k => CANVAS.has(k));
+check('6: kein fremder Schlüssel steht in einem der Bausätze', fremdImBausatz.length === 0, fremdImBausatz);
 
 // ------------------------------------------- 7: Doktrinen und Aufstellungen (v8.306.0)
 // Beides sind AUSWAHLKARTEN: drei Optionen nebeneinander, der Unterschied soll auf einen Blick
