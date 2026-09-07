@@ -25,6 +25,7 @@
 //   listen   - der Raid nimmt wieder die Verbandsliste  -> 0b, 0c
 //   eintrag  - der Menueeintrag faellt weg              -> 1a, 1b, 2a, 3a, 3b, 3c, 4a, 4b
 //   ziel     - die Zielwahl wird nicht ausgelesen       -> 4b
+//   flotte   - der Ruf endet ohne eigene Flottenwahl    -> 4d, 4e
 const fs = require('fs');
 const path = require('path');
 const { starteBrowser, SPIELDATEI, SPIEL_URL, pruefer } = require('./lib/umgebung');
@@ -40,7 +41,11 @@ const SAB = process.env.KEPLER_VRUF_SABOTAGE || '';
 const MUSS_FALLEN = {
   listen:  ['0b', '0c'],
   eintrag: ['1a', '1b', '2a', '3a', '3b', '3c', '4a', '4b'],
-  ziel:    ['4b']
+  ziel:    ['4b'],
+  /* 07.09.2026: der Ruf endet wieder ohne die eigene Flottenwahl - der Zustand vor diesem
+     Auftrag. 4a-4c bleiben dabei GRUEN: Der Ruf selbst ging immer richtig raus, es fehlte nur
+     der zweite Schritt. Genau diese Aufteilung belegt, dass 4d/4e etwas Eigenes messen. */
+  flotte:  ['4d', '4e']
 };
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -232,6 +237,28 @@ async function menueOeffnen(t){
       && anfrage.festungSystem === SYS && /schleifen die Feste/.test(anfrage.message || ''), anfrage);
     check('4b: und traegt die gewaehlte Zielwahl mit - nicht stumm den Kern',
       !!anfrage && anfrage.festungZiel === 'schild', { festungZiel: anfrage ? anfrage.festungZiel : null });
+    /* 4d/4e: DIE EIGENE FLOTTE KOMMT GLEICH MIT (Auftrag Sascha 07.09.2026, woertlich: „gleich
+       beim raid ausrufen hinzufuegen die eigene flottenauswahl sonst muss man als noch bei
+       allianz dem raid schiffe herbeifuegen").
+       Bis dahin endete der Ruf mit dem Aufruf, und der Rufer stand ohne eigene Schiffe da - um
+       seine Flotte anzuschliessen, musste er in den Allianz-Tab, dort die Musterbox suchen und
+       „Flotte anschliessen" druecken. Genau derselbe Umweg, den dieses Overlay am 04.09.2026 fuer
+       die ZIELWAHL abgeschafft hat.
+       GEMESSEN WIRD DER ZUSTAND NACH DEM RUF, nicht der Quelltext: dass die Flottenwahl offen
+       steht, und dass es die zum ANSCHLIESSEN ist und nicht irgendeine. 4e ist dabei die
+       wichtigere Haelfte - eine offene Flottenwahl, die einen normalen Angriff startet, waere
+       schlimmer als gar keine. */
+    const fw = await t1.page.evaluate(() => {
+      const o = document.querySelector('.fwahl-overlay.open');
+      if (!o) return { offen:false };
+      const knopf = [...o.querySelectorAll('button')].map(b => (b.textContent||'').trim());
+      return { offen:true, text: (o.textContent||'').replace(/\s+/g,' ').trim().slice(0, 160), knopf };
+    });
+    check('4d: nach dem Ruf steht die eigene Flottenwahl gleich offen',
+      fw.offen === true, fw);
+    check('4e: und es ist die zum ANSCHLIESSEN, nicht irgendeine Flottenwahl',
+      fw.offen === true && /Koordinierter Angriff/.test(fw.text || '')
+      && (fw.knopf || []).some(t => /Flotte anschließen/.test(t)), fw);
     check('4c: keine Skriptfehler auf dem ganzen Weg', t1.errs.length === 0, t1.errs.slice(0, 2));
     await t1.ctx.close();
 
