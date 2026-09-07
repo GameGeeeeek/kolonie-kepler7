@@ -8875,8 +8875,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.698.0';
+  const VERSION = '8.699.0';
   const PATCHNOTES = [
+  { version:'8.699.0', date:'07.09.2026', changes:[
+    '<strong>Der Wrackkonvoi sieht endlich aus wie einer.</strong> Statt drei gleicher blauer Rauten treiben dort jetzt drei aufgebrochene Schiffe \u2013 ein Gro\u00dffrachter, ein Tr\u00e4gerschiff und ein Kreuzer, jeder an einer gezackten Bruchkante entzweigerissen, mit freiliegenden Spanten und Brandspuren.',
+    'Dazwischen liegt ein Feld kleiner Tr\u00fcmmer, am gr\u00f6\u00dften St\u00fcck tritt Gas aus, und eine Notbake blinkt \u2013 das Einzige an diesem Konvoi, was noch Strom hat. Sie ist auch der Grund, warum er sich \u00fcberhaupt orten l\u00e4sst.',
+    'Der Peilring dreht sich weiter wie bisher, und am Rumpfbalken siehst du unver\u00e4ndert, wie viel von dem Konvoi noch \u00fcbrig ist.'
+  ] },
   { version:'8.698.0', date:'07.09.2026', changes:[
     '<strong>Das Sternendock am Vorposten liefert jetzt wirklich ab.</strong> Wer auf der Endstufe das Sternendock baut, sieht am Vorposten, wie viele Schiffe bereitliegen \u2013 mit F\u00fcllbalken und dem Hinweis, wann Schluss ist. Bisher stand dort gar nichts.',
     '<strong>Abholen geht auch mit leerem Lager.</strong> Der Griff hing allein am Rohstofflager. Direkt nach einer Abholung ist das leer \u2013 und ein Dock voller Kreuzer war in diesem Fenster nicht erreichbar. Jetzt bedient derselbe Knopf beides, und er sagt vorher, was kommt.',
@@ -9021,18 +9026,11 @@
     '<strong>„Garnison zurückrufen" nennt dem Besitzer seine eigene Zahl.</strong> Stehen an deinem Vorposten 900 Schiffe, von denen 700 deinen Verbündeten gehören, holst du 200 – und genau das steht jetzt am Knopf und im Bestätigungsfeld. Vorher versprachen beide die volle Zahl, und der Server hätte abgelehnt.',
     'Wächter: <code>test_vorposten_verbuendet_ui</code> (40 Prüfungen, siebzehn Gegenproben gemessen). Neu ist außerdem ein Abgleich, der jede Testvorlage gegen die Felder hält, die der Server wirklich schickt – ein erfundenes Feld hatte diese Etappe schon einmal grün aussehen lassen, obwohl die Zahl im Spiel immer 0 war.'
   ] },
-  { version:'8.679.0', date:'05.09.2026', changes:[
-    '<strong>Dein Vorposten fördert jetzt \u2013 und du kannst es endlich abholen.</strong> Jede Station legt <strong>Erz, Kristalle und Deuterium</strong> in ein Lager, im selben Verhältnis wie deine eigenen Fördergebäude. Ein Handelsknoten trägt fast das Doppelte eines Festungsrings. Abgeholt wird über das Kartenmenü; die Fracht landet auf deinem aktiven Standort.',
-    '<strong>Nach zwölf Stunden ist Schluss.</strong> Was danach entsteht, verfällt \u2013 ein vergessener Vorposten ist keine Bank. Die Station sagt dir, wie voll sie ist und wann es so weit ist.',
-    '<strong>Das Lager ist für jeden sichtbar, auch für Angreifer.</strong> Das ist Absicht: Wer stürmt, soll riechen können, wo sich der Flug lohnt. Fällt ein Vorposten, teilen sich die Angreifer sein Lager nach Schadensanteil \u2013 bestraft wird, wer hortet, nicht wer ausbaut.',
-    '<strong>Wichtig für alle, die schon einen Vorposten haben:</strong> Gesammelt wird erst <em>ab jetzt</em>. Die Wochen davor zählen nicht \u2013 sonst stünde jede bestehende Station in derselben Sekunde randvoll da.',
-    'Wächter: <code>test_vorposten_lager_ui</code> (13 Prüfungen) und ein neuer Abschnitt in <code>test_vorposten_lager_http</code>. Der Abhol-Knopf ist die eine Stelle, die den Server fragt \u2013 gutgeschrieben wird der Ertrag über die Belohnungs-Warteschlange, damit dein Lagerdeckel greift.'
-  ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1101;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1102;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -12146,6 +12144,198 @@
     const ry = rx * Math.max(0.60, kbOrbitMass().ry);
     const rad = (60 + (index || 0) * 72) * Math.PI / 180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
+  }
+  /* ---- Das Wrackfeld als gerendertes Bild (GR-10, 07.09.2026) --------------------------------
+     VORHER standen hier drei gleiche cyanfarbene Rauten auf dem Peilring. Sie sagten nichts
+     darueber, WAS das Objekt ist - und der Konvoi war damit das letzte Kartenobjekt, das noch
+     flaches SVG war: Vorposten (vorpostenSilhouette), Nester (nestBildUrl) und Festungen sind
+     seit der Grafik-Runde gerenderte <image>-Kacheln.
+
+     DIE IDEE IST EINE ERSPARNIS, KEINE ERFINDUNG: Ein Wrackkonvoi besteht aus kaputten Schiffen,
+     und 46 Rumpfformen liegen seit Langem in SHIP_HULL_DEFS. Drei davon werden hier WIRKLICH
+     zerschnitten - der vorhandene Polygonzug wird an einer senkrechten Linie geteilt und die
+     Schnittkante durch eine gezackte Bruchlinie ersetzt. Kein neuer Formendatensatz, keine neue
+     Tabelle; faellt eine Rumpfform weg, faellt hier automatisch ein Stueck weg statt falsch zu
+     zeichnen.
+
+     WAS STATISCH IST UND WAS SICH BEWEGT: Das Bild wird EINMAL gerendert und zwischengespeichert,
+     wie beim Vorposten und beim Nest - ein Marker, der pro Bild neu gemalt wird, kostet auf dem
+     Handy mehr als er wert ist. Die Bewegung tragen deshalb die Teile, die SVG bleiben: der
+     drehende Peilring und die blinkende Notbake. Genau deshalb driftet hier nichts.
+
+     WARUM EIN SCHLUESSEL UND NICHT EINER JE KONVOI: A2_MAX ist 2 galaxieweit. Zwei verschiedene
+     Bilder waeren zwei Renderlaeufe und doppelter Speicher fuer einen Unterschied, den bei 36 px
+     Kantenlaenge niemand sieht. */
+  const KONVOI_BILD = 168;                  // Kantenlaenge der gerenderten Kachel, wie beim Nest
+  const KONVOI_BILD_CACHE = {};
+  /* Zufall MIT SAAT. Math.random() waere hier falsch: Das Bild wird zwar nur einmal gerendert,
+     aber ein Zwischenspeicher, der beim Leeren ein anderes Bild liefert, ist ein Marker, der sich
+     ohne Anlass veraendert. Dieselbe Saat gibt immer dasselbe Wrack. */
+  function kvSaat(n){ const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); }
+  /* Teilt einen Rumpf bei `bei` (Anteil der Laenge) in zwei Polygone und ersetzt die gerade
+     Schnittkante durch eine gezackte Bruchlinie. Beide Haelften bekommen DIESELBE Zackenfolge,
+     damit sie sichtbar zusammengehoeren. Reicht eine Haelfte nicht fuer ein Polygon, gibt die
+     Funktion null zurueck und der Aufrufer laesst das Schiff weg - lieber ein Wrack weniger als
+     eine kaputte Form. */
+  function kvBruch(pts, bei, id){
+    const xs = pts.map(p => p[0]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const X = x0 + (x1 - x0) * bei;
+    const links = [], rechts = [];
+    for (let i = 0; i < pts.length; i++){
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      (a[0] <= X ? links : rechts).push(a);
+      if ((a[0] - X) * (b[0] - X) < 0){
+        const t = (X - a[0]) / (b[0] - a[0]);
+        links.push([X, a[1] + (b[1] - a[1]) * t]); rechts.push([X, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    if (links.length < 3 || rechts.length < 3) return null;
+    const kys = [...links, ...rechts].filter(p => Math.abs(p[0] - X) < 0.01).map(p => p[1]);
+    if (kys.length < 2) return [links, rechts];
+    /* Die gezackte Bruchkante. Erster und letzter Punkt liegen OHNE Versatz genau auf X: Sie sind
+       zugleich die Schnittpunkte des Rumpfes, und ein Versatz dort risse zwischen Kante und Rumpf
+       eine Luecke auf. Gezackt wird nur dazwischen. */
+    const yA = Math.min(...kys), yB = Math.max(...kys), n = 5, kante = [];
+    for (let i = 0; i <= n; i++){
+      const rand = (i === 0 || i === n);
+      kante.push([X + (rand ? 0 : (kvSaat(id * 7 + i) - 0.5) * (x1 - x0) * 0.10), yA + (yB - yA) * (i / n)]);
+    }
+    /* DER RING WIRD ROTIERT, NICHT GEFILTERT (Durchsicht 07.09.2026, gemessener Fehler).
+       Ein erster Entwurf warf die beiden Schnittpunkte einfach aus der Liste und haengte die
+       Bruchkante immer HINTEN an. Das stimmt nur, wenn die Schnittpunkte zufaellig am Listenende
+       liegen - und das tun sie fast nie: Alle Ruempfe in SHIP_HULL_DEFS beginnen am Bug, also am
+       groessten x, weshalb die rechte Haelfte ihre Schnittpunkte immer MITTEN in der Liste hat.
+       GEMESSEN am alten Stand: 5 der 6 Bruchstuecke waren ueberschlagen, das linke Frachterstueck
+       hatte Flaeche -24 statt rund -550 - es war zu einer Schleife kollabiert. Sichtbar war das
+       nicht, weil ein Wrack der eine Gegenstand ist, bei dem kaputte Geometrie wie Absicht aussieht.
+       Richtig ist: Die beiden Schnittpunkte teilen den Ring in zwei Boegen. Der Bogen mit den
+       echten Rumpfpunkten bleibt, der andere - die gerade Schnittkante - wird durch die gezackte
+       ersetzt, in der Richtung, die zu den Enden des Bogens passt. */
+    const zusammen = (ring) => {
+      const idx = [];
+      for (let i = 0; i < ring.length; i++) if (Math.abs(ring[i][0] - X) < 0.01) idx.push(i);
+      if (idx.length !== 2) return ring;          // nicht der Normalfall - lieber unveraendert
+      const [i1, i2] = idx;
+      const bogenA = ring.slice(i1, i2 + 1);
+      const bogenB = ring.slice(i2).concat(ring.slice(0, i1 + 1));
+      const echte = b => b.filter(p => Math.abs(p[0] - X) > 0.01).length;
+      const bogen = echte(bogenA) >= echte(bogenB) ? bogenA : bogenB;
+      const vonY = bogen[bogen.length - 1][1], nachY = bogen[0][1];
+      const gerichtet = (kante[0][1] <= kante[kante.length - 1][1]) === (vonY <= nachY)
+        ? kante : [...kante].reverse();
+      return bogen.concat(gerichtet.slice(1, -1));
+    };
+    return [zusammen(links), zusammen(rechts)];
+  }
+  /* Ein Bruchstueck, gezeichnet mit dem Massstab des GANZEN Rumpfes und nicht mit seinem eigenen -
+     sonst wird jede Scherbe auf dieselbe Laenge gestreckt und ein schmales Heckstueck sieht aus wie
+     ein langer duenner Splitter statt wie ein Drittel Frachter. `spanten` gibt an, auf welcher
+     Seite die Bruchkante liegt (-1 links, +1 rechts). */
+  function kvStueck(c, poly, s, mx, my, spanten){
+    const P = poly.map(p => [(p[0] - mx) * s, (p[1] - my) * s]);
+    const xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+    const hx0 = Math.min(...xs), hx1 = Math.max(...xs), hy0 = Math.min(...ys), hy1 = Math.max(...ys);
+    const L = Math.max(hx1 - hx0, hy1 - hy0);
+    const pfad = () => { c.beginPath(); P.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); };
+    // Koerper: Licht von oben links, Schatten unten rechts - dieselbe Richtung wie ueberall seit Buendel A.
+    const g = c.createLinearGradient(hx0, hy0, hx1, hy1);
+    g.addColorStop(0, '#5a5f70'); g.addColorStop(0.42, '#2a2f3b'); g.addColorStop(1, '#0d1017');
+    pfad(); c.fillStyle = g; c.fill();
+    c.save(); pfad(); c.clip();
+    // Freiliegende Spanten an der Bruchseite: die Rippen, die den Rumpf trugen. Sie sind das
+    // Merkmal, an dem man "aufgerissen" liest und nicht "dunkel angemalt".
+    const von = spanten > 0 ? hx0 : hx1, ri = spanten > 0 ? 1 : -1;
+    c.lineWidth = Math.max(0.6, L * 0.030);
+    for (let i = 0; i < 4; i++){
+      const x = von + ri * L * (0.04 + i * 0.070);
+      c.strokeStyle = 'rgba(0,0,0,0.60)';
+      c.beginPath(); c.moveTo(x, hy0); c.lineTo(x, hy1); c.stroke();
+      c.strokeStyle = 'rgba(186,196,216,0.26)';
+      c.beginPath(); c.moveTo(x + ri * L * 0.016, hy0); c.lineTo(x + ri * L * 0.016, hy1); c.stroke();
+    }
+    for (let i = 0; i < 5; i++){
+      const fx = hx0 + (hx1 - hx0) * kvSaat(i * 3.1 + 1), fy = hy0 + (hy1 - hy0) * kvSaat(i * 5.7 + 2);
+      const fr = L * (0.05 + 0.07 * kvSaat(i * 2.3 + 3));
+      const rg = c.createRadialGradient(fx, fy, 0, fx, fy, fr);
+      rg.addColorStop(0, 'rgba(0,0,0,0.45)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = rg; c.beginPath(); c.arc(fx, fy, fr, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+    pfad(); c.strokeStyle = 'rgba(0,0,0,0.75)'; c.lineWidth = Math.max(0.6, L * 0.020); c.stroke();
+    // Ein glimmender Saum NUR an der Bruchkante - Rot um das ganze Stueck laese sich als
+    // Leuchtschrift, nicht als heisses Metall.
+    c.save(); pfad(); c.clip();
+    const gl = c.createLinearGradient(von, 0, von + ri * L * 0.10, 0);
+    gl.addColorStop(0, 'rgba(226,110,74,0.26)'); gl.addColorStop(1, 'rgba(226,110,74,0)');
+    c.fillStyle = gl; c.fillRect(hx0, hy0, hx1 - hx0, hy1 - hy0);
+    c.restore();
+  }
+  /* Die drei Ruempfe: die groessten mit deutlich verschiedener Silhouette, damit man drei Dinge
+     erkennt statt dreimal dasselbe - und es sind Schiffe, die der Spieler selbst baut. */
+  const KONVOI_WRACKS = [
+    { key:'frachtergross', gr:0.80, bei:0.46, ax:-0.42, ay:-0.34, wi: 20 },
+    { key:'carrier',       gr:0.70, bei:0.58, ax: 0.46, ay: 0.30, wi:200 },
+    { key:'cruisers',      gr:0.50, bei:0.40, ax: 0.14, ay:-0.44, wi:118 }
+  ];
+  function kvZeichneWrackfeld(c, S){
+    const cx = S/2, cy = S/2, R = S * 0.26;
+    c.clearRect(0, 0, S, S);
+    // Schwacher Dunst statt der frueheren dunklen Scheibe: Er gibt dem Feld einen Kern, ohne es
+    // in eine Plakette zu sperren.
+    const dunst = c.createRadialGradient(cx, cy, 0, cx, cy, R * 1.35);
+    dunst.addColorStop(0, 'rgba(10,13,26,0.55)'); dunst.addColorStop(0.62, 'rgba(10,13,26,0.28)');
+    dunst.addColorStop(1, 'rgba(10,13,26,0)');
+    c.fillStyle = dunst; c.beginPath(); c.arc(cx, cy, R * 1.35, 0, Math.PI * 2); c.fill();
+    // Truemmerfeld: kleine Splitter zwischen den grossen Stuecken. Ohne sie stehen drei Objekte
+    // im Nichts statt in einem Feld.
+    for (let i = 0; i < 22; i++){
+      const a = kvSaat(i * 1.7) * Math.PI * 2, rr = R * (0.38 + 0.86 * kvSaat(i * 2.9));
+      const sr = R * (0.022 + 0.042 * kvSaat(i * 4.1));
+      c.save(); c.translate(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.82);
+      c.rotate(kvSaat(i * 6.3) * Math.PI);
+      c.fillStyle = i % 3 ? 'rgba(90,98,116,0.85)' : 'rgba(58,64,78,0.9)';
+      c.fillRect(-sr, -sr * 0.42, sr * 2, sr * 0.84);
+      c.restore();
+    }
+    KONVOI_WRACKS.forEach((teil, n) => {
+      const d = SHIP_HULL_DEFS[teil.key]; if (!d) return;
+      const st = kvBruch(d.pts, teil.bei, n + 1); if (!st) return;
+      const hxs = d.pts.map(p => p[0]), hys = d.pts.map(p => p[1]);
+      const hw = Math.max(...hxs) - Math.min(...hxs);
+      const mx = (Math.min(...hxs) + Math.max(...hxs)) / 2, my = (Math.min(...hys) + Math.max(...hys)) / 2;
+      const s2 = (R * 2 * teil.gr) / hw;      // EIN Massstab fuer beide Haelften desselben Schiffs
+      const drift = R * 0.055;
+      c.save();
+      c.translate(cx + R * teil.ax, cy + R * teil.ay);
+      c.rotate(teil.wi * Math.PI / 180);
+      st.forEach((poly, k) => {
+        c.save();
+        c.translate(k === 0 ? -drift : drift, k === 0 ? -drift * 0.42 : drift * 0.42);
+        c.rotate((k === 0 ? -1 : 1) * 0.10);
+        kvStueck(c, poly, s2, mx, my, k === 0 ? -1 : 1);
+        c.restore();
+      });
+      c.restore();
+    });
+    // Austretendes Gas am groessten Stueck: der einzige Hinweis darauf, dass das hier vor Kurzem
+    // noch ein Schiff war.
+    const gx = cx + R * KONVOI_WRACKS[0].ax, gy = cy + R * KONVOI_WRACKS[0].ay;
+    const gg = c.createRadialGradient(gx, gy, 0, gx, gy, R * 0.48);
+    gg.addColorStop(0, 'rgba(190,214,236,0.16)'); gg.addColorStop(0.55, 'rgba(150,180,210,0.06)');
+    gg.addColorStop(1, 'rgba(150,180,210,0)');
+    c.fillStyle = gg; c.beginPath(); c.arc(gx, gy, R * 0.48, 0, Math.PI * 2); c.fill();
+  }
+  function konvoiBildUrl(){
+    if (!('feld' in KONVOI_BILD_CACHE)){
+      try {
+        const cv = document.createElement('canvas'); cv.width = KONVOI_BILD; cv.height = KONVOI_BILD;
+        const c = cv.getContext('2d'); if (!c) throw new Error('kein 2D-Context');
+        kvZeichneWrackfeld(c, KONVOI_BILD);
+        KONVOI_BILD_CACHE.feld = cv.toDataURL();
+      } catch(e){ KONVOI_BILD_CACHE.feld = null; }
+    }
+    return KONVOI_BILD_CACHE.feld;
   }
   // Abklingzeit steht AM ZIEL (schlaege[uid]) und reist mit dem Galaxie-Zustand - ablesbar ohne
   // Serverfrage, wie bei Nest und Festung. Der Server bleibt Autoritaet (403 mit abklingzeit:true).
@@ -64516,20 +64706,45 @@ function sekSternUse(key, x, y, k, unentdeckt){
         platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
         const anteil = Math.max(0, Math.min(1, (k.lp||0) / Math.max(1, k.lpMax||1)));
         const b = r * 1.15;
-        // Drei angewinkelte Rumpf-Scherben auf leicht versetzten Bahnen - lose Truemmer, kein Zahnrad.
-        const scherben = [30, 150, 270].map((g, j) => {
-          const rad = g * Math.PI/180, rr = r * (0.5 + 0.12 * j);
-          const cx = coord.x + rr*Math.cos(rad), cy = coord.y + rr*Math.sin(rad), s = r * 0.32;
-          return `<polygon points="${(cx-s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy-s*0.8).toFixed(1)} ${(cx+s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+s*0.8).toFixed(1)}" fill="#8fd0ea" fill-opacity="0.85" stroke="#0a0d1a" stroke-width="0.6"/>`;
-        }).join('');
+        /* GR-10: das Wrackfeld als gerenderte Kachel (kvZeichneWrackfeld), wie Vorposten und Nest.
+           Der RUECKFALL bleibt die alte Zeichnung - ohne Canvas (oder wenn toDataURL wirft, etwa
+           bei abgeschalteten Bilddaten) stuende sonst gar nichts an der Stelle. Er zeichnet die
+           drei Scherben und die dunkle Scheibe, die das Bild sonst ersetzt. */
+        const kvUrl = konvoiBildUrl();
+        const kvS = r * 3.1;
+        const scherben = kvUrl
+          ? `<image href="${kvUrl}" x="${(coord.x - kvS/2).toFixed(1)}" y="${(coord.y - kvS/2).toFixed(1)}" width="${kvS.toFixed(1)}" height="${kvS.toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`
+          : `<circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.75).toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="#8fd0ea" stroke-width="1.2"/>`
+            + [30, 150, 270].map((g, j) => {
+                const rad = g * Math.PI/180, rr = r * (0.5 + 0.12 * j);
+                const cx = coord.x + rr*Math.cos(rad), cy = coord.y + rr*Math.sin(rad), s = r * 0.32;
+                return `<polygon points="${(cx-s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy-s*0.8).toFixed(1)} ${(cx+s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+s*0.8).toFixed(1)}" fill="#8fd0ea" fill-opacity="0.85" stroke="#0a0d1a" stroke-width="0.6"/>`;
+              }).join('');
+        /* Die Notbake bleibt SVG und blinkt: Das Bild ist zwischengespeichert und kann sich nicht
+           bewegen, und ein Marker ohne jede Regung liest sich als Kulisse statt als Ziel. Sie sagt
+           zugleich, warum sich der Konvoi ueberhaupt orten laesst - hier ist noch Strom. */
+        const bake = `<circle cx="${(coord.x + r*0.46).toFixed(1)}" cy="${(coord.y + r*0.30).toFixed(1)}" r="${(r*0.10).toFixed(2)}" fill="#ffdcd7">
+              <animate attributeName="opacity" values="1;0.15;1;0.15;1;0.15" dur="4s" repeatCount="indefinite"/>
+            </circle>`;
         inner += `
           <g class="planet-node" data-map-konvoi="${escapeHtml(String(k.id))}" style="cursor:pointer;">
             <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}%${konvoiAbklingBis(k) > Date.now() ? ' · dein nächster Schlag in ' + fmtDuration((konvoiAbklingBis(k) - Date.now())/1000) : ''} (antippen für das Menü)</title>
-            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4">
+            <!-- TREFFERFLAECHE, und sie ist hier PFLICHT (Durchsicht 07.09.2026, echter Befund).
+                 Bis GR-10 war der gefuellte dunkle Kern (r x 0,75) das einzige antippbare Kind des
+                 Markers. Der Umbau hat ihn in den Rueckfall verschoben und das neue Bild mit
+                 pointer-events="none" versehen - uebrig blieben ein gestrichelter Faden von 1,3
+                 Einheiten, eine Bake von 1,2 und der Rumpfbalken. In der MITTE, wo der Finger
+                 hingeht, war nichts mehr. Der unsichtbare Kreis liegt innerhalb des Platzes, den
+                 kbMarkerFrei mit sichtR = r x 1,6 ohnehin freihaelt, und traegt zugleich das
+                 Mindestmass von 44 px (KB_TAP_PX), das derselbe Befund bei Asteroiden und
+                 Vorposten schon gesetzt hat. Die Bestandstests fangen das NICHT: sie schicken das
+                 Klickereignis direkt an den Knoten und umgehen die Trefferpruefung. -->
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${Math.max(r*1.5, kbTrefferEinheiten()/2).toFixed(1)}" fill="transparent" stroke="none"/>
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4" pointer-events="none">
               <animateTransform attributeName="transform" type="rotate" from="0 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" to="360 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" dur="9s" repeatCount="indefinite"/>
             </circle>
-            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.75).toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="#8fd0ea" stroke-width="1.2"/>
             ${scherben}
+            ${bake}
             <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2*anteil).toFixed(1)}" height="2.6" fill="#8fd0ea"/>
             <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y - r - 6).toFixed(1)}" text-anchor="middle" style="fill:#8fd0ea;">Wrackkonvoi</text>
