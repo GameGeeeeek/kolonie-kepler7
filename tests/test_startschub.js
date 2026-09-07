@@ -19,11 +19,41 @@
 // GEGENPROBE (in beide Richtungen ausgefuehrt, per KEPLER_SPIELDATEI gegen origin/main v8.624.0):
 // siehe Pflichtliste am Ende dieses Kopfes.
 //
+// NACHGEZOGEN AM 07.09.2026, weil der Test rot war, ohne dass jemand etwas geaendert hatte.
+// Zwei Erwartungen von Abschnitt 7 waren eingetippt und mit dem Kalender falsch geworden; sie
+// leiten sich jetzt aus dem Generator-Block ab (siehe `jetztGalaxie` unten). Neu gemessene
+// Gegenproben fuer genau diese zwei Pruefungen:
+//   * Karte zaehlt wieder ALLE statt nur der sichtbaren Systeme (visSys -> STAR_SYSTEMS)
+//     -> 7-anker faellt, mit "aufDerKarte 115 gegen sichtbarLautGenerator 113". Diese
+//     Fehlerklasse konnte die alte eingetippte 111 gar nicht fangen.
+//   * der Startschub wird nicht mehr gemeldet -> 7a faellt (7b bleibt gruen: schubGesehen wird
+//     weiterhin gesetzt, das ist die richtige Aufteilung und kein Mangel).
+// Und die eigentliche Zusage, mit KEPLER_TESTZEIT belegt: gruen an allen vier gemessenen Daten
+// (heute 113, 28.09. 119, 16.11. 133, 01.06.2027 189 sichtbare Systeme).
+//
 // PFLICHTLISTE (gemessen am 02.09.2026, Prueflisten beider Laeufe per diff identisch, 30 Pruefungen):
 // am alten Stand fallen 27 - der ganze Quelltext-Teil (0-vorab, 0a und die 20 davon abhaengigen,
 // die fehlend() dann rot meldet statt sie zu ueberspringen), dazu 7-anker 7a 7b 8a 8b.
 // gruen bleiben MUESSEN (3): 7-vorab und 8-vorab (Boot ohne Skriptfehler), 8c (kepler ohne
 // Serverfeld traegt keine Gürtelbahn - die "hat nicht"-Haelfte des Paars, deshalb nie allein).
+/* DIE VORSTELLBARE UHR (KEPLER_TESTZEIT, 07.09.2026).
+   Dieser Test misst eine Galaxie, die mit dem KALENDER waechst - genau daran ist er am
+   07.09.2026 gefallen, ohne dass jemand etwas geaendert hatte. Die Erwartungen leiten sich
+   seitdem ab, statt eingetippt zu sein; diese Uhr ist der BELEG, dass das reicht:
+     KEPLER_TESTZEIT=2027-06-01 node tests/test_startschub.js
+   Gestellt werden BEIDE Uhren - die des Node-Prozesses (aus der `jetztGalaxie` rechnet) und die
+   der Seite (aus der das Spiel rechnet). Nur eine von beiden zu stellen erzeugte einen
+   Unterschied, den es im Betrieb nicht gibt, und der Test pruefte dann seine eigene Kulisse.
+   ERSETZT WIRD NUR Date.now (Hausregel aus dem Skill `neuer-test`): nie die Uhr-Hilfen des
+   Browsertreibers - die heilen versaeumte Timer nach - und nie ein Proxy um Date, der in eine
+   Endlosrekursion laeuft. */
+const TESTZEIT = process.env.KEPLER_TESTZEIT ? Date.parse(process.env.KEPLER_TESTZEIT) : 0;
+if (process.env.KEPLER_TESTZEIT && !isFinite(TESTZEIT)){
+  console.log('FAIL - KEPLER_TESTZEIT ist kein lesbares Datum: ' + process.env.KEPLER_TESTZEIT);
+  process.exit(1);
+}
+if (TESTZEIT) Date.now = () => TESTZEIT;
+
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -179,7 +209,7 @@ async function tab(browser, save, feld){
     if (p.startsWith('storage/')){ const k = decodeURIComponent(p.slice(8)); if (req.method() === 'PUT'){ puts.push(req.postData() || ''); return j({ ok: true, version: 2 }); } if (st[k] !== undefined) return j({ key: k, value: st[k], shared: true, version: 1 }); return j({ e: 1 }, 404); }
     return j({ ok: true });
   });
-  await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
+  await page.addInitScript((t) => { if (t) Date.now = () => t; localStorage.setItem('kepler7_token', 'tok'); }, TESTZEIT);
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3200);
   const logText = await page.evaluate(() => { const l = document.getElementById('log'); return l ? l.innerText : ''; });
@@ -189,13 +219,54 @@ async function tab(browser, save, feld){
 }
 const feldPlatz = (sys) => ({ [sys]: { plaetze: { 0: { frei: false, sorte: 'eisenkern', groesse: 'brocken', vorrat: 1000 } } } });
 
+/* DIE ZWEI ERWARTUNGEN VON ABSCHNITT 7 WERDEN ABGELEITET, NICHT EINGETIPPT (07.09.2026).
+   Hier standen "111 Sternsysteme" und der Fixture-Wert weeklySystemsSeen: 14. Beide waren am
+   02.09.2026 richtig und ab dem 07.09.2026 falsch, ohne dass jemand etwas geaendert haette:
+   WEEKLY_SYSTEM_EPOCH ist der 20.07.2026, und alle sieben Tage kommen zwei Systeme dazu
+   (WEEKLY_SYSTEMS_PER_WEEK = 2). 111 = 69 + 30 + 12 stimmte in Kalenderwoche 5; am 07.09.2026
+   waren 16 Wochensysteme gebaut, also 115. Und der Ueberhang von 16 - 14 = 2 liess das Spiel den
+   WOCHEN-Hinweis melden ("2 neue Sternsysteme kartiert: Ophioara-Void, Auris-Saum") statt des
+   Schub-Hinweises, den 7a messen will - die Pruefung mass ab da etwas anderes als ihren
+   Gegenstand.
+   Genau die Regel aus dem Skill `neuer-test`: gegen den GEMESSENEN Ausgangsstand vergleichen,
+   nie gegen eingetippte Zahlen. Beide Groessen kommen jetzt aus dem Generator-Block des Spiels,
+   also aus derselben Rechnung, die auch die Karte benutzt. */
+const jetztGalaxie = (() => {
+  const h = neueGalaxie();
+  h.extendWeeklySystems(Date.now());
+  const basisUndSchub = h.BASE_STAR_SYSTEM_COUNT + h.SCHUB_SYSTEM_COUNT;
+  /* SICHTBAR ist nicht GEBAUT, und der Unterschied ist der eigentliche Gewinn dieser Ableitung:
+     Die Karte schreibt `visSys.length + ' Sternsysteme kartiert'`, und visSys laesst die
+     VERSTECKTEN Systeme (zenith, tiefsee) weg - sie tauchen erst nach ihrer Entdeckung auf.
+     Die alte eingetippte 111 verbarg diese Regel; gemessen baut der Generator heute 115 und die
+     Karte zeigt 113. Der Fixture entdeckt nichts (`discovered: {}`), also fallen beide weg.
+     Gezaehlt wird das Merkmal, nicht die Zahl 2 - ein drittes verstecktes System zieht hier
+     automatisch mit. */
+  const versteckt = h.STAR_SYSTEMS.filter(x => x.hidden).length;
+  return { gesamt: h.STAR_SYSTEMS.length, versteckt, sichtbar: h.STAR_SYSTEMS.length - versteckt,
+           wochen: h.STAR_SYSTEMS.length - basisUndSchub };
+})();
+
 (async () => {
   const browser = await starteBrowser();
   // 7) Bestandskonto (weeklySystemsSeen gesetzt): der Hinweis kommt genau einmal.
   {
-    const t = await tab(browser, spielstand({ weeklySystemsSeen: 14 }), { systeme: [], felder: {} });
+    /* weeklySystemsSeen auf den HEUTE gebauten Stand: Nur dann ist der Wochen-Ueberhang null und
+       der Schub-Hinweis das, was gemessen wird. Ein fester Wert misst nach dem naechsten
+       Wochenwechsel den Wochen-Hinweis statt des Schub-Hinweises. */
+    const t = await tab(browser, spielstand({ weeklySystemsSeen: jetztGalaxie.wochen }), { systeme: [], felder: {} });
     check('7-vorab: Boot ohne Skriptfehler', t.errs.length === 0, t.errs.slice(0, 2));
-    check('7-anker: die Karte kennt 111 Sternsysteme', await t.page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); return true; }) && (await (async () => { await t.page.waitForTimeout(1200); return t.page.evaluate(() => /111 Sternsysteme/.test((document.querySelector('#tab-karte') || document.body).innerText)); })()));
+    await t.page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
+    await t.page.waitForTimeout(1200);
+    const kartenZahl = await t.page.evaluate(() => {
+      const txt = (document.querySelector('#tab-karte') || document.body).innerText;
+      const m = txt.match(/(\d+)\s+Sternsysteme/);
+      return m ? Number(m[1]) : null;
+    });
+    check('7-anker: die Karte zeigt so viele Sternsysteme, wie der Generator SICHTBAR baut',
+      kartenZahl === jetztGalaxie.sichtbar,
+      { aufDerKarte: kartenZahl, sichtbarLautGenerator: jetztGalaxie.sichtbar,
+        gebaut: jetztGalaxie.gesamt, versteckt: jetztGalaxie.versteckt, davonWochen: jetztGalaxie.wochen });
     check('7a: der Hinweis auf die 30 neuen Systeme steht im Protokoll', /Fernaufklärung hat 30 neue Sternsysteme kartiert/.test(t.logText), t.logText.slice(0, 120));
     await t.page.waitForTimeout(2500);
     check('7b: der Spielstand merkt sich den Hinweis (schubGesehen), damit er kein zweites Mal kommt', t.puts.some(b => /schubGesehen[\\"]+:\s*true/.test(b)), { puts: t.puts.length });
@@ -204,7 +275,7 @@ const feldPlatz = (sys) => ({ [sys]: { plaetze: { 0: { frei: false, sorte: 'eise
   // 8) Die Gürtelliste des Servers hat Vorrang: vega (nicht in der lokalen Auswahl) traegt die Gürtelbahn,
   //    kepler (lokal Gürtel, aber ohne Serverfeld) nicht - beide Haelften des Paars.
   {
-    const t = await tab(browser, spielstand({ weeklySystemsSeen: 14, schubGesehen: true }), { systeme: ['vega', 'orion'], felder: Object.assign({}, feldPlatz('vega'), feldPlatz('orion')) });
+    const t = await tab(browser, spielstand({ weeklySystemsSeen: jetztGalaxie.wochen, schubGesehen: true }), { systeme: ['vega', 'orion'], felder: Object.assign({}, feldPlatz('vega'), feldPlatz('orion')) });
     check('8-vorab: Boot ohne Skriptfehler', t.errs.length === 0, t.errs.slice(0, 2));
     const bahn = async (sys) => { await t.page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); }); await t.page.waitForTimeout(800); await oeffneSystemUeberSektoren(t.page, sys); await t.page.waitForTimeout(1200);
       return t.page.evaluate(() => { const L = document.getElementById('galaxySystemLayer'); return !!(L && [...L.querySelectorAll('ellipse')].some(e => e.getAttribute('stroke') === '#c9c7bd' && e.getAttribute('stroke-dasharray') === '1,7')); }); };
