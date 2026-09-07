@@ -41,9 +41,18 @@
 //       Dieselbe Lehre, in der Form, die auch freistehende Beschriftungen erfasst.
 //   1g  Keine überdeckte Beschriftung blieb mangels Bezugsgröße ungeprüft. Der Wächter zählt aus,
 //       was er NICHT beurteilen konnte - sonst wäre 1c grün, sobald die Bezugsmessung wegfällt.
+//   1h  Keine Beschriftung liegt auf dem KÖRPER ihres EIGENEN Objekts. Das ist der Fehler, den die
+//       Regel beim Bauen zweimal gemacht hat: "über das eigene Objekt hinweg" wurde zu "mitten
+//       darauf". Gefunden hat ihn beide Male der Bestandstest test_kartenbeschriftung, nicht dieser
+//       Wächter - der klammerte das eigene Objekt aus, genau wie die fehlerhafte Umsetzung.
 //
-// GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor der Reparatur (`git show 890ff38:weltraum_kolonie.html`),
-// Aufruf mit KEPLER_ENTFLECHTER_GEGENPROBE=alt. Die unten GEMESSENE Liste muss dort fallen.
+// GEGENPROBE IN ZWEI RICHTUNGEN, beide gemessen:
+//   alt      `git show 890ff38:weltraum_kolonie.html` - der Stand VOR der Reparatur. Dort fällt 1b.
+//   entwurf  `git show 479b1f5:weltraum_kolonie.html` - mein EIGENER erster Entwurf, der die
+//            Gegenrichtung ohne Rücksicht auf das eigene Objekt probierte. Dort fällt 1h, und nur
+//            1h. Dieser zweite Stand ist der wertvollere von beiden: Er ist kein historischer
+//            Zustand, sondern ein Fehler, der beim Bauen dieser Etappe wirklich passiert ist.
+// Aufruf: KEPLER_SPIELDATEI=<kopie> KEPLER_ENTFLECHTER_GEGENPROBE=alt|entwurf
 const { starteBrowser, SPIEL_URL, ruhigeUhren, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check: rohCheck, ende } = pruefer();
@@ -51,14 +60,20 @@ const ergebnis = {};
 const check = (name, bedingung, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bedingung; rohCheck(name, bedingung, zusatz); };
 
 const SAB = process.env.KEPLER_ENTFLECHTER_GEGENPROBE || '';
-/* GEMESSEN gegen 890ff38 (Stand vor KB-22), nicht geschätzt. 1a fehlt hier bewusst: Es ist die
+/* GEMESSEN, nicht geschätzt - und dreimal nach unten korrigiert, weil die Messung mein Bauchgefühl
+   jedes Mal widerlegt hat (erst 1e, dann 1g, dann 1c). 1a fehlt hier bewusst: Es ist die
    Vorbedingung (das Gürtelsystem zeigt überhaupt genug Objekte), gilt an beiden Ständen und
    belegt nichts über die Reparatur. 1d und 1e gelten am alten Stand ebenfalls - der alte Code
    überschritt den Rahmen nie und verirrte keine Beschriftung, er blieb einfach liegen. 1g gilt
    dort ebenfalls: Die Kürzel der Vorkommen überlappen am alten Stand zwar sichtbar, aber nicht die
-   GEMESSENE Fläche, an der 1c ansetzt - also gibt es dort auch nichts zu übergehen. Ein erster
-   Entwurf hatte 1e und 1g mit aufgelistet; beide Male hat die Messung das widerlegt. */
-const MUSS_FALLEN = { alt: ['1b', '1c'] };
+   GEMESSENE Fläche, an der 1c ansetzt - also gibt es dort auch nichts zu übergehen.
+   1c steht ebenfalls nicht mehr drin, und das ist die interessanteste der drei Streichungen: Vor
+   der Korrektur des blinden Flecks (eigenes Objekt bei verschobenen Plätzen) fiel 1c am alten
+   Stand - aber aus dem FALSCHEN Grund. Es hielt die eigene Planetenscheibe für einen freien Platz.
+   Mit der richtigen Regel erfüllen beide Stände 1c, und nur 1b unterscheidet sie noch. Eine
+   Prüfung, die aus dem falschen Grund rot ist, ist genauso wertlos wie eine, die aus dem falschen
+   Grund grün ist. */
+const MUSS_FALLEN = { alt: ['1b'], entwurf: ['1h'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
@@ -222,9 +237,15 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
     for (let v = 1; v <= 2; v++) plaetze.push({ dy: -richtung*7*v, dx: 0 });
     for (const s of [8, -8, 12, -12]) plaetze.push({ dy: 0, dx: s });
     const andere = l.labels.filter(y => y !== x).map(y => y.box);
+    /* Das EIGENE Objekt zählt bei einem verschobenen Platz mit - genau wie in der Umsetzung.
+       Ohne diese Zeile hatte diese Prüfung denselben blinden Fleck wie der erste Entwurf der
+       Regel selbst und meldete "2 Plätze frei" für Stellen, an denen die eigene Planetenscheibe
+       liegt (gemessen am 07.09.2026). Ein Wächter, der eine andere Regel prüft als die, die
+       gilt, ist schlimmer als keiner. */
     const frei = plaetze.filter(p => {
       const k = { x: start.x + p.dx, y: start.y + p.dy, w: start.w, h: start.h };
-      return !l.flaechen.some(f => f.nr !== x.eigenNr && schneidet(k, f.b)) && !andere.some(a => schneidet(k, a));
+      const versetzt = !!(p.dx || p.dy);
+      return !l.flaechen.some(f => (versetzt || f.nr !== x.eigenNr) && schneidet(k, f.b)) && !andere.some(a => schneidet(k, a));
     });
     if (frei.length) versaeumt.push(x.text + ' liegt auf ' + draufliegend.map(f => f.art).join('/') +
       ', obwohl ' + frei.length + ' Plätze frei sind (z. B. dy=' + frei[0].dy + ' dx=' + frei[0].dx + ')');
@@ -262,6 +283,14 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
   }
   check('1e: keine Beschriftung steht näher an einem fremden Objekt als am eigenen',
     verirrt.length === 0, verirrt.join(' | ') || 'keine');
+
+  /* 1h ist der Wächter über genau den Fehler, den die Regel zweimal gemacht hat: Eine Beschriftung
+     nach oben "über ihr eigenes Objekt hinweg" zu schieben und dabei DARAUF zu landen. Gemessen
+     wird gegen den KÖRPER, nicht gegen die Gruppe - die Beschriftung ist selbst Teil ihrer Gruppe,
+     deren Box sie also immer vollständig enthält, und die Prüfung wäre sonst nie grün. */
+  const aufSichSelbst = namen.filter(x => schneidet(x.box, l.flaechen[x.eigenNr].b)).map(x => x.text);
+  check('1h: keine Beschriftung liegt auf dem Körper ihres eigenen Objekts',
+    aufSichSelbst.length === 0, aufSichSelbst.join(' | ') || 'keine');
 
   check('1f: keine Skriptfehler beim Zeichnen', fehler.length === 0, fehler.slice(0, 2).join(' | ') || 'keine');
 

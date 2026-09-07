@@ -64512,21 +64512,30 @@ function sekSternUse(key, x, y, k, unentdeckt){
          (<), damit bei Gleichstand der weiter vorn stehende - und das heißt: der näher am eigenen
          Objekt liegende - Platz gewinnt. */
       if (!wahl){
+        /* ZWEI Kennzahlen, in dieser Reihenfolge verglichen: erst die Fläche auf einer
+           PLANETENSCHEIBE, dann die Gesamtfläche. Eine Scheibe ist der grösste, hellste und
+           texturierteste Körper auf der Karte - Text darauf ist unlesbar, Text auf einem schmalen
+           Asteroidenmarker nur unschön. Genau diese Rangfolge hält der Bestandstest seit KB-16
+           fest, und ohne sie tauscht die Wahl das eine gegen das andere: GEMESSEN am 07.09.2026
+           schob ein erster Entwurf erst "Draconis", nach dessen Reparatur dann "Sporenherd" auf
+           eine fremde Scheibe - jedes Mal, weil die reine Summe das für einen Fortschritt hielt. */
         const ueberdeckung = (k, mitEigenem) => {
-          let summe = 0;
-          const dazu = f => {
+          let summe = 0, scheibe = 0;
+          const dazu = (f, istScheibe) => {
             const ox = Math.min(k.x + k.w, f.x + f.w) - Math.max(k.x, f.x);
             const oy = Math.min(k.y + k.h, f.y + f.h) - Math.max(k.y, f.y);
-            if (ox > 0 && oy > 0) summe += ox * oy;
+            if (ox > 0 && oy > 0){ summe += ox * oy; if (istScheibe) scheibe += ox * oy; }
           };
-          for (const f of flaechen) if (mitEigenem || f.g !== eigen) dazu(f);
-          for (const g of gesetzt) dazu(g);
-          return summe;
+          for (const f of flaechen) if (mitEigenem || f.g !== eigen) dazu(f, !!f.g.getAttribute('data-planet'));
+          for (const g of gesetzt) dazu(g, false);
+          return { scheibe, summe };
         };
-        let beste = Infinity;
+        let beste = null;
         for (const p of plaetze){
           const k = kastenAn(p), f = ueberdeckung(k, versetzt(p));
-          if (f < beste) { beste = f; wahl = p; kasten = k; }
+          if (!beste || f.scheibe < beste.scheibe || (f.scheibe === beste.scheibe && f.summe < beste.summe)){
+            beste = f; wahl = p; kasten = k;
+          }
         }
       }
       versatz = wahl.dy; seitlich = wahl.dx;
