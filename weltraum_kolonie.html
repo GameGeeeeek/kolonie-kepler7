@@ -12147,6 +12147,173 @@
     const rad = (60 + (index || 0) * 72) * Math.PI / 180;
     return { x: SUN_X + rx*Math.cos(rad), y: SUN_Y + ry*Math.sin(rad) };
   }
+  /* ---- Das Wrackfeld als gerendertes Bild (GR-10, 07.09.2026) --------------------------------
+     VORHER standen hier drei gleiche cyanfarbene Rauten auf dem Peilring. Sie sagten nichts
+     darueber, WAS das Objekt ist - und der Konvoi war damit das letzte Kartenobjekt, das noch
+     flaches SVG war: Vorposten (vorpostenSilhouette), Nester (nestBildUrl) und Festungen sind
+     seit der Grafik-Runde gerenderte <image>-Kacheln.
+
+     DIE IDEE IST EINE ERSPARNIS, KEINE ERFINDUNG: Ein Wrackkonvoi besteht aus kaputten Schiffen,
+     und 46 Rumpfformen liegen seit Langem in SHIP_HULL_DEFS. Drei davon werden hier WIRKLICH
+     zerschnitten - der vorhandene Polygonzug wird an einer senkrechten Linie geteilt und die
+     Schnittkante durch eine gezackte Bruchlinie ersetzt. Kein neuer Formendatensatz, keine neue
+     Tabelle; faellt eine Rumpfform weg, faellt hier automatisch ein Stueck weg statt falsch zu
+     zeichnen.
+
+     WAS STATISCH IST UND WAS SICH BEWEGT: Das Bild wird EINMAL gerendert und zwischengespeichert,
+     wie beim Vorposten und beim Nest - ein Marker, der pro Bild neu gemalt wird, kostet auf dem
+     Handy mehr als er wert ist. Die Bewegung tragen deshalb die Teile, die SVG bleiben: der
+     drehende Peilring und die blinkende Notbake. Genau deshalb driftet hier nichts.
+
+     WARUM EIN SCHLUESSEL UND NICHT EINER JE KONVOI: A2_MAX ist 2 galaxieweit. Zwei verschiedene
+     Bilder waeren zwei Renderlaeufe und doppelter Speicher fuer einen Unterschied, den bei 36 px
+     Kantenlaenge niemand sieht. */
+  const KONVOI_BILD = 168;                  // Kantenlaenge der gerenderten Kachel, wie beim Nest
+  const KONVOI_BILD_CACHE = {};
+  /* Zufall MIT SAAT. Math.random() waere hier falsch: Das Bild wird zwar nur einmal gerendert,
+     aber ein Zwischenspeicher, der beim Leeren ein anderes Bild liefert, ist ein Marker, der sich
+     ohne Anlass veraendert. Dieselbe Saat gibt immer dasselbe Wrack. */
+  function kvSaat(n){ const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); }
+  /* Teilt einen Rumpf bei `bei` (Anteil der Laenge) in zwei Polygone und ersetzt die gerade
+     Schnittkante durch eine gezackte Bruchlinie. Beide Haelften bekommen DIESELBE Zackenfolge,
+     damit sie sichtbar zusammengehoeren. Reicht eine Haelfte nicht fuer ein Polygon, gibt die
+     Funktion null zurueck und der Aufrufer laesst das Schiff weg - lieber ein Wrack weniger als
+     eine kaputte Form. */
+  function kvBruch(pts, bei, id){
+    const xs = pts.map(p => p[0]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const X = x0 + (x1 - x0) * bei;
+    const links = [], rechts = [];
+    for (let i = 0; i < pts.length; i++){
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      (a[0] <= X ? links : rechts).push(a);
+      if ((a[0] - X) * (b[0] - X) < 0){
+        const t = (X - a[0]) / (b[0] - a[0]);
+        links.push([X, a[1] + (b[1] - a[1]) * t]); rechts.push([X, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    if (links.length < 3 || rechts.length < 3) return null;
+    const kys = [...links, ...rechts].filter(p => Math.abs(p[0] - X) < 0.01).map(p => p[1]);
+    if (kys.length < 2) return [links, rechts];
+    const yA = Math.min(...kys), yB = Math.max(...kys), n = 5, kante = [];
+    for (let i = 0; i <= n; i++){
+      kante.push([X + (kvSaat(id * 7 + i) - 0.5) * (x1 - x0) * 0.10, yA + (yB - yA) * (i / n)]);
+    }
+    const ohne = (arr, hinten) => {
+      const rein = arr.filter(p => Math.abs(p[0] - X) > 0.01);
+      return hinten ? rein.concat(kante) : rein.concat([...kante].reverse());
+    };
+    return [ohne(links, true), ohne(rechts, false)];
+  }
+  /* Ein Bruchstueck, gezeichnet mit dem Massstab des GANZEN Rumpfes und nicht mit seinem eigenen -
+     sonst wird jede Scherbe auf dieselbe Laenge gestreckt und ein schmales Heckstueck sieht aus wie
+     ein langer duenner Splitter statt wie ein Drittel Frachter. `spanten` gibt an, auf welcher
+     Seite die Bruchkante liegt (-1 links, +1 rechts). */
+  function kvStueck(c, poly, s, mx, my, spanten){
+    const P = poly.map(p => [(p[0] - mx) * s, (p[1] - my) * s]);
+    const xs = P.map(p => p[0]), ys = P.map(p => p[1]);
+    const hx0 = Math.min(...xs), hx1 = Math.max(...xs), hy0 = Math.min(...ys), hy1 = Math.max(...ys);
+    const L = Math.max(hx1 - hx0, hy1 - hy0);
+    const pfad = () => { c.beginPath(); P.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); };
+    // Koerper: Licht von oben links, Schatten unten rechts - dieselbe Richtung wie ueberall seit Buendel A.
+    const g = c.createLinearGradient(hx0, hy0, hx1, hy1);
+    g.addColorStop(0, '#5a5f70'); g.addColorStop(0.42, '#2a2f3b'); g.addColorStop(1, '#0d1017');
+    pfad(); c.fillStyle = g; c.fill();
+    c.save(); pfad(); c.clip();
+    // Freiliegende Spanten an der Bruchseite: die Rippen, die den Rumpf trugen. Sie sind das
+    // Merkmal, an dem man "aufgerissen" liest und nicht "dunkel angemalt".
+    const von = spanten > 0 ? hx0 : hx1, ri = spanten > 0 ? 1 : -1;
+    c.lineWidth = Math.max(0.6, L * 0.030);
+    for (let i = 0; i < 4; i++){
+      const x = von + ri * L * (0.04 + i * 0.070);
+      c.strokeStyle = 'rgba(0,0,0,0.60)';
+      c.beginPath(); c.moveTo(x, hy0); c.lineTo(x, hy1); c.stroke();
+      c.strokeStyle = 'rgba(186,196,216,0.26)';
+      c.beginPath(); c.moveTo(x + ri * L * 0.016, hy0); c.lineTo(x + ri * L * 0.016, hy1); c.stroke();
+    }
+    for (let i = 0; i < 5; i++){
+      const fx = hx0 + (hx1 - hx0) * kvSaat(i * 3.1 + 1), fy = hy0 + (hy1 - hy0) * kvSaat(i * 5.7 + 2);
+      const fr = L * (0.05 + 0.07 * kvSaat(i * 2.3 + 3));
+      const rg = c.createRadialGradient(fx, fy, 0, fx, fy, fr);
+      rg.addColorStop(0, 'rgba(0,0,0,0.45)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = rg; c.beginPath(); c.arc(fx, fy, fr, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+    pfad(); c.strokeStyle = 'rgba(0,0,0,0.75)'; c.lineWidth = Math.max(0.6, L * 0.020); c.stroke();
+    // Ein glimmender Saum NUR an der Bruchkante - Rot um das ganze Stueck laese sich als
+    // Leuchtschrift, nicht als heisses Metall.
+    c.save(); pfad(); c.clip();
+    const gl = c.createLinearGradient(von, 0, von + ri * L * 0.10, 0);
+    gl.addColorStop(0, 'rgba(226,110,74,0.26)'); gl.addColorStop(1, 'rgba(226,110,74,0)');
+    c.fillStyle = gl; c.fillRect(hx0, hy0, hx1 - hx0, hy1 - hy0);
+    c.restore();
+  }
+  /* Die drei Ruempfe: die groessten mit deutlich verschiedener Silhouette, damit man drei Dinge
+     erkennt statt dreimal dasselbe - und es sind Schiffe, die der Spieler selbst baut. */
+  const KONVOI_WRACKS = [
+    { key:'frachtergross', gr:0.80, bei:0.46, ax:-0.42, ay:-0.34, wi: 20 },
+    { key:'carrier',       gr:0.70, bei:0.58, ax: 0.46, ay: 0.30, wi:200 },
+    { key:'cruisers',      gr:0.50, bei:0.40, ax: 0.14, ay:-0.44, wi:118 }
+  ];
+  function kvZeichneWrackfeld(c, S){
+    const cx = S/2, cy = S/2, R = S * 0.26;
+    c.clearRect(0, 0, S, S);
+    // Schwacher Dunst statt der frueheren dunklen Scheibe: Er gibt dem Feld einen Kern, ohne es
+    // in eine Plakette zu sperren.
+    const dunst = c.createRadialGradient(cx, cy, 0, cx, cy, R * 1.35);
+    dunst.addColorStop(0, 'rgba(10,13,26,0.55)'); dunst.addColorStop(0.62, 'rgba(10,13,26,0.28)');
+    dunst.addColorStop(1, 'rgba(10,13,26,0)');
+    c.fillStyle = dunst; c.beginPath(); c.arc(cx, cy, R * 1.35, 0, Math.PI * 2); c.fill();
+    // Truemmerfeld: kleine Splitter zwischen den grossen Stuecken. Ohne sie stehen drei Objekte
+    // im Nichts statt in einem Feld.
+    for (let i = 0; i < 22; i++){
+      const a = kvSaat(i * 1.7) * Math.PI * 2, rr = R * (0.38 + 0.86 * kvSaat(i * 2.9));
+      const sr = R * (0.022 + 0.042 * kvSaat(i * 4.1));
+      c.save(); c.translate(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 0.82);
+      c.rotate(kvSaat(i * 6.3) * Math.PI);
+      c.fillStyle = i % 3 ? 'rgba(90,98,116,0.85)' : 'rgba(58,64,78,0.9)';
+      c.fillRect(-sr, -sr * 0.42, sr * 2, sr * 0.84);
+      c.restore();
+    }
+    KONVOI_WRACKS.forEach((teil, n) => {
+      const d = SHIP_HULL_DEFS[teil.key]; if (!d) return;
+      const st = kvBruch(d.pts, teil.bei, n + 1); if (!st) return;
+      const hxs = d.pts.map(p => p[0]), hys = d.pts.map(p => p[1]);
+      const hw = Math.max(...hxs) - Math.min(...hxs);
+      const mx = (Math.min(...hxs) + Math.max(...hxs)) / 2, my = (Math.min(...hys) + Math.max(...hys)) / 2;
+      const s2 = (R * 2 * teil.gr) / hw;      // EIN Massstab fuer beide Haelften desselben Schiffs
+      const drift = R * 0.055;
+      c.save();
+      c.translate(cx + R * teil.ax, cy + R * teil.ay);
+      c.rotate(teil.wi * Math.PI / 180);
+      st.forEach((poly, k) => {
+        c.save();
+        c.translate(k === 0 ? -drift : drift, k === 0 ? -drift * 0.42 : drift * 0.42);
+        c.rotate((k === 0 ? -1 : 1) * 0.10);
+        kvStueck(c, poly, s2, mx, my, k === 0 ? -1 : 1);
+        c.restore();
+      });
+      c.restore();
+    });
+    // Austretendes Gas am groessten Stueck: der einzige Hinweis darauf, dass das hier vor Kurzem
+    // noch ein Schiff war.
+    const gx = cx + R * KONVOI_WRACKS[0].ax, gy = cy + R * KONVOI_WRACKS[0].ay;
+    const gg = c.createRadialGradient(gx, gy, 0, gx, gy, R * 0.48);
+    gg.addColorStop(0, 'rgba(190,214,236,0.16)'); gg.addColorStop(0.55, 'rgba(150,180,210,0.06)');
+    gg.addColorStop(1, 'rgba(150,180,210,0)');
+    c.fillStyle = gg; c.beginPath(); c.arc(gx, gy, R * 0.48, 0, Math.PI * 2); c.fill();
+  }
+  function konvoiBildUrl(){
+    if (!('feld' in KONVOI_BILD_CACHE)){
+      try {
+        const cv = document.createElement('canvas'); cv.width = KONVOI_BILD; cv.height = KONVOI_BILD;
+        const c = cv.getContext('2d'); if (!c) throw new Error('kein 2D-Context');
+        kvZeichneWrackfeld(c, KONVOI_BILD);
+        KONVOI_BILD_CACHE.feld = cv.toDataURL();
+      } catch(e){ KONVOI_BILD_CACHE.feld = null; }
+    }
+    return KONVOI_BILD_CACHE.feld;
+  }
   // Abklingzeit steht AM ZIEL (schlaege[uid]) und reist mit dem Galaxie-Zustand - ablesbar ohne
   // Serverfrage, wie bei Nest und Festung. Der Server bleibt Autoritaet (403 mit abklingzeit:true).
   function konvoiAbklingBis(k){
@@ -64516,20 +64683,34 @@ function sekSternUse(key, x, y, k, unentdeckt){
         platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
         const anteil = Math.max(0, Math.min(1, (k.lp||0) / Math.max(1, k.lpMax||1)));
         const b = r * 1.15;
-        // Drei angewinkelte Rumpf-Scherben auf leicht versetzten Bahnen - lose Truemmer, kein Zahnrad.
-        const scherben = [30, 150, 270].map((g, j) => {
-          const rad = g * Math.PI/180, rr = r * (0.5 + 0.12 * j);
-          const cx = coord.x + rr*Math.cos(rad), cy = coord.y + rr*Math.sin(rad), s = r * 0.32;
-          return `<polygon points="${(cx-s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy-s*0.8).toFixed(1)} ${(cx+s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+s*0.8).toFixed(1)}" fill="#8fd0ea" fill-opacity="0.85" stroke="#0a0d1a" stroke-width="0.6"/>`;
-        }).join('');
+        /* GR-10: das Wrackfeld als gerenderte Kachel (kvZeichneWrackfeld), wie Vorposten und Nest.
+           Der RUECKFALL bleibt die alte Zeichnung - ohne Canvas (oder wenn toDataURL wirft, etwa
+           bei abgeschalteten Bilddaten) stuende sonst gar nichts an der Stelle. Er zeichnet die
+           drei Scherben und die dunkle Scheibe, die das Bild sonst ersetzt. */
+        const kvUrl = konvoiBildUrl();
+        const kvS = r * 3.1;
+        const scherben = kvUrl
+          ? `<image href="${kvUrl}" x="${(coord.x - kvS/2).toFixed(1)}" y="${(coord.y - kvS/2).toFixed(1)}" width="${kvS.toFixed(1)}" height="${kvS.toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/>`
+          : `<circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.75).toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="#8fd0ea" stroke-width="1.2"/>`
+            + [30, 150, 270].map((g, j) => {
+                const rad = g * Math.PI/180, rr = r * (0.5 + 0.12 * j);
+                const cx = coord.x + rr*Math.cos(rad), cy = coord.y + rr*Math.sin(rad), s = r * 0.32;
+                return `<polygon points="${(cx-s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy-s*0.8).toFixed(1)} ${(cx+s).toFixed(1)},${cy.toFixed(1)} ${cx.toFixed(1)},${(cy+s*0.8).toFixed(1)}" fill="#8fd0ea" fill-opacity="0.85" stroke="#0a0d1a" stroke-width="0.6"/>`;
+              }).join('');
+        /* Die Notbake bleibt SVG und blinkt: Das Bild ist zwischengespeichert und kann sich nicht
+           bewegen, und ein Marker ohne jede Regung liest sich als Kulisse statt als Ziel. Sie sagt
+           zugleich, warum sich der Konvoi ueberhaupt orten laesst - hier ist noch Strom. */
+        const bake = `<circle cx="${(coord.x + r*0.46).toFixed(1)}" cy="${(coord.y + r*0.30).toFixed(1)}" r="${(r*0.10).toFixed(2)}" fill="#ffdcd7">
+              <animate attributeName="opacity" values="1;0.15;1;0.15;1;0.15" dur="4s" repeatCount="indefinite"/>
+            </circle>`;
         inner += `
           <g class="planet-node" data-map-konvoi="${escapeHtml(String(k.id))}" style="cursor:pointer;">
             <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}%${konvoiAbklingBis(k) > Date.now() ? ' · dein nächster Schlag in ' + fmtDuration((konvoiAbklingBis(k) - Date.now())/1000) : ''} (antippen für das Menü)</title>
             <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4">
               <animateTransform attributeName="transform" type="rotate" from="0 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" to="360 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" dur="9s" repeatCount="indefinite"/>
             </circle>
-            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*0.75).toFixed(1)}" fill="rgba(10,13,26,0.55)" stroke="#8fd0ea" stroke-width="1.2"/>
             ${scherben}
+            ${bake}
             <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(coord.x - b).toFixed(1)}" y="${(coord.y + r*0.95).toFixed(1)}" width="${(b*2*anteil).toFixed(1)}" height="2.6" fill="#8fd0ea"/>
             <text class="planet-label" x="${coord.x.toFixed(1)}" y="${(coord.y - r - 6).toFixed(1)}" text-anchor="middle" style="fill:#8fd0ea;">Wrackkonvoi</text>
