@@ -64528,7 +64528,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Beide sind genau der Tausch, den eine einzige Summe nicht sehen kann: Sie wurde kleiner,
            während der Schaden woanders neu entstand. */
         const bewerte = (k, mitEigenem) => {
-          let scheibe = 0, objekt = 0, label = 0;
+          let mitten = 0, scheibe = 0, objekt = 0, label = 0;
           const flaeche = f => {
             const ox = Math.min(k.x + k.w, f.x + f.w) - Math.max(k.x, f.x);
             const oy = Math.min(k.y + k.h, f.y + f.h) - Math.max(k.y, f.y);
@@ -64537,20 +64537,36 @@ function sekSternUse(key, x, y, k, unentdeckt){
           for (const f of flaechen){
             if (!mitEigenem && f.g === eigen) continue;
             const a = flaeche(f);
-            if (a) { if (f.g.getAttribute('data-planet')) scheibe += a; else objekt += a; }
+            if (!a) continue;
+            if (f.g.getAttribute('data-planet')) scheibe += a; else objekt += a;
+            // Die MITTE ist der teure Teil: Dort ist der Marker nicht nur verdeckt, dort fängt
+            // die Beschriftung auch seinen Tipp ab (test_konvoi_wrackfeld 5a misst genau das).
+            const mx = f.x + f.w/2, my2 = f.y + f.h/2;
+            if (mx >= k.x && mx <= k.x + k.w && my2 >= k.y && my2 <= k.y + k.h) mitten++;
           }
           for (const g of gesetzt) label += flaeche(g);
-          return { scheibe, objekt, label };
+          return { mitten, scheibe, objekt, label };
         };
         const start = bewerte(kastenAn(plaetze[0]), false);
-        // "höchstens so schlecht wie die Ausgangsstelle" - in jeder Kennzahl einzeln.
-        const zumutbar = f => f.scheibe <= start.scheibe && f.objekt <= start.objekt && f.label <= start.label;
+        /* ZUMUTBAR ist ein Platz nur, wenn er nichts NEUES kaputt macht. Die drei harten Grenzen
+           sind nicht frei gewählt, sondern das, was die Bestandstests seit KB-16 festhalten:
+             mitten   keine zusätzlich verdeckte Markermitte  (test_konvoi_wrackfeld 5a)
+             scheibe  keine zusätzliche Planetenscheibe       (test_kartenbeschriftung 1)
+             label    keine zusätzliche Beschriftung          (test_kartenmarker 2)
+           `objekt` darf wachsen - und nur deshalb ist der Fehlerbericht überhaupt lösbar: Im
+           dichten Gürtelsystem ist JEDE der neun Lagen belegt, gemessen. Ohne diesen einen
+           Freiheitsgrad bliebe die Beschriftung auf der Mitte des Vorkommens liegen, also genau
+           dort, wo der Bericht sie nicht haben will. Der Tausch ist gerichtet: eine verdeckte
+           MITTE gegen eine teilweise Überlappung am Rand eines anderen Markers. */
+        const zumutbar = f => f.mitten <= start.mitten && f.scheibe <= start.scheibe && f.label <= start.label;
         let beste = null;
         for (const p of plaetze){
           const k = kastenAn(p), f = bewerte(k, versetzt(p));
           if (!zumutbar(f)) continue;
-          const rang = [f.scheibe, f.objekt + f.label];
-          if (!beste || rang[0] < beste[0] || (rang[0] === beste[0] && rang[1] < beste[1])){
+          const rang = [f.mitten, f.scheibe, f.objekt + f.label];
+          if (!beste || rang[0] < beste[0]
+              || (rang[0] === beste[0] && (rang[1] < beste[1]
+              || (rang[1] === beste[1] && rang[2] < beste[2])))){
             beste = rang; wahl = p; kasten = k;
           }
         }
