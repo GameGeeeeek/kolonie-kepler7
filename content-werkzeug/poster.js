@@ -44,62 +44,127 @@ const sterne = (seed, n = 190) => {
 };
 
 // ---------- Bausteine fuers Umbau-Motiv ---------------------------------
-// Flaches Piktogramm: so sahen die Anlagen vorher aus - eine Silhouette ohne Tiefe.
-// Motiv Solarkraftwerk, weil es das erste Gebaeude jeder Kolonie ist.
-const flachesSymbol = (cx, cy, s) => `
-  <g transform="translate(${cx} ${cy}) scale(${s})" fill="#6d7686">
-    <g transform="skewY(-14)">
-      <rect x="-96" y="-92" width="192" height="104" rx="8"/>
-    </g>
-    <g stroke="#41485a" stroke-width="4" opacity="0.9">
-      <g transform="skewY(-14)">
-        <line x1="-32" y1="-92" x2="-32" y2="12"/>
-        <line x1="32" y1="-92" x2="32" y2="12"/>
-        <line x1="-96" y1="-40" x2="96" y2="-40"/>
-      </g>
-    </g>
-    <rect x="-11" y="6" width="22" height="52" rx="6"/>
-    <rect x="-72" y="52" width="144" height="20" rx="9"/>
+// Gebaeudepaare: links das flache Piktogramm von frueher, rechts das isometrische
+// Bauwerk von heute. Sockelplatte und Schatten sind allen gemeinsam, nur der Aufbau
+// wechselt - so bleibt die Bildsprache ueber alle Motive gleich.
+const sockel = akzent => `
+  <ellipse cx="14" cy="72" rx="118" ry="30" fill="#000" opacity="0.55" filter="url(#blur14)"/>
+  <polygon points="0,-96 104,-41 104,41 0,96 -104,41 -104,-41" fill="#1d2531"/>
+  <polygon points="0,-96 104,-41 0,14 -104,-41" fill="#2c3646"/>
+  <polygon points="104,-41 104,41 0,96 0,14" fill="#161d27"/>
+  <polygon points="-104,-41 0,14 0,96 -104,41" fill="#212a37"/>
+  <polygon points="0,-96 104,-41 0,14 -104,-41" fill="none" stroke="${akzent}" stroke-width="3" opacity="0.75"/>`;
+
+const leuchte = (x, y, akzent) => `
+  <g transform="translate(${x} ${y})">
+    <polygon points="0,-24 24,-11 24,9 0,22 -24,9 -24,-11" fill="#3a4658"/>
+    <polygon points="0,-24 24,-11 0,2 -24,-11" fill="#54627a"/>
+    <circle cx="0" cy="-7" r="8" fill="${akzent}" filter="url(#blur6)"/>
+    <circle cx="0" cy="-7" r="3.5" fill="#fff"/>
   </g>`;
 
-// Isometrisches Bauwerk auf Sockelplatte - so sehen sie jetzt aus: Tiefe, Licht,
-// Schlagschatten, ein warmer Akzent. Dasselbe Solarkraftwerk wie links.
-const isoBauwerk = (cx, cy, s, akzent) => `
+const GEBAEUDE = {
+  // --- Solarkraftwerk: geneigtes Paneel auf Stuetzen -----------------------
+  solar: {
+    flach: `<g fill="#6d7686">
+      <g transform="skewY(-14)"><rect x="-96" y="-92" width="192" height="104" rx="8"/></g>
+      <g stroke="#41485a" stroke-width="4" opacity="0.9"><g transform="skewY(-14)">
+        <line x1="-32" y1="-92" x2="-32" y2="12"/><line x1="32" y1="-92" x2="32" y2="12"/>
+        <line x1="-96" y1="-40" x2="96" y2="-40"/></g></g>
+      <rect x="-11" y="6" width="22" height="52" rx="6"/>
+      <rect x="-72" y="52" width="144" height="20" rx="9"/></g>`,
+    iso: akzent => `
+      <g transform="translate(0 -74)">
+        <g stroke="#2a3346" stroke-width="9" stroke-linecap="round">
+          <line x1="-56" y1="30" x2="-56" y2="78"/><line x1="56" y1="14" x2="56" y2="62"/>
+          <line x1="0" y1="46" x2="0" y2="92"/></g>
+        <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="#2f5480"/>
+        <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="none" stroke="${akzent}" stroke-width="3"/>
+        <g stroke="#9dc4ee" stroke-width="2" opacity="0.55">
+          <line x1="-49" y1="-44" x2="47" y2="6"/><line x1="-2" y1="-68" x2="0" y2="30"/>
+          <line x1="-72" y1="-32" x2="24" y2="18"/><line x1="-25" y1="-56" x2="71" y2="-6"/></g>
+        <polygon points="-96,-20 -2,-68 -49,-44" fill="#bcd9f7" opacity="0.42"/>
+      </g>
+      ${leuchte(42, 24, akzent)}`
+  },
+
+  // --- Erzmine: Foerderturm ueber dem Schacht ------------------------------
+  erz: {
+    flach: `<g fill="#6d7686">
+      <path d="M-58,54 L-30,-72 L30,-72 L58,54 Z"/>
+      <rect x="-46" y="-16" width="92" height="12" rx="5" fill="#41485a"/>
+      <rect x="-34" y="14" width="68" height="12" rx="5" fill="#41485a"/>
+      <rect x="-16" y="-100" width="32" height="30" rx="7"/>
+      <rect x="-78" y="54" width="156" height="20" rx="9"/></g>`,
+    iso: akzent => `
+      <g transform="translate(0 -58)">
+        <g stroke="#39435a" stroke-width="10" stroke-linecap="round">
+          <line x1="-52" y1="66" x2="-16" y2="-42"/><line x1="52" y1="50" x2="16" y2="-42"/>
+          <line x1="-52" y1="66" x2="16" y2="-42"/><line x1="52" y1="50" x2="-16" y2="-42"/></g>
+        <g stroke="${akzent}" stroke-width="5" opacity="0.85">
+          <line x1="-36" y1="22" x2="36" y2="14"/><line x1="-26" y1="-10" x2="26" y2="-16"/></g>
+        <polygon points="0,-74 34,-56 34,-34 0,-16 -34,-34 -34,-56" fill="#3a4658"/>
+        <polygon points="0,-74 34,-56 0,-38 -34,-56" fill="#5c6c86"/>
+        <circle cx="0" cy="-52" r="13" fill="${akzent}" filter="url(#blur6)"/>
+        <circle cx="0" cy="-52" r="5" fill="#fff"/>
+      </g>
+      <g transform="translate(-46 22)">
+        <polygon points="0,-18 22,-7 22,9 0,20 -22,9 -22,-7" fill="#2b3444"/>
+        <polygon points="0,-18 22,-7 0,4 -22,-7" fill="#46566e"/></g>`
+  },
+
+  // --- Fusionsreaktor: Kuppel mit gluehendem Kern --------------------------
+  fusion: {
+    flach: `<g fill="#6d7686">
+      <path d="M-76,40 a76,76 0 0 1 152,0 Z"/>
+      <rect x="-88" y="40" width="176" height="20" rx="9"/>
+      <circle cx="0" cy="-4" r="26" fill="#41485a"/>
+      <rect x="-8" y="-104" width="16" height="34" rx="7"/></g>`,
+    iso: akzent => `
+      <g transform="translate(0 -50)">
+        <ellipse cx="0" cy="14" rx="86" ry="42" fill="#2b3444"/>
+        <path d="M-86,14 a86,58 0 0 1 172,0 Z" fill="#3d4a5f"/>
+        <path d="M-86,14 a86,58 0 0 1 172,0 Z" fill="none" stroke="${akzent}" stroke-width="3" opacity="0.9"/>
+        <path d="M-52,14 a52,40 0 0 1 104,0 Z" fill="#55647e" opacity="0.55"/>
+        <ellipse cx="0" cy="14" rx="86" ry="42" fill="none" stroke="${akzent}" stroke-width="2.5" opacity="0.6"/>
+        <circle cx="0" cy="-14" r="26" fill="${akzent}" filter="url(#blur10)"/>
+        <circle cx="0" cy="-14" r="11" fill="#fff"/>
+        <rect x="-6" y="-92" width="12" height="46" rx="5" fill="#8b9cb6"/>
+      </g>
+      ${leuchte(-52, 30, akzent)}`
+  },
+
+  // --- Raketensilo: drei Schaechte mit offenen Klappen ---------------------
+  silo: {
+    flach: `<g fill="#6d7686">
+      <rect x="-78" y="-58" width="44" height="112" rx="10"/>
+      <rect x="-22" y="-86" width="44" height="140" rx="10"/>
+      <rect x="34" y="-58" width="44" height="112" rx="10"/>
+      <g fill="#41485a"><rect x="-72" y="-40" width="32" height="9" rx="4"/>
+        <rect x="-16" y="-68" width="32" height="9" rx="4"/><rect x="40" y="-40" width="32" height="9" rx="4"/></g>
+      <rect x="-92" y="54" width="184" height="20" rx="9"/></g>`,
+    iso: akzent => `
+      <g transform="translate(0 -46)">
+        ${[[-52,16],[0,-6],[52,16]].map(([x,y],i) => `
+        <g transform="translate(${x} ${y})">
+          <polygon points="0,-52 30,-36 30,10 0,26 -30,10 -30,-36" fill="#333e51"/>
+          <polygon points="0,-52 30,-36 0,-20 -30,-36" fill="#4d5c74"/>
+          <polygon points="30,-36 30,10 0,26 0,-20" fill="#26303f"/>
+          <polygon points="0,-52 30,-36 0,-20 -30,-36" fill="none" stroke="${akzent}" stroke-width="2.5" opacity="0.9"/>
+          <circle cx="0" cy="-34" r="9" fill="${akzent}" opacity="${0.85 - i*0.18}" filter="url(#blur6)"/>
+        </g>`).join('')}
+      </g>
+      ${leuchte(-2, 42, akzent)}`
+  }
+};
+
+const flachesSymbol = (cx, cy, s, art) => `
+  <g transform="translate(${cx} ${cy}) scale(${s})">${GEBAEUDE[art].flach}</g>`;
+
+const isoBauwerk = (cx, cy, s, akzent, art) => `
   <g transform="translate(${cx} ${cy}) scale(${s})">
-    <ellipse cx="14" cy="72" rx="122" ry="31" fill="#000" opacity="0.55" filter="url(#blur14)"/>
-    <polygon points="0,-96 104,-41 104,41 0,96 -104,41 -104,-41" fill="#1d2531"/>
-    <polygon points="0,-96 104,-41 0,14 -104,-41" fill="#2c3646"/>
-    <polygon points="104,-41 104,41 0,96 0,14" fill="#161d27"/>
-    <polygon points="-104,-41 0,14 0,96 -104,41" fill="#212a37"/>
-    <polygon points="0,-96 104,-41 0,14 -104,-41" fill="none" stroke="${akzent}" stroke-width="3" opacity="0.75"/>
-
-    <!-- Paneel deutlich ueber der Platte auf sichtbaren Stuetzen: liegt es direkt
-         auf, verschmilzt es mit der Sockelflaeche und man sieht kein Kraftwerk. -->
-    <g transform="translate(0 -74)">
-      <g stroke="#2a3346" stroke-width="9" stroke-linecap="round">
-        <line x1="-56" y1="30" x2="-56" y2="78"/>
-        <line x1="56" y1="14" x2="56" y2="62"/>
-        <line x1="0" y1="46" x2="0" y2="92"/>
-      </g>
-      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="#2f5480"/>
-      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="none" stroke="${akzent}" stroke-width="3" opacity="1"/>
-      <g stroke="#9dc4ee" stroke-width="2" opacity="0.55">
-        <line x1="-49" y1="-44" x2="47" y2="6"/>
-        <line x1="-2" y1="-68" x2="0" y2="30"/>
-        <line x1="-72" y1="-32" x2="24" y2="18"/>
-        <line x1="-25" y1="-56" x2="71" y2="-6"/>
-      </g>
-      <polygon points="-96,-20 -2,-68 -49,-44" fill="#bcd9f7" opacity="0.42"/>
-      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="none" stroke="#0b1018" stroke-width="1" opacity="0.45"/>
-    </g>
-
-    <!-- Verteilerkasten, nach innen gerueckt -->
-    <g transform="translate(42 24)">
-      <polygon points="0,-24 24,-11 24,9 0,22 -24,9 -24,-11" fill="#3a4658"/>
-      <polygon points="0,-24 24,-11 0,2 -24,-11" fill="#54627a"/>
-      <circle cx="0" cy="-7" r="8" fill="${akzent}" filter="url(#blur6)"/>
-      <circle cx="0" cy="-7" r="3.5" fill="#fff"/>
-    </g>
+    ${sockel(akzent)}
+    ${GEBAEUDE[art].iso(akzent)}
   </g>`;
 
 const pfeil = (cx, cy, akzent) => `
@@ -110,7 +175,7 @@ const pfeil = (cx, cy, akzent) => `
   </g>`;
 
 // ---------- Poster ------------------------------------------------------
-function poster({ akzent, zeile, unter, seed }) {
+function poster({ akzent, zeile, unter, seed, art }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <filter id="blur6" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="6"/></filter>
@@ -142,9 +207,9 @@ function poster({ akzent, zeile, unter, seed }) {
   <rect x="0" y="700" width="${W}" height="4" fill="${akzent}" opacity="0.32" filter="url(#blur24)"/>
 
   <!-- Vorher / Nachher, gezeichnet statt abfotografiert -->
-  ${flachesSymbol(258, 726, 1.45)}
+  ${flachesSymbol(258, 726, 1.45, art)}
   ${pfeil(540, 722, akzent)}
-  ${isoBauwerk(816, 692, 1.34, akzent)}
+  ${isoBauwerk(816, 692, 1.34, akzent, art)}
 
   <text x="258" y="960" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, sans-serif"
         font-size="30" font-weight="bold" fill="#7f8899" letter-spacing="5">VORHER</text>
@@ -167,7 +232,13 @@ function poster({ akzent, zeile, unter, seed }) {
 }
 
 const POSTER = [
-  { name: 'umbau', akzent: '#fac775', seed: 4242,
+  { name: 'umbau_solar',  art: 'solar',  akzent: '#fac775', seed: 4242,
+    zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' },
+  { name: 'umbau_erz',    art: 'erz',    akzent: '#e0b184', seed: 1717,
+    zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' },
+  { name: 'umbau_fusion', art: 'fusion', akzent: '#8ee6c0', seed: 2828,
+    zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' },
+  { name: 'umbau_silo',   art: 'silo',   akzent: '#ff9a8a', seed: 3939,
     zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' }
 ];
 POSTER.forEach(p => fs.writeFileSync(`${OUT}/${p.name}.svg`, poster(p)));
