@@ -32,6 +32,22 @@ node aufnahmen.js ./bilder                        # Screenshots
 ans Backend weiter. Zusätzliche Umgebungsvariablen: `ROOT`, `WEB`, `WEB_ALT`,
 `PLAYWRIGHT`, `BCRYPT`.
 
+## Key-Art-Poster
+
+`poster.js` erzeugt gezeichnete Poster im Kepler-7-Stil (Illustration, Wortmarke,
+Zeile, Domain-Pille), `poster_render.js` rastert sie auf 1080x1920:
+
+```bash
+node poster.js ./pos && node poster_render.js ./pos
+```
+
+Die Wortmarke ist **aus Pfaden gebaut, nicht gesetzt**: Der Container hat keine
+geometrische Techno-Schrift, und über alle Poster hinweg muss sie identisch aussehen.
+
+Ein gezeichnetes Vorher/Nachher (`umbau`) schlägt bei Grafik-Updates den rohen
+Screenshot-Vergleich - Sascha, 07.09.2026: der Screenshot-Vergleich passt nicht zur
+Bildsprache der übrigen Posts.
+
 ## Vorher/Nachher
 
 Für Grafik-Updates. Der alte Stand kommt aus der Git-Historie, beide laufen gegen
