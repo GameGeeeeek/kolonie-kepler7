@@ -49033,7 +49033,7 @@ async function claimPendingRewards(){
     const zu = ov.querySelector('[data-vruf-zu]');
     if (zu) zu.onclick = () => schliesseVerbandsRuf();
     const start = ov.querySelector('[data-vruf-start]');
-    if (start) start.onclick = () => {
+    if (start) start.onclick = async () => {
       const dsel = ov.querySelector('#vrufDauer');
       const sek = dsel ? parseInt(dsel.value, 10) : ALLIANCE_MUSTER_DURATIONS[vorwahl];
       const nsel = ov.querySelector('#vrufNachricht');
@@ -49044,7 +49044,39 @@ async function claimPendingRewards(){
       // ein offenes Overlay darueber saehe aus, als waere nichts passiert. Die Eingabe bleibt
       // dabei in `vrufLetzte` stehen - beim naechsten Oeffnen desselben Ziels steht sie wieder da.
       schliesseVerbandsRuf();
-      if (typeof a.start === 'function') a.start(sek, txt, zusatz);
+      if (typeof a.start !== 'function') return;
+      /* DIE EIGENE FLOTTE KOMMT GLEICH MIT (Auftrag Sascha 07.09.2026, woertlich: „gleich beim
+         raid ausrufen hinzufuegen die eigene flottenauswahl sonst muss man als noch bei allianz
+         dem raid schiffe herbeifuegen").
+         Bis hierher endete der Ruf mit dem Aufruf - und der Rufer stand ohne eigene Schiffe da.
+         Um seine eigene Flotte anzuschliessen, musste er in den Allianz-Tab, dort die Musterbox
+         suchen und „Flotte anschliessen" druecken. Genau derselbe Umweg, den dieses Overlay am
+         04.09.2026 fuer die ZIELWAHL abgeschafft hat; die Flotte war nur uebersehen worden.
+
+         WARUM HIER UND NICHT IN DEN VIER KARTENMENUES: Festung, Nest, Vorposten und Konvoi rufen
+         alle durch diesen einen Dialog. Vier Kopien waeren vier Stellen, an denen man es beim
+         naechsten Zielart vergisst.
+
+         WARUM DER VORHANDENE PICKER UND KEIN ZWEITES FELD IM OVERLAY: `oeffneFlottenwahl` mit
+         `start: joinAllianceMusterAttack` ist derselbe erprobte Weg, den der Knopf im Allianz-Tab
+         geht - dieselbe Sperre (mindestens ein Schiff), dieselbe Serverpruefung, dieselbe
+         Bindung der Schiffe. Ein eigenes Auswahlfeld im Ruf-Overlay waere eine zweite
+         Flottenwahl, die beim naechsten Umbau auseinanderlaeuft.
+
+         FREIWILLIG BLEIBT FREIWILLIG: Wer nur ausrufen und selbst nicht mitfliegen will, schliesst
+         die Flottenwahl - der Verband steht dann trotzdem. Deshalb wird sie ANGEBOTEN und nicht
+         erzwungen. */
+      await a.start(sek, txt, zusatz);
+      const doc = state.allianceMusterAttack;
+      const laeuft = !!(doc && doc.phase === 'gathering' && doc.museterEndsAt > Date.now());
+      const schonDabei = !!(state.allianceMusterContribution
+        && doc && state.allianceMusterContribution.musterAttackId === doc.id);
+      if (laeuft && !schonDabei && typeof oeffneFlottenwahl === 'function'){
+        oeffneFlottenwahl({
+          art: 'Koordinierter Angriff', titel: 'Deine Flotte gleich anschließen',
+          keys: ATTACK_SHIP_KEYS, ziehtAb: true, startLabel: 'Flotte anschließen',
+          sperre: fwahlMindestensEins, start: () => joinAllianceMusterAttack() });
+      }
     };
     ov.classList.add('open');
   }
