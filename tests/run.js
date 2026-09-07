@@ -70,6 +70,23 @@ try {
   melde('Icon-Whitelist (check-icons.js)', false, (e.stdout ? e.stdout.toString() : '').trim().split('\n').pop());
 }
 
+// 2b. Textfelder brauchen eine ANZEIGESTELLE (07.09.2026). Nicht "jeder Eintrag braucht ein desc" -
+//     das waere hier falsch, weil die 55 gewoehnlichen Schiffe ihre Erklaerung aus einer if/else-
+//     Kette der Werft beziehen und gar kein desc-Feld haben. Geprueft wird die Fehlerklasse, die
+//     dieses Projekt WIRKLICH getroffen hat: ein Text, der geschrieben, aber nirgends gerendert
+//     wird. tests/test_schiffstexte.js nennt zwei Faelle (`desc` bis v8.347.0, `nicheDesc` davor);
+//     die Gegenprobe dieser Pruefung hat einen dritten gefunden - bei v8.98.1 standen 18
+//     `effectDesc`-Texte in der Datei und null Lesestellen. Begruendung und Zaehlweise:
+//     Dateikopf von check-texte.js.
+try {
+  execFileSync(process.execPath, [path.join(WURZEL, 'check-texte.js')], { cwd: WURZEL, stdio: 'pipe' });
+  melde('Textfelder haben eine Anzeigestelle (check-texte.js)', true);
+} catch (e) {
+  const aus = (e.stdout ? e.stdout.toString() : '') + (e.stderr ? e.stderr.toString() : '');
+  melde('Textfelder haben eine Anzeigestelle (check-texte.js)', false,
+    aus.split('\n').filter(z => /\(\d+ Definition/.test(z)).join(' · ').trim().slice(0, 120) || 'siehe node check-texte.js');
+}
+
 // 3. Es darf KEINE index.html mehr geben. Bis zum 01.09.2026 lag hier eine byte-gleiche Kopie der
 //    Spieldatei, nur weil nginx standardmäßig index.html als Startseite erwartet; seit
 //    `index weltraum_kolonie.html;` in der nginx.conf des Pi ist sie überflüssig. Der Deploy kopiert

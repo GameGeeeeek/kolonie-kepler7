@@ -501,10 +501,123 @@ if (SRV) {
     falsch.length === 0, { falsch, behauptet: behauptet.map(b => b.name + ' (' + b.teile.join(' + ') + ')') });
 }
 
+/* ---- 12) V6: das Sternendock haengt am Lager-Griff ----------------------------------------------
+   DIESELBE FEHLERKLASSE WIE 9a, EINE ETAPPE SPAETER. Der Server bedient Lager und Sternendock mit
+   EINER Belohnung: `pushPendingReward(..., { type:'vorposten-lager', ..., schiffe: { cruisers: n } })`.
+   Der Lager-Zweig des Clients las bis zum 07.09.2026 nur erz/kristalle/deuterium - die Kreuzer
+   waeren ersatzlos verfallen, weil die Belohnung nach dem Zweig aus der Warteschlange geraeumt
+   wird. Genau so ist beim Abbau schon einmal die ganze Garnison verschwunden (Abschnitt 9).
+   Geprueft wird die REGEL, nicht die Schreibweise: Der Zweig liest `schiffe`, loest ueber
+   shipDefOrSuper auf (nicht ueber einen Index-Zugriff) und schreibt in currentFleet(). */
+const lagerVon = JS.indexOf("r.type === 'vorposten-lager'");
+const lagerZweig = lagerVon < 0 ? '' : ohneKommentar(JS.slice(lagerVon, lagerVon + 4000));
+check('12-anker: der Lager-Zweig von claimPendingRewards ist auffindbar (sonst misst 12a nichts)',
+  lagerVon > 0 && /sysNameL/.test(lagerZweig), { gefunden: lagerVon > 0 });
+check('12a: der Lager-Zweig nimmt die Schiffe des Sternendocks entgegen',
+  /r\.schiffe/.test(lagerZweig) && /shipDefOrSuper\(/.test(lagerZweig) && /currentFleet\(\)/.test(lagerZweig),
+  { liestSchiffe: /r\.schiffe/.test(lagerZweig), ueberShipDefOrSuper: /shipDefOrSuper\(/.test(lagerZweig),
+    inDieFlotte: /currentFleet\(\)/.test(lagerZweig) });
+/* Und der Server schickt das Feld auch wirklich - sonst prueft 12a einen Zweig fuer eine
+   Belohnung, die es nicht gibt (die Sorte Pruefung, die aus dem falschen Grund gruen ist). */
+if (SRV) {
+  check('12b: der Server legt die Dock-Schiffe in dieselbe Belohnung wie das Lager',
+    /schiffe: schiffe \? \{ \[VP_DOCK_SCHIFF\]: schiffe \} : null/.test(SRV)
+    && /type: 'vorposten-lager'/.test(SRV),
+    { feldGefunden: /schiffe: schiffe \?/.test(SRV) });
+}
+
+/* ---- 13) V6: drei Wirkungen, die kein Prozentsatz sind ------------------------------------------
+   vpProjektWirkungText faellt am Ende in einen Prozent-Zweig ("+X % <Name>"). Fuer die drei
+   Endprojekte waere das Unsinn: `werftSchiff: 1` ist eine Stueckzahl je Zeitraum ("+100 %"),
+   `marktPlaetze: 2` sind zwei Plaetze ("+200 %"), `verlust: 0.08` sind Prozentpunkte auf den
+   Grundverlust des Angreifers. Der Kommentar an jener Funktion sagt dieselbe Falle fuer `scan`
+   und `flugDeckel` schon voraus - das hier sind die naechsten drei Faelle. */
+const wirkVon = JS.indexOf('function vpProjektWirkungText(');
+/* Das Fenster endet an der NAECHSTEN Funktion, nicht nach geschaetzten 2600 Zeichen - die
+   ueberschossen den Rumpf um rund 500 Zeichen in die Nachbarfunktionen hinein. Kein Falschgruen
+   (dort steht kein `k === '...'`), aber ein Anker, der mehr misst als er benennt, ist ein Anker,
+   dem man beim naechsten Umbau nicht mehr trauen kann. Der Endanker wird geprueft, bevor er
+   benutzt wird: fehlt er, liefert indexOf -1 und der Slice liefe bis zum Dateiende. */
+const wirkBis = JS.indexOf('\n  function ', wirkVon + 10);
+const wirkFn = wirkVon < 0 ? '' : JS.slice(wirkVon, wirkBis > wirkVon ? wirkBis : wirkVon + 2600);
+check('13-anker: vpProjektWirkungText ist auffindbar (sonst misst 13a nichts)',
+  wirkVon > 0 && /d\.wirkung/.test(wirkFn), { gefunden: wirkVon > 0 });
+check('13a: werftSchiff, marktPlaetze und verlust haben einen eigenen Zweig vor dem Prozent-Zweig',
+  ["werftSchiff", "marktPlaetze", "verlust"].every(k => new RegExp("k === '" + k + "'").test(wirkFn)),
+  { ohneZweig: ["werftSchiff", "marktPlaetze", "verlust"].filter(k => !new RegExp("k === '" + k + "'").test(wirkFn)) });
+
+/* ---- 14) V6: die drei Dock-Zahlen sind eine Kopie-Familie ----------------------------------------
+   Der Wirkungstext liest `vorpostenCache.dockSchiff/dockStunden/dockMax` MIT RUECKFALL auf drei
+   eingetippte Werte. Die stehen ein zweites Mal im Server (VP_DOCK_SCHIFF/STUNDEN/MAX) - und eine
+   Kopie ohne Waechter driftet. Der Laufzeittest (test_vorposten_lager_ui.js, 6a) prueft den
+   CACHE-Pfad mit abweichenden Werten; diese Pruefung hier ist die andere Haelfte und misst den
+   RUECKFALL. Beide zusammen decken den Ausdruck ab, keine allein.
+   Zieht der Server morgen auf ein anderes Schiff um, sieht ein Client, der die Konfiguration noch
+   nicht geladen hat, sonst das falsche. */
+if (SRV) {
+  const vpDockSrv = {
+    dockSchiff: (SRV.match(/const VP_DOCK_SCHIFF = '([a-z]+)'/) || [])[1],
+    dockStunden: Number((SRV.match(/const VP_DOCK_STUNDEN = (\d+)/) || [])[1]),
+    dockMax: Number((SRV.match(/const VP_DOCK_MAX = (\d+)/) || [])[1])
+  };
+  check('14-anker: die drei VP_DOCK_-Konstanten sind im Server lesbar (sonst misst 14a nichts)',
+    !!vpDockSrv.dockSchiff && vpDockSrv.dockStunden > 0 && vpDockSrv.dockMax > 0, vpDockSrv);
+  const rueckSchiff = (wirkFn.match(/vorpostenCache\.dockSchiff \|\| '([a-z]+)'/) || [])[1];
+  const rueckStunden = Number((wirkFn.match(/vorpostenCache\.dockStunden \|\| (\d+)/) || [])[1]);
+  const rueckMax = Number((wirkFn.match(/vorpostenCache\.dockMax \|\| (\d+)/) || [])[1]);
+  check('14a: die Rueckfallwerte des Wirkungstexts sind die Serverwerte',
+    rueckSchiff === vpDockSrv.dockSchiff && rueckStunden === vpDockSrv.dockStunden && rueckMax === vpDockSrv.dockMax,
+    { imSpiel: { rueckSchiff, rueckStunden, rueckMax }, imServer: vpDockSrv });
+}
+
+/* ---- 15) V6: der Dockstand hat einen Leser, und der Griff haengt nicht am Lager allein ----------
+   `dockBereit` reiste seit V6 vom Server an jeden Client und wurde im Spiel NIRGENDS gelesen
+   (`grep -c dockBereit weltraum_kolonie.html` war 0). Genau die Fehlerklasse, gegen die dieser
+   ganze Auftrag gebaut ist: ein fertiger Zweig, den nichts erreicht.
+   15b ist die teurere Haelfte. Der Abholgriff hing an `vorpostenCache.lagerAktiv &&
+   !vorpostenLagerLeer(v)`, und `vorpostenLagerLeer` sieht nur erz/kristalle/deuterium. Direkt nach
+   einer Abholung ist das Lager leer - ein Dock voller Kreuzer war in diesem Fenster unerreichbar.
+   Der Server hat dieses Loch auf SEINER Seite ausdruecklich geschlossen
+   (`if (!VP_LAGER_AKTIV && !VP_ENDPROJEKTE_AKTIV)`); hier war es wieder offen. */
+check('15a: der Dockstand des Servers wird im Spiel gelesen',
+  /\bdockBereit\b/.test(JS), { treffer: (JS.match(/\bdockBereit\b/g) || []).length });
+const griffVon = JS.indexOf("label: dockDa && !lagerDa ? 'Sternendock abholen'");
+const griff = griffVon < 0 ? '' : JS.slice(Math.max(0, griffVon - 700), griffVon + 700);
+check('15-anker: der Abhol-Eintrag ist auffindbar (sonst misst 15b nichts)',
+  griffVon > 0 && /vorpostenLagerHolen\(/.test(griff), { gefunden: griffVon > 0 });
+check('15b: er steht auch dann da, wenn nur das Sternendock etwas hat',
+  /dockBereit \|\| 0\) > 0/.test(griff) && /lagerDa \|\| dockDa/.test(griff),
+  { auszug: (griff.match(/const dockDa[^\n]*/) || [])[0] });
+if (SRV) {
+  check('15c: der Server nimmt die Abholung ebenfalls fuer JEDE der beiden Quellen an',
+    /if \(!VP_LAGER_AKTIV && !VP_ENDPROJEKTE_AKTIV\)/.test(SRV)
+      && /if \(vorpostenLagerLeer\(stand\) && !schiffe\)/.test(SRV), {});
+}
+
+
+
 ende();
 
 
-/* GEGENPROBE, sieben Richtungen (jeweils NUR die eine Datei angefasst, die Testdatei blieb neu).
+/* V6, ZWEITE RUNDE (07.09.2026). Gemessen gegen `git show origin/main:weltraum_kolonie.html`,
+   Pruefnamen beider Laeufe per `diff` verglichen - einziger Unterschied ist die Schlusszeile.
+   Am alten Stand FALLEN 12a, 13a, 14a, 15a, 15-anker und 15b.
+   15a mit `treffer: 0`: `dockBereit` reiste seit V6 vom Server an jeden Client und wurde im Spiel
+   NIRGENDS gelesen - dieselbe Fehlerklasse, gegen die Abschnitt 12 gebaut ist, nur eine Ebene
+   hoeher. Der 15-Anker faellt dort mit und sagt damit ausdruecklich, dass 15b nichts misst; das
+   ist seine Aufgabe, nicht sein Versagen.
+   GRUEN bleiben dort 12b und 15c - beide messen den SERVER, und der war laengst fertig. Genau
+   diese Aufteilung ist der Beweis: Die fehlende Haelfte war immer die des Spiels.
+
+   Abschnitt 14 hat eine zweite Haelfte in test_vorposten_lager_ui.js (6a): Dort schickt die
+   Fixture ABWEICHENDE Dock-Werte und beweist damit den CACHE-Pfad; hier wird der RUECKFALL gegen
+   VP_DOCK_* geprueft. Keine der beiden allein deckt den Ausdruck ab.
+
+   Der Endanker von 13 war bis zu dieser Runde eine geschaetzte Laenge (2600 Zeichen) und
+   ueberschoss den Funktionsrumpf um rund 500 Zeichen. Kein Falschgruen - aber gemessen wird jetzt
+   bis zur naechsten Funktion, mit Existenzpruefung des Ankers.
+
+GEGENPROBE, sieben Richtungen (jeweils NUR die eine Datei angefasst, die Testdatei blieb neu).
    Zu Abschnitt 10, gemessen am 05.09.2026:
    G) Die Vorlage in test_vorposten_verbuendet_ui.js zurueck auf `garnisonVon`: 10a FAELLT, und
       NUR 10a (Pruefnamen beider Laeufe per `diff`). Das ist genau der Stand, an dem der Fehler
@@ -558,5 +671,10 @@ ende();
       Vorher stieg die Datei an dieser Stelle komplett aus. 29 serverabhaengige Pruefungen fehlen
       dann, und Pruefung 0 sagt warum.
    I) Das Superschlachtschiff in SHIP_DEFS aufgenommen: 9c FAELLT - und nur 9c. Die Regel von 9a
-      haette dann keine Grundlage mehr; das soll auffallen, statt dass 9a still zur Formsache wird. */
+      haette dann keine Grundlage mehr; das soll auffallen, statt dass 9a still zur Formsache wird.
+   J) V6 (07.09.2026): Am Stand vor diesem Auftrag fallen 12a und 13a. 12a, weil der Lager-Zweig
+      `schiffe` nicht las - die Kreuzer des Sternendocks waeren beim Abholen ersatzlos verfallen.
+      13a, weil die drei Endprojekt-Wirkungen in den Prozent-Zweig gelaufen waeren und dort
+      "+100 % werftSchiff" ergeben haetten. 12b bleibt dort GRUEN: Der Server schickt das Feld
+      laengst, es fehlte nur der Empfaenger - genau die Haelfte, die auffallen soll. */
 
