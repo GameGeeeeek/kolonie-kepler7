@@ -63793,6 +63793,25 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }
     return best;   // reicht nicht ganz - dann wenigstens der groesste erreichbare Abstand
   }
+  /* Der Staerkebogen des Schuerfrechts (GR-11, 07.09.2026). Er beginnt oben und laeuft im
+     Uhrzeigersinn - dieselbe Leserichtung wie eine Uhr, damit "fast voll" ohne Legende als "viel"
+     liest.
+     DER VOLLKREIS BRAUCHT EINEN EIGENEN ZWEIG: Ein SVG-Bogen ueber exakt 360 Grad hat identischen
+     Start- und Endpunkt und wird von jedem Renderer als NICHTS gezeichnet - die staerkste Eskorte
+     saehe damit aus wie gar keine. Genau die Sorte Randfall, die man erst im Spiel bemerkt.
+     Der Bogen traegt pointer-events="none": Die Trefferflaeche des Vorkommens ist das
+     kb-treffer-Rechteck, und ein Zierstrich soll sie nicht ueberlagern. */
+  function astWacheBogen(x, y, rr, anteil, farbe){
+    const a = Math.max(0, Math.min(1, anteil || 0));
+    if (a <= 0) return '';
+    if (a >= 0.999){
+      return `<circle cx="${x}" cy="${y}" r="${rr.toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.9" stroke-opacity="0.95" pointer-events="none"/>`;
+    }
+    const w = a * Math.PI * 2 - Math.PI/2;          // Startpunkt oben (-90 Grad)
+    const x2 = x + rr * Math.cos(w), y2 = y + rr * Math.sin(w);
+    const gross = a > 0.5 ? 1 : 0;
+    return `<path d="M ${x.toFixed(1)} ${(y-rr).toFixed(1)} A ${rr.toFixed(1)} ${rr.toFixed(1)} 0 ${gross} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.9" stroke-opacity="0.95" stroke-linecap="round" pointer-events="none"/>`;
+  }
   function asteroidMarkerR(groesseKey){
     return ({ splitter:4.5, brocken:6, kern:7.5, koloss:9.5 })[groesseKey] || 5;
   }
@@ -64579,12 +64598,60 @@ function sekSternUse(key, x, y, k, unentdeckt){
            eine Brutkammer den Urmateriekern daneben. Der Schuerfrecht-Ring zaehlt mit, weil er
            sichtbar dazugehoert. */
         platzierteMarker.push({ x: pos.x, y: pos.y, r: r * (a.halter ? 1.45 : 1.15) });
+        /* GR-11 (Auftrag Sascha 07.09.2026): Der Ring trug bisher EIN Bit - fremd/eigen, bewacht
+           oder nicht. Der Server schickt zu jedem Recht aber `halterName`, `tag`, `seit`,
+           `eskorte` und `schutzBis`; alles davon stand nur im Menue und im <title>, und ein
+           Titel-Tooltip existiert auf dem Handy nicht. Drei Zusaetze, jeder aus einem Feld, das
+           laengst ankommt:
+             A  der Ring wird zum BOGEN - seine Laenge sagt, wie stark die Eskorte ist
+             B  das Kuerzel des Halters steht darunter
+             C  ein Puls laeuft, solange die Schutzfrist nach einem Besitzwechsel gilt */
         let ring = '';
+        let halterKuerzel = '';
         if (a.halter){
-          const rr = (r*1.45).toFixed(1);
+          const rr = r * 1.45;
           const farbe = asteroidMeinRecht(a) ? '#5dcaa5' : '#e0667a';
-          const bewacht = eskorteSchiffssumme(a.eskorte) > 0;
-          ring = `<circle cx="${x}" cy="${y}" r="${rr}" fill="none" stroke="${farbe}" stroke-width="1.3" stroke-opacity="0.85"${bewacht ? '' : ' stroke-dasharray="3,3"'}/>`;
+          const wache = eskorteSchiffssumme(a.eskorte);
+          /* A: DIE STUFEN SIND EINE ERSTE KALIBRIERUNG, und sie stehen hier, damit man sie findet.
+             Das Spiel kennt fuer die Eskortenstaerke bisher KEINE Klassen - das Menue nennt die
+             rohe Schiffszahl ("Kampfflotte gegen die stationierte Eskorte (N Schiffe)"). Der
+             Marker kann keine Zahl tragen, also traegt er die Klasse; die ZAHL bleibt im Menue und
+             im <title>. Dieselbe Arbeitsteilung wie beim Lager des Vorpostens: Balken auf der
+             Karte, genaue Werte daneben.
+             Die Schwellen sind bewusst grob und wachsen ungleich - der Unterschied zwischen 1 und
+             5 Schiffen entscheidet ueber einen Angriff, der zwischen 40 und 60 nicht mehr. */
+          const STUFEN = [1, 5, 15, 40];
+          const stufe = STUFEN.filter(n => wache >= n).length;      // 0..4
+          const anteil = stufe / STUFEN.length;
+          if (!wache){
+            // Unbewacht bleibt der gestrichelte Ring - "eine offene Einladung, und man sieht es
+            // auf der Karte". Ein Bogen der Laenge null waere unsichtbar statt aussagekraeftig.
+            ring = `<circle cx="${x}" cy="${y}" r="${rr.toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.3" stroke-opacity="0.85" stroke-dasharray="3,3" pointer-events="none"/>`;
+          } else {
+            // Der schwache Vollring bleibt darunter: Er traegt weiter die Aussage "belegt", auch
+            // wenn der Bogen kurz ist.
+            ring = `<circle cx="${x}" cy="${y}" r="${rr.toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.3" stroke-opacity="0.22" pointer-events="none"/>`
+              + astWacheBogen(x, y, rr, anteil, farbe);
+          }
+          /* C: Der Puls laeuft, solange die SCHUTZFRIST nach einem Besitzwechsel gilt
+             (AST_SCHUTZ_MS = 2 Stunden im Server). Das ist keine Stimmung, sondern eine Auskunft:
+             In diesem Fenster laesst sich das Recht gar nicht anfechten - das Kartenmenue sagt es
+             mit Restzeit, der Marker sagt es auf einen Blick. Er endet von selbst, weil die Frist
+             endet; ein Marker, der immer pulst, sagt nichts. */
+          if ((a.schutzBis || 0) > Date.now()){
+            ring += `<circle cx="${x}" cy="${y}" r="${rr.toFixed(1)}" fill="none" stroke="${farbe}" stroke-width="1.1" pointer-events="none">`
+              + `<animate attributeName="r" values="${rr.toFixed(1)};${(rr*1.35).toFixed(1)};${rr.toFixed(1)}" dur="3.2s" repeatCount="indefinite"/>`
+              + `<animate attributeName="stroke-opacity" values="0.5;0;0.5" dur="3.2s" repeatCount="indefinite"/></circle>`;
+          }
+          /* B: WER da sitzt. Der Allianz-Tag, sonst die ersten drei Zeichen des Namens - dieselbe
+             Auskunft, die der Spieler-Marker schon traegt. Die Klasse `planet-label` ist nicht
+             Kosmetik: An ihr haengt kbLabelsEntflechten, und damit erbt das Kuerzel den Schutz
+             gegen Ueberdeckung automatisch (KB-19: eine neue Beschriftungsart soll ihn nicht
+             erst nachgereicht bekommen). */
+          const wer = (a.tag ? '[' + a.tag + ']' : String(a.halterName || '').slice(0, 3).toUpperCase());
+          if (wer){
+            halterKuerzel = `<text class="planet-label" x="${x}" y="${(y + rr + 7).toFixed(1)}" text-anchor="middle" style="fill:${farbe}; font-size:7px; font-weight:600;">${escapeHtml(wer)}</text>`;
+          }
         }
         const halterTitel = a.halter ? ' – ' + (asteroidMeinRecht(a) ? 'dein Schürfrecht' : 'reserviert von ' + (a.halterName||'?')) + (eskorteSchiffssumme(a.eskorte) > 0 ? '' : ' (unbewacht)') : '';
         /* Der Urmateriekern ist die einzige Sorte mit eigenem Kartenbild (28.08.2026, Spieler-
@@ -64604,6 +64671,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             ${ring}
             <polygon points="${ecken}" fill="${istUrmaterie ? '#8a5f1c' : g.farbe}" stroke="${istUrmaterie ? '#ffe6ab' : '#0a0d1a'}" stroke-width="1.2"/>
             <circle cx="${x}" cy="${y}" r="${(r*0.32).toFixed(1)}" fill="${istUrmaterie ? '#ffe6ab' : (so.res.antimaterie ? '#f3aec6' : '#0a0d1a')}" opacity="${istUrmaterie ? 0.95 : (so.res.antimaterie ? 0.95 : 0.35)}"/>
+            ${halterKuerzel}
           </g>`;
       }
     }
