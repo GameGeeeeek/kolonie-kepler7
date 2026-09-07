@@ -38,6 +38,7 @@ ans Backend weiter. Zusätzliche Umgebungsvariablen: `ROOT`, `WEB`, `WEB_ALT`,
 Zeile, Domain-Pille), `poster_render.js` rastert sie auf 1080x1920:
 
 ```bash
+node nest_render.js            # nur fuer die Nest-Motive, siehe unten
 node poster.js ./pos && node poster_render.js ./pos
 ```
 
@@ -47,6 +48,27 @@ geometrische Techno-Schrift, und über alle Poster hinweg muss sie identisch aus
 Ein gezeichnetes Vorher/Nachher (`umbau`) schlägt bei Grafik-Updates den rohen
 Screenshot-Vergleich - Sascha, 07.09.2026: der Screenshot-Vergleich passt nicht zur
 Bildsprache der übrigen Posts.
+
+### Die Nest-Motive zeigen echte Spielgrafik
+
+`nest_render.js` schneidet den Zeichencode der Brutkörper **aus
+`weltraum_kolonie.html` heraus** und lässt ihn in Chromium laufen; die PNGs landen in
+`content-werkzeug/nester/` und werden von `poster.js` als Bild eingebettet. Nichts daran
+ist nachgemalt - ein selbst gezeichnetes Nest würde dem Publikum etwas über das Spiel
+versprechen, was das Spiel nicht einlöst.
+
+Der Schnitt hängt an **Textankern, nicht an Zeilennummern** (die Spieldatei wächst
+täglich): jeder Anker muss genau einmal vorkommen, der Schnitt wird vor dem Lauf per
+`new Function()` auf Syntax geprüft, und ein Bild unter 20 kB gilt als Fehlschlag. Zieht
+jemand die Nest-Funktionen um, bricht der Lauf mit Namen des fehlenden Ankers ab statt
+still ein leeres Poster zu liefern.
+
+Die Ordner `nester/` und die gerenderten Poster liegen **nicht** im Repo - sie sind
+jederzeit reproduzierbar und würden es nur schwer machen.
+
+Die linke Hälfte (`VORHER`) ist ebenfalls kein Freihand-Entwurf, sondern die
+nachgerechnete Geometrie des alten Kartenmarkers aus dem Stand vor `077e9f0`
+(Radius `r*(0.55+0.12*Math.sin(g))` mit `g` in **Grad**, Punkte `r*0.30`).
 
 ## Vorher/Nachher
 

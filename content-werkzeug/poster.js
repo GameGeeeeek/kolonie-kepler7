@@ -7,6 +7,17 @@ const OUT = process.argv[2] || './poster';
 fs.mkdirSync(OUT, { recursive: true });
 
 const W = 1080, H = 1920;
+// Die Brutkoerper der Alien-Nester sind KEINE Nachzeichnung: nest_render.js laesst den
+// Zeichencode aus weltraum_kolonie.html selbst laufen und legt die PNGs in nester/ ab.
+// Das Poster zeigt damit genau das Bild, das im Spiel auf der Systemkarte steht.
+const NEST_BILDER = process.env.NEST_BILDER || __dirname + '/nester';
+const nestBild = datei => {
+  const pfad = `${NEST_BILDER}/${datei}`;
+  if (!fs.existsSync(pfad))
+    throw new Error(`${pfad} fehlt - erst "node nest_render.js" laufen lassen.`);
+  return 'data:image/png;base64,' + fs.readFileSync(pfad).toString('base64');
+};
+
 const rnd = seed => { let s = seed; return () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff; };
 
 // ---------- Wortmarke "KEPLER 7" ----------------------------------------
@@ -156,15 +167,42 @@ const GEBAEUDE = {
       </g>
       ${leuchte(-2, 42, akzent)}`
   }
+,
+
+  /* --- Alien-Nest, Stufe 5 (Königin) -------------------------------------
+     Links der Marker, wie er bis zum 06.09.2026 auf der Systemkarte stand: dunkler Kreis,
+     sechs Punkte, weisser Kern fuer die Koenigin. Die Geometrie ist die des alten Codes
+     (Radius r*(0.55+0.12*Math.sin(g)) mit g in GRAD, Punkte r*0.30) - nicht nachempfunden,
+     sondern nachgerechnet, damit das "Vorher" auch wirklich das Vorher ist.
+     Rechts der gebackene Brutkoerper aus dem Spiel. Ein Sockel waere hier falsch: das ist
+     kein Bauwerk auf einem Planeten, sondern eine Kreatur im All. */
+  nest: {
+    ohneSockel: true,
+    // Beide Seiten auf derselben Hoehe, weil hier keine Sockelplatte die Unterkante setzt.
+    // Das Vorher war auf der Karte ein Punkt, das Jetzt eine Kreatur - der Groessensprung
+    // ist Teil der Aussage, deshalb steht rechts bewusst groesser als links.
+    layout: { linksX: 250, linksY: 706, linksS: 1.18, pfeilX: 528,
+              rechtsX: 822, rechtsY: 706, rechtsS: 1.45 },
+    flach: `<g>
+      <circle cx="0" cy="0" r="100" fill="rgba(10,13,26,0.55)" stroke="#6d7686" stroke-width="4"/>
+      ${[0,60,120,180,240,300].map(g => {
+        const rad = g * Math.PI/180, rr = 100 * (0.55 + 0.12 * Math.sin(g));
+        return `<circle cx="${(rr*Math.cos(rad)).toFixed(1)}" cy="${(rr*Math.sin(rad)).toFixed(1)}" r="30" fill="#6d7686" fill-opacity="0.85"/>`;
+      }).join('')}
+      <circle cx="0" cy="0" r="34" fill="#8b929e" fill-opacity="0.9"/></g>`,
+    iso: (akzent, bild) => `
+      <circle cx="0" cy="0" r="135" fill="${akzent}" opacity="0.30" filter="url(#blur24)"/>
+      <image href="${nestBild(bild)}" x="-150" y="-150" width="300" height="300"/>`
+  }
 };
 
 const flachesSymbol = (cx, cy, s, art) => `
   <g transform="translate(${cx} ${cy}) scale(${s})">${GEBAEUDE[art].flach}</g>`;
 
-const isoBauwerk = (cx, cy, s, akzent, art) => `
+const isoBauwerk = (cx, cy, s, akzent, art, bild) => `
   <g transform="translate(${cx} ${cy}) scale(${s})">
-    ${sockel(akzent)}
-    ${GEBAEUDE[art].iso(akzent)}
+    ${GEBAEUDE[art].ohneSockel ? '' : sockel(akzent)}
+    ${GEBAEUDE[art].iso(akzent, bild)}
   </g>`;
 
 const pfeil = (cx, cy, akzent) => `
@@ -175,7 +213,10 @@ const pfeil = (cx, cy, akzent) => `
   </g>`;
 
 // ---------- Poster ------------------------------------------------------
-function poster({ akzent, zeile, unter, seed, art }) {
+function poster({ akzent, zeile, unter, seed, art, bild }) {
+  const L = Object.assign({ linksX: 258, linksY: 726, linksS: 1.45, pfeilX: 540,
+                           rechtsX: 816, rechtsY: 692, rechtsS: 1.34 },
+                          GEBAEUDE[art].layout || {});
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <filter id="blur6" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="6"/></filter>
@@ -207,13 +248,13 @@ function poster({ akzent, zeile, unter, seed, art }) {
   <rect x="0" y="700" width="${W}" height="4" fill="${akzent}" opacity="0.32" filter="url(#blur24)"/>
 
   <!-- Vorher / Nachher, gezeichnet statt abfotografiert -->
-  ${flachesSymbol(258, 726, 1.45, art)}
-  ${pfeil(540, 722, akzent)}
-  ${isoBauwerk(816, 692, 1.34, akzent, art)}
+  ${flachesSymbol(L.linksX, L.linksY, L.linksS, art)}
+  ${pfeil(L.pfeilX, 722, akzent)}
+  ${isoBauwerk(L.rechtsX, L.rechtsY, L.rechtsS, akzent, art, bild)}
 
-  <text x="258" y="960" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, sans-serif"
+  <text x="${L.linksX}" y="960" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, sans-serif"
         font-size="30" font-weight="bold" fill="#7f8899" letter-spacing="5">VORHER</text>
-  <text x="816" y="960" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, sans-serif"
+  <text x="${L.rechtsX}" y="960" text-anchor="middle" font-family="Liberation Sans, DejaVu Sans, sans-serif"
         font-size="30" font-weight="bold" fill="${akzent}" letter-spacing="5">JETZT</text>
 
   <rect x="0" y="1020" width="${W}" height="900" fill="url(#gUnten)"/>
@@ -240,6 +281,17 @@ const POSTER = [
     zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' },
   { name: 'umbau_silo',   art: 'silo',   akzent: '#ff9a8a', seed: 3939,
     zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' }
+,
+  // Akzent = v.farbe aus ALIEN_VOELKER (weltraum_kolonie.html), damit Poster und Karte
+  // dieselbe Volksfarbe zeigen.
+  { name: 'nest_kryll',     art: 'nest', akzent: '#8fd694', seed: 5151, bild: 'kryll_5.png',
+    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' },
+  { name: 'nest_verglueht', art: 'nest', akzent: '#e0765a', seed: 6262, bild: 'verglueht_5.png',
+    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' },
+  { name: 'nest_xantheer',  art: 'nest', akzent: '#7ea8e8', seed: 7373, bild: 'xantheer_5.png',
+    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' },
+  { name: 'nest_vex',       art: 'nest', akzent: '#e0c168', seed: 8484, bild: 'vex_5.png',
+    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' }
 ];
 POSTER.forEach(p => fs.writeFileSync(`${OUT}/${p.name}.svg`, poster(p)));
 console.log('SVGs geschrieben:', POSTER.length);
