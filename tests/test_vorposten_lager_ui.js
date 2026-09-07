@@ -93,6 +93,7 @@ function spielstand(){
     const ctx = await browser.newContext({ viewport:{ width:1280, height:1000 } });
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
+    let schreibZaehler = 0;
     const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }),
       /* `kepler7-save-v3` - der Schluessel, den das Spiel wirklich liest (`STORE_KEY`). Hier stand
          `v1`: Die Vorlage kam damit NIE an, und jede Pruefung, die an Rohstoffen, Flotte oder
@@ -112,6 +113,14 @@ function spielstand(){
         modulAusbauKosten:250, modulBauAbklingMs:0, modulBestand:{}, modulBauAb:0,
         projektDefs: opt.projektDefs || [], projekteAktiv: !!opt.projektDefs, flugDeckel:0.5,
         lagerAktiv:true, lagerStunden:STUNDEN,
+        /* ABSICHTLICH NICHT die Serverwerte 'cruisers'/24/7. Abschnitt 6 prueft den Text des
+           Sternendocks, und der liest `vorpostenCache.dockSchiff/dockStunden/dockMax` MIT
+           RUECKFALL auf genau jene drei Zahlen. Stuenden hier dieselben Werte, waere jede
+           Erwartung auch dann gruen, wenn der Code den Cache gar nicht anfasst - ein Tippfehler
+           im Feldnamen bliebe unbemerkt (Durchsicht 07.09.2026). Abweichende Werte trennen die
+           beiden Faelle: Was hier steht, kann NUR ueber den Cache im Text landen.
+           Die Paritaet der Rueckfallzahlen gegen VP_DOCK_* prueft test_vorposten_paritaet.js. */
+        ...(opt.dockKonfig || {}),
         liste:[vpDoc], eigene: vpDoc.eigener ? 1 : 0 });
       if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
       if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
@@ -128,7 +137,15 @@ function spielstand(){
       if (p === 'storage-list'){ const pref = decodeURIComponent((u.split('prefix=')[1] || '').split('&')[0]);
         return j({ keys: Object.keys(st).filter(k => k.startsWith(pref)) }); }
       if (p.startsWith('storage/')){ const k = decodeURIComponent(p.slice(8));
-        if (req.method() === 'PUT'){ try { st[k] = JSON.parse(req.postData()||'{}').value; } catch(e){} return j({ ok:true }); }
+        /* GEZAEHLT WIRD JEDES SCHREIBEN DES SPIELSTANDS. Ohne diesen Zaehler kann der 5-Anker gar
+           nicht rot werden: `st` ist mit der Vorlage VORBELEGT, ein Lauf ohne einen einzigen PUT
+           liefert also dieselbe Flotte zurueck wie ein Lauf, in dem der Zweig nichts gebucht hat -
+           `flotte` ist nie null, `cruisers` immer eine Zahl. Der Anker haette „save() wurde
+           gerufen" behauptet und in Wahrheit nur belegt, dass die Vorlage noch da ist
+           (Durchsicht 07.09.2026). */
+        if (req.method() === 'PUT'){ try { st[k] = JSON.parse(req.postData()||'{}').value; } catch(e){}
+          if (k === 'kepler7-save-v3') schreibZaehler++;
+          return j({ ok:true }); }
         return st[k] === undefined ? j({ error:'nix' }, 404) : j({ value: st[k] }); }
       return j({ ok:true });
     });
@@ -173,11 +190,14 @@ function spielstand(){
     await page.waitForTimeout(300);
     const g = await page.evaluate(() => {
       const m = document.querySelector('.kmenu');
-      if (!m) return { text: null, lagerZeile: null, lagerErz: null };
+      if (!m) return { text: null, lagerZeile: null, lagerErz: null, dockZeile: null, dockAnz: null };
       const zeile = m.querySelector('[data-vp-lager]');
+      const dz = m.querySelector('[data-vp-dock]');
       return { text: (m.textContent || '').replace(/\s+/g, ' ').trim(),
         lagerZeile: zeile ? (zeile.textContent || '').replace(/\s+/g, ' ').trim() : null,
-        lagerErz: zeile ? Number(zeile.getAttribute('data-vp-lager')) : null };
+        lagerErz: zeile ? Number(zeile.getAttribute('data-vp-lager')) : null,
+        dockZeile: dz ? (dz.textContent || '').replace(/\s+/g, ' ').trim() : null,
+        dockAnz: dz ? Number(dz.getAttribute('data-vp-dock')) : null };
     });
     /* Die Flotte wird aus dem GESPEICHERTEN Spielstand gelesen, nicht aus dem DOM: `state` liegt
        in der IIFE des Spiels und ist von aussen nicht erreichbar - und der Umweg ueber die
@@ -207,9 +227,10 @@ function spielstand(){
     }
     let flotte = null;
     try { flotte = (JSON.parse(st['kepler7-save-v3'] || '{}') || {}).fleet || null; } catch (e) {}
-    const logText = await page.evaluate(() => (window.__logMit || []).join(' | ')).catch(() => null);
+    const logMit = await page.evaluate(() => (window.__logMit || []).slice()).catch(() => []);
+    const logText = (logMit || []).join(' | ');
     await ctx.close();
-    return { ...g, errs, flotte, logText, projektText };
+    return { ...g, errs, flotte, logText, logMit, projektText, schreibZaehler };
   }
 
   /* Abschnitt 5 (V6, 07.09.2026): Das Sternendock haengt am SELBEN Griff wie das Lager - der
@@ -225,12 +246,34 @@ function spielstand(){
   const fremd = await messe(vp({ eigener:false, besitzer:'u-fremd', besitzerName:'Nachbar' }));
   const voll  = await messe(vp({ lagerVollAb: now - 60000 }));
   const leer  = await messe(vp({ lager:{ erz:0, kristalle:0, deuterium:0 }, lagerVollAb: now + 12*3600*1000 }));
+  /* Schluessel, Namen, Zweige und Wirkungen sind die des Servers (server.js, VP_ENDPROJEKTE) -
+     eine Kopie-Familie. Ein erster Entwurf hatte `zweig:'militaer'` (den es im Spiel gar nicht
+     gibt; die drei heissen werft/handel/festung) und `name:'Sperrfeuer'` statt
+     `Sperrfeuerleitstand` - gerendert wurde damit ein Zustand, den das echte Spiel nie erzeugt. */
   const PROJ = [
-    { key:'sternendock',  name:'Sternendock',  icon:'ti-anchor',   stufeAb:8, zweig:'militaer', dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ werftSchiff: 1 },  desc:'' },
-    { key:'sternenmarkt', name:'Sternenmarkt', icon:'ti-basket',   stufeAb:8, zweig:'handel',   dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ marktPlaetze: 2 }, desc:'' },
-    { key:'sperrfeuer',   name:'Sperrfeuer',   icon:'ti-shield',   stufeAb:8, zweig:'militaer', dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ verlust: 0.08 },   desc:'' }
+    { key:'sternendock',  name:'Sternendock',          icon:'ti-anchor', stufeAb:8, zweig:'werft',   dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ werftSchiff: 1 },  desc:'' },
+    { key:'sternenmarkt', name:'Sternenmarkt',         icon:'ti-basket', stufeAb:8, zweig:'handel',  dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ marktPlaetze: 2 }, desc:'' },
+    { key:'sperrfeuer',   name:'Sperrfeuerleitstand',  icon:'ti-shield', stufeAb:8, zweig:'festung', dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ verlust: 0.08 },   desc:'' }
   ];
-  const proj = await messe(vp(), { projektDefs: PROJ });
+  const DOCK_KONFIG = { dockSchiff:'bomber', dockStunden:6, dockMax:3 };
+  const proj = await messe(vp(), { projektDefs: PROJ, dockKonfig: DOCK_KONFIG });
+
+  /* Abschnitt 7: DIE HAELFTE, DIE FEHLTE. `dockBereit` kam vom Server an jeden Client und wurde
+     im Spiel nirgends gelesen (`grep -c dockBereit` war 0). Beide Laeufe hier haben ein LEERES
+     Lager - genau der Zustand, in dem der alte Griff `vorpostenCache.lagerAktiv &&
+     !vorpostenLagerLeer(v)` den Eintrag verschwinden liess und ein volles Dock unerreichbar war.
+     `leerLager` ist deshalb nicht Beiwerk, sondern der Kern der Messung. */
+  const leerLager = { lager:{ erz:0, kristalle:0, deuterium:0 }, lagerVollAb: now + 12*3600*1000 };
+  const dockKonf2 = { dockSchiff:'cruisers', dockStunden:24, dockMax:3 };
+  const dockTeil = await messe(vp({ ...leerLager, dockBereit:2, dockSchiff:'cruisers' }), { dockKonfig: dockKonf2 });
+  const dockVoll = await messe(vp({ ...leerLager, dockBereit:3, dockSchiff:'cruisers' }), { dockKonfig: dockKonf2 });
+
+  /* 5c: der unbekannte Schiffsschluessel. Der Server liefert einen Typ, den diese Spielversion
+     nicht kennt - der Normalfall unserer Auslieferungsreihenfolge (Backend zuerst live). Vorher
+     wurde er still verschluckt, und weil das Lager gleichzeitig leer war, behauptete die Meldung
+     sogar „es war leer". Der Ertrag ist zu diesem Zeitpunkt beim Server schon geshiftet. */
+  const fremdSchiff = await messe(vp(), { belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
+    erz: 0, kristalle: 0, deuterium: 0, schiffe: { gibtesnichtmehr: 2 } } });
 
   /* Der Anker verlangt ein ECHTES Menue: `text` ist null, wenn `.kmenu` fehlt, und die Laenge
      liegt bei einem Kartenmenue in den Hunderten - nicht in den Millionen wie bei der ganzen
@@ -259,17 +302,25 @@ function spielstand(){
 
   await browser.close();
   /* ---- 5) Die Kreuzer des Sternendocks ------------------------------------------------------- */
-  check('5-anker: der Lauf mit der Dock-Belohnung hat einen Spielstand gespeichert',
-    !!(dock.flotte && typeof dock.flotte.cruisers === 'number'),
-    { flotte: dock.flotte, fehler: dock.errs.slice(0, 2) });
+  check('5-anker: der Lauf mit der Dock-Belohnung hat den Spielstand wirklich GESCHRIEBEN',
+    dock.schreibZaehler > 0 && !!(dock.flotte && typeof dock.flotte.cruisers === 'number'),
+    { puts: dock.schreibZaehler, cruisers: dock.flotte ? dock.flotte.cruisers : null, fehler: dock.errs.slice(0, 2) });
+  /* Der Dock-Lauf war der einzige ohne Fehlerpruefung - 4a deckt nur die vier Menuelaeufe ab.
+     Ein ReferenceError im neuen Zweig haette dort nur als Beiwerk eines fallenden Ankers gestanden. */
+  check('5-anker2: kein JavaScript-Fehler im Dock-Lauf', dock.errs.length === 0, dock.errs.slice(0, 3));
   check('5a: die drei Kreuzer aus dem Sternendock sind in der Flotte angekommen',
     !!dock.flotte && dock.flotte.cruisers === 15,
     { erwartet: 15, gemessen: dock.flotte ? dock.flotte.cruisers : null, ausgangsstand: 12 });
   /* Und der Spieler ERFAEHRT es. Eine stille Gutschrift waere fast so schlecht wie keine: Wer
      nicht sieht, dass das Dock geliefert hat, baut es kein zweites Mal. */
-  check('5b: die Meldung nennt das Sternendock und die Schiffe',
-    /Sternendock/.test(dock.logText || '') && /3\u00d7|3\u00a0\u00d7|3x/i.test((dock.logText || '').replace(/\s/g, '')),
-    { meldung: (dock.logText || '').slice(0, 220) });
+  /* EINE Meldung muss alles sagen, nicht der Join ueber alle. Der erste Entwurf prueft `logText`
+     - dort duerften „Sternendock" und „3x" aus zwei verschiedenen Eintraegen stammen, und der
+     Schiffsname wurde gar nicht geprueft: „aus dem Sternendock: 3x <irgendwas>" waere gruen
+     geblieben (Durchsicht 07.09.2026). Gesucht wird deshalb der EINE Eintrag, der alles traegt. */
+  const dockMeldung = (dock.logMit || []).find(t => /Sternendock/.test(t)) || '';
+  check('5b: EINE Meldung nennt Sternendock, Anzahl, Schiffsnamen und Landeort',
+    /Sternendock/.test(dockMeldung) && /3\s*\u00d7\s*Kreuzer/.test(dockMeldung) && /auf Heimatbasis/.test(dockMeldung),
+    { meldung: dockMeldung.slice(0, 240) });
 
   /* Abschnitt 6 (V6, 07.09.2026): DIE DREI ENDPROJEKTE TRAGEN KEINEN ANTEIL.
      `vpProjektWirkungText` faellt fuer jeden unbekannten Schluessel in den Prozent-Zweig. Ohne
@@ -286,9 +337,10 @@ function spielstand(){
   check('6-anker: das Projektfenster wurde gezeichnet und nennt alle drei Endprojekte',
     /Sternendock/.test(pt) && /Sternenmarkt/.test(pt) && /Sperrfeuer/.test(pt) && pt.length < 20000,
     { laenge: pt.length, auszug: pt.slice(0, 200), fehler: proj.errs.slice(0, 2) });
-  check('6a: das Sternendock nennt Schiff, Takt und Stapel - keine Prozentzahl',
-    /1 Kreuzer je 24 Stunden, bis zu 7 gestapelt/.test(pt) && !/% werftSchiff/.test(pt),
-    { auszug: (pt.match(/Sternendock.{0,80}/) || [])[0] });
+  check('6a: das Sternendock nennt Schiff, Takt und Stapel AUS DEM CACHE - keine Prozentzahl',
+    /1 Bomber je 6 Stunden, bis zu 3 gestapelt/.test(pt) && !/% werftSchiff/.test(pt)
+      && !/Kreuzer|24 Stunden|bis zu 7/.test(pt),
+    { auszug: (pt.match(/Sternendock.{0,80}/) || [])[0], geschickt: DOCK_KONFIG });
   check('6b: der Sternenmarkt nennt zwei Angebotsplaetze - keine Prozentzahl',
     /\+2 Angebotsplätze an der Modulbörse/.test(pt) && !/% marktPlaetze/.test(pt),
     { auszug: (pt.match(/Sternenmarkt.{0,80}/) || [])[0] });
@@ -296,6 +348,38 @@ function spielstand(){
     /\+8 Prozentpunkte Verlust für jeden Angreifer/.test(pt) && !/\+8 % verlust/.test(pt),
     { auszug: (pt.match(/Sperrfeuer.{0,80}/) || [])[0] });
   check('6d: kein JavaScript-Fehler im Projektfenster', proj.errs.length === 0, proj.errs.slice(0, 3));
+
+  /* ---- 5c) Ein Schiffstyp, den diese Version nicht kennt ------------------------------------- */
+  check('5c: ein unbekannter Schiffstyp wird gemeldet statt still verschluckt',
+    (fremdSchiff.logMit || []).some(t => /Sternendock/.test(t) && /noch nicht kennt/.test(t))
+      && !(fremdSchiff.logMit || []).some(t => /Sternendock/.test(t) && /es war leer/.test(t)),
+    { meldung: ((fremdSchiff.logMit || []).find(t => /Lager deines Vorpostens/.test(t)) || '').slice(0, 240) });
+
+  /* ---- 7) Das Sternendock ist sichtbar und erreichbar ---------------------------------------- */
+  check('7-anker: beide Dock-Laeufe haben ein echtes Kartenmenue gezeichnet',
+    [dockTeil, dockVoll].every(x => typeof x.text === 'string' && x.text.length > 40 && x.text.length < 20000)
+      && dockTeil.errs.length === 0 && dockVoll.errs.length === 0,
+    { laengen: [dockTeil, dockVoll].map(x => x.text === null ? null : x.text.length),
+      fehler: [...dockTeil.errs, ...dockVoll.errs].slice(0, 2) });
+  check('7a: der Dockstand steht im Info-Block - Anzahl und Schiffsname',
+    dockTeil.dockAnz === 2 && /Sternendock:/.test(dockTeil.dockZeile || '') && /Kreuzer/.test(dockTeil.dockZeile || ''),
+    { anzahl: dockTeil.dockAnz, zeile: dockTeil.dockZeile });
+  check('7b: solange Platz ist, steht dabei, wieviel hineinpasst',
+    /von 3/.test(dockTeil.dockZeile || '') && !/voll/.test(dockTeil.dockZeile || ''),
+    { zeile: dockTeil.dockZeile });
+  /* Der Deckel ist kein Schoenheitsfehler: `vorpostenDockStand` kappt hart bei dockMax, und
+     `dockSeit` wird beim Abholen nur bis zum Deckel zurueckgerechnet. Wer sein Dock stehen laesst,
+     verliert Schiffe - und erfuhr es bis hierher nirgends. */
+  check('7c: am Deckel steht „voll" und dass Weiteres verfaellt',
+    /voll/.test(dockVoll.dockZeile || '') && /verfällt/.test(dockVoll.dockZeile || '') && !/von 3/.test(dockVoll.dockZeile || ''),
+    { zeile: dockVoll.dockZeile });
+  /* DIE WICHTIGSTE PRUEFUNG DIESES ABSCHNITTS. Beide Laeufe haben ein leeres Lager. Haengt der
+     Griff wieder allein an `vorpostenLagerLeer`, faellt genau diese Zeile - und die Schiffe sind
+     unerreichbar, so wie es die Belohnung vor diesem Auftrag war. */
+  check('7d: der Abhol-Eintrag steht da, obwohl das Lager LEER ist',
+    /Sternendock abholen/.test(dockTeil.text), { auszug: (dockTeil.text.match(/.{0,60}abholen.{0,60}/) || [])[0] });
+  check('7e: und bei leerem Lager UND leerem Dock steht er nicht da',
+    !/abholen/.test(leer.text), { auszug: leer.text.slice(0, 120) });
 
   ende();
 })();
@@ -331,7 +415,8 @@ function spielstand(){
    `.catch`). Meine neue war die einzige Ausnahme. Wer eine Regel misst, muss BEIDE Schreibweisen
    kennen, sonst widerlegt er einen richtigen Befund mit einer zu engen Suche.
 
-   V6 (07.09.2026), Abschnitt 5 und 6, gemessen gegen `git show origin/main:weltraum_kolonie.html`:
+   V6 (07.09.2026), Abschnitte 5, 6 und 7, gemessen gegen `git show origin/main:weltraum_kolonie.html`
+   (Pruefnamen beider Laeufe per `diff` verglichen - einziger Unterschied ist die Schlusszeile):
    5a FAELLT dort mit `gemessen: 12` gegen `erwartet: 15` - die drei Kreuzer des Sternendocks
    waeren beim Abholen ersatzlos verfallen, weil die Belohnung nach dem Zweig aus der
    Warteschlange geraeumt wird. 5b FAELLT, die Meldung nennt das Dock nicht. Der 5-Anker bleibt
@@ -339,4 +424,33 @@ function spielstand(){
    6a, 6b und 6c FALLEN dort ebenfalls; im Fenster stuende „+100 % werftSchiff", „+200 %
    marktPlaetze" und „+8 % verlust". Der 6-Anker bleibt GRUEN - das Fenster wird gezeichnet, nur
    sein Inhalt ist falsch. Genau diese Haelfte-gruen/Haelfte-rot-Aufteilung ist der Beweis, dass
-   die Anker messen und nicht bloss mitfallen. */
+   die Anker messen und nicht bloss mitfallen.
+
+   ZWEITE RUNDE, aus der adversarischen Durchsicht desselben Aenderungssatzes (07.09.2026). Drei
+   Befunde betrafen DIESE DATEI, nicht die Spieldatei:
+
+   1) DER 5-ANKER KONNTE GAR NICHT ROT WERDEN. `st` ist mit der Vorlage vorbelegt, und der Anker
+      las genau diesen Schluessel. Ein Lauf ohne einen einzigen PUT liefert damit dieselbe Flotte
+      wie ein Lauf, in dem der Zweig nichts gebucht hat: `flotte` nie null, `cruisers` immer eine
+      Zahl. Der Kommentar behauptete „belegt zugleich, dass der Zweig sein save() gerufen hat" -
+      das war falsch. Gezaehlt werden jetzt die PUTs auf `kepler7-save-v3`; die Gegenprobe misst
+      dort `puts: 6` bei `cruisers: 12`, also ein echtes Schreiben OHNE Buchung. Das ist der
+      Unterschied, den der alte Anker nicht sehen konnte.
+   2) ABSCHNITT 6 MASS NUR DEN RUECKFALL. Die Fixture schickte `dockSchiff/dockStunden/dockMax`
+      gar nicht, und der Code faellt dann auf 'cruisers'/24/7 zurueck - genau die Werte, die 6a
+      erwartete. Ein Tippfehler in einem der drei Cache-Namen waere gruen geblieben. Die Fixture
+      schickt jetzt ABWEICHENDE Werte (bomber/6/3), die nur ueber den Cache im Text landen koennen;
+      die Paritaet der Rueckfallzahlen gegen VP_DOCK_* prueft test_vorposten_paritaet.js, 14a.
+   3) 5B KONNTE QUER UEBER MELDUNGEN GREIFEN. Geprueft wurde der Join ALLER Log-Eintraege -
+      „Sternendock" und „3x" durften aus zwei verschiedenen stammen, und der Schiffsname wurde gar
+      nicht geprueft. Gesucht wird jetzt der EINE Eintrag, der alles traegt.
+
+   Neu dazu, ebenfalls beide Richtungen gemessen:
+   5c FAELLT am alten Stand mit der Meldung „ist eingetroffen - es war leer." - der unbekannte
+      Schiffstyp wurde still verschluckt, und die Meldung log dabei.
+   7a bis 7d FALLEN am alten Stand (`anzahl: null`, `zeile: null`): `dockBereit` hatte im Spiel
+      keinen einzigen Leser, und der Abhol-Eintrag hing allein am Lager - bei leerem Lager waren
+      die fertigen Schiffe unerreichbar.
+   7-anker und 7e bleiben dort GRUEN. Der Anker, weil das Kartenmenue gezeichnet wird und nur sein
+   Inhalt fehlt; 7e, weil ein Eintrag bei leerem Lager UND leerem Dock auch vorher nicht da war -
+   die Pruefung schuetzt die Gegenrichtung, nicht dieselbe. */
