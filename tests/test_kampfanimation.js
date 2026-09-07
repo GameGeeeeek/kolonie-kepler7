@@ -16,10 +16,17 @@
 //   3. Es nimmt dem Ziel den Klick NICHT. Das Gefecht liegt ueber dem Marker seines Ziels; ohne
 //      pointer-events="none" waere das Nest waehrend des Kampfes nicht mehr antippbar - genau die
 //      Fehlerklasse, die GR-11 am Schuerfrecht-Kuerzel hatte.
-//   4. Eine Mission OHNE Kampf (Kolonisierung) erzeugt KEIN Gefecht. Die Gegenrichtung des Paars:
+//   4. DAS GEFECHT HAENGT AN DER ANKUNFT, nicht an der Rueckkehr (4a). `endTime` ist bei jedem
+//      Schlag die RUECKKEHR - die Ankunft liegt in der Mitte der Spanne. Der erste Entwurf hing
+//      am Ende und haette das Gefecht erst aufblitzen lassen, wenn die Flotte laengst wieder zu
+//      Hause landet; der Fixture hier hatte damals so kurze Flugzeiten, dass er das nicht sehen
+//      konnte. Gemessen wird deshalb der ABSTAND zur Rueckkehr.
+//   5. Eine Mission OHNE Kampf (Kolonisierung) erzeugt KEIN Gefecht. Die Gegenrichtung des Paars:
 //      Ohne sie waere die Pruefung auch von einem Zeichner erfuellt, der immer feuert.
 //
-// GEGENPROBE: KEPLER_KA1_GEGENPROBE=alt gegen den Stand vor KA-1.
+// GEGENPROBEN (KEPLER_KA1_GEGENPROBE), beide Pflichtlisten gemessen:
+//   alt       - der Stand vor KA-1 (origin/main a415efb)
+//   rueckkehr - der Haken haengt wieder an endTime statt an der Ankunft (mein erster Entwurf)
 const fs = require('fs');
 const { starteBrowser, SPIELDATEI, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -34,7 +41,17 @@ const SAB = process.env.KEPLER_KA1_GEGENPROBE || '';
    eines. Sie belegen also nichts ueber KA-1 und gehoeren nicht in die Pflichtliste; scharf
    werden sie erst am neuen Stand, wo eines dastehen KANN. 1d fiel dagegen mit, weil es das
    Attribut eines Elements liest, das dort gar nicht existiert. */
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '1d'] };
+/* Beide Listen GEMESSEN, nicht geschaetzt.
+   `alt`   - origin/main a415efb, der Stand vor KA-1: dort gibt es gar kein Gefecht.
+   `rueckkehr` - mein eigener erster Entwurf, bei dem der Haken an `endTime` (der RUECKKEHR) hing
+     statt an der Ankunft. Er faellt IDENTISCH zu `alt`, und genau das ist die Aussage: Aus Sicht
+     des Spielers war die erste Fassung so gut wie gar keine - zum Zeitpunkt, an dem man hinsieht,
+     steht nichts da. Die alte Fassung dieses Tests konnte das nicht sehen, weil ihr Fixture Hin-
+     und Rueckflug in 72 Sekunden zusammenfallen liess. */
+const MUSS_FALLEN = {
+  alt:       ['1a', '1b', '1c', '1d', '4a'],
+  rueckkehr: ['1a', '1b', '1c', '1d', '4a']
+};
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
@@ -132,17 +149,22 @@ async function messeGefecht(page){
       const st = JSON.parse(JSON.stringify(basis));
       const jetzt = Date.now();
       st.fleet = Object.assign({}, st.fleet, { jaeger: 200, cruisers: 80, colonyShips: 3 });
-      /* DIE ANKUNFT MUSS NACH DEM AUFKLAPPEN LIEGEN, und das ist der Kern der Messvorrichtung.
-         Ein erster Entwurf setzte endTime auf +2,5 s: Die Mission traf waehrend des Bootfensters
-         ein, die acht Sekunden waren beim Messen laengst vorbei, 1a fiel - und 2a war GRUEN, weil
-         nichts mehr dastand. Eine Pruefung, die aus dem falschen Grund gruen ist, ist so schlecht
-         wie eine rote (Skill `neuer-test`). Boot (3,5 s) plus Reiter (0,6 s) plus Aufklappen
-         (~1,5 s) sind rund 5,6 s; 12 s lassen Luft und werden unten abgewartet, nicht geraten. */
+      /* EIN ECHTER RUNDFLUG, und das ist seit dem 07.09.2026 der Kern dieser Messvorrichtung.
+         `endTime` ist bei einem Schlag die RUECKKEHR, nicht die Ankunft: Die Ankunft liegt in
+         der MITTE der Spanne. Der erste Entwurf setzte startTime auf -60 s und endTime auf +12 s
+         - bei 72 Sekunden Gesamtdauer fielen Hin- und Rueckflug praktisch zusammen, und der Test
+         konnte den Unterschied gar nicht sehen. Genau durch diese Luecke kam der blockierende
+         Befund der Durchsicht herein: Der Haken hing an der Rueckkehr, und das Gefecht waere
+         erst aufgeblitzt, wenn die Flotte laengst wieder zu Hause landet.
+         JETZT: Start weit in der Vergangenheit, Rueckkehr weit in der Zukunft, Ankunft (Mitte)
+         rund 14 s nach dem Laden - also nach Boot (3,5 s), Reiter (0,6 s) und Aufklappen (~1,5 s),
+         und mit deutlichem Abstand zur Rueckkehr. Abschnitt 4 misst genau diesen Abstand. */
+      const HIN = 14000, GESAMT = 600000;   // Ankunft in 14 s, Rueckkehr in 10 Minuten
       st.fleet.missions = [ typ === 'nest'
         ? { id: 9001, type:'nest-angriff', system:SYS, nestId: NEST_ID, fleetName:'1. Flotte',
-            startTime: jetzt - 60000, endTime: jetzt + 12000, composition:{ jaeger: 60 } }
+            startTime: jetzt + HIN - GESAMT/2, endTime: jetzt + HIN + GESAMT/2, composition:{ jaeger: 60 } }
         : { id: 9002, type:'colonize', system:SYS, targetId:'chronos1', fleetName:'Siedler',
-            startTime: jetzt - 60000, endTime: jetzt + 12000, composition:{ colonyShips: 1 } } ];
+            startTime: jetzt - 60000, endTime: jetzt + HIN, composition:{ colonyShips: 1 } } ];
       const fern = jetzt + 365*24*3600*1000;
       for (const k of ['nextPlanetEventCheck','lastEventTime','nextTraderCheck','nextRaidTime','nextFactionGift']) if (st[k] !== undefined) st[k] = fern;
       st.activeEvent = null; st.buffs = [];
@@ -171,6 +193,25 @@ async function messeGefecht(page){
       g1.da === true && g1.abstandZumNest !== null && g1.abstandZumNest < 120,
       { abstand: g1.abstandZumNest });
     check('1d: es nimmt dem Ziel den Klick nicht (pointer-events)', g1.pe === 'none', { pe: g1.pe });
+
+    /* 4a: DER BLOCKIERENDE BEFUND DER DURCHSICHT, als Wachposten.
+       Das Gefecht gehoert an die ANKUNFT. Gemessen wird das am Abstand zur RUECKKEHR: Die Mission
+       dieses Fixtures kehrt erst in zehn Minuten heim; steht das Gefecht JETZT schon da, kann es
+       nicht an endTime gehangen haben.
+       DIE MESSUNG STEHT HIER, nicht weiter unten: Ein erster Entwurf las den Spielstand nach
+       `t1.ctx.close()` und starb an "Target page ... has been closed" - derselbe Ablauffehler,
+       der in dieser Sitzung schon einmal eine Pruefung aus dem falschen Grund gruen gemacht hat.
+       Der Zeitpunkt ist ausserdem der richtige: Die Aussage gilt fuer den Moment, in dem das
+       Gefecht gesehen wurde. */
+    /* Gelesen wird der SERVERSEITIGE Spielstand aus dem Mock-Speicher, nicht localStorage: Das
+       Spiel legt seinen Stand im Server-Modus dort ab, und ein erster Entwurf bekam von
+       localStorage schlicht null zurueck. */
+    const restMission = ((t1.stand().fleet || {}).missions || [])[0];
+    const restzeit = restMission ? Math.round((restMission.endTime - Date.now())/1000) : null;
+    check('4a: das Gefecht stand da, waehrend die Flotte noch MINUTEN von der Rueckkehr entfernt war',
+      g1.da === true && restzeit !== null && restzeit > 120,
+      { restzeitSek: restzeit, gefechtDa: g1.da,
+        hinweis: 'endTime ist die Rueckkehr - die Ankunft liegt in der Mitte der Spanne' });
 
     // ---- 2) Es endet von selbst ------------------------------------------------------------
     /* MIT VORGESTELLTER UHR statt mit Warten: Nur Date.now wird ersetzt (Hausregel) - die

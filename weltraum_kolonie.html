@@ -57931,6 +57931,30 @@ async function claimPendingRewards(){
         any = true;
         ankunftsKampf(m, planetKey, fleet, showLog);
       }
+      /* KA-1: DAS GEFECHT GEHOERT AN DIE ANKUNFT, nicht an die Rueckkehr (Durchsicht 07.09.2026,
+         blockierender Befund an meinem eigenen Entwurf).
+         Der erste Entwurf haengte kampfMerken() in die `done`-Schleife weiter unten. Die laeuft
+         bei `now >= m.endTime` - und `endTime` ist bei JEDEM dieser Schlaege die RUECKKEHR, nicht
+         die Ankunft: `endTime: jetzt + flug*1000`, waehrend die Protokollzeile daneben
+         "Ankunft in flug/2, zurueck in flug" sagt. buildMap teilt dieselbe Spanne selbst
+         (`returning = art.rundflug && frac >= 0.5`). Ein Nest-Schlag mit 20 Minuten Flugzeit
+         haette das Gefecht also in Minute 20 gezeigt - in dem Moment, in dem die Flotte zu Hause
+         landet, an einem Nest, an dem niemand mehr steht. Die Regel steht als Kommentar direkt
+         ueber dieser Schleife; ich habe sie beim Bauen ueberlesen.
+         GEZEIGT WIRD NUR EIN FRISCHES GEFECHT: Wer die Ankunft verschlafen hat (Tab zu, ueber
+         Nacht weg - applyOfflineProgress ruft checkMissions beim Laden), bekommt sie nicht
+         nachtraeglich vorgespielt. Die Marke wird trotzdem gesetzt, damit sie nicht beim
+         naechsten Tick doch noch feuert. */
+      for (const m of fleet.missions){
+        if (!MISSION_KAMPF[m.type] || m.__kampfGezeigt) continue;
+        const kunst = MISSION_LINIEN[m.type];
+        const kdauer = Math.max(1000, m.endTime - (m.startTime || (m.endTime - 3600000)));
+        // Rundflug: die Haelfte der Spanne. Einwegflug: das Ende. Dieselbe Teilung wie in buildMap.
+        const ankunft = (kunst && kunst.rundflug) ? (m.endTime - kdauer/2) : m.endTime;
+        if (now < ankunft) continue;
+        m.__kampfGezeigt = true;
+        if (now - ankunft < KAMPF_DAUER_MS) kampfMerken(m);
+      }
       /* Eine Mission, deren Ausgang gerade beim Server liegt, ist NICHT fertig - sonst schickte
          der naechste Tick denselben Anflug ein zweites Mal los. */
       const done = fleet.missions.filter(m => now >= m.endTime && !serverMissionLaeuft(m));
@@ -57942,13 +57966,6 @@ async function claimPendingRewards(){
       for (const m of done) if (m.id !== undefined && serverAufloeserFuer(m.type)) laufendeServerAufloesungen.add(m.id);
       fleet.missions = fleet.missions.filter(m => now < m.endTime || serverMissionLaeuft(m));
       for (const m of done){
-        /* KA-1: Das Gefecht wird HIER gemerkt, an der einen Stelle, an der jede ankommende
-           Mission durchlaeuft - vor der type-Kette und vor der Server-Aufloesung. Damit gilt es
-           gleichermassen fuer die serverseitig abgerechneten Schlaege (Nest, Festung, Konvoi,
-           Vorposten, Anfechtung) und fuer den oertlich abgerechneten Angriff auf NPC und Spieler.
-           Ein Haken je Zweig waere die Sorte Kopie, die beim naechsten Missionstyp vergessen wird.
-           kampfMerken() entscheidet selbst anhand von MISSION_KAMPF, ob ueberhaupt gekaempft wird. */
-        kampfMerken(m);
         /* Abbaumission zurueck (v8.478.0). Bewusst VOR der type-Kette und mit continue statt als
            weiteres else-if: Die Kette ist lang gewachsen, und ein neuer Zweig mittendrin ist die
            Sorte Eingriff, bei der irgendwann ein else verrutscht.
@@ -59612,7 +59629,7 @@ async function claimPendingRewards(){
       const sy = planetSystemOf(key);
       if (sy) raus.add(sy);
     }
-    for (const v of ((vorpostenCache.liste || []).filter(v => v && v.eigener))) if (v.sys) raus.add(v.sys);
+    for (const v of meineVorposten()) if (v.sys) raus.add(v.sys);
     if (myAllianceTag() && state.allianceBase && state.allianceBase.foundedAt && state.allianceBase.sector) raus.add(state.allianceBase.sector);
     const feld = state.asteroidFeld || {};
     for (const sy of Object.keys(feld)){
@@ -59624,12 +59641,32 @@ async function claimPendingRewards(){
     }
     return raus;
   }
+  /* EIN RIEGEL UND EINE FRIST (KA-3, Durchsicht 07.09.2026).
+     RIEGEL: switchTab('verteidigung') ruft loadDetectedFleets ungebremst; ein Wechsel auf die
+     Karte im Ladefenster saehe noch das alte loadedAt und startete einen ZWEITEN Lauf - je eine
+     Liste plus bis zu 60 Einzelabrufe.
+     FRIST: 45 Sekunden, nicht 60. Die kuerzeste Basis-Flugdauer im Spiel ist 40 s
+     (NPCS[].duration; PLANETS[].duration liegt bei 45 s), und Geschwindigkeitsfaktoren machen
+     sie kuerzer, nicht laenger - mit einer Minute waere eine kurze Erkundung schon vorbei,
+     bevor sie je auf der Karte stand. Die erste Fassung dieses Kommentars behauptete das
+     Gegenteil und war gegen die Daten derselben Datei falsch. */
+  const ABHORCH_FRIST_MS = 45000;
+  let abhorchLaeuft = false;
+  function abhorchVielleichtLaden(){
+    if (abhorchLaeuft) return;
+    if (abhorchCache && Date.now() - (abhorchCache.loadedAt || 0) <= ABHORCH_FRIST_MS) return;
+    loadDetectedFleets();
+  }
   async function loadDetectedFleets(){
+    if (abhorchLaeuft) return;
+    abhorchLaeuft = true;
+    try {
     const posts = myAbhorchposten();
     /* Seit KA-3 haengt die Aufklaerung nicht mehr allein am Abhorchposten: Wer irgendwo eigene
        Praesenz hat, sieht die Bewegungen DORT auch ohne Posten. Ohne beides gibt es nichts. */
     const praesenz = meinePraesenzSysteme();
     if ((!posts.length && !praesenz.size) || !useBackend()){ abhorchCache = { detected: [], loadedAt: Date.now() }; renderAbhorchpostenBox(); return; }
+    // (Der Riegel wird im finally am Ende geloest - auch auf diesem Weg.)
     try {
       const listRes = await storageList('missions:', true);
       const myKey = 'missions:'+state.player.id;
@@ -59663,6 +59700,7 @@ async function claimPendingRewards(){
       detected.sort((a,b)=>a.endTime-b.endTime);
       abhorchCache = { detected, loadedAt: now };
     } catch(e){ abhorchCache = { detected: [], loadedAt: Date.now() }; }
+    } finally { abhorchLaeuft = false; }
     renderAbhorchpostenBox();
   }
   function renderAbhorchpostenBox(){
@@ -59676,7 +59714,7 @@ async function claimPendingRewards(){
     const missionTypeLabel = { explore:'Erkundung', colonize:'Kolonisierung', 'colonize-moon':'Mond-Kolonisierung', relocate:'Verlegung', attack:'Angriff (NPC)' };
     box.innerHTML = `
       <div class="section-title" style="margin-top:1.25rem;"><i class="ti ti-map-pin" aria-hidden="true"></i>Abhorchposten <span class="lvl-pill">Stufe ${bestPost.level}${posts.length>1?' · '+posts.length+' Monde':''}</span></div>
-      <div class="bmeta">Erfasst fremde Flottenbewegungen innerhalb von ${abhorchpostenRangeSectors(bestPost.level)} Sektor(en) um ${posts.map(p=>planetDisplayName(p.moonKey)).join(', ')}${bestPost.level<3?' - Missionstyp ab Stufe 3, Schiffszusammensetzung ab Stufe 4.':(bestPost.level<4?' - Schiffszusammensetzung ab Stufe 4.':'.')}</div>
+      <div class="bmeta">Erfasst fremde Flottenbewegungen innerhalb von ${abhorchpostenRangeSectors(bestPost.level)} Sektor(en) um ${posts.map(p=>planetDisplayName(p.moonKey)).join(', ')} – dazu, unabhängig von der Reichweite, alles in Systemen mit eigener Präsenz (Planet, Mond, Vorposten, Allianzbasis oder Schürfrecht mit Eskorte), und dort immer mit voller Auskunft${bestPost.level<3?' - Missionstyp ab Stufe 3, Schiffszusammensetzung ab Stufe 4.':(bestPost.level<4?' - Schiffszusammensetzung ab Stufe 4.':'.')}</div>
       ${!rows.length ? `<div class="bmeta">${cache?'Keine fremden Flotten in Reichweite erfasst.':'lädt…'}</div>` : rows.map(r => {
         const originName = (STAR_SYSTEMS.find(s=>s.id===r.originSystem)||{}).name || r.originSystem;
         const destName = (STAR_SYSTEMS.find(s=>s.id===r.destSystem)||{}).name || r.destSystem;
@@ -64120,17 +64158,29 @@ function sekSternUse(key, x, y, k, unentdeckt){
   const FLOTTE_BILD = 64;
   const FLOTTE_BILD_CACHE = {};
   function flottenBildUrl(key){
-    if (!(key in FLOTTE_BILD_CACHE)){
+    /* DER ANSTRICH GEHOERT IN DEN SCHLUESSEL (Durchsicht 07.09.2026). drawShipMiniIcon liest
+       activeShipSkinStops() - der Lack ist ins Bild eingebrannt. Mit `key` allein bliebe eine
+       fliegende Flotte nach einem Lackwechsel bis zum Neuladen grau. Dieselbe Regel steht schon
+       zweimal in dieser Datei (schiffBildKlasse und die Berichtsliste); dies war die dritte
+       Stelle und die einzige, die sie nicht befolgte. Die Werftmarke muss NICHT mit hinein:
+       markOverride=1 blendet sie ohnehin aus.
+       UNBEKANNTER RUMPF WIRD VORHER ABGEFANGEN, und das ist kein Beiwerk: drawShipMiniIcon
+       bricht bei fehlendem SHIP_HULL_DEFS-Eintrag NACH dem clearRect ab, toDataURL liefert dann
+       eine gueltige, vollstaendig durchsichtige Grafik - der dokumentierte Rueckfall auf den
+       alten Pfeil griffe also genau in dem Fall nicht, fuer den er geschrieben ist. Die beiden
+       vorhandenen Aufrufer pruefen das; dieser tut es jetzt auch. Wichtig fuer KA-3: Die
+       Zusammensetzung kommt dort aus dem Spielstand eines FREMDEN Clients und ist ungeprueft. */
+    if (!SHIP_HULL_DEFS[key] || typeof drawShipMiniIcon !== 'function') return null;
+    const merk = ((state && state.shipSkin) || 'standard') + '|' + key;
+    if (!(merk in FLOTTE_BILD_CACHE)){
       try {
         const cv = document.createElement('canvas'); cv.width = FLOTTE_BILD; cv.height = FLOTTE_BILD;
         if (!cv.getContext('2d')) throw new Error('kein 2D-Context');
-        /* markOverride=1 heisst "keine Werftmarken": Die Plaketten sind bei 14 Kartenpixeln nicht
-           lesbar und wuerden den Umriss zumatschen, um den es hier geht. */
         drawShipMiniIcon(key, cv, 1);
-        FLOTTE_BILD_CACHE[key] = cv.toDataURL();
-      } catch(e){ FLOTTE_BILD_CACHE[key] = null; }
+        FLOTTE_BILD_CACHE[merk] = cv.toDataURL();
+      } catch(e){ FLOTTE_BILD_CACHE[merk] = null; }
     }
-    return FLOTTE_BILD_CACHE[key];
+    return FLOTTE_BILD_CACHE[merk];
   }
   /* Das STAERKSTE Schiff im Verband gibt dem Marker seine Gestalt - gemessen an
      SHIP_SCORE_WEIGHTS, derselben Tabelle, aus der auch die Flottenbewertung kommt. Bewusst nicht
@@ -64146,8 +64196,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
     return best;
   }
   function flottenSchiffe(comp){
+    /* Number() ist Pflicht, nicht Kosmetik: Bei KA-3 kommt `comp` aus dem Spielstand eines
+       FREMDEN Clients. Eine Zusammensetzung mit Zeichenketten machte aus `0 + "5" + "3"` die
+       Zeichenkette "053" - fmt() druckte 5,3 statt 8, und `n === 1` traefe nie. */
     let n = 0;
-    for (const k of Object.keys(comp || {})) if (comp[k] > 0) n += comp[k];
+    for (const k of Object.keys(comp || {})){
+      const v = Number(comp[k]);
+      if (isFinite(v) && v > 0) n += v;
+    }
     return n;
   }
   /* WIE VIELE BEGLEITER, und die Schwellen sind eine ERSTE KALIBRIERUNG - so wie der Staerkebogen
@@ -64195,6 +64251,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (art.rundflug && returning) return name + ' · Rückflug';
     const n = flottenSchiffe(m.composition || (m.shipKey ? { [m.shipKey]: m.qty || 0 } : null));
     if (!n) return art.rundflug ? name + ' · Hinflug' : (m.fleetName ? name + ' · ' + art.was : art.was);
+    /* EINWEGFLUEGE BEHALTEN IHRE ART (Durchsicht 07.09.2026): Kolonisierung, Mondlandung,
+       Verlegung, Garnison und Vorposten-Bau fliegen nie zurueck - dort ist "wohin und wozu" die
+       Frage, nicht die Staerke. Der erste Entwurf schrieb auch dort nur die Schiffszahl, und die
+       fuenf Arten waren danach nur noch an der Linienfarbe zu unterscheiden. */
+    /* `name` IST bereits art.was, wenn die Mission keinen Flottennamen hat - sonst stuende hier
+       "Kolonisierung · Kolonisierung · 1 Schiff". Genau diese Doppelung nennt der Kommentar in
+       test_flugbahnen.js als "erster Versuch"; sie ist mir beim Nachziehen der Einwegfluege ein
+       zweites Mal passiert und beim ersten Lauf des nachgezogenen Tests aufgefallen. */
+    if (!art.rundflug){
+      const kopf = m.fleetName ? name + ' · ' + art.was : art.was;
+      return kopf + ' · ' + fmt(n) + ' Schiff' + (n === 1 ? '' : 'e');
+    }
     return name + ' · ' + fmt(n) + ' Schiff' + (n === 1 ? '' : 'e');
   }
   const KAMPF_DAUER_MS = 8000;
@@ -64212,7 +64280,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const art = MISSION_KAMPF[m.type];
     kampfAnimationen.push({
       nr: ++kampfZaehler, farbe: art.farbe, was: art.was, bis: Date.now() + KAMPF_DAUER_MS,
-      m: { type: m.type, targetId: m.targetId, system: m.system, nestId: m.nestId, zielId: m.zielId }
+      m: { type: m.type, targetId: m.targetId, system: m.system, nestId: m.nestId, zielId: m.zielId, platz: m.platz }
     });
     // Deckel gegen einen Verband, der mit vielen Missionen gleichzeitig eintrifft.
     if (kampfAnimationen.length > 8) kampfAnimationen = kampfAnimationen.slice(-8);
@@ -64248,6 +64316,17 @@ function sekSternUse(key, x, y, k, unentdeckt){
     /* Ein Nest ist KEIN Planet - die generische Suche darunter (PLANETS.find) fiele ins Leere und
        die Linie bliebe aus. Der Index bestimmt den Winkel und muss derselbe sein wie beim
        Zeichnen, sonst zeigte die Linie neben den Marker. */
+    /* Die Anfechtung eines Schuerfrechts zielt auf einen GUERTELPLATZ, nicht auf einen Planeten
+       (Durchsicht 07.09.2026): ihre targetId ist `sysId + ':' + platz`, die generische Suche am
+       Ende faende nie einen Planeten und lieferte null. Ohne diesen Zweig zeigte KA-1 dort nie
+       ein Gefecht - obwohl der Hilfetext das Schuerfrecht ausdruecklich mit aufzaehlt.
+       Eine Flugbahn bekommt sie dadurch NICHT: Die Linien-Schleife filtert ueber MISSION_LINIEN,
+       und dort steht 'asteroid-contest' nicht. */
+    if (m.type === 'asteroid-contest'){
+      const pl = (m.platz !== undefined && m.platz !== null) ? m.platz : String(m.targetId || '').split(':')[1];
+      if (pl === undefined) return null;
+      return { system: m.system, pos: asteroidPlatzXY(String(pl)) };
+    }
     if (m.type === 'nest-angriff'){
       const liste = nesterImSystem(m.system);
       const i = liste.findIndex(x => String(x.id) === String(m.nestId));
@@ -65544,7 +65623,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // Die Richtung: von der Galaxielage des anderen Systems auf die Systemansicht projiziert.
       const hier = STAR_SYSTEMS.find(x => x.id === activeSystem);
       const dort = STAR_SYSTEMS.find(x => x.id === (rein ? f.originSystem : f.destSystem));
-      let dx = 1, dy = -0.4;
+      // Normiert wie der gerechnete Zweig darunter - greift, wenn zwei Systeme dieselbe Lage haben.
+      let dx = 0.928, dy = -0.371;
       if (hier && dort && (dort.gx !== hier.gx || dort.gy !== hier.gy)){
         dx = dort.gx - hier.gx; dy = dort.gy - hier.gy;
         const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
@@ -65562,7 +65642,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
          gebaut und erprobt, und eine zweite Staffel danebenzustellen waere eine zweite Wahrheit.
          Unter Stufe 3 nennt sie den Missionstyp nicht; Stufe 4 (oder eigene Praesenz) auch die
          Schiffe, und dann wird der Rumpf gezeichnet wie bei den eigenen. */
-      const typText = f.detectLevel >= 3 ? ((MISSION_LINIEN[f.type] || {}).was || f.type) : 'unbekannt';
+      /* "Angriff (NPC)" wie in der Abhorchposten-Box, nicht bloss "Angriff" (Durchsicht
+         07.09.2026): PvP kann gar nicht veroeffentlicht werden - missionDestinationSystem
+         schliesst attack-player und spy-player aus. Eine violette Bahn auf MEIN System mit der
+         Aufschrift "Spieler X - Angriff" waere die naheliegendste Fehllesung, die die Karte
+         anbieten kann. */
+      const typText = f.detectLevel >= 3
+        ? (f.type === 'attack' ? 'Angriff (NPC)' : ((MISSION_LINIEN[f.type] || {}).was || f.type))
+        : 'unbekannt';
       const marke = f.detectLevel >= 4
         ? flottenMarke({ composition: f.composition }, fx, fy, winkel, '#c3bef5')
         : `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="4.5" fill="#c3bef5" fill-opacity="0.75" pointer-events="none"/>`;
@@ -68245,11 +68332,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
     /* KA-3: Die Aufklaerung wurde bis heute NUR beim Wechsel auf den Verteidigungs-Reiter geladen -
        auf der Karte war der Zwischenspeicher deshalb immer leer, und die fremden Flotten konnten
        dort gar nicht erscheinen. Gemessen beim Bau von KA-3, nicht vermutet.
-       MIT ALTERSGRENZE statt bei jedem Wechsel: Der Abruf ist eine Liste plus bis zu 60
-       Einzelabrufe im geteilten Speicher. Eine Minute ist kurz genug, dass eine anfliegende Flotte
-       nicht verpasst wird (die kuerzeste Flugzeit im Spiel liegt darueber), und lang genug, dass
-       Hin- und Herwechseln zwischen den Reitern den Server nicht flutet. */
-    if (tab === 'karte' && (!abhorchCache || Date.now() - (abhorchCache.loadedAt || 0) > 60000)) loadDetectedFleets();
+       MIT ALTERSGRENZE, weil der Abruf eine Liste plus bis zu 60 Einzelabrufe im geteilten
+       Speicher ist. Die Frist laeuft zusaetzlich im Sekundentakt weiter (siehe ABHORCH_FRIST_MS
+       im Tick) - ohne das saehe wer auf der Karte STEHEN BLEIBT nie eine neu gestartete Flotte,
+       und genau dort soll man ja stehen bleiben. */
+    if (tab === 'karte') abhorchVielleichtLaden();
     if (tab === 'berichte'){
       loadReports();
       loadMessages();
@@ -75236,6 +75323,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // System aufgeklappt ist. Ein zweiter buildMap()-Aufruf von hier würde die Gruppe ein zweites Mal
     // je Sekunde neu schreiben - dieselbe Arbeit doppelt, und im Grundzustand ins Leere.
     if (activeTab === 'karte'){
+      /* KA-3: Die Aufklaerung altert auch dann, wenn niemand den Reiter wechselt. abhorchVielleichtLaden
+         prueft selbst Riegel und Frist (45 s) und ist damit fast immer ein Ruecksprung ohne Arbeit. */
+      abhorchVielleichtLaden();
       // Auffangnetz mit Eingangs-Signatur (Etappe G-1, Messung: ~1,7 ms String-Aufbau je Sekunde,
       // der fast immer im "unverändert"-Vergleich endete). Direkte Aufrufe (Nutzeraktionen,
       // Daten-Ankünfte) bleiben unangetastet; hier wird nur der blinde Sekundenaufbau gespart.
