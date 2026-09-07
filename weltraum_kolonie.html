@@ -64512,31 +64512,50 @@ function sekSternUse(key, x, y, k, unentdeckt){
          (<), damit bei Gleichstand der weiter vorn stehende - und das heißt: der näher am eigenen
          Objekt liegende - Platz gewinnt. */
       if (!wahl){
-        /* ZWEI Kennzahlen, in dieser Reihenfolge verglichen: erst die Fläche auf einer
-           PLANETENSCHEIBE, dann die Gesamtfläche. Eine Scheibe ist der grösste, hellste und
-           texturierteste Körper auf der Karte - Text darauf ist unlesbar, Text auf einem schmalen
-           Asteroidenmarker nur unschön. Genau diese Rangfolge hält der Bestandstest seit KB-16
-           fest, und ohne sie tauscht die Wahl das eine gegen das andere: GEMESSEN am 07.09.2026
-           schob ein erster Entwurf erst "Draconis", nach dessen Reparatur dann "Sporenherd" auf
-           eine fremde Scheibe - jedes Mal, weil die reine Summe das für einen Fortschritt hielt. */
-        const ueberdeckung = (k, mitEigenem) => {
-          let summe = 0, scheibe = 0;
-          const dazu = (f, istScheibe) => {
+        /* DREI Kennzahlen getrennt: Fläche auf einer PLANETENSCHEIBE, auf einem sonstigen
+           Kartenobjekt, auf einer anderen BESCHRIFTUNG. Getrennt, weil sie nicht gegeneinander
+           aufgerechnet werden dürfen - jede steht für einen anderen Schaden:
+             Scheibe   der grösste, hellste, texturierteste Körper; Text darauf ist unlesbar.
+             Objekt    ein Marker; Text darauf verdeckt ihn UND fängt den Tipp darauf ab.
+             Label     zwei Namen übereinander sind beide unlesbar.
+           AUSWEICHEN DARF NIE VERSCHLIMMERN: Gewählt wird nur ein Platz, der in JEDER der drei
+           Kennzahlen höchstens so schlecht ist wie die Ausgangsstelle. Findet sich keiner, bleibt
+           die Beschriftung, wo sie ist.
+           GEMESSEN am 07.09.2026, und zwar an zwei Fehlschlägen des Entwurfs davor, der nur
+           Scheibe und Gesamtsumme verglich und deshalb Objekt gegen Label tauschen durfte:
+             test_kartenmarker      "Oberon" und "Allianzbasis [KB]" landeten übereinander (vega)
+             test_konvoi_wrackfeld  ein Tipp auf die MITTE des Markers traf die Beschriftung
+           Beide sind genau der Tausch, den eine einzige Summe nicht sehen kann: Sie wurde kleiner,
+           während der Schaden woanders neu entstand. */
+        const bewerte = (k, mitEigenem) => {
+          let scheibe = 0, objekt = 0, label = 0;
+          const flaeche = f => {
             const ox = Math.min(k.x + k.w, f.x + f.w) - Math.max(k.x, f.x);
             const oy = Math.min(k.y + k.h, f.y + f.h) - Math.max(k.y, f.y);
-            if (ox > 0 && oy > 0){ summe += ox * oy; if (istScheibe) scheibe += ox * oy; }
+            return (ox > 0 && oy > 0) ? ox * oy : 0;
           };
-          for (const f of flaechen) if (mitEigenem || f.g !== eigen) dazu(f, !!f.g.getAttribute('data-planet'));
-          for (const g of gesetzt) dazu(g, false);
-          return { scheibe, summe };
+          for (const f of flaechen){
+            if (!mitEigenem && f.g === eigen) continue;
+            const a = flaeche(f);
+            if (a) { if (f.g.getAttribute('data-planet')) scheibe += a; else objekt += a; }
+          }
+          for (const g of gesetzt) label += flaeche(g);
+          return { scheibe, objekt, label };
         };
+        const start = bewerte(kastenAn(plaetze[0]), false);
+        // "höchstens so schlecht wie die Ausgangsstelle" - in jeder Kennzahl einzeln.
+        const zumutbar = f => f.scheibe <= start.scheibe && f.objekt <= start.objekt && f.label <= start.label;
         let beste = null;
         for (const p of plaetze){
-          const k = kastenAn(p), f = ueberdeckung(k, versetzt(p));
-          if (!beste || f.scheibe < beste.scheibe || (f.scheibe === beste.scheibe && f.summe < beste.summe)){
-            beste = f; wahl = p; kasten = k;
+          const k = kastenAn(p), f = bewerte(k, versetzt(p));
+          if (!zumutbar(f)) continue;
+          const rang = [f.scheibe, f.objekt + f.label];
+          if (!beste || rang[0] < beste[0] || (rang[0] === beste[0] && rang[1] < beste[1])){
+            beste = rang; wahl = p; kasten = k;
           }
         }
+        // plaetze[0] ist die Ausgangsstelle und erfüllt `zumutbar` immer - `wahl` ist also gesetzt.
+        if (!wahl){ wahl = plaetze[0]; kasten = kastenAn(plaetze[0]); }
       }
       versatz = wahl.dy; seitlich = wahl.dx;
       if (versatz){
