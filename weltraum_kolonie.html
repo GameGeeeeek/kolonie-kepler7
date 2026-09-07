@@ -12193,15 +12193,40 @@
     if (links.length < 3 || rechts.length < 3) return null;
     const kys = [...links, ...rechts].filter(p => Math.abs(p[0] - X) < 0.01).map(p => p[1]);
     if (kys.length < 2) return [links, rechts];
+    /* Die gezackte Bruchkante. Erster und letzter Punkt liegen OHNE Versatz genau auf X: Sie sind
+       zugleich die Schnittpunkte des Rumpfes, und ein Versatz dort risse zwischen Kante und Rumpf
+       eine Luecke auf. Gezackt wird nur dazwischen. */
     const yA = Math.min(...kys), yB = Math.max(...kys), n = 5, kante = [];
     for (let i = 0; i <= n; i++){
-      kante.push([X + (kvSaat(id * 7 + i) - 0.5) * (x1 - x0) * 0.10, yA + (yB - yA) * (i / n)]);
+      const rand = (i === 0 || i === n);
+      kante.push([X + (rand ? 0 : (kvSaat(id * 7 + i) - 0.5) * (x1 - x0) * 0.10), yA + (yB - yA) * (i / n)]);
     }
-    const ohne = (arr, hinten) => {
-      const rein = arr.filter(p => Math.abs(p[0] - X) > 0.01);
-      return hinten ? rein.concat(kante) : rein.concat([...kante].reverse());
+    /* DER RING WIRD ROTIERT, NICHT GEFILTERT (Durchsicht 07.09.2026, gemessener Fehler).
+       Ein erster Entwurf warf die beiden Schnittpunkte einfach aus der Liste und haengte die
+       Bruchkante immer HINTEN an. Das stimmt nur, wenn die Schnittpunkte zufaellig am Listenende
+       liegen - und das tun sie fast nie: Alle Ruempfe in SHIP_HULL_DEFS beginnen am Bug, also am
+       groessten x, weshalb die rechte Haelfte ihre Schnittpunkte immer MITTEN in der Liste hat.
+       GEMESSEN am alten Stand: 5 der 6 Bruchstuecke waren ueberschlagen, das linke Frachterstueck
+       hatte Flaeche -24 statt rund -550 - es war zu einer Schleife kollabiert. Sichtbar war das
+       nicht, weil ein Wrack der eine Gegenstand ist, bei dem kaputte Geometrie wie Absicht aussieht.
+       Richtig ist: Die beiden Schnittpunkte teilen den Ring in zwei Boegen. Der Bogen mit den
+       echten Rumpfpunkten bleibt, der andere - die gerade Schnittkante - wird durch die gezackte
+       ersetzt, in der Richtung, die zu den Enden des Bogens passt. */
+    const zusammen = (ring) => {
+      const idx = [];
+      for (let i = 0; i < ring.length; i++) if (Math.abs(ring[i][0] - X) < 0.01) idx.push(i);
+      if (idx.length !== 2) return ring;          // nicht der Normalfall - lieber unveraendert
+      const [i1, i2] = idx;
+      const bogenA = ring.slice(i1, i2 + 1);
+      const bogenB = ring.slice(i2).concat(ring.slice(0, i1 + 1));
+      const echte = b => b.filter(p => Math.abs(p[0] - X) > 0.01).length;
+      const bogen = echte(bogenA) >= echte(bogenB) ? bogenA : bogenB;
+      const vonY = bogen[bogen.length - 1][1], nachY = bogen[0][1];
+      const gerichtet = (kante[0][1] <= kante[kante.length - 1][1]) === (vonY <= nachY)
+        ? kante : [...kante].reverse();
+      return bogen.concat(gerichtet.slice(1, -1));
     };
-    return [ohne(links, true), ohne(rechts, false)];
+    return [zusammen(links), zusammen(rechts)];
   }
   /* Ein Bruchstueck, gezeichnet mit dem Massstab des GANZEN Rumpfes und nicht mit seinem eigenen -
      sonst wird jede Scherbe auf dieselbe Laenge gestreckt und ein schmales Heckstueck sieht aus wie
@@ -64704,7 +64729,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
         inner += `
           <g class="planet-node" data-map-konvoi="${escapeHtml(String(k.id))}" style="cursor:pointer;">
             <title>Wrackkonvoi – Rumpf ${Math.round(anteil*100)}%${konvoiAbklingBis(k) > Date.now() ? ' · dein nächster Schlag in ' + fmtDuration((konvoiAbklingBis(k) - Date.now())/1000) : ''} (antippen für das Menü)</title>
-            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4">
+            <!-- TREFFERFLAECHE, und sie ist hier PFLICHT (Durchsicht 07.09.2026, echter Befund).
+                 Bis GR-10 war der gefuellte dunkle Kern (r x 0,75) das einzige antippbare Kind des
+                 Markers. Der Umbau hat ihn in den Rueckfall verschoben und das neue Bild mit
+                 pointer-events="none" versehen - uebrig blieben ein gestrichelter Faden von 1,3
+                 Einheiten, eine Bake von 1,2 und der Rumpfbalken. In der MITTE, wo der Finger
+                 hingeht, war nichts mehr. Der unsichtbare Kreis liegt innerhalb des Platzes, den
+                 kbMarkerFrei mit sichtR = r x 1,6 ohnehin freihaelt, und traegt zugleich das
+                 Mindestmass von 44 px (KB_TAP_PX), das derselbe Befund bei Asteroiden und
+                 Vorposten schon gesetzt hat. Die Bestandstests fangen das NICHT: sie schicken das
+                 Klickereignis direkt an den Knoten und umgehen die Trefferpruefung. -->
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${Math.max(r*1.5, kbTrefferEinheiten()/2).toFixed(1)}" fill="transparent" stroke="none"/>
+            <circle cx="${coord.x.toFixed(1)}" cy="${coord.y.toFixed(1)}" r="${(r*1.5).toFixed(1)}" fill="none" stroke="#8fd0ea" stroke-width="1.3" stroke-opacity="0.5" stroke-dasharray="4,4" pointer-events="none">
               <animateTransform attributeName="transform" type="rotate" from="0 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" to="360 ${coord.x.toFixed(1)} ${coord.y.toFixed(1)}" dur="9s" repeatCount="indefinite"/>
             </circle>
             ${scherben}

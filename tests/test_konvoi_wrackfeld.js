@@ -182,6 +182,103 @@ function konvoiObj(){
     { kontrolleAlt: mass.altSym, gemessenNeu: mass.neuSym, schwelle: 40 });
   check('3a: kein JavaScript-Fehler beim Zeichnen', errs.length === 0, errs.slice(0, 3));
 
+  /* ---- 4) Die Bruchgeometrie: gerechnet, nicht betrachtet ------------------------------------
+     DER TEUERSTE BEFUND DIESES AUFTRAGS. Die erste Fassung von kvBruch warf die beiden
+     Schnittpunkte aus der Punktliste und haengte die Bruchkante immer HINTEN an. Das stimmt nur,
+     wenn die Schnittpunkte zufaellig am Listenende liegen - und das tun sie fast nie: Alle
+     Ruempfe in SHIP_HULL_DEFS beginnen am Bug, also am groessten x, weshalb die rechte Haelfte
+     ihre Schnittpunkte immer MITTEN in der Liste hat. GEMESSEN waren 5 der 6 Stuecke
+     ueberschlagen, das linke Frachterstueck mit Flaeche 24 statt 617 - zu einer Schleife
+     kollabiert.
+     WARUM KEIN BILDVERGLEICH DAS GEFANGEN HAETTE: Ein Wrack ist der eine Gegenstand, bei dem
+     kaputte Geometrie wie Absicht aussieht. Abschnitt 2 blieb gruen, weil ein ueberschlagenes
+     Polygon genauso wenig drehsymmetrisch ist wie ein heiles. Diese Pruefung rechnet deshalb:
+     Ein Polygon ohne Selbstschnitt, und die beiden Haelften ergeben zusammen wieder den ganzen
+     Rumpf. Beides sind REGELN, keine Momentaufnahmen - sie gelten auch, wenn sich die Ruempfe,
+     die Schnittstellen oder die Zackenzahl aendern. */
+  {
+    const von = JS.indexOf('function kvBruch(');
+    const bis = JS.indexOf('\n  function kvStueck(', von);
+    const rumpfVon = JS.indexOf('const SHIP_HULL_DEFS = {');
+    const rumpfBis = JS.indexOf('\n    function ', rumpfVon);
+    const wracksVon = JS.indexOf('const KONVOI_WRACKS = [');
+    const wracksBis = JS.indexOf('];', wracksVon);
+    check('4-anker: kvBruch, SHIP_HULL_DEFS und KONVOI_WRACKS sind schneidbar (sonst misst 4 nichts)',
+      von > 0 && bis > von && rumpfVon > 0 && rumpfBis > rumpfVon && wracksVon > 0 && wracksBis > wracksVon,
+      { kvBruch: von > 0, huellen: rumpfVon > 0, wracks: wracksVon > 0 });
+    let ergebnis = { fehler: 'nicht ausgefuehrt' };
+    try {
+      const saatVon = JS.indexOf('function kvSaat(');
+      const f = new Function(JS.slice(rumpfVon, rumpfBis) + '\n' + JS.slice(saatVon, bis)
+        + '\n' + JS.slice(wracksVon, wracksBis + 2)
+        + '\nreturn { kvBruch, SHIP_HULL_DEFS, KONVOI_WRACKS };')();
+      const flaeche = p => { let a = 0; for (let i = 0; i < p.length; i++){ const q = p[(i+1)%p.length]; a += p[i][0]*q[1] - q[0]*p[i][1]; } return Math.abs(a/2); };
+      const schnitt = p => {
+        const o = (x,y,z) => (y[0]-x[0])*(z[1]-x[1]) - (y[1]-x[1])*(z[0]-x[0]);
+        const kr = (a,b,c,d) => { const d1=o(c,d,a), d2=o(c,d,b), d3=o(a,b,c), d4=o(a,b,d);
+          return ((d1>0&&d2<0)||(d1<0&&d2>0)) && ((d3>0&&d4<0)||(d3<0&&d4>0)); };
+        const n = p.length;
+        for (let i = 0; i < n; i++) for (let j = i+2; j < n; j++){
+          if (i === 0 && j === n-1) continue;
+          if (kr(p[i], p[(i+1)%n], p[j], p[(j+1)%n])) return true;
+        }
+        return false;
+      };
+      const zeilen = [];
+      let ueberschlagen = 0, fehlend = 0;
+      f.KONVOI_WRACKS.forEach((teil, n) => {
+        const d = f.SHIP_HULL_DEFS[teil.key];
+        if (!d){ fehlend++; zeilen.push({ key: teil.key, fehlt: true }); return; }
+        const st = f.kvBruch(d.pts, teil.bei, n + 1);
+        if (!st){ fehlend++; zeilen.push({ key: teil.key, kvBruch: null }); return; }
+        const ganz = flaeche(d.pts);
+        const summe = st.reduce((a, poly) => a + flaeche(poly), 0);
+        const kaputt = st.filter(schnitt).length;
+        ueberschlagen += kaputt;
+        zeilen.push({ key: teil.key, anteil: Math.round(100 * summe / ganz), ueberschlagen: kaputt });
+      });
+      ergebnis = { zeilen, ueberschlagen, fehlend, anzahl: f.KONVOI_WRACKS.length };
+    } catch (e){ ergebnis = { fehler: String(e) }; }
+
+    check('4a: alle drei Ruempfe sind vorhanden und lassen sich zerschneiden',
+      !ergebnis.fehler && ergebnis.anzahl === 3 && ergebnis.fehlend === 0, ergebnis);
+    /* Genau die Luecke, die Abschnitt 2 offen liess: Faellt ein Rumpfschluessel weg, verschwindet
+       das Wrack still - `if (!d) return;` im Zeichner. Zwei Wracks sind ebenso wenig
+       drehsymmetrisch wie drei, 2a bliebe also gruen. */
+    check('4b: kein Bruchstueck ueberschlaegt sich',
+      !ergebnis.fehler && ergebnis.ueberschlagen === 0,
+      { ueberschlagen: ergebnis.ueberschlagen, zeilen: ergebnis.zeilen });
+    /* Die zweite Haelfte derselben Regel: Ein Schnitt darf nichts verschlucken. Die Spanne
+       95-105 % faengt den Zackenversatz auf (er traegt etwas Flaeche zu oder ab), nicht aber
+       einen Kollaps - der alte Stand kam auf 53 %. */
+    check('4c: die beiden Haelften ergeben zusammen wieder den ganzen Rumpf',
+      !ergebnis.fehler && (ergebnis.zeilen || []).every(z => z.anteil >= 95 && z.anteil <= 105),
+      { anteile: (ergebnis.zeilen || []).map(z => z.key + '=' + z.anteil + '%') });
+  }
+
+  /* ---- 5) Der Marker bleibt antippbar -------------------------------------------------------
+     Der Umbau hat den einzigen gefuellten Kern des Markers in den Rueckfall verschoben und das
+     Bild mit pointer-events="none" versehen. Uebrig blieben ein gestrichelter Faden, eine Bake
+     von 1,2 Einheiten und der Rumpfbalken - in der Mitte, wo der Finger hingeht, war nichts.
+     Die Bestandstests fangen das nicht: sie schicken das Klickereignis DIREKT an den Knoten
+     (`n.dispatchEvent(new MouseEvent('click'))`) und umgehen die Trefferpruefung vollstaendig.
+     Diese Pruefung fragt deshalb den Browser, WAS an der Mitte des Markers liegt. */
+  const treffer = await page.evaluate(() => {
+    const g = document.querySelector('[data-map-konvoi]');
+    if (!g) return { da:false };
+    const b = g.getBoundingClientRect();
+    const x = b.left + b.width/2, y = b.top + b.height/2;
+    const el = document.elementFromPoint(x, y);
+    return { da:true, trifft: !!(el && el.closest('[data-map-konvoi]')),
+      getroffen: el ? (el.tagName + (el.getAttribute('fill') ? ' fill=' + el.getAttribute('fill') : '')) : null,
+      breite: Math.round(b.width), hoehe: Math.round(b.height) };
+  });
+  check('5-anker: der Marker hat eine messbare Flaeche auf dem Bildschirm',
+    treffer.da && treffer.breite > 4 && treffer.hoehe > 4,
+    { breite: treffer.breite, hoehe: treffer.hoehe });
+  check('5a: ein Tipp auf die MITTE des Markers trifft ihn wirklich',
+    treffer.trifft === true, treffer);
+
   await ctx.close(); await browser.close();
   ende();
 })();
@@ -200,6 +297,30 @@ function konvoiObj(){
    Bake in einer Zeile und fiel am alten Stand mit - obwohl der Peilring dort in Ordnung war. Die
    Fussnote behauptete das Gegenteil. Aufgeloest wurde das an der PRUEFUNG, nicht an der Fussnote:
    1c schuetzt jetzt allein das Vorhandene, 1d misst allein das Neue.
+
+   ZWEITE RUNDE, aus der adversarischen Durchsicht desselben Aenderungssatzes (07.09.2026). Sie
+   hat ZWEI echte Fehler gefunden, die kein Bildvergleich haette finden koennen. Gegenprobe gegen
+   den Stand VOR der Korrektur (Commit c2d1146, also den eigenen ersten Wurf):
+
+   4b FAELLT dort mit `ueberschlagen: 5` - fuenf der sechs Bruchstuecke waren ueberschlagene
+      Polygone. kvBruch warf die beiden Schnittpunkte aus der Punktliste und haengte die
+      Bruchkante immer HINTEN an; das stimmt nur, wenn die Schnittpunkte am Listenende liegen,
+      und das tun sie fast nie.
+   4c FAELLT mit `frachtergross=25%`, `carrier=76%`, `cruisers=48%` - drei Viertel des Frachters
+      fehlten schlicht. Nach der Korrektur ergeben beide Haelften ueberall wieder 100 %.
+   5a FAELLT mit `getroffen: "ellipse fill=url(#sysNebelSonne)"`. Das ist der Beleg, den kein
+      DOM-Test liefern kann: Ein Tipp auf die MITTE des Konvoi-Markers traf die SONNE des Systems.
+      Der Umbau hatte den einzigen gefuellten Kern in den Rueckfall verschoben und das Bild mit
+      pointer-events="none" versehen - der Klick ging durch den Marker hindurch. Die drei
+      Bestandstests (test_A2_ui, test_konvoi_frist, test_pve_abklingsperre) schicken das
+      Klickereignis direkt an den Knoten und konnten das gar nicht sehen.
+   GRUEN bleiben dort 4-anker, 4a und 5-anker: Die Ruempfe waren da, kvBruch lieferte etwas, und
+   der Marker hatte eine Flaeche - nur war das Gelieferte falsch und die Flaeche nicht treffbar.
+
+   WARUM ABSCHNITT 2 DAS NICHT GEFANGEN HAT, und warum das kein Versagen ist: Ein ueberschlagenes
+   Polygon ist genauso wenig drehsymmetrisch wie ein heiles. Ein Wrack ist ausserdem der eine
+   Gegenstand, bei dem kaputte Geometrie wie Absicht aussieht - auf dem Bildschirm sah der erste
+   Wurf plausibel aus. Deshalb RECHNET Abschnitt 4, statt zu betrachten.
 
    WARUM DIE KONTROLLE IN 2a IM TEST SELBST GEZEICHNET WIRD und nicht aus der Spieldatei kommt:
    Nach diesem Auftrag gibt es die alte Geometrie dort nicht mehr (ausser im Rueckfall, den man
