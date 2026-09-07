@@ -45,37 +45,60 @@ const sterne = (seed, n = 190) => {
 
 // ---------- Bausteine fuers Umbau-Motiv ---------------------------------
 // Flaches Piktogramm: so sahen die Anlagen vorher aus - eine Silhouette ohne Tiefe.
+// Motiv Solarkraftwerk, weil es das erste Gebaeude jeder Kolonie ist.
 const flachesSymbol = (cx, cy, s) => `
   <g transform="translate(${cx} ${cy}) scale(${s})" fill="#6d7686">
-    <rect x="-70" y="-96" width="24" height="10" rx="3" transform="rotate(-32 -58 -91)"/>
-    <rect x="-13" y="-104" width="26" height="86" rx="8"/>
-    <path d="M-62,-18 h124 a14,14 0 0 1 14,14 v16 a10,10 0 0 1 -10,10 h-132 a10,10 0 0 1 -10,-10 v-16 a14,14 0 0 1 14,-14 z"/>
-    <rect x="-84" y="26" width="168" height="20" rx="9"/>
+    <g transform="skewY(-14)">
+      <rect x="-96" y="-92" width="192" height="104" rx="8"/>
+    </g>
+    <g stroke="#41485a" stroke-width="4" opacity="0.9">
+      <g transform="skewY(-14)">
+        <line x1="-32" y1="-92" x2="-32" y2="12"/>
+        <line x1="32" y1="-92" x2="32" y2="12"/>
+        <line x1="-96" y1="-40" x2="96" y2="-40"/>
+      </g>
+    </g>
+    <rect x="-11" y="6" width="22" height="52" rx="6"/>
+    <rect x="-72" y="52" width="144" height="20" rx="9"/>
   </g>`;
 
 // Isometrisches Bauwerk auf Sockelplatte - so sehen sie jetzt aus: Tiefe, Licht,
-// Schlagschatten, ein warmer Akzent.
+// Schlagschatten, ein warmer Akzent. Dasselbe Solarkraftwerk wie links.
 const isoBauwerk = (cx, cy, s, akzent) => `
   <g transform="translate(${cx} ${cy}) scale(${s})">
-    <ellipse cx="14" cy="66" rx="118" ry="30" fill="#000" opacity="0.55" filter="url(#blur14)"/>
-    <polygon points="0,-108 116,-46 116,44 0,106 -116,44 -116,-46" fill="#1d2531"/>
-    <polygon points="0,-108 116,-46 0,16 -116,-46" fill="#2c3646"/>
-    <polygon points="116,-46 116,44 0,106 0,16" fill="#161d27"/>
-    <polygon points="-116,-46 0,16 0,106 -116,44" fill="#212a37"/>
-    <polygon points="0,-108 116,-46 0,16 -116,-46" fill="none" stroke="${akzent}" stroke-width="3" opacity="0.75"/>
-    <g transform="translate(0 -34)">
-      <polygon points="0,-92 62,-59 62,7 0,40 -62,7 -62,-59" fill="#3a4658"/>
-      <polygon points="0,-92 62,-59 0,-26 -62,-59" fill="#54627a"/>
-      <polygon points="62,-59 62,7 0,40 0,-26" fill="#2b3444"/>
-      <polygon points="-62,-59 0,-26 0,40 -62,7" fill="#394354"/>
-      <g transform="translate(0 -46)">
-        <polygon points="0,-30 34,-12 34,10 0,28 -34,10 -34,-12" fill="#6b7c96"/>
-        <polygon points="0,-30 34,-12 0,6 -34,-12" fill="#8b9cb6"/>
-        <rect x="-6" y="-96" width="12" height="66" rx="5" fill="#9aa9c0" transform="rotate(-30)"/>
-        <circle cx="-42" cy="-78" r="13" fill="${akzent}" filter="url(#blur6)"/>
-        <circle cx="-42" cy="-78" r="6" fill="#fff"/>
+    <ellipse cx="14" cy="72" rx="122" ry="31" fill="#000" opacity="0.55" filter="url(#blur14)"/>
+    <polygon points="0,-96 104,-41 104,41 0,96 -104,41 -104,-41" fill="#1d2531"/>
+    <polygon points="0,-96 104,-41 0,14 -104,-41" fill="#2c3646"/>
+    <polygon points="104,-41 104,41 0,96 0,14" fill="#161d27"/>
+    <polygon points="-104,-41 0,14 0,96 -104,41" fill="#212a37"/>
+    <polygon points="0,-96 104,-41 0,14 -104,-41" fill="none" stroke="${akzent}" stroke-width="3" opacity="0.75"/>
+
+    <!-- Paneel deutlich ueber der Platte auf sichtbaren Stuetzen: liegt es direkt
+         auf, verschmilzt es mit der Sockelflaeche und man sieht kein Kraftwerk. -->
+    <g transform="translate(0 -74)">
+      <g stroke="#2a3346" stroke-width="9" stroke-linecap="round">
+        <line x1="-56" y1="30" x2="-56" y2="78"/>
+        <line x1="56" y1="14" x2="56" y2="62"/>
+        <line x1="0" y1="46" x2="0" y2="92"/>
       </g>
-      <rect x="-46" y="-16" width="92" height="7" rx="3" fill="${akzent}" opacity="0.85"/>
+      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="#2f5480"/>
+      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="none" stroke="${akzent}" stroke-width="3" opacity="1"/>
+      <g stroke="#9dc4ee" stroke-width="2" opacity="0.55">
+        <line x1="-49" y1="-44" x2="47" y2="6"/>
+        <line x1="-2" y1="-68" x2="0" y2="30"/>
+        <line x1="-72" y1="-32" x2="24" y2="18"/>
+        <line x1="-25" y1="-56" x2="71" y2="-6"/>
+      </g>
+      <polygon points="-96,-20 -2,-68 -49,-44" fill="#bcd9f7" opacity="0.42"/>
+      <polygon points="-96,-20 -2,-68 94,-18 0,30" fill="none" stroke="#0b1018" stroke-width="1" opacity="0.45"/>
+    </g>
+
+    <!-- Verteilerkasten, nach innen gerueckt -->
+    <g transform="translate(42 24)">
+      <polygon points="0,-24 24,-11 24,9 0,22 -24,9 -24,-11" fill="#3a4658"/>
+      <polygon points="0,-24 24,-11 0,2 -24,-11" fill="#54627a"/>
+      <circle cx="0" cy="-7" r="8" fill="${akzent}" filter="url(#blur6)"/>
+      <circle cx="0" cy="-7" r="3.5" fill="#fff"/>
     </g>
   </g>`;
 
@@ -144,8 +167,8 @@ function poster({ akzent, zeile, unter, seed }) {
 }
 
 const POSTER = [
-  { name: 'umbau', akzent: '#ffc47a', seed: 4242,
-    zeile: '52 Bauwerke neu gezeichnet', unter: '23 Verteidigungsanlagen · 29 Gebäude' }
+  { name: 'umbau', akzent: '#fac775', seed: 4242,
+    zeile: '52 Bauwerke neu gezeichnet', unter: '29 Gebäude · 23 Verteidigungsanlagen' }
 ];
 POSTER.forEach(p => fs.writeFileSync(`${OUT}/${p.name}.svg`, poster(p)));
 console.log('SVGs geschrieben:', POSTER.length);
