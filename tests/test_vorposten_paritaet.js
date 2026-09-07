@@ -349,6 +349,46 @@ check('9c: die Voraussetzung von 9a stimmt noch - Superschlachtschiff ohne SHIP_
   !superInDefs && superInAngriff && garniKeys,
   { inShipDefs: superInDefs, inAttackShipKeys: superInAngriff, garnisonNimmtAttackShipKeys: garniKeys });
 
+/* ---- 12) V6: das Sternendock haengt am Lager-Griff ----------------------------------------------
+   DIESELBE FEHLERKLASSE WIE 9a, EINE ETAPPE SPAETER. Der Server bedient Lager und Sternendock mit
+   EINER Belohnung: `pushPendingReward(..., { type:'vorposten-lager', ..., schiffe: { cruisers: n } })`.
+   Der Lager-Zweig des Clients las bis zum 07.09.2026 nur erz/kristalle/deuterium - die Kreuzer
+   waeren ersatzlos verfallen, weil die Belohnung nach dem Zweig aus der Warteschlange geraeumt
+   wird. Genau so ist beim Abbau schon einmal die ganze Garnison verschwunden (Abschnitt 9).
+   Geprueft wird die REGEL, nicht die Schreibweise: Der Zweig liest `schiffe`, loest ueber
+   shipDefOrSuper auf (nicht ueber einen Index-Zugriff) und schreibt in currentFleet(). */
+const lagerVon = JS.indexOf("r.type === 'vorposten-lager'");
+const lagerZweig = lagerVon < 0 ? '' : ohneKommentar(JS.slice(lagerVon, lagerVon + 4000));
+check('12-anker: der Lager-Zweig von claimPendingRewards ist auffindbar (sonst misst 12a nichts)',
+  lagerVon > 0 && /sysNameL/.test(lagerZweig), { gefunden: lagerVon > 0 });
+check('12a: der Lager-Zweig nimmt die Schiffe des Sternendocks entgegen',
+  /r\.schiffe/.test(lagerZweig) && /shipDefOrSuper\(/.test(lagerZweig) && /currentFleet\(\)/.test(lagerZweig),
+  { liestSchiffe: /r\.schiffe/.test(lagerZweig), ueberShipDefOrSuper: /shipDefOrSuper\(/.test(lagerZweig),
+    inDieFlotte: /currentFleet\(\)/.test(lagerZweig) });
+/* Und der Server schickt das Feld auch wirklich - sonst prueft 10a einen Zweig fuer eine
+   Belohnung, die es nicht gibt (die Sorte Pruefung, die aus dem falschen Grund gruen ist). */
+if (SRV) {
+  check('12b: der Server legt die Dock-Schiffe in dieselbe Belohnung wie das Lager',
+    /schiffe: schiffe \? \{ \[VP_DOCK_SCHIFF\]: schiffe \} : null/.test(SRV)
+    && /type: 'vorposten-lager'/.test(SRV),
+    { feldGefunden: /schiffe: schiffe \?/.test(SRV) });
+}
+
+/* ---- 13) V6: drei Wirkungen, die kein Prozentsatz sind ------------------------------------------
+   vpProjektWirkungText faellt am Ende in einen Prozent-Zweig ("+X % <Name>"). Fuer die drei
+   Endprojekte waere das Unsinn: `werftSchiff: 1` ist eine Stueckzahl je Zeitraum ("+100 %"),
+   `marktPlaetze: 2` sind zwei Plaetze ("+200 %"), `verlust: 0.08` sind Prozentpunkte auf den
+   Grundverlust des Angreifers. Der Kommentar an jener Funktion sagt dieselbe Falle fuer `scan`
+   und `flugDeckel` schon voraus - das hier sind die naechsten drei Faelle. */
+const wirkVon = JS.indexOf('function vpProjektWirkungText(');
+const wirkFn = wirkVon < 0 ? '' : JS.slice(wirkVon, wirkVon + 2600);
+check('13-anker: vpProjektWirkungText ist auffindbar (sonst misst 13a nichts)',
+  wirkVon > 0 && /d\.wirkung/.test(wirkFn), { gefunden: wirkVon > 0 });
+check('13a: werftSchiff, marktPlaetze und verlust haben einen eigenen Zweig vor dem Prozent-Zweig',
+  ["werftSchiff", "marktPlaetze", "verlust"].every(k => new RegExp("k === '" + k + "'").test(wirkFn)),
+  { ohneZweig: ["werftSchiff", "marktPlaetze", "verlust"].filter(k => !new RegExp("k === '" + k + "'").test(wirkFn)) });
+
+
 const LISTEN = ['RES_DEFS', 'BUILDING_DEFS', 'RESEARCH_DEFS', 'SHIP_DEFS', 'TIER2_DEFS', 'MODULE_DEFS'];
 const ZAHLENINDEX = /^(\d+|i|j|n|idx|index|Math\.[\s\S]+)$/;
 const alsArray = LISTEN.filter(n => new RegExp('const ' + n + ' = \\[').test(JS));
@@ -558,5 +598,10 @@ ende();
       Vorher stieg die Datei an dieser Stelle komplett aus. 29 serverabhaengige Pruefungen fehlen
       dann, und Pruefung 0 sagt warum.
    I) Das Superschlachtschiff in SHIP_DEFS aufgenommen: 9c FAELLT - und nur 9c. Die Regel von 9a
-      haette dann keine Grundlage mehr; das soll auffallen, statt dass 9a still zur Formsache wird. */
+      haette dann keine Grundlage mehr; das soll auffallen, statt dass 9a still zur Formsache wird.
+   J) V6 (07.09.2026): Am Stand vor diesem Auftrag fallen 12a und 13a. 12a, weil der Lager-Zweig
+      `schiffe` nicht las - die Kreuzer des Sternendocks waeren beim Abholen ersatzlos verfallen.
+      13a, weil die drei Endprojekt-Wirkungen in den Prozent-Zweig gelaufen waeren und dort
+      "+100 % werftSchiff" ergeben haetten. 12b bleibt dort GRUEN: Der Server schickt das Feld
+      laengst, es fehlte nur der Empfaenger - genau die Haelfte, die auffallen soll. */
 

@@ -13950,10 +13950,21 @@
     if (!d || !d.wirkung) return '';
     const namen = { kern:'Kern', verteidigung:'Verteidigung', garnison:'Garnisonsplätze',
                     flug:'kürzere eigene Anflüge', prod:'Produktionsbonus' };
+    /* DREI WIRKUNGEN SIND KEIN ANTEIL (V6, 07.09.2026). Die Endprojekte tragen Groessen, die der
+       Prozent-Zweig unten zu Unsinn machen wuerde: `werftSchiff: 1` ist eine STUECKZAHL je
+       Zeitraum (sonst staende „+100 % werftSchiff"), `marktPlaetze: 2` sind ZWEI PLAETZE (sonst
+       „+200 %"), und `verlust: 0.08` sind acht PROZENTPUNKTE, die auf den Grundverlust des
+       Angreifers addiert werden - kein Aufschlag auf einen Bestand.
+       Der Kommentar ueber dieser Funktion sagt genau diese Falle fuer `scan` und `flugDeckel`
+       schon voraus; die drei hier sind die naechsten drei Faelle derselben Art. */
     const teile = [];
     for (const k of Object.keys(d.wirkung)){
       const w = d.wirkung[k];
       if (k === 'scan') teile.push('+' + w + ' Aufklärungsstufe' + (w === 1 ? '' : 'n'));
+      else if (k === 'werftSchiff') teile.push(w + ' ' + (shipDefOrSuper(vorpostenCache.dockSchiff || 'cruisers') || {}).name
+          + ' je ' + (vorpostenCache.dockStunden || 24) + ' Stunden, bis zu ' + (vorpostenCache.dockMax || 7) + ' gestapelt');
+      else if (k === 'marktPlaetze') teile.push('+' + w + ' ' + (w === 1 ? 'Angebotsplatz' : 'Angebotsplätze') + ' an der Modulbörse');
+      else if (k === 'verlust') teile.push('+' + Math.round(w * 100) + ' Prozentpunkte Verlust für jeden Angreifer');
       else if (k === 'flugDeckel') teile.push('Flugzeit-Grenze ' + Math.round(w * 100) + ' % statt ' + Math.round((vorpostenCache.flugDeckel || VORPOSTEN_FLUG_DECKEL) * 100) + ' %');
       else teile.push('+' + Math.round(w * 100) + ' % ' + (namen[k] || k));
     }
@@ -31050,9 +31061,29 @@ async function claimPendingRewards(){
              „ist eingetroffen – es war leer – dein Lager war voll, der Rest ist verfallen"
              (Durchsicht 04.09.2026). Zwei Aussagen ueber dieselbe Lieferung, die einander
              widersprechen. */
-          const nichtsGeschickt = Object.keys(gaben).length === 0;
+          /* V6, DAS STERNENDOCK: Am selben Griff haengt, was die Helling fertig hat - der Server
+             schickt `schiffe` ({ cruisers: n }) in DERSELBEN Belohnung wie das Lager.
+             Ohne diesen Zweig waeren die Schiffe ersatzlos weg: Die Belohnung wird nach dem
+             Zweig aus der Warteschlange geraeumt, und der Ertrag stand nirgends. Genau dieser
+             Fehler ist dem Projekt beim Abbau-Zweig schon einmal passiert (Garnison verfiel
+             still); deshalb steht der Zweig hier im SELBEN Auftrag wie der Schalter.
+             `shipDefOrSuper` statt SHIP_DEFS.find - dieselbe Begruendung wie beim Abbau. */
+          const dockTeile = [];
+          if (r.schiffe && typeof r.schiffe === 'object'){
+            const flotteL = currentFleet();
+            for (const [k, n] of Object.entries(r.schiffe)){
+              const anz = Math.max(0, Math.round(Number(n) || 0));
+              const defL = shipDefOrSuper(k);
+              if (anz && defL){
+                flotteL[k] = (flotteL[k] || 0) + anz;
+                dockTeile.push(anz + '\u00d7 ' + (defL.name || k));
+              }
+            }
+          }
+          const nichtsGeschickt = Object.keys(gaben).length === 0 && !dockTeile.length;
           log('Das Lager deines Vorpostens ' + vpMeldName(r) + ' bei ' + sysNameL + ' ist eingetroffen'
             + (teileL.length ? ': ' + teileL.join(', ') : (nichtsGeschickt ? ' – es war leer' : ''))
+            + (dockTeile.length ? ' – aus dem Sternendock: ' + dockTeile.join(', ') : '')
             + (verfielL ? ' – dein Lager war voll, ' + (teileL.length ? 'der Rest' : 'alles davon') + ' ist verfallen' : '') + '.', 'ti-truck', 'ok');
           ladeVorposten();
           save();

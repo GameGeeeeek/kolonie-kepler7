@@ -88,7 +88,8 @@ function spielstand(){
 
 (async () => {
   const browser = await starteBrowser();
-  async function messe(vpDoc){
+  async function messe(vpDoc, opt){
+    opt = opt || {};
     const ctx = await browser.newContext({ viewport:{ width:1280, height:1000 } });
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
@@ -109,13 +110,20 @@ function spielstand(){
         zweige:[{ key:'handel', name:'Handelsknoten', kurz:'Verdient.', namen:{8:'Sternenmarkt'}, mult:{} }],
         zweigAb:4, maxStufe:8, modulDefs:[], modulSeltenheiten:{}, modulBaubar:['gewoehnlich'],
         modulAusbauKosten:250, modulBauAbklingMs:0, modulBestand:{}, modulBauAb:0,
-        projektDefs:[], projekteAktiv:false, flugDeckel:0.5,
+        projektDefs: opt.projektDefs || [], projekteAktiv: !!opt.projektDefs, flugDeckel:0.5,
         lagerAktiv:true, lagerStunden:STUNDEN,
         liste:[vpDoc], eigene: vpDoc.eigener ? 1 : 0 });
       if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
       if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
       if (p === 'players-map') return j({ players:[] });
-      if (p === 'pending-rewards/claim') return j({ reward:null });
+      /* Die Messvorrichtung fuer Abschnitt 5: die vorgemerkte Belohnung GENAU EINMAL - so wie der
+         echte Server, der den Eintrag beim Abholen mit shift() entfernt. Ohne das "genau einmal"
+         liefe der Claim-Takt in eine Endlosgutschrift und die Flotte waere am Ende beliebig gross;
+         die Pruefung wuerde dann nicht die Gutschrift messen, sondern die Zahl der Takte. */
+      if (p === 'pending-rewards/claim'){
+        if (opt.belohnung && !st.__geliefert){ st.__geliefert = 1; return j({ reward: opt.belohnung }); }
+        return j({ reward:null });
+      }
       if (p === 'chat/global' || p === 'chat/allianz') return j({ ok:true, nachrichten:[], neuesteTs:0 });
       if (p === 'storage-list'){ const pref = decodeURIComponent((u.split('prefix=')[1] || '').split('&')[0]);
         return j({ keys: Object.keys(st).filter(k => k.startsWith(pref)) }); }
@@ -124,7 +132,23 @@ function spielstand(){
         return st[k] === undefined ? j({ error:'nix' }, 404) : j({ value: st[k] }); }
       return j({ ok:true });
     });
-    await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); window.confirm = () => true; });
+    /* DIE MELDUNG WIRD MITGESCHNITTEN, NICHT AM ENDE ABGELESEN. Ein erster Entwurf las das
+       Log-Fenster nach dem Lauf aus - da stand laengst die Fernaufklaerung drin, die Meldung ueber
+       das Dock war weggerollt. Genau davor warnt die Hausregel: bei transienten Meldungen den
+       Ereignisverlauf messen, nicht den spaeteren DOM-Endzustand. Der Beobachter haengt sich vor
+       dem Spielcode ein, weil die Belohnung schon beim Hochfahren abgeholt wird. */
+    await page.addInitScript(() => {
+      localStorage.setItem('kepler7_token', 'tok'); window.confirm = () => true;
+      window.__logMit = [];
+      document.addEventListener('DOMContentLoaded', () => {
+        const l = document.getElementById('log');
+        if (!l) return;
+        new MutationObserver(ms => {
+          for (const m of ms) for (const n of m.addedNodes)
+            window.__logMit.push((n.textContent || '').replace(/\s+/g, ' ').trim());
+        }).observe(l, { childList: true, subtree: true });
+      });
+    });
     await page.goto(SPIEL_URL); await page.waitForTimeout(6000);
     await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
       .forEach(id => { const n = document.getElementById(id); if (n) n.style.display = 'none'; }));
@@ -155,14 +179,58 @@ function spielstand(){
         lagerZeile: zeile ? (zeile.textContent || '').replace(/\s+/g, ' ').trim() : null,
         lagerErz: zeile ? Number(zeile.getAttribute('data-vp-lager')) : null };
     });
+    /* Die Flotte wird aus dem GESPEICHERTEN Spielstand gelesen, nicht aus dem DOM: `state` liegt
+       in der IIFE des Spiels und ist von aussen nicht erreichbar - und der Umweg ueber die
+       Speicherung belegt zugleich, dass der Zweig sein save() wirklich gerufen hat (Regel 73).
+       Kommt nichts an, bleibt `flotte` null und Abschnitt 5 sagt das, statt still zu vergleichen. */
+    /* Abschnitt 6 braucht ein ZWEITES Fenster: die Wirkungstexte stehen nicht im Kartenmenue,
+       sondern im Projekt-Overlay dahinter. Geklickt wird der Menueeintrag, nicht die Funktion -
+       `vpProjektWirkungText` liegt in der IIFE des Spiels und ist von aussen unerreichbar, und
+       genau deshalb misst nur dieser Weg auch, dass sie von DORT aus aufrufbar ist. Waere
+       `shipDefOrSuper` ausser Reichweite, stuende hier ein ReferenceError statt eines Textes. */
+    let projektText = null;
+    if (opt.projektDefs){
+      await page.evaluate(() => {
+        const m = document.querySelector('.kmenu');
+        if (!m) return;
+        for (const b of m.querySelectorAll('[data-kmenu-i]'))
+          if (/Projekte/.test(b.textContent || '')){ b.click(); return; }
+      });
+      await page.waitForFunction(() => {
+        const o = document.getElementById('vorpostenProjektOverlay');
+        return o && (o.textContent || '').length > 40;
+      }, null, { timeout: 15000 }).catch(() => {});
+      projektText = await page.evaluate(() => {
+        const o = document.getElementById('vorpostenProjektOverlay');
+        return o ? (o.textContent || '').replace(/\s+/g, ' ').trim() : null;
+      });
+    }
+    let flotte = null;
+    try { flotte = (JSON.parse(st['kepler7-save-v3'] || '{}') || {}).fleet || null; } catch (e) {}
+    const logText = await page.evaluate(() => (window.__logMit || []).join(' | ')).catch(() => null);
     await ctx.close();
-    return { ...g, errs };
+    return { ...g, errs, flotte, logText, projektText };
   }
 
+  /* Abschnitt 5 (V6, 07.09.2026): Das Sternendock haengt am SELBEN Griff wie das Lager - der
+     Server legt seine fertigen Kreuzer als `schiffe` in dieselbe Belohnung. Bis zu diesem Auftrag
+     las der Lager-Zweig nur erz/kristalle/deuterium; die Schiffe waeren beim Abholen ersatzlos
+     verfallen, weil die Belohnung danach aus der Warteschlange geraeumt wird. Genau so ist beim
+     Abbau schon einmal eine ganze Garnison verschwunden.
+     GEMESSEN WIRD DIE GUTSCHRIFT, nicht der Quelltext: 12 Kreuzer im Ausgangsstand, drei aus dem
+     Dock, also 15 im gespeicherten Spielstand. */
+  const dock = await messe(vp(), { belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
+    erz: 1000, kristalle: 0, deuterium: 0, schiffe: { cruisers: 3 } } });
   const eigen = await messe(vp());
   const fremd = await messe(vp({ eigener:false, besitzer:'u-fremd', besitzerName:'Nachbar' }));
   const voll  = await messe(vp({ lagerVollAb: now - 60000 }));
   const leer  = await messe(vp({ lager:{ erz:0, kristalle:0, deuterium:0 }, lagerVollAb: now + 12*3600*1000 }));
+  const PROJ = [
+    { key:'sternendock',  name:'Sternendock',  icon:'ti-anchor',   stufeAb:8, zweig:'militaer', dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ werftSchiff: 1 },  desc:'' },
+    { key:'sternenmarkt', name:'Sternenmarkt', icon:'ti-basket',   stufeAb:8, zweig:'handel',   dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ marktPlaetze: 2 }, desc:'' },
+    { key:'sperrfeuer',   name:'Sperrfeuer',   icon:'ti-shield',   stufeAb:8, zweig:'militaer', dauerMs:129600000, kosten:{ erz:1000 }, wirkung:{ verlust: 0.08 },   desc:'' }
+  ];
+  const proj = await messe(vp(), { projektDefs: PROJ });
 
   /* Der Anker verlangt ein ECHTES Menue: `text` ist null, wenn `.kmenu` fehlt, und die Laenge
      liegt bei einem Kartenmenue in den Hunderten - nicht in den Millionen wie bei der ganzen
@@ -190,6 +258,45 @@ function spielstand(){
   check('4a: kein JavaScript-Fehler in den vier Durchlaeufen', alle.length === 0, alle.slice(0, 3));
 
   await browser.close();
+  /* ---- 5) Die Kreuzer des Sternendocks ------------------------------------------------------- */
+  check('5-anker: der Lauf mit der Dock-Belohnung hat einen Spielstand gespeichert',
+    !!(dock.flotte && typeof dock.flotte.cruisers === 'number'),
+    { flotte: dock.flotte, fehler: dock.errs.slice(0, 2) });
+  check('5a: die drei Kreuzer aus dem Sternendock sind in der Flotte angekommen',
+    !!dock.flotte && dock.flotte.cruisers === 15,
+    { erwartet: 15, gemessen: dock.flotte ? dock.flotte.cruisers : null, ausgangsstand: 12 });
+  /* Und der Spieler ERFAEHRT es. Eine stille Gutschrift waere fast so schlecht wie keine: Wer
+     nicht sieht, dass das Dock geliefert hat, baut es kein zweites Mal. */
+  check('5b: die Meldung nennt das Sternendock und die Schiffe',
+    /Sternendock/.test(dock.logText || '') && /3\u00d7|3\u00a0\u00d7|3x/i.test((dock.logText || '').replace(/\s/g, '')),
+    { meldung: (dock.logText || '').slice(0, 220) });
+
+  /* Abschnitt 6 (V6, 07.09.2026): DIE DREI ENDPROJEKTE TRAGEN KEINEN ANTEIL.
+     `vpProjektWirkungText` faellt fuer jeden unbekannten Schluessel in den Prozent-Zweig. Ohne
+     eigene Zweige stuende im Projektfenster „+100 % werftSchiff", „+200 % marktPlaetze" und
+     „+8 % verlust" - drei Zahlen, von denen keine stimmt: `werftSchiff: 1` ist eine STUECKZAHL je
+     Zeitraum, `marktPlaetze: 2` sind zwei PLAETZE, und `verlust: 0.08` sind acht PROZENTPUNKTE
+     auf den Grundverlust des Angreifers.
+     GEMESSEN WIRD DAS GERENDERTE FENSTER, nicht der Quelltext - Abschnitt 13 der Paritaetsdatei
+     tut Letzteres bereits. Dieser Weg belegt zusaetzlich, dass `shipDefOrSuper` von dort aus
+     ueberhaupt erreichbar ist: waere es das nicht, stuende hier ein ReferenceError statt eines
+     Textes, und der Anker faenge das ab.
+     Die Wirkungswerte sind die des Servers (server.js, VP_ENDPROJEKTE) - eine Kopie-Familie. */
+  const pt = proj.projektText || '';
+  check('6-anker: das Projektfenster wurde gezeichnet und nennt alle drei Endprojekte',
+    /Sternendock/.test(pt) && /Sternenmarkt/.test(pt) && /Sperrfeuer/.test(pt) && pt.length < 20000,
+    { laenge: pt.length, auszug: pt.slice(0, 200), fehler: proj.errs.slice(0, 2) });
+  check('6a: das Sternendock nennt Schiff, Takt und Stapel - keine Prozentzahl',
+    /1 Kreuzer je 24 Stunden, bis zu 7 gestapelt/.test(pt) && !/% werftSchiff/.test(pt),
+    { auszug: (pt.match(/Sternendock.{0,80}/) || [])[0] });
+  check('6b: der Sternenmarkt nennt zwei Angebotsplaetze - keine Prozentzahl',
+    /\+2 Angebotsplätze an der Modulbörse/.test(pt) && !/% marktPlaetze/.test(pt),
+    { auszug: (pt.match(/Sternenmarkt.{0,80}/) || [])[0] });
+  check('6c: das Sperrfeuer nennt Prozentpunkte, nicht Prozent',
+    /\+8 Prozentpunkte Verlust für jeden Angreifer/.test(pt) && !/\+8 % verlust/.test(pt),
+    { auszug: (pt.match(/Sperrfeuer.{0,80}/) || [])[0] });
+  check('6d: kein JavaScript-Fehler im Projektfenster', proj.errs.length === 0, proj.errs.slice(0, 3));
+
   ende();
 })();
 
@@ -222,4 +329,14 @@ function spielstand(){
    also keinen Praezedenzfall. Das war falsch: Die zweite Form ist `.catch(() => null)` direkt am
    Aufruf, und mit ihr behandeln ALLE zwoelf Vorposten-Aktionen den Fall (acht per `try`, vier per
    `.catch`). Meine neue war die einzige Ausnahme. Wer eine Regel misst, muss BEIDE Schreibweisen
-   kennen, sonst widerlegt er einen richtigen Befund mit einer zu engen Suche. */
+   kennen, sonst widerlegt er einen richtigen Befund mit einer zu engen Suche.
+
+   V6 (07.09.2026), Abschnitt 5 und 6, gemessen gegen `git show origin/main:weltraum_kolonie.html`:
+   5a FAELLT dort mit `gemessen: 12` gegen `erwartet: 15` - die drei Kreuzer des Sternendocks
+   waeren beim Abholen ersatzlos verfallen, weil die Belohnung nach dem Zweig aus der
+   Warteschlange geraeumt wird. 5b FAELLT, die Meldung nennt das Dock nicht. Der 5-Anker bleibt
+   GRUEN: Der Lauf hat gespeichert, die Messung ist also echt und nicht nur ausgefallen.
+   6a, 6b und 6c FALLEN dort ebenfalls; im Fenster stuende „+100 % werftSchiff", „+200 %
+   marktPlaetze" und „+8 % verlust". Der 6-Anker bleibt GRUEN - das Fenster wird gezeichnet, nur
+   sein Inhalt ist falsch. Genau diese Haelfte-gruen/Haelfte-rot-Aufteilung ist der Beweis, dass
+   die Anker messen und nicht bloss mitfallen. */
