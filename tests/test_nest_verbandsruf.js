@@ -43,7 +43,7 @@ const check = (name, bedingung, zusatz) => { ergebnis[String(name).split(':')[0]
 
 const SAB = process.env.KEPLER_NVRUF_SABOTAGE || '';
 const MUSS_FALLEN = {
-  alt:    ['0a', '0b', '0c', '1a', '1b', '2a', '3a', '3b', '3c', '4a', '4b', '5a'],
+  alt:    ['0a', '0b', '0c', '0e', '1a', '1b', '2a', '3a', '3b', '3c', '4a', '4b', '5a'],
   helfer: ['0a', '0c']
 };
 
@@ -161,6 +161,20 @@ function rumpf(name, endeAnker){
   check('0c: und das Nestmenue liest denselben Helfer - keine zweite Kopie',
     !!rNest && /verbandsRufSperre\(\)/.test(rNest)
     && !/Nur Admins und Offiziere rufen einen Verband aus\./.test(rNest || ''), { gefunden: !!rNest });
+
+  /* 0e: DIE ZWEITE ANZEIGESTELLE (Durchsicht 07.09.2026). CLAUDE.md verlangt bei einer
+     Mechanik-Aenderung ALLE Darstellungen derselben Sache - Vorschau, Banner, Bericht, HILFE,
+     Tutorial. Der allgemeine Hilfe-Eintrag "Koordinierte Angriffe" wurde nachgezogen, der
+     fachspezifische zum Nest nicht: Er sagte weiter, der Klick oeffne das Menue mit "Nest
+     angreifen" - Punkt. Ein Spieler vor einer Koenigin schlaegt genau DORT nach und geht
+     weiterhin den Umweg ueber den Allianz-Tab, den dieser Auftrag abschaffen soll.
+     Gemessen wird der Abschnitt, der das Nest erklaert, nicht die ganze Datei. */
+  const hVon = JS.indexOf("title:'Alien-Nester");
+  const hBis = hVon > 0 ? JS.indexOf("},", hVon) : -1;
+  const hNest = (hVon > 0 && hBis > hVon) ? JS.slice(hVon, hBis) : '';
+  check('0e: der Hilfe-Eintrag zum Nest nennt den Verbands-Ruf im Kartenmenue',
+    hNest.length > 0 && /Allianz-Verband ausrufen/.test(hNest),
+    { abschnittGefunden: hVon > 0, laenge: hNest.length });
 
   const browser = await starteBrowser();
   try {

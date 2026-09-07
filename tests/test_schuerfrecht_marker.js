@@ -49,7 +49,7 @@ const SAB = process.env.KEPLER_GR11_GEGENPROBE || '';
    vorher richtig - sie sind die Vorbedingung, gegen die 1c bis 1e ueberhaupt etwas aussagen,
    und kein Beleg fuer GR-11. Ein erster Entwurf hatte sie mit aufgelistet; die Messung hat das
    widerlegt. */
-const MUSS_FALLEN = { alt: ['1c', '1d', '1e', '2a', '2b', '3a', '4b'] };
+const MUSS_FALLEN = { alt: ['1c', '1d', '1e', '1f', '1g', '2a', '2b', '3a', '4b'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
@@ -176,6 +176,34 @@ async function bogenLaengen(page){
        und Endpunkt = gar nichts gezeichnet. Die staerkste Eskorte saehe aus wie keine. */
     check('1e: die staerkste Eskorte ist SICHTBAR - der Vollkreis wird nicht zu nichts',
       (bg['5'] || {}).art === 'vollkreis' && l('5') > 20, { platz5: bg['5'] });
+
+    /* 1f/1g: ZWEI BEFUNDE DER DURCHSICHT VOM 07.09.2026.
+       1f - Der Kommentar am Bogen behauptete, die genaue Schiffszahl stehe "im Menue und im
+       <title>". Der <title> trug sie nie. Das ist keine Kleinigkeit: Im Kartenmenue nennt sie nur
+       der `grund` des Eintrags "Schuerfrecht anfechten", und der wird waehrend der Schutzfrist
+       und ohne Minentechnik ERSETZT - in genau diesen Faellen waere der Bogen die einzige Aussage
+       zur Eskorte gewesen. Jetzt traegt der <title> sie mit, und diese Pruefung haelt das fest.
+       1g - `platzierteMarker` meldete kbLabelsEntflechten den Radius des RINGS (1.45), gezeichnet
+       wird aber bis zum aeusseren Umkehrpunkt des Pulses (1.35 x 1.45 = 1.9575). Die Festung
+       nebenan meldet aus genau diesem Grund laengst 1.9. Ein zu klein gemeldeter Marker laedt den
+       Entflechter ein, eine Beschriftung in den Puls zu legen. Gemessen wird die REGEL - die
+       gemeldete Zahl deckt die gezeichnete -, nicht die Zahl selbst. */
+    const titel = await t1.page.evaluate(() => {
+      const g = document.querySelector('[data-map-asteroid="4"]');
+      const t = g ? g.querySelector('title') : null;
+      return t ? (t.textContent||'').trim() : '';
+    });
+    check('1f: der <title> nennt die genaue Eskortenstaerke - im Kartenmenue wird sie zeitweise ersetzt',
+      /Eskorte:\s*25\s*Schiffe/.test(titel), { titel });
+    const HTML = require('fs').readFileSync(SPIELDATEI, 'utf8');
+    const mMeldung = HTML.match(/platzierteMarker\.push\(\{ x: pos\.x, y: pos\.y, r: r \* \(a\.halter \? ([\d.]+)/);
+    const mPuls = HTML.match(/values="\$\{rr\.toFixed\(1\)\};\$\{\(rr\*([\d.]+)\)\.toFixed\(1\)\}/);
+    const mRing = HTML.match(/const rr = r \* ([\d.]+);/);
+    const gemeldet = mMeldung ? Number(mMeldung[1]) : null;
+    const gezeichnet = (mPuls && mRing) ? Number(mRing[1]) * Number(mPuls[1]) : null;
+    check('1g: der gemeldete Markerradius deckt die gezeichnete Flaeche samt Schutzpuls',
+      gemeldet !== null && gezeichnet !== null && gemeldet >= gezeichnet - 0.0001,
+      { gemeldet, gezeichnet, ring: mRing ? mRing[1] : null, pulsFaktor: mPuls ? mPuls[1] : null });
 
     // ---- 2) B: das Halter-Kuerzel ----------------------------------------------------------------
     const kuerzel = await t1.page.evaluate(() => {
