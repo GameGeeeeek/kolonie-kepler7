@@ -12,7 +12,13 @@
 //      Punkte nur annähert, würde Systeme aus ihrem Gebiet schneiden.
 //   B) Der Umriss ist eine Kurve, kein Kantenzug.
 //   C) Die Fläche ist ein Verlauf, keine Platte - und jeder Verlauf ist wirklich definiert.
-//   D) Die Kurve BAUCHT NICHT DAVON. Eine Kurve durch dieselben Punkte liegt zwischen ihnen
+//   D) Die Kurve BAUCHT NICHT DAVON. SEIT DEM 07.09.2026 ANDERS GEMESSEN, und das steht hier,
+//      damit niemand dem Kopf mehr glaubt als dem Code: Der Bauch in Pixeln ist keine brauchbare
+//      Groesse mehr, weil er mit der Zahl der Systeme in einer Region waechst - der Kalender
+//      liefert alle sieben Tage zwei neue. Geprueft werden jetzt die ZEICHENPARAMETER, die den
+//      Bauch erzeugen (1d), plus ein bewusst weites Netz (1e). Ein scharfer geometrischer Beleg,
+//      dass keine Region das Nachbargebiet erobert, existiert damit NICHT mehr - 1a haelt nur
+//      die Gegenrichtung (jedes System in seinem eigenen Gebiet). Die alte Begruendung: Eine Kurve durch dieselben Punkte liegt zwischen ihnen
 //      weiter außen als die Sehne. Mit der ersten Spannung (1/6) und dem alten Abstand (22)
 //      wuchsen die Regionen gemessen so weit, dass Nachbargebiete ineinanderliefen. Gemessen wird
 //      deshalb der Abstand der Umrisskurve vom Schwerpunkt gegen den Abstand des äußersten
@@ -151,20 +157,30 @@ check('0b: die Fläche kommt aus einem radialen Verlauf je Region',
      sind jederzeit erlaubt; zurueck zu 22 und 1/6 zu gehen ist der Rueckfall, den diese Pruefung
      fangen soll. Beide Zahlen werden aus dem Quelltext GELESEN, nicht angenommen. */
   const mAbstand = JS.match(/return \[q\[0\] \+ dx\/l\*(\d+(?:\.\d+)?), q\[1\] \+ dy\/l\*(\d+(?:\.\d+)?)\];/);
-  const mSpannung = JS.match(/const c1x = p1\[0\] \+ \(p2\[0\]-p0\[0\]\)\/(\d+)/);
+  /* ALLE VIER TEILER, nicht nur der erste (Durchsicht 07.09.2026). Die erste Fassung las nur
+     den von c1x. Ein Rueckfall haette dann genuegt, c2x auf /6 zu drehen und c1x auf /8 zu
+     lassen: 1d waere gruen geblieben, die ZWEITE Haelfte jedes Kurvensegments haette wieder
+     gebaucht wie im ersten Entwurf, und 1e faengt das laut eigenem Kommentar nicht. Beim
+     Aufweitungsabstand war es von Anfang an richtig gemacht (beide Achsen); hier fehlte es. */
+  const mSpannung = JS.match(/const c1x = p1\[0\] \+ \(p2\[0\]-p0\[0\]\)\/(\d+), c1y = p1\[1\] \+ \(p2\[1\]-p0\[1\]\)\/(\d+);\s*\n\s*const c2x = p2\[0\] - \(p3\[0\]-p1\[0\]\)\/(\d+), c2y = p2\[1\] - \(p3\[1\]-p1\[1\]\)\/(\d+);/);
   const abstand = mAbstand ? Number(mAbstand[1]) : null;
-  const spannung = mSpannung ? Number(mSpannung[1]) : null;
-  check('1d: Aufweitung und Kurvenspannung bleiben so eng wie ausgeliefert (Abstand ≤ 16, Teiler ≥ 8)',
-    abstand !== null && spannung !== null && abstand <= 16 && spannung >= 8
+  const teiler = mSpannung ? [1,2,3,4].map(i => Number(mSpannung[i])) : null;
+  const schwaechster = teiler ? Math.min.apply(null, teiler) : null;
+  check('1d: Aufweitung und alle vier Kurvenspannungen bleiben so eng wie ausgeliefert (Abstand ≤ 16, Teiler ≥ 8)',
+    abstand !== null && teiler !== null && abstand <= 16 && schwaechster >= 8
     && mAbstand[1] === mAbstand[2],
-    { abstand, spannungsTeiler: spannung, beideAchsenGleich: mAbstand ? mAbstand[1] === mAbstand[2] : null });
+    { abstand, teiler, schwaechsterTeiler: schwaechster,
+      beideAchsenGleich: mAbstand ? mAbstand[1] === mAbstand[2] : null });
   /* 1e: das Sicherungsnetz. Es trennt den ausgelieferten Stand NICHT vom ersten Entwurf (beide
-     liegen relativ zwischen 9 % und 15 %) - es faengt eine Zeichnung, die voellig entgleist. */
+     liegen relativ zwischen 7 % und 18 %, am ersten Entwurf gemessen) - es faengt eine Zeichnung, die voellig entgleist. */
   const dick = m.regionen.filter(r => r.anteil > BAUCH_ANTEIL_MAX).map(r => r.key + '=' + Math.round(r.anteil*100) + '%');
+  /* An die Regionenzahl gekoppelt: Bei leerem m.regionen waere `dick.length === 0` gruen,
+     obwohl nichts gemessen wurde - eine Pruefung, die aus dem falschen Grund gruen ist
+     (Durchsicht 07.09.2026). 1a bis 1c erben dasselbe Muster von frueher; hier ist es behoben. */
   check('1e: keine Region baucht weiter als ein Viertel ihres eigenen Radius',
-    dick.length === 0,
-    { zuWeit: dick, schwelle: Math.round(BAUCH_ANTEIL_MAX*100) + '%',
-      groesster: Math.round(Math.max.apply(null, m.regionen.map(r => r.anteil))*100) + '%' });
+    m.regionen.length === 8 && dick.length === 0,
+    { gemessen: m.regionen.length, zuWeit: dick, schwelle: Math.round(BAUCH_ANTEIL_MAX*100) + '%',
+      groesster: m.regionen.length ? Math.round(Math.max.apply(null, m.regionen.map(r => r.anteil))*100) + '%' : 'nichts gemessen' });
 
   await ctx.close();
   await browser.close();
@@ -185,7 +201,11 @@ check('0b: die Fläche kommt aus einem radialen Verlauf je Region',
 //   grün: node tests/test_sektorregionen.js                                   (7 von 7)
 //   rot am Stand vor Bündel F (KEPLER_SPIELDATEI=/tmp/alt.html): 0a 0b 1b 1c (vier von sieben).
 //     Prüfnamen beider Läufe per diff verglichen und identisch (7 zu 7).
-//     1a und 1d bleiben dort GRÜN, und das ist kein Mangel, sondern die Aussage: Das alte Polygon
+//   ACHTUNG, DIESER BLOCK IST TEILWEISE UEBERHOLT (07.09.2026): Er beschreibt das ALTE 1d, das
+//   eine Pixelschwelle war. Das heutige 1d liest Zeichenparameter aus dem Quelltext und faellt am
+//   Stand vor Bündel F, weil es `weicherUmriss` dort gar nicht gibt - aus "vier von sieben"
+//   werden also fuenf von acht. Die gueltige Gegenprobe steht im Block darueber.
+//     1a bleibt dort GRÜN, und das ist kein Mangel, sondern die Aussage: Das alte Polygon
 //     schloss seine Systeme ebenfalls ein (1a) und wuchs ihnen nicht davon (1d, gemessen 20 bis
 //     22 px). Beide Prüfungen sichern Eigenschaften, die der Umbau NICHT verlieren durfte - der
 //     ausgelieferte Stand liegt mit 16 bis 23 px im selben Bereich wie das Polygon davor.
