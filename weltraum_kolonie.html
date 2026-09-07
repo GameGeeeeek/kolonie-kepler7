@@ -64461,30 +64461,64 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // Richtung: weg vom eigenen Objekt. Ohne eigenes Objekt (freistehende Beschriftung) nach unten.
       const richtung = eigenF ? (b.y + b.height/2 >= eigenF.my ? 1 : -1) : 1;
       let kasten = { x: b.x, y: b.y, w: b.width, h: b.height };
-      let versatz = 0, frei = false;
-      // HÖCHSTENS 21 Einheiten (3 Schritte). Der erste Entwurf erlaubte 42 - damit fand zwar jedes
+      let versatz = 0, seitlich = 0;
+      // ENGER RAHMEN, mit Absicht. Der erste Entwurf erlaubte 42 Einheiten - damit fand zwar jedes
       // Label einen freien Platz, aber "Deine Basis" landete unter dem NACHBARPLANETEN Rhea und
       // gehörte optisch zu ihm. Die Kollision war weg, die Zuordnung Label->Planet kaputt; gesehen
-      // nur am Screenshot, nicht an der Zahl (Regel 42/53). Findet sich in diesem Rahmen kein
-      // freier Platz, bleibt das Label lieber an seinem Objekt - eine überlappende Beschriftung ist
-      // ehrlicher als eine, die beim falschen Planeten steht.
-      let seitlich = 0;
+      // nur am Screenshot, nicht an der Zahl (Regel 42/53). Jeder Platz unten bleibt deshalb dicht
+      // am eigenen Objekt: höchstens 14 Einheiten senkrecht, höchstens 12 seitlich.
       const belegt = k => flaechen.some(f => f.g !== eigen && schneidet(k, f)) || gesetzt.some(g => schneidet(k, g));
-      for (let versuch = 0; versuch < 3; versuch++){
-        if (!belegt(kasten)) { frei = true; break; }
-        versatz += richtung * 7;
-        kasten = { x: b.x, y: b.y + versatz, w: b.width, h: b.height };
+      /* Die Plätze in VORZUGSREIHENFOLGE - der erste freie gewinnt, deshalb steht der Verbleib an
+         Ort und Stelle vorn und der weiteste Versatz hinten:
+           1. gar nicht verschieben
+           2. senkrecht WEG vom eigenen Objekt (7, dann 14)
+           3. senkrecht ÜBER das eigene Objekt hinweg (7, dann 14) - neu, siehe unten
+           4. seitlich (8, -8, 12, -12)
+         Punkt 3 ist der Kern der Reparatur vom 07.09.2026 (Fehlerbericht Sascha: "Planetenname
+         überdeckt die Mitte eines Asteroiden-Vorkommens"). GEMESSEN am Gürtelsystem Chronos: Ein
+         Planetenname steht UNTER seinem Planeten, "weg vom eigenen Objekt" heißt damit "weiter nach
+         unten" - und unten liegt die Gürtelbahn. Alle bis dahin erlaubten Plätze landeten auf dem
+         NÄCHSTEN Vorkommen, der Entflechter gab auf, und der Name blieb auf der Scheibe liegen.
+         Nach oben, also über den eigenen Planeten hinweg, war der erste Schritt frei. Ein Label
+         über seinem Planeten ist genauso eindeutig zugeordnet wie eines darunter; die Regel
+         "höchstens 14" gilt unverändert, nur eben in beide Richtungen. */
+      const plaetze = [{ dy: 0, dx: 0 }];
+      for (let v = 1; v <= 2; v++) plaetze.push({ dy: richtung * 7 * v, dx: 0 });
+      for (let v = 1; v <= 2; v++) plaetze.push({ dy: -richtung * 7 * v, dx: 0 });
+      for (const s of [8, -8, 12, -12]) plaetze.push({ dy: 0, dx: s });
+      const kastenAn = p => ({ x: b.x + p.dx, y: b.y + p.dy, w: b.width, h: b.height });
+      let wahl = null;
+      for (const p of plaetze){
+        const k = kastenAn(p);
+        if (!belegt(k)) { wahl = p; kasten = k; break; }
       }
-      // Reicht der senkrechte Rahmen nicht, wird SEITLICH ausgewichen - höchstens 12 Einheiten, und
-      // erst nachdem senkrecht nichts frei war. Ein kleiner seitlicher Versatz behält die Zuordnung
-      // (das Label steht weiter direkt an seinem Objekt), ein großer nicht.
-      if (!frei){
-        for (const s of [8, -8, 12, -12]){
-          const k = { x: b.x + s, y: b.y, w: b.width, h: b.height };
-          if (!belegt(k)) { frei = true; versatz = 0; seitlich = s; kasten = k; break; }
+      /* Ist KEIN Platz frei, wird der mit der KLEINSTEN Überdeckung genommen - nicht mehr stur der
+         Ausgangsplatz. Bis zum 07.09.2026 fiel der Entflechter hier auf die Ausgangsstelle zurück,
+         und die war im gemessenen Fall die schlechteste von allen: genau die Mitte des Vorkommens.
+         Die alte Begründung ("eine überlappende Beschriftung ist ehrlicher als eine beim falschen
+         Planeten") bleibt gültig und wird hier nicht verletzt: Gewählt wird nur aus derselben
+         engen Liste oben, die Zuordnung ist also bauartbedingt erhalten. Der Vergleich ist strikt
+         (<), damit bei Gleichstand der weiter vorn stehende - und das heißt: der näher am eigenen
+         Objekt liegende - Platz gewinnt. */
+      if (!wahl){
+        const ueberdeckung = k => {
+          let summe = 0;
+          const dazu = f => {
+            const ox = Math.min(k.x + k.w, f.x + f.w) - Math.max(k.x, f.x);
+            const oy = Math.min(k.y + k.h, f.y + f.h) - Math.max(k.y, f.y);
+            if (ox > 0 && oy > 0) summe += ox * oy;
+          };
+          for (const f of flaechen) if (f.g !== eigen) dazu(f);
+          for (const g of gesetzt) dazu(g);
+          return summe;
+        };
+        let beste = Infinity;
+        for (const p of plaetze){
+          const k = kastenAn(p), f = ueberdeckung(k);
+          if (f < beste) { beste = f; wahl = p; kasten = k; }
         }
       }
-      if (!frei) { versatz = 0; seitlich = 0; kasten = { x: b.x, y: b.y, w: b.width, h: b.height }; }
+      versatz = wahl.dy; seitlich = wahl.dx;
       if (versatz){
         const y0 = parseFloat(t.getAttribute('y'));
         if (!isNaN(y0)) t.setAttribute('y', (y0 + versatz).toFixed(1));
