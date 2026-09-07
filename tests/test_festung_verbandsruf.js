@@ -23,9 +23,10 @@
 //
 // GEGENPROBE (KEPLER_VRUF_SABOTAGE, Pflichtlisten unten gemessen):
 //   listen   - der Raid nimmt wieder die Verbandsliste  -> 0b, 0c
-//   eintrag  - der Menueeintrag faellt weg              -> 1a, 1b, 2a, 3a, 3b, 3c, 4a, 4b
-//   ziel     - die Zielwahl wird nicht ausgelesen       -> 4b
+//   eintrag  - der Menueeintrag faellt weg              -> 1a, 1b, 2a, 3a, 3b, 3c, 4a, 4b, 4d, 4e, 5a, 5b, 5c, 5d
+//   ziel     - die Zielwahl wird nicht ausgelesen       -> 4b, 5b
 //   flotte   - der Ruf endet ohne eigene Flottenwahl    -> 4d, 4e
+//   zustand  - das Overlay liest wieder state.allianceMusterAttack statt des Rueckgabewerts -> 5d
 const fs = require('fs');
 const path = require('path');
 const { starteBrowser, SPIELDATEI, SPIEL_URL, pruefer } = require('./lib/umgebung');
@@ -40,12 +41,20 @@ const check = (name, bedingung, zusatz) => { ergebnis[String(name).split(':')[0]
 const SAB = process.env.KEPLER_VRUF_SABOTAGE || '';
 const MUSS_FALLEN = {
   listen:  ['0b', '0c'],
-  eintrag: ['1a', '1b', '2a', '3a', '3b', '3c', '4a', '4b'],
-  ziel:    ['4b'],
+  /* 07.09.2026 NEU GEMESSEN. Diese zwei Listen stammten aus dem Lauf vom 04.09.2026 und waren
+     seither falsch: 4d/4e (Flottenwahl) und 5a/5b (Escape, Erhalt der Eingabe) kamen danach dazu,
+     ohne dass jemand die Gegenproben noch einmal gefahren waere. `eintrag` erwartete 8 Ausfaelle
+     und bekam 12, `ziel` erwartete 1 und bekam 2 - beide Gegenproben haetten also rot gemeldet,
+     obwohl der Code in Ordnung war. Genau die Sorte Wartungsschuld, die eine Gegenprobe wertlos
+     macht: Wer sie zweimal rot sieht, hoert auf, sie zu fahren. */
+  eintrag: ['1a', '1b', '2a', '3a', '3b', '3c', '4a', '4b', '4d', '4e', '5a', '5b', '5c', '5d'],
+  ziel:    ['4b', '5b'],
   /* 07.09.2026: der Ruf endet wieder ohne die eigene Flottenwahl - der Zustand vor diesem
      Auftrag. 4a-4c bleiben dabei GRUEN: Der Ruf selbst ging immer richtig raus, es fehlte nur
      der zweite Schritt. Genau diese Aufteilung belegt, dass 4d/4e etwas Eigenes messen. */
-  flotte:  ['4d', '4e']
+  flotte:  ['4d', '4e'],
+  /* 07.09.2026, GEMESSEN: der Zustand vor der Reparatur des schwersten Durchsicht-Befunds. */
+  zustand: ['5d']
 };
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -304,6 +313,61 @@ async function menueOeffnen(t){
     check('5b: nach einer Ablehnung stehen Sammelphase, Zielwahl und Nachricht wieder da',
       behalten.da && behalten.dauer === 45*60 && behalten.ziel === 'tuerme' && /Zweiter Versuch/.test(behalten.txt || ''),
       behalten);
+
+    /* ---- 5c) DIE FREMDE MUSTERUNG ------------------------------------------------------------
+       Der schwerste Befund der Durchsicht vom 07.09.2026, und er haette einen Spieler seine ganze
+       Flotte kosten koennen. Der Ablauf, den 5c nachstellt:
+         1. Die Allianz hat KEINEN Verband - der Eintrag ist frei, das Overlay geht auf.
+         2. Waehrenddessen ruft ein ANDERER Offizier einen Verband gegen ein fremdes Ziel aus.
+            `refreshAllianceMusterAttack` (Tab-Wechsel, Intervall) schreibt dessen Dokument in
+            `state.allianceMusterAttack` - das Feld gehoert der ALLIANZ, nicht diesem Ruf.
+         3. Der eigene Ruf wird vom Server abgelehnt (409, es laeuft ja schon einer).
+         4. Der erste Entwurf las danach `state.allianceMusterAttack`, fand dort das FREMDE
+            Dokument in Phase 'gathering' und oeffnete die Flottenwahl - deren Knopf
+            `joinAllianceMusterAttack` schliesst an den laufenden Verband an. Ein Spieler haette
+            seine Angriffsflotte an einen Angriff gebunden, den er nie ausgerufen hat.
+       Die Reparatur ist eine Regel, kein Sonderfall: NUR DER RUECKGABEWERT von
+       createAllianceMusterAttack zaehlt. Sie wird hier am Verhalten gemessen, nicht am Quelltext. */
+    const t6 = await tab(browser, fixture(true));
+    await menueOeffnen(t6);
+    const fremd = await t6.page.evaluate(async () => {
+      const b = [...document.querySelectorAll('.kmenu button')].find(x => /Allianz-Verband ausrufen/.test(x.textContent||''));
+      if (!b) return { da:false, grund:'kein Knopf' };
+      const frei = !b.disabled;      // Schritt 1: ohne laufenden Verband ist der Eintrag frei
+      b.click();
+      return { da: !!document.querySelector('#vrufOverlay.open'), frei };
+    });
+    // Schritt 2: der fremde Verband taucht im geteilten Speicher auf ...
+    t6.store['alliance:' + TAG + ':musterattack'] = JSON.stringify({
+      id:'fremd-1', zielArt:null, targetTag:'FEIND', createdBy:'x9', createdByName:'Fremder Offizier',
+      message:'', createdAt: Date.now(), museterEndsAt: Date.now() + 3600000, phase:'gathering',
+      dispatch:null, result:null });
+    // ... und der Tab-Wechsel zieht ihn in den Zustand (loadAllianceBase -> refreshAllianceMusterAttack).
+    await t6.page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="allianz"]'); if (x) x.click(); });
+    await t6.page.waitForTimeout(1500);
+    // Schritt 3: der eigene Ruf wird abgelehnt.
+    t6.store.__ablehnen = true;
+    const nachAblehnung = await t6.page.evaluate(async () => {
+      const o = document.getElementById('vrufOverlay');
+      const offenVorher = !!(o && o.classList.contains('open'));
+      if (o && offenVorher){
+        const btn = o.querySelector('[data-vruf-start]');
+        if (btn) btn.click();
+      }
+      await new Promise(r => setTimeout(r, 1500));
+      const fw = document.querySelector('.fwahl-overlay.open');
+      return { offenVorher, flottenwahl: !!fw,
+        text: fw ? (fw.textContent||'').replace(/\s+/g,' ').trim().slice(0, 120) : '' };
+    });
+    check('5c: der Eintrag war frei und das Overlay ging auf - die Messvorrichtung steht',
+      fremd.da === true && fremd.frei === true, fremd);
+    /* DIE EIGENTLICHE ZUSAGE. Sie ist bewusst als „darf NICHT" formuliert: Der Schaden entsteht
+       nicht dadurch, dass etwas fehlt, sondern dadurch, dass sich etwas oeffnet, das an einen
+       fremden Angriff bindet. */
+    check('5d: nach einer Ablehnung oeffnet sich KEINE Flottenwahl - auch nicht, wenn inzwischen ein FREMDER Verband im Zustand steht',
+      nachAblehnung.offenVorher === true && nachAblehnung.flottenwahl === false, nachAblehnung);
+    check('5e: keine Skriptfehler auf diesem Weg', t6.errs.length === 0, t6.errs.slice(0, 2));
+    await t6.ctx.close();
     await t5.ctx.close();
 
     // ---- 2) Ohne Allianz -------------------------------------------------------------------------
