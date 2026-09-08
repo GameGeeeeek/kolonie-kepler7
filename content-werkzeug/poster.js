@@ -10,6 +10,13 @@ const W = 1080, H = 1920;
 // Die Brutkoerper der Alien-Nester sind KEINE Nachzeichnung: nest_render.js laesst den
 // Zeichencode aus weltraum_kolonie.html selbst laufen und legt die PNGs in nester/ ab.
 // Das Poster zeigt damit genau das Bild, das im Spiel auf der Systemkarte steht.
+const SCHIFF_BILDER = process.env.SCHIFF_BILDER || __dirname + '/schiffe';
+const schiffBild = datei => {
+  const pfad = `${SCHIFF_BILDER}/${datei}`;
+  if (!fs.existsSync(pfad))
+    throw new Error(`${pfad} fehlt - erst "node schiff_render.js" laufen lassen.`);
+  return 'data:image/png;base64,' + fs.readFileSync(pfad).toString('base64');
+};
 const NEST_BILDER = process.env.NEST_BILDER || __dirname + '/nester';
 const nestBild = datei => {
   const pfad = `${NEST_BILDER}/${datei}`;
@@ -194,6 +201,43 @@ const GEBAEUDE = {
       <circle cx="0" cy="0" r="135" fill="${akzent}" opacity="0.30" filter="url(#blur24)"/>
       <image href="${nestBild(bild)}" x="-150" y="-150" width="300" height="300"/>`
   }
+,
+
+  /* --- Flottenmarker auf der Karte (v8.702.0) -----------------------------
+     Links der Zeiger, der bis zum 07.09.2026 fuer jede fliegende Flotte stand. Er ist nicht
+     nachempfunden: Polygon und Hof stehen woertlich so im Spiel und sind dort bis heute der
+     Rueckfall, wenn kein Rumpfbild zustande kommt (`flottenMarke`).
+     Rechts derselbe Marker von heute - Flaggschiff (Kantenlaenge 22) und bis zu drei Begleiter
+     (11) auf den Plaetzen, die das Spiel vergibt, mitsamt der Drehung um -90 Grad: Der
+     gezeichnete Rumpf zeigt nach rechts, der alte Zeiger nach oben.
+     BEIDE SEITEN IM SELBEN MASSSTAB. Der Groessenunterschied ist hier keine Gestaltung,
+     sondern die Aussage - im Spiel sind es dieselben Kartenkoordinaten. */
+  flotte: {
+    ohneSockel: true,
+    layout: { linksX: 262, linksY: 690, linksS: 10, pfeilX: 540,
+              rechtsX: 812, rechtsY: 690, rechtsS: 10 },
+    /* Der Hof ist im Spiel eine 18 px grosse, zu 18 % deckende Scheibe unter einem 12 px hohen
+       Zeiger - dort liest er sich als Schein. Zehnfach vergroessert wuerde daraus eine Muenze
+       mit harter Kante, deshalb bekommt er hier eine Weichzeichnung. Geometrie und Deckkraft
+       bleiben, was das Spiel zeichnet. */
+    flach: `<g>
+      <circle cx="0" cy="0" r="9" fill="#6d7686" opacity="0.18" filter="url(#blurHof)"/>
+      <polygon points="0,-6 4,5 0,2 -4,5" fill="#6d7686"/></g>`,
+    iso: (akzent, bild) => {
+      const G = 22, k = 11, plaetze = [[-13,-7],[-13,7],[-21,0]];
+      const url = schiffBild(bild);
+      /* Nach der Drehung liegt das Geleit UNTER dem Flaggschiff (aus (x,y) wird (y,-x)): der
+         Verband reicht von -11 bis 26,5. Ohne Ausgleich haengt er nach unten aus der Mitte und
+         legt sich auf die Beschriftung - deshalb die Verschiebung um die halbe Hoehe. */
+      return `<g transform="translate(0 -7.75)">
+        <circle cx="0" cy="0" r="10" fill="${akzent}" opacity="0.16" filter="url(#blurHof)"/>
+        <g transform="rotate(-90)">
+          ${plaetze.map(([x,y]) => `<image href="${url}" x="${x-k/2}" y="${y-k/2}" width="${k}" height="${k}" opacity="0.85"/>`).join('')}
+          <image href="${url}" x="${-G/2}" y="${-G/2}" width="${G}" height="${G}"/>
+        </g>
+      </g>`;
+    }
+  }
 };
 
 const flachesSymbol = (cx, cy, s, art) => `
@@ -219,6 +263,7 @@ function poster({ akzent, zeile, unter, seed, art, bild }) {
                           GEBAEUDE[art].layout || {});
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
+    <filter id="blurHof" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2.2"/></filter>
     <filter id="blur6" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="6"/></filter>
     <filter id="blur10" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="10"/></filter>
     <filter id="blur14" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="14"/></filter>
@@ -291,7 +336,11 @@ const POSTER = [
   { name: 'nest_xantheer',  art: 'nest', akzent: '#7ea8e8', seed: 7373, bild: 'xantheer_5.png',
     zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' },
   { name: 'nest_vex',       art: 'nest', akzent: '#e0c168', seed: 8484, bild: 'vex_5.png',
-    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' }
+    zeile: 'Aus sechs Punkten wurde eine Königin', unter: '4 Alien-Völker · 5 Stufen · 20 Brutkörper' },
+  // Akzent = MISSION_LINIEN.attack.hin, die Farbe, in der eine Angriffsbahn auf der Karte liegt.
+  { name: 'flotte_karte', art: 'flotte', akzent: '#e24b4a', seed: 9595,
+    bild: 'kausalitaetsbrecher.png',
+    zeile: 'Aus dem Pfeil wurde eine Flotte', unter: 'Dein stärkstes Schiff führt · bis zu 3 Begleiter' }
 ];
 POSTER.forEach(p => fs.writeFileSync(`${OUT}/${p.name}.svg`, poster(p)));
 console.log('SVGs geschrieben:', POSTER.length);

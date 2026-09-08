@@ -38,7 +38,8 @@ ans Backend weiter. Zusätzliche Umgebungsvariablen: `ROOT`, `WEB`, `WEB_ALT`,
 Zeile, Domain-Pille), `poster_render.js` rastert sie auf 1080x1920:
 
 ```bash
-node nest_render.js            # nur fuer die Nest-Motive, siehe unten
+node nest_render.js            # nur fuer das Nest-Motiv, siehe unten
+node schiff_render.js          # nur fuer das Flotten-Motiv, siehe unten
 node poster.js ./pos && node poster_render.js ./pos
 ```
 
@@ -63,12 +64,32 @@ täglich): jeder Anker muss genau einmal vorkommen, der Schnitt wird vor dem Lau
 jemand die Nest-Funktionen um, bricht der Lauf mit Namen des fehlenden Ankers ab statt
 still ein leeres Poster zu liefern.
 
-Die Ordner `nester/` und die gerenderten Poster liegen **nicht** im Repo - sie sind
-jederzeit reproduzierbar und würden es nur schwer machen.
+Die Ordner `nester/`, `schiffe/` und die gerenderten Poster liegen **nicht** im Repo -
+sie sind jederzeit reproduzierbar und würden es nur schwer machen.
 
 Die linke Hälfte (`VORHER`) ist ebenfalls kein Freihand-Entwurf, sondern die
 nachgerechnete Geometrie des alten Kartenmarkers aus dem Stand vor `077e9f0`
 (Radius `r*(0.55+0.12*Math.sin(g))` mit `g` in **Grad**, Punkte `r*0.30`).
+
+### Das Flotten-Motiv: zwei Wege zum selben Ziel
+
+`schiff_render.js` holt die Schiffsrümpfe, **schneidet aber nicht**. `drawShipMiniIcon` hängt
+an einem Dutzend Nachbarn (`SHIP_HULL_DEFS`, `SHIP_GRAD_STOPS`, `markStil`, `hullEngines`,
+`activeShipSkinStops` …); ein Schnitt, der die alle einsammelt, wäre geraten. Stattdessen
+bekommt eine **Kopie** der Spieldatei im Scratch-Verzeichnis eine einzige zusätzliche Zeile,
+die die Funktion nach aussen reicht — danach läuft das Spiel selbst und zeichnet mit seinem
+eigenen Code. Das Repo bleibt unberührt.
+
+Faustregel: **wenige, klar umrissene Funktionen → schneiden** (`nest_render.js`); **eine
+Funktion mitten im Geflecht → das Spiel laufen lassen und eine Zeile exportieren**
+(`schiff_render.js`). Beide prüfen ihren Anker vorher auf genau ein Vorkommen und brechen mit
+Namen ab, statt still ein leeres Bild zu liefern.
+
+Auch hier ist das `VORHER` nachgerechnet: Zeiger und Hof (`0,-6 4,5 0,2 -4,5`, Kreis `r=9`
+mit 18 %) stehen wörtlich so im Spiel und sind dort bis heute der Rückfall, wenn kein
+Rumpfbild zustande kommt. Beide Hälften stehen im **selben Maßstab** — der Größenunterschied
+ist die Aussage, nicht Gestaltung. Der Hof bekommt eine Weichzeichnung, weil eine zehnfach
+vergrösserte 18-%-Scheibe sonst als Münze mit harter Kante liest statt als Schein.
 
 ## Vorher/Nachher
 
