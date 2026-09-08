@@ -63386,7 +63386,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
   function kbBadgeReihe(badges){
     const liste = badges || [];
     if (liste.length <= KB_BADGE_PLAETZE) return { zeigen: liste, rest: 0 };
-    return { zeigen: liste.slice(0, KB_BADGE_PLAETZE - 1), rest: liste.length - (KB_BADGE_PLAETZE - 1) };
+    /* VORRANG SCHLAEGT REIHENFOLGE (Befund der Durchsicht an PR #614, bestaetigt).
+       Der Deckel schnitt bis hierher stur von hinten ab - und der Anflug-Alarm (KS-6) steht in der
+       Liste hinter Piratenbasis, Krieg und Wurmloch. Traegt ein System alle drei, verschwand
+       ausgerechnet die Warnung vor dem eigenen Totalverlust in der Zaehlmarke: KS-6 verspricht
+       Sichtbarkeit, KS-5 nahm sie ihm wieder weg. Zwei Aenderungen desselben Auftrags, die sich
+       gegenseitig aufheben - genau die Sorte Fehler, die einzeln betrachtet keiner ist.
+       `vorrang` bleibt bewusst RAR: Es traegt nur, was der Spieler sofort sehen muss, weil ihm
+       sonst etwas verlorengeht. Wer es an ein drittes Abzeichen haengt, hebt den Deckel auf. */
+    const vorne = liste.filter(b => b && b.vorrang);
+    const uebrig = liste.filter(b => !(b && b.vorrang));
+    const zeigen = vorne.concat(uebrig).slice(0, KB_BADGE_PLAETZE - 1);
+    return { zeigen, rest: liste.length - zeigen.length };
   }
   function karteSystemBadges(sysId){
     const badges = [];
@@ -63452,7 +63463,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       ? vpAlarm.anflug.filter(a => a && (a.ankunftAt || 0) > Date.now()) : [];
     if (vpAnflug.length){
       const schiffe = vpAnflug.reduce((n, a) => n + (Number(a.schiffe) || 0), 0);
-      badges.push({ icon:'🔥',
+      badges.push({ icon:'🔥', vorrang: true,
         /* ARTIKELFREI ueber das Gattungswort, wie bei KB-29: `vpTitel` liefert den STUFENNAMEN,
            und der wechselt das Geschlecht (der Ankerkern, die Sternenwerft, das Werftgeruest).
            „deinen Sternenwerft" war genau der Fehler, den die Verbandsziele schon einmal hatten -
@@ -63491,16 +63502,35 @@ function sekSternUse(key, x, y, k, unentdeckt){
         /* KS-2: Der Zaehler steht am Abzeichen, nicht nur im Menue. Sichtbar wird er aber nur
            dort, wo er eine Entscheidung traegt - am THRONNEST des Volkes und erst, wenn es eng
            wird (noch eines fehlt). Sonst traegt ihn allein der Titel: Eine Zweitzeile an jedem
-           Nest waere Zahlenrauschen ueber der halben Karte. */
+           Nest waere Zahlenrauschen ueber der halben Karte.
+           GERECHNET WIRD FUER JEDES VOLK IM SYSTEM, nicht nur fuer das des staerksten Nestes
+           (Befund der Durchsicht an PR #614). Steht hier das Thronnest eines Volkes bei 3 von 4
+           und daneben ein hoeherstufiges Nest eines ANDEREN Volkes, waehlte `stark` das zweite -
+           und die Warnung des bedrohten Volkes verschwand ausgerechnet an seinem Thronsystem.
+           DER SERVER ERZEUGT DIESEN ZUSTAND HEUTE NICHT: `nestSystemFrei` lehnt ein System ab, in
+           dem schon ein Nest steht, und sowohl die Aussaat als auch das Weiterziehen fragen sie.
+           Der Client ist aber seit jeher fuer mehrere Nester je System geschrieben - der Titel
+           daneben zaehlt sie ausdruecklich („und N weitere Nester"). Diese eine Stelle nahm als
+           einzige an, es gaebe nur ein Volk; die Annahme faellt weg, statt sich auf eine Regel zu
+           verlassen, die woanders steht.
+           GEZEIGT WIRD DAS DRAENGENDSTE: das Volk, dem am wenigsten fehlt. Zwei Zaehler
+           uebereinander waeren an derselben Stelle zwei Wahrheiten. */
+        const voelkerHier = [...new Set(nester.map(n => n && n.volk).filter(Boolean))];
+        const schwarmKandidaten = voelkerHier.map(v => nestSchwarmStand(v)).filter(Boolean)
+          .filter(st => !st.koenigin && st.thron && nester.some(n => String(n.id) === String(st.thron.id)))
+          .sort((a, b) => a.fehlt - b.fehlt);
         const schwarm = nestSchwarmStand(stark.volk);
-        const thronHier = !!(schwarm && !schwarm.koenigin && schwarm.thron
-                             && nester.some(n => String(n.id) === String(schwarm.thron.id)));
+        const draengend = schwarmKandidaten[0] || null;
+        const thronHier = !!draengend;
         badges.push({ icon: koenigin ? '👑' : '👾',
           title: volk.name + ' – ' + (sd ? sd.name : 'Nest')
             + (nester.length > 1 ? ' und ' + (nester.length-1) + ' weitere' + (nester.length === 2 ? 's Nest' : ' Nester') : '')
             + (volk.schwaeche ? ' · Schwäche: ' + nestSchwaecheName(volk.schwaeche) : '')
-            + (schwarm ? ' · ' + nestSchwarmSatz(stark.volk) : ''),
-          schwarm: (thronHier && schwarm.fehlt === 1) ? (schwarm.anzahl + '/' + schwarm.noetig) : undefined });
+            + (schwarm ? ' · ' + nestSchwarmSatz(stark.volk) : '')
+            /* Steht hier der Thron eines ANDEREN Volkes, gehoert dessen Stand ebenfalls in den
+               Titel - sonst nennte die Zweitzeile eine Zahl, die der Titel nicht erklaert. */
+            + ((draengend && draengend.thron.volk !== stark.volk) ? ' · ' + nestSchwarmSatz(draengend.thron.volk) : ''),
+          schwarm: (draengend && draengend.fehlt === 1) ? (draengend.anzahl + '/' + draengend.noetig) : undefined });
       }
       /* ♻️ Wrackkonvoi - ein wanderndes Beute-Ziel, kein Nest und keine Festung. Der Rumpf-Anteil
          sagt, ob sich der Weg lohnt; der Zusatz "driftet weiter" erklaert, warum man nicht zu lange
@@ -66608,10 +66638,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
            (`flug: 0.20`, Deckel von 0,5 auf 0,75, gemessen in VP_PROJEKT_DEFS des Servers).
            Die Marke `m.tor` setzen alle SIEBEN Missionserzeuger der fuenf Torarten - fuenf Arten,
            sieben Stellen, weil die Erkundung drei hat (von Hand, Auto-Erkunder hin, Auto-Erkunder
-           zurueck). Die Zahl haelt test_sprungtor_route 4c fest, und zwar durch Zaehlen der
-           Aufrufe im Quelltext. Deshalb steht der gezaehlte Ausdruck hier ABSICHTLICH NICHT
-           woertlich: Ein Kommentar, der sein eigenes Suchmuster zitiert, zaehlt sich mit. Genau
-           das ist beim ersten Lauf passiert - gemessen 8 statt 7.
+           zurueck). SECHS davon fragen den heutigen Torzustand ab; der siebte, der Rueckweg des
+           Auto-Erkunders, uebernimmt die MARKE SEINES HINWEGS, weil er auch dessen DAUER
+           uebernimmt (Befund der Durchsicht an PR #614). Beides haelt test_sprungtor_route 4c
+           fest. Der gezaehlte Ausdruck steht hier ABSICHTLICH NICHT woertlich: Ein Kommentar, der
+           sein eigenes Suchmuster zitiert, zaehlt sich mit - gemessen 8 statt 7 beim ersten Lauf.
            `undefined` heisst: aus einem Spielstand von VOR dieser Version. Solche Missionen
            behalten das alte Verhalten - eine erfundene Marke waere schlechter als die alte
            Ungenauigkeit, und die Missionen laufen ohnehin binnen Stunden aus.
@@ -67176,6 +67207,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (!canAfford({deuterium: fuelCost})) return false; // nächster Tick versucht es automatisch erneut
     pay({deuterium: fuelCost});
     tour.lastLegDuration = dur;
+    /* KB-30, Befund der Durchsicht an PR #614: Der Rueckweg uebernimmt DIESE Dauer unveraendert
+       (symmetrische Naeherung, siehe dort). Er muss deshalb auch DIESE Torlage tragen - eine aus
+       dem Ursprungssystem frisch gerechnete waere eine zweite Wahrheit ueber dieselbe Zahl, und
+       genau das Auseinanderlaufen, das KB-30 ueberhaupt behebt. Dauer und Marke kommen ab hier
+       gemeinsam aus einer Quelle. */
+    tour.lastLegTor = vorpostenTorAn(planet.system);
     fleet.missions.push({ id: nextMissionId(), type:'explore', targetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourLeg:true, tor: vorpostenTorAn(planet.system) });
     render(); save();
     return true;
@@ -67191,9 +67228,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})) return false;
     pay({deuterium: fuelCost});
-    /* Der Rueckweg fliegt zum URSPRUNG, nicht zum zuletzt erkundeten Ziel - das Tor, das hier
-       zaehlt, steht also im System des Ursprungsplaneten. */
-    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId: tour.originPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourReturn:true, tor: vorpostenTorAn((PLANETS.find(pl => pl.id === tour.originPlanet) || {}).system) });
+    /* DIE MARKE GEHOERT ZUR DAUER, nicht zum Zielsystem (Befund der Durchsicht an PR #614,
+       bestaetigt). `dur` ist hier die Dauer des letzten HINWEGS - samt dessen Tor-Rabatt. Eine aus
+       dem Ursprungssystem frisch gerechnete Marke koennte davon abweichen: Steht nur an EINEM der
+       beiden Systeme ein nutzbares Tor, zeigte die Bahn eine Passage, die diese Flugzeit nicht
+       hat, oder unterschluege eine, die drinsteckt. Genau dieses Auseinanderlaufen behebt KB-30 -
+       es hier neu einzufuehren waere die Behebung, die ihren eigenen Fehler mitbringt.
+       Der Rueckfall auf `undefined` gilt fuer eine Tour, die vor dieser Version begonnen hat: Dann
+       bleibt es beim alten Verhalten, wie bei jeder anderen Mission ohne Marke. */
+    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId: tour.originPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourReturn:true, tor: tour.lastLegTor });
     render(); save();
     return true;
   }

@@ -262,7 +262,7 @@ const SAB = process.env.KEPLER_TOR_GEGENPROBE || '';
      ring = vor KB-27 (4cdf423): Bahn schon durch das Tor, Tor noch flach     -> 3a, 3b fallen.
      hoch = vor KB-32 (d525800): Tor aufrecht, aber der Entflechter kennt nur das erste Bild der
             Gruppe -> die Beschriftung liegt auf dem Tor, 3d faellt. */
-const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'], hoch: ['3d'], marke: ['4a', '4c'] };
+const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'], hoch: ['3d'], marke: ['4a', '4c', '4d'] };
 const ergebnis = {};
 const check2 = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
@@ -419,9 +419,22 @@ const SONNE = (() => {
        `undefined` absichtlich der Rueckfall ist. Die Zahl ist GEMESSEN (08.09.2026): sieben
        Erzeuger fuer fuenf Arten, weil die Erkundung drei hat (von Hand, Auto-Erkunder hin,
        Auto-Erkunder zurueck). */
+    /* Sieben Erzeuger, aber nur SECHS fragen den heutigen Torzustand ab: Der Rueckweg des
+       Auto-Erkunders uebernimmt die Marke SEINES HINWEGS, weil er auch dessen DAUER uebernimmt
+       (Befund der Durchsicht an PR #614). Eine dort frisch gerechnete Marke koennte von der
+       eingefrorenen Flugzeit abweichen - genau das Auseinanderlaufen, das KB-30 behebt.
+       Gezaehlt wird deshalb BEIDES getrennt; eine Summe waere gruen, wenn eine Stelle wegfiele
+       und eine andere doppelt stuende. */
     const erzeuger = (quelle.match(/tor: vorpostenTorAn\(/g) || []).length;
+    const ausHinweg = (quelle.match(/tor: tour\.lastLegTor/g) || []).length;
     check2('4c: alle sieben Missionserzeuger der Tor-Arten setzen die Marke',
-      erzeuger === 7, { gemessen: erzeuger, erwartet: 7 });
+      erzeuger === 6 && ausHinweg === 1,
+      { ausTorzustand: erzeuger, ausHinweg, erwartet: '6 + 1' });
+    /* Und die Marke des Hinwegs wird auch wirklich GESETZT - sonst truege der Rueckweg still
+       `undefined` und fiele auf das alte Verhalten zurueck, ohne dass 4c es merkt. */
+    check2('4d: der Hinweg des Auto-Erkunders merkt sich seine Torlage mit der Dauer',
+      /tour\.lastLegDuration = dur;/.test(quelle) && /tour\.lastLegTor = vorpostenTorAn\(/.test(quelle),
+      { dauer: /tour\.lastLegDuration = dur;/.test(quelle), marke: /tour\.lastLegTor = vorpostenTorAn\(/.test(quelle) });
   } finally {
     await browser.close();
   }

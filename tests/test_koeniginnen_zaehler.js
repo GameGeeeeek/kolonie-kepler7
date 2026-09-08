@@ -21,10 +21,20 @@
 //       hineinwandert.
 //   2b  Das AELTESTE zaehlt, nicht das staerkste. Gemessen mit einer Vorlage, in der beide
 //       auseinanderfallen - sonst waere 1a auch mit der falschen Regel gruen.
+//   3a  ZWEI VOELKER IM SELBEN SYSTEM (Befund der Durchsicht an PR #614): Der Zaehler wird fuer
+//       JEDES Volk gerechnet, nicht nur fuer das des staerksten Nestes. Steht hier das Thronnest
+//       der Verglühten bei 3 von 4 und daneben ein hoeherstufiges Nest der Nomaden von Vex, waehlte
+//       die erste Fassung das zweite - und die Warnung verschwand ausgerechnet am bedrohten
+//       Thronsystem. Gezeigt wird das DRAENGENDSTE Volk, also das mit dem kleinsten Rest.
+//       Der Server erzeugt diesen Zustand heute nicht (`nestSystemFrei` lehnt ein belegtes System
+//       ab); der Client ist aber seit jeher fuer mehrere Nester je System geschrieben und zaehlt
+//       sie im Titel ausdruecklich. Geprueft wird also der Client, nicht der Server.
 //
-// GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor KS-2, Aufruf mit KEPLER_KOENIGIN_GEGENPROBE=alt.
-// Dort fallen 1a, 1b, 1c und 2b - den Zaehler gibt es nicht. 2a bleibt gruen (der falsche Satz
+// GEGENPROBE 1: `KEPLER_SPIELDATEI` auf den Stand vor KS-2, Aufruf mit KEPLER_KOENIGIN_GEGENPROBE=alt.
+// Dort fallen 1a, 1b, 1c, 2b und 3a - den Zaehler gibt es nicht. 2a bleibt gruen (der falsche Satz
 // stand auch vorher nirgends) und ist damit kein Beleg fuer KS-2, sondern der Waechter dagegen.
+// GEGENPROBE 2: `KEPLER_SPIELDATEI` auf den Stand VOR der Mehrvolk-Rechnung (Commit 3b9a794),
+// Aufruf mit KEPLER_KOENIGIN_GEGENPROBE=voelker. Dort faellt genau 3a.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSektorMitSystem } = require('./lib/karte');
 const { check, ende } = pruefer();
@@ -32,7 +42,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_KOENIGIN_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '2b'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '2b', '3a'], voelker: ['3a'] };
 const now = Date.now();
 
 /* DREI Nester EINES Volkes. Das AELTESTE (`seit` am kleinsten) steht in `vega`, das STAERKSTE
@@ -43,6 +53,12 @@ const NESTER_DREI = [
   { id:'n-mitte', sys:'kepler', volk:'verglueht', stufe:4, lp:60000, lpMax:80000, seit: now - 2*864e5, letzteReifung: now - 864e5 },
   { id:'n-jung',  sys:'rhea',   volk:'verglueht', stufe:1, lp:8000,  lpMax:10000, seit: now - 1*864e5, letzteReifung: now - 864e5 }
 ];
+/* Dieselbe Lage plus ein STAERKERES Nest eines ZWEITEN Volkes im selben System vega. `stark` -
+   das staerkste Nest des Systems - ist damit das der Nomaden von Vex (Stufe 4 gegen Stufe 2), das
+   draengende Volk bleiben aber die Verglühten (3 von 4 gegen 1 von 4). */
+const NESTER_ZWEI_VOELKER = NESTER_DREI.concat([
+  { id:'n-vex', sys:'vega', volk:'vex', stufe:4, lp:60000, lpMax:80000, seit: now - 3*864e5, letzteReifung: now - 864e5 }
+]);
 /* Dieselbe Lage, aber die Koenigin ist schon da (Stufe 5 am aeltesten). */
 const NESTER_KOENIGIN = NESTER_DREI.map((n, i) => Object.assign({}, n,
   i === 0 ? { stufe:5, lp:3.5e6, lpMax:4e6 } : {}));
@@ -137,6 +153,20 @@ async function karteMessen(page){
   merke('2b: gezaehlt wird das AELTESTE, nicht das staerkste (Stufe 4 steht in kepler)',
     /Vega-System/.test(nestTitel) && !/Kepler-System/.test(nestTitel),
     { titel: nestTitel });
+
+  // ---- Zwei Voelker im selben System -----------------------------------------------------------
+  nester = NESTER_ZWEI_VOELKER;
+  await oeffnen(page);
+  const m3 = await karteMessen(page);
+  const schwarmTitel3 = (m3.titel || []).find(t => /von 4 Nestern|bereits geschlüpft/.test(t)) || '';
+  /* DREI Bedingungen, weil zwei davon einzeln nichts belegen: Der Titel muss vom staerksten Nest
+     stammen (Nomaden von Vex), der Schwarm-Satz von den Verglühten, und der Zaehler auf der Karte
+     muss deren Stand tragen. Ohne die erste Bedingung waere die Pruefung auch dann gruen, wenn das
+     zweite Volk gar nicht im Bild ist - und misst dann nur noch einmal 1a. */
+  merke('3a: bei zwei Voelkern im System zaehlt das draengende, nicht das staerkste Nest',
+    /Nomaden von Vex/.test(schwarmTitel3) && /Verglühten: 3 von 4 Nestern/.test(schwarmTitel3)
+      && (m3.zaehler || []).some(z => z === '3/4'),
+    { titel: schwarmTitel3, zaehler: m3.zaehler });
 
   // ---- Die Koenigin ist schon da ---------------------------------------------------------------
   nester = NESTER_KOENIGIN;

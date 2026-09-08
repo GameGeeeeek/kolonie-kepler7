@@ -19,11 +19,19 @@
 //       dem eigenen Totalverlust ist keine. Gemessen mit ausgeschalteter Ereignis-Ebene.
 //   2c  AUFLAGE 3, zweite Haelfte: KEINE laufende Restzeit im Titel - die Karte baut sich im
 //       Sekundentakt neu.
+//   3a  AUFLAGE 4 (Befund der Durchsicht an PR #614): Der Alarm ueberlebt den Abzeichen-Deckel
+//       aus KS-5. Beide Aenderungen stammen aus demselben Auftrag: KS-6 hebt die Warnung auf die
+//       oberen Ebenen, KS-5 deckelt die Zeile bei vier Plaetzen und schnitt bis dahin stur von
+//       hinten ab - und der Alarm steht in der Liste hinter Piratenbasis, Sichtung, Krieg und
+//       Wurmloch. Traegt ein System sie alle, verschwand ausgerechnet die Warnung vor dem eigenen
+//       Totalverlust in der Zaehlmarke. Gemessen wird mit genau diesem vollen System.
 //
-// GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor KS-6, Aufruf mit KEPLER_ANFLUG_GEGENPROBE=alt.
-// Dort fallen 1a, 1b und 2b. 2a und 2c bleiben gruen (es gibt gar kein Alarm-Abzeichen, das zu
-// frueh oder zu geschwaetzig sein koennte) und sind damit keine Belege fuer KS-6, sondern die
-// Waechter ueber seine Auflagen.
+// GEGENPROBE 1: `KEPLER_SPIELDATEI` auf den Stand vor KS-6, Aufruf mit KEPLER_ANFLUG_GEGENPROBE=alt.
+// Dort fallen 1a, 1b, 2b, 2c und 3a - gemessen, nicht gesetzt. 2c steht in der Liste, weil es einen
+// Alarmtitel VERLANGT, bevor es ihn auf Restzeiten abklopft; ohne KS-6 gibt es gar keinen. Nur 2a
+// bleibt gruen und ist damit kein Beleg fuer KS-6, sondern der Waechter ueber seine Auflage.
+// GEGENPROBE 2: `KEPLER_SPIELDATEI` auf den Stand VOR dem Vorrang (Commit 3b9a794), Aufruf mit
+// KEPLER_ANFLUG_GEGENPROBE=deckel. Dort faellt genau 3a - der Alarm ist da, aber abgeschnitten.
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSektorMitSystem } = require('./lib/karte');
 const { check, ende } = pruefer();
@@ -31,7 +39,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_ANFLUG_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '2b'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '2b', '2c', '3a'], deckel: ['3a'] };
 const SYS = 'vega';
 const now = Date.now();
 
@@ -42,6 +50,9 @@ const STUFEN = [1,2,3,4,5,6,7,8].map(n => ({ stufe:n, name:'Stufe '+n, kernLp: 2
    'vorbei' = Ankunft schon geschehen (der Server haelt sie zwei Stunden lang weiter in der
    Liste), 'keiner' = leere Liste. */
 let anflugArt = 'laufend';
+/* `vollePiste` haengt dem System vier weitere Ereignis-Abzeichen an (Piratenbasis, Sichtung,
+   Krieg, Wurmloch). Mit dem Alarm sind das fuenf - einer mehr, als die Zeile Plaetze hat. */
+let vollePiste = false;
 function vpDoc(){
   const anflug = anflugArt === 'laufend' ? [{ tag:'RIV', schiffe: 1200, ankunftAt: now + 25*60000 }]
                : anflugArt === 'vorbei'  ? [{ tag:'RIV', schiffe: 1200, ankunftAt: now - 25*60000 }]
@@ -62,8 +73,12 @@ function backend(store){
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
     if (p === 'health') return j({ ok:true });
     if (p === 'me') return j({ userId:'u', username:'A', homeSystem:'kepler', homeSlot:0, attackShieldMs:0 });
-    if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, unlockedAlienRaces:[],
-      collapsedSystems:{}, activeWormhole:null, activePirateFaction:null, activeWar:null,
+    if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1,
+      unlockedAlienRaces: vollePiste ? [{ id:'kris', name:'Kristallinen', system:SYS }] : [],
+      collapsedSystems:{},
+      activeWormhole: vollePiste ? { from:SYS, to:'kepler' } : null,
+      activePirateFaction: vollePiste ? { name:'Schwarze Sichel', system:SYS } : null,
+      activeWar: vollePiste ? { system:SYS, factionA:'Konsortium', factionB:'Freihandel' } : null,
       news:[], controlledSystems:{}, factions:{}, alienNester:[], wrackKonvois:[] });
     if (p === 'vorposten') return j({ ok:true, aktiv:true, bauAktiv:true, maxJeKonto:3, schutzMs:43200000,
       abklingMs:14400000, ausbauMs:43200000, garnisonFaktor:0.5, stufen:STUFEN, zweigAb:4, maxStufe:8,
@@ -103,6 +118,7 @@ async function messen(page){
     const zeichen = [...g.querySelectorAll('text')].map(eigen).filter(Boolean);
     const titel = [...g.querySelectorAll('title')].map(t => t.textContent);
     return { knoten:true, zeichen, titel,
+             marke: zeichen.find(z => /^\+\d+$/.test(z)) || '',
              alarmTitel: titel.find(t => /im Anflug/.test(t)) || '',
              vorpostenTitel: titel.find(t => /Kern \d+%/.test(t)) || '' };
   }, SYS);
@@ -163,6 +179,18 @@ async function messen(page){
   merke('2a: ein Anflug, dessen Ankunft vorbei ist, loest keinen Alarm aus',
     !(m3.zeichen || []).includes('🔥') && (m3.zeichen || []).includes('🛰'),
     { zeichen: m3.zeichen });
+
+  // ---- 4) Volles System: der Deckel schneidet, der Alarm bleibt --------------------------------
+  anflugArt = 'laufend';
+  vollePiste = true;
+  await oeffnen(page);
+  const m4 = await messen(page);
+  /* Zwei Bedingungen, weil eine allein nichts belegt: Steht keine Zaehlmarke da, hat der Deckel
+     gar nicht gegriffen und ein sichtbares 🔥 waere kein Beweis. */
+  merke('3a: im vollen System schneidet der Deckel, der Alarm bleibt trotzdem stehen',
+    (m4.zeichen || []).includes('🔥') && /^\+\d+$/.test(m4.marke || ''),
+    { zeichen: m4.zeichen, marke: m4.marke });
+  vollePiste = false;
 
   merke('2d: keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await browser.close();
