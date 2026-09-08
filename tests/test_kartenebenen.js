@@ -138,8 +138,16 @@ async function bild(page){
       routenAn: !!(knopf('routen') && knopf('routen').classList.contains('active')),
       aufklaerungKnopf: !!(knopf('aufklaerung') && knopf('aufklaerung').getClientRects().length),
       aufklaerungAn: !!(knopf('aufklaerung') && knopf('aufklaerung').classList.contains('active')),
-      eigeneBilder: svg ? svg.querySelectorAll('image').length : 0,
+      /* EIGENE Marken sind alle gezeichneten Ruempfe AUSSER denen der fremden Flotten - die
+         werden mit derselben Funktion gezeichnet und sind sonst nicht zu unterscheiden. Genau
+         daran ist der erste Entwurf dieser Pruefung gescheitert: 2b zaehlte 15 gegen 11 und
+         meldete rot, obwohl die vier fehlenden Bilder die fremde Flotte waren, die beim
+         Ausblenden der Aufklaerung korrekt verschwand. Der Container-Selektor ist deshalb
+         Pflicht, nicht Feinschliff (Hausregel: Selektoren auf den geprueften Container
+         begrenzen). */
+      eigeneBilder: svg ? [...svg.querySelectorAll('image')].filter(i => !i.closest('[data-map-fremdflotte]')).length : 0,
       eigeneTexte: texte.filter(t => /Schiffe?$|Rückflug/.test(t)).length,
+      fremdeBilder: svg ? svg.querySelectorAll('[data-map-fremdflotte] image').length : 0,
       fremdeBahnen: svg ? svg.querySelectorAll('line[stroke-dasharray="4,4"]').length : 0,
       fremdeTexte: texte.filter(t => /Nova/.test(t)).length
     };
@@ -187,7 +195,7 @@ async function schalte(page, ebene){
     const an = await bild(t.page);
     check('1a: Leiste, beide Knoepfe und etwas zum Ausblenden sind da (Vorbedingung)',
       an.leiste && an.routenKnopf && an.routenAn && an.aufklaerungKnopf && an.aufklaerungAn
-      && an.eigeneBilder > 0 && an.eigeneTexte > 0 && an.fremdeBahnen > 0, an);
+      && an.eigeneBilder > 0 && an.eigeneTexte > 0 && an.fremdeBahnen > 0 && an.fremdeBilder > 0, an);
 
     await schalte(t.page, 'routen');
     const ohneRouten = await bild(t.page);
@@ -206,9 +214,10 @@ async function schalte(page, ebene){
     await schalte(t.page, 'aufklaerung');
     const ohneAufk = await bild(t.page);
     check('2a: Aufklaerung AUS blendet die fremde Flotte aus',
-      ohneAufk.aufklaerungAn === false && ohneAufk.fremdeBahnen === 0 && ohneAufk.fremdeTexte === 0,
-      { vorher: { bahnen: an.fremdeBahnen, texte: an.fremdeTexte },
-        nachher: { bahnen: ohneAufk.fremdeBahnen, texte: ohneAufk.fremdeTexte } });
+      ohneAufk.aufklaerungAn === false && ohneAufk.fremdeBahnen === 0 && ohneAufk.fremdeTexte === 0
+      && ohneAufk.fremdeBilder === 0,
+      { vorher: { bahnen: an.fremdeBahnen, texte: an.fremdeTexte, bilder: an.fremdeBilder },
+        nachher: { bahnen: ohneAufk.fremdeBahnen, texte: ohneAufk.fremdeTexte, bilder: ohneAufk.fremdeBilder } });
     check('2b: und laesst die EIGENEN Marken unberuehrt (die Schalter sind unabhaengig)',
       ohneAufk.eigeneBilder === an.eigeneBilder && ohneAufk.eigeneTexte === an.eigeneTexte,
       { erwartet: { bilder: an.eigeneBilder, texte: an.eigeneTexte },
