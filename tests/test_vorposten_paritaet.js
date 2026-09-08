@@ -509,14 +509,26 @@ if (SRV) {
    wird. Genau so ist beim Abbau schon einmal die ganze Garnison verschwunden (Abschnitt 9).
    Geprueft wird die REGEL, nicht die Schreibweise: Der Zweig liest `schiffe`, loest ueber
    shipDefOrSuper auf (nicht ueber einen Index-Zugriff) und schreibt in currentFleet(). */
-const lagerVon = JS.indexOf("r.type === 'vorposten-lager'");
-const lagerZweig = lagerVon < 0 ? '' : ohneKommentar(JS.slice(lagerVon, lagerVon + 4000));
-check('12-anker: der Lager-Zweig von claimPendingRewards ist auffindbar (sonst misst 12a nichts)',
-  lagerVon > 0 && /sysNameL/.test(lagerZweig), { gefunden: lagerVon > 0 });
-check('12a: der Lager-Zweig nimmt die Schiffe des Sternendocks entgegen',
-  /r\.schiffe/.test(lagerZweig) && /shipDefOrSuper\(/.test(lagerZweig) && /currentFleet\(\)/.test(lagerZweig),
-  { liestSchiffe: /r\.schiffe/.test(lagerZweig), ueberShipDefOrSuper: /shipDefOrSuper\(/.test(lagerZweig),
-    inDieFlotte: /currentFleet\(\)/.test(lagerZweig) });
+/* NACHGEZOGEN MIT VP-1 (08.09.2026): Die Buchung ist aus dem Belohnungszweig herausgewachsen und
+   heisst jetzt vorpostenFrachtBuchen - seit die Fracht erst nach einem Flug ankommt, gibt es ZWEI
+   Wege dorthin (Rueckfall ohne freien Flottenslot und Ankunft des Transportverbands). Der alte
+   Waechter schnitt 4000 Zeichen ab dem Belohnungszweig und fand die Schiffe dort nicht mehr - er
+   fiel auf richtigem Code, weil er eine ANDERE Regel prueft als die geltende.
+   Die Zusage ist unveraendert: Die Schiffe des Sternendocks duerfen nicht still verfallen. Sie
+   wird jetzt an der Buchung selbst gemessen - UND daran, dass beide Wege durch sie hindurchgehen.
+   Das ist strenger als vorher: Ein dritter Weg, der selbst bucht, faellt hier auf. */
+const buchVon = JS.indexOf('function vorpostenFrachtBuchen(');
+const buchBis = buchVon < 0 ? -1 : JS.indexOf('\nasync function claimPendingRewards(', buchVon);
+const buchung = (buchVon > 0 && buchBis > buchVon) ? ohneKommentar(JS.slice(buchVon, buchBis)) : '';
+check('12-anker: die Buchung der Vorposten-Fracht ist auffindbar (sonst misst 12a nichts)',
+  buchVon > 0 && buchBis > buchVon && /sysNameL/.test(buchung), { von: buchVon, bis: buchBis });
+check('12a: die Buchung nimmt die Schiffe des Sternendocks entgegen',
+  /r\.schiffe/.test(buchung) && /shipDefOrSuper\(/.test(buchung) && /currentFleet\(\)/.test(buchung),
+  { liestSchiffe: /r\.schiffe/.test(buchung), ueberShipDefOrSuper: /shipDefOrSuper\(/.test(buchung),
+    inDieFlotte: /currentFleet\(\)/.test(buchung) });
+check('12b: beide Wege zur Fracht gehen durch DIESE Buchung - keiner bucht selbst',
+  (JS.match(/vorpostenFrachtBuchen\(/g) || []).length >= 3,
+  { aufrufe: (JS.match(/vorpostenFrachtBuchen\(/g) || []).length });
 /* Und der Server schickt das Feld auch wirklich - sonst prueft 12a einen Zweig fuer eine
    Belohnung, die es nicht gibt (die Sorte Pruefung, die aus dem falschen Grund gruen ist). */
 if (SRV) {
@@ -581,10 +593,16 @@ if (SRV) {
    (`if (!VP_LAGER_AKTIV && !VP_ENDPROJEKTE_AKTIV)`); hier war es wieder offen. */
 check('15a: der Dockstand des Servers wird im Spiel gelesen',
   /\bdockBereit\b/.test(JS), { treffer: (JS.match(/\bdockBereit\b/g) || []).length });
+/* DER SLICE HAT EINEN ENDANKER STATT EINER ZEICHENZAHL (nachgezogen 08.09.2026). Vorher waren es
+   700 Zeichen nach dem Label - VP-1 hat dort vier Kommentarzeilen eingefuegt, und
+   `vorpostenLagerHolen(` rutschte aus dem Fenster. Der Waechter fiel auf richtigem Code und sagte
+   dabei „gefunden: true", was die Ursache verschleierte. Ein Endanker wandert mit. */
 const griffVon = JS.indexOf("label: dockDa && !lagerDa ? 'Sternendock abholen'");
-const griff = griffVon < 0 ? '' : JS.slice(Math.max(0, griffVon - 700), griffVon + 700);
+const griffBis = griffVon < 0 ? -1 : JS.indexOf('vorpostenLagerHolen(sysId) });', griffVon);
+const griff = (griffVon > 0 && griffBis > griffVon) ? JS.slice(Math.max(0, griffVon - 900), griffBis + 40) : '';
 check('15-anker: der Abhol-Eintrag ist auffindbar (sonst misst 15b nichts)',
-  griffVon > 0 && /vorpostenLagerHolen\(/.test(griff), { gefunden: griffVon > 0 });
+  griffVon > 0 && griffBis > griffVon && /vorpostenLagerHolen\(/.test(griff),
+  { labelGefunden: griffVon > 0, endankerGefunden: griffBis > griffVon });
 check('15b: er steht auch dann da, wenn nur das Sternendock etwas hat',
   /dockBereit \|\| 0\) > 0/.test(griff) && /lagerDa \|\| dockDa/.test(griff),
   { auszug: (griff.match(/const dockDa[^\n]*/) || [])[0] });

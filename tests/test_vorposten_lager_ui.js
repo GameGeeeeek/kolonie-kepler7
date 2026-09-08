@@ -76,11 +76,22 @@ function vp(over){
     lagerRate:{ erz:28125, kristalle:9375, deuterium:7500 },
     lagerVollAb: now + 9 * 3600 * 1000 }, over || {});
 }
-function spielstand(){
+/* `slotsVoll` fuellt die Flottenslots. Gebraucht seit VP-1 (08.09.2026): Die abgeholte Fracht
+   fliegt seither als Transportverband nach Hause und wird erst bei der Ankunft gebucht. Abschnitt
+   5 misst aber die UEBERGABE der Dock-Schiffe, nicht den Flug - und die geschieht auf beiden Wegen
+   durch dieselbe Funktion (vorpostenFrachtBuchen). Mit vollen Slots greift der Rueckfall, der
+   sofort bucht, und die drei Pruefungen messen weiter genau das, wofuer sie geschrieben wurden.
+   Den Weg ueber den Verband misst tests/test_vorposten_fracht.js (2b: die Schiffe reisen mit und
+   kommen an). Die Alternative - hier auf einen echten Flug warten - haette den Test um Minuten
+   verlaengert und dieselbe Zusage ein zweites Mal geprueft. */
+function spielstand(slotsVoll){
+  const missionen = [];
+  if (slotsVoll) for (let i = 0; i < 8; i++)
+    missionen.push({ id: 7000+i, type:'explore', targetId:'thessa', startTime: now, endTime: now + 9e6, composition:{ spaeher: 1 } });
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil']) g[t] = true;
   return JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true, seenTabHints:g, activeEvent:{ key:'__testruhe__', bis: now+9e8 },
     resources:{ energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:9e4, forschungspunkte:3e4 },
-    buildings:{ solar:22, mine:20, labor:14, lager:60, werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, missions:[] },
+    buildings:{ solar:22, mine:20, labor:14, lager:60, werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, spaeher:20, missions: missionen },
     colonies:{}, discovered:{}, activeBasePlanet:'home', player:{ id:ICH, name:'Ich' }, xp:9e5, credits:5000, buffs:[],
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
@@ -99,7 +110,7 @@ function spielstand(){
          `v1`: Die Vorlage kam damit NIE an, und jede Pruefung, die an Rohstoffen, Flotte oder
          Gebaeuden haengt, mass den Startzustand statt der Vorlage - still gruen aus dem falschen
          Grund. Gemessen und behoben am 05.09.2026. */
-      'kepler7-save-v3': spielstand() };
+      'kepler7-save-v3': spielstand(opt.slotsVoll) };
     await page.route('**/api/**', async r => {
       const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
       const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
@@ -240,7 +251,7 @@ function spielstand(){
      Abbau schon einmal eine ganze Garnison verschwunden.
      GEMESSEN WIRD DIE GUTSCHRIFT, nicht der Quelltext: 12 Kreuzer im Ausgangsstand, drei aus dem
      Dock, also 15 im gespeicherten Spielstand. */
-  const dock = await messe(vp(), { belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
+  const dock = await messe(vp(), { slotsVoll: true, belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
     erz: 1000, kristalle: 0, deuterium: 0, schiffe: { cruisers: 3 } } });
   const eigen = await messe(vp());
   const fremd = await messe(vp({ eigener:false, besitzer:'u-fremd', besitzerName:'Nachbar' }));
@@ -272,7 +283,10 @@ function spielstand(){
      nicht kennt - der Normalfall unserer Auslieferungsreihenfolge (Backend zuerst live). Vorher
      wurde er still verschluckt, und weil das Lager gleichzeitig leer war, behauptete die Meldung
      sogar „es war leer". Der Ertrag ist zu diesem Zeitpunkt beim Server schon geshiftet. */
-  const fremdSchiff = await messe(vp(), { belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
+  /* `slotsVoll` wie beim Dock-Lauf: Seit VP-1 fliegt die Fracht als Transportverband nach Hause,
+     und die Meldung ueber den unbekannten Schiffstyp entsteht erst bei der BUCHUNG. Mit vollen
+     Slots greift der Rueckfall, der sofort bucht - dieselbe Funktion, dieselbe Meldung. */
+  const fremdSchiff = await messe(vp(), { slotsVoll: true, belohnung: { type:'vorposten-lager', system:SYS, name:'Handelsposten',
     erz: 0, kristalle: 0, deuterium: 0, schiffe: { gibtesnichtmehr: 2 } } });
 
   /* Der Anker verlangt ein ECHTES Menue: `text` ist null, wenn `.kmenu` fehlt, und die Laenge

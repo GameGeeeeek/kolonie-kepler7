@@ -14442,7 +14442,11 @@
     /* GEMELDET WIRD HIER NUR DER AUFBRUCH, nicht der Ertrag: Was wirklich ankommt, entscheidet der
        Lagerdeckel im Claim-Zweig, und der meldet es selbst. Zwei Meldungen ueber dieselbe Lieferung
        koennten einander widersprechen - genau der Fehler, der am 04.09.2026 im Claim-Zweig steckte. */
-    log('Die Fracht vom Vorposten in ' + ((STAR_SYSTEMS.find(x => x.id === sysId) || { name: sysId }).name) + ' ist unterwegs.', 'ti-box', 'ok');
+    /* KEINE zweite Meldung ueber denselben Vorgang mehr (VP-1): Frueher stand hier „ist
+       unterwegs", und der Claim-Zweig meldete unmittelbar danach die Ankunft - zwei Saetze ueber
+       eine Lieferung, die in Wahrheit sofort da war. Jetzt meldet der Verband seinen Aufbruch
+       selbst (vorpostenFrachtStarten) oder der Rueckfall seine Sofortbuchung; beides sagt genau
+       eines, und beides weiss mehr als diese Stelle. */
     await claimPendingRewards();
     await ladeVorposten(); render(); save();
   }
@@ -31211,6 +31215,145 @@ function belohnungGabenBuchen(r){
   const xp = zahl(r.xp);           if (xp){ addXp(xp); teile.push('+'+fmt(xp)+' Erfahrung'); }
   return teile;
 }
+/* ===== VP-1: DER TRANSPORTVERBAND =====
+   Er entsteht aus der Belohnung, nicht aus dem Klick. Das ist bewusst so: Der Server reiht eine
+   `vorposten-lager`-Belohnung an DREI Stellen ein - beim Abholen auf Knopfdruck, beim Stufenausbau
+   und nach einer Umruestung (gemessen in server.js, 08.09.2026). In allen drei Faellen liegt die
+   Fracht am Vorposten und muss nach Hause gebracht werden; ein Verband nur fuer den Knopfdruck
+   waere die willkuerlichere Regel und braeuchte ausserdem eine Merkhilfe, die einen Neustart
+   zwischen Klick und Einloesung nicht ueberlebt.
+
+   KEINE SCHIFFE, SONDERN EIN SLOT. Der Auftrag nennt als Kosten die Zeit und einen Flottenslot -
+   nicht bestimmte Schiffe. Frachter zur Bedingung zu machen waere eine Balance-Aenderung, die
+   niemand bestellt hat: Wer keine hat, koennte sein Lager gar nicht mehr abholen. Der Verband
+   verhaelt sich damit wie der Recycler-Sammelauftrag, der ebenfalls einen Slot belegt, ohne eine
+   Flotte mitzufuehren.
+
+   DIE FLUGZEIT KOMMT AUS DERSELBEN RECHNUNG WIE DER VORPOSTEN-BAU (vorpostenFlug ueber
+   asteroidFlugBasis), nur mit einem Frachter statt einem Kolonieschiff als Bezug. Damit gilt der
+   Sprungtor-Rabatt auch hier - und weil vorpostenFlug jetzt eine fuenfte Aufrufstelle hat, traegt
+   'vorposten-fracht' `sprungtor:true` in MISSION_LINIEN. Diese Kopie-Familie ist gemessen und in
+   tests/test_sprungtor_route 2a festgenagelt. */
+const VP_FRACHT_BEZUG = { frachter: 1 };
+/* EINE Quelle fuer die Flugzeit: der Menuetext, der sie ankuendigt, und der Missionsstart, der sie
+   einfriert. Zwei Rechnungen waeren zwei Wahrheiten - und die Ankuendigung waere die, der niemand
+   nachrechnet. */
+function vorpostenFrachtFlug(sysId){
+  return vorpostenFlug(sysId, missionDurationFor(asteroidFlugBasis(sysId), VP_FRACHT_BEZUG, ['frachter'], sysId));
+}
+function vorpostenFrachtStarten(r){
+  if (!r || !r.system) return false;
+  const cf = currentFleet();
+  if (!cf || !Array.isArray(cf.missions)) return false;
+  // Ohne freien Slot KEIN Verband - der Aufrufer bucht dann sofort (siehe dort).
+  if (activeFleetMissionCount() >= maxConcurrentFleets()) return false;
+  const sysN = (STAR_SYSTEMS.find(x => x.id === r.system) || { name: r.system }).name;
+  const flug = vorpostenFrachtFlug(r.system);
+  const jetzt = Date.now();
+  /* Die FRACHT wird eingefroren, nicht nachgerechnet - genau wie die Ladung einer Abbaumission.
+     Sie liegt beim Server schon nicht mehr in der Warteschlange; eine spaetere Nachfrage haette
+     nichts, worauf sie sich stuetzen koennte. `fracht` traegt die ganze Belohnung, damit
+     vorpostenFrachtBuchen bei der Ankunft dieselbe Form vorfindet wie hier. */
+  cf.missions.push({
+    id: nextMissionId(), type:'vorposten-fracht', targetId: r.system, system: r.system,
+    startTime: jetzt, endTime: jetzt + Math.max(1, flug) * 1000,
+    fleetName: 'Transportverband', fracht: r
+  });
+  log('Ein Transportverband ist von ' + planetDisplayName(state.activeBasePlanet) + ' zum Vorposten '
+    + vpMeldName(r) + ' bei ' + sysN + ' unterwegs – zurück in ' + fmtDuration(flug)
+    + '. Er belegt so lange einen Flottenslot.', 'ti-truck', 'ok');
+  ladeVorposten();
+  render(); save();
+  return true;
+}
+
+/* ===== VP-1: EINE Quelle fuer die Gutschrift der Vorposten-Fracht =====
+   Dieser Rumpf stand bis zum 08.09.2026 inline im Belohnungszweig. Seit die Fracht erst nach einem
+   Flug ankommt, gibt es ZWEI Wege dorthin - den Rueckfall ohne freien Flottenslot und die Ankunft
+   des Transportverbands. Zwei Kopien derselben Buchung waeren genau die Stelle, an der der
+   Lagerdeckel oder das Sternendock beim naechsten Umbau auseinanderlaufen.
+   `unterwegsGewesen` faerbt nur den Satzanfang: „ist eingetroffen" stimmt in beiden Faellen, aber
+   nach einem Flug soll dabeistehen, dass der Verband zurueck ist.
+   Die Warnstufe der Meldung geht ueber `vorpostenFrachtWarnung` heraus statt ueber den
+   Rueckgabewert: Der Aufrufer soll EINE Zeichenkette bekommen und selbst loggen - beide Aufrufer
+   haengen naemlich noch etwas Eigenes an. */
+let vorpostenFrachtWarnung = false;
+function vorpostenFrachtBuchen(r, sysNameL, unterwegsGewesen){
+  vorpostenFrachtWarnung = false;
+          /* DER ERTRAG GEHT DURCH gainResources, nicht direkt in state.resources (Befund des
+             Review-Bots auf PR #562, bestaetigt). Dort haengt der Lagerdeckel - und der Kommentar
+             an jener Funktion sagt genau diesen Fall voraus: „Jede kuenftige Quelle (Ereignis,
+             Geschenk, Belohnung) klemmt dadurch automatisch am selben Deckel, ohne dass jemand
+             daran denken muss." Eine direkte Addition haette den Lagerausbau ausgehebelt: Wer oft
+             genug abholt, braucht kein Lager mehr.
+             GEMELDET WIRD, WAS ANKOMMT, nicht was geschickt wurde - sonst behauptet das Protokoll
+             einen Ertrag, den der Spieler nie bekommen hat. */
+          const teileL = [];
+          const vorherL = {};
+          const gaben = {};
+          for (const k of ['erz','kristalle','deuterium']){
+            const menge = Math.max(0, Math.round(Number(r[k]) || 0));
+            if (menge){ vorherL[k] = state.resources[k] || 0; gaben[k] = menge; }
+          }
+          if (Object.keys(gaben).length) gainResources(gaben);
+          let verfielL = false;
+          for (const k of Object.keys(gaben)){
+            const bekommen = Math.max(0, Math.round((state.resources[k] || 0) - vorherL[k]));
+            if (bekommen > 0) teileL.push(fmt(bekommen) + ' ' + resDefFor(k).label);
+            if (bekommen < gaben[k]) verfielL = true;
+          }
+          /* „es war leer" gilt nur, wenn wirklich NICHTS geschickt wurde. Vorher hing der Satz an
+             dem, was ANKAM - kam nichts an, weil das Lager voll war, las sich die Meldung
+             „ist eingetroffen – es war leer – dein Lager war voll, der Rest ist verfallen"
+             (Durchsicht 04.09.2026). Zwei Aussagen ueber dieselbe Lieferung, die einander
+             widersprechen. */
+          /* V6, DAS STERNENDOCK: Am selben Griff haengt, was die Helling fertig hat - der Server
+             schickt `schiffe` ({ cruisers: n }) in DERSELBEN Belohnung wie das Lager.
+             Ohne diesen Zweig waeren die Schiffe ersatzlos weg: Die Belohnung wird nach dem
+             Zweig aus der Warteschlange geraeumt, und der Ertrag stand nirgends. Genau dieser
+             Fehler ist dem Projekt beim Abbau-Zweig schon einmal passiert (Garnison verfiel
+             still); deshalb steht der Zweig hier im SELBEN Auftrag wie der Schalter.
+             `shipDefOrSuper` statt SHIP_DEFS.find - dieselbe Begruendung wie beim Abbau. */
+          const dockTeile = [];
+          let dockUnbekannt = 0;
+          if (r.schiffe && typeof r.schiffe === 'object'){
+            const flotteL = currentFleet();
+            for (const [k, n] of Object.entries(r.schiffe)){
+              const anz = Math.max(0, Math.round(Number(n) || 0));
+              const defL = shipDefOrSuper(k);
+              if (!anz) continue;
+              if (defL){
+                flotteL[k] = (flotteL[k] || 0) + anz;
+                dockTeile.push(anz + '\u00d7 ' + (defL.name || k));
+              } else {
+                /* EIN UNBEKANNTER SCHLUESSEL DARF NICHT STILL VERSCHWINDEN (Durchsicht 07.09.2026).
+                   Die Belohnung ist beim Server schon aus der Warteschlange geshiftet, wenn wir hier
+                   ankommen - was der Zweig jetzt nicht bucht, ist endgueltig weg. Und der Fall ist
+                   nicht theoretisch, sondern der NORMALFALL unserer eigenen Auslieferungsreihenfolge:
+                   Backend zuerst live, Frontend hinterher. Faellt in diesem Fenster ein neuer
+                   VP_DOCK_SCHIFF-Schluessel, kennt der alte Client ihn nicht. Beim Abbau-Zweig ist
+                   dieselbe Form ungefaehrlich - dort kommen die Schluessel aus der eigenen Garnison,
+                   die der Client selbst gebaut hat.
+                   Gezaehlt statt gebucht: Was das Schiff kann, wissen wir nicht, also erfinden wir es
+                   nicht - aber der Spieler erfaehrt, dass etwas ankam, das er nicht sieht. */
+                dockUnbekannt += anz;
+              }
+            }
+          }
+          const nichtsGeschickt = Object.keys(gaben).length === 0 && !dockTeile.length && !dockUnbekannt;
+          /* WOHIN die Schiffe gehen, steht dabei: currentFleet() bucht auf den AKTIVEN Standort, und
+             wer auf einer Kolonie steht, suchte sie sonst auf der Heimatbasis. Der Abbau-Zweig nennt
+             den Ort aus genau diesem Grund. */
+          const dockOrt = planetDisplayName(state.activeBasePlanet);
+          vorpostenFrachtWarnung = !!dockUnbekannt;
+          return ((unterwegsGewesen ? 'Dein Transportverband ist zurück: das Lager deines Vorpostens '
+                                    : 'Das Lager deines Vorpostens ') + vpMeldName(r) + ' bei ' + sysNameL + ' ist eingetroffen'
+            + (teileL.length ? ': ' + teileL.join(', ') : (nichtsGeschickt ? ' – es war leer' : ''))
+            + (dockTeile.length ? ' – aus dem Sternendock: ' + dockTeile.join(', ') + ' auf ' + dockOrt : '')
+            + (dockUnbekannt ? ' – aus dem Sternendock kamen ' + dockUnbekannt + ' Schiff' + (dockUnbekannt === 1 ? '' : 'e')
+                + ' eines Typs, den diese Spielversion noch nicht kennt – bitte die Seite neu laden' : '')
+            + (verfielL ? ' – dein Lager war voll, ' + (teileL.length ? 'der Rest' : 'alles davon') + ' ist verfallen' : '') + '.');
+}
 async function claimPendingRewards(){
     if (!useBackend()) return;
     try {
@@ -31392,80 +31535,23 @@ async function claimPendingRewards(){
            Der Zweig steht hier, bevor der Server-Schalter VP_LAGER_AKTIV faellt: Eine Belohnung
            ohne Zweig faellt still durch und ist ersatzlos weg (test_vorposten_paritaet 3b). */
         if (r.type === 'vorposten-lager'){
+          /* VP-1 (Wunsch des Betreibers, woertlich): „wenn man ressourcen abholt von dem vorposten
+             macht sich ein transportverband auf dem heimatplaneten auf den weg, man bekommt erst
+             die ressourcen wenn der verband angekommen ist, und er nimmt fuer die dauer des
+             hinwegs und rueckflugs einen flottenslot ein."
+             Die Fracht wird deshalb NICHT mehr sofort gebucht, sondern in eine Mission eingefroren
+             - dieselbe Bauart wie die Ladung einer Abbaumission (`m.res`). Gebucht wird sie bei der
+             Ankunft, durch DIESELBE Funktion, die sie hier sonst sofort buchen wuerde.
+             DER RUECKFALL IST DAS ALTE VERHALTEN, und das ist Absicht: Ist kein Flottenslot frei,
+             wird sofort gebucht statt verworfen. Die Belohnung ist beim Server in diesem Moment
+             schon aus der Warteschlange geschoben - was dieser Zweig nicht bucht, ist endgueltig
+             weg. Eine Lieferung zu verlieren, weil gerade alle Slots belegt sind, waere ein
+             Spielerschaden fuer eine Anzeigefrage. */
+          if (vorpostenFrachtStarten(r)) continue;
           const sysNameL = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
-          /* DER ERTRAG GEHT DURCH gainResources, nicht direkt in state.resources (Befund des
-             Review-Bots auf PR #562, bestaetigt). Dort haengt der Lagerdeckel - und der Kommentar
-             an jener Funktion sagt genau diesen Fall voraus: „Jede kuenftige Quelle (Ereignis,
-             Geschenk, Belohnung) klemmt dadurch automatisch am selben Deckel, ohne dass jemand
-             daran denken muss." Eine direkte Addition haette den Lagerausbau ausgehebelt: Wer oft
-             genug abholt, braucht kein Lager mehr.
-             GEMELDET WIRD, WAS ANKOMMT, nicht was geschickt wurde - sonst behauptet das Protokoll
-             einen Ertrag, den der Spieler nie bekommen hat. */
-          const teileL = [];
-          const vorherL = {};
-          const gaben = {};
-          for (const k of ['erz','kristalle','deuterium']){
-            const menge = Math.max(0, Math.round(Number(r[k]) || 0));
-            if (menge){ vorherL[k] = state.resources[k] || 0; gaben[k] = menge; }
-          }
-          if (Object.keys(gaben).length) gainResources(gaben);
-          let verfielL = false;
-          for (const k of Object.keys(gaben)){
-            const bekommen = Math.max(0, Math.round((state.resources[k] || 0) - vorherL[k]));
-            if (bekommen > 0) teileL.push(fmt(bekommen) + ' ' + resDefFor(k).label);
-            if (bekommen < gaben[k]) verfielL = true;
-          }
-          /* „es war leer" gilt nur, wenn wirklich NICHTS geschickt wurde. Vorher hing der Satz an
-             dem, was ANKAM - kam nichts an, weil das Lager voll war, las sich die Meldung
-             „ist eingetroffen – es war leer – dein Lager war voll, der Rest ist verfallen"
-             (Durchsicht 04.09.2026). Zwei Aussagen ueber dieselbe Lieferung, die einander
-             widersprechen. */
-          /* V6, DAS STERNENDOCK: Am selben Griff haengt, was die Helling fertig hat - der Server
-             schickt `schiffe` ({ cruisers: n }) in DERSELBEN Belohnung wie das Lager.
-             Ohne diesen Zweig waeren die Schiffe ersatzlos weg: Die Belohnung wird nach dem
-             Zweig aus der Warteschlange geraeumt, und der Ertrag stand nirgends. Genau dieser
-             Fehler ist dem Projekt beim Abbau-Zweig schon einmal passiert (Garnison verfiel
-             still); deshalb steht der Zweig hier im SELBEN Auftrag wie der Schalter.
-             `shipDefOrSuper` statt SHIP_DEFS.find - dieselbe Begruendung wie beim Abbau. */
-          const dockTeile = [];
-          let dockUnbekannt = 0;
-          if (r.schiffe && typeof r.schiffe === 'object'){
-            const flotteL = currentFleet();
-            for (const [k, n] of Object.entries(r.schiffe)){
-              const anz = Math.max(0, Math.round(Number(n) || 0));
-              const defL = shipDefOrSuper(k);
-              if (!anz) continue;
-              if (defL){
-                flotteL[k] = (flotteL[k] || 0) + anz;
-                dockTeile.push(anz + '\u00d7 ' + (defL.name || k));
-              } else {
-                /* EIN UNBEKANNTER SCHLUESSEL DARF NICHT STILL VERSCHWINDEN (Durchsicht 07.09.2026).
-                   Die Belohnung ist beim Server schon aus der Warteschlange geshiftet, wenn wir hier
-                   ankommen - was der Zweig jetzt nicht bucht, ist endgueltig weg. Und der Fall ist
-                   nicht theoretisch, sondern der NORMALFALL unserer eigenen Auslieferungsreihenfolge:
-                   Backend zuerst live, Frontend hinterher. Faellt in diesem Fenster ein neuer
-                   VP_DOCK_SCHIFF-Schluessel, kennt der alte Client ihn nicht. Beim Abbau-Zweig ist
-                   dieselbe Form ungefaehrlich - dort kommen die Schluessel aus der eigenen Garnison,
-                   die der Client selbst gebaut hat.
-                   Gezaehlt statt gebucht: Was das Schiff kann, wissen wir nicht, also erfinden wir es
-                   nicht - aber der Spieler erfaehrt, dass etwas ankam, das er nicht sieht. */
-                dockUnbekannt += anz;
-              }
-            }
-          }
-          const nichtsGeschickt = Object.keys(gaben).length === 0 && !dockTeile.length && !dockUnbekannt;
-          /* WOHIN die Schiffe gehen, steht dabei: currentFleet() bucht auf den AKTIVEN Standort, und
-             wer auf einer Kolonie steht, suchte sie sonst auf der Heimatbasis. Der Abbau-Zweig nennt
-             den Ort aus genau diesem Grund. */
-          const dockOrt = planetDisplayName(state.activeBasePlanet);
-          log('Das Lager deines Vorpostens ' + vpMeldName(r) + ' bei ' + sysNameL + ' ist eingetroffen'
-            + (teileL.length ? ': ' + teileL.join(', ') : (nichtsGeschickt ? ' – es war leer' : ''))
-            + (dockTeile.length ? ' – aus dem Sternendock: ' + dockTeile.join(', ') + ' auf ' + dockOrt : '')
-            + (dockUnbekannt ? ' – aus dem Sternendock kamen ' + dockUnbekannt + ' Schiff' + (dockUnbekannt === 1 ? '' : 'e')
-                + ' eines Typs, den diese Spielversion noch nicht kennt – bitte die Seite neu laden' : '')
-            + (verfielL ? ' – dein Lager war voll, ' + (teileL.length ? 'der Rest' : 'alles davon') + ' ist verfallen' : '') + '.',
-            'ti-truck', dockUnbekannt ? 'warn' : 'ok');
-          ladeVorposten();
+          log(vorpostenFrachtBuchen(r, sysNameL, false)
+            + ' Kein Flottenslot war frei – die Fracht kam ohne Transportverband an.',
+            'ti-truck', vorpostenFrachtWarnung ? 'warn' : 'ok');          ladeVorposten();
           save();
           continue;
         }
@@ -58347,6 +58433,23 @@ async function claimPendingRewards(){
           log('Die Eskorte ist zurück: '+zurueck+' Schiff(e) wieder auf '+planetDisplayName(planetKey)+'.', 'ti-shield');
           continue;
         }
+        /* VP-1: DER TRANSPORTVERBAND IST ZURUECK. Gebucht wird durch dieselbe Funktion, die den
+           Rueckfall ohne Flottenslot bucht - eine zweite Kopie waere die Stelle, an der Lagerdeckel
+           und Sternendock beim naechsten Umbau auseinanderlaufen.
+           DIE FRACHT MUSS DA SEIN: Eine Mission dieses Typs ohne `fracht` kann es nur geben, wenn
+           ein Spielstand von Hand veraendert wurde - dann lieber nichts buchen als etwas erfinden,
+           aber die Mission trotzdem abraeumen, damit der Slot frei wird. */
+        if (m.type === 'vorposten-fracht'){
+          const sysNameF = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
+          if (m.fracht){
+            log(vorpostenFrachtBuchen(m.fracht, sysNameF, true), 'ti-truck', vorpostenFrachtWarnung ? 'warn' : 'ok');
+          } else {
+            log('Ein Transportverband ist von ' + sysNameF + ' zurück, führte aber keine Fracht mit.', 'ti-truck', 'warn');
+          }
+          ladeVorposten();
+          save();
+          continue;
+        }
         if (m.type === 'mining'){
           /* Aufbereitung (v8.485.0): Die Anlage legt oben drauf. Der Zuschlag wird VOR der
              Gutschrift berechnet (er bestimmt ja, wie viel gutzuschreiben ist), BEZAHLT wird aber
@@ -64687,7 +64790,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
   const MISSION_LINIEN = {
     /* `sprungtor:true` heisst: DIESE Art fliegt wirklich durch ein Sprungtor im Zielsystem - ihre
        Flugzeit laeuft ueber vorpostenFlug(). GEMESSEN an den Aufrufstellen (08.09.2026), nicht
-       geraten: Erkundung, Kolonisierung, Abbau und der Vorposten-Bau rechnen damit; Mondlandung
+       geraten: Erkundung, Kolonisierung, Abbau, der Vorposten-Bau und - seit VP-1 - der
+       Transportverband rechnen damit; Mondlandung
        und Bergbau-Eskorte NICHT (sie rufen missionDurationFor direkt), und keine der PvP- oder
        Angriffsarten - deren Reaktionsfenster darf sich nie verschieben, das steht so im
        Vorposten-Hilfetext. Eine Bahn durch das Tor bei einer Art, die es gar nicht nutzt, waere
@@ -64723,6 +64827,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
        der Gesamtzeit mitten im Abbau; die Flotte waere auf dem Rueckweg gezeichnet worden,
        waehrend sie noch am Brocken haengt. */
     mining:          { hin:'#d9a441', rueck:'#5dcaa5', rundflug:true,  was:'Abbau',   bergbau:true, warten:true, sprungtor:true },
+    /* VP-1: Der Transportverband holt die Fracht vom Vorposten. Konvoi-Form statt Keil
+       (`bergbau:true`) - er fuehrt keine Kampfschiffe; Rundflug, weil er zurueckkommt; und
+       `sprungtor:true`, weil seine Flugzeit ueber vorpostenFlug() laeuft (die Kopie-Familie, die
+       tests/test_sprungtor_route 2a festnagelt). KEIN `warten:true`: Das Verladen am Vorposten
+       fuehrt der Verband nicht als eigene Etappe mit - er kennt nur Start und Ankunft. */
+    'vorposten-fracht': { hin:'#8fd0ea', rueck:'#5dcaa5', rundflug:true, was:'Fracht', bergbau:true, sprungtor:true },
     'mining-escort': { hin:'#c9b48a', rueck:null,      rundflug:false, was:'Eskorte', bergbau:true }
   };
   // Zielposition einer Mission im aktuell gezeigten System. Gibt zusätzlich zurück, ob das Ziel
@@ -64780,7 +64890,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
       return { system: m.system, pos: konvoiMarkerXY(i >= 0 ? i : 0) };
     }
     // Vorposten (B2): ein Objekt je System, auf seiner festen Bahn.
-    if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-rueckruf'){
+    if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend'
+        || m.type === 'vorposten-rueckruf' || m.type === 'vorposten-fracht'){
       return { system: m.system || m.targetId, pos: vorpostenMarkerXY() };
     }
     // Alle uebrigen Arten zielen auf einen Planeten. Ein Mond liegt auf der Karte beim
@@ -64872,17 +64983,40 @@ function sekSternUse(key, x, y, k, unentdeckt){
        macht DANN den Entflechter transform-fest, bevor er das Portal in OBJEKTE aufnimmt. Die
        Klasse hier zu setzen, ohne das zu tun, macht es schlimmer statt besser: Der Entflechter
        naehme eine fast dreimal zu grosse Fläche an. */
+    /* ALLE BILDER EINER GRUPPE, NICHT NUR DAS ERSTE (KB-32, Fehlerbericht Sascha mit Screenshot:
+       „der name des aussenposten überlagert das tor"). `g.querySelector('image')` nahm das ERSTE
+       Bild - beim Vorposten ist das die Station. Seit KB-27 haengt darueber ein zweites Bild, das
+       aufrechte Sprungtor, und das galt damit als leerer Raum: Die Beschriftung wich nach oben aus
+       und landete genau darauf.
+       Zusammengefasst wird die HUELLE aller Bilder der Gruppe. Bewusst nicht `g.getBBox()`: Die
+       Gruppe traegt bei einigen Arten auch Text (Stufenzahl, Abzeichen) und Pulsringe, die weit
+       ueber den Koerper hinauslaufen - die Huelle daraus waere zu gross und schoebe Beschriftungen
+       grundlos beiseite. Bilder sind genau die gezeichneten Koerper.
+       Der Rueckfall auf den groessten Kreis bleibt fuer die Arten ohne Bild unveraendert. */
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
-      let el = g.querySelector('image') || g.querySelector('circle.body');
-      if (!el){
-        const kreise = [...g.querySelectorAll('circle')];
-        if (kreise.length) el = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
+      let b = null;
+      const bilder = [...g.querySelectorAll('image')];
+      for (const bild of bilder){
+        let k; try { k = bild.getBBox(); } catch (e) { continue; }
+        if (!k || !k.width) continue;
+        if (!b){ b = { x: k.x, y: k.y, w: k.width, h: k.height }; continue; }
+        const x1 = Math.min(b.x, k.x), y1 = Math.min(b.y, k.y);
+        const x2 = Math.max(b.x + b.w, k.x + k.width), y2 = Math.max(b.y + b.h, k.y + k.height);
+        b = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
       }
-      if (!el) return;
-      let b; try { b = el.getBBox(); } catch (e) { return; }
-      if (!b || !b.width) return;
-      flaechen.push({ g, x: b.x, y: b.y, w: b.width, h: b.height, mx: b.x + b.width/2, my: b.y + b.height/2 });
+      if (!b){
+        let el = g.querySelector('circle.body');
+        if (!el){
+          const kreise = [...g.querySelectorAll('circle')];
+          if (kreise.length) el = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
+        }
+        if (!el) return;
+        let k; try { k = el.getBBox(); } catch (e) { return; }
+        if (!k || !k.width) return;
+        b = { x: k.x, y: k.y, w: k.width, h: k.height };
+      }
+      flaechen.push({ g, x: b.x, y: b.y, w: b.w, h: b.h, mx: b.x + b.w/2, my: b.y + b.h/2 });
     });
     if (!flaechen.length) return;
     const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -65784,7 +65918,17 @@ function sekSternUse(key, x, y, k, unentdeckt){
             ${vorpostenSilhouette(vp, posV.x, posV.y, rV, farbeV)}
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2).toFixed(1)}" height="2.6" fill="#0a0d1a" opacity="0.55"/>
             <rect x="${(posV.x - bV).toFixed(1)}" y="${(posV.y + rV*0.95).toFixed(1)}" width="${(bV*2*anteilV).toFixed(1)}" height="2.6" fill="${farbeV}"/>
-            <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(posV.y - rV - 8).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.eigenName || vp.name || 'Vorposten') : (vp.eigenName || vp.name || 'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>
+            <!-- KB-32 (Fehlerbericht Sascha mit Screenshot: „der name des aussenposten überlagert
+                 das tor"). Der Name stand IMMER ueber der Station. Seit KB-27 steht dort das
+                 aufrechte Sprungtor - und es ist zu hoch, als dass der Beschriftungs-Entflechter
+                 es noch wegschieben koennte: Sein Rahmen laesst bewusst nur wenige Einheiten
+                 Versatz zu, damit Namen nicht quer ueber die Karte wandern.
+                 Steht ein Tor, geht der Name deshalb NACH UNTEN, unter den Kernbalken. Gefragt
+                 wird dieselbe Quelle, aus der auch die Zeichnung und die Flugbahn ihre Torposition
+                 holen (vorpostenSprungtorXY) - eine zweite Bedingung („hat Stufe 7") liefe beim
+                 naechsten Projekt auseinander. Ohne Tor bleibt alles wie bisher: Der Platz oben
+                 ist dann frei, und dort steht der Name seit jeher. -->
+            <text class="planet-label" x="${posV.x.toFixed(1)}" y="${(vorpostenSprungtorXY(vp, posV.x, posV.y, rV) ? (posV.y + rV*0.95 + 11) : (posV.y - rV - 8)).toFixed(1)}" text-anchor="middle" style="fill:${farbeV};">${escapeHtml(vp.eigener ? 'Dein ' + (vp.eigenName || vp.name || 'Vorposten') : (vp.eigenName || vp.name || 'Vorposten') + ' [' + (vp.besitzerName||'?') + ']')}</text>
           </g>`;
       }
     }
@@ -67415,7 +67559,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
         if (lagerDa) bringt.push(vorpostenLagerText(v.lager));
         if (dockDa) bringt.push(Math.floor(v.dockBereit) + '× ' + vpDockSchiffName(v));
         eintraege.push({ icon:'ti-box', label: dockDa && !lagerDa ? 'Sternendock abholen' : 'Lager abholen',
-          grund:'Bringt ' + bringt.join(' und ') + ' auf ' + planetDisplayName(state.activeBasePlanet) + '.'
+          /* VP-1: „Bringt ... auf <Standort>." las sich als Sofortlieferung und war es auch, bis
+             der Transportverband dazwischenkam. Der Grund nennt jetzt die Flugzeit - wer sie erst
+             nach dem Klick erfaehrt, plant seine Flottenslots falsch. Gerechnet wird sie mit
+             derselben Formel wie beim Start (vorpostenFrachtStarten), nicht mit einer zweiten. */
+          grund:'Bringt ' + bringt.join(' und ') + ' auf ' + planetDisplayName(state.activeBasePlanet)
+            + ' – ein Transportverband fliegt hin und zurück (' + fmtDuration(vorpostenFrachtFlug(sysId)) + ') und belegt so lange einen Flottenslot.'
             + (lagerDa && (v.lagerVollAb||0) <= jetzt ? ' Das Lager ist VOLL – was jetzt entsteht, verfällt.' : '')
             + (dockDa && v.dockBereit >= (vorpostenCache.dockMax || 7) ? ' Das Sternendock ist VOLL – was jetzt fertig wird, verfällt.' : ''),
           fn: () => vorpostenLagerHolen(sysId) });
@@ -71305,14 +71454,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
             </div>
           `;
         }
-        if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-rueckruf'){
+        if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend'
+            || m.type === 'vorposten-rueckruf' || m.type === 'vorposten-fracht'){
           const remaining = Math.max(0, m.endTime-now);
           const totalDur = Math.max(1, (m.endTime-(m.startTime||m.endTime))/1000);
           const pct = 100 - (remaining/(totalDur*1000)*100);
           const sysName = (STAR_SYSTEMS.find(x => x.id === (m.system||m.targetId)) || { name: m.system || '?' }).name;
-          const rund = m.type === 'vorposten-bau' || m.type === 'vorposten-angriff';
+          const rund = m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-fracht';
           const phase = rund ? (remaining > (totalDur*1000)/2 ? 'Anflug' : 'Rückflug') : (m.type === 'vorposten-rueckruf' ? 'Rückkehr' : 'Anflug');
-          const was = m.type === 'vorposten-bau' ? 'Baukolonne → Vorposten' : m.type === 'vorposten-angriff' ? 'Angriff → ' + (m.stufeName||'Vorposten') + ' von ' + (m.besitzerName||'?') : m.type === 'vorposten-defend' ? 'Garnison → Vorposten' : 'Garnison ← Vorposten';
+          const was = m.type === 'vorposten-bau' ? 'Baukolonne → Vorposten'
+                    : m.type === 'vorposten-fracht' ? 'Transportverband → Lager'
+                    : m.type === 'vorposten-angriff' ? 'Angriff → ' + (m.stufeName||'Vorposten') + ' von ' + (m.besitzerName||'?')
+                    : m.type === 'vorposten-defend' ? 'Garnison → Vorposten' : 'Garnison ← Vorposten';
           return `
             <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Unterwegs: ${fleetBreakdownHtml(m.composition||m.schiffe||{})}">
               <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -73635,10 +73788,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
             icon = 'ti-alien'; color = v.farbe;
             label = 'Nest-Angriff → ' + v.name + ' (' + ((STAR_SYSTEMS.find(x=>x.id===m.system)||{name:m.system||'?'}).name) + ')';
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||{}) + ' – ' + (m.stufeName || 'Nest') + '.';
-          } else if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend' || m.type === 'vorposten-rueckruf'){
-            icon = 'ti-building-community'; color = m.type === 'vorposten-angriff' ? VORPOSTEN_FARBE_FREMD : VORPOSTEN_FARBE_EIGEN;
+          } else if (m.type === 'vorposten-bau' || m.type === 'vorposten-angriff' || m.type === 'vorposten-defend'
+                     || m.type === 'vorposten-rueckruf' || m.type === 'vorposten-fracht'){
+            icon = m.type === 'vorposten-fracht' ? 'ti-truck' : 'ti-building-community';
+            color = m.type === 'vorposten-angriff' ? VORPOSTEN_FARBE_FREMD : VORPOSTEN_FARBE_EIGEN;
             const sysNV = (STAR_SYSTEMS.find(x=>x.id===(m.system||m.targetId))||{name:m.system||'?'}).name;
-            label = (m.type === 'vorposten-bau' ? 'Vorposten-Bau → ' : m.type === 'vorposten-angriff' ? 'Vorposten-Angriff → ' : m.type === 'vorposten-defend' ? 'Garnison → ' : 'Garnison ← ') + sysNV;
+            label = (m.type === 'vorposten-bau' ? 'Vorposten-Bau → '
+                   : m.type === 'vorposten-fracht' ? 'Transportverband ← '
+                   : m.type === 'vorposten-angriff' ? 'Vorposten-Angriff → '
+                   : m.type === 'vorposten-defend' ? 'Garnison → ' : 'Garnison ← ') + sysNV;
             shipsTooltip = 'Unterwegs: ' + fleetBreakdownHtml(m.composition||m.schiffe||{}) + '.';
           } else if (m.type === 'konvoi-angriff'){
             // Eigener Zweig wie beim Nest darueber - sonst "Erkundungsziel".
