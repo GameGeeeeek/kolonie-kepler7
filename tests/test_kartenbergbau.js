@@ -45,7 +45,9 @@ const SAB = process.env.KEPLER_BERGBAU_GEGENPROBE || '';
    einen Foerderstrahl gibt es nicht -> 2d und 2e fallen. 2a bleibt dort gruen und ist damit kein
    Beleg fuer KA-2, sondern die mitgezogene Zusage: Auf dem Vorkommen zu stehen war ja nie falsch,
    falsch waere die halbe Strecke. */
-const MUSS_FALLEN = { alt: ['1a', '1b', '2a'], strahl: ['2d', '2e'] };
+/* `sprung` ist der erste KA-2-Entwurf (de06f5b): Er zog den Halteabstand erst im Zeichnen ab, die
+   Marke flog also bis in die Brockenmitte und sprang bei `hinBis` zurueck -> 2f faellt. */
+const MUSS_FALLEN = { alt: ['1a', '1b', '2a'], strahl: ['2d', '2e'], sprung: ['2f'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
@@ -291,6 +293,45 @@ async function markenOrt(page){
     /* Eine ruhende Linie saehe aus wie eine Verbindung, nicht wie eine Taetigkeit - die Bewegung
        IST die Aussage. Und `pointer-events="none"`, weil der Strahl sonst genau die beiden
        Trefferflaechen abfinge, die dort etwas oeffnen sollen. */
+    /* 2f: KEIN SPRUNG AN DER PHASENGRENZE. Der erste Entwurf von KA-2 zog den Halteabstand erst
+       im Zeichnen ab - er wirkte damit NUR waehrend der Foerderung. Die Marke flog bis in die
+       Brockenmitte, sprang bei `hinBis` um rund siebzehn Einheiten zurueck und beim Abflug wieder
+       vor: zwei sichtbare Spruenge, die kein Test gesehen haette.
+       GEMESSEN WIRD DER ANFLUG KURZ VOR SEINEM ENDE: Steht die Marke dort schon nahe am
+       Halteplatz, kann sie beim Umschalten nicht mehr springen. Ein Vergleich der beiden
+       Zustaende waere die ehrlichere Messung, ginge aber nur mit zwei Laeufen, deren Uhren sich
+       um Millisekunden unterscheiden - dieser eine Lauf misst dieselbe Zusage an einer Stelle,
+       an der sie entscheidet. */
+    /* KURZ VOR DER ANKUNFT: hinBis liegt eine Sekunde VOR uns, der Anflug ist also zu 99,8 %
+       durch. Alle anderen Zeiten bleiben wie im Hauptlauf - der einzige Unterschied ist die
+       Phase, sonst maesse 2f etwas, das sich auch aus einem anderen Grund unterscheiden koennte. */
+    /* KURZ VOR DER ANKUNFT heisst hier: der Anflug ist zu 99,94 % durch. Das ist gemessen und
+       nicht grosszuegig gewaehlt - ein erster Entwurf setzte `hinBis` nur eine Sekunde voraus, bei
+       einem 30-Sekunden-Anflug sind das aber erst 96,8 %, und dort liegt AUCH der springende Stand
+       rund siebzehn Einheiten entfernt. Die Pruefung war damit gruen, ohne zu unterscheiden.
+       Der lange Anflug (zehn Stunden) loest beides zugleich: Der Rest-Anteil wird winzig, und
+       `hinBis` bleibt trotzdem weit genug in der Zukunft, dass der Seitenaufbau ihn nicht
+       ueberholt - sonst maesse der Lauf die Foerderphase und 2f waere eine Kopie von 2a. */
+    const t5 = await karte(browser, { [SAVE_KEY]: stand({
+      zeiten: { startTime: jetzt - 36000000, hinBis: jetzt + 120000,
+                abbauBis: jetzt + 870000, endTime: jetzt + 900000 } }) });
+    const ortV = await markenOrt(t5.page);
+    /* BELEGEN, DASS WIRKLICH DER ANFLUG GEMESSEN WURDE. Ein erster Entwurf setzte `hinBis` nur
+       zwanzig Sekunden voraus - der Seitenaufbau samt Regionssuche brauchte laenger, der Lauf mass
+       also die FOERDERPHASE und 2f war eine Kopie von 2a: gruen auf beiden Staenden, ohne je zu
+       unterscheiden. Die Beschriftung sagt die Phase: „foerdert" steht nur waehrend des Abbaus. */
+    const formV = await messeForm(t5.page);
+    await t5.ctx.close();
+    const imAnflug = !(formV.texte || []).some(t => /fördert/.test(t));
+    check('2f-vorab: der Lauf hat wirklich den ANFLUG gemessen, nicht die Foerderung',
+      imAnflug === true, { texte: (formV.texte || []).filter(t => /Erzzug/.test(t)) });
+    const dVor = (ortV && ortV.ziel) ? Math.hypot(ortV.x - ortV.ziel.x, ortV.y - ortV.ziel.y) : null;
+    check('2f: schon kurz vor der Ankunft steht die Marke am Halteplatz - kein Sprung beim Umschalten',
+      imAnflug === true && dZiel !== null && dVor !== null && Math.abs(dVor - dZiel) < 3,
+      { kurzVorAnkunft: dVor === null ? null : +dVor.toFixed(1),
+        waehrendFoerderung: dZiel === null ? null : +dZiel.toFixed(1),
+        unterschied: (dVor !== null && dZiel !== null) ? +Math.abs(dVor - dZiel).toFixed(1) : null });
+
     check('2e: er bewegt sich und faengt keine Klicks ab',
       str.some(l => l.animiert) && str.every(l => l.zeiger === 'none'),
       { animiert: str.filter(l => l.animiert).length, zeiger: str.map(l => l.zeiger) });

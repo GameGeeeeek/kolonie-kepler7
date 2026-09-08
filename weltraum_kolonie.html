@@ -66647,17 +66647,47 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Rueckweg wird nur beim Rundflug gerechnet", und zwar bevor irgendetwas gelaufen war. */
         const hatStand = !!(art.rundflug && art.warten && m.hinBis && m.abbauBis
                             && m.abbauBis > m.hinBis && m.endTime > m.abbauBis);
+        /* KA-2: DER KONVOI BREMST IN DIE FEUERSTELLUNG, statt zurueckzuspringen.
+           Der erste Entwurf zog den Halteabstand erst im Zeichnen ab - er wirkte damit NUR
+           waehrend der Foerderung. Die Marke flog also bis in die Brockenmitte, sprang bei
+           `hinBis` um rund siebzehn Einheiten zurueck und beim Abflug wieder vor: zwei sichtbare
+           Spruenge. Gefunden hat das die adversarische Durchsicht dieses Entwurfs, nicht der Test.
+           Jetzt wird der GANZE Hinweg um `haltF` gestaucht: Die Flotte erreicht die Mitte nie, der
+           Rueckweg beginnt am selben Punkt, und an keiner Phasengrenze gibt es etwas zu springen.
+           GEMESSEN WIRD AM HEUTIGEN BROCKEN, nicht an `m.groesse`: Die Zeichnung nimmt den
+           aktuellen Platz, und der Nachschub darf dort einen anderen Brocken hinsetzen - ein
+           Abstand aus der eingefrorenen Groesse laege dann neben dem gezeichneten Rand.
+           IST DER BROCKEN LEERGEFOERDERT, liefert `asteroidAn` null (es verlangt `vorrat > 0`, und
+           die Ladung wird beim START entnommen). Dann bleibt alles wie bisher: kein Abstand, kein
+           Strahl. Ein Laser ins Leere BEHAUPTET, dort werde abgebaut; eine Marke im Leeren ist nur
+           ungenau - dieselbe Abwaegung wie in missionMapZiel. */
+        const abbauBrocken = (hatStand && art.bergbau && targetInView)
+          ? asteroidAn(m.system, m.platz) : null;
+        const anflugLang = Math.hypot(targetPos.x - originX, targetPos.y - originY) || 1;
+        /* Der Anteil deckelt den Abstand auf kurzen Strecken - ein Abbauflug bleibt IM System und
+           ist kurz (gemessen rund 60 Einheiten, gegen mehrere hundert bei einer Erkundung). Ohne
+           ihn saesse der Konvoi dort fast auf halbem Weg, also genau dort, wo der alte
+           Halbierungsfehler ihn hatte. Der Boden 0,5 ist eine Leitplanke, kein Mass: Er haelt die
+           Marke auch dann auf der richtigen Seite des Brockens, wenn jemand den Anteil spaeter
+           erhoeht. */
+        const haltAbstand = abbauBrocken
+          ? Math.min(asteroidMarkerR(abbauBrocken.groesse) + 12, anflugLang * 0.28) : 0;
+        const haltF = abbauBrocken ? Math.max(0.5, 1 - haltAbstand / anflugLang) : 1;
         let returning, f2, wartet = false;
         if (hatStand){
           if (now < m.hinBis){
             returning = false;
-            f2 = Math.max(0, Math.min(1, (now - st) / Math.max(1, m.hinBis - st)));
+            f2 = haltF * Math.max(0, Math.min(1, (now - st) / Math.max(1, m.hinBis - st)));
           } else if (now < m.abbauBis){
-            // Am Ziel, foerdernd: Die Marke steht auf dem Vorkommen und wandert nicht.
-            returning = false; f2 = 1; wartet = true;
+            // Am Ziel, foerdernd: Die Marke steht auf ihrem HALTEPLATZ und wandert nicht.
+            returning = false; f2 = haltF; wartet = true;
           } else {
             returning = true;
-            f2 = Math.max(0, Math.min(1, (now - m.abbauBis) / Math.max(1, m.endTime - m.abbauBis)));
+            /* Der Rueckweg laeuft vom ZIEL zum Ursprung (`from` ist dort targetPos). Der
+               Halteplatz liegt `1 - haltF` davon entfernt - dort beginnt er, und mit `haltF`
+               gestaucht endet er wie bisher genau am Ursprung. */
+            const zurueck = Math.max(0, Math.min(1, (now - m.abbauBis) / Math.max(1, m.endTime - m.abbauBis)));
+            f2 = (1 - haltF) + zurueck * haltF;
           }
         } else {
           // Einwegflug (Kolonisierung, Mondlandung, Verlegung): die volle Zeit ist der Hinweg.
@@ -66678,18 +66708,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
            GEMESSEN WIRD ER AN DER MISSION, nicht am Vorkommen: `m.groesse` friert die Groesse beim
            Start ein und ueberlebt damit auch ein Vorkommen, das waehrend des Abbaus neu gewuerfelt
            wurde. */
-        const foerdert = !!(wartet && art.bergbau);
-        const laenge = Math.hypot(toX-fromX, toY-fromY) || 1;
-        /* DER ABSTAND IST GEDECKELT, und der Deckel ist gemessen, nicht gewaehlt: Ein Abbauflug
-           bleibt IM System und ist damit kurz (im Testfixture rund 50 Einheiten, gegen mehrere
-           hundert bei einer Erkundung). Ein fester Abstand von 19 waere dort ein Drittel der
-           ganzen Strecke - der Konvoi saesse fast auf halbem Weg, also genau dort, wo der alte
-           Halbierungsfehler ihn hatte. Der Anteil haelt ihn auf jeder Streckenlaenge dicht am
-           Fels; die feste Zahl haelt ihn bei einer langen Strecke davon ab, im Gestein zu stehen. */
-        const abbauAbstand = foerdert ? Math.min(asteroidMarkerR(m.groesse) + 12, laenge * 0.28) : 0;
-        const zurueck = abbauAbstand / laenge;
-        const shipX = fromX + (toX-fromX)*(f2 - zurueck);
-        const shipY = fromY + (toY-fromY)*(f2 - zurueck);
+        /* Gezeichnet wird der Strahl NUR, wenn wirklich noch ein Brocken dasteht - `abbauBrocken`
+           traegt diese Bedingung schon. */
+        const foerdert = !!(wartet && art.bergbau && abbauBrocken);
+        const shipX = fromX + (toX-fromX)*f2;
+        const shipY = fromY + (toY-fromY)*f2;
         const angle = Math.atan2(toY-fromY, toX-fromX) * 180/Math.PI + 90;
         const color = returning ? art.rueck : art.hin;
         /* DIE BAHN TRAEGT IHREN NAMEN (KB-31, 08.09.2026). `data-kb-bahn` ist keine Kosmetik:
