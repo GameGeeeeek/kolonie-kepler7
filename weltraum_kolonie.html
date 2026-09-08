@@ -65505,10 +65505,39 @@ function sekSternUse(key, x, y, k, unentdeckt){
   }
   // Gemeinsame Trümmerfeld-Info-Funktion (Dashboard-Karten UND Sektorkarte nutzen dieselbe Logik).
   // Gleiche Abbaurate wie collectDebrisWithRecyclers: 8/s pro stationiertem Recycler, sonst kein Abbau.
+  /* KS-8: STEHEN GERADE PIRATEN AN DIESEM FELD? (08.09.2026)
+     Die Piraten-Truemmerraeuber hatten bis hierher KEINE dauerhafte Anzeige ausserhalb der
+     Verteidigungs-Box - nur einen Toast von gut vier Sekunden bei zehn Minuten Frist. Die Karte
+     zeigt das Truemmerfeld laengst; sie muss nur noch sagen, dass jemand daran arbeitet.
+     `state.pirateDebrisRaid` fuehrt hoechstens EINEN Raub gleichzeitig (der Erzeuger kehrt sonst
+     zurueck) - die Abfrage ist deshalb ein Vergleich und keine Suche. */
+  /* Der Puls ist DIESELBE Machart wie der Alarmring am Vorposten und der Schutzfrist-Puls am
+     Schuerfrecht: SMIL, kein eigener Zeitgeber, `pointer-events="none"`. Eine dritte Bauart fuer
+     dieselbe Aussage waere eine dritte Wahrheit. */
+  function truemmerRaubPuls(x, y, r, raub){
+    if (!raub) return '';
+    return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (r*1.6).toFixed(1) + '" fill="none" stroke="#e0a548" stroke-width="1.6" pointer-events="none">'
+      + '<animate attributeName="r" values="' + (r*1.2).toFixed(1) + ';' + (r*2.2).toFixed(1) + ';' + (r*1.2).toFixed(1) + '" dur="1.4s" repeatCount="indefinite"/>'
+      + '<animate attributeName="stroke-opacity" values="0.9;0;0.9" dur="1.4s" repeatCount="indefinite"/></circle>';
+  }
+  function truemmerRaubAn(planetKey){
+    const raid = state.pirateDebrisRaid;
+    if (!raid || raid.planetKey !== planetKey) return null;
+    return ((raid.endTime || 0) > Date.now()) ? raid : null;
+  }
   function debrisInfoText(planetKey){
     const debrisField = state.debrisFields[planetKey];
     const debrisTotal = debrisField ? Object.values(debrisField).reduce((a,b)=>a+b,0) : 0;
     if (!debrisTotal) return null;
+    /* KS-8: Der Raub steht VOR allem anderen im Text - eine Recycler-Restzeit ist neben einer
+       laufenden Pluenderung die falsche erste Auskunft. Er haengt am VORHANDENEN Klickziel; ein
+       zweites antippbares Ding auf denselben Koordinaten ist die meistreparierte Stelle dieser
+       Karte, und diese Anzeige braucht keines. */
+    const raub = truemmerRaubAn(planetKey);
+    const raubText = raub
+      ? 'Piraten plündern dieses Trümmerfeld – noch ' + fmtDuration(Math.max(0, (raub.endTime - Date.now())/1000))
+        + ', dann ziehen sie mit der Beute ab. Abfangen im Verteidigungs-Reiter. '
+      : '';
     const fleet = planetKey==='home' ? state.fleet : (state.colonies[planetKey] ? state.colonies[planetKey].fleet : null);
     const recyclerCount = (fleet && fleet.recycler) || 0;
     const auftrag = (state.recyclerAuftraege||{})[planetKey];
@@ -65519,13 +65548,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const r = recyclerAuftragRest(planetKey);
       const kern = 'Trümmerfeld: '+fmt(debrisTotal)+' – '+recyclerCount+'x Recycler '
         + (r.voll ? 'stationiert, Lager voll – Abbau steht still' : 'stationiert, Abbau in ~'+fmtDuration(r.sek));
-      return kern + (auftrag ? ' · Sammelauftrag von '+planetDisplayName(auftrag.heimat)+', kehren danach selbständig zurück' : '');
+      return raubText + kern + (auftrag ? ' · Sammelauftrag von '+planetDisplayName(auftrag.heimat)+', kehren danach selbständig zurück' : '');
     }
     // Unterwegs ist etwas anderes als "steht niemand bereit" - ohne diese Unterscheidung
     // stuende hier "wird nicht abgebaut", waehrend die Recycler schon im Anflug sind.
     const imAnflug = recyclerUnterwegsZu(planetKey);
-    if (imAnflug > 0) return 'Trümmerfeld: '+fmt(debrisTotal)+' – '+imAnflug+'x Recycler im Anflug';
-    return 'Trümmerfeld: '+fmt(debrisTotal)+' – kein Recycler stationiert, wird nicht abgebaut';
+    if (imAnflug > 0) return raubText + 'Trümmerfeld: '+fmt(debrisTotal)+' – '+imAnflug+'x Recycler im Anflug';
+    return raubText + 'Trümmerfeld: '+fmt(debrisTotal)+' – kein Recycler stationiert, wird nicht abgebaut';
   }
   // Markup-Zwischenspeicher der Systemebene (v8.498.0, Etappe B-2). Der Galaxie-Zwischenspeicher
   // von v8.310.0 sparte nur die GALAXIE - die Systemebene wurde laut ihrem eigenen Kommentar
@@ -66343,7 +66372,10 @@ function sekSternUse(key, x, y, k, unentdeckt){
       }
     }
     if (state.debrisFields.home && Object.keys(state.debrisFields.home).length && activeSystem === myHomeSystem){
-      inner += `<g data-map-debris="home"><circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="6" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>`;
+      /* KS-8: Wird gerade gepluendert, faerbt sich das Zeichen und bekommt einen Puls. Der Text
+         dazu steht im vorhandenen Klickziel (debrisInfoText) - kein zweites antippbares Ding auf
+         denselben Koordinaten, das ist die meistreparierte Stelle dieser Karte. */
+      inner += `<g data-map-debris="home">${truemmerRaubPuls(SUN_X+14, SUN_Y-24, 6, truemmerRaubAn('home'))}<circle cx="${SUN_X+14}" cy="${SUN_Y-24}" r="6" fill="${truemmerRaubAn('home') ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${SUN_X+14}" y="${SUN_Y-21}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn('home') ? '\u2620' : 'T'}</text></g>`;
     }
 
     // Eigene Heimatbasis (nur im eigenen Heimatsystem)
@@ -66466,7 +66498,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           ${tfInProgress ? `<circle cx="${px}" cy="${py}" r="${r+2}" fill="none" stroke="${(PLANET_TYPE_INFO[tfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${tfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[tfState.targetType]||{}).label||''}</title></circle>` : ''}
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
-          ${hasDebris ? `<g data-map-debris="${p.id}"><circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="#c9c7bd" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">T</text></g>` : ''}
+          ${hasDebris ? `<g data-map-debris="${p.id}">${truemmerRaubPuls(pos.x+r+2, pos.y-r-2, 7, truemmerRaubAn(p.id))}<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="${truemmerRaubAn(p.id) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(p.id) ? '\u2620' : 'T'}</text></g>` : ''}
           ${hasMoon ? sysMondbahn(pos.x, pos.y, r+2) + `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_'+p.id ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
