@@ -54,7 +54,11 @@ function backend(store){
     if (p === 'me') return j({ userId:'u', username:'A', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
     if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, unlockedAlienRaces:[], collapsedSystems:{},
       activeWormhole:null, news:[], controlledSystems:{}, factions:{}, alienNester: [] });
-    if (p === 'asteroid/field') return j({ systeme:[SYS], felder:{ [SYS]: { plaetze:{} } } });
+    /* Der Guertel traegt jetzt einen Brocken auf Platz '3' - denselben, auf den die Fixture-Mission
+       zielt. Mit dem leeren `plaetze:{}` von vorher gab es keinen [data-map-asteroid]-Marker, 2a
+       hatte also kein messbares Ziel und meldete `ziel: null`: rot aus dem falschen Grund. */
+    if (p === 'asteroid/field') return j({ systeme:[SYS], felder:{ [SYS]: { plaetze:{
+      '3': { sorte:'eisen', groesse:'brocken', vorrat:90000 } } } } });
     if (p === 'storage-list') return j({ keys: Object.keys(store).filter(k => k.indexOf('__') !== 0) });
     if (p.startsWith('storage/')){
       const k = decodeURIComponent(p.slice(8));
@@ -129,28 +133,33 @@ async function messeFremde(page){
 
 /* Misst die FORM der Marke: Wie viele gezeichnete Ruempfe, welche Groessen, und stehen sie in
    einer Reihe? Der Konvoi hat lauter gleich grosse Bilder, der Keil genau ein grosses. */
+/* Misst die FORM der Marke: wie viele gezeichnete Ruempfe, welche Groessen, und stehen sie in
+   einer Reihe? Der Konvoi hat lauter gleich grosse Bilder, der Keil genau ein grosses.
+   GESCOPT auf `[data-map-flotte]`. Ein Zaehler ueber alle <image> misst die halbe Karte mit -
+   Nester, Vorposten und Wrackkonvois zeichnen ebenfalls Bilder. Genau so ist der erste Entwurf
+   dieser Pruefung gescheitert: 9 Bilder gemessen, davon gehoerten 2 zur Flotte. */
 async function messeForm(page){
   return page.evaluate(() => {
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return { svg:false };
-    const bilder = [...svg.querySelectorAll('image')].filter(i => !i.closest('[data-map-fremdflotte]'));
+    const marke = svg.querySelector('[data-map-flotte]');
+    const bilder = marke ? [...marke.querySelectorAll('image')] : [];
     const groessen = bilder.map(i => Math.round(Number(i.getAttribute('width')))).sort((a,b)=>a-b);
     const versatz = bilder.map(i => Math.round(Number(i.getAttribute('y')) + Number(i.getAttribute('height'))/2));
-    return { svg:true, anzahl: bilder.length, groessen,
+    return { svg:true, art: marke ? marke.getAttribute('data-map-flotte') : null,
+      anzahl: bilder.length, groessen,
       // Eine Reihe liegt auf EINER Achse: alle y-Mitten gleich. Der Keil setzt zwei daneben.
       eineReihe: versatz.length > 1 && new Set(versatz).size === 1,
       verschiedeneGroessen: new Set(groessen).size,
-      linien: svg.querySelectorAll('line').length,
       texte: [...svg.querySelectorAll('text')].map(t => (t.textContent||'').trim()) };
   });
 }
 async function markenOrt(page){
   return page.evaluate(() => {
     const svg = document.getElementById('galaxyMapSvg');
-    const bilder = [...svg.querySelectorAll('image')].filter(i => !i.closest('[data-map-fremdflotte]'));
-    if (!bilder.length) return null;
-    const g = bilder[0].closest('g[transform]');
-    const mt = g && /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute('transform')||'');
+    const g = svg && svg.querySelector('[data-map-flotte]');
+    if (!g) return null;
+    const mt = /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute('transform')||'');
     const ast = document.querySelector('[data-map-asteroid]');
     let ziel = null;
     if (ast){ const b = ast.getBBox(); ziel = { x: b.x + b.width/2, y: b.y + b.height/2 }; }
@@ -196,25 +205,25 @@ async function markenOrt(page){
     const ortB = await markenOrt(t1.page);
     await t1.ctx.close();
 
-    /* Die Kampfflotte fliegt DIESELBE Mission zum selben Ziel - der einzige Unterschied ist die
-       Zusammensetzung. Waere die Form gleich, koennte kein Spieler die beiden unterscheiden. */
-    const t2 = await karte(browser, { [SAVE_KEY]: stand({ comp: { jaeger: 120, cruisers: 20 }, typ: 'attack' }) });
-    const kampf = await messeForm(t2.page);
-    await t2.ctx.close();
-
-    check('1b: sie sieht ANDERS aus als eine Kampfflotte (Reihe gegen Keil)',
-      bergbau.eineReihe === true && kampf.eineReihe === false
-      && bergbau.verschiedeneGroessen === 1 && kampf.verschiedeneGroessen > 1,
-      { bergbau: { reihe: bergbau.eineReihe, groessen: bergbau.groessen },
-        kampf:   { reihe: kampf.eineReihe,   groessen: kampf.groessen } });
-
-    // ---- 1c) Mit Kampfschiffen ist es keine reine Bergbauflotte mehr ------------------------
+    /* Der Vergleich laeuft ueber DIESELBE Mission zum selben Ziel - der einzige Unterschied ist
+       die Zusammensetzung. Waere die Form gleich, koennte kein Spieler die beiden unterscheiden.
+       Ein erster Entwurf verglich gegen eine `attack`-Mission mit derselben targetId; die zielt
+       aber auf einen NPC, den es unter `sys:platz` nicht gibt, also wurde gar nichts gezeichnet
+       und 1b war rot aus dem falschen Grund (gemessen: 0 Bilder). */
     const t3 = await karte(browser, { [SAVE_KEY]: stand({ comp: { frachter: 12, recycler: 6, jaeger: 40 } }) });
     const gemischt = await messeForm(t3.page);
     await t3.ctx.close();
+
+    check('1b: sie sieht ANDERS aus als eine Kampfflotte (Reihe gegen Keil)',
+      bergbau.art === 'bergbau' && gemischt.art === 'kampf'
+      && bergbau.eineReihe === true && gemischt.eineReihe === false
+      && bergbau.verschiedeneGroessen === 1 && gemischt.verschiedeneGroessen > 1,
+      { bergbau: { art: bergbau.art, reihe: bergbau.eineReihe, groessen: bergbau.groessen },
+        kampf:   { art: gemischt.art, reihe: gemischt.eineReihe, groessen: gemischt.groessen } });
+
     check('1c: eine Abbauflotte MIT Kampfschiffen faellt zurueck in die Kampfform',
-      gemischt.eineReihe === false && gemischt.verschiedeneGroessen > 1,
-      { reihe: gemischt.eineReihe, groessen: gemischt.groessen });
+      gemischt.art === 'kampf' && gemischt.eineReihe === false && gemischt.verschiedeneGroessen > 1,
+      { art: gemischt.art, reihe: gemischt.eineReihe, groessen: gemischt.groessen });
 
     // ---- 2) Waehrend der Foerderung steht sie am Vorkommen ----------------------------------
     check('2a: waehrend der Foerderung steht die Marke AM VORKOMMEN, nicht auf halbem Rueckweg',
