@@ -12264,6 +12264,42 @@
       + escapeHtml(teile.join(' · ')) + ' – beim Fall nach Schadensanteil geteilt</div>';
   }
   // Nur lesend, wie asteroidenImSystem: Der Render darf keinen Zustand aendern.
+  /* WIE NAH EIN VOLK AN SEINER KOENIGIN IST (KS-2, 08.09.2026).
+     Der Server laesst sie ab NEST_KOENIGIN_AB Nestern eines Volkes am AELTESTEN schluepfen
+     (server.js: `const NEST_KOENIGIN_AB = 4`, Block bei den Nest-Takten). Bis heute stand diese
+     Regel NUR dort - der Spieler sah die Koenigin erst, wenn sie da war, und dann haelt sie
+     4.000.000 Lebenspunkte. Die Daten liegen laengst im Client: Jede Nest-Nutzlast fuehrt `volk`
+     und `seit`. Kein Backend, kein neuer Abruf.
+     KOPIE-FAMILIE: Die Zahl 4 steht auch in server.js. Wer sie dort aendert, aendert sie hier mit;
+     test_koeniginnen_zaehler haelt die Zusage am gerenderten Bild fest.
+     WAS HIER AUSDRUECKLICH NICHT BEHAUPTET WIRD: dass das Volk ab der Koenigin aufhoert, sich
+     auszubreiten. Der Kommentar im Server sagt das, sein Code nicht - der Ausbreitungsfilter
+     lautet `if (!v || !(v.ausbreitMult > 0) || n.stufe < 3) continue;` und kennt keine Koenigin;
+     Stufe 5 ist groesser als 3, sie wirft weiter (nachgelesen am 08.09.2026). Ein Versprechen,
+     das kein Code einloest, gehoert nicht in die Anzeige. */
+  const NEST_KOENIGIN_AB = 4;
+  function nestSchwarmStand(volk){
+    if (!volk) return null;
+    const eigene = (galaxyCache.alienNester || []).filter(n => n && n.volk === volk);
+    if (!eigene.length) return null;
+    const koenigin = eigene.find(n => (n.stufe||1) >= 5) || null;
+    // Wie der Server: das AELTESTE nach `seit`, nicht das staerkste.
+    const thron = eigene.reduce((a, b) => ((a.seit||0) <= (b.seit||0) ? a : b));
+    return { anzahl: eigene.length, noetig: NEST_KOENIGIN_AB, koenigin, thron,
+             fehlt: Math.max(0, NEST_KOENIGIN_AB - eigene.length) };
+  }
+  function nestSchwarmSatz(volk){
+    const st = nestSchwarmStand(volk);
+    if (!st) return '';
+    const v = nestVolk(volk);
+    const sysName = id => ((STAR_SYSTEMS.find(x => x.id === id) || { name: id }).name);
+    if (st.koenigin) return 'Die Königin der ' + v.name + ' ist bereits geschlüpft (bei '
+      + sysName(st.koenigin.sys) + ').';
+    return v.name + ': ' + st.anzahl + ' von ' + st.noetig + ' Nestern. '
+      + (st.fehlt === 1
+          ? 'Beim nächsten schlüpft die Königin am ältesten – bei ' + sysName(st.thron.sys) + '.'
+          : 'Bei ' + st.noetig + ' schlüpft sie am ältesten – bei ' + sysName(st.thron.sys) + '.');
+  }
   function nesterImSystem(sysId){
     return (galaxyCache.alienNester || []).filter(n => n && n.sys === sysId);
   }
@@ -63367,10 +63403,19 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const koenigin = (stark.stufe||1) >= 5;   // wie im Kartenmenue; NEST_STUFEN[5] ist die Koenigin
         const volk = nestVolk(stark.volk);
         const sd = nestStufeDef(stark.stufe);
+        /* KS-2: Der Zaehler steht am Abzeichen, nicht nur im Menue. Sichtbar wird er aber nur
+           dort, wo er eine Entscheidung traegt - am THRONNEST des Volkes und erst, wenn es eng
+           wird (noch eines fehlt). Sonst traegt ihn allein der Titel: Eine Zweitzeile an jedem
+           Nest waere Zahlenrauschen ueber der halben Karte. */
+        const schwarm = nestSchwarmStand(stark.volk);
+        const thronHier = !!(schwarm && !schwarm.koenigin && schwarm.thron
+                             && nester.some(n => String(n.id) === String(schwarm.thron.id)));
         badges.push({ icon: koenigin ? '👑' : '👾',
           title: volk.name + ' – ' + (sd ? sd.name : 'Nest')
             + (nester.length > 1 ? ' und ' + (nester.length-1) + ' weitere' + (nester.length === 2 ? 's Nest' : ' Nester') : '')
-            + (volk.schwaeche ? ' · Schwäche: ' + nestSchwaecheName(volk.schwaeche) : '') });
+            + (volk.schwaeche ? ' · Schwäche: ' + nestSchwaecheName(volk.schwaeche) : '')
+            + (schwarm ? ' · ' + nestSchwarmSatz(stark.volk) : ''),
+          schwarm: (thronHier && schwarm.fehlt === 1) ? (schwarm.anzahl + '/' + schwarm.noetig) : undefined });
       }
       /* ♻️ Wrackkonvoi - ein wanderndes Beute-Ziel, kein Nest und keine Festung. Der Rumpf-Anteil
          sagt, ob sich der Weg lohnt; der Zusatz "driftet weiter" erklaert, warum man nicht zu lange
@@ -63524,6 +63569,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
         // Bekannte Verteidigungsstaerke direkt unterm 🔎 (KB-5) - wie am Spieler-Marker der
         // Systemebene, Farbe traegt die Verlaesslichkeit.
         if (b.dp !== undefined) abzeichen += '<text data-kb-intel-dp="' + sy.id + '" x="' + (x - 16 - i*14) + '" y="' + (y - 3) + '" text-anchor="middle" style="font-size:7.5px; font-weight:600; fill:' + b.dpFarbe + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:2.5px;"><title>' + b.title + '</title>🛡 ' + fmt(b.dp) + '</text>';
+        /* KS-2: derselbe Platz wie der 🛡-Wert, dieselbe Machart - eine zweite Zeichenart daneben
+           waere eine zweite Wahrheit ueber denselben Punkt. */
+        if (b.schwarm) abzeichen += '<text data-kb-schwarm="' + sy.id + '" x="' + (x - 16 - i*14) + '" y="' + (y - 3) + '" text-anchor="middle" style="font-size:7.5px; font-weight:700; fill:#e0a548; paint-order:stroke; stroke:#0b0e1a; stroke-width:2.5px;"><title>' + b.title + '</title>' + b.schwarm + '</text>';
       });
       /* DIE ZAEHLMARKE steht auf dem letzten Platz und traegt im Titel, WAS sie verdeckt - sonst
          waere sie eine Auskunft, die selbst keine ist. */
@@ -67500,6 +67548,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
       + (v.schwaeche ? `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Wirksam dagegen: <strong>${escapeHtml(nestSchwaecheName(v.schwaeche))}</strong> im Verband</div>` : '')
       + (v.art ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> ${escapeHtml(v.art.charAt(0).toUpperCase() + v.art.slice(1))}.</div>` : '')
       + reifText
+      /* KS-2: Die einzige Bedrohung im Spiel, die man vorher SIEHT und verhindern kann. Sie steht
+         hier und nicht nur im Titel des Abzeichens: Auf dem Handy gibt es keinen Tooltip. */
+      + (nestSchwarmSatz(nest.volk) ? '<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> ' + escapeHtml(nestSchwarmSatz(nest.volk)) + '</div>' : '')
       + (v.wandert ? '<div class="bmeta"><i class="ti ti-arrows-shuffle" aria-hidden="true"></i> Dieses Nest <strong>wandert</strong> – ein Verband, der zu spät kommt, findet nichts mehr vor und kehrt unversehrt zurück.</div>' : ''));
   }
   /* Das Konvoi-Kartenmenue - das Gegenstueck zu nestMapMenu, nur schlanker: OHNE Volk, OHNE
