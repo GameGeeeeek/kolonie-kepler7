@@ -25276,11 +25276,27 @@
   function abandonColony(planetKey){
     if (planetKey === 'home'){ log('Die Heimatbasis kann nicht aufgegeben werden.', 'ti-alert-triangle'); return; }
     if (!state.colonies[planetKey]){ log('Keine Kolonie zum Aufgeben ausgewählt.', 'ti-alert-triangle'); return; }
-    const fleetHere = state.colonies[planetKey].fleet;
-    if (fleetHere && (fleetHere.missions||[]).length > 0){ log('Diese Kolonie hat noch Missionen unterwegs - erst zurückkehren lassen, bevor sie aufgegeben werden kann.', 'ti-alert-triangle'); return; }
+    /* DER RIEGEL GILT AUCH FUER DEN MOND (Befund P1 der Durchsicht an PR #613, bestaetigt am
+       Code). Er prueft die Missionen der Kolonie - loescht aber unmittelbar darunter den
+       zugehoerigen Mond MIT, ohne dessen Missionen anzusehen. Eine Mission auf der Mondflotte war
+       damit still weg, samt allem, was sie mitfuehrt.
+       DAS LOCH IST AELTER ALS VP-1: Jede von einem Mond gestartete Mission konnte so verschwinden.
+       Der Transportverband macht es nur leichter erreichbar, weil er sich an den GERADE aktiven
+       Standort haengt - der Spieler waehlt ihn dafuer nicht bewusst aus.
+       Der Mond wird deshalb vor dem Riegel bestimmt, nicht danach. */
     const alreadyMoon = isMoonKey(planetKey);
     const moonKey = 'moon_'+planetKey;
     const hasColonizedMoon = !alreadyMoon && !!state.colonies[moonKey];
+    const fleetHere = state.colonies[planetKey].fleet;
+    const fleetMoon = hasColonizedMoon ? state.colonies[moonKey].fleet : null;
+    const missionenHier = (fleetHere && (fleetHere.missions||[]).length) || 0;
+    const missionenMond = (fleetMoon && (fleetMoon.missions||[]).length) || 0;
+    if (missionenHier > 0 || missionenMond > 0){
+      log(missionenHier > 0
+          ? 'Diese Kolonie hat noch Missionen unterwegs - erst zurückkehren lassen, bevor sie aufgegeben werden kann.'
+          : 'Der zugehörige Mond (' + planetDisplayName(moonKey) + ') hat noch Missionen unterwegs - er ginge beim Aufgeben mit verloren. Erst zurückkehren lassen.',
+        'ti-alert-triangle'); return;
+    }
     const displayName = planetDisplayName(planetKey);
     const warnMoon = hasColonizedMoon ? ' Der zugehörige Mond ('+planetDisplayName(moonKey)+') geht dabei ebenfalls verloren.' : '';
     if (!confirm('Kolonie '+displayName+' wirklich aufgeben? Alle dortigen Gebäude und die stationierte Flotte gehen unwiderruflich verloren.'+warnMoon+' Der Planet bleibt entdeckt und kann später erneut kolonisiert werden.')) return;

@@ -32,7 +32,7 @@ const ICH = 'u-ich';
 const SYS = 'vega';
 const now = Date.now();
 const GEGENPROBE = process.env.KEPLER_FRACHT_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'], standort: ['2d'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'], standort: ['2d'], mond: ['2e'] };
 
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp: 20000*s, verteidigung: 2500*s,
   garnisonMax: 300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
@@ -68,9 +68,14 @@ function spielstand(opt){
     fleet:{ jaeger:80, cruisers:12, spaeher:20, frachter:10, missions: missionen },
     /* `aufKolonie` stellt den AKTIVEN Standort auf eine Kolonie, waehrend der Verband an der
        Heimatflotte haengt - der Fall aus der Durchsicht an PR #613. */
-    colonies: opt.aufKolonie ? { [KOLONIE]: { fleet:{ cruisers: 0, missions: [] }, buildings:{}, resources:{} } } : {},
-    discovered: opt.aufKolonie ? { [KOLONIE]: true } : {},
-    activeBasePlanet: opt.aufKolonie ? KOLONIE : 'home', player:{ id:ICH, name:'Ich' },
+    /* `mondMitMission` stellt den Fall des P1-Befunds her: Kolonie ohne Missionen, ihr MOND mit
+       einer - und der Mond geht beim Aufgeben der Kolonie mit verloren. */
+    colonies: opt.mondMitMission
+      ? { [KOLONIE]: { fleet:{ cruisers: 0, missions: [] }, buildings:{}, resources:{} },
+          ['moon_' + KOLONIE]: { fleet:{ cruisers: 0, missions: [ Object.assign({}, angekommenSpaet) ] }, buildings:{}, resources:{} } }
+      : (opt.aufKolonie ? { [KOLONIE]: { fleet:{ cruisers: 0, missions: [] }, buildings:{}, resources:{} } } : {}),
+    discovered: (opt.aufKolonie || opt.mondMitMission) ? { [KOLONIE]: true, ['moon_' + KOLONIE]: true } : {},
+    activeBasePlanet: (opt.aufKolonie || opt.mondMitMission) ? KOLONIE : 'home', player:{ id:ICH, name:'Ich' },
     xp:9e5, credits:5e5, buffs:[], lastTick: now, colonyNames:{}, modules:{}, shipModules:{},
     nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5, weeklySystemsSeen:14,
     schubGesehen:true, lastSeenReportTime: now });
@@ -158,6 +163,11 @@ async function stand(l){
   return { save: sv, logs };
 }
 
+/* Eine Mission, die noch LANGE unterwegs ist - sie soll beim Aufgeben im Weg stehen, nicht
+   waehrend des Tests ankommen. */
+const angekommenSpaet = { id: 4712, type:'vorposten-fracht', targetId: SYS, system: SYS,
+  startTime: now, endTime: now + 9e6, fleetName:'Transportverband',
+  fracht: { type:'vorposten-lager', system: SYS, name:'Sternenwerft', erz: 3000 } };
 const BELOHNUNG = { type:'vorposten-lager', system: SYS, name:'Sternenwerft',
                     erz: 5000, kristalle: 2000, deuterium: 500 };
 /* Eine ECHTE Kolonie-Kennung aus der Spieldatei, keine erfundene: Ein unbekannter Schluessel
@@ -216,6 +226,30 @@ const KOLONIE = (fsF.readFileSync(SPIELDATEI, 'utf8').match(/\{ id:'(\w+)',[^\n]
       aufKolonie: sd.save && ((sd.save.colonies[KOLONIE]||{}).fleet||{}).cruisers,
       logs: sd.logs.filter(t => /Transportverband/.test(t)) });
   await d2.ctx.close();
+
+  /* 2e: DIE FRACHT DARF NICHT MIT DER KOLONIE VERSCHWINDEN. Befund P1 der zweiten Durchsicht an
+     PR #613: `abandonColony` prueft die Missionen der KOLONIE, loescht aber den zugehoerigen Mond
+     mit - ohne dessen Missionen anzusehen. Das Loch ist aelter als VP-1 (jede von einem Mond
+     gestartete Mission traf es), der Transportverband macht es nur leichter erreichbar.
+     Gemessen wird ueber den echten Knopf, nicht am Quelltext: `confirm` wird auf „ja" gestellt,
+     damit ein fehlender Riegel WIRKLICH loeschen wuerde - sonst waere die Pruefung aus dem
+     falschen Grund gruen. */
+  const e2 = await lauf(browser, { mondMitMission: true });
+  await e2.page.evaluate(() => { window.confirm = () => true; });
+  await e2.page.evaluate(() => { const b = document.getElementById('colonyAbandonBtn'); if (b) b.click(); });
+  await e2.page.waitForTimeout(900);
+  const nachAufgabe = await e2.page.evaluate((k) => ({
+    kolonieDa: !!document.querySelector('#colonyAbandonBtn'),
+    knopfDa: !!document.getElementById('colonyAbandonBtn'),
+    logs: (window.__logs || []).slice(-4)
+  }), KOLONIE);
+  const se = await stand(e2);
+  merke('2e: der Mond mit unterwegs befindlicher Fracht verhindert das Aufgeben der Kolonie',
+    !!se.save && !!se.save.colonies && !!se.save.colonies['moon_' + KOLONIE]
+    && (((se.save.colonies['moon_' + KOLONIE] || {}).fleet || {}).missions || []).some(m => m && m.id === 4712),
+    { kolonienNachher: se.save && Object.keys(se.save.colonies || {}),
+      logs: nachAufgabe.logs });
+  await e2.ctx.close();
 
   merke('2c: die angekommene Mission belegt keinen Slot mehr',
     !!sb.save && !((sb.save.fleet.missions||[]).some(m => m && m.id === 4711)),
