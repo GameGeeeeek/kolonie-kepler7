@@ -66381,8 +66381,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const shipY = fromY + (toY-fromY)*f2;
         const angle = Math.atan2(toY-fromY, toX-fromX) * 180/Math.PI + 90;
         const color = returning ? art.rueck : art.hin;
+        /* DIE BAHN TRAEGT IHREN NAMEN (KB-31, 08.09.2026). `data-kb-bahn` ist keine Kosmetik:
+           Drei Waechter suchten die Flugbahn bisher ueber "Strichstaerke 1.5 und kein
+           stroke-dasharray" und nahmen davon die ERSTE. Dieselbe Signatur haben aber zwei Linien
+           der Vorposten-Silhouette - der Peilstrahl des Tiefenhorchens und der Mast zum Sprungtor
+           (beide in vorpostenProjektTeile) -, und die haengen VOR den Routen im Markup. Sobald ein
+           Vorposten im gezeigten System steht, hat der Waechter also den Mast gemessen statt der
+           Bahn. Aufgefallen ist es nie, weil kein Fixture dieser drei einen Vorposten setzt: ein
+           Fehler, der auf seine Gelegenheit wartete.
+           Der WERT ist die Missionsart, nicht die Id - so kann eine Pruefung auch fragen, WELCHE
+           Bahn sie misst, ohne die laufende Nummer zu kennen. */
         inner += `
-          <line x1="${originX.toFixed(1)}" y1="${originY.toFixed(1)}" x2="${targetPos.x.toFixed(1)}" y2="${targetPos.y.toFixed(1)}" stroke="${color}" stroke-opacity="0.5" stroke-width="1.5"/>
+          <line data-kb-bahn="${m.type}" x1="${originX.toFixed(1)}" y1="${originY.toFixed(1)}" x2="${targetPos.x.toFixed(1)}" y2="${targetPos.y.toFixed(1)}" stroke="${color}" stroke-opacity="0.5" stroke-width="1.5"/>
           ${flottenMarke(m, shipX, shipY, angle, color, art.bergbau)}
           <text class="planet-label" pointer-events="none" x="${shipX.toFixed(1)}" y="${(shipY-14).toFixed(1)}" text-anchor="middle" style="fill:${color};">${flottenBeschriftung(m, art, returning, wartet)}</text>
         `;
