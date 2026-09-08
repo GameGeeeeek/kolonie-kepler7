@@ -65631,7 +65631,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
       `;
     }
     const now = Date.now();
-    for (const { planet: originKey, fleet } of allFleetsWithPlanet()){
+    /* DER ROUTEN-SCHALTER GILT AUCH HIER (08.09.2026). Bis dahin deckelte `karteEbeneAn('routen')`
+       nur die systemuebergreifenden Linien in buildGalaxyMap - und ausgerechnet der Knopf dafuer
+       wird NUR auf der Systemebene eingeblendet (in der Sektoransicht ist er ausgeblendet).
+       GEMESSEN: System geoeffnet, Knopf gedrueckt, Zustand springt von `active` auf inaktiv, und
+       im Bild aendert sich nichts - 17 Bilder, 7 Pfade, 14 Texte vorher wie nachher. Der Schalter
+       war also genau dort wirkungslos, wo man ihn ueberhaupt zu sehen bekam.
+       Mitgedeckelt wird alles, was an einer eigenen Mission haengt: die Bahn, die Flottenmarke und
+       das Gefecht am Ziel. Wer die Routen ausblendet, will die Karte ohne den eigenen Verkehr
+       sehen - eine Flotte ohne ihre Linie waere ein halber Schalter. */
+    if (karteEbeneAn('routen')) for (const { planet: originKey, fleet } of allFleetsWithPlanet()){
       for (const m of fleet.missions.filter(mm=>MISSION_LINIEN[mm.type])){
         const art = MISSION_LINIEN[m.type];
         const ziel = missionMapZiel(m);
@@ -65696,7 +65705,10 @@ function sekSternUse(key, x, y, k, unentdeckt){
        meint.
        GESTRICHELT UND IN SENSOR-VIOLETT, damit man sie ohne Legende von den eigenen
        unterscheidet, und blasser - es ist Aufklaerung, keine Gewissheit. */
-    for (const f of ((abhorchCache && abhorchCache.detected) || [])){
+    /* Fremde Bewegungen sind AUFKLAERUNG und haengen deshalb an diesem Schalter, nicht an
+       `routen` - der Knopftext nennt ausdruecklich "Spähberichte, Peilungen". Wer die eigenen
+       Routen ausblendet, will trotzdem sehen, wer auf ihn zufliegt. */
+    if (karteEbeneAn('aufklaerung')) for (const f of ((abhorchCache && abhorchCache.detected) || [])){
       const rein = f.destSystem === activeSystem, raus = f.originSystem === activeSystem;
       if (!rein && !raus) continue;
       if (!f.endTime || f.endTime <= now) continue;
@@ -65747,7 +65759,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
        ALLES TRAEGT pointer-events="none": Das Gefecht liegt ueber den Markern seines Ziels, und
        ein Zierstrich darf dem Nest oder der Festung den Tipp nicht abnehmen - dieselbe Regel,
        an der GR-11 gemessen wurde. */
-    for (const k of kampfLaufende()){
+    if (karteEbeneAn('routen')) for (const k of kampfLaufende()){
       const kz = missionMapZiel(k.m);
       if (!kz || kz.system !== activeSystem || !kz.pos) continue;
       const zx = kz.pos.x, zy = kz.pos.y;
