@@ -44,8 +44,23 @@ check('der alte Einzelfilter auf explore ist weg',
 // Einwegflüge dürfen nicht auf halber Strecke umkehren.
 check('die Tabelle unterscheidet Rundflug und Einwegflug',
   /rundflug:true/.test(tab) && /rundflug:false/.test(tab));
+/* ZWEI STELLEN seit KB-24 (08.09.2026), und die Pruefung nennt beide. Der Zeichner kennt seit
+   der Abbaumission einen dritten Zustand - die Flotte STEHT am Vorkommen und foerdert -, und die
+   Rechnung dafuer laeuft in einem eigenen Zweig. Die Regel dieser Pruefung gilt unveraendert: Ein
+   Rueckweg wird NUR beim Rundflug gerechnet. Sie muss ihn deshalb an beiden Stellen sehen.
+   Diese Pruefung hat sich sofort bezahlt gemacht: Der erste Entwurf des dritten Zustands fragte
+   nur `art.warten` ab. Ein Einwegflug mit Standzeit haette damit einen Rueckweg bekommen, den es
+   nicht gibt - gefunden, bevor der erste Browser startete.
+   Die zweite Haelfte steht bewusst unter `!hatDreiPhasen ||`: Die Regel lautet „WO es den dritten
+   Zustand gibt, ist er gedeckelt", nicht „es muss ihn geben". Ein Bestandstest, der die Existenz
+   einer Erweiterung verlangt, ist an jedem aelteren Stand rot - und damit als Aussage wertlos. */
+const hatDreiPhasen = /const hatStand = /.test(src);
 check('der Rückweg wird nur beim Rundflug gerechnet',
-  src.includes('const returning = art.rundflug && frac >= 0.5;'));
+  /returning = art\.rundflug && frac >= 0\.5;/.test(src)
+  && (!hatDreiPhasen || /const hatStand = !!\(art\.rundflug && art\.warten/.test(src)),
+  { zweiphasig: /returning = art\.rundflug && frac >= 0\.5;/.test(src),
+    dreiphasigVorhanden: hatDreiPhasen,
+    dreiphasigGedeckelt: /const hatStand = !!\(art\.rundflug && art\.warten/.test(src) });
 
 // ---- Verhalten: je eine laufende Mission pro Art ------------------------------------------------
 // Ziele aus der ECHTEN Spieldatei ziehen - eine erfundene targetId wäre kein Test.

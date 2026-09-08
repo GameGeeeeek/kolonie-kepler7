@@ -128,6 +128,10 @@ async function lauf(browser, vp){
        Bau, Abbau). Das alte BODENLAGER trug keines - es war nur eine Ansammlung von Polygonen und
        Linien. Gezaehlt wird deshalb, was OHNE solches Merkmal gezeichnet wird; das ist die Regel,
        die 1b eigentlich meint, und sie bleibt richtig, wenn die Station neue Teile bekommt. */
+    /* `[data-vp-garnison]` ist am 08.09.2026 entfallen (die fuenf Dreiecke unter der Station).
+       Der Selektor bleibt in dieser Liste stehen und kostet nichts: Er trifft nichts mehr, und
+       sollte die Anzeige je zurueckkehren, zaehlt sie sofort wieder als markiertes Teil statt die
+       1b-Zaehlung zu verfaelschen. */
     const MARKEN = '[data-vp-bild],[data-vp-modul],[data-vp-projekt],[data-vp-garnison],[data-vp-schaden],[data-vp-bau],[data-vp-abbau],[data-vp-verlauf]';
     const ohneMarke = [...n.querySelectorAll('polygon')].filter(el => !el.closest(MARKEN)).length;
     return { da:true, html: n.innerHTML, ohneMarke, hofR: hof ? Number(hof) : 0, breite: b ? b.width : 0, hoehe: b ? b.height : 0,
