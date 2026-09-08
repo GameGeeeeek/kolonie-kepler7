@@ -11773,6 +11773,22 @@
     return Math.max(1 - deckel, 1 - f);
   }
   function vorpostenFlug(sysId, sek){ return sek * vorpostenFlugMult(sysId); }
+  /* STAND EIN NUTZBARES TOR, ALS DIE MISSION STARTETE? (KB-30, Befund der Durchsicht an PR #611.)
+     Die Flugzeit wird beim Start EINGEFROREN (`endTime`), die Flugbahn las bisher den HEUTIGEN
+     Torzustand. Wird ein Tor waehrend eines Fluges fertig, zeichnete die Bahn eine Passage, die
+     die Flugzeit gar nicht hat - das Tor verkuerzt wirklich (`wirkung: { flug: 0.20,
+     flugDeckel: 0.75 }` in VP_PROJEKT_DEFS des Servers, gemessen), also war das eine Aussage
+     ueber die Strecke, die der Rechnung widersprach.
+     Die Bedingung ist WORTGLEICH die von vorpostenSprungtorXY - dort entscheidet sie ueber die
+     Zeichnung des Tores, hier ueber seine Nutzung. Wer die eine aendert, aendert die andere mit.
+     WARUM NICHT AUS DEN DATEN ABGELEITET: Der Server schickt nur die SCHLUESSEL der fertigen
+     Projekte (`vpProjekteFertig` bildet auf `p.key` ab), keinen Fertigstellungszeitpunkt. Die
+     Bahn kann also nicht selbst nachrechnen, ob das Tor beim Start schon stand. */
+  function vorpostenTorAn(sysId){
+    if (!sysId) return false;
+    return vorpostenImSystem(sysId).some(v => vorpostenDarfMitwirken(v)
+      && Array.isArray(v.projekte) && v.projekte.indexOf('sprungtor') >= 0);
+  }
   // Der Produktions-Kanal: Summe der prod-Anteile aller eigenen Vorposten, gedeckelt.
   function vorpostenProdBonus(){
     let sum = 0;
@@ -13911,7 +13927,7 @@
     const jetzt = Date.now();
     const fleetName = resolveFleetName();
     cf.missions.push({
-      id: nextMissionId(), type:'vorposten-bau', targetId: sysId, system: sysId,
+      id: nextMissionId(), type:'vorposten-bau', targetId: sysId, system: sysId, tor: vorpostenTorAn(sysId),
       startTime: jetzt, endTime: jetzt + flug*1000, fleetName, composition: { colonyShips: 1 },
       kosten: Object.assign({}, VORPOSTEN_BAUKOSTEN)
     });
@@ -30411,7 +30427,7 @@
     pay(totalCost);
     cf.colonyShips -= 1;
     const fleetName = resolveFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'colonize', targetId: planetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName });
+    cf.missions.push({ id: nextMissionId(), type:'colonize', targetId: planetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName, tor: vorpostenTorAn(planet.system) });
     trackEvent('colonize_started');
     log(fleetName+': Kolonieschiff unterwegs nach '+planet.name+' (~'+Math.round(dur)+'s Flugzeit). Treibstoff verbraucht: '+fuelCostText(fuel)+'.', 'ti-planet');
     render(); save();
@@ -31269,7 +31285,7 @@ function vorpostenFrachtStarten(r){
      nichts, worauf sie sich stuetzen koennte. `fracht` traegt die ganze Belohnung, damit
      vorpostenFrachtBuchen bei der Ankunft dieselbe Form vorfindet wie hier. */
   cf.missions.push({
-    id: nextMissionId(), type:'vorposten-fracht', targetId: r.system, system: r.system,
+    id: nextMissionId(), type:'vorposten-fracht', targetId: r.system, system: r.system, tor: vorpostenTorAn(r.system),
     startTime: jetzt, endTime: jetzt + Math.max(1, flug) * 1000,
     fleetName: 'Transportverband', fracht: r
   });
@@ -66331,7 +66347,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
            die Flotte verschwindet also im Tor, durch das sie kam.
            NUR wenn das Ziel im Blick liegt: Fliegt die Flotte aus dem gezeigten System HINAUS,
            liegt das Tor, das ihr die Zeit spart, im Zielsystem und nicht hier. */
-        const durchsTor = !originInView && targetInView && art.sprungtor && sprungtorPos;
+        /* WAS BEIM START GALT, NICHT WAS JETZT GILT (KB-30, Befund der Durchsicht an PR #611).
+           `endTime` friert die Flugzeit beim Start ein; gelesen wurde hier bisher der HEUTIGE
+           Torzustand. Wird ein Tor waehrend eines Fluges fertig, zeichnete die Bahn eine
+           Passage, die die Flugzeit gar nicht hat - und das Tor verkuerzt wirklich
+           (`flug: 0.20`, Deckel von 0,5 auf 0,75, gemessen in VP_PROJEKT_DEFS des Servers).
+           Die Marke `m.tor` setzen alle SIEBEN Missionserzeuger der fuenf Torarten - fuenf Arten,
+           sieben Stellen, weil die Erkundung drei hat (von Hand, Auto-Erkunder hin, Auto-Erkunder
+           zurueck). Die Zahl haelt test_sprungtor_route 4c fest, und zwar durch Zaehlen der
+           Aufrufe im Quelltext. Deshalb steht der gezaehlte Ausdruck hier ABSICHTLICH NICHT
+           woertlich: Ein Kommentar, der sein eigenes Suchmuster zitiert, zaehlt sich mit. Genau
+           das ist beim ersten Lauf passiert - gemessen 8 statt 7.
+           `undefined` heisst: aus einem Spielstand von VOR dieser Version. Solche Missionen
+           behalten das alte Verhalten - eine erfundene Marke waere schlechter als die alte
+           Ungenauigkeit, und die Missionen laufen ohnehin binnen Stunden aus.
+           DEN UMGEKEHRTEN FALL kann der Client nicht heilen: Faellt der Vorposten waehrend des
+           Fluges, ist `sprungtorPos` null und die Bahn beginnt wieder am Sonnenrand, obwohl die
+           Flugzeit den Rabatt noch traegt. Ein Tor zu zeichnen, das nicht mehr steht, waere die
+           schlechtere der beiden Ungenauigkeiten. */
+        const torDamals = (m.tor === undefined) ? true : !!m.tor;
+        const durchsTor = !originInView && targetInView && art.sprungtor && sprungtorPos && torDamals;
         if (durchsTor){ originX = sprungtorPos.x; originY = sprungtorPos.y; }
         else if (!originInView){ originX = SUN_X; originY = SUN_Y; }
         else if (originKey === 'home'){ originX = homeMarkerPos.x; originY = homeMarkerPos.y; }
@@ -66841,7 +66876,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (!canAfford({deuterium: fuelCost})) return false; // nächster Tick versucht es automatisch erneut
     pay({deuterium: fuelCost});
     tour.lastLegDuration = dur;
-    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourLeg:true });
+    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourLeg:true, tor: vorpostenTorAn(planet.system) });
     render(); save();
     return true;
   }
@@ -66856,7 +66891,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const fuelCost = missionFuelCost(dur, 1);
     if (!canAfford({deuterium: fuelCost})) return false;
     pay({deuterium: fuelCost});
-    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId: tour.originPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourReturn:true });
+    /* Der Rueckweg fliegt zum URSPRUNG, nicht zum zuletzt erkundeten Ziel - das Tor, das hier
+       zaehlt, steht also im System des Ursprungsplaneten. */
+    fleet.missions.push({ id: nextMissionId(), type:'explore', targetId: tour.originPlanet, startTime: Date.now(), endTime: Date.now()+dur*1000, fleetName:'Auto-Erkunder', composition:{ships:1}, tourReturn:true, tor: vorpostenTorAn((PLANETS.find(pl => pl.id === tour.originPlanet) || {}).system) });
     render(); save();
     return true;
   }
@@ -66951,7 +66988,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (fleetLimitBlocks()) return;
     pay({deuterium: fuelCost});
     const fleetName = nextFleetName();
-    cf.missions.push({ id: nextMissionId(), type:'explore', targetId: planetId, startTime: Date.now(), endTime: Date.now() + dur*1000, fleetName, composition:{ships:1} });
+    cf.missions.push({ id: nextMissionId(), type:'explore', targetId: planetId, startTime: Date.now(), endTime: Date.now() + dur*1000, fleetName, composition:{ships:1}, tor: vorpostenTorAn(planet.system) });
     log(fleetName+' von '+planetDisplayName(state.activeBasePlanet)+' Richtung '+planet.name+' gestartet. Treibstoff verbraucht: '+fuelCost+' Deuterium.', 'ti-rocket');
     render(); save();
   }
@@ -67305,7 +67342,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     cf.missions.push({
       id: nextMissionId(), type:'mining', targetId: sysId + ':' + platz,
       // platz NICHT in eine Zahl wandeln: Peilungen tragen eine ID wie 'p3' (+'p3' waere NaN).
-      system: sysId, platz: platz, sorte: a.sorte, groesse: a.groesse, peilung: !!a.peilung,
+      system: sysId, platz: platz, sorte: a.sorte, groesse: a.groesse, peilung: !!a.peilung, tor: vorpostenTorAn(sysId),
       startTime: jetzt,
       hinBis: jetzt + (plan.flug/2)*1000,
       abbauBis: jetzt + (plan.flug/2 + plan.abbau)*1000,

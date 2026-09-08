@@ -82,7 +82,7 @@ function doc(over){
    erfundene targetId findet missionMapZiel nicht, es gaebe keine Bahn, und der Test waere still
    leer statt rot. */
 const ZIELPLANET = (fs2.readFileSync(SPIELDATEI, 'utf8').match(/\{ id:'(\w+)',[^\n]*system:'vega'/) || [])[1];
-function spielstand(lagerStufe, wenigVorrat){
+function spielstand(lagerStufe, wenigVorrat, torMarke){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
   return JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true, seenTabHints:g, activeEvent:{ key:'__testruhe__', bis: now+9e8 },
     /* `wenigVorrat` startet weit UNTER dem Lagerdeckel. Ohne das ist ein Zugang gar nicht messbar:
@@ -96,18 +96,22 @@ function spielstand(lagerStufe, wenigVorrat){
          Systems - genau der Fall, in dem bisher die Sonne als Platzhalter stand. Der Zielplanet
          wird aus der Spieldatei GELESEN, nicht erfunden (eine erfundene targetId liefert kein
          Ziel und damit gar keine Bahn - der Test waere still leer). */
-      { id: 9001, type:'explore', targetId: ZIELPLANET, fleetName:'Kundschafter',
-        startTime: now - 60000, endTime: now + 600000, composition:{ spaeher: 4 } } ] },
+      /* `torMarke` ist die eingefrorene Auskunft „stand beim Start ein Tor?" (KB-30). undefined
+         heisst: aus einem Spielstand von VOR KB-30 - dann gilt das alte Verhalten, und genau das
+         messen 1a bis 1c weiterhin. Gruppe 4 setzt sie ausdruecklich. */
+      Object.assign({ id: 9001, type:'explore', targetId: ZIELPLANET, fleetName:'Kundschafter',
+        startTime: now - 60000, endTime: now + 600000, composition:{ spaeher: 4 } },
+        torMarke === undefined ? {} : { tor: torMarke }) ] },
     colonies:{}, discovered:{}, activeBasePlanet:'home', player:{ id:ICH, name:'Ich' }, xp:9e5, credits:5e5, buffs:[],
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
 }
-async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
+async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, torMarke){
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   let belohnungRaus = false;
-  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand(lagerStufe, wenigVorrat) };
+  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand(lagerStufe, wenigVorrat, torMarke) };
   await page.route('**/api/**', async r => {
     const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
@@ -258,7 +262,7 @@ const SAB = process.env.KEPLER_TOR_GEGENPROBE || '';
      ring = vor KB-27 (4cdf423): Bahn schon durch das Tor, Tor noch flach     -> 3a, 3b fallen.
      hoch = vor KB-32 (d525800): Tor aufrecht, aber der Entflechter kennt nur das erste Bild der
             Gruppe -> die Beschriftung liegt auf dem Tor, 3d faellt. */
-const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'], hoch: ['3d'] };
+const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'], hoch: ['3d'], marke: ['4a', '4c'] };
 const ergebnis = {};
 const check2 = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
@@ -384,6 +388,40 @@ const SONNE = (() => {
       !!b.bahn && !b.tor && abst(b.bahn, SONNE) < 3,
       { zurSonne: b.bahn ? +abst(b.bahn, SONNE).toFixed(1) : null, tor: b.tor });
     await ohne.ctx.close();
+
+    /* ---- 4) KB-30: WAS BEIM START GALT, NICHT WAS JETZT GILT --------------------------------
+       Befund der Durchsicht an PR #611, bestaetigt: `endTime` friert die Flugzeit beim Start ein,
+       die Bahn las den HEUTIGEN Torzustand. Wird ein Tor waehrend eines Fluges fertig, zeichnete
+       die Bahn eine Passage, die die Flugzeit gar nicht hat - und das Tor verkuerzt wirklich
+       (`wirkung: { flug: 0.20, flugDeckel: 0.75 }` in VP_PROJEKT_DEFS des Servers).
+       BEIDE LAEUFE HABEN DAS TOR IM BILD und unterscheiden sich NUR in der Marke der Mission.
+       Das ist der Kern: Ohne 4b waere 4a auch dann gruen, wenn die Bahn nie mehr durch ein Tor
+       ginge; ohne 4a waere 4b auch dann gruen, wenn die Marke gar nicht gelesen wuerde. */
+    const spaet = await lauf(browser, doc({ projekte:['sprungtor'] }), null, undefined, undefined, false);
+    const c = await bahnStart(spaet.page, '#378add');
+    check2('4a: eine Mission, die VOR dem Tor startete, beginnt an der Sonne - obwohl das Tor jetzt steht',
+      !!c.bahn && !!c.tor && abst(c.bahn, SONNE) < 3 && abst(c.bahn, c.tor) > 12,
+      { torGezeichnet: !!c.tor, zurSonne: c.bahn ? +abst(c.bahn, SONNE).toFixed(1) : null,
+        zumTor: (c.bahn && c.tor) ? +abst(c.bahn, c.tor).toFixed(1) : null });
+    await spaet.ctx.close();
+
+    const frueh = await lauf(browser, doc({ projekte:['sprungtor'] }), null, undefined, undefined, true);
+    const d = await bahnStart(frueh.page, '#378add');
+    check2('4b: eine Mission, die MIT Tor startete, beginnt am Tor',
+      !!d.bahn && !!d.tor && abst(d.bahn, d.tor) < 3 && abst(d.bahn, SONNE) > 12,
+      { zumTor: (d.bahn && d.tor) ? +abst(d.bahn, d.tor).toFixed(1) : null,
+        zurSonne: d.bahn ? +abst(d.bahn, SONNE).toFixed(1) : null });
+    await frueh.ctx.close();
+
+    /* 4c: DIE ZWEITE KOPIE-FAMILIE. 2a haelt fest, WELCHE Arten durch ein Tor fliegen; 4c haelt
+       fest, dass auch jede Stelle, die so eine Mission ERZEUGT, die Marke setzt. Ohne sie faellt
+       eine neue Missionsart still auf das alte Verhalten zurueck - und zwar unauffaellig, weil
+       `undefined` absichtlich der Rueckfall ist. Die Zahl ist GEMESSEN (08.09.2026): sieben
+       Erzeuger fuer fuenf Arten, weil die Erkundung drei hat (von Hand, Auto-Erkunder hin,
+       Auto-Erkunder zurueck). */
+    const erzeuger = (quelle.match(/tor: vorpostenTorAn\(/g) || []).length;
+    check2('4c: alle sieben Missionserzeuger der Tor-Arten setzen die Marke',
+      erzeuger === 7, { gemessen: erzeuger, erwartet: 7 });
   } finally {
     await browser.close();
   }
