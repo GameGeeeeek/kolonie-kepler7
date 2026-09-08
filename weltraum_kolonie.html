@@ -63970,10 +63970,32 @@ function sekSternUse(key, x, y, k, unentdeckt){
   function closeKarteMenu(){
     if (karteMenuEl){ karteMenuEl.remove(); karteMenuEl = null; }
   }
-  // eintraege: [{ icon, label, grund, disabled, fn }] - grund erscheint als kleine Zeile darunter
-  // und erklärt, warum ein Eintrag grau ist.
+  // eintraege: [{ icon, label, grund, disabled, slot, fn }] - grund erscheint als kleine Zeile
+  // darunter und erklärt, warum ein Eintrag grau ist.
+  /* DIE FLOTTENSLOT-AMPEL (KS-1, 08.09.2026).
+     GEMESSEN: `fleetLimitBlocks()` tut nur zweierlei - `log()` und `return true`. Es meldet sich
+     also erst NACH Zielwahl, Flottenwahl und Startklick, an 25 Aufrufstellen. Bei anfangs zwei
+     Slots (`maxConcurrentFleets`) laeuft ein normaler Spieler mehrmals die Woche dagegen und
+     fuellt eine Schiffswahl umsonst aus.
+     `slot:true` an einem Eintrag heisst: Dieser Auftrag kostet einen Flottenslot. Den SATZ dazu
+     formuliert diese eine Stelle - nicht jedes Menue fuer sich. Waere es umgekehrt, staende
+     derselbe Text neunmal da und liefe beim naechsten Umbau auseinander; das Muster gab es
+     bereits halb, `asteroidMapMenu` schrieb seit jeher „(belegt einen Flottenslot)".
+     GESPERRT WIRD NICHT: Der Eintrag bleibt klickbar und nennt nur den Stand. Wer trotzdem
+     klickt, bekommt die gewohnte Meldung aus `fleetLimitBlocks()` - ein grauer Knopf haette den
+     Weg zur Erklaerung abgeschnitten, und die Sperre ist ohnehin die des Spielstands, nicht die
+     des Menues. */
+  function slotSatz(){
+    const belegt = activeFleetMissionCount(), max = maxConcurrentFleets();
+    return belegt >= max
+      ? 'Alle ' + max + ' Flottenslots sind belegt – erst muss eine Flotte zurück.'
+      : 'Belegt einen Flottenslot (' + belegt + ' von ' + max + ' belegt).';
+  }
   function openKarteMenu(ev, art, titel, eintraege, infoHtml){
     closeKarteMenu();
+    for (const e of (eintraege || [])) if (e && e.slot){
+      e.grund = (e.grund ? e.grund.replace(/\s*$/, '') + ' ' : '') + slotSatz();
+    }
     const el = document.createElement('div');
     el.className = 'kmenu';
     el.setAttribute('role', 'menu');
@@ -64126,7 +64148,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       grund: erkUnterwegs ? 'Bereits eine Erkundung zu diesem Ziel unterwegs.'
         : (!erkFrei ? 'Kein freies Erkundungsschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'
         : 'Flugzeit '+fmtDuration(erkDur)+' · '+missionFuelCost(erkDur,1)+' Deuterium'),
-      disabled: erkUnterwegs || !erkFrei, fn: () => sendExploreMission(planetId) });
+      disabled: erkUnterwegs || !erkFrei, slot: true, fn: () => sendExploreMission(planetId) });
     if (!meins){
       const kolUnterwegs = cf.missions.some(m => m.type==='colonize' && m.targetId === planetId);
       const limitVoll = currentColonyCount() + pendingColonyCount() >= maxColoniesAllowed();
@@ -64141,7 +64163,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       else if (limitVoll){ grund = 'Kolonie-Limit erreicht ('+(currentColonyCount()+pendingColonyCount())+'/'+maxColoniesAllowed()+') – Kolonial-Logistik erforschen.'; gesperrt = true; }
       else if ((cf.colonyShips||0) < 1){ grund = 'Kein Kolonieschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'; gesperrt = true; }
       else if (!canAfford(gesamt)){ grund = 'Nicht genug Ressourcen: '+costText(gesamt); gesperrt = true; }
-      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt,
+      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt, slot: true,
         fn: () => colonizePlanet(planetId) });
     }
     const ti = planetTypeInfoFor(p);
@@ -64170,7 +64192,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       if (unterwegs){ grund = 'Ein Kolonieschiff ist bereits unterwegs.'; gesperrt = true; }
       else if ((cf.colonyShips||0) < 1){ grund = 'Kein Kolonieschiff auf '+planetDisplayName(state.activeBasePlanet)+'.'; gesperrt = true; }
       else if (!canAfford(gesamt)){ grund = 'Nicht genug Ressourcen: '+costText(gesamt); gesperrt = true; }
-      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt,
+      eintraege.push({ icon:'ti-planet', label:'Kolonisieren', grund, disabled: gesperrt, slot: true,
         fn: () => colonizeMoon(parentKey) });
     }
     openKarteMenu(ev, meins ? 'Eigener Mond' : 'Mond', planetDisplayName(moonKey), eintraege);
@@ -64189,15 +64211,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
           : (spaeher < 1 ? 'Kein Spähschiff oder Spionagekreuzer auf '+planetDisplayName(state.activeBasePlanet)+'.'
           : (spyUnterwegs ? 'Alle Spähschiffe dort sind bereits im Einsatz.'
           : 'Deckt Flottenstärke und Verteidigung auf.')),
-        disabled: !!pakt || spaeher < 1 || spyUnterwegs,
+        disabled: !!pakt || spaeher < 1 || spyUnterwegs, slot: true,
         fn: () => sendSpyMission(userId, name) },
       { icon:'ti-sword', label:'Angreifen',
         grund: pakt ? 'Nichtangriffspakt aktiv – ein Angriff ist blockiert.'
           : 'Öffnet die Flottenauswahl im Galaxie-Tab.',
-        disabled: !!pakt,
+        disabled: !!pakt, slot: true,
         fn: () => goToAttackPlayer(userId, name) },
       { icon:'ti-skull', label:'Monde belagern',
-        grund:'Lädt die Mondliste des Ziels – braucht Mondzerstörer.',
+        grund:'Lädt die Mondliste des Ziels – braucht Mondzerstörer.', slot: true,
         fn: () => goToMoonSiege(userId, name) }
     ];
     openKarteMenu(ev, 'Fremder Spieler', name, eintraege);
@@ -64225,7 +64247,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       (() => { const sperre = npcAngriffSperrGrund(npcId);
         return { icon:'ti-sword', label:'Angreifen',
           grund: sperre || 'Öffnet die Flottenwahl.',
-          disabled: !!sperre,
+          disabled: !!sperre, slot: true,
           fn: () => oeffneNpcAngriff(npcId) }; })()
     ];
     /* Infoblock statt eines nackten "Angreifen" (E1b). Das Menue trug bis dahin KEINE einzige
@@ -67411,7 +67433,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const vSperre = verbandsRufSperre();
 
     const eintraege = [
-      { icon:'ti-sword', label:'Nest angreifen', grund, disabled: gesperrt,
+      { icon:'ti-sword', label:'Nest angreifen', grund, disabled: gesperrt, slot: true,
         fn: () => oeffneNestAngriff(String(nest.id)) },
       /* VERBAND AUSRUFEN, jetzt auch am Nest (Auftrag Sascha 07.09.2026, woertlich: „nester und
          koenigin auch angreifbar mit allianz machen").
@@ -67472,7 +67494,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     else if (wartet){ grund = 'Deine Verbände sammeln sich neu – nächster Schlag in ' + fmtDuration((abklingBis - Date.now())/1000) + '.'; gesperrt = true; }
 
     const eintraege = [
-      { icon:'ti-sword', label:'Konvoi angreifen', grund, disabled: gesperrt,
+      { icon:'ti-sword', label:'Konvoi angreifen', grund, disabled: gesperrt, slot: true,
         fn: () => oeffneKonvoiAngriff(String(k.id)) }
     ];
     const entkommtBis = konvoiEntkommtBis(k);
@@ -67549,7 +67571,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const garnUnterwegs = cf.missions.some(m => m.type === 'vorposten-defend' && m.targetId === sysId);
       eintraege.push({ icon:'ti-shield', label:'Garnison entsenden',
         grund: garnUnterwegs ? 'Eine Garnison ist bereits unterwegs.' : !kampfschiffe ? 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.' : frei < 1 ? 'Die Garnison ist voll (' + grenze + ').' : frei + ' von ' + grenze + ' Plätzen frei – Kampfschiffe verteidigen den Vorposten.',
-        disabled: garnUnterwegs || !kampfschiffe || frei < 1, fn: () => vorpostenGarnisonSenden(sysId) });
+        disabled: garnUnterwegs || !kampfschiffe || frei < 1, slot: true, fn: () => vorpostenGarnisonSenden(sysId) });
       /* DER EIGENE ANTEIL, nicht die Gesamtzahl (Befund der Durchsicht, 05.09.2026). Seit V5
          gibt `/api/vorposten/rueckruf` NUR zurueck, was DIESES Konto gestellt hat, und antwortet
          mit 400 (`leer`), wenn das nichts ist - „Der Besitzer eines Vorpostens, in dem
@@ -67779,7 +67801,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       else if (!kampfschiffe){ grund = 'Keine Kampfschiffe auf ' + planetDisplayName(state.activeBasePlanet) + '.'; gesperrt = true; }
       else if (schutz){ grund = 'Bauschutz – angreifbar in ' + fmtDuration((v.schutzBis - jetzt)/1000) + '.'; gesperrt = true; }
       else if (abklingBis > jetzt){ grund = 'Deine Verbände sammeln sich neu – nächster Schlag in ' + fmtDuration((abklingBis - jetzt)/1000) + '.'; gesperrt = true; }
-      eintraege.push({ icon:'ti-sword', label:'Vorposten angreifen', grund, disabled: gesperrt, fn: () => oeffneVorpostenAngriff(sysId) });
+      eintraege.push({ icon:'ti-sword', label:'Vorposten angreifen', grund, disabled: gesperrt, slot: true, fn: () => oeffneVorpostenAngriff(sysId) });
     }
     const nutzen = v.nutzen || {};
     /* Ausrichtung und Stufe von N (02.09.2026): Der Vorposten hat acht Stufen und ab der vierten
@@ -67925,7 +67947,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const verbandGrund = vSperre.grund, verbandGesperrt = vSperre.gesperrt;
 
     const eintraege = [
-      { icon:'ti-sword', label:'Festung angreifen', grund, disabled: gesperrt,
+      { icon:'ti-sword', label:'Festung angreifen', grund, disabled: gesperrt, slot: true,
         fn: () => oeffneFestungsangriff(sysId) },
       /* VERBAND AUSRUFEN (Auftrag Sascha 04.09.2026). Hier stand bisher nur ein HINWEIS auf den
          Allianz-Tab (unten im Info-Block, jetzt entfernt) - man musste die Festung dort ein zweites
@@ -67991,7 +68013,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
              : (fremd ? asteroidHalterText(a) + ' – nur der Halter darf hier abbauen.'
              : (!(cf.schuerfschiff||0) ? 'Kein Minenschiff auf ' + planetDisplayName(state.activeBasePlanet) + '.'
              : (!frei ? 'Alle Minenschiffe dort sind bereits unterwegs.' : 'Öffnet die Flottenwahl.'))),
-        disabled: gesperrt || fremd || !frei,
+        disabled: gesperrt || fremd || !frei, slot: true,
         fn: () => oeffneAbbaumission(sysId, platz) }
     ];
     /* Anfechtung (v8.491.0): Am FREMD reservierten Vorkommen steht statt der Rechte-Einträge der
@@ -68007,7 +68029,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
              : schutz ? 'Schutzfrist nach dem letzten Besitzwechsel – noch ' + fmtDuration((a.schutzBis - Date.now())/1000) + '.'
              : (wache ? 'Kampfflotte gegen die stationierte Eskorte (' + wache + ' Schiffe). Der Vorrat bleibt liegen – du eroberst die Quelle.'
                       : 'Dieses Recht ist unbewacht – eine kleine Flotte genügt.'),
-        disabled: gesperrt || laeuft || schutz,
+        disabled: gesperrt || laeuft || schutz, slot: true,
         fn: () => oeffneAnfechtung(sysId, platz) });
     }
     /* Schürfrechte (v8.489.0): nur im geteilten Feld (mit Server) und nie auf Peilungen - die
@@ -68028,8 +68050,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
       } else {
         eintraege.push({ icon:'ti-shield', label: eskorte ? 'Eskorte verstärken' : 'Eskorte stationieren',
           grund: anflugLaeuft ? 'Eine Eskorte ist bereits im Anflug.'
-               : 'Kampfschiffe bleiben am Vorkommen stationiert und verteidigen dein Recht (belegt einen Flottenslot).',
-          disabled: anflugLaeuft,
+               : 'Kampfschiffe bleiben am Vorkommen stationiert und verteidigen dein Recht.',
+          disabled: anflugLaeuft, slot: true,
           fn: () => oeffneEskorte(sysId, platz) });
         if (eskorte && eskorteSchiffssumme(eskorte.schiffe)){
           eintraege.push({ icon:'ti-shield', label:'Eskorte zurückrufen ('+eskorteSchiffssumme(eskorte.schiffe)+' Schiffe)',
