@@ -147,6 +147,8 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
       abbau: teile('[data-vp-abbau]').length,
       garnison: teile('[data-vp-garnison]').map(e => ({ voll: e.getAttribute('data-vp-garnison'),
         gefuellt: e.querySelectorAll('polygon[fill-opacity]').length, leer: e.querySelectorAll('polygon[stroke-width]').length })),
+      // Die Auskunft, die die entfallenen Dreiecke ersetzt (5b): der Tooltip des Markers.
+      titel: (document.querySelector('[data-map-vorposten] title') || {}).textContent || '',
       alarm: teile('[data-vp-alarm]').map(e => (e.querySelector('animate') || {}).getAttribute ? e.querySelector('animate').getAttribute('dur') : null),
       /* Die AUSDEHNUNG, gemessen am gezeichneten Bild: der weiteste Punkt irgendeines Bauteils vom
          Mittelpunkt, als Vielfaches des Marker-Radius. Die Beschriftung bleibt aussen vor - sie ist
@@ -269,15 +271,22 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
   check('4d: ohne Abbau kein Demontagegeruest', voll.mess.abbau === 0, { abbau: voll.mess.abbau });
 
   // ---- 5) Die Garnison -------------------------------------------------------------------------
-  check('5a: eine leere Garnison zeigt fuenf leere Plaetze', (() => {
-    const g = voll.mess.garnison[0];
-    return !!g && g.voll === '0' && g.gefuellt === 0 && g.leer === 5;
-  })(), { garnison: voll.mess.garnison });
+  /* UMGEDREHT AM 08.09.2026 (Auftrag Sascha mit Screenshot: „entferne die dreiecke unter der
+     sternenwerft ... wie bei den anderen vorposten typen"). Bis hierher pruefte 5a/5b, DASS die
+     fuenf Garnison-Dreiecke da sind und den Fuellstand zeigen. Die Anzeige ist entfallen; die
+     Pruefungen sind deshalb NICHT geloescht, sondern umgedreht - sonst koennte sie jemand
+     versehentlich wieder einbauen, ohne dass etwas anschlaegt.
+     Was NICHT verlorengehen darf, ist die Auskunft selbst: Die Schiffszahl steht weiterhin im
+     <title> des Markers, und 5b misst genau das. Eine entfernte Anzeige ist nur dann in Ordnung,
+     wenn das, was sie sagte, woanders steht - sonst ist es kein Aufraeumen, sondern ein Verlust. */
   const halbeFlotte = await lauf(browser, doc({ garnisonAnzahl: 1500, garnisonMax: 3000 }));
-  check('5b: eine halb belegte Garnison zeigt die Haelfte gefuellt', (() => {
-    const g = halbeFlotte.mess.garnison[0];
-    return !!g && g.voll === '3' && g.gefuellt === 3;
-  })(), { garnison: halbeFlotte.mess.garnison });
+  const halbeGarnisonPruefung = halbeFlotte.mess.garnison;
+  check('5a: unter der Station stehen keine Garnison-Dreiecke mehr',
+    voll.mess.garnison.length === 0 && halbeGarnisonPruefung.length === 0,
+    { leer: voll.mess.garnison, halb: halbeGarnisonPruefung });
+  check('5b: die Schiffszahl der Garnison steht weiterhin am Marker',
+    /1500\s*Schiffe Garnison/.test(halbeFlotte.mess.titel || ''),
+    { titel: (halbeFlotte.mess.titel || '').slice(0, 120) });
 
   // ---- 6) Der Anflug ---------------------------------------------------------------------------
   check('6a: ohne Anflug kein Alarmring', voll.mess.alarm.length === 0, { alarm: voll.mess.alarm });

@@ -10833,21 +10833,16 @@
   /* DIE GARNISON, ablesbar ohne Menue: eine Reihe kleiner Rumpfzeichen unter der Station, gefuellt
      nach Belegung. Bewusst NICHT an den Dockpads: die gibt es erst ab Stufe 5, die Garnison aber ab
      der ersten Stationsstufe - ein Zeichen, das je nach Stufe woanders sitzt, liest sich nicht. */
-  function vorpostenGarnisonZeichen(vp, x, y, r, farbe){
-    const max = (vp && vp.garnisonMax) || 0;
-    if (!max) return '';
-    const anteil = Math.max(0, Math.min(1, ((vp && vp.garnisonAnzahl) || 0) / max));
-    const P = (n) => n.toFixed(1);
-    const voll = Math.round(anteil * 5);
-    const breite = r * 0.26;
-    return `<g data-vp-garnison="${voll}" pointer-events="none">` + [0,1,2,3,4].map(i => {
-      const cx = x + (i - 2) * breite * 1.5, cy = y + r * 1.62;
-      const p = `${P(cx)},${P(cy - breite*0.5)} ${P(cx + breite*0.5)},${P(cy + breite*0.5)} ${P(cx - breite*0.5)},${P(cy + breite*0.5)}`;
-      return i < voll
-        ? `<polygon points="${p}" fill="${farbe}" fill-opacity="0.95"/>`
-        : `<polygon points="${p}" fill="none" stroke="${farbe}" stroke-width="0.9" stroke-opacity="0.4"/>`;
-    }).join('') + `</g>`;
-  }
+  /* DIE GARNISON-DREIECKE SIND WEG (08.09.2026, Auftrag Sascha mit Screenshot: „entferne die
+     dreiecke unter der sternenwerft ... wie bei den anderen vorposten typen").
+     Sie standen als fuenf Polygone unter JEDER Station und zeigten den Fuellstand der Garnison in
+     Fuenfteln - eine Information, die daneben ohnehin genauer steht: Der <title> des Markers nennt
+     die Schiffszahl, das Kartenmenue ebenfalls. Fuenf Zeichen fuer eine gerundete Angabe, die
+     einen Schritt weiter exakt zu haben ist, sind den Platz unter der Silhouette nicht wert.
+     Die Funktion ist ENTFERNT und nicht nur abgeschaltet - toter Code, der nach dem Grund fuer
+     sein Dasein fragen laesst, ist schlimmer als keiner. Die Pruefungen 5a und 5b in
+     tests/test_vorposten_zustand.js sind mitgezogen: Sie messen jetzt, dass unter der Station
+     NICHTS mehr steht, und dass die Schiffszahl weiterhin abzulesen ist. */
   /* ===== DIE KAPSEL: der Vorposten als gezeichneter Koerper (GR-5, 04.09.2026) =====
      Spieler-Urteil zur Strichfassung: "sehr langweilig gezeichnet, mehr wie ein Icon". Der
      Befund dahinter war messbar - die Planeten der Karte sind prozedural GERENDERT
@@ -11484,7 +11479,6 @@
     return vorpostenProjektTeile(vp, x, y, r, farbe)
       + koerper
       + vorpostenModulTeile(vp, x, y, r, farbe)
-      + vorpostenGarnisonZeichen(vp, x, y, r, farbe)
       + vorpostenSchaden(vp, x, y, r)
       + vorpostenBaustelle(vp, x, y, r, farbe)
       + vorpostenUmruestZeichen(vp, x, y, r, farbe)
