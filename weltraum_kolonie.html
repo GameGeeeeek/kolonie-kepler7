@@ -12559,6 +12559,29 @@
   }
   /* Die eigene Abklingzeit als Menuezeile - sichtbar auch dann, wenn der Knopf aus einem anderen
      Grund gesperrt ist (Konvoi und Nest; die Festung hat festungBeitragZeilen). Leer ohne eigenen Schlag. */
+  /* KS-3: WIE VIELE SCHON DRAN WAREN (08.09.2026). Die Beute von Nest und Wrackkonvoi wird nach
+     SCHADENSANTEIL geteilt - ohne diese Auskunft greift man blind an und merkt hinterher, dass der
+     eigene Anteil 8 Prozent war. Die Festung sagt es laengst (`festungBeitragKurz`), Nest und
+     Konvoi kannten die Zahlen nur nicht.
+     DIESELBE RECHNUNG, KEINE ZWEITE: `festungBeitragDaten` liest `beitraege` und `schlaege` und
+     ist damit auf jedes Ziel anwendbar, das beides fuehrt - eine eigene Nest-Rechnung waere die
+     zweite Wahrheit ueber denselben Wert.
+     NUR DIE ANZAHL, NIEMALS DIE NAMEN. Die Namen stehen in `beitraege` (die Karten-Route gibt die
+     Galaxie roh heraus), aber sie anzuzeigen machte aus einer PvE-Auskunft eine PvP-Zielliste:
+     Wer viel beigetragen hat, waere danach ein lohnendes Ziel.
+     KEIN EINSCHLAGSPULS auf der Karte, obwohl er naheliegt - die Anteilsformel macht das heisse
+     Ziel systematisch zum schlechter zahlenden, ein Wegweiser dorthin waere ein schlechter Rat. */
+  function pveBeitragZeile(ziel){
+    const d = festungBeitragDaten(ziel);
+    if (!d.beitragende) return '';
+    const wer = d.beitragende === 1 ? 'Ein Kommandant hat' : d.beitragende + ' Kommandanten haben';
+    const meins = d.meinSchaden > 0
+      ? ' Dein Anteil bisher: ' + fmt(Math.round(d.meinSchaden)) + ' Schaden (' + Math.round(d.anteil*100) + '%).'
+      : ' Du warst noch nicht dabei.';
+    return '<div class="bmeta"><i class="ti ti-users" aria-hidden="true"></i> ' + wer
+      + ' hier bereits Schaden gemacht.' + escapeHtml(meins)
+      + ' <span style="opacity:0.75;">Die Beute wird nach Anteil geteilt.</span></div>';
+  }
   function pveAbklingZeile(letzter, bis, ziel){
     const jetzt = Date.now();
     if (!letzter) return '';
@@ -67575,6 +67598,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
           'Wie viel vom Nest noch steht - nicht ein Vergleich mit anderen Nestern.')
       + nestBergungZeile(stDef)
       + pveAbklingZeile((nest.schlaege && state.player && nest.schlaege[state.player.id]) || 0, abklingBis, 'diesem Nest')
+      /* KS-3: WIE VIELE SCHON DRAN WAREN, und wie gross der eigene Anteil bisher ist. Die Beute
+         wird nach Schadensanteil geteilt; ohne diese Zeile greift man blind an und merkt hinterher,
+         dass der Anteil 8 Prozent war. Die Festung sagt es laengst - `festungBeitragDaten` rechnet
+         Summe, eigenen Anteil und Zahl der Beitragenden -, das Nest kannte sie nur nicht. Dieselbe
+         Funktion, keine zweite Rechnung: Sie liest `beitraege` und `schlaege` und ist damit auf
+         jedes Ziel anwendbar, das beides fuehrt.
+         NUR DIE ANZAHL, NIEMALS DIE NAMEN. Die Namen stehen zwar in `beitraege` (die Karten-Route
+         gibt die Galaxie roh heraus), aber sie anzuzeigen machte aus einer PvE-Auskunft eine
+         PvP-Zielliste - wer viel beigetragen hat, waere danach ein lohnendes Ziel. */
+      + pveBeitragZeile(nest)
       + (v.schwaeche ? `<div class="bmeta"><i class="ti ti-target" aria-hidden="true"></i> Wirksam dagegen: <strong>${escapeHtml(nestSchwaecheName(v.schwaeche))}</strong> im Verband</div>` : '')
       + (v.art ? `<div class="bmeta"><i class="ti ti-info-circle" aria-hidden="true"></i> ${escapeHtml(v.art.charAt(0).toUpperCase() + v.art.slice(1))}.</div>` : '')
       + reifText
@@ -67618,6 +67651,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
           'Wie viel vom Konvoi noch steht - nicht ein Vergleich mit anderen Zielen.')
       + konvoiBergungZeile(k)
       + pveAbklingZeile((k.schlaege && state.player && k.schlaege[state.player.id]) || 0, abklingBis, 'diesem Konvoi')
+      /* KS-3: dieselbe Zeile wie am Nest - dasselbe Beuteprinzip, dieselbe Rechnung. */
+      + pveBeitragZeile(k)
       + driftText);
   }
   /* Was DEINE Schlaege bewirkt haben - an der Festung selbst ablesbar, nicht nur im Bericht.
