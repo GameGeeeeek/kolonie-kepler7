@@ -25,6 +25,11 @@
 //       aus derselben Quelle (`slotSatz`) im Knopftitel, und die Sperre VOR der Rueckfrage -
 //       sie stand danach, der Spieler bestaetigte also einen Bau, der in derselben Sekunde
 //       abgelehnt wurde.
+//   2c  UND ZWAR SICHTBAR, nicht nur im `title` (dritte Durchsicht an PR #614). Genau dieser
+//       Knopf wurde am 02.09.2026 umgebaut, WEIL es am Telefon kein Hover gibt; der erste
+//       Nachtrag stellte den Satz ausgerechnet wieder dorthin. Gemessen wird deshalb am
+//       gerenderten Knopf: Bei belegten Slots traegt sein sichtbarer TEXT den Stand, und der
+//       Titel daneben die lange Fassung.
 //
 // GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor KS-1, Aufruf mit KEPLER_SLOT_GEGENPROBE=alt.
 // Dort fallen 1a, 1b, 2a und 2b - den Satz gibt es nicht. 1c bleibt gruen (der Satz fehlt
@@ -40,7 +45,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_SLOT_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '2a', '2b'], knopf: ['2a', '2b'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '2a', '2b', '2c'], knopf: ['2a', '2b', '2c'], sichtbar: ['2c'] };
 
 const SYS = 'chronos';
 const SAVE_KEY = 'kepler7-save-v3';
@@ -61,6 +66,16 @@ function backend(store){
     if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, unlockedAlienRaces:[], collapsedSystems:{},
       activeWormhole:null, news:[], controlledSystems:{}, factions:{}, alienNester: [] });
     if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
+    /* Der Bau-Knopf zeichnet sich nur mit einem Server, der Vorposten KENNT (`vorpostenCache.aktiv`)
+       - das Sammelmuster weiter unten lieferte fuer `vorposten` eine leere Liste, und damit gab es
+       den Knopf im Test gar nicht. Ohne diese Route waere 2c still leer. */
+    if (p === 'vorposten') return j({ ok:true, aktiv:true, bauAktiv:true, maxJeKonto:3, schutzMs:43200000,
+      abklingMs:14400000, ausbauMs:43200000, garnisonFaktor:0.5, zweigAb:4, maxStufe:8, zweige:[],
+      stufen:[1,2,3,4,5,6,7,8].map(n => ({ stufe:n, name:'Stufe '+n, kernLp:20000*n, verteidigung:2500*n,
+        garnisonMax:300*n, flug:0.06, prod:0.015, scan:1, kosten: n===1?null:{ erz:1000 } })),
+      liste:[], eigene:0, modulDefs:[], modulSeltenheiten:{}, modulBestand:{}, modulSlotsMax:5,
+      projektDefs:[], projekteAktiv:true, flugDeckel:0.5, abbauMs:86400000, abbauAktiv:true,
+      lagerAktiv:true, dockMax:7 });
     if (p === 'storage-list') return j({ keys: Object.keys(store) });
     if (p.startsWith('storage/')){
       const k = decodeURIComponent(p.slice(8));
@@ -175,6 +190,19 @@ async function menue(page, planetId){
       mVoll.menue === true && !!erkVoll && /Alle \d+ Flottenslots sind belegt/.test(erkVoll.grund)
       && !/Belegt einen Flottenslot/.test(erkVoll.grund),
       { grund: erkVoll && erkVoll.grund });
+    /* 2c: Am gerenderten Knopf gemessen, nicht am Quelltext - der Befund war ja gerade, dass der
+       Satz im `title` steht und damit am Telefon unsichtbar ist. Ein Quelltext-Muster koennte das
+       eine nicht vom anderen unterscheiden. Der sichtbare Text ist `textContent`; der Titel wird
+       daneben mitgeprueft, damit die lange Fassung nicht beim Umbau verlorengeht. */
+    const knopf = await voll.page.evaluate(() => {
+      const b = document.querySelector('[data-vorposten-bau]');
+      return b ? { da:true, text: (b.textContent||'').trim(), titel: b.getAttribute('title')||'' } : { da:false };
+    });
+    merke('2c: bei belegten Slots steht der Stand SICHTBAR auf dem Bau-Knopf, nicht nur im Titel',
+      knopf.da === true && /Slots belegt/.test(knopf.text || '')
+        && /Alle \d+ Flottenslots sind belegt/.test(knopf.titel || ''),
+      knopf);
+
     await voll.ctx.close();
 
     /* 2a: Die Marke steht an jedem Eintrag, der wirklich einen Slot kostet - gezaehlt im

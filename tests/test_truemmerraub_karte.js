@@ -15,6 +15,12 @@
 //       dann gruen, wenn das Zeichen IMMER so aussaehe.
 //   2b  KEIN zweites antippbares Ding auf denselben Koordinaten. Zwei Klickziele uebereinander
 //       sind die meistreparierte Stelle dieser Karte; diese Anzeige braucht keines.
+//   3a  DAS FELD EINES MONDES (dritte Durchsicht an PR #614): `pickRaidTargetPlanet` zieht aus
+//       `['home', ...Object.keys(state.colonies)]`, und Mondkolonien wohnen dort unter
+//       `moon_<planetId>` - ein abgewehrter Ueberfall auf einem Mond legt sein Truemmerfeld also
+//       unter diesem Schluessel an, und `pirateDebrisRaidCandidates` zaehlt jeden Schluessel des
+//       Bestands auf. Die Karte kannte nur den Planetenschluessel; ein zehnminuetiger Raub am
+//       Mondfeld stand nirgends. Gemessen mit genau diesem Spielstand.
 //
 // NICHT ENTHALTEN und das steht hier, damit niemand es fuer vergessen haelt: die FLUGBAHN der
 // Abfangflotte. `MISSION_LINIEN` kennt 'intercept-pirates' nicht, und die Art dort aufzunehmen
@@ -30,7 +36,13 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_RAUB_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '3a'], mond: ['3a'] };
+/* Der Traeger des Mondes wird aus der Spieldatei GELESEN, nicht erfunden: Ein erfundener
+   Schluessel liefert keinen Kartenknoten, und die Pruefung waere still leer. */
+const fsM = require('fs');
+const QUELLE = fsM.readFileSync(process.env.KEPLER_SPIELDATEI || require('./lib/umgebung').SPIELDATEI, 'utf8');
+const MONDPLANET = ((QUELLE.match(/\{ id:'(\w+)',[^\n]*system:'kepler'/g) || [])
+  .map(z => (z.match(/id:'(\w+)'/) || [])[1]).filter(Boolean))[0];
 const now = Date.now();
 
 function backend(store){
@@ -54,16 +66,18 @@ function backend(store){
 
 /* `mitRaub` ist der EINZIGE Unterschied zwischen beiden Laeufen - alles andere bleibt gleich,
    sonst maesse 2a etwas, das sich auch aus einem anderen Grund unterscheiden koennte. */
-function spielstand(mitRaub){
+function spielstand(mitRaub, mond){
   return JSON.stringify({
     tutorialSeen:true, newbieWelcomeSeen:true,
     resources:{ energie:48000, erz:52000, kristalle:31000, deuterium:20000, antimaterie:900, forschungspunkte:2200 },
     buildings:{ solar:18, mine:17, kristallmine:15, labor:10, lager:12, werft:9 },
     research:{}, fleet:{ jaeger:400, cruisers:60, ships:3, missions:[] },
     discovered:{}, colonies:{}, activeBasePlanet:'home',
-    debrisFields: { home: { erz: 4000, kristalle: 1500 } },
+    debrisFields: mond
+      ? { ['moon_' + MONDPLANET]: { erz: 4000, kristalle: 1500 } }
+      : { home: { erz: 4000, kristalle: 1500 } },
     pirateDebrisRaid: mitRaub
-      ? { planetKey:'home', fleet:{ recycler:4, jaeger:2 }, power: 120,
+      ? { planetKey: mond ? ('moon_' + MONDPLANET) : 'home', fleet:{ recycler:4, jaeger:2 }, power: 120,
           startTime: now - 60000, endTime: now + 480000, interceptArrival:null, interceptSource:null }
       : null,
     player:{ id:'u', name:'A' }, xp:52000, credits:184000, buffs:[], lastTick: now,
@@ -72,11 +86,11 @@ function spielstand(mitRaub){
   });
 }
 
-async function messen(mitRaub, browser){
+async function messen(mitRaub, browser, mond){
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
-  await page.route('**/api/**', backend({ 'kepler7-save-v3': spielstand(mitRaub) }));
+  await page.route('**/api/**', backend({ 'kepler7-save-v3': spielstand(mitRaub, mond) }));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3000);
@@ -89,24 +103,28 @@ async function messen(mitRaub, browser){
   await page.waitForTimeout(700);
   const offen = await oeffneSystemUeberSektoren(page, 'kepler');
   await page.waitForTimeout(1800);
-  const m = await page.evaluate(() => {
+  const m = await page.evaluate(schluessel => {
     const svg = document.getElementById('galaxyMapSvg');
-    const g = svg && svg.querySelector('[data-map-debris]');
+    /* Beim Mondlauf wird GENAU sein Marker gesucht, nicht der erste beste: Ein Treffer auf dem
+       Planetenmarker daneben waere aus dem falschen Grund gruen. */
+    const g = svg && (schluessel ? svg.querySelector('[data-map-debris="' + schluessel + '"]')
+                                 : svg.querySelector('[data-map-debris]'));
     if (!g) return { marker:false };
     const t = g.querySelector('text');
     return { marker:true,
       zeichen: t ? (t.textContent || '').trim() : '',
       puls: g.querySelectorAll('animate').length,
       klickziele: svg.querySelectorAll('[data-map-debris]').length };
-  });
+  }, mond ? ('moon_' + MONDPLANET) : null);
   /* Der Klicktext kommt aus dem VORHANDENEN Klickziel - dasselbe, das der Spieler antippt. Der
      Klick loest `pushToast(...)` aus (gemessen an der Verdrahtung), also wird der TOAST gelesen und
      nicht das Protokoll: Der erste Entwurf las `#log` und bekam dessen aelteste Zeile - die
      Pruefung „nennt den Raub zuerst" fiel damit auf richtigem Code durch. */
-  await page.evaluate(() => {
-    const n = document.querySelector('#galaxyMapSvg [data-map-debris]');
+  await page.evaluate(schluessel => {
+    const n = document.querySelector('#galaxyMapSvg ' +
+      (schluessel ? '[data-map-debris="' + schluessel + '"]' : '[data-map-debris]'));
     if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 }));
-  });
+  }, mond ? ('moon_' + MONDPLANET) : null);
   await page.waitForTimeout(400);
   const text = await page.evaluate(() => {
     const t = [...document.querySelectorAll('.toast, [class*=toast]')]
@@ -121,6 +139,7 @@ async function messen(mitRaub, browser){
   const browser = await starteBrowser();
   const mit  = await messen(true, browser);
   const ohne = await messen(false, browser);
+  const mond = await messen(true, browser, true);
   await browser.close();
 
   merke('0a: das Truemmer-Zeichen steht in beiden Laeufen', mit.marker === true && ohne.marker === true,
@@ -138,6 +157,13 @@ async function messen(mitRaub, browser){
   merke('2b: kein zweites antippbares Ding auf denselben Koordinaten',
     mit.klickziele === ohne.klickziele && mit.klickziele === 1,
     { mit: mit.klickziele, ohne: ohne.klickziele });
+  /* 3a: Derselbe Massstab wie 1a und 1b, nur am Mondschluessel. Der Traegerplanet steht daneben,
+     damit ein leerer MONDPLANET nicht als stille gruene Pruefung durchgeht. */
+  merke('3a: das Truemmerfeld eines MONDES bekommt denselben Marker und Klicktext',
+    !!MONDPLANET && mond.marker === true && mond.zeichen === '☠' && mond.puls >= 2
+      && /Piraten plündern dieses Trümmerfeld/.test(mond.text || ''),
+    { traeger: MONDPLANET, marker: mond.marker, zeichen: mond.zeichen, puls: mond.puls,
+      auszug: (mond.text || '').slice(0, 90) });
   merke('2c: keine Skriptfehler', (mit.errs||[]).length === 0 && (ohne.errs||[]).length === 0,
     { mit: (mit.errs||[]).slice(0,2), ohne: (ohne.errs||[]).slice(0,2) });
 

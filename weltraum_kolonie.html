@@ -65534,9 +65534,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
         /* DIE FLOTTENSLOT-AMPEL AUCH HIER (KS-1, nachgetragen nach der zweiten Durchsicht an
            PR #614): Dieser Knopf sitzt ausserhalb von `openKarteMenu`, wo der Satz sonst
            entsteht - er blieb deshalb als einziger slotkostender Karteneinstieg stumm. Der Satz
-           kommt aus derselben Quelle (`slotSatz`), damit er nicht auseinanderlaeuft. */
+           kommt aus derselben Quelle (`slotSatz`), damit er nicht auseinanderlaeuft.
+           SICHTBAR UND NICHT NUR IM `title` (dritte Durchsicht an PR #614, bestaetigt): Genau
+           dieser Knopf wurde am 02.09.2026 schon einmal umgebaut, WEIL es am Telefon kein Hover
+           gibt - eine Warnung, die nur im Titel steht, ist dort keine. Der erste Nachtrag stellte
+           den Satz ausgerechnet wieder dorthin.
+           SICHTBAR WIRD NUR DER SPERRFALL: Fuer die lange Fassung („belegt einen Flottenslot,
+           1 von 2 belegt") ist auf einer Pille kein Platz, und sie waere in vier von fuenf
+           Faellen Rauschen. Was der Spieler VOR dem Tippen wissen muss, ist der eine Fall, in dem
+           es nicht losgeht; die vollstaendige Fassung bleibt daneben im Titel. */
+        const slotsVoll = activeFleetMissionCount() >= maxConcurrentFleets();
         const titelB = (grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.') + ' ' + slotSatz();
-        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(titelB)}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
+        html += `<button class="planet-pill" data-vorposten-bau="1" ${(grundB || slotsVoll) ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(titelB)}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten${slotsVoll ? ' · Slots belegt' : ''}</button>`;
       }
     }
     box.innerHTML = html;
@@ -66497,6 +66506,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
     for (const p of sysPlanets){
       const disc = state.discovered[p.id];
       const hasDebris = state.debrisFields[p.id] && Object.keys(state.debrisFields[p.id]).length;
+      /* DAS FELD EINES MONDES HAT SEINEN EIGENEN SCHLUESSEL (dritte Durchsicht an PR #614).
+         `pickRaidTargetPlanet` zieht aus `['home', ...Object.keys(state.colonies)]`, und
+         Mondkolonien wohnen dort unter `moon_<planetId>` - ein abgewehrter Ueberfall auf einem
+         Mond legt sein Truemmerfeld also unter diesem Schluessel an, und
+         `pirateDebrisRaidCandidates` zaehlt jeden Schluessel des Bestands auf. Die Karte kannte
+         bis hierher nur den Planetenschluessel: Ein zehnminuetiger Raub am Mondfeld stand
+         nirgends. Das Abzeichen steht unten LINKS, diagonal gegenueber dem des Planeten und auf
+         der dem Mond abgewandten Seite - der Mond selbst sitzt unten rechts. Denselben
+         `data-map-debris`-Haken wie der Planet, damit der vorhandene Klickweg ihn ohne
+         Sonderfall bedient. */
+      const mondSchluessel = 'moon_' + p.id;
+      const hasMoonDebris = state.debrisFields[mondSchluessel] && Object.keys(state.debrisFields[mondSchluessel]).length;
       const hasMoon = state.moons && state.moons[p.id];
       const isMine = !!state.colonies[p.id];
       const pos = planetOrbitXY(p);
@@ -66550,6 +66571,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
           ${hasDebris ? `<g data-map-debris="${p.id}">${truemmerRaubPuls(pos.x+r+2, pos.y-r-2, 7, truemmerRaubAn(p.id))}<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="${truemmerRaubAn(p.id) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(p.id) ? '\u2620' : 'T'}</text></g>` : ''}
+          ${hasMoonDebris ? `<g data-map-debris="${mondSchluessel}">${truemmerRaubPuls(pos.x-r-2, pos.y+r+2, 6, truemmerRaubAn(mondSchluessel))}<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="6" fill="${truemmerRaubAn(mondSchluessel) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y+r+5).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(mondSchluessel) ? '\u2620' : '\u263e'}</text></g>` : ''}
           ${hasMoon ? sysMondbahn(pos.x, pos.y, r+2) + `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_'+p.id ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
