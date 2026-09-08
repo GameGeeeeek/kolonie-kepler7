@@ -12,7 +12,13 @@
 //      Punkte nur annähert, würde Systeme aus ihrem Gebiet schneiden.
 //   B) Der Umriss ist eine Kurve, kein Kantenzug.
 //   C) Die Fläche ist ein Verlauf, keine Platte - und jeder Verlauf ist wirklich definiert.
-//   D) Die Kurve BAUCHT NICHT DAVON. Eine Kurve durch dieselben Punkte liegt zwischen ihnen
+//   D) Die Kurve BAUCHT NICHT DAVON. SEIT DEM 07.09.2026 ANDERS GEMESSEN, und das steht hier,
+//      damit niemand dem Kopf mehr glaubt als dem Code: Der Bauch in Pixeln ist keine brauchbare
+//      Groesse mehr, weil er mit der Zahl der Systeme in einer Region waechst - der Kalender
+//      liefert alle sieben Tage zwei neue. Geprueft werden jetzt die ZEICHENPARAMETER, die den
+//      Bauch erzeugen (1d), plus ein bewusst weites Netz (1e). Ein scharfer geometrischer Beleg,
+//      dass keine Region das Nachbargebiet erobert, existiert damit NICHT mehr - 1a haelt nur
+//      die Gegenrichtung (jedes System in seinem eigenen Gebiet). Die alte Begruendung: Eine Kurve durch dieselben Punkte liegt zwischen ihnen
 //      weiter außen als die Sehne. Mit der ersten Spannung (1/6) und dem alten Abstand (22)
 //      wuchsen die Regionen gemessen so weit, dass Nachbargebiete ineinanderliefen. Gemessen wird
 //      deshalb der Abstand der Umrisskurve vom Schwerpunkt gegen den Abstand des äußersten
@@ -25,19 +31,32 @@ const { check, ende } = pruefer();
 const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
 const ICH = 'u-ich';
 const now = Date.now();
-/* GEMESSENER BEREICH (06.09.2026, alle acht Regionen): Der äußerste Punkt der Umrisskurve liegt
-   beim ausgelieferten Stand (Spannung 1/8, Abstand 16) zwischen 16 und 23 px weiter vom
-   Schwerpunkt entfernt als das äußerste System. Beim ersten Entwurf (Spannung 1/6, Abstand 22)
-   waren es 22 bis 34 px, und drei Regionen liefen im Bild sichtbar ins Nachbargebiet.
-   Die Schwelle liegt zwischen den beiden Höchstwerten (23 und 34); am ersten Entwurf fallen
-   damit gemessen wispern (28), obsidian (29) und meridian (34).
-   NACHGEMESSEN am 06.09.2026 nach einem Befund der adversarischen Durchsicht, der für rand 26
-   statt 18 angab und daraus einen Sicherheitsabstand von nur 1 ableitete: Der Befund
-   reproduziert NICHT. Zwei aufeinanderfolgende Läufe liefern identisch
-   kepler=17 wispern=19 solmark=16 obsidian=20 meridian=23 pulsar=16 ilyra=16 rand=18, und eine
-   Kontrolle mit 4000 statt 240 Stützstellen auf der Kurve ändert keine einzige Zahl - die
-   Abtastung unterschätzt also nicht. Der Abstand zur Schwelle beträgt 4, nicht 1. */
-const BAUCH_MAX = 27;
+/* WARUM HIER KEINE PIXELSCHWELLE MEHR STEHT (07.09.2026, gemessen).
+   Bis heute stand hier BAUCH_MAX = 27: der absolute Abstand der Umrisskurve vom Schwerpunkt,
+   abzueglich des aeussersten Systems. Am 06.09.2026 mass das kepler=17 wispern=19 solmark=16
+   obsidian=20 meridian=23 pulsar=16 ilyra=16 rand=18, und die Schwelle lag sauber darueber.
+
+   EINEN TAG SPAETER war die Pruefung rot, ohne dass jemand etwas geaendert hatte: wispern=29.
+   Die Ursache ist der KALENDER. WEEKLY_SYSTEM_EPOCH ist der 20.07.2026, alle sieben Tage kommen
+   zwei Systeme dazu; am 07.09.2026 waren es 16 statt 14, und eines davon landete in Wispern.
+   BEWIESEN, nicht geschlossen: Mit auf den 06.09.2026 vorgestellter Uhr (nur Date.now ersetzt)
+   faellt wispern von 12 auf 11 Systeme und der Bauch von 29 auf exakt die 19 von damals; ilyra
+   ebenso von 13 auf 12 Systeme und von 17 auf 16. Alle sechs uebrigen Regionen bleiben
+   zeichengleich. Die Galaxie ist gewachsen, die Geometrie ist heil.
+
+   WARUM AUCH EINE RELATIVE SCHWELLE NICHT REICHT: Der Bauch faellt mit der Groesse der Region.
+   Gemessen betraegt er 5-13 % des Regionsradius (Radien 124 bis 344) - wispern sprang absolut um
+   10 px, relativ nur von 6 % auf 10 %. Aber der erste Entwurf, den diese Pruefung fangen sollte
+   (Spannung 1/6, Abstand 22), lag bei obsidian 29/191 = 15 %, meridian 34/344 = 10 % und wispern
+   28/311 = 9 % - er UEBERSCHNEIDET sich also relativ mit dem ausgelieferten Stand. Eine
+   Bauchmessung, ob absolut oder relativ, trennt die beiden Staende nicht mehr.
+
+   WAS STATTDESSEN GEPRUEFT WIRD: die beiden Zeichenparameter selbst, denn genau sie sind das,
+   was Regel D schuetzt - der Aufweitungsabstand (22 -> 16) und die Kurvenspannung (1/6 -> 1/8).
+   Sie sind kalenderfest und als UNGLEICHUNG formuliert, nicht als Momentaufnahme: enger als heute
+   darf jederzeit werden, weiter nie. Dazu ein LOCKERER geometrischer Sicherungsnetz-Wert; er
+   trennt die Staende ausdruecklich nicht, er faengt nur eine voellig entgleiste Zeichnung. */
+const BAUCH_ANTEIL_MAX = 0.25;   // gemessen 0,05-0,13 - bewusst weit, siehe oben
 
 function spielstand(){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
@@ -112,6 +131,10 @@ check('0b: die Fläche kommt aus einem radialen Verlauf je Region',
       }
       out.push({ key: g.getAttribute('data-sektor'), d, punkte: punkte.length, draussen,
                  bauch: Math.round(randWeit - sysWeit),
+                 /* Der Bauch IM VERHAELTNIS zum eigenen Radius - die groessenunabhaengige Form
+                    derselben Messung. Die absolute Zahl haengt an der Groesse der Region und
+                    damit daran, wie viele Systeme der Kalender ihr inzwischen gegeben hat. */
+                 anteil: (randWeit - sysWeit) / Math.max(1, sysWeit),
                  fill: pfad.getAttribute('fill') || '',
                  verlaufDa: !!svg.querySelector('radialGradient#' + CSS.escape((pfad.getAttribute('fill')||'').replace(/^url\(#|\)$/g, ''))) });
     }
@@ -128,21 +151,61 @@ check('0b: die Fläche kommt aus einem radialen Verlauf je Region',
     { kantig: gerade, beispiel: (m.regionen[0] || {}).d ? m.regionen[0].d.slice(0, 70) : null });
   const platt = m.regionen.filter(r => !/^url\(#skr-/.test(r.fill) || !r.verlaufDa).map(r => r.key + ' ' + r.fill);
   check('1c: jede Fläche ist ein definierter Verlauf, keine Platte', platt.length === 0, platt);
-  console.log('       (gemessener Bauch je Region: ' + m.regionen.map(r => r.key + '=' + r.bauch).join(' ') + ')');
-  const dick = m.regionen.filter(r => r.bauch > BAUCH_MAX).map(r => r.key + '=' + r.bauch);
-  check('1d: die Kurve umschließt ihr Gebiet, ohne ins Nachbargebiet zu wachsen',
-    dick.length === 0, { zuWeit: dick, schwelle: BAUCH_MAX, groesster: Math.max.apply(null, m.regionen.map(r => r.bauch)) });
+  console.log('       (gemessener Bauch je Region: ' + m.regionen.map(r => r.key + '=' + r.bauch + ' (' + Math.round(r.anteil*100) + '%)').join(' ') + ')');
+  /* 1d: DIE ZWEI ZEICHENPARAMETER, um die es bei Regel D wirklich geht. Als Ungleichung, nicht
+     als Momentaufnahme: Ein kleinerer Abstand und eine schwaechere Spannung bauchen weniger und
+     sind jederzeit erlaubt; zurueck zu 22 und 1/6 zu gehen ist der Rueckfall, den diese Pruefung
+     fangen soll. Beide Zahlen werden aus dem Quelltext GELESEN, nicht angenommen. */
+  const mAbstand = JS.match(/return \[q\[0\] \+ dx\/l\*(\d+(?:\.\d+)?), q\[1\] \+ dy\/l\*(\d+(?:\.\d+)?)\];/);
+  /* ALLE VIER TEILER, nicht nur der erste (Durchsicht 07.09.2026). Die erste Fassung las nur
+     den von c1x. Ein Rueckfall haette dann genuegt, c2x auf /6 zu drehen und c1x auf /8 zu
+     lassen: 1d waere gruen geblieben, die ZWEITE Haelfte jedes Kurvensegments haette wieder
+     gebaucht wie im ersten Entwurf, und 1e faengt das laut eigenem Kommentar nicht. Beim
+     Aufweitungsabstand war es von Anfang an richtig gemacht (beide Achsen); hier fehlte es. */
+  const mSpannung = JS.match(/const c1x = p1\[0\] \+ \(p2\[0\]-p0\[0\]\)\/(\d+), c1y = p1\[1\] \+ \(p2\[1\]-p0\[1\]\)\/(\d+);\s*\n\s*const c2x = p2\[0\] - \(p3\[0\]-p1\[0\]\)\/(\d+), c2y = p2\[1\] - \(p3\[1\]-p1\[1\]\)\/(\d+);/);
+  const abstand = mAbstand ? Number(mAbstand[1]) : null;
+  const teiler = mSpannung ? [1,2,3,4].map(i => Number(mSpannung[i])) : null;
+  const schwaechster = teiler ? Math.min.apply(null, teiler) : null;
+  check('1d: Aufweitung und alle vier Kurvenspannungen bleiben so eng wie ausgeliefert (Abstand ≤ 16, Teiler ≥ 8)',
+    abstand !== null && teiler !== null && abstand <= 16 && schwaechster >= 8
+    && mAbstand[1] === mAbstand[2],
+    { abstand, teiler, schwaechsterTeiler: schwaechster,
+      beideAchsenGleich: mAbstand ? mAbstand[1] === mAbstand[2] : null });
+  /* 1e: das Sicherungsnetz. Es trennt den ausgelieferten Stand NICHT vom ersten Entwurf (beide
+     liegen relativ zwischen 7 % und 18 %, am ersten Entwurf gemessen) - es faengt eine Zeichnung, die voellig entgleist. */
+  const dick = m.regionen.filter(r => r.anteil > BAUCH_ANTEIL_MAX).map(r => r.key + '=' + Math.round(r.anteil*100) + '%');
+  /* An die Regionenzahl gekoppelt: Bei leerem m.regionen waere `dick.length === 0` gruen,
+     obwohl nichts gemessen wurde - eine Pruefung, die aus dem falschen Grund gruen ist
+     (Durchsicht 07.09.2026). 1a bis 1c erben dasselbe Muster von frueher; hier ist es behoben. */
+  check('1e: keine Region baucht weiter als ein Viertel ihres eigenen Radius',
+    m.regionen.length === 8 && dick.length === 0,
+    { gemessen: m.regionen.length, zuWeit: dick, schwelle: Math.round(BAUCH_ANTEIL_MAX*100) + '%',
+      groesster: m.regionen.length ? Math.round(Math.max.apply(null, m.regionen.map(r => r.anteil))*100) + '%' : 'nichts gemessen' });
 
   await ctx.close();
   await browser.close();
   ende();
 })().catch(e => { console.log('FAIL - Ausnahme: ' + (e && e.stack || e)); process.exit(1); });
 //
+// GEGENPROBE NACHGEMESSEN 07.09.2026 (1d ist jetzt eine Parameter-, keine Pixelpruefung):
+//   grün: node tests/test_sektorregionen.js                                   (8 von 8)
+//   rot mit einer Kopie, die auf den ERSTEN ENTWURF zurueckdreht (Abstand 22, Spannung 1/6):
+//     genau 1d faellt, gemeldet mit { abstand: 22, spannungsTeiler: 6 }.
+//     1e bleibt dort GRUEN (18 % gegen die Schranke von 25 %) - und das ist keine Luecke,
+//     sondern die Aussage, die oben am Schwellenblock steht: Eine Bauchmessung trennt die
+//     beiden Staende nicht mehr, deshalb prueft 1d die Parameter und 1e ist nur das Netz.
+//   Die Schranke von 1e wurde ueber die Zukunft gemessen (Uhr vorgestellt, nur Date.now):
+//     heute 13 %, 28.09. 13 %, 16.11. 11 %, 01.06.2027 13 %, 01.01.2028 12 % - nie ueber 13 %.
+//
 // GEGENPROBE GEMESSEN 06.09.2026:
 //   grün: node tests/test_sektorregionen.js                                   (7 von 7)
 //   rot am Stand vor Bündel F (KEPLER_SPIELDATEI=/tmp/alt.html): 0a 0b 1b 1c (vier von sieben).
 //     Prüfnamen beider Läufe per diff verglichen und identisch (7 zu 7).
-//     1a und 1d bleiben dort GRÜN, und das ist kein Mangel, sondern die Aussage: Das alte Polygon
+//   ACHTUNG, DIESER BLOCK IST TEILWEISE UEBERHOLT (07.09.2026): Er beschreibt das ALTE 1d, das
+//   eine Pixelschwelle war. Das heutige 1d liest Zeichenparameter aus dem Quelltext und faellt am
+//   Stand vor Bündel F, weil es `weicherUmriss` dort gar nicht gibt - aus "vier von sieben"
+//   werden also fuenf von acht. Die gueltige Gegenprobe steht im Block darueber.
+//     1a bleibt dort GRÜN, und das ist kein Mangel, sondern die Aussage: Das alte Polygon
 //     schloss seine Systeme ebenfalls ein (1a) und wuchs ihnen nicht davon (1d, gemessen 20 bis
 //     22 px). Beide Prüfungen sichern Eigenschaften, die der Umbau NICHT verlieren durfte - der
 //     ausgelieferte Stand liegt mit 16 bis 23 px im selben Bereich wie das Polygon davor.
