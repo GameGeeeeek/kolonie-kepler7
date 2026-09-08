@@ -10651,8 +10651,172 @@
   const VP_MODUL_WINKEL = { geschuetz: 270, kernpanzer: 315, raffinerie: 0, hangar: 90, sprungrechner: 180, horchposten: 225 };
   /* WIE HOCH DAS SPRUNGTOR UEBER DER STATION STEHT. Eine Zahl, zwei Leser: die Zeichnung des
      Tores und die Flugbahn, die seit KB-26 durch das Tor fuehrt. Stuende sie zweimal da, zeigte
-     die Bahn beim naechsten Verschieben des Tores daneben - und zwar unauffaellig. */
-  const VP_TOR_HOCH = 1.72;
+     die Bahn beim naechsten Verschieben des Tores daneben - und zwar unauffaellig.
+
+     1,72 -> 1,66 mit KB-27, und der Radius ist AUSGERECHNET, nicht gewaehlt. Der erste Anlauf
+     rechnete mit „Mitte + Radius <= 2,45" und kam auf 0,70 r bei einer Mitte von 1,75 r - er fiel
+     prompt bei test_vorposten_zustand 12a, GEMESSEN 3,63 r statt 2,45. Zwei Fehler steckten darin:
+       (a) Die Kachelkante war doppelt so gross wie noetig. `Ra = 0,455 x S` heisst: eine Kachel
+           von S traegt einen Ring vom Radius 0,455 S. Fuer einen Ring von R braucht man also
+           S = R / 0,455 - nicht das Doppelte davon.
+       (b) Gemessen wird nicht die Oberkante, sondern der ABSTAND zur weitesten ECKE (kbMarkerFrei
+           rechnet mit Math.hypot, und der Waechter tut es ihm nach). Fuer ein Teil, das nicht ueber
+           dem Mittelpunkt liegt, ist die Ecke weiter weg als die Kante - genau die Lehre aus dem
+           Tiefenhorchposten, einmal mehr.
+     Die richtige Bedingung lautet damit: hypot(Halbkante, Hoehe + Halbkante) <= 2,45 bei einer
+     Halbkante von R/0,91, und Hoehe - R >= 1,05, damit der Ring die Station nicht beruehrt.
+     R = 0,60 und Hoehe = 1,66 ergeben 2,41 und 1,06 - beides eingehalten, nachgerechnet unten im
+     Waechter statt hier eingetippt. */
+  const VP_TOR_HOCH = 1.66;
+  const VP_TOR_RADIUS = 0.60;              // sichtbarer Aussenradius in Stationsradien
+
+  /* ===== DAS SPRUNGTOR (KB-27, 08.09.2026) =====
+     Auftrag Sascha: "ein richtiges tor mit grafik nicht einfach nur ein ring ... ähnlich Stargate
+     Atlantis, so in dem Stil."
+
+     DER ERSTE ENTWURF LAG FALSCH, und zwar nicht im Detail: Er legte das Tor FLACH in die
+     Bahnebene, wie einen Reifen, der um die Station liegt. Ein Tor steht AUFRECHT - man fliegt
+     hindurch, nicht darüber. Das ist der ganze Unterschied zwischen einem Ring und einem Tor, und
+     keine Menge Plattenfugen hätte ihn ausgeglichen.
+
+     VIER TEILE, aus der Vorlage abgelesen:
+       RING       schwerer Metallkörper, Licht von oben links, mit Innen- und Aussenkante
+       CHEVRONS   neun Klammern rings um den Ring, jede mit leuchtendem Kern - das Erkennungs-
+                  zeichen schlechthin. Ohne sie ist es ein Reifen mit Fuellung.
+       GLYPHEN    ein vertieftes Band innen im Ring mit Zeichen darauf. Sie sind bei dieser
+                  Groesse nicht lesbar und sollen es auch nicht sein - sie tragen die Textur.
+       HORIZONT   die Flaeche selbst: hell in der Mitte, Wellen darin, heller Rand. Ein Verlauf
+                  allein sieht aus wie ein Loch; erst die Wellen machen daraus eine Oberflaeche.
+     Der Ring bleibt metallen, die Chevrons tragen die Zweigfarbe - so bleibt die Station an ihrer
+     Farbe erkennbar, ohne dass das Tor seine Form verliert. */
+  const TOR_BILD = 128;
+  const TOR_BILD_CACHE = {};
+  function zeichneSprungtor(c, S, farbe){
+    const cx = S/2, cy = S/2;
+    const Ra = S*0.455;                    // Aussenkante des Rings
+    const Ri = S*0.330;                    // Innenkante = Rand des Horizonts
+    c.clearRect(0, 0, S, S);
+
+    /* 1) DER HORIZONT. Zuerst, damit der Ring darueber liegt und ihn sauber beschneidet. */
+    c.save();
+    c.beginPath(); c.arc(cx, cy, Ri, 0, Math.PI*2); c.clip();
+    const hg = c.createRadialGradient(cx - Ri*0.18, cy - Ri*0.22, S*0.01, cx, cy, Ri);
+    hg.addColorStop(0,    '#eaf9ff');
+    hg.addColorStop(0.22, '#9adcff');
+    hg.addColorStop(0.60, '#2f8fd6');
+    hg.addColorStop(1,    '#12437a');
+    c.fillStyle = hg; c.fillRect(0, 0, S, S);
+    /* Die Wellen: vier Ringe, deren Radius mit dem Winkel leicht schwankt. Eine glatte Scheibe
+       liest sich als Loch, eine bewegte als Oberflaeche - das ist der ganze Trick. */
+    c.globalCompositeOperation = 'lighter';
+    c.lineWidth = Math.max(1, S*0.011);
+    for (let k = 0; k < 4; k++){
+      const basis = Ri * (0.26 + k*0.19);
+      const amp = Ri * 0.035 * (1 + k*0.35);
+      c.beginPath();
+      for (let a = 0; a <= 64; a++){
+        const w = a/64 * Math.PI*2;
+        const rr = basis + Math.sin(w*3 + k*1.7) * amp + Math.sin(w*5 - k) * amp*0.4;
+        const px = cx + Math.cos(w)*rr, py = cy + Math.sin(w)*rr;
+        a ? c.lineTo(px, py) : c.moveTo(px, py);
+      }
+      c.closePath();
+      c.strokeStyle = 'rgba(255,255,255,' + (0.30 - k*0.05).toFixed(2) + ')';
+      c.stroke();
+    }
+    c.restore();
+
+    /* 2) DER RING. Ein Kreisring mit Verlauf ueber die Flaeche, nicht am Rand entlang - so faellt
+       das Licht ueber den ganzen Koerper statt nur auf eine Kante. */
+    c.save();
+    c.beginPath();
+    c.arc(cx, cy, Ra, 0, Math.PI*2);
+    c.arc(cx, cy, Ri, 0, Math.PI*2, true);
+    const rg = c.createLinearGradient(cx - Ra, cy - Ra, cx + Ra*0.7, cy + Ra);
+    rg.addColorStop(0,    '#8b97ad');
+    rg.addColorStop(0.28, '#5a6880');
+    rg.addColorStop(0.62, '#333e52');
+    rg.addColorStop(1,    '#1b2231');
+    c.fillStyle = rg; c.fill('evenodd');
+    c.restore();
+
+    /* 3) DAS GLYPHENBAND - eine vertiefte Rinne knapp innen im Ring, mit 24 Zeichen darauf. Die
+       Rinne ist dunkler als der Ring, die Zeichen heller: so entsteht Tiefe ohne eine zweite
+       Lichtquelle. */
+    const Rg1 = Ri + (Ra-Ri)*0.16, Rg2 = Ri + (Ra-Ri)*0.46;
+    c.save();
+    c.beginPath();
+    c.arc(cx, cy, Rg2, 0, Math.PI*2);
+    c.arc(cx, cy, Rg1, 0, Math.PI*2, true);
+    c.fillStyle = 'rgba(14,18,28,0.62)'; c.fill('evenodd');
+    c.strokeStyle = 'rgba(190,205,230,0.5)';
+    c.lineWidth = Math.max(0.7, S*0.007);
+    const Rgm = (Rg1 + Rg2)/2, gh = (Rg2 - Rg1)*0.34;
+    for (let i = 0; i < 24; i++){
+      const w = (i/24) * Math.PI*2 + 0.13;
+      const co = Math.cos(w), si = Math.sin(w);
+      c.beginPath();
+      c.moveTo(cx + co*(Rgm - gh), cy + si*(Rgm - gh));
+      c.lineTo(cx + co*(Rgm + gh), cy + si*(Rgm + gh));
+      c.stroke();
+    }
+    c.restore();
+
+    /* 4) DIE CHEVRONS. Neun Stueck, gleichmaessig verteilt, der erste OBEN - so steht es in der
+       Vorlage, und die Neunzahl ist das, was ein Auge sofort wiedererkennt.
+       Jeder ist eine Klammer, die den Ring von aussen umgreift und nach innen zeigt: ein
+       dunkler Sockel, darauf ein leuchtender Kern in der Zweigfarbe. */
+    for (let i = 0; i < 9; i++){
+      const w = -Math.PI/2 + (i/9)*Math.PI*2;
+      const co = Math.cos(w), si = Math.sin(w);
+      c.save();
+      c.translate(cx + co*(Ra*0.955), cy + si*(Ra*0.955));
+      c.rotate(w + Math.PI/2);                 // Spitze zeigt zur Mitte
+      const b = S*0.085, h = S*0.075;          // Breite und Hoehe der Klammer
+      c.beginPath();
+      c.moveTo(-b/2, -h*0.42); c.lineTo(b/2, -h*0.42);
+      c.lineTo(b*0.30, h*0.58); c.lineTo(0, h*0.30); c.lineTo(-b*0.30, h*0.58);
+      c.closePath();
+      c.fillStyle = '#232c3c'; c.fill();
+      c.strokeStyle = 'rgba(200,214,236,0.55)'; c.lineWidth = Math.max(0.7, S*0.006); c.stroke();
+      // Der leuchtende Kern - dieselbe Form, kleiner.
+      c.beginPath();
+      c.moveTo(-b*0.28, -h*0.20); c.lineTo(b*0.28, -h*0.20);
+      c.lineTo(b*0.16, h*0.30); c.lineTo(0, h*0.10); c.lineTo(-b*0.16, h*0.30);
+      c.closePath();
+      c.fillStyle = farbe; c.fill();
+      c.restore();
+    }
+
+    /* 5) KANTEN ZULETZT: die Innenkante hell (dort beruehrt der Horizont das Metall), die
+       Aussenkante dunkel (dort endet das Bauwerk gegen den Raum). */
+    c.save();
+    c.beginPath(); c.arc(cx, cy, Ri, 0, Math.PI*2);
+    c.strokeStyle = 'rgba(220,244,255,0.75)'; c.lineWidth = Math.max(1, S*0.013); c.stroke();
+    c.beginPath(); c.arc(cx, cy, Ra, 0, Math.PI*2);
+    c.strokeStyle = 'rgba(8,11,18,0.8)'; c.lineWidth = Math.max(1, S*0.010); c.stroke();
+    c.restore();
+  }
+  function sprungtorBildUrl(farbe){
+    const key = String(farbe || '#fac775');
+    if (!(key in TOR_BILD_CACHE)){
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = TOR_BILD; cv.height = TOR_BILD;
+        const c = cv.getContext('2d');
+        if (!c) throw new Error('kein 2D-Context');
+        zeichneSprungtor(c, TOR_BILD, key);
+        TOR_BILD_CACHE[key] = cv.toDataURL();
+      } catch(e){ TOR_BILD_CACHE[key] = null; }
+    }
+    return TOR_BILD_CACHE[key];
+  }
+
+  /* Vom sichtbaren Aussenradius zur Kachelkante: Der gezeichnete Ring endet bei TOR_RING_ANTEIL
+     der Kachel, alles ausserhalb ist durchsichtig. Wer stattdessen die Kachelkante gleich dem
+     Durchmesser setzt, zeichnet das Tor rund ein Fuenftel zu klein. */
+  const TOR_RING_ANTEIL = 0.455;
+
   /* Wo das Tor eines Vorpostens im Bild steht - oder null, wenn dieser Vorposten keines hat.
      `fertig` ist dieselbe Liste, aus der auch die Zeichnung liest. */
   function vorpostenSprungtorXY(vp, x, y, r){
@@ -10758,17 +10922,31 @@
         + `<circle cx="${P(ex)}" cy="${P(ey)}" r="${P(r*0.09)}" fill="${farbe}"/></g>`;
     }
     if (fertig.indexOf('sprungtor') >= 0){
-      /* Das Sprungtor ist das teuerste Bauwerk des Systems und bekommt das auffaelligste Bild:
-         ein offenstehender Torus ueber der Station, dessen Inneres schimmert. Es ist bewusst das
-         EINZIGE Teil mit einer Fuellung, damit es aus jeder Entfernung als Erstes auffaellt. */
-      const tx = x, ty = y - r*VP_TOR_HOCH, rx = r*0.92, ry = r*0.40;   // eingezogen, damit es in die Reservierung passt
-      out += `<g data-vp-projekt="sprungtor">`
-        + `<line x1="${P(x)}" y1="${P(y - r*0.9)}" x2="${P(tx)}" y2="${P(ty + ry*0.6)}" stroke="${farbe}" stroke-width="1.5"/>`
-        + `<ellipse cx="${P(tx)}" cy="${P(ty)}" rx="${P(rx*0.72)}" ry="${P(ry*0.72)}" fill="${farbe}" fill-opacity="0.28">`
-        + `<animate attributeName="fill-opacity" values="0.16;0.42;0.16" dur="2.8s" repeatCount="indefinite"/></ellipse>`
-        + `<ellipse cx="${P(tx)}" cy="${P(ty)}" rx="${P(rx)}" ry="${P(ry)}" fill="none" stroke="${farbe}" stroke-width="2.4"/>`
-        + `<ellipse cx="${P(tx)}" cy="${P(ty)}" rx="${P(rx*0.72)}" ry="${P(ry*0.72)}" fill="none" stroke="${farbe}" stroke-width="1" stroke-opacity="0.6"/>`
-        + `</g>`;
+      /* DAS SPRUNGTOR IST EIN BAUWERK, KEIN RING (KB-27, Auftrag Sascha: „ein richtiges tor mit
+         grafik nicht einfach nur ein ring"). Hier standen drei Ellipsen: ein flach liegender
+         Reifen mit pulsierender Fuellung. Zwei Dinge waren daran falsch, und nur eines davon war
+         die Zeichenqualitaet - ein Tor steht AUFRECHT. Man fliegt hindurch, nicht darueber; genau
+         das ist der Unterschied zwischen einem Ring und einem Tor, und seit KB-26 fliegen die
+         Flotten wirklich hindurch.
+         Gezeichnet wird wie bei Planeten, Nestern und der Station selbst: einmal auf Leinwand,
+         dann als Bild aus dem Zwischenspeicher (sprungtorBildUrl). Faellt das Backen aus, bleibt
+         der alte Ring als Rueckfall stehen - ein Tor, das gar nicht erscheint, waere schlimmer
+         als ein schlichtes. */
+      const tx = x, ty = y - r*VP_TOR_HOCH;
+      const torR = r * VP_TOR_RADIUS;
+      const bild = sprungtorBildUrl(farbe);
+      const stiel = `<line x1="${P(x)}" y1="${P(y - r*0.9)}" x2="${P(tx)}" y2="${P(ty + torR*0.55)}" stroke="${farbe}" stroke-width="1.5"/>`;
+      if (bild){
+        const kante = torR / TOR_RING_ANTEIL;   // Kachelkante, NICHT Durchmesser (siehe VP_TOR_HOCH)
+        out += `<g data-vp-projekt="sprungtor">` + stiel
+          + `<image href="${bild}" x="${P(tx - kante/2)}" y="${P(ty - kante/2)}" width="${P(kante)}" height="${P(kante)}"/>`
+          + `</g>`;
+      } else {
+        out += `<g data-vp-projekt="sprungtor">` + stiel
+          + `<circle cx="${P(tx)}" cy="${P(ty)}" r="${P(torR*0.72)}" fill="${farbe}" fill-opacity="0.28"/>`
+          + `<circle cx="${P(tx)}" cy="${P(ty)}" r="${P(torR)}" fill="none" stroke="${farbe}" stroke-width="2.4"/>`
+          + `</g>`;
+      }
     }
     return out;
   }
@@ -46130,6 +46308,66 @@ async function claimPendingRewards(){
      Hervorheben statt nur hinspringen: Auf einer Bahn mit bis zu zehn Plaetzen findet man den
      richtigen sonst nicht. Die Marke haengt am DOM-Knoten und ueberlebt kein Neuzeichnen - das ist
      hier richtig so, sie soll ja nur kurz blinken. */
+  /* ===== Das rote Fadenkreuz (KB-29, Wunsch Sascha: „das ziel angezeigt wird auf der karte mit
+     einem roten fadenkreuz und die zeit darueber wann der angriff ankommt") =====
+
+     WARUM EINE MARKE UND KEIN BLINKEN: `fundort-blink` haengt an einem DOM-Knoten und ueberlebt
+     kein Neuzeichnen - richtig fuer „schau mal hier", falsch fuer „hier schlaegt in 7 Minuten dein
+     Verband ein". Die Marke ist deshalb Zustand und wird beim Kartenaufbau MITGEZEICHNET.
+
+     WARUM DIE SEKUNDEN NICHT IM MARKUP STEHEN: Die Systemebene hat einen Markup-Zwischenspeicher
+     (lastSystemLayerMarkup) und einen Signatur-Riegel davor. Eine mitlaufende Zahl im Markup
+     erzwaenge einen vollstaendigen Neuaufbau je Sekunde - genau das, wogegen beide gebaut sind.
+     Im Bild steht deshalb nur der Zeitpunkt als Attribut; `karteZielZeitAktualisieren()` schreibt
+     jede Sekunde den Text hinein. Faellt der Aufbau doch einmal an, steht die Zahl trotzdem richtig
+     drin, weil sie beim Bauen aus derselben Funktion kommt.
+
+     WANN SIE VERFAELLT: eine Minute nach dem Einschlag, sonst nach fuenf Minuten. Ohne Ablauf
+     bliebe ein Fadenkreuz ueber einem Ziel stehen, das es nicht mehr gibt. */
+  let karteZielMarke = null;   // { system, selektor, ankunft, verfaellt }
+  const KARTE_ZIELMARKE_DAUER = 5 * 60 * 1000;
+  function karteZielMarkeAktiv(){
+    return (karteZielMarke && Date.now() < karteZielMarke.verfaellt) ? karteZielMarke : null;
+  }
+  function karteZielZeitText(ankunft){
+    if (!ankunft) return 'ZIEL';
+    const rest = ankunft - Date.now();
+    return rest > 0 ? ('Einschlag in ' + fmtDuration(rest/1000)) : 'Einschlag';
+  }
+  function karteZielZeitAktualisieren(){
+    const el = document.querySelector('[data-karte-zielzeit]');
+    if (!el) return;
+    el.textContent = karteZielZeitText(Number(el.getAttribute('data-karte-zielzeit')) || 0);
+  }
+  /* Der Radius kommt vom Objekt darunter, nicht als feste Zahl: Ein Nest belegt gut das Doppelte
+     eines Festungsmarkers, ein festes Fadenkreuz laege ueber dem einen und im anderen. */
+  function karteFadenkreuzSvg(x, y, r, ankunft){
+    const R = Math.max(13, r * 1.25), arm = R * 0.5, F = '#e24b4a';
+    let g = '<g data-karte-fadenkreuz="1" pointer-events="none">';
+    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R.toFixed(1)}" fill="none" stroke="${F}" stroke-width="1.6" stroke-opacity="0.95" stroke-dasharray="${(R*0.55).toFixed(1)} ${(R*0.3).toFixed(1)}">`
+       + `<animateTransform attributeName="transform" type="rotate" from="0 ${x.toFixed(1)} ${y.toFixed(1)}" to="360 ${x.toFixed(1)} ${y.toFixed(1)}" dur="7s" repeatCount="indefinite"/></circle>`;
+    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(R*0.6).toFixed(1)}" fill="none" stroke="${F}" stroke-width="1" stroke-opacity="0.5"/>`;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      g += `<line x1="${(x+dx*R*0.92).toFixed(1)}" y1="${(y+dy*R*0.92).toFixed(1)}" x2="${(x+dx*(R*0.92+arm)).toFixed(1)}" y2="${(y+dy*(R*0.92+arm)).toFixed(1)}" stroke="${F}" stroke-width="1.7" stroke-linecap="round" stroke-opacity="0.95"/>`;
+    }
+    g += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.9" fill="${F}"/>`;
+    g += `<text class="planet-label" x="${x.toFixed(1)}" y="${(y - R - arm - 4).toFixed(1)}" text-anchor="middle" data-karte-zielzeit="${Math.round(ankunft||0)}" style="fill:${F}; font-size:8px; font-weight:700; letter-spacing:0.3px;">${escapeHtml(karteZielZeitText(ankunft))}</text>`;
+    return g + '</g>';
+  }
+  /* Der Klick aus der Verbandszeile: Karte auf, System auf, Fadenkreuz setzen. Die Meldung sagt
+     ausdruecklich, WAS dort liegt - der Selektor allein trifft im System das erste Objekt seiner
+     Art, und bei zwei Nestern waere sonst offen, welches gemeint ist. */
+  function zeigeVerbandsziel(system, selektor, was, ankunft){
+    if (!system || !selektor) return false;
+    karteZielMarke = { system, selektor, ankunft: ankunft || 0,
+                       verfaellt: (ankunft && ankunft > Date.now()) ? (ankunft + 60000) : (Date.now() + KARTE_ZIELMARKE_DAUER) };
+    const sysName = (STAR_SYSTEMS.find(x => x.id === system) || { name: system }).name;
+    springeZuKartenziel(system, selektor);
+    log(ankunft && ankunft > Date.now()
+        ? was + ' – Einschlag in ' + fmtDuration((ankunft - Date.now())/1000) + ' bei ' + sysName + '.'
+        : was + ' – das Ziel liegt bei ' + sysName + '.', 'ti-target');
+    return true;
+  }
   function springeZuKartenziel(system, selektor){
     if (!system) return false;
     switchTab('karte');
@@ -48873,27 +49111,69 @@ async function claimPendingRewards(){
      dann ist `doc.targetTag` null. Vier Anzeigestellen und die Allianz-Nachricht lasen ihn bisher
      direkt - ohne diese EINE Quelle stuende dort viermal "[null]" (Punkt 6 der Checkliste: nicht
      die Mechanik geht kaputt, sondern die zweite Anzeigestelle). */
+  /* ZWEI FEHLER AUS DEM SPIELER-REPORT VOM 08.09.2026 (Screenshot der Allianz-Nachrichten):
+     (a) Der Nest-Zweig gab `doc.nestSystem` ROH aus. Das ist eine Kennung, kein Name - im Chat
+         stand woertlich „bei sys_halvar_weite". Der Festungs-Zweig loeste sie laengst ueber
+         STAR_SYSTEMS auf; die beiden liefen also auseinander. Jetzt loest EINE Zeile alle drei auf.
+     (b) Der Nest-Zweig gab nur den Volksnamen zurueck, und die Ankuendigung setzte „das Alien-Nest
+         der " davor - bei „Die Verglühten" las sich das als „der Die Verglühten". Volksnamen
+         tragen ihren eigenen Artikel und beugen sich nicht ('Kryll-Schwarm', 'Nomaden von Vex'),
+         ein Genitiv laesst sich daraus nicht bauen.
+     DARAUS DIE REGEL FUER DIESE FUNKTION: Sie liefert eine VOLLSTAENDIGE, ARTIKELFREIE
+     Zielbezeichnung. Kein Aufrufer setzt mehr einen Artikel oder ein Bestimmungswort davor - genau
+     das war die Doppelung. Der Allianzbasis-Zweig nennt sich deshalb selbst „Allianzbasis [TAG]"
+     statt bloss „[TAG]". */
   function musterZielText(doc){
     if (!doc) return '?';
+    const sysName = id => id ? ((STAR_SYSTEMS.find(x => x.id === id) || { name: id }).name) : '';
     if (doc.zielArt === 'alien-nest'){
-      const volk = doc.nestVolkName || 'Alien-Nest';
-      return doc.nestSystem ? (volk + ' bei ' + doc.nestSystem) : volk;
+      const volk = doc.nestVolkName || '';
+      const s = sysName(doc.nestSystem);
+      return 'Alien-Nest' + (s ? ' bei ' + s : '') + (volk ? ' (' + volk + ')' : '');
     }
     // Asteroidenfestung als Verbandsziel (01.09.2026) - Stufenname und System aus dem Dokument,
     // wie beim Nest; der Server schreibt beides beim Ausrufen hinein.
     if (doc.zielArt === 'festung'){
       const st = doc.festungStufeName || 'Asteroidenfestung';
-      const sysN = doc.festungSystem ? ((STAR_SYSTEMS.find(x => x.id === doc.festungSystem) || { name: doc.festungSystem }).name) : '';
-      return sysN ? (st + ' bei ' + sysN) : st;
+      const s = sysName(doc.festungSystem);
+      return st + (s ? ' bei ' + s : '');
     }
     // Vorposten (02.09.2026): Der BESITZER gehoert in den Namen - er ist die Auskunft, die den
     // Unterschied zu Nest und Festung ausmacht (dahinter steht ein Spieler, keine Welt).
     if (doc.zielArt === 'vorposten'){
       const st = doc.vorpostenStufeName || 'Vorposten';
-      const sysV = doc.vorpostenSystem ? ((STAR_SYSTEMS.find(x => x.id === doc.vorpostenSystem) || { name: doc.vorpostenSystem }).name) : '';
-      return st + ' von ' + (doc.vorpostenBesitzerName || '?') + (sysV ? ' bei ' + sysV : '');
+      const s = sysName(doc.vorpostenSystem);
+      return st + ' von ' + (doc.vorpostenBesitzerName || '?') + (s ? ' bei ' + s : '');
     }
-    return '[' + (doc.targetTag || '?') + ']';
+    return 'Allianzbasis [' + (doc.targetTag || '?') + ']';
+  }
+  /* WO liegt das Ziel auf der Karte? Schwesterfunktion zu musterZielText - dieselbe Verzweigung,
+     andere Frage. Sie liefert dasselbe Paar aus System und Selektor, das missionsKartenziel fuer
+     die eigenen Missionen liefert, damit beide Wege denselben Sprung benutzen.
+     EINE FREMDE ALLIANZBASIS HAT KEINEN ORT AUF DIESER KARTE - dort steht bewusst null statt eines
+     geratenen Systems: Ein Klick, der irgendwohin springt, waere schlechter als kein Klick (dieselbe
+     Begruendung wie bei Expedition und Abgrund in FP_OHNE_KARTENORT). */
+  function musterZielOrt(doc){
+    if (!doc) return null;
+    if (doc.zielArt === 'alien-nest') return doc.nestSystem ? { system: doc.nestSystem, selektor: '[data-map-nest]' } : null;
+    if (doc.zielArt === 'festung')    return doc.festungSystem ? { system: doc.festungSystem, selektor: '[data-map-festung]' } : null;
+    if (doc.zielArt === 'vorposten')  return doc.vorpostenSystem ? { system: doc.vorpostenSystem, selektor: '[data-map-vorposten]' } : null;
+    return null;
+  }
+  /* Wann schlaegt der Verband ein? Erst mit dem Abflug (`phase === 'enroute'`) steht die Zeit fest;
+     waehrend der Sammelphase gibt es sie noch nicht, und eine erfundene waere schlechter als keine. */
+  function musterZielAnkunft(doc){
+    return (doc && doc.phase === 'enroute' && doc.dispatch && doc.dispatch.arrivalAt) ? doc.dispatch.arrivalAt : 0;
+  }
+  /* Der eigene BEITRAG kennt sein Ziel auch dann, wenn das Verbandsdokument gerade nicht geladen
+     ist (Seite frisch geoeffnet, Server langsam). Deshalb erst das lebende Dokument fragen, dann
+     den beim Beitritt mitgeschriebenen Text - und erst zuletzt den rohen Tag. */
+  function musterBeitragZielText(contrib){
+    if (!contrib) return '?';
+    const doc = state.allianceMusterAttack;
+    if (doc && doc.id === contrib.musterAttackId) return musterZielText(doc);
+    if (contrib.zielText) return contrib.zielText;
+    return contrib.targetTag ? ('Allianzbasis [' + contrib.targetTag + ']') : 'unbekanntes Ziel';
   }
   /* DIE VIER SPERRGRUENDE DES VERBANDS-RUFS, EINMAL (Auftrag Sascha 07.09.2026, woertlich:
      „nester und koenigin auch angreifbar mit allianz machen").
@@ -48957,7 +49237,7 @@ async function claimPendingRewards(){
     musterParticipantsCache = { musterAttackId: doc.id, fetchedAt: Date.now(), parts: [] };
     const zielText = musterZielText(doc);
     log('Koordinierter Angriff gegen '+zielText+' geplant - Sammelphase '+fmtDuration(museterSeconds)+'.', 'ti-sword');
-    await postAllianceBaseNews('⚔ '+(state.player.name||'Ein Kommandant')+' plant einen koordinierten Angriff gegen '+(doc.zielArt==='alien-nest'?'das Alien-Nest der '+zielText:(doc.zielArt==='festung'||doc.zielArt==='vorposten')?zielText:'die Allianzbasis von '+zielText)+'! Sammelphase: '+fmtDuration(museterSeconds)+' - schließt eure Angriffsflotten im Allianz-Tab an.'+(doc.message?' Nachricht: „'+doc.message+'"':''));
+    await postAllianceBaseNews('⚔ '+(state.player.name||'Ein Kommandant')+' plant einen koordinierten Angriff gegen '+zielText+'! Sammelphase: '+fmtDuration(museterSeconds)+' - schließt eure Angriffsflotten im Allianz-Tab an.'+(doc.message?' Nachricht: „'+doc.message+'"':''));
     render(); save();
     /* DER RUECKGABEWERT IST DIE EINZIGE VERLAESSLICHE ERFOLGSMELDUNG (Durchsicht 07.09.2026).
        Diese Funktion hatte neun Fehlerpfade mit blossem `return;` und liess `state.allianceMusterAttack`
@@ -49125,7 +49405,12 @@ async function claimPendingRewards(){
     if (!res.ok || !data.ok){ log(data && data.error || 'Beitritt fehlgeschlagen.', 'ti-alert-triangle'); return; }
     for (const [k,v] of Object.entries(data.join.composition||{})){ if (v>0) cf[k] = Math.max(0, (cf[k]||0)-v); }
     if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
-    state.allianceMusterContribution = { musterAttackId: doc.id, targetTag: doc.targetTag, composition: data.join.composition, power: data.join.power, originPlanet: state.activeBasePlanet, joinedAt: data.join.joinedAt };
+    /* `zielText` und `zielOrt` werden beim Beitritt MITGESCHRIEBEN, obwohl beide aus dem
+       Verbandsdokument ableitbar sind: Nach einem Neuladen ist `state.allianceMusterAttack` erst
+       da, wenn der Server geantwortet hat - bis dahin haette die Flottenposition kein Ziel zu
+       nennen. Sie sind ein Rueckfall, nicht die Wahrheit: musterBeitragZielText fragt immer zuerst
+       das lebende Dokument. */
+    state.allianceMusterContribution = { musterAttackId: doc.id, targetTag: doc.targetTag, zielText: musterZielText(doc), zielOrt: musterZielOrt(doc), composition: data.join.composition, power: data.join.power, originPlanet: state.activeBasePlanet, joinedAt: data.join.joinedAt };
     log('Deine Flotte ('+data.join.shipCount+' Schiffe, '+fmt(data.join.power)+' Angriffskraft) schließt sich dem koordinierten Angriff gegen '+musterZielText(doc)+' an.', 'ti-sword');
     await refreshAllianceMusterParticipants(true);
     render(); save();
@@ -49138,7 +49423,7 @@ async function claimPendingRewards(){
     if (!doc || doc.id !== contrib.musterAttackId || doc.phase !== 'gathering' || doc.museterEndsAt <= Date.now()){
       log('Ein Rückzug ist nur während der laufenden Sammelphase möglich.', 'ti-alert-triangle'); return;
     }
-    if (!confirm('Deine Flotte vom koordinierten Angriff gegen ['+contrib.targetTag+'] zurückziehen? Die Schiffe kehren sofort zurück.')) return;
+    if (!confirm('Deine Flotte vom koordinierten Angriff gegen '+musterBeitragZielText(contrib)+' zurückziehen? Die Schiffe kehren sofort zurück.')) return;
     let res, data;
     try {
       res = await backendFetch('/musterattack/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tag, musterAttackId: contrib.musterAttackId }) });
@@ -49148,7 +49433,7 @@ async function claimPendingRewards(){
     const originFleet = contrib.originPlanet==='home' ? state.fleet : (state.colonies[contrib.originPlanet] ? state.colonies[contrib.originPlanet].fleet : null);
     if (originFleet){ for (const [k,v] of Object.entries(contrib.composition||{})){ if (typeof v==='number' && v>0) originFleet[k] = (originFleet[k]||0)+v; } }
     if (typeof data.saveVersion === 'number' && data.saveVersion > gameSaveVersion) gameSaveVersion = data.saveVersion;
-    log('Flotte vom koordinierten Angriff gegen ['+contrib.targetTag+'] zurückgezogen - alle Schiffe sind zurück.', 'ti-arrows-shuffle');
+    log('Flotte vom koordinierten Angriff gegen '+musterBeitragZielText(contrib)+' zurückgezogen - alle Schiffe sind zurück.', 'ti-arrows-shuffle');
     state.allianceMusterContribution = null;
     await refreshAllianceMusterParticipants(true);
     render(); save();
@@ -49186,7 +49471,7 @@ async function claimPendingRewards(){
       if (!res.ok || !data.ok || !data.doc) return;
       const fresh = data.doc;
       if (fresh.phase === 'enroute' && fresh.dispatch && fresh.id === doc.id){
-        postAllianceBaseNews('⚔ Koordinierter Angriff gegen ['+fresh.targetTag+'] gestartet! '+fresh.dispatch.participantCount+' Kommandanten, '+fmt(fresh.dispatch.totalShips)+' Schiffe, '+fmt(fresh.dispatch.totalPower)+' Angriffskraft. Ankunft in ~'+fmtDuration(Math.max(0,(fresh.dispatch.arrivalAt-Date.now())/1000))+'.');
+        postAllianceBaseNews('⚔ Koordinierter Angriff gegen '+musterZielText(fresh)+' gestartet! '+fresh.dispatch.participantCount+' Kommandanten, '+fmt(fresh.dispatch.totalShips)+' Schiffe, '+fmt(fresh.dispatch.totalPower)+' Angriffskraft. Ankunft in ~'+fmtDuration(Math.max(0,(fresh.dispatch.arrivalAt-Date.now())/1000))+'.');
       }
       state.allianceMusterAttack = fresh;
     } catch(e){}
@@ -49204,8 +49489,12 @@ async function claimPendingRewards(){
       if (!res.ok || !data.ok || !data.doc) return;
       const fresh = data.doc;
       if (fresh.phase === 'resolved' && fresh.result && !fresh.result.noParticipants){
-        const { success, destroyed, damage, targetTag } = fresh.result;
-        postAllianceBaseNews((success?'⚔ Koordinierter Angriff gegen ['+targetTag+'] erfolgreich - '+fmt(damage)+' Schaden!':'Koordinierter Angriff gegen ['+targetTag+'] wurde abgewehrt.')+(destroyed?' DIE GEGNERISCHE ALLIANZBASIS WURDE ZERSTÖRT!':''));
+        /* `fresh.result.targetTag` gibt es nur beim Allianzbasis-Ziel; bei Nest, Festung und
+           Vorposten stand hier woertlich „gegen [undefined]" (Spieler-Report 08.09.2026). Das
+           DOKUMENT kennt die Zielart, das Ergebnis nicht - also fragt die Meldung das Dokument. */
+        const { success, destroyed, damage } = fresh.result;
+        const zielN = musterZielText(fresh);
+        postAllianceBaseNews((success?'⚔ Koordinierter Angriff gegen '+zielN+' erfolgreich - '+fmt(damage)+' Schaden!':'Koordinierter Angriff gegen '+zielN+' wurde abgewehrt.')+(destroyed?' DIE GEGNERISCHE ALLIANZBASIS WURDE ZERSTÖRT!':''));
       }
       if (myAllianceTag() === attackerTag) state.allianceMusterAttack = fresh;
     } catch(e){}
@@ -49329,8 +49618,8 @@ async function claimPendingRewards(){
     state.resources.forschungspunkte = data.newForschungspunkte;
     if (data.destroyed) state.allianceBaseAttacksWon = (state.allianceBaseAttacksWon||0)+1;
     const lostText = lostParts.join(', ');
-    logScoreChange(data.battlePoints*3, 'Koordinierter Angriff gegen ['+doc.targetTag+']'+(data.destroyed?' - Basis ZERSTÖRT':(data.success?' erfolgreich':' abgewehrt'))+' (+'+data.battlePoints+' Kampfpunkte)', 'ti-sword');
-    log('Koordinierter Angriff gegen ['+doc.targetTag+'] abgeschlossen: '+(data.destroyed?'Basis ZERSTÖRT! ':(data.success?'Erfolgreich, ':'Abgewehrt, '))+fmt(data.damage||0)+' Schaden verursacht. Deine Belohnung: +'+data.credits+' Kredite, +'+data.forschungspunkte+' Forschungspunkte, +'+data.battlePoints+' Kampfpunkte.'+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), data.destroyed?'ti-skull':'ti-sword');
+    logScoreChange(data.battlePoints*3, 'Koordinierter Angriff gegen '+musterZielText(doc)+''+(data.destroyed?' - Basis ZERSTÖRT':(data.success?' erfolgreich':' abgewehrt'))+' (+'+data.battlePoints+' Kampfpunkte)', 'ti-sword');
+    log('Koordinierter Angriff gegen '+musterZielText(doc)+' abgeschlossen: '+(data.destroyed?'Basis ZERSTÖRT! ':(data.success?'Erfolgreich, ':'Abgewehrt, '))+fmt(data.damage||0)+' Schaden verursacht. Deine Belohnung: +'+data.credits+' Kredite, +'+data.forschungspunkte+' Forschungspunkte, +'+data.battlePoints+' Kampfpunkte.'+(lostText?' Eigene Verluste: '+lostText+'.':' Alle eigenen Schiffe zurückgekehrt.'), data.destroyed?'ti-skull':'ti-sword');
     // v8.430.0: Verbandsflotte, eigener Beitrag und Verluste ALS OBJEKTE in den Bericht - vorher
     // stand hier nur ownLostText als fertiger Satz (keine Schiffsbilder, kein Nachbau). doc.dispatch
     // gehoert beim Musterangriff sicher noch DIESEM Angriff (ein Schlag, kein Mehrwellen-Dokument
@@ -60055,14 +60344,35 @@ async function claimPendingRewards(){
     }
     const muster = state.allianceMusterContribution;
     if (muster && muster.composition && Object.keys(muster.composition).length){
-      // Der Musterangriff fuehrt keine Ankunftszeit mit - deshalb ankunft:0, die Zeile zeigt dann
-      // bewusst keinen Countdown statt einen erfundenen.
+      /* `ankunft` bleibt 0: Das ist die Ankunft am SAMMELPUNKT, und die hat der Musterangriff nicht
+         (er sammelt zu Hause). Die Ankunft am ZIEL ist eine andere Groesse und steht in
+         `zielAnkunft` - sie existiert erst nach dem Abflug. Beide in EIN Feld zu werfen haette
+         „Anflug auf den Sammelpunkt" ueber einen Verband geschrieben, der laengst auf das Ziel
+         zufliegt.
+         DAS ZIEL WIRD NICHT MEHR AUS `targetTag` GEBAUT (Spieler-Report 08.09.2026: „Musterangriff
+         auf [?]"): Bei Nest, Festung und Vorposten ist der Tag null - und das sind drei der vier
+         Zielarten, die es seit Phase 5 gibt. */
+      const musterDoc = state.allianceMusterAttack;
+      const docPasst = !!(musterDoc && musterDoc.id === muster.musterAttackId);
       out.push({ art:'muster', composition: muster.composition, power: muster.power||0,
                  originPlanet: muster.originPlanet || 'home',
                  ankunft: 0, start: muster.joinedAt || 0,
-                 ziel: 'Musterangriff auf ['+(muster.targetTag||'?')+']' });
+                 zielAnkunft: docPasst ? musterZielAnkunft(musterDoc) : 0,
+                 zielOrt: (docPasst ? musterZielOrt(musterDoc) : null) || muster.zielOrt || null,
+                 ziel: 'Musterangriff auf ' + musterBeitragZielText(muster) });
     }
     return out;
+  }
+  /* Das Klickziel eines Verbands-Eintrags - EINE Quelle fuer beide Anzeigestellen, aus demselben
+     Grund wie die Zeile selbst. Ohne Ort kein Attribut: Ein Allianz-Raid und ein Angriff auf eine
+     fremde Allianzbasis haben keinen Punkt auf dieser Karte, und ein Klick, der trotzdem irgendwo
+     landet, ist schlechter als kein Klick. */
+  function verbandKlickAttr(e){
+    if (!e || !e.zielOrt || !e.zielOrt.system || !e.zielOrt.selektor) return '';
+    return ' data-fp-vziel="' + escapeHtml(e.zielOrt.system) + '|' + escapeHtml(e.zielOrt.selektor) + '"'
+         + ' data-fp-vzeit="' + Math.round(e.zielAnkunft || 0) + '"'
+         + ' data-fp-vwas="' + escapeHtml(e.ziel || 'Ziel') + '" style="cursor:pointer;"'
+         + ' title="' + escapeHtml((e.ziel || 'Ziel') + ' – antippen zeigt das Ziel auf der Karte') + '"';
   }
   // Die Zeile - EINE Quelle fuer beide Anzeigestellen, wie recyclerAuftragZeile().
   function allianzVerbandZeile(e){
@@ -60073,13 +60383,20 @@ async function claimPendingRewards(){
     const dauer = Math.max(1, (e.ankunft - (e.start || e.ankunft)) / 1000);
     const pct = imAnflug ? Math.max(0, Math.min(100, 100 - (rest/(dauer*1000)*100))) : 100;
     const farbe = e.art === 'raid' ? '#c98bdb' : '#e24b4a';
+    /* Nach dem Abflug zaehlt die Zeile auf den EINSCHLAG herunter, statt „gebunden" zu zeigen: Die
+       Zeit steht seit dem Abflug im Verbandsdokument (dispatch.arrivalAt) und war hier nur nie
+       abgefragt worden. Waehrend der Sammelphase gibt es sie nicht - dann bleibt es bei „gebunden",
+       einer erfundenen Zahl waere schlechter als gar keiner. */
+    const zielRest = (e.zielAnkunft && e.zielAnkunft > now) ? (e.zielAnkunft - now) : 0;
     const lage = imAnflug ? 'Anflug auf den Sammelpunkt'
+                          : zielRest ? 'Im Anflug auf das Ziel'
                           : (e.art === 'raid' ? 'Am Sammelpunkt, wartet auf den Abflug' : 'Verband angeschlossen');
     return `
-      <div class="card-row" style="flex-direction:column; align-items:stretch;" title="Angeschlossen: ${fleetBreakdownHtml(e.composition)}">
+      <div class="card-row" style="flex-direction:column; align-items:stretch;"${verbandKlickAttr(e)} title="Angeschlossen: ${fleetBreakdownHtml(e.composition)}">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div class="bname"><i class="ti ti-users" aria-hidden="true" style="color:${farbe};"></i>${e.ziel} · ${fmt(schiffe)} Schiffe</div>
           ${imAnflug ? `<span class="lvl-pill">${fmtDuration(rest/1000)}</span>`
+                     : zielRest ? `<span class="lvl-pill" style="color:${farbe};">Einschlag in ${fmtDuration(zielRest/1000)}</span>`
                      : `<span class="lvl-pill" style="color:${farbe};">gebunden</span>`}
         </div>
         <div class="bmeta">${lage} · von ${planetDisplayName(e.originPlanet)} · ${fmt(Math.round(e.power))} Angriffskraft</div>
@@ -61576,6 +61893,11 @@ async function claimPendingRewards(){
          einer Passage, die der Spieler gar nicht mehr sieht. NUR die beiden Enden, NICHT expiresAt:
          eine mitlaufende Restzeit erzwaenge einen Kartenneubau je Sekunde. */
       (function(){ const w = wurmlochOffen(); return w ? (w.from + '↔' + w.to) : ''; })(),
+      /* KB-29: Setzen und Verfallen der Zielmarke muessen sofort im Bild stehen. BEWUSST OHNE die
+         Restsekunden - die schreibt karteZielZeitAktualisieren() direkt in den Textknoten, ein
+         sekundengenauer Anteil erzwaenge hier einen Kartenneubau je Sekunde (dieselbe Ueberlegung
+         wie beim Wurmloch darueber und bei den Nest-Lebenspunkten). */
+      (function(){ const zm = karteZielMarkeAktiv(); return zm ? (zm.system + zm.selektor) : ''; })(),
       // Vorposten (B2): entstehen, wachsen, fallen - schlank wie Nest und Konvoi.
       (vorpostenCache.liste||[]).map(v => v.id + ':' + v.stufe + ':' + Math.round(((v.kern||{}).lp||0)/1000) + ':' + (v.garnisonAnzahl||0)).join(','),
       /* KA-1: Ohne diesen Anteil erschiene ein Gefecht erst beim 5-Sekunden-Vollbau und waere
@@ -64982,6 +65304,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
        mit, damit zwei Marker nicht aufeinander landen (KB-17). Jede Markerart traegt sich hier
        ein; wer eine neue hinzufuegt, tut dasselbe. */
     const platzierteMarker = [];
+    /* Wo die Objekte liegen, auf die ein Fadenkreuz zeigen kann (KB-29) - eingetragen dort, wo sie
+       WIRKLICH gezeichnet werden. Wer die Stelle spaeter neu ausrechnet, zeichnet in genau den
+       Faellen daneben, in denen der Kollisionsschieber verschoben hat; dieselbe Lehre wie beim
+       Sprungtor eine Zeile weiter unten. Schluessel ist der Selektor, damit derselbe Aufloeser
+       (musterZielOrt) beide Wege bedient - Sprung und Fadenkreuz. */
+    const zielPunkte = {};
     /* Wo im gezeigten System ein NUTZBARES Sprungtor steht - gesetzt beim Zeichnen des Vorpostens
        (dort ist seine wirkliche Position bekannt), gelesen von der Flugbahn weiter unten. null,
        solange keines da ist. */
@@ -65196,6 +65524,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
            die spaeter gezeichneten Marker (Nester, NPCs, Spieler) ihr ausweichen. Ohne diese Zeile
            koennte ein Nest genau auf der Bastion landen (KB-17). */
         platzierteMarker.push({ x: pos.x, y: pos.y, r: r * 1.9 });
+        zielPunkte['[data-map-festung]'] = { x: pos.x, y: pos.y, r: r * 1.9 };
         const x = pos.x.toFixed(1), y = pos.y.toFixed(1);
         const anteil = Math.max(0, Math.min(1, (fest.kern||0) / (fest.kernMax || st.kern || 1)));
         // Eine Zinnenform: Rechteck mit drei Zacken oben. Handgezeichnet aus Punkten, damit sie
@@ -65242,6 +65571,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const sichtR = r * 2.0;
         const coord = kbMarkerFrei(nestMarkerXY(i), sysPlanets, activeSunType.r, sichtR, platzierteMarker);
         platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
+        // Das ERSTE Nest im System - derselbe Griff, den auch der Selektor [data-map-nest] tut.
+        if (!zielPunkte['[data-map-nest]']) zielPunkte['[data-map-nest]'] = { x: coord.x, y: coord.y, r: sichtR };
         const anteil = Math.max(0, Math.min(1, (nest.lp || 0) / Math.max(1, nest.lpMax || 1)));
         const b = r * 1.15;
         /* Der gerenderte Brutkoerper (Buendel D). Die Kachel ist r x 3 breit - das Bild bringt
@@ -65376,6 +65707,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Etappe V5b mit, das ist keine neue Regel, sondern die vorhandene sichtbar gemacht. */
         if (vorpostenDarfMitwirken(vp)) sprungtorPos = vorpostenSprungtorXY(vp, posV.x, posV.y, rV) || sprungtorPos;
         platzierteMarker.push({ x: posV.x, y: posV.y, r: sichtV });
+        zielPunkte['[data-map-vorposten]'] = { x: posV.x, y: posV.y, r: sichtV };
         const farbeV = vp.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD;
         const anteilV = Math.max(0, Math.min(1, ((vp.kern||{}).lp||0) / Math.max(1, (vp.kern||{}).lpMax||1)));
         const bV = rV * 1.15;
@@ -65978,6 +66310,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // Inhalt trotz gleicher Signatur wieder hinein (dieselbe childElementCount-Logik wie
     // setBoxHtml). Bei einem Skip bleiben die alten Knoten samt Klick-Handler stehen; der Klick
     // nach übersprungenen Ticks ist in tests/test_systemebene_cache.js abgedeckt.
+    /* Das Fadenkreuz ganz zuletzt: Es soll UEBER dem Ziel liegen, nicht darunter. */
+    {
+      const marke = karteZielMarkeAktiv();
+      const punkt = marke && marke.system === activeSystem ? zielPunkte[marke.selektor] : null;
+      if (punkt) inner += karteFadenkreuzSvg(punkt.x, punkt.y, punkt.r, marke.ankunft);
+    }
     if (inner === lastSystemLayerMarkup && svg.childElementCount) return;
     lastSystemLayerMarkup = inner;
     svg.innerHTML = inner;
@@ -73147,7 +73485,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
           // erst der Server. Ein heruntergezaehlter Countdown waere an dieser Stelle geraten.
           if (m.type === 'allianz-verband'){
             const e = m.eintrag;
-            restText = e.ankunft > nowT ? fmtDuration((e.ankunft - nowT)/1000) : 'gebunden';
+            restText = e.ankunft > nowT ? fmtDuration((e.ankunft - nowT)/1000)
+                     : (e.zielAnkunft && e.zielAnkunft > nowT) ? 'Einschlag in ' + fmtDuration((e.zielAnkunft - nowT)/1000)
+                     : 'gebunden';
           }
           // Eine stationierte Eskorte hat ebenso kein endTime: Sie steht, bis sie zurückgerufen wird.
           if (m.type === 'asteroid-eskorte') restText = 'stationiert';
@@ -73173,6 +73513,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
             shipsTooltip = 'Angeschlossen: '+fleetBreakdownHtml(e.composition)
                          + (e.ankunft > nowT ? ' – im Anflug auf den Sammelpunkt.'
                                              : ' – am Sammelpunkt, gebunden bis die Welle ausgefochten ist.');
+            // Dieselbe Quelle wie in der Missionsliste (verbandKlickAttr) - sonst waere genau hier
+            // die zweite Stelle, an der ein neues Verbandsziel kein Klickziel bekommt.
+            klickAttr = verbandKlickAttr(e);
           } else if (m.type === 'recycler-auftrag'){
             icon = 'ti-recycle'; color = '#5dcaa5';
             const flotte = fleetAtPlanet(m.zielKey);
@@ -73328,6 +73671,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
         });
         /* FL-1: dieselbe Verdrahtungsstelle, damit beide Wege nach jedem Neuschreiben der Box
            wieder haengen (setBoxHtml-Muster, siehe Kommentar darueber). */
+        /* KB-29: Der angeschlossene Verband fuehrt zum Ziel. BEWUSST dokumentweit statt auf
+           fpList gescopt - dieselbe Zeile steht in der Missionsliste im Flotte-Tab UND hier im
+           Seitenmenue. Ein erster Entwurf haengte sie an die Verdrahtung im Flotte-Zweig; dort
+           bekam die Zeile im Seitenmenue auf JEDEM anderen Reiter keinen Handler (gemessen: der
+           Klick tat nichts, solange der Basis-Tab offen war). Das Seitenmenue steht ausserhalb der
+           Tab-Riegel und ist damit die einzige Stelle, die beide Listen sicher erreicht. */
+        document.querySelectorAll('[data-fp-vziel]').forEach(el => {
+          el.onclick = () => {
+            const roh = el.getAttribute('data-fp-vziel') || '';
+            const trenner = roh.indexOf('|');
+            if (trenner < 0) return;
+            zeigeVerbandsziel(roh.slice(0, trenner), roh.slice(trenner + 1),
+                              el.getAttribute('data-fp-vwas') || 'Ziel',
+                              Number(el.getAttribute('data-fp-vzeit')) || 0);
+          };
+        });
         fpList.querySelectorAll('[data-fp-mziel]').forEach(el => {
           el.onclick = () => {
             const roh = el.getAttribute('data-fp-mziel') || '';
@@ -75564,6 +75923,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
         karteAuffangSig = kSig; karteVollbauZeit = kJetzt;
         buildGalaxyMap();
       }
+      /* KB-29: laeuft ausserhalb des Riegels - der Countdown am Fadenkreuz zaehlt jede Sekunde,
+         der Kartenaufbau soll das nicht tun. Ohne Marke ist es ein Ruecksprung ohne Arbeit. */
+      karteZielZeitAktualisieren();
     }
   }
 

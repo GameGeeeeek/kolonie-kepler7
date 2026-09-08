@@ -140,7 +140,12 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
     return {
       da:true,
       module: teile('[data-vp-modul]').map(e => ({ key: e.getAttribute('data-vp-modul'), seltenheit: e.getAttribute('data-vp-modul-seltenheit'), lage: lage(e), html: e.innerHTML })),
-      projekte: teile('[data-vp-projekt]').map(e => ({ key: e.getAttribute('data-vp-projekt'), html: e.innerHTML })),
+      projekte: teile('[data-vp-projekt]').map(e => {
+        // Die Flaeche im Bild - fuer 2c, das nach dem AUFFALLEN fragt und nicht nach Markup.
+        const b = e.getBoundingClientRect();
+        return { key: e.getAttribute('data-vp-projekt'), html: e.innerHTML,
+                 flaeche: Math.round((b.width||0) * (b.height||0)) };
+      }),
       schaden: teile('[data-vp-schaden]').map(e => e.getAttribute('data-vp-schaden')),
       schadenTeile: teile('[data-vp-schaden]').reduce((n, e) => n + e.children.length, 0),
       bau: teile('[data-vp-bau]').map(e => e.getAttribute('data-vp-bau')),
@@ -246,11 +251,27 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
   check('2b: die andere Haelfte der Projekttabelle zeichnet ebenso - und nur sie',
     andere.mess.projekte.map(p => p.key).sort().join(',') === 'bollwerk,handelskammer',
     { gezeichnet: andere.mess.projekte.map(p => p.key) });
-  check('2c: das Sprungtor ist das einzige Teil mit einer Fuellung - es soll zuerst auffallen', (() => {
+  /* GEPRUEFT WIRD DAS AUFFALLEN, NICHT DAS MARKUP (nachgezogen mit KB-27). Hier stand
+     `/fill-opacity="0\.\d+"/` - das war die Bauweise der drei Ellipsen, aus denen das Tor bis
+     dahin bestand, nicht seine Zusage. Als das Tor ein gerendertes Bild wurde, fiel die Pruefung
+     auf richtigem Code: Ein `<image>` hat keine fill-opacity, faellt aber staerker auf als jede
+     Ellipse. Genau die Fehlerklasse aus docs/PROJECT_MEMORY.md („Ein Waechter, der eine andere
+     Regel prueft als die geltende").
+     Ein zweiter Anlauf verglich die FLAECHE der Umrandungen und fiel ebenfalls - zu Recht: Der
+     Dockring ist ein Reifen um die ganze Station, seine Box ist viermal so gross wie die des
+     Tores, gezeichnet ist davon aber nur ein Strich. Eine Box-Flaeche misst kein Auffallen.
+     GEMESSEN wird deshalb, was die anderen Teile wirklich unterscheidet (nachgesehen an allen
+     fuenf Projektteilen, 08.09.2026): Bollwerk, Dockring, Handelskammer und Tiefenhorchposten sind
+     Strichzeichnungen - ihre Fuellungen sind ausschliesslich der dunkle Hinterlegungston und ein
+     Akzentpunkt. Das Tor ist das einzige mit einer GEZEICHNETEN OBERFLAECHE. Es faellt, wenn das
+     Tor wieder zur Strichzeichnung wird, und ebenso, wenn ein zweites Projekt eine Oberflaeche
+     bekommt - dann ist zu entscheiden, was zuerst auffallen soll, statt es dem Zufall zu lassen. */
+  check('2c: das Sprungtor ist das einzige Projektteil mit einer gezeichneten Oberflaeche', (() => {
+    const flaechig = (p) => /<image[ >]/.test(p.html) || /fill-opacity="0\.\d+"/.test(p.html);
     const tor = voll.mess.projekte.find(p => p.key === 'sprungtor');
     const rest = voll.mess.projekte.filter(p => p.key !== 'sprungtor');
-    return !!tor && /fill-opacity="0\.\d+"/.test(tor.html) && rest.every(p => !/fill-opacity="0\.\d+"/.test(p.html));
-  })(), { tor: (voll.mess.projekte.find(p => p.key === 'sprungtor')||{}).html });
+    return !!tor && flaechig(tor) && rest.length > 0 && rest.every(p => !flaechig(p));
+  })(), { teile: voll.mess.projekte.map(p => ({ key: p.key, bild: /<image[ >]/.test(p.html), flaeche: p.flaeche })) });
 
   // ---- 3) Der Zustand des Kerns ----------------------------------------------------------------
   check('3a: ein unversehrter Kern zeigt KEINEN Schaden', voll.mess.schaden.length === 0, { schaden: voll.mess.schaden });
