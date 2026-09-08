@@ -245,21 +245,58 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
 }
 
 const SAB = process.env.KEPLER_TOR_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1b'] };
+/* ZWEI VERGLEICHSSTAENDE, weil dieser Test inzwischen zwei Aenderungen bewacht - und die
+   MUSS_FALLEN-Liste gilt immer NUR fuer einen bestimmten alten Stand. Gemessen, nicht gesetzt:
+     alt  = vor KB-26 (264b8c6). Dort begann die Bahn an der Sonne UND das Tor war ein flacher
+            Ellipsen-Ring -> 1b, 3a und 3b fallen.
+     ring = vor KB-27 (4cdf423). Dort fliegt die Flotte schon durch das Tor (KB-26 ist drin),
+            das Tor ist aber noch der flache Ring -> nur 3a und 3b fallen, 1b bleibt gruen.
+   Der erste Anlauf fuehrte nur `alt` und lief gegen 4cdf423 - die Gegenprobe meldete daraufhin
+   „1b blieb gruen" und hatte recht: Sie mass einen Stand, der KB-26 laengst kennt. */
+const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'] };
 const ergebnis = {};
 const check2 = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 /* Wo die Bahn ANFAENGT, und wo Sonne und Tor stehen. Alles aus dem gerenderten Bild: Die
-   Torposition wird NICHT nachgerechnet, sondern an der gezeichneten Ellipse abgelesen - eine
-   zweite Rechnung waere eine zweite Wahrheit und ginge beim naechsten Verschieben auseinander. */
+   Torposition wird NICHT nachgerechnet, sondern am gezeichneten Tor abgelesen - eine zweite
+   Rechnung waere eine zweite Wahrheit und ginge beim naechsten Verschieben auseinander.
+   ABGELESEN WIRD DIE MITTE DES TORBILDS, NICHT EINE ELLIPSE (nachgezogen mit KB-27). Bis dahin
+   bestand das Tor aus drei Ellipsen, und der Test suchte genau die - als es ein gerendertes Bild
+   wurde, fand er nichts und meldete auf richtigem Code rot. Die Mitte kommt jetzt aus dem
+   Rahmen des gezeichneten Teils, egal woraus es besteht: Bild wie Ellipse. */
 async function bahnStart(page, farbe){
   return page.evaluate((f) => {
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return { svg:false };
     const l = [...svg.querySelectorAll('line')].find(e => (e.getAttribute('stroke')||'') === f && !e.getAttribute('stroke-dasharray'));
-    const tor = svg.querySelector('[data-vp-projekt="sprungtor"] ellipse');
-    const mitte = tor ? { x: Number(tor.getAttribute('cx')), y: Number(tor.getAttribute('cy')) } : null;
-    return { svg:true, bahn: l ? { x:Number(l.getAttribute('x1')), y:Number(l.getAttribute('y1')) } : null, tor: mitte };
+    const tor = svg.querySelector('[data-vp-projekt="sprungtor"] image, [data-vp-projekt="sprungtor"] ellipse, [data-vp-projekt="sprungtor"] circle');
+    let mitte = null;
+    if (tor && tor.tagName === 'image'){
+      mitte = { x: Number(tor.getAttribute('x')) + Number(tor.getAttribute('width'))/2,
+                y: Number(tor.getAttribute('y')) + Number(tor.getAttribute('height'))/2 };
+    } else if (tor){
+      mitte = { x: Number(tor.getAttribute('cx')), y: Number(tor.getAttribute('cy')) };
+    }
+    /* KB-27: Bauart und Ausdehnung des Tores. `gestalt` sagt, WORAUS es besteht; `masse` gibt
+       Breite und Hoehe im Bild und den Abstand der weitesten Ecke zur Stationsmitte, gemessen in
+       Marker-Radien - dieselbe Groesse, die kbMarkerFrei reserviert. Der Radius kommt wie in
+       test_vorposten_zustand aus dem unsichtbaren Trefferkreis (r = rV x 1,45). */
+    const grp = svg.querySelector('[data-vp-projekt="sprungtor"]');
+    let gestalt = null, masse = null;
+    if (grp){
+      gestalt = { bild: grp.querySelectorAll('image').length, ellipsen: grp.querySelectorAll('ellipse').length };
+      const treffer = svg.querySelector('[data-map-vorposten] circle[fill="transparent"]');
+      const gb = grp.getBoundingClientRect();
+      if (treffer && gb.width && gb.height){
+        const tb = treffer.getBoundingClientRect();
+        const sx = tb.left + tb.width/2, sy = tb.top + tb.height/2, rV = (tb.width/2)/1.45;
+        const ecken = [[gb.left,gb.top],[gb.right,gb.top],[gb.left,gb.bottom],[gb.right,gb.bottom]];
+        masse = { breite: gb.width, hoehe: gb.height,
+                  seitenverhaeltnis: +(gb.width/gb.height).toFixed(2),
+                  eckeInRadien: +(Math.max.apply(null, ecken.map(p => Math.hypot(p[0]-sx, p[1]-sy))) / rV).toFixed(2) };
+      }
+    }
+    return { svg:true, bahn: l ? { x:Number(l.getAttribute('x1')), y:Number(l.getAttribute('y1')) } : null, tor: mitte, gestalt, masse };
   }, farbe);
 }
 const abst = (a,b) => (a && b) ? Math.hypot(a.x-b.x, a.y-b.y) : null;
@@ -294,6 +331,24 @@ const SONNE = (() => {
       !!a.bahn && !!a.tor && abst(a.bahn, a.tor) < 3 && abst(a.bahn, SONNE) > 12,
       { zumTor: a.tor ? +abst(a.bahn, a.tor).toFixed(1) : null,
         zurSonne: +abst(a.bahn, SONNE).toFixed(1) });
+
+    /* ---- 3) DAS TOR SELBST (KB-27, Auftrag Sascha: „ein richtiges tor mit grafik nicht einfach
+       nur ein ring ... aehnlich stargate atlantis") ------------------------------------------- */
+    check2('3a: das Tor ist ein gerendertes Bauwerk, kein Ellipsen-Ring',
+      !!a.gestalt && a.gestalt.bild === 1 && a.gestalt.ellipsen === 0, { gestalt: a.gestalt });
+    /* AUFRECHT ist die eigentliche Zusage - ein Tor durchfliegt man, ein Reifen liegt herum. Der
+       flache Vorgaenger war 2,3-mal so breit wie hoch (rx 0,92 r zu ry 0,40 r); ein aufrechtes Tor
+       ist rund quadratisch. Gemessen mit Spielraum, damit der Stiel unten nicht stoert. */
+    check2('3b: es steht aufrecht - Breite und Hoehe liegen beieinander',
+      !!a.masse && a.masse.seitenverhaeltnis > 0.55 && a.masse.seitenverhaeltnis < 1.45, { masse: a.masse });
+    /* Und es bleibt im reservierten Platz. Diese Pruefung gilt auch fuer den flachen Vorgaenger -
+       sie ist kein Beleg fuer KB-27, sondern der Waechter, der die naechste Vergroesserung faengt.
+       GEMESSEN wird die weiteste ECKE, nicht die Oberkante: kbMarkerFrei rechnet mit Math.hypot.
+       Genau diese Verwechslung hat den ersten Entwurf des Tores auf 3,63 r wachsen lassen. */
+    const reserviert = Number((quelle.match(/const VORPOSTEN_SICHT = ([\d.]+);/) || [])[1]);
+    check2('3c: das Tor bleibt im reservierten Platz des Vorpostens',
+      reserviert > 0 && !!a.masse && a.masse.eckeInRadien <= reserviert,
+      { gemessen: a.masse && a.masse.eckeInRadien, reserviert });
     await mitTorLauf.ctx.close();
 
     // ---- 1c) Ohne Tor ---------------------------------------------------------------------------
