@@ -31571,6 +31571,20 @@ async function claimPendingRewards(){
              schon aus der Warteschlange geschoben - was dieser Zweig nicht bucht, ist endgueltig
              weg. Eine Lieferung zu verlieren, weil gerade alle Slots belegt sind, waere ein
              Spielerschaden fuer eine Anzeigefrage. */
+          /* ERST DEN VORPOSTEN KENNEN, DANN DIE FLUGZEIT EINFRIEREN (Befund der Durchsicht an
+             PR #613, bestaetigt und an der Aufrufkette gemessen). `vorpostenFlugMult` liest
+             `vorpostenCache`, und den fuellt beim Start erst `loadGalaxyState`: /galaxy abwarten,
+             DANN /vorposten - ZWEI Anfragen nacheinander, waehrend diese Einloesung nur EINE
+             braucht und beide im selben Takt losgeschickt werden (Startzeile am Dateiende).
+             Der Wettlauf ist damit nicht knapp, sondern entschieden: `vorpostenAn()` liefert null,
+             `vorpostenFlugMult` gibt 1 zurueck, und der Verband truege die ungekuerzte Flugzeit -
+             fuer immer, denn eine eingefrorene Mission rechnet nie nach.
+             NUR HIER und NUR beim ersten Mal: `geladen` bleibt 0, solange /vorposten nie
+             geantwortet hat. Jede andere Belohnung soll dafuer keine Anfrage zahlen, und wenn der
+             Abruf scheitert, versucht es die naechste Lagerlieferung erneut (der Zaehler der
+             Schleife deckelt das bei zehn). `ladeVorposten()` wirft nicht und kehrt ohne Backend
+             sofort zurueck - dieser Zweig kann daran also nicht haengenbleiben. */
+          if (!vorpostenCache.geladen) await ladeVorposten();
           if (vorpostenFrachtStarten(r)) continue;
           const sysNameL = (STAR_SYSTEMS.find(x=>x.id===r.system)||{name:r.system}).name;
           log(vorpostenFrachtBuchen(r, sysNameL, false)

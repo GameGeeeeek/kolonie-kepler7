@@ -12,6 +12,9 @@
 //       bleibt, wo er war.
 //   1b  Stattdessen entsteht eine Mission 'vorposten-fracht', die die Fracht eingefroren mitfuehrt.
 //   1c  Sie belegt einen Flottenslot. Gemessen an der Anzeige, nicht an der Rechnung.
+//   1d  Der Flugrabatt des Vorpostens steckt in der eingefrorenen Flugzeit - auch dann, wenn die
+//       Einloesung frueher antwortet als der Abruf des Vorpostens. Gemessen als Verhaeltnis
+//       zweier sonst gleicher Laeufe, nicht gegen eine eingetippte Sollzeit.
 //   2a  Bei der ANKUNFT wird gebucht - Bestand steigt, und die Meldung sagt, dass der Verband
 //       zurueck ist. Gemessen mit einer Mission, deren Ankunft schon vorbei ist.
 //   2b  Die Schiffe aus dem Sternendock reisen mit und kommen an.
@@ -32,12 +35,16 @@ const ICH = 'u-ich';
 const SYS = 'vega';
 const now = Date.now();
 const GEGENPROBE = process.env.KEPLER_FRACHT_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'], standort: ['2d'], mond: ['2e'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'], standort: ['2d'], mond: ['2e'], kalt: ['1d'] };
 
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp: 20000*s, verteidigung: 2500*s,
   garnisonMax: 300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
 const ZWEIGE = [{ key:'werft', name:'Werft', kurz:'x', namen:{4:'Werftgerüst',5:'Dockring',6:'Schiffsschmiede',7:'Flottenwerft',8:'Sternenwerft'}, mult:{} }];
 
+/* Der Flugrabatt der Vorlage steht als KONSTANTE da, weil 1d gegen ihn rechnet. Eine zweite,
+   eingetippte 0.2 in der Erwartung waere genau die Sorte Zahl, die beim naechsten Vorlagen-Umbau
+   still falsch wird. */
+const VP_FLUG_RABATT = 0.2;
 function vpDoc(over){
   return Object.assign({
     id:'vp-1', sys:SYS, besitzer:ICH, besitzerName:'Ich', seit: now - 86400000,
@@ -47,7 +54,7 @@ function vpDoc(over){
     slots:5, module:[], modulBoni:null, projekte:[], projektBoni:null,
     lager:{ erz: 5000, kristalle: 2000, deuterium: 500 }, lagerVollAb: now + 36e5, dockBereit: 0,
     abbauAb:null, schutzBis:0, ausbauAb: now - 1000,
-    nutzen:{ flug:0.2, prod:0.05, scan:3, flugDeckel:0.5 }, eigener:true,
+    nutzen:{ flug:VP_FLUG_RABATT, prod:0.05, scan:3, flugDeckel:0.5 }, eigener:true,
     anflug:[], meinLetzterSchlag:0, letzterKampf:null, kampfverlauf:[], naechsteStufe:null
   }, over || {});
 }
@@ -96,10 +103,18 @@ async function lauf(browser, opt){
     if (p === 'me') return j({ userId:ICH, username:'Ich', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
     if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, activePirateFaction:null, unlockedAlienRaces:[],
       activeWar:null, collapsedSystems:{}, activeWormhole:null, news:[], alienNester:[], controlledSystems:{}, wrackKonvois:[] });
-    if (p === 'vorposten') return j({ ok:true, aktiv:true, bauAktiv:true, maxJeKonto:3, schutzMs:43200000, abklingMs:14400000,
+    if (p === 'vorposten'){
+      /* TRAEGE ANTWORT (1d). Im echten Start ist der Wettlauf schon ohne Zutun entschieden -
+         `loadGalaxyState` muss /galaxy abwarten, BEVOR es /vorposten ueberhaupt schickt, waehrend
+         die Einloesung mit einer Anfrage auskommt. Der Mock erfuellt beide sofort, und dann
+         entscheidet die Taktzuteilung des Browsers. Eine Pruefung, die davon abhaengt, misst
+         Glueck. Die Verzoegerung macht die REIHENFOLGE zur Vorgabe statt zum Zufall. */
+      if (opt.vorpostenTraege) await new Promise(res => setTimeout(res, opt.vorpostenTraege));
+      return j({ ok:true, aktiv:true, bauAktiv:true, maxJeKonto:3, schutzMs:43200000, abklingMs:14400000,
       ausbauMs:43200000, garnisonFaktor:0.5, stufen:STUFEN, zweige:ZWEIGE, zweigAb:4, maxStufe:8, liste:[vpDoc(opt.vp)], eigene:1,
       modulDefs:[], modulSeltenheiten:{}, modulBestand:{}, modulSlotsMax:5, projektDefs:[], projekteAktiv:true,
       flugDeckel:0.5, abbauMs:86400000, abbauAktiv:true, lagerAktiv:true, dockMax:7 });
+    }
     if (p === 'asteroid/field') return j({ systeme:[], felder:{} });
     if (p === 'reports') return j(req.method() === 'POST' ? { ok:true } : { reports:[] });
     if (p === 'players-map') return j({ players:[] });
@@ -198,6 +213,36 @@ const KOLONIE = (fsF.readFileSync(SPIELDATEI, 'utf8').match(/\{ id:'(\w+)',[^\n]
   const belegt = slots ? Number((slots.match(/(\d+)\s*\//) || [])[1]) : null;
   merke('1c: er belegt einen Flottenslot', belegt >= 1, { anzeige: slots, belegt });
   await a.ctx.close();
+
+  /* ---- 1d) DER FLUGRABATT UEBERLEBT DEN KALTEN ZWISCHENSPEICHER ------------------------------
+     Befund der Durchsicht an PR #613, bestaetigt an der Aufrufkette: `vorpostenFlugMult` liest
+     `vorpostenCache`, und den fuellt beim Start erst /galaxy -> /vorposten - zwei Anfragen
+     nacheinander, waehrend die Einloesung mit einer auskommt. Traf sie zuerst ein, stand der
+     Speicher leer, `vorpostenAn()` gab null, und der Verband bekam die UNGEKUERZTE Flugzeit
+     eingefroren. Eingefroren heisst fuer immer: die Mission rechnet nie nach.
+
+     GEMESSEN WIRD DIE REGEL, NICHT EINE ZAHL: zweimal derselbe Lauf mit derselben traegen
+     Antwort, einmal mit Rabatt in der Vorlage und einmal ohne. Der Unterschied zwischen beiden
+     Dauern IST der Rabatt. Eine eingetippte Sollzeit waere beim naechsten Umbau der Flugformel
+     still falsch; dieser Vergleich nicht.
+
+     Am Stand vor der Behebung sind beide Dauern GLEICH - der Rabatt kam in keinem der beiden
+     Laeufe an, und genau das faellt hier auf. */
+  const dauerVon = async (rabatt) => {
+    const l = await lauf(browser, { belohnung: BELOHNUNG, vorpostenTraege: 400,
+                                    vp: { nutzen:{ flug: rabatt, prod:0.05, scan:3, flugDeckel:0.5 } } });
+    const sv = await stand(l);
+    await l.ctx.close();
+    const m = (((sv.save || {}).fleet || {}).missions || []).filter(x => x && x.type === 'vorposten-fracht')[0];
+    return m ? (m.endTime - m.startTime) : null;
+  };
+  const mitRabatt = await dauerVon(VP_FLUG_RABATT);
+  const ohneRabatt = await dauerVon(0);
+  const verhaeltnis = (mitRabatt && ohneRabatt) ? (mitRabatt / ohneRabatt) : null;
+  merke('1d: der Flugrabatt des Vorpostens wirkt, auch wenn die Einloesung vor /vorposten antwortet',
+    verhaeltnis !== null && Math.abs(verhaeltnis - (1 - VP_FLUG_RABATT)) < 0.01,
+    { mitRabattS: mitRabatt && Math.round(mitRabatt/1000), ohneRabattS: ohneRabatt && Math.round(ohneRabatt/1000),
+      verhaeltnis: verhaeltnis && +verhaeltnis.toFixed(3), erwartet: 1 - VP_FLUG_RABATT });
 
   // ---- 2) Die Ankunft --------------------------------------------------------------------------
   const angekommen = { id: 4711, type:'vorposten-fracht', targetId: SYS, system: SYS,
