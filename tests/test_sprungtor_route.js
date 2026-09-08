@@ -245,22 +245,32 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
 }
 
 const SAB = process.env.KEPLER_TOR_GEGENPROBE || '';
+<<<<<<< HEAD
 const MUSS_FALLEN = { alt: ['1b', '3a', '3b'] };
+=======
+const MUSS_FALLEN = { alt: ['1b'] };
+>>>>>>> origin/main
 const ergebnis = {};
 const check2 = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 /* Wo die Bahn ANFAENGT, und wo Sonne und Tor stehen. Alles aus dem gerenderten Bild: Die
+<<<<<<< HEAD
    Torposition wird NICHT nachgerechnet, sondern am gezeichneten Tor abgelesen - eine zweite
    Rechnung waere eine zweite Wahrheit und ginge beim naechsten Verschieben auseinander.
    ABGELESEN WIRD DIE MITTE DES TORBILDS, NICHT EINE ELLIPSE (nachgezogen mit KB-27). Bis dahin
    bestand das Tor aus drei Ellipsen, und der Test suchte genau die - als es ein gerendertes Bild
    wurde, fand er nichts und meldete auf richtigem Code rot. Die Mitte kommt jetzt aus dem
    Rahmen des gezeichneten Teils, egal woraus es besteht: Bild wie Ellipse. */
+=======
+   Torposition wird NICHT nachgerechnet, sondern an der gezeichneten Ellipse abgelesen - eine
+   zweite Rechnung waere eine zweite Wahrheit und ginge beim naechsten Verschieben auseinander. */
+>>>>>>> origin/main
 async function bahnStart(page, farbe){
   return page.evaluate((f) => {
     const svg = document.getElementById('galaxyMapSvg');
     if (!svg) return { svg:false };
     const l = [...svg.querySelectorAll('line')].find(e => (e.getAttribute('stroke')||'') === f && !e.getAttribute('stroke-dasharray'));
+<<<<<<< HEAD
     const tor = svg.querySelector('[data-vp-projekt="sprungtor"] image, [data-vp-projekt="sprungtor"] ellipse, [data-vp-projekt="sprungtor"] circle');
     let mitte = null;
     if (tor && tor.tagName === 'image'){
@@ -289,6 +299,11 @@ async function bahnStart(page, farbe){
       }
     }
     return { svg:true, bahn: l ? { x:Number(l.getAttribute('x1')), y:Number(l.getAttribute('y1')) } : null, tor: mitte, gestalt, masse };
+=======
+    const tor = svg.querySelector('[data-vp-projekt="sprungtor"] ellipse');
+    const mitte = tor ? { x: Number(tor.getAttribute('cx')), y: Number(tor.getAttribute('cy')) } : null;
+    return { svg:true, bahn: l ? { x:Number(l.getAttribute('x1')), y:Number(l.getAttribute('y1')) } : null, tor: mitte };
+>>>>>>> origin/main
   }, farbe);
 }
 const abst = (a,b) => (a && b) ? Math.hypot(a.x-b.x, a.y-b.y) : null;
@@ -323,6 +338,7 @@ const SONNE = (() => {
       !!a.bahn && !!a.tor && abst(a.bahn, a.tor) < 3 && abst(a.bahn, SONNE) > 12,
       { zumTor: a.tor ? +abst(a.bahn, a.tor).toFixed(1) : null,
         zurSonne: +abst(a.bahn, SONNE).toFixed(1) });
+<<<<<<< HEAD
 
     /* ---- 3) DAS TOR SELBST (KB-27, Auftrag Sascha: „ein richtiges tor mit grafik nicht einfach
        nur ein ring ... aehnlich stargate atlantis") ------------------------------------------- */
@@ -341,6 +357,8 @@ const SONNE = (() => {
     check2('3c: das Tor bleibt im reservierten Platz des Vorpostens',
       reserviert > 0 && !!a.masse && a.masse.eckeInRadien <= reserviert,
       { gemessen: a.masse && a.masse.eckeInRadien, reserviert });
+=======
+>>>>>>> origin/main
     await mitTorLauf.ctx.close();
 
     // ---- 1c) Ohne Tor ---------------------------------------------------------------------------
