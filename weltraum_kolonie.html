@@ -31276,8 +31276,18 @@ function vorpostenFrachtStarten(r){
    Rueckgabewert: Der Aufrufer soll EINE Zeichenkette bekommen und selbst loggen - beide Aufrufer
    haengen naemlich noch etwas Eigenes an. */
 let vorpostenFrachtWarnung = false;
-function vorpostenFrachtBuchen(r, sysNameL, unterwegsGewesen){
+/* WOHIN die Schiffe gehen, ist ein PARAMETER und nicht mehr `currentFleet()` (Befund der
+   Durchsicht an PR #613, bestaetigt): Der Transportverband kuendigt beim Start einen Ort an
+   („Bringt ... auf Heimatbasis"), und `currentFleet()` liest den Standort, der GERADE aktiv ist.
+   Wer waehrend des Fluges auf eine Kolonie wechselt, bekaeme seine Sternendock-Schiffe dort - an
+   einem Ort, den ihm niemand versprochen hat, und an dem sie ihm womoeglich fehlen.
+   Die Rohstoffe sind davon nicht betroffen (state.resources ist global), die Schiffe schon.
+   Der SOFORT buchende Rueckfall uebergibt weiterhin den aktiven Standort - dort ist er richtig,
+   und die Meldung sagt genau das. */
+function vorpostenFrachtBuchen(r, sysNameL, unterwegsGewesen, zielFlotte, zielOrt){
   vorpostenFrachtWarnung = false;
+  const flotteZiel = zielFlotte || currentFleet();
+  const ortZiel = zielOrt || state.activeBasePlanet;
           /* DER ERTRAG GEHT DURCH gainResources, nicht direkt in state.resources (Befund des
              Review-Bots auf PR #562, bestaetigt). Dort haengt der Lagerdeckel - und der Kommentar
              an jener Funktion sagt genau diesen Fall voraus: „Jede kuenftige Quelle (Ereignis,
@@ -31315,7 +31325,7 @@ function vorpostenFrachtBuchen(r, sysNameL, unterwegsGewesen){
           const dockTeile = [];
           let dockUnbekannt = 0;
           if (r.schiffe && typeof r.schiffe === 'object'){
-            const flotteL = currentFleet();
+            const flotteL = flotteZiel;
             for (const [k, n] of Object.entries(r.schiffe)){
               const anz = Math.max(0, Math.round(Number(n) || 0));
               const defL = shipDefOrSuper(k);
@@ -31342,7 +31352,7 @@ function vorpostenFrachtBuchen(r, sysNameL, unterwegsGewesen){
           /* WOHIN die Schiffe gehen, steht dabei: currentFleet() bucht auf den AKTIVEN Standort, und
              wer auf einer Kolonie steht, suchte sie sonst auf der Heimatbasis. Der Abbau-Zweig nennt
              den Ort aus genau diesem Grund. */
-          const dockOrt = planetDisplayName(state.activeBasePlanet);
+          const dockOrt = planetDisplayName(ortZiel);
           vorpostenFrachtWarnung = !!dockUnbekannt;
           return ((unterwegsGewesen ? 'Dein Transportverband ist zurück: das Lager deines Vorpostens '
                                     : 'Das Lager deines Vorpostens ') + vpMeldName(r) + ' bei ' + sysNameL + ' ist eingetroffen'
@@ -58440,7 +58450,10 @@ async function claimPendingRewards(){
         if (m.type === 'vorposten-fracht'){
           const sysNameF = (STAR_SYSTEMS.find(x => x.id === m.system) || { name: m.system }).name;
           if (m.fracht){
-            log(vorpostenFrachtBuchen(m.fracht, sysNameF, true), 'ti-truck', vorpostenFrachtWarnung ? 'warn' : 'ok');
+            /* `fleet` und `planetKey` sind die Flotte, AN DER DIE MISSION HAENGT - also der Ort,
+               von dem der Verband gestartet ist und den die Ankuendigung genannt hat. Genau dorthin
+               gehoert seine Ladung, unabhaengig davon, welchen Standort der Spieler gerade ansieht. */
+            log(vorpostenFrachtBuchen(m.fracht, sysNameF, true, fleet, planetKey), 'ti-truck', vorpostenFrachtWarnung ? 'warn' : 'ok');
           } else {
             log('Ein Transportverband ist von ' + sysNameF + ' zurück, führte aber keine Fracht mit.', 'ti-truck', 'warn');
           }

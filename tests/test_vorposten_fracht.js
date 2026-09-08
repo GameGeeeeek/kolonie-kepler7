@@ -32,7 +32,7 @@ const ICH = 'u-ich';
 const SYS = 'vega';
 const now = Date.now();
 const GEGENPROBE = process.env.KEPLER_FRACHT_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '4a'], standort: ['2d'] };
 
 const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp: 20000*s, verteidigung: 2500*s,
   garnisonMax: 300*s, flug:0.06, prod:0.015, scan:1, kosten: s===1?null:{ erz:1000 } }));
@@ -66,7 +66,11 @@ function spielstand(opt){
     resources:{ energie:9e5, erz:1000, kristalle:1000, deuterium:1000, antimaterie:9e4, forschungspunkte:3e4 },
     buildings:{ solar:22, mine:20, labor:14, lager:60, werft:14 }, research:{},
     fleet:{ jaeger:80, cruisers:12, spaeher:20, frachter:10, missions: missionen },
-    colonies:{}, discovered:{}, activeBasePlanet:'home', player:{ id:ICH, name:'Ich' },
+    /* `aufKolonie` stellt den AKTIVEN Standort auf eine Kolonie, waehrend der Verband an der
+       Heimatflotte haengt - der Fall aus der Durchsicht an PR #613. */
+    colonies: opt.aufKolonie ? { [KOLONIE]: { fleet:{ cruisers: 0, missions: [] }, buildings:{}, resources:{} } } : {},
+    discovered: opt.aufKolonie ? { [KOLONIE]: true } : {},
+    activeBasePlanet: opt.aufKolonie ? KOLONIE : 'home', player:{ id:ICH, name:'Ich' },
     xp:9e5, credits:5e5, buffs:[], lastTick: now, colonyNames:{}, modules:{}, shipModules:{},
     nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5, weeklySystemsSeen:14,
     schubGesehen:true, lastSeenReportTime: now });
@@ -156,6 +160,10 @@ async function stand(l){
 
 const BELOHNUNG = { type:'vorposten-lager', system: SYS, name:'Sternenwerft',
                     erz: 5000, kristalle: 2000, deuterium: 500 };
+/* Eine ECHTE Kolonie-Kennung aus der Spieldatei, keine erfundene: Ein unbekannter Schluessel
+   wuerde als Standort still ignoriert, und der Test maesse dann gar nichts. */
+const KOLONIE = (fsF.readFileSync(SPIELDATEI, 'utf8').match(/\{ id:'(\w+)',[^\n]*system:'kepler'/g) || [])
+  .map(z => (z.match(/id:'(\w+)'/) || [])[1]).filter(x => x && x !== 'home')[0] || 'thessa';
 
 (async () => {
   const browser = await starteBrowser();
@@ -195,6 +203,20 @@ const BELOHNUNG = { type:'vorposten-lager', system: SYS, name:'Sternenwerft',
   merke('2b: die Schiffe aus dem Sternendock reisen mit und kommen an',
     !!sb.save && (sb.save.fleet.cruisers || 0) >= 14,
     { cruisers: sb.save && sb.save.fleet.cruisers });
+  /* 2d: DER VERBAND LIEFERT DORT AB, WO ER GESTARTET IST. Befund der Durchsicht an PR #613:
+     `vorpostenFrachtBuchen` rief `currentFleet()` - den GERADE aktiven Standort. Wer waehrend des
+     Fluges auf eine Kolonie wechselt, haette seine Sternendock-Schiffe dort bekommen, an einem
+     Ort, den ihm niemand versprochen hat. Die Rohstoffe sind global und davon nicht betroffen. */
+  const d2 = await lauf(browser, { missionen: [angekommen], aufKolonie: true });
+  const sd = await stand(d2);
+  merke('2d: die Schiffe landen am STARTORT des Verbands, nicht am gerade aktiven Standort',
+    !!sd.save && (sd.save.fleet.cruisers || 0) >= 14
+    && ((sd.save.colonies[KOLONIE] || {}).fleet || {}).cruisers === 0,
+    { kolonie: KOLONIE, heimat: sd.save && sd.save.fleet.cruisers,
+      aufKolonie: sd.save && ((sd.save.colonies[KOLONIE]||{}).fleet||{}).cruisers,
+      logs: sd.logs.filter(t => /Transportverband/.test(t)) });
+  await d2.ctx.close();
+
   merke('2c: die angekommene Mission belegt keinen Slot mehr',
     !!sb.save && !((sb.save.fleet.missions||[]).some(m => m && m.id === 4711)),
     { missionen: sb.save && (sb.save.fleet.missions||[]).map(m => m && m.type) });
