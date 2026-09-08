@@ -41,7 +41,11 @@ const SAB = process.env.KEPLER_BERGBAU_GEGENPROBE || '';
    und ohne KA-3 ist dort nie etwas zu sehen. Es belegt also nichts ueber KA-3; scharf wird es
    erst am neuen Stand, wo etwas zu sehen sein KANN. Dieselbe Ueberlegung wie bei 2a/3a in
    test_kampfanimation.js. */
-const MUSS_FALLEN = { alt: ['1a', '1b', '2a'] };
+/* `strahl` ist der Stand vor KA-2 (08.09.2026): Die Marke liegt dort EXAKT auf dem Vorkommen,
+   einen Foerderstrahl gibt es nicht -> 2d und 2e fallen. 2a bleibt dort gruen und ist damit kein
+   Beleg fuer KA-2, sondern die mitgezogene Zusage: Auf dem Vorkommen zu stehen war ja nie falsch,
+   falsch waere die halbe Strecke. */
+const MUSS_FALLEN = { alt: ['1a', '1b', '2a'], strahl: ['2d', '2e'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
@@ -170,7 +174,22 @@ async function markenOrt(page){
     const ast = document.querySelector('[data-map-asteroid]');
     let ziel = null;
     if (ast){ const b = ast.getBBox(); ziel = { x: b.x + b.width/2, y: b.y + b.height/2 }; }
-    return mt ? { x:+mt[1], y:+mt[2], ziel } : null;
+    /* DER ANFANG DER BAHN wird mitgemessen, weil 2a seit KA-2 die REGEL prueft und nicht mehr
+       einen Schwellwert: „am Vorkommen und nicht auf halbem Rueckweg" laesst sich nur gegen den
+       Ort messen, an den der halbierende Fehler die Marke setzen wuerde - die MITTE der Route. */
+    /* RUECKFALL AUF DAS ALTE SUCHMUSTER, wenn es `data-kb-bahn` noch nicht gibt: Das Merkmal kam
+       erst mit KB-31 (08.09.2026). Ohne diesen Zweig maesse 2a an einem aelteren Stand gar nichts
+       und faellt dann aus dem falschen Grund - der Gegenprobe-Lauf haette es als Beleg fuer KA-2
+       gelesen, obwohl es nur die fehlende Bahn-Kennung war. Dieses Fixture setzt keinen Vorposten,
+       das alte Muster ist hier also eindeutig. */
+    const bahn = (svg && svg.querySelector('line[data-kb-bahn]'))
+      || (svg && [...svg.querySelectorAll('line')].find(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray')))
+      || null;
+    const start = bahn ? { x:+bahn.getAttribute('x1'), y:+bahn.getAttribute('y1') } : null;
+    const strahl = svg ? [...svg.querySelectorAll('[data-kb-foerderstrahl] line')].map(l => ({
+      x1:+l.getAttribute('x1'), y1:+l.getAttribute('y1'), x2:+l.getAttribute('x2'), y2:+l.getAttribute('y2'),
+      animiert: !!l.querySelector('animate'), zeiger: l.closest('[data-kb-foerderstrahl]').getAttribute('pointer-events') })) : [];
+    return mt ? { x:+mt[1], y:+mt[2], ziel, start, strahl } : null;
   });
 }
 
@@ -235,11 +254,46 @@ async function markenOrt(page){
       { art: gemischt.art, reihe: gemischt.eineReihe, groessen: gemischt.groessen });
 
     // ---- 2) Waehrend der Foerderung steht sie am Vorkommen ----------------------------------
+    /* 2a prueft die REGEL, nicht einen Schwellwert (nachgezogen mit KA-2, 08.09.2026).
+       Bis dahin stand hier `abstand < 6`. Das war richtig, solange die Marke waehrend der
+       Foerderung EXAKT auf dem Vorkommen lag - seit dem Foerderstrahl haelt der Konvoi bewusst
+       Abstand, sonst haette der Strahl Laenge null. Die Zahl 6 war aber nie die Zusage; die Zusage
+       lautet „am Vorkommen und nicht auf halbem Rueckweg", und der Kommentar am Code nennt genau
+       diesen Fehler: „der Kartenzeichner kennt hinBis nicht und halbiert stur bei frac>=0.5".
+       GEMESSEN WIRD DESHALB GEGEN DIE ROUTENMITTE - den Ort, an den der halbierende Fehler die
+       Marke setzen wuerde. Die Marke muss NAEHER am Vorkommen stehen als an dieser Mitte - bei
+       genau dem Fehler, den 2a faengt, waere der Abstand zur Mitte NULL und der zum Vorkommen die
+       halbe Strecke. Damit zieht die Pruefung bei jeder kuenftigen Abstandsaenderung mit, ohne
+       ihre Kraft zu verlieren.
+       KEIN VIELFACHES als Schwelle: Ein erster Entwurf verlangte „viermal weiter zur Mitte" und
+       fiel auf richtigem Code durch - ein Abbauflug bleibt IM System und ist kurz (gemessen: rund
+       50 Einheiten), die Mitte liegt also nur 25 Einheiten entfernt. Die Schwelle haette den
+       Standabstand verboten statt den Fehler. */
+    const routenMitte = (ortB && ortB.start && ortB.ziel)
+      ? { x: (ortB.start.x + ortB.ziel.x)/2, y: (ortB.start.y + ortB.ziel.y)/2 } : null;
+    const dZiel  = (ortB && ortB.ziel) ? Math.hypot(ortB.x - ortB.ziel.x, ortB.y - ortB.ziel.y) : null;
+    const dMitte = routenMitte ? Math.hypot(ortB.x - routenMitte.x, ortB.y - routenMitte.y) : null;
     check('2a: waehrend der Foerderung steht die Marke AM VORKOMMEN, nicht auf halbem Rueckweg',
-      !!(ortB && ortB.ziel) && Math.hypot(ortB.x - ortB.ziel.x, ortB.y - ortB.ziel.y) < 6,
-      ortB ? { marke: { x:+ortB.x.toFixed(1), y:+ortB.y.toFixed(1) },
-               ziel: ortB.ziel ? { x:+ortB.ziel.x.toFixed(1), y:+ortB.ziel.y.toFixed(1) } : null,
-               abstand: ortB.ziel ? +Math.hypot(ortB.x-ortB.ziel.x, ortB.y-ortB.ziel.y).toFixed(1) : null } : null);
+      dZiel !== null && dMitte !== null && dZiel < dMitte,
+      { abstandZumVorkommen: dZiel === null ? null : +dZiel.toFixed(1),
+        abstandZurRoutenmitte: dMitte === null ? null : +dMitte.toFixed(1),
+        verhaeltnis: (dZiel && dMitte) ? +(dMitte/dZiel).toFixed(1) : null });
+
+    /* KA-2: DER STRAHL SELBST. Der Auftrag lautete woertlich „wenn eine flotte fördert soll das
+       grafisch angezeigt werden z.b ein laserstrahl auf dem asteroiden". */
+    const str = (ortB && ortB.strahl) || [];
+    const trifft = str.length > 0 && ortB.ziel
+      && str.every(l => Math.hypot(l.x2 - ortB.ziel.x, l.y2 - ortB.ziel.y) < 3
+                     && Math.hypot(l.x1 - ortB.x, l.y1 - ortB.y) < 3);
+    check('2d: ein Strahl laeuft von der Flotte auf das Vorkommen',
+      str.length >= 2 && trifft && Math.hypot(str[0].x2-str[0].x1, str[0].y2-str[0].y1) > 8,
+      { teile: str.length, laenge: str.length ? +Math.hypot(str[0].x2-str[0].x1, str[0].y2-str[0].y1).toFixed(1) : null });
+    /* Eine ruhende Linie saehe aus wie eine Verbindung, nicht wie eine Taetigkeit - die Bewegung
+       IST die Aussage. Und `pointer-events="none"`, weil der Strahl sonst genau die beiden
+       Trefferflaechen abfinge, die dort etwas oeffnen sollen. */
+    check('2e: er bewegt sich und faengt keine Klicks ab',
+      str.some(l => l.animiert) && str.every(l => l.zeiger === 'none'),
+      { animiert: str.filter(l => l.animiert).length, zeiger: str.map(l => l.zeiger) });
 
     check('2b: und die Beschriftung sagt, was sie tut',
       (bergbau.texte || []).some(t => /Erzzug/.test(t) && /fördert/.test(t)),

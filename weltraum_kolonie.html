@@ -64928,6 +64928,33 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }
     return hat;
   }
+  /* KA-2: DER FOERDERSTRAHL (Auftrag Sascha: „wenn eine flotte fördert soll das grafisch angezeigt
+     werden z.b ein laserstrahl auf dem asteroiden").
+     DREI SCHICHTEN, und jede hat einen Grund:
+       - ein breiter, blasser Kern, damit der Strahl auf einem Handybildschirm ueberhaupt zu sehen
+         ist (ein Haarstrich von 1 px verschwindet dort im Rauschen),
+       - ein heller duenner Strich darauf, der ihm die Kante gibt,
+       - ein LAUFENDES Strichmuster, das die Bewegungsrichtung traegt. Das ist der Teil, der
+         „foerdert gerade" von „steht dort herum" unterscheidet - eine ruhende Linie saehe aus wie
+         eine Verbindung, nicht wie eine Taetigkeit.
+     Die Bewegung laeuft ueber SMIL (`<animate>`) und nicht ueber einen Zeitgeber: Die Karte baut
+     sich zwar im Sekundentakt neu, aber SMIL laeuft im Browser weiter und braucht keinen eigenen
+     Takt - dieselbe Machart wie der Alarmring am Vorposten und der Schutzfrist-Puls am
+     Schuerfrecht.
+     `pointer-events="none"` an ALLEN Teilen: Der Strahl liegt zwischen Flotte und Vorkommen und
+     wuerde sonst genau die beiden Trefferflaechen abfangen, die dort etwas oeffnen sollen.
+     KEIN eigener Ebenen-Schalter: Er haengt an derselben `routen`-Ebene wie die Bahn und die
+     Flottenmarke, weil er zu genau dieser Mission gehoert. */
+  function foerderStrahl(x1, y1, x2, y2, farbe){
+    const P = n => n.toFixed(1);
+    const strich = 'x1="' + P(x1) + '" y1="' + P(y1) + '" x2="' + P(x2) + '" y2="' + P(y2) + '"';
+    return '<g data-kb-foerderstrahl="1" pointer-events="none">'
+      + '<line ' + strich + ' stroke="' + farbe + '" stroke-width="4.5" stroke-opacity="0.16" stroke-linecap="round"/>'
+      + '<line ' + strich + ' stroke="' + farbe + '" stroke-width="1.4" stroke-opacity="0.75" stroke-linecap="round"/>'
+      + '<line ' + strich + ' stroke="#fff6d8" stroke-width="1.1" stroke-opacity="0.85" stroke-dasharray="3 7" stroke-linecap="round">'
+      + '<animate attributeName="stroke-dashoffset" values="10;0" dur="0.6s" repeatCount="indefinite"/></line>'
+      + '</g>';
+  }
   function flottenMarke(m, x, y, angle, farbe, bergbauArt){
     const comp = m.composition || (m.shipKey ? { [m.shipKey]: m.qty || 0 } : null);
     /* Konvoi-Form nur, wenn BEIDES stimmt: Die Missionsart ist Bergbau UND es fliegt wirklich
@@ -66602,8 +66629,30 @@ function sekSternUse(key, x, y, k, unentdeckt){
         }
         const fromX = returning ? targetPos.x : originX, fromY = returning ? targetPos.y : originY;
         const toX = returning ? originX : targetPos.x, toY = returning ? originY : targetPos.y;
-        const shipX = fromX + (toX-fromX)*f2;
-        const shipY = fromY + (toY-fromY)*f2;
+        /* KA-2: DER FOERDERSTRAHL (Auftrag Sascha, woertlich: „wenn eine flotte fördert soll das
+           grafisch angezeigt werden z.b ein laserstrahl auf dem asteroiden").
+           DAS PROBLEM WAR DIE GEOMETRIE, nicht das Zeichnen: Waehrend der Foerderung setzt der
+           Zweig darueber `f2 = 1`, die Marke liegt also EXAKT auf dem Vorkommen - ein Strahl
+           haette Laenge null. Der Konvoi haelt deshalb Abstand und schiesst darauf.
+           DER ABSTAND WIRD GERECHNET, NICHT GEWAEHLT: `asteroidMarkerR` liefert je nach Groesse
+           4,5 bis 9,5 Einheiten; der Konvoi steht eine halbe Kachel (F = 15) dahinter, also
+           `r + 12`. Damit steht er bei jeder Groesse knapp neben dem Fels statt darauf - bei einer
+           festen Zahl saesse er beim Splitter im Nichts und beim Koloss wieder im Gestein.
+           GEMESSEN WIRD ER AN DER MISSION, nicht am Vorkommen: `m.groesse` friert die Groesse beim
+           Start ein und ueberlebt damit auch ein Vorkommen, das waehrend des Abbaus neu gewuerfelt
+           wurde. */
+        const foerdert = !!(wartet && art.bergbau);
+        const laenge = Math.hypot(toX-fromX, toY-fromY) || 1;
+        /* DER ABSTAND IST GEDECKELT, und der Deckel ist gemessen, nicht gewaehlt: Ein Abbauflug
+           bleibt IM System und ist damit kurz (im Testfixture rund 50 Einheiten, gegen mehrere
+           hundert bei einer Erkundung). Ein fester Abstand von 19 waere dort ein Drittel der
+           ganzen Strecke - der Konvoi saesse fast auf halbem Weg, also genau dort, wo der alte
+           Halbierungsfehler ihn hatte. Der Anteil haelt ihn auf jeder Streckenlaenge dicht am
+           Fels; die feste Zahl haelt ihn bei einer langen Strecke davon ab, im Gestein zu stehen. */
+        const abbauAbstand = foerdert ? Math.min(asteroidMarkerR(m.groesse) + 12, laenge * 0.28) : 0;
+        const zurueck = abbauAbstand / laenge;
+        const shipX = fromX + (toX-fromX)*(f2 - zurueck);
+        const shipY = fromY + (toY-fromY)*(f2 - zurueck);
         const angle = Math.atan2(toY-fromY, toX-fromX) * 180/Math.PI + 90;
         const color = returning ? art.rueck : art.hin;
         /* DIE BAHN TRAEGT IHREN NAMEN (KB-31, 08.09.2026). `data-kb-bahn` ist keine Kosmetik:
@@ -66618,6 +66667,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Bahn sie misst, ohne die laufende Nummer zu kennen. */
         inner += `
           <line data-kb-bahn="${m.type}" x1="${originX.toFixed(1)}" y1="${originY.toFixed(1)}" x2="${targetPos.x.toFixed(1)}" y2="${targetPos.y.toFixed(1)}" stroke="${color}" stroke-opacity="0.5" stroke-width="1.5"/>
+          ${foerdert ? foerderStrahl(shipX, shipY, targetPos.x, targetPos.y, color) : ''}
           ${flottenMarke(m, shipX, shipY, angle, color, art.bergbau)}
           <text class="planet-label" pointer-events="none" x="${shipX.toFixed(1)}" y="${(shipY-14).toFixed(1)}" text-anchor="middle" style="fill:${color};">${flottenBeschriftung(m, art, returning, wartet)}</text>
         `;
