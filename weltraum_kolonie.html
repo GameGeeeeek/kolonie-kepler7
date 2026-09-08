@@ -64382,7 +64382,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (m.type === 'asteroid-contest' || m.type === 'mining' || m.type === 'mining-escort'){
       const pl = (m.platz !== undefined && m.platz !== null) ? m.platz : String(m.targetId || '').split(':')[1];
       if (pl === undefined) return null;
-      return { system: m.system, pos: asteroidPlatzXY(String(pl)) };
+      /* NUR ECHTE GUERTELPLAETZE. Eine PEILUNG traegt eine ID wie 'p3' - der Kommentar an der
+         Abbaumission sagt das ausdruecklich („platz NICHT in eine Zahl wandeln") - und sie liegt
+         gar nicht auf der Guertelbahn. asteroidPlatzXY rechnet `platz * 36`, aus 'p3' wird damit
+         NaN, und die Bahn bekaeme x2="NaN": eine Linie ins Nichts plus Konsolenfehler.
+         GEMESSEN vom Bestandstest test_peilung („keine Konsolenfehler"), nachdem der erste Entwurf
+         von KB-24 diesen Zweig fuer den Abbau geoeffnet hatte. Keine Linie ist hier die ehrliche
+         Auskunft - dieselbe Regel wie beim Gefecht: lieber nichts zeigen als etwas Falsches. */
+      const pos = asteroidPlatzXY(String(pl));
+      if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return null;
+      return { system: m.system, pos };
     }
     if (m.type === 'nest-angriff'){
       const liste = nesterImSystem(m.system);

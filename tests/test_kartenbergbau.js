@@ -187,8 +187,10 @@ async function markenOrt(page){
       const st = JSON.parse(JSON.stringify(basis));
       st.fleet = Object.assign({}, st.fleet, { jaeger:400, frachter:60, recycler:20, cruisers:80, missions: [] });
       const comp = opt.comp || { frachter: 12, recycler: 6 };
+      const platz = opt.peilung ? 'p3' : '3';
       st.fleet.missions = [Object.assign({
-        id: 8101, type: opt.typ || 'mining', targetId: SYS + ':3', system: SYS, platz: '3',
+        id: 8101, type: opt.typ || 'mining', targetId: SYS + ':' + platz, system: SYS, platz: platz,
+        peilung: !!opt.peilung,
         fleetName: 'Erzzug', startTime: jetzt - 30000, composition: comp
       }, opt.zeiten || { hinBis: jetzt - 5000, abbauBis: jetzt + 870000, endTime: jetzt + 900000 })];
       const fern = jetzt + 365*24*3600*1000;
@@ -235,6 +237,18 @@ async function markenOrt(page){
     check('2b: und die Beschriftung sagt, was sie tut',
       (bergbau.texte || []).some(t => /Erzzug/.test(t) && /fördert/.test(t)),
       { passende: (bergbau.texte||[]).filter(t => /Erzzug/.test(t)) });
+
+    /* 2c ist der Waechter ueber den Fehler, den der erste Entwurf von KB-24 gebaut hat: Eine
+       PEILUNG traegt eine ID wie 'p3' und liegt NICHT auf der Guertelbahn. asteroidPlatzXY rechnet
+       `platz * 36`, aus 'p3' wird NaN, und die Bahn bekam x2="NaN" samt Konsolenfehler. Gefunden
+       hat das der Bestandstest test_peilung, nicht dieser Waechter - und zwar erst im vollen
+       Lauf. Deshalb steht die Pruefung jetzt HIER, wo sie in Sekunden statt in 43 Minuten faellt. */
+    const t4 = await karte(browser, { [SAVE_KEY]: stand({ peilung: true }) });
+    const peil = await messeForm(t4.page);
+    check('2c: eine Peilung (Platz „p3", nicht auf der Guertelbahn) zeichnet keine Bahn ins Nichts',
+      t4.errs.length === 0 && peil.art === null,
+      { fehler: t4.errs.slice(0, 2), marke: peil.art });
+    await t4.ctx.close();
 
     check('3a: keine Skriptfehler', t1.errs.length === 0, t1.errs.slice(0, 2));
   } finally {
