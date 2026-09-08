@@ -518,3 +518,36 @@ war es erst, nachdem drei von vier Vergabestellen nachgezählt waren.**
 **Übertragbar:** Eine aus einem Befund abgeleitete Aufgabe ist eine *Hypothese*, kein Auftrag. Sie
 gehört mit ihrer Messvorschrift notiert („prüfe, ob X gegen den gespeicherten Stand urteilt UND ob
 es eine Quelle gibt, die ohne Speichern schreibt"), nicht als Feststellung.
+
+## Nachtrag 07.09.2026: Ein Wächter, der eine andere Regel prüft als die geltende
+
+KB-22 (der Beschriftungs-Entflechter gibt nicht mehr auf, solange ein Platz frei ist) wurde in drei
+Anläufen gebaut. **Alle drei Fehler fand derselbe alte Bestandstest — nie der neue Wächter, der im
+selben Auftrag entstand.** Der Grund ist lehrreicher als die Fehler:
+
+Die Umsetzung klammerte beim Suchen nach einem freien Platz das **eigene** Objekt aus. Das ist an
+der unverschobenen Ausgangsstelle richtig (dort hat der Zeichencode die Beschriftung neben ihr
+Objekt gesetzt), aber falsch, sobald verschoben wird. Der neue Wächter übernahm dieselbe
+Ausklammerung — weil er aus demselben Kopf und derselben Stunde stammte. Er prüfte damit
+buchstäblich die Regel, die im Code stand, statt der Regel, die gelten sollte:
+
+| gemessen | Folge |
+|---|---|
+| Entwurf 1: Gegenrichtung ohne eigenes Objekt | „Draconis" landete auf der **eigenen** Scheibe (3 Formfaktoren) |
+| Entwurf 2: eigenes Objekt mitgezählt | „Sporenherd" landete auf einer **fremden** Scheibe |
+| Entwurf 3: Planetenscheibe schlägt jede andere Überdeckung | grün |
+
+Zweimal meldete der neue Wächter dabei **grün**, einmal sogar **rot aus dem falschen Grund**
+(er hielt die eigene Planetenscheibe für einen freien Platz und fand deshalb eine Gegenprobe, die
+nichts belegte).
+
+**Übertragbar, zwei Punkte:**
+
+1. **Ein Wächter, der zusammen mit der Änderung entsteht, erbt deren blinde Flecken.** Er ist
+   deshalb kein Ersatz für die Bestandstests, sondern eine Ergänzung — und wenn beide
+   widersprechen, hat zuerst der ältere recht. Bei einer Verhaltensänderung gehören die
+   Bestandstests desselben Bereichs **vor** dem eigenen neuen Wächter gefahren.
+2. **Der wertvollste Gegenproben-Stand ist oft nicht der historische, sondern der eigene
+   Fehlversuch.** `MUSS_FALLEN` trägt hier zwei Richtungen: `alt` (der Stand vor der Etappe) und
+   `entwurf` (der eigene erste Entwurf, aus der Git-Historie geholt). Nur die zweite belegt, dass
+   die Prüfung gegen den Fehler schützt, der wirklich passiert ist.

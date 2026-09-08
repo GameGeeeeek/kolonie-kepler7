@@ -136,8 +136,10 @@ function backend(store) {
   /* Wo steht der GEZEICHNETE Heimatmarker? Aus dem DOM abgelesen statt aus einer Zahl - und zwar
      am MARKER selbst, nicht an seinem Label.
      KORREKTUR 21.08.2026: Hier wurde das Label gegriffen ("Deine Basis", y minus 20 Einheiten).
-     Das war eine Zeitbombe: kbLabelsEntflechten (KB-16) darf ein Label um bis zu 21 Einheiten
-     senkrecht und 12 seitlich verschieben, waehrend 3b darunter 1,0 Einheiten Toleranz verlangt.
+     Das war eine Zeitbombe: kbLabelsEntflechten (KB-16) darf ein Label um bis zu 14 Einheiten
+     senkrecht (seit KB-22 in BEIDE Richtungen) und 12 seitlich verschieben, waehrend 3b darunter
+     1,0 Einheiten Toleranz verlangt. Die frueher hier genannten 21 Einheiten waren schon vor
+     KB-22 falsch - geprueft wurden immer nur zwei Schritte zu 7.
      Der Test war also nur so lange gruen, wie dieses eine Label zufaellig an seiner natuerlichen
      Stelle bleibt - und im Heimatsystem am Handy weicht genau dieses aus (in
      test_kartenbeschriftung als bekannte Ausnahme namentlich hinterlegt).
