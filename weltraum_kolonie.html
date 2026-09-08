@@ -12654,6 +12654,15 @@
   // jeder Aenderung neu, und ein <select> darin verloere seinen Wert. Genau dieser Fehler hat beim
   // Allianz-Raid dazu gefuehrt, dass still mit der Vorgabedauer gestartet wurde.
   let festungZiel = 'kern';
+  /* KS-7: SOLL DER BELAGERUNGSPLAN AN DIESEM ZIEL VERBRAUCHT WERDEN? (08.09.2026)
+     Bis hierher wurde eine Vormerkung bedingungslos am naechsten Festungsschlag verbraucht - ein
+     episches Fundstueck mit 1,2 % Chance verpuffte also an der Schanze, wenn die zufaellig vor der
+     Sternenfeste dran war. Das ist eine echte Wahl, die der Spieler nicht treffen konnte.
+     VORGABE `true`: Ohne Zutun bleibt es beim alten Verhalten. Eine Vorgabe `false` waere eine
+     stille Aenderung an einem Gegenstand, den man schon besitzt.
+     Der Zustand liegt wie `festungZiel` in einer Modulvariable und NICHT im Spielstand: Er gilt
+     fuer den offenen Dialog, nicht fuer das Konto. */
+  let festungPlanNutzen = true;
   /* DIE EINE Stelle, die "was macht eine Festung mit meiner Fuhre" beantwortet - Vorschau,
      Kartenmenue und Missionsstart rufen sie. Sie liefert BEIDE Faktoren zusammen, damit keine
      Anzeigestelle nur den einen anwendet (Arbeitsregel 6: der wiederkehrende Fehler dieses
@@ -13771,11 +13780,16 @@
        Zeile „Plan aktiv" neben einer unveraenderten Spanne waere das Etikett statt der Wirkung
        (Arbeitsregel 61) - und der Spieler koennte nicht sehen, was der Plan ihm eigentlich bringt.
        Die ungekuerzte Spanne steht als Gegenrechnung daneben. */
-    const planAktiv = !!state.belagerungsplan;
+    const planAktiv = !!state.belagerungsplan && festungPlanNutzen;
     const vLoRoh = Math.round(vBasis*100), vHiRoh = Math.round(vBasis*100) + 6;
     const vLo = Math.round(vLoRoh * (planAktiv ? 1 - BELAGERUNGSPLAN_SENKUNG : 1));
     const vHi = Math.round(vHiRoh * (planAktiv ? 1 - BELAGERUNGSPLAN_SENKUNG : 1));
     html += `<div class="bmeta"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Die Festung schießt zurück: rechne mit rund ${vLo}–${vHi}% Verlusten des Verbands${tuermeStehen ? ' – die Geschütztürme sind der Grund' : ''}.</div>`;
+    /* KS-7: Der Schalter steht DIREKT an der Zahl, die er bewegt - die Verlustspanne darueber
+       rechnet ihn bereits ein. Eine Zeile „Plan aktiv" neben einer unveraenderten Spanne waere
+       das Etikett statt der Wirkung, und genau davor warnt der Kommentar am Rechenblock. */
+    if (state.belagerungsplan) html += `<div class="bmeta" style="margin-top:6px;"><button type="button" data-fest-plan="1"${festungPlanNutzen ? ' class="primary"' : ''} style="font-size:11px; padding:4px 8px;">${festungPlanNutzen ? '\u2713 ' : ''}Belagerungsplan für diesen Schlag verwenden</button>`
+      + `<span style="opacity:.75; margin-left:6px;">${festungPlanNutzen ? 'Er wird beim Start verbraucht.' : 'Er bleibt für ein lohnenderes Ziel vorgemerkt.'}</span></div>`;
     if (planAktiv) html += `<div class="bmeta" style="color:#5dcaa5;"><i class="ti ti-building-fortress" aria-hidden="true"></i> <strong>Belagerungsplan vorgemerkt</strong> – bereits eingerechnet (ohne ihn wären es ${vLoRoh}–${vHiRoh}%). Er wird mit diesem Angriff verbraucht.</div>`;
     html += `<div class="bmeta"><i class="ti ti-droplet" aria-hidden="true"></i> Treibstoff ${fuelCostText(fuel)} · Danach ${FESTUNG_ABKLING_STD} Stunden Abklingzeit an DIESER Festung.</div>`;
     return html;
@@ -14725,6 +14739,10 @@
     // nie existierte, und der Spieler schoesse auf etwas, das er gar nicht gewaehlt hat.
     const moeglich = festungZiele(fest);
     if (moeglich.indexOf(festungZiel) < 0) festungZiel = moeglich[0] || 'kern';
+    /* Und die Plan-Wahl mit derselben Begruendung wie das Ziel darueber: Ohne diese Zeile truege
+       der Dialog die Entscheidung vom letzten Mal - womoeglich ein „nicht verwenden", das fuer eine
+       ganz andere Festung gedacht war. */
+    festungPlanNutzen = true;
     oeffneFlottenwahl({
       art: 'Festung',
       titel: st.name + ' angreifen',
@@ -14758,8 +14776,11 @@
     pay(fuel);
     const jetzt = Date.now();
     const fleetName = resolveFleetName();
-    const plan = !!state.belagerungsplan;
-    state.belagerungsplan = false;
+    /* KS-7: Verbraucht wird er NUR, wenn er auch gewaehlt ist. Vorher stand hier ein
+       bedingungsloses `state.belagerungsplan = false` - eine Vormerkung war damit an jedem
+       naechsten Schlag weg, auch an dem, fuer den man sie gar nicht einsetzen wollte. */
+    const plan = !!state.belagerungsplan && festungPlanNutzen;
+    if (plan) state.belagerungsplan = false;
     cf.missions.push({
       id: nextMissionId(), type:'festung-angriff', targetId: sysId,
       // Die KENNUNG der Festung reist mit: Faellt sie waehrend des Fluges und der galaxyTick setzt
@@ -24581,6 +24602,12 @@
        der Flottenname und der Vorlagenname darunter. */
     ov.querySelectorAll('[data-fest-ziel]').forEach(b => b.onclick = () => {
       festungZiel = b.getAttribute('data-fest-ziel');
+      zeichneFlottenwahl();
+    });
+    /* KS-7: dieselbe Bauart wie die Zielknoepfe darueber - Zustand umlegen, neu zeichnen. Die
+       Vorschau rechnet den Plan dann mit oder ohne, die Spanne bewegt sich sichtbar. */
+    ov.querySelectorAll('[data-fest-plan]').forEach(b => b.onclick = () => {
+      festungPlanNutzen = !festungPlanNutzen;
       zeichneFlottenwahl();
     });
     /* Die Standort-Zielknoepfe des Spielerangriffs - dieselbe Bauart wie die Festungsziele darueber.
