@@ -63377,6 +63377,36 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // sekundengenaue Angabe im Titel erzwaenge den Neuaufbau der ganzen Karte je Tick.
       if (wA && wB) badges.push({ icon:'🌀', title:'Wurmloch: ' + wA.name + ' ↔ ' + wB.name + ' – Flüge zu beiden Enden dauern 25% weniger' });
     }
+    /* KS-6: DER ANFLUG AUF DEN EIGENEN VORPOSTEN steigt auf die oberen Kartenebenen.
+       Bis hierher lebte der Alarm nur im EINEN geoeffneten System (der rote Ring am Marker); wer
+       ihn sehen wollte, musste das System schon offen haben. Ueber diese Funktion erscheint er
+       jetzt auch am Systemplatz der Sektoransicht und - ueber die vorhandene Aggregation - im
+       Regions-Tooltip der Uebersicht.
+       ER STEHT ABSICHTLICH VOR DEM EREIGNIS-RIEGEL: Eine abschaltbare Warnung vor dem eigenen
+       Totalverlust ist keine. Das gewoehnliche 🛰 unten bleibt dagegen unter dem Schalter - es ist
+       Landkarte, kein Alarm.
+       NUR WAS NOCH KOMMT: `vorpostenAnflugAktiv` haelt einen Eintrag bis zu ZWEI STUNDEN nach der
+       Ankunft fuer aktiv (VORPOSTEN_ANFLUG_GNADE im Server) - ohne diesen Filter brennte die
+       Uebersicht stundenlang fuer ein Gefecht, das laengst vorbei ist. Gemessen wird deshalb
+       `ankunftAt > jetzt` und sonst nichts.
+       KEINE RESTZEIT IM TITEL: Die Karte baut sich im Sekundentakt neu; eine laufende Zahl darin
+       waere dieselbe Tick-Unruhe, wegen der auch das Wurmloch-Abzeichen ohne Restzeit auskommt.
+       Die Zeit steht im Kartenmenue des Vorpostens, wo sie hingehoert. */
+    const vpAlarm = vorpostenAn(sysId);
+    const vpAnflug = (vpAlarm && vpAlarm.eigener && Array.isArray(vpAlarm.anflug))
+      ? vpAlarm.anflug.filter(a => a && (a.ankunftAt || 0) > Date.now()) : [];
+    if (vpAnflug.length){
+      const schiffe = vpAnflug.reduce((n, a) => n + (Number(a.schiffe) || 0), 0);
+      badges.push({ icon:'🔥',
+        /* ARTIKELFREI ueber das Gattungswort, wie bei KB-29: `vpTitel` liefert den STUFENNAMEN,
+           und der wechselt das Geschlecht (der Ankerkern, die Sternenwerft, das Werftgeruest).
+           „deinen Sternenwerft" war genau der Fehler, den die Verbandsziele schon einmal hatten -
+           „deinen Vorposten <Name>" stimmt dagegen immer. */
+        title: 'Angriff auf deinen Vorposten ' + vpTitel(vpAlarm) + ' – ' + vpAnflug.length + ' Verband'
+          + (vpAnflug.length === 1 ? '' : 'e') + ' im Anflug'
+          + (schiffe > 0 ? ' mit ' + fmt(schiffe) + ' Schiffen' : '')
+          + '. Die Ankunftszeit steht im Kartenmenü.' });
+    }
     /* ===== Landmarken (E1) ====================================================================
        Festung, Nest und NPC lebten bis hierher AUSSCHLIESSLICH im aufgeklappten System. Wer eine
        Festung finden wollte, musste 67 Systeme einzeln durchklicken - genau der Zustand, gegen den
@@ -63432,7 +63462,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       /* 🛰 Vorposten (B2): eigen oder fremd - der Titel nennt den Besitzer, denn das ist die
          Entscheidung, die man an der Landmarke trifft (angreifen oder meiden). */
       const vpHier = vorpostenAn(sysId);
-      if (vpHier){
+      if (vpHier && !vpAnflug.length){
         const kernPct = Math.round(100 * Math.max(0, Math.min(1, ((vpHier.kern||{}).lp||0) / Math.max(1, (vpHier.kern||{}).lpMax||1))));
         // Auf jeder Stufe eine Station (GR-6) - deshalb traegt die Landmarke immer dasselbe Zeichen.
         badges.push({ icon: '🛰', title: (vpHier.eigener ? 'Dein ' : '') + vpTitel(vpHier) + (vpHier.eigener ? '' : ' von ' + (vpHier.besitzerName||'?')) + ' – Kern ' + kernPct + '%, ' + (vpHier.garnisonAnzahl||0) + ' Schiffe Garnison' });
