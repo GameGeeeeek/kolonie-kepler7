@@ -31,7 +31,7 @@ const { check: rohCheck, ende } = pruefer();
 const ergebnis = {};
 const check = (name, bedingung, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bedingung; rohCheck(name, bedingung, zusatz); };
 
-const SAB = process.env.KEPLER_KAF_GEGENPROBE || '';
+const SAB = process.env.KEPLER_EBENEN_GEGENPROBE || '';
 /* GEMESSEN gegen origin/main a415efb (Stand vor KA-2/KA-3), nicht geschaetzt.
    2a fehlt hier BEWUSST und ist kein Mangel: Es prueft, dass ohne Praesenz NICHTS zu sehen ist -
    und ohne KA-3 ist dort nie etwas zu sehen. Es belegt also nichts ueber KA-3; scharf wird es
@@ -195,7 +195,12 @@ async function schalte(page, ebene){
     const an = await bild(t.page);
     check('1a: Leiste, beide Knoepfe und etwas zum Ausblenden sind da (Vorbedingung)',
       an.leiste && an.routenKnopf && an.routenAn && an.aufklaerungKnopf && an.aufklaerungAn
-      && an.eigeneBilder > 0 && an.eigeneTexte > 0 && an.fremdeBahnen > 0 && an.fremdeBilder > 0, an);
+      && an.eigeneBilder > 0 && an.eigeneTexte > 0 && an.fremdeBahnen > 0 && an.fremdeTexte > 0, an);
+  /* `fremdeBilder` steht bewusst NICHT in dieser Vorbedingung, obwohl es naheliegt: Der Zaehler
+     haengt am Merkmal data-map-fremdflotte, und das gibt es erst seit KB-23. Am Vergleichsstand
+     waere 1a damit rot - eine Vorbedingung, die am alten Stand nicht gilt, kann nichts absichern,
+     und die roten 1b/2a stuenden dann unter dem Verdacht, nur Folgefehler zu sein. Gemessen wird
+     hier deshalb, was es in BEIDEN Staenden gibt: die gestrichelte Bahn und ihre Beschriftung. */
 
     await schalte(t.page, 'routen');
     const ohneRouten = await bild(t.page);
