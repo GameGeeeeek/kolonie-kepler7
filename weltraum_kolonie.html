@@ -66459,6 +66459,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
       platzierteMarker.push({ x: hc.x, y: hc.y, r: 11 });
       homeMarkerPos = hc;
       const homeHasMoon = state.moons && state.moons.home;
+      /* DER HEIMATMOND HAT DENSELBEN EIGENEN SCHLUESSEL wie jeder andere (vierte Durchsicht an
+         PR #614). Die Heimatbasis wird getrennt von der Planetenschleife gezeichnet, und ihr
+         Truemmerzeichen oben fragt nur `debrisFields.home` - ein Raub an `moon_home` stand
+         deshalb auch nach dem letzten Nachtrag nirgends. Zwei Zeichenwege, dieselbe Zusage:
+         Beide brauchen ihn. */
+      const heimatMondFeld = state.debrisFields['moon_home'] && Object.keys(state.debrisFields['moon_home']).length;
       const hcx = hc.x.toFixed(1), hcy = hc.y.toFixed(1);
       const homeOrbS = orbitalStationOf('home');
       let homeOrbitalRingSvg = '';
@@ -66493,6 +66499,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             : `<circle cx="${hcx}" cy="${hcy}" r="10" fill="rgba(126,119,221,0.3)"/>`) + sysSchatten('home', hc.x, hc.y, 10, 0.72) + ringVorne; })()}
           <circle cx="${hcx}" cy="${hcy}" r="10" fill="none" stroke="#7f77dd" stroke-width="1.5"/>
           ${homeTfInProgress ? `<circle cx="${hcx}" cy="${hcy}" r="12" fill="none" stroke="${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${homeTfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).label||''}</title></circle>` : ''}
+          ${heimatMondFeld ? `<g data-map-debris="moon_home">${truemmerRaubPuls(hc.x-13, hc.y+13, 6, truemmerRaubAn('moon_home'))}<circle cx="${(hc.x-13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="6" fill="${truemmerRaubAn('moon_home') ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(hc.x-13).toFixed(1)}" y="${(hc.y+16).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn('moon_home') ? '\u2620' : '\u263e'}</text></g>` : ''}
           ${homeHasMoon ? sysMondbahn(hc.x, hc.y, 13) + `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_home' ? `<circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(hc.x+11.5).toFixed(1)}" cy="${(hc.y+12).toFixed(1)}" r="3.2" fill="#aeb1c4"/>

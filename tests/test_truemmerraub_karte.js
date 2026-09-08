@@ -21,6 +21,9 @@
 //       unter diesem Schluessel an, und `pirateDebrisRaidCandidates` zaehlt jeden Schluessel des
 //       Bestands auf. Die Karte kannte nur den Planetenschluessel; ein zehnminuetiger Raub am
 //       Mondfeld stand nirgends. Gemessen mit genau diesem Spielstand.
+//   3b  UND DER HEIMATMOND (vierte Durchsicht an PR #614): Die Heimatbasis wird GETRENNT von der
+//       Planetenschleife gezeichnet, ihr Truemmerzeichen fragt nur `debrisFields.home`. `moon_home`
+//       ist derselbe Fall wie 3a auf dem zweiten Zeichenweg - zwei Wege, dieselbe Zusage.
 //
 // NICHT ENTHALTEN und das steht hier, damit niemand es fuer vergessen haelt: die FLUGBAHN der
 // Abfangflotte. `MISSION_LINIEN` kennt 'intercept-pirates' nicht, und die Art dort aufzunehmen
@@ -36,7 +39,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_RAUB_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '3a'], mond: ['3a'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '3a', '3b'], mond: ['3a'], heimatmond: ['3b'] };
 /* Der Traeger des Mondes wird aus der Spieldatei GELESEN, nicht erfunden: Ein erfundener
    Schluessel liefert keinen Kartenknoten, und die Pruefung waere still leer. */
 const fsM = require('fs');
@@ -74,10 +77,10 @@ function spielstand(mitRaub, mond){
     research:{}, fleet:{ jaeger:400, cruisers:60, ships:3, missions:[] },
     discovered:{}, colonies:{}, activeBasePlanet:'home',
     debrisFields: mond
-      ? { ['moon_' + MONDPLANET]: { erz: 4000, kristalle: 1500 } }
+      ? { [mond]: { erz: 4000, kristalle: 1500 } }
       : { home: { erz: 4000, kristalle: 1500 } },
     pirateDebrisRaid: mitRaub
-      ? { planetKey: mond ? ('moon_' + MONDPLANET) : 'home', fleet:{ recycler:4, jaeger:2 }, power: 120,
+      ? { planetKey: mond || 'home', fleet:{ recycler:4, jaeger:2 }, power: 120,
           startTime: now - 60000, endTime: now + 480000, interceptArrival:null, interceptSource:null }
       : null,
     player:{ id:'u', name:'A' }, xp:52000, credits:184000, buffs:[], lastTick: now,
@@ -115,7 +118,7 @@ async function messen(mitRaub, browser, mond){
       zeichen: t ? (t.textContent || '').trim() : '',
       puls: g.querySelectorAll('animate').length,
       klickziele: svg.querySelectorAll('[data-map-debris]').length };
-  }, mond ? ('moon_' + MONDPLANET) : null);
+  }, mond || null);
   /* Der Klicktext kommt aus dem VORHANDENEN Klickziel - dasselbe, das der Spieler antippt. Der
      Klick loest `pushToast(...)` aus (gemessen an der Verdrahtung), also wird der TOAST gelesen und
      nicht das Protokoll: Der erste Entwurf las `#log` und bekam dessen aelteste Zeile - die
@@ -124,7 +127,7 @@ async function messen(mitRaub, browser, mond){
     const n = document.querySelector('#galaxyMapSvg ' +
       (schluessel ? '[data-map-debris="' + schluessel + '"]' : '[data-map-debris]'));
     if (n) n.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:200, clientY:200 }));
-  }, mond ? ('moon_' + MONDPLANET) : null);
+  }, mond || null);
   await page.waitForTimeout(400);
   const text = await page.evaluate(() => {
     const t = [...document.querySelectorAll('.toast, [class*=toast]')]
@@ -139,7 +142,8 @@ async function messen(mitRaub, browser, mond){
   const browser = await starteBrowser();
   const mit  = await messen(true, browser);
   const ohne = await messen(false, browser);
-  const mond = await messen(true, browser, true);
+  const mond = await messen(true, browser, 'moon_' + MONDPLANET);
+  const heimatmond = await messen(true, browser, 'moon_home');
   await browser.close();
 
   merke('0a: das Truemmer-Zeichen steht in beiden Laeufen', mit.marker === true && ohne.marker === true,
@@ -164,6 +168,13 @@ async function messen(mitRaub, browser, mond){
       && /Piraten plündern dieses Trümmerfeld/.test(mond.text || ''),
     { traeger: MONDPLANET, marker: mond.marker, zeichen: mond.zeichen, puls: mond.puls,
       auszug: (mond.text || '').slice(0, 90) });
+  /* 3b: Derselbe Massstab auf dem ZWEITEN Zeichenweg. Die Heimatbasis steht nur im eigenen
+     Heimatsystem, das der Lauf ohnehin oeffnet (kepler). */
+  merke('3b: auch der HEIMATMOND bekommt Marker und Klicktext',
+    heimatmond.marker === true && heimatmond.zeichen === '☠' && heimatmond.puls >= 2
+      && /Piraten plündern dieses Trümmerfeld/.test(heimatmond.text || ''),
+    { marker: heimatmond.marker, zeichen: heimatmond.zeichen, puls: heimatmond.puls,
+      auszug: (heimatmond.text || '').slice(0, 90) });
   merke('2c: keine Skriptfehler', (mit.errs||[]).length === 0 && (ohne.errs||[]).length === 0,
     { mit: (mit.errs||[]).slice(0,2), ohne: (ohne.errs||[]).slice(0,2) });
 
