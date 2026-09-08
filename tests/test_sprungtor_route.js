@@ -253,7 +253,12 @@ const SAB = process.env.KEPLER_TOR_GEGENPROBE || '';
             das Tor ist aber noch der flache Ring -> nur 3a und 3b fallen, 1b bleibt gruen.
    Der erste Anlauf fuehrte nur `alt` und lief gegen 4cdf423 - die Gegenprobe meldete daraufhin
    „1b blieb gruen" und hatte recht: Sie mass einen Stand, der KB-26 laengst kennt. */
-const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'] };
+/* DREI VERGLEICHSSTAENDE, alle gemessen:
+     alt  = vor KB-26 (264b8c6): Bahn an der Sonne UND flacher Ellipsen-Ring -> 1b, 3a, 3b fallen.
+     ring = vor KB-27 (4cdf423): Bahn schon durch das Tor, Tor noch flach     -> 3a, 3b fallen.
+     hoch = vor KB-32 (d525800): Tor aufrecht, aber der Entflechter kennt nur das erste Bild der
+            Gruppe -> die Beschriftung liegt auf dem Tor, 3d faellt. */
+const MUSS_FALLEN = { alt: ['1b', '3a', '3b'], ring: ['3a', '3b'], hoch: ['3d'] };
 const ergebnis = {};
 const check2 = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
@@ -291,7 +296,17 @@ async function bahnStart(page, farbe){
         const tb = treffer.getBoundingClientRect();
         const sx = tb.left + tb.width/2, sy = tb.top + tb.height/2, rV = (tb.width/2)/1.45;
         const ecken = [[gb.left,gb.top],[gb.right,gb.top],[gb.left,gb.bottom],[gb.right,gb.bottom]];
-        masse = { breite: gb.width, hoehe: gb.height,
+        /* KB-32: Liegt eine Beschriftung AUF dem Tor? Gemessen im Bildschirmraum, also mit allen
+           Transformationen - das ist, was der Spieler sieht. */
+        const kollision = [...svg.querySelectorAll('text.planet-label')].map(t => {
+          const tb = t.getBoundingClientRect();
+          const ueber = tb.left < gb.right && tb.right > gb.left && tb.top < gb.bottom && tb.bottom > gb.top;
+          if (!ueber) return null;
+          const bx = Math.max(0, Math.min(tb.right, gb.right) - Math.max(tb.left, gb.left));
+          const by = Math.max(0, Math.min(tb.bottom, gb.bottom) - Math.max(tb.top, gb.top));
+          return { text: (t.textContent || '').trim(), flaeche: +(bx * by).toFixed(1) };
+        }).filter(Boolean);
+        masse = { breite: gb.width, hoehe: gb.height, aufDemTor: kollision,
                   seitenverhaeltnis: +(gb.width/gb.height).toFixed(2),
                   eckeInRadien: +(Math.max.apply(null, ecken.map(p => Math.hypot(p[0]-sx, p[1]-sy))) / rV).toFixed(2) };
       }
@@ -319,8 +334,12 @@ const SONNE = (() => {
     const tab = quelle.slice(tabVon, quelle.indexOf('\n  };', tabVon));
     const mitTor = [...tab.matchAll(/^\s{4}'?([\w-]+)'?:\s*\{[^\n]*sprungtor:true/gm)].map(m => m[1]).sort();
     check2('0a: ein Zielplanet in vega steht in der Spieldatei', !!ZIELPLANET, { ZIELPLANET });
-    check2('2a: genau die vier Arten mit vorpostenFlug tragen sprungtor:true',
-      JSON.stringify(mitTor) === JSON.stringify(['colonize','explore','mining','vorposten-bau']), { mitTor });
+    /* Die Liste waechst mit den Aufrufstellen von vorpostenFlug() - sie ist eine Kopie-Familie,
+       kein fester Bestand. VP-1 hat mit dem Transportverband die fuenfte Aufrufstelle gebracht
+       (vorpostenFrachtFlug); die Zusage bleibt dieselbe: GENAU die Arten, deren Flugzeit ueber
+       vorpostenFlug laeuft, tragen sprungtor:true - keine mehr und keine weniger. */
+    check2('2a: genau die fuenf Arten mit vorpostenFlug tragen sprungtor:true',
+      JSON.stringify(mitTor) === JSON.stringify(['colonize','explore','mining','vorposten-bau','vorposten-fracht']), { mitTor });
 
     // ---- 1) Mit Tor ------------------------------------------------------------------------------
     const mitTorLauf = await lauf(browser, doc({ projekte:['sprungtor'] }));
@@ -349,6 +368,13 @@ const SONNE = (() => {
     check2('3c: das Tor bleibt im reservierten Platz des Vorpostens',
       reserviert > 0 && !!a.masse && a.masse.eckeInRadien <= reserviert,
       { gemessen: a.masse && a.masse.eckeInRadien, reserviert });
+    /* KB-32 (Fehlerbericht Sascha mit Screenshot: „der name des aussenposten überlagert das tor").
+       Der Beschriftungs-Entflechter griff die belegte Flaeche einer Gruppe ueber das ERSTE Bild -
+       beim Vorposten die Station. Das aufrechte Tor darueber galt damit als leerer Raum, und die
+       Beschriftung wich genau dorthin aus. Gemessen wird die Ueberdeckung im Bildschirmraum. */
+    check2('3d: keine Beschriftung liegt auf dem Tor',
+      !!a.masse && Array.isArray(a.masse.aufDemTor) && a.masse.aufDemTor.length === 0,
+      { aufDemTor: a.masse && a.masse.aufDemTor });
     await mitTorLauf.ctx.close();
 
     // ---- 1c) Ohne Tor ---------------------------------------------------------------------------

@@ -61,7 +61,16 @@ function doc(over){
     anflug:[], meinLetzterSchlag:0, letzterKampf:null, kampfverlauf:[], naechsteStufe:null
   }, over || {});
 }
-function spielstand(lagerStufe, wenigVorrat){
+/* `slotsVoll` fuellt die Flottenslots. Gebraucht seit VP-1 (08.09.2026): Die abgeholte Fracht
+   fliegt seither als Transportverband nach Hause und wird erst bei der Ankunft gebucht. Die
+   Pruefungen 11 und 13 messen aber die BUCHUNG und ihre Meldung, nicht den Flug - und die
+   geschieht auf beiden Wegen durch dieselbe Funktion (vorpostenFrachtBuchen). Mit vollen Slots
+   greift der Rueckfall, der sofort bucht. Den Weg ueber den Verband misst
+   tests/test_vorposten_fracht.js. */
+function spielstand(lagerStufe, wenigVorrat, slotsVoll){
+  const missionen = [];
+  if (slotsVoll) for (let i = 0; i < 8; i++)
+    missionen.push({ id: 6000+i, type:'explore', targetId:'thessa', startTime: Date.now(), endTime: Date.now() + 9e6, composition:{ spaeher: 1 } });
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
   return JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true, seenTabHints:g, activeEvent:{ key:'__testruhe__', bis: now+9e8 },
     /* `wenigVorrat` startet weit UNTER dem Lagerdeckel. Ohne das ist ein Zugang gar nicht messbar:
@@ -70,17 +79,17 @@ function spielstand(lagerStufe, wenigVorrat){
     resources: wenigVorrat
       ? { energie:9e5, erz:100, kristalle:100, deuterium:100, antimaterie:9e4, forschungspunkte:3e4 }
       : { energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:9e4, forschungspunkte:3e4 },
-    buildings:{ solar:22, mine:20, labor:14, lager:(lagerStufe === undefined ? 60 : lagerStufe), werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, missions:[] },
+    buildings:{ solar:22, mine:20, labor:14, lager:(lagerStufe === undefined ? 60 : lagerStufe), werft:14 }, research:{}, fleet:{ jaeger:80, cruisers:12, spaeher:20, missions: missionen },
     colonies:{}, discovered:{}, activeBasePlanet:'home', player:{ id:ICH, name:'Ich' }, xp:9e5, credits:5e5, buffs:[],
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
 }
-async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat){
+async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   let belohnungRaus = false;
-  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand(lagerStufe, wenigVorrat) };
+  const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }), 'kepler7-save-v3': spielstand(lagerStufe, wenigVorrat, belohnung ? true : slotsVoll) };
   await page.route('**/api/**', async r => {
     const req = r.request(), u = req.url(), p = u.split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
