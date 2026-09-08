@@ -65749,7 +65749,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
            `abbauBis` (Ende der Foerderung), und dazwischen bewegt sich die Flotte NICHT.
            Gerechnet wird deshalb aus diesen beiden Zeitpunkten statt aus der halben Gesamtdauer;
            fehlen sie (jede andere Art, und alte Spielstaende), bleibt es bei der Halbierung. */
-        const hatStand = !!(art.warten && m.hinBis && m.abbauBis && m.abbauBis > m.hinBis && m.endTime > m.abbauBis);
+        /* `art.rundflug` steht hier NICHT umsonst zuerst: Ohne diese Bedingung bekaeme ein
+           Einwegflug mit Standzeit einen Rueckweg, den es gar nicht gibt - und der Zweig darunter
+           berechnete ihn stillschweigend. Gefunden hat das test_flugbahnen mit der Pruefung „der
+           Rueckweg wird nur beim Rundflug gerechnet", und zwar bevor irgendetwas gelaufen war. */
+        const hatStand = !!(art.rundflug && art.warten && m.hinBis && m.abbauBis
+                            && m.abbauBis > m.hinBis && m.endTime > m.abbauBis);
         let returning, f2, wartet = false;
         if (hatStand){
           if (now < m.hinBis){
