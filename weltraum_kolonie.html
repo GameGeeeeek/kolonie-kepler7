@@ -63278,6 +63278,25 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }
     return null;
   }
+  /* WIE VIELE ABZEICHEN NEBENEINANDER PASSEN (KS-5, 08.09.2026) - nachgerechnet, nicht gewaehlt.
+     Die Zeichen sitzen in der Sektoransicht bei `x - 16 - i*14`, die Knotenspalten bei
+     `[66, 200, 334] * W/400`. Am Handy ist W exakt 400, die linke Spalte also bei x = 66:
+        i=0 -> 50   i=1 -> 36   i=2 -> 22   i=3 -> 8   i=4 -> -6
+     Das FUENFTE Zeichen liegt damit ausserhalb der viewBox. `karteSystemBadges` kann bis zu
+     zwoelf liefern, gedeckelt wurde nirgends - ob ein Spieler den Wrackkonvoi, den Vorposten oder
+     den NPC sieht, hing damit an seiner Bildschirmbreite statt an seiner Aufklaerung.
+     VIER PLAETZE, davon der letzte fuer die Zaehlmarke: drei Zeichen plus „+N". Die REIHENFOLGE
+     ist die, in der karteSystemBadges sie anlegt - Allianzbasis und Statthalter zuerst, weil sie
+     feststehen, die wechselnde Lage danach. Wer den Deckel senkt, wirft also von hinten weg.
+     DER DECKEL STEHT HIER UND NICHT IN karteSystemBadges: Die Funktion speist vier Verbraucher,
+     darunter den Regions-Tooltip der Uebersicht, der ALLE Hinweise sammeln soll. Ein Deckel an
+     der Quelle wuerde ihm still Eintraege nehmen, die er gerade zusammentragen will. */
+  const KB_BADGE_PLAETZE = 4;
+  function kbBadgeReihe(badges){
+    const liste = badges || [];
+    if (liste.length <= KB_BADGE_PLAETZE) return { zeigen: liste, rest: 0 };
+    return { zeigen: liste.slice(0, KB_BADGE_PLAETZE - 1), rest: liste.length - (KB_BADGE_PLAETZE - 1) };
+  }
   function karteSystemBadges(sysId){
     const badges = [];
     if (state.allianceBase && state.allianceBase.foundedAt && myAllianceTag() && sysId === state.allianceBase.sector)
@@ -63499,12 +63518,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
         ? '<svg x="' + (x+12) + '" y="' + (y-26) + '" width="14" height="14" viewBox="0 0 100 100" opacity="0.85">' + ICONS['fac_' + eigner.id].replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') + '</svg>'
         : '';
       let abzeichen = '';
-      kbBadges.forEach(function(b, i){
+      const kbReihe = kbBadgeReihe(kbBadges);
+      kbReihe.zeigen.forEach(function(b, i){
         abzeichen += '<text x="' + (x - 16 - i*14) + '" y="' + (y - 14) + '" text-anchor="middle" style="font-size:11px;"><title>' + b.title + '</title>' + b.icon + '</text>';
         // Bekannte Verteidigungsstaerke direkt unterm 🔎 (KB-5) - wie am Spieler-Marker der
         // Systemebene, Farbe traegt die Verlaesslichkeit.
         if (b.dp !== undefined) abzeichen += '<text data-kb-intel-dp="' + sy.id + '" x="' + (x - 16 - i*14) + '" y="' + (y - 3) + '" text-anchor="middle" style="font-size:7.5px; font-weight:600; fill:' + b.dpFarbe + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:2.5px;"><title>' + b.title + '</title>🛡 ' + fmt(b.dp) + '</text>';
       });
+      /* DIE ZAEHLMARKE steht auf dem letzten Platz und traegt im Titel, WAS sie verdeckt - sonst
+         waere sie eine Auskunft, die selbst keine ist. */
+      if (kbReihe.rest > 0) abzeichen += '<text x="' + (x - 16 - kbReihe.zeigen.length*14) + '" y="' + (y - 14) + '" text-anchor="middle" style="font-size:10px; font-weight:700; fill:#c9c7bd;"><title>'
+        + kbBadges.slice(kbReihe.zeigen.length).map(function(b){ return b.icon + ' ' + b.title; }).join('\n')
+        + '</title>+' + kbReihe.rest + '</text>';
       // Die dominierende Macht steht hinter Heimat und eigener Basis: Wo ich selbst wohne, ist das
       // die naeherliegende Auskunft. Danach sagt dom.kurz, wem die Gegend gehoert - vorher kannte
       // diese Zeile nur die eigene Eroberung und die Fraktion.
@@ -63790,7 +63815,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // nicht nur Atmosphäre.
       const badgeSize = Math.max(8, 11*knotenSkala);
       const badgeStep = Math.max(9, 13*knotenSkala);
-      const badgeMarkup = badges.map((b,i) => `<text x="${(pos.x+11*knotenSkala+i*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${badgeSize.toFixed(1)}px;"><title>${b.title}</title>${b.icon}</text>`).join('');
+      /* Derselbe Deckel wie in der Sektoransicht - eine Reihe, die ueber den Knoten hinauslaeuft,
+         ist hier genauso unlesbar, nur in die andere Richtung. */
+      const badgeReihe = kbBadgeReihe(badges);
+      const badgeMarkup = badgeReihe.zeigen.map((b,i) => `<text x="${(pos.x+11*knotenSkala+i*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${badgeSize.toFixed(1)}px;"><title>${b.title}</title>${b.icon}</text>`).join('')
+        + (badgeReihe.rest > 0 ? `<text x="${(pos.x+11*knotenSkala+badgeReihe.zeigen.length*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${(badgeSize*0.9).toFixed(1)}px; font-weight:700; fill:#c9c7bd;"><title>${badges.slice(badgeReihe.zeigen.length).map(b => b.icon + ' ' + b.title).join('\n')}</title>+${badgeReihe.rest}</text>` : '');
 
       // Eigener Besitz gefuellt, Fremdes nur umrandet; Breite und Deckkraft folgen der Rangstufe -
       // beides aus systemDominanz, damit ein Knoten auf beiden Kartenebenen gleich zu lesen ist.
