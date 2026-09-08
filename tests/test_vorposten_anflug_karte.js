@@ -25,6 +25,11 @@
 //       hinten ab - und der Alarm steht in der Liste hinter Piratenbasis, Sichtung, Krieg und
 //       Wurmloch. Traegt ein System sie alle, verschwand ausgerechnet die Warnung vor dem eigenen
 //       Totalverlust in der Zaehlmarke. Gemessen wird mit genau diesem vollen System.
+//   3b  AUFLAGE 5 (zweite Durchsicht an PR #614): Der Titel der Zaehlmarke nennt GENAU die
+//       verdeckten Abzeichen. Beide Zeichner schnitten ihn aus der urspruenglichen Liste; sobald
+//       der Vorrang die Reihenfolge aendert, nannte er das sichtbare 🔥 als verdeckt und liess ein
+//       wirklich verdecktes weg. Geprueft wird die Regel, nicht der Wortlaut: kein sichtbares
+//       Zeichen steht im Titel, und die Zahl der Titelzeilen ist die Zahl der Zaehlmarke.
 //
 // GEGENPROBE 1: `KEPLER_SPIELDATEI` auf den Stand vor KS-6, Aufruf mit KEPLER_ANFLUG_GEGENPROBE=alt.
 // Dort fallen 1a, 1b, 2b, 2c und 3a - gemessen, nicht gesetzt. 2c steht in der Liste, weil es einen
@@ -39,7 +44,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_ANFLUG_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '2b', '2c', '3a'], deckel: ['3a'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '2b', '2c', '3a'], deckel: ['3a'], titel: ['3b'] };
 const SYS = 'vega';
 const now = Date.now();
 
@@ -117,7 +122,9 @@ async function messen(page){
     const eigen = t => { const l = t.lastChild; return (l && l.nodeType === 3) ? l.nodeValue.trim() : ''; };
     const zeichen = [...g.querySelectorAll('text')].map(eigen).filter(Boolean);
     const titel = [...g.querySelectorAll('title')].map(t => t.textContent);
-    return { knoten:true, zeichen, titel,
+    const markeEl = [...g.querySelectorAll('text')].find(t => /^\+\d+$/.test(eigen(t)));
+    const markeTitel = markeEl ? (markeEl.querySelector('title') || {}).textContent || '' : '';
+    return { knoten:true, zeichen, titel, markeTitel,
              marke: zeichen.find(z => /^\+\d+$/.test(z)) || '',
              alarmTitel: titel.find(t => /im Anflug/.test(t)) || '',
              vorpostenTitel: titel.find(t => /Kern \d+%/.test(t)) || '' };
@@ -190,6 +197,15 @@ async function messen(page){
   merke('3a: im vollen System schneidet der Deckel, der Alarm bleibt trotzdem stehen',
     (m4.zeichen || []).includes('🔥') && /^\+\d+$/.test(m4.marke || ''),
     { zeichen: m4.zeichen, marke: m4.marke });
+  /* 3b: Aus dem Titel gelesen, nicht aus dem Quelltext. `zeilen` ist die Zahl der verdeckten
+     Abzeichen, `sichtbar` die Zeichen, die tatsaechlich in der Reihe stehen (die Zaehlmarke
+     selbst ausgenommen). Keines davon darf im Titel auftauchen. */
+  const versteckteZeilen = (m4.markeTitel || '').split('\n').filter(z => z.trim());
+  const sichtbar = (m4.zeichen || []).filter(z => !/^\+\d+$/.test(z) && !/[A-Za-z]/.test(z));
+  const doppelt = sichtbar.filter(z => (m4.markeTitel || '').indexOf(z) >= 0);
+  merke('3b: der Titel der Zaehlmarke nennt genau die verdeckten Abzeichen',
+    versteckteZeilen.length === Number((m4.marke || '+0').slice(1)) && doppelt.length === 0,
+    { zeilen: versteckteZeilen.length, marke: m4.marke, sichtbar, faelschlichGenannt: doppelt });
   vollePiste = false;
 
   merke('2d: keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));

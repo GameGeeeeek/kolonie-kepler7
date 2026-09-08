@@ -19,11 +19,19 @@
 //   2a  DIE KOPIE-FAMILIE: Die Zahl der markierten Eintraege im Quelltext. Der Satz entsteht an
 //       EINER Stelle (openKarteMenu), die Marke `slot: true` steht an jedem Eintrag, der wirklich
 //       einen Slot kostet. Wer ein neues Kartenmenue baut und die Marke vergisst, faellt hier.
+//   2b  DER EINE EINSTIEG AUSSERHALB DES MENUES (zweite Durchsicht an PR #614): Der Knopf
+//       „Vorposten errichten" in der Detailtafel geht nicht durch `openKarteMenu` und blieb als
+//       einziger slotkostender Karteneinstieg stumm. Geprueft wird beides, was ihn heilt: der Satz
+//       aus derselben Quelle (`slotSatz`) im Knopftitel, und die Sperre VOR der Rueckfrage -
+//       sie stand danach, der Spieler bestaetigte also einen Bau, der in derselben Sekunde
+//       abgelehnt wurde.
 //
 // GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor KS-1, Aufruf mit KEPLER_SLOT_GEGENPROBE=alt.
-// Dort fallen 1a, 1b und 2a - den Satz gibt es nicht. 1c bleibt gruen (der Satz fehlt ueberall,
-// also auch dort, wo er fehlen soll) und ist damit kein Beleg fuer KS-1, sondern der Waechter
-// gegen die naechste Uebertreibung.
+// Dort fallen 1a, 1b, 2a und 2b - den Satz gibt es nicht. 1c bleibt gruen (der Satz fehlt
+// ueberall, also auch dort, wo er fehlen soll) und ist damit kein Beleg fuer KS-1, sondern der
+// Waechter gegen die naechste Uebertreibung.
+// GEGENPROBE 2: Stand vor dem Nachtrag (Commit 90f1179), Aufruf mit KEPLER_SLOT_GEGENPROBE=knopf.
+// Dort fallen 2a (15 statt 16 Marken) und 2b.
 const fsS = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -32,7 +40,7 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_SLOT_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '2a'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '2a', '2b'], knopf: ['2a', '2b'] };
 
 const SYS = 'chronos';
 const SAVE_KEY = 'kepler7-save-v3';
@@ -173,10 +181,27 @@ async function menue(page, planetId){
        Quelltext, weil kein Lauf alle neun Kartenmenues gleichzeitig oeffnen kann. Die Zahl ist
        GEMESSEN (08.09.2026): Erkunden, Kolonisieren (Planet), Kolonisieren (Mond), Spaehen,
        Angreifen, Monde belagern, NPC-Angriff, Nest, Konvoi, Garnison entsenden, Vorposten-
-       Angriff, Festung, Abbaumission, Anfechtung, Eskorte. */
+       Angriff, Festung, Abbaumission, Anfechtung, Eskorte - und seit der zweiten Durchsicht an
+       PR #614 die Garnison am VERBUENDETEN Vorposten, die als einzige der beiden
+       Garnison-Eintraege ohne Marke dastand. */
     const marken = (QUELLE.match(/slot: true/g) || []).length;
-    merke('2a: alle 15 slotkostenden Karteneintraege tragen die Marke', marken === 15,
-      { gemessen: marken, erwartet: 15 });
+    merke('2a: alle 16 slotkostenden Karteneintraege tragen die Marke', marken === 16,
+      { gemessen: marken, erwartet: 16 });
+
+    /* 2b: Der Knopf ausserhalb des Menues. Beide Anker werden VOR der Benutzung auf Existenz
+       geprueft - fehlt einer, liefert `indexOf` -1, und ein Vergleich zweier -1 waere aus dem
+       falschen Grund gruen. Der Rumpf wird bis `pay(gesamt)` geschnitten, also ueber die ganze
+       Vorpruefung; dass dieser Endanker existiert, gehoert mit zur Bedingung. */
+    const vonBau = QUELLE.indexOf('function vorpostenBauStarten(');
+    const bisBau = vonBau >= 0 ? QUELLE.indexOf('pay(gesamt);', vonBau) : -1;
+    const rumpf = (vonBau >= 0 && bisBau > vonBau) ? QUELLE.slice(vonBau, bisBau) : '';
+    const iSperre = rumpf.indexOf('if (fleetLimitBlocks()) return;');
+    const iFrage = rumpf.indexOf('if (!confirm(');
+    const titelZeile = /const titelB = [^\n]*\+ slotSatz\(\);/.test(QUELLE)
+      && /data-vorposten-bau="1"[^\n]*escapeHtml\(titelB\)/.test(QUELLE);
+    merke('2b: der Bau-Knopf nennt den Slot und sperrt VOR der Rueckfrage',
+      titelZeile && iSperre >= 0 && iFrage >= 0 && iSperre < iFrage,
+      { titelZeile, sperre: iSperre, frage: iFrage, rumpfDa: rumpf.length > 0 });
   } finally {
     await browser.close();
   }

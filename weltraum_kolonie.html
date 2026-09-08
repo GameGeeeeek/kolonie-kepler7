@@ -13999,8 +13999,12 @@
     const gesamt = Object.assign({}, VORPOSTEN_BAUKOSTEN);
     for (const [fr, fa] of Object.entries(fuel)) gesamt[fr] = (gesamt[fr]||0) + fa;
     if (!canAfford(gesamt)){ log('Nicht genug Rohstoffe: Baukosten ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' plus Treibstoff ' + fuelCostText(fuel) + '.', 'ti-alert-triangle', 'warn'); return; }
-    if (!confirm('Vorposten in ' + sysN + ' errichten?\n\nKosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' + Treibstoff ' + fuelCostText(fuel) + '.\nDie Baukolonne (1 Kolonieschiff) fliegt hin und zurück (' + fmtDuration(flug) + '). Ein Vorposten ist eine verbindliche Ortswahl: Aufgeben erstattet nichts.')) return;
+    /* DIE SLOTSPERRE STEHT VOR DER RUECKFRAGE (Befund der zweiten Durchsicht an PR #614).
+       Sie stand danach: Der Spieler bestaetigte einen Bau, den das Spiel in derselben Sekunde
+       ablehnte - und die Ablehnung war nur eine Protokollzeile. Vorgezogen aendert sie nichts am
+       Spielstand (`pay` kommt erst darunter) und erspart genau die Rueckfrage, die nie zaehlt. */
     if (fleetLimitBlocks()) return;
+    if (!confirm('Vorposten in ' + sysN + ' errichten?\n\nKosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' + Treibstoff ' + fuelCostText(fuel) + '.\nDie Baukolonne (1 Kolonieschiff) fliegt hin und zurück (' + fmtDuration(flug) + '). Ein Vorposten ist eine verbindliche Ortswahl: Aufgeben erstattet nichts.')) return;
     pay(gesamt);
     const jetzt = Date.now();
     const fleetName = resolveFleetName();
@@ -63385,7 +63389,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
   const KB_BADGE_PLAETZE = 4;
   function kbBadgeReihe(badges){
     const liste = badges || [];
-    if (liste.length <= KB_BADGE_PLAETZE) return { zeigen: liste, rest: 0 };
+    if (liste.length <= KB_BADGE_PLAETZE) return { zeigen: liste, versteckt: [], rest: 0 };
     /* VORRANG SCHLAEGT REIHENFOLGE (Befund der Durchsicht an PR #614, bestaetigt).
        Der Deckel schnitt bis hierher stur von hinten ab - und der Anflug-Alarm (KS-6) steht in der
        Liste hinter Piratenbasis, Krieg und Wurmloch. Traegt ein System alle drei, verschwand
@@ -63394,10 +63398,17 @@ function sekSternUse(key, x, y, k, unentdeckt){
        gegenseitig aufheben - genau die Sorte Fehler, die einzeln betrachtet keiner ist.
        `vorrang` bleibt bewusst RAR: Es traegt nur, was der Spieler sofort sehen muss, weil ihm
        sonst etwas verlorengeht. Wer es an ein drittes Abzeichen haengt, hebt den Deckel auf. */
-    const vorne = liste.filter(b => b && b.vorrang);
-    const uebrig = liste.filter(b => !(b && b.vorrang));
-    const zeigen = vorne.concat(uebrig).slice(0, KB_BADGE_PLAETZE - 1);
-    return { zeigen, rest: liste.length - zeigen.length };
+    const geordnet = liste.filter(b => b && b.vorrang).concat(liste.filter(b => !(b && b.vorrang)));
+    /* DIE VERDECKTEN KOMMEN AUS DERSELBEN GEORDNETEN LISTE (Befund der zweiten Durchsicht an
+       PR #614, bestaetigt). Beide Zeichner schnitten den Titel der Zaehlmarke bis hierher selbst
+       aus der URSPRUENGLICHEN Liste (`badges.slice(zeigen.length)`) - was stimmte, solange die
+       Reihenfolge unangetastet blieb. Mit dem Vorrang stimmt es nicht mehr: Gemessen an einem
+       System mit sechs Abzeichen nannte der Titel das sichtbare 🔥 als verdeckt und liess das
+       wirklich verdeckte ⚔️ weg. Wer die Reihenfolge aendert, muss auch den Rest daraus nehmen -
+       deshalb liefert diese Funktion ihn jetzt selbst, statt ihn zweimal nachbauen zu lassen. */
+    const zeigen = geordnet.slice(0, KB_BADGE_PLAETZE - 1);
+    const versteckt = geordnet.slice(KB_BADGE_PLAETZE - 1);
+    return { zeigen, versteckt, rest: versteckt.length };
   }
   function karteSystemBadges(sysId){
     const badges = [];
@@ -63691,7 +63702,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       /* DIE ZAEHLMARKE steht auf dem letzten Platz und traegt im Titel, WAS sie verdeckt - sonst
          waere sie eine Auskunft, die selbst keine ist. */
       if (kbReihe.rest > 0) abzeichen += '<text x="' + (x - 16 - kbReihe.zeigen.length*14) + '" y="' + (y - 14) + '" text-anchor="middle" style="font-size:10px; font-weight:700; fill:#c9c7bd;"><title>'
-        + kbBadges.slice(kbReihe.zeigen.length).map(function(b){ return b.icon + ' ' + b.title; }).join('\n')
+        + kbReihe.versteckt.map(function(b){ return b.icon + ' ' + b.title; }).join('\n')
         + '</title>+' + kbReihe.rest + '</text>';
       // Die dominierende Macht steht hinter Heimat und eigener Basis: Wo ich selbst wohne, ist das
       // die naeherliegende Auskunft. Danach sagt dom.kurz, wem die Gegend gehoert - vorher kannte
@@ -63982,7 +63993,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
          ist hier genauso unlesbar, nur in die andere Richtung. */
       const badgeReihe = kbBadgeReihe(badges);
       const badgeMarkup = badgeReihe.zeigen.map((b,i) => `<text x="${(pos.x+11*knotenSkala+i*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${badgeSize.toFixed(1)}px;"><title>${b.title}</title>${b.icon}</text>`).join('')
-        + (badgeReihe.rest > 0 ? `<text x="${(pos.x+11*knotenSkala+badgeReihe.zeigen.length*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${(badgeSize*0.9).toFixed(1)}px; font-weight:700; fill:#c9c7bd;"><title>${badges.slice(badgeReihe.zeigen.length).map(b => b.icon + ' ' + b.title).join('\n')}</title>+${badgeReihe.rest}</text>` : '');
+        + (badgeReihe.rest > 0 ? `<text x="${(pos.x+11*knotenSkala+badgeReihe.zeigen.length*badgeStep).toFixed(1)}" y="${(pos.y-11*knotenSkala).toFixed(1)}" text-anchor="middle" style="font-size:${(badgeSize*0.9).toFixed(1)}px; font-weight:700; fill:#c9c7bd;"><title>${badgeReihe.versteckt.map(b => b.icon + ' ' + b.title).join('\n')}</title>+${badgeReihe.rest}</text>` : '');
 
       // Eigener Besitz gefuellt, Fremdes nur umrandet; Breite und Deckkraft folgen der Rangstufe -
       // beides aus systemDominanz, damit ein Knoten auf beiden Kartenebenen gleich zu lesen ist.
@@ -65520,7 +65531,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Knopf klickbar und gedaempft; vorpostenBauStarten() nennt den Grund als wartenden Toast
            (`warn`, 9 s). Dieselbe Lehre wie beim Festungsschlag: Eine Sperre, die ihren Grund nicht
            sagt, sieht fuer den Spieler wie ein kaputtes Spiel aus. */
-        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.')}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
+        /* DIE FLOTTENSLOT-AMPEL AUCH HIER (KS-1, nachgetragen nach der zweiten Durchsicht an
+           PR #614): Dieser Knopf sitzt ausserhalb von `openKarteMenu`, wo der Satz sonst
+           entsteht - er blieb deshalb als einziger slotkostender Karteneinstieg stumm. Der Satz
+           kommt aus derselben Quelle (`slotSatz`), damit er nicht auseinanderlaeuft. */
+        const titelB = (grundB || 'Baukosten: ' + kostenText(VORPOSTEN_BAUKOSTEN) + ' – eine Baukolonne (1 Kolonieschiff) fliegt hin und zurück.') + ' ' + slotSatz();
+        html += `<button class="planet-pill" data-vorposten-bau="1" ${grundB ? 'aria-disabled="true" style="opacity:0.55;"' : ''} title="${escapeHtml(titelB)}"><i class="ti ti-building-community" aria-hidden="true"></i>Vorposten errichten</button>`;
       }
     }
     box.innerHTML = html;
@@ -68103,7 +68119,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           : freiV < 1 ? (platzV !== null ? 'Für dich ist hier kein Platz mehr frei – der Anteil aller Verbündeten an dieser Garnison ist ausgeschöpft.' : 'Die Garnison ist voll.')
           : 'Verstärkt den Vorposten von ' + (v.besitzerName || 'deinem Verbündeten') + '. Deine Schiffe bleiben deine'
             + (platzV !== null ? ' – er nimmt von dir noch ' + platzV + ' an.' : '; der Anteil aller Verbündeten an einer Garnison ist aber begrenzt.'),
-        disabled: garnUnterwegsV || !kampfschiffe || freiV < 1, fn: () => vorpostenGarnisonSenden(sysId) });
+        disabled: garnUnterwegsV || !kampfschiffe || freiV < 1, slot: true, fn: () => vorpostenGarnisonSenden(sysId) });
       }
       /* DER RUECKRUF STEHT AUSSERHALB DER BUENDNIS-BEDINGUNG (Durchsicht 05.09.2026). Wer die
          Allianz verlassen hat, ist nicht mehr `verbuendet`, seine Schiffe stehen aber weiter dort
