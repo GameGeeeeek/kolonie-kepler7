@@ -64205,8 +64205,29 @@ function sekSternUse(key, x, y, k, unentdeckt){
      Der gezeichnete Rumpf zeigt nach RECHTS (die Nase liegt bei x=92 von 100), der alte Pfeil
      nach oben - deshalb `angle - 90` statt `angle`. Vertauscht man das, fliegt die ganze Flotte
      quer zur Bahn, und zwar unauffaellig genug, um es zu uebersehen. */
-  function flottenMarke(m, x, y, angle, farbe){
+  /* REINE BERGBAUFLOTTE: nur Frachtraum und Recycler, kein einziges Kampfschiff. Die Liste steht
+     hier und wird nicht aus einem Kampfwert abgeleitet - `SHIP_SCORE_WEIGHTS` kennt fuer Frachter
+     durchaus Gewichte (frachter 10, frachtergross 40, bergungsfrachter 80, recycler 12), eine
+     Ableitung "Gewicht 0 = Frachter" waere also schlicht falsch.
+     Leere oder unbekannte Zusammensetzung zaehlt NICHT als Bergbau: Ein alter Spielstand ohne
+     `composition` bekaeme sonst still die Konvoi-Form, obwohl niemand weiss, was da fliegt. */
+  const FRACHT_SHIP_KEYS = ['frachter', 'frachtergross', 'bergungsfrachter', 'recycler'];
+  function istBergbauflotte(comp){
+    if (!comp) return false;
+    let hat = false;
+    for (const k of Object.keys(comp)){
+      if (!(comp[k] > 0)) continue;
+      if (FRACHT_SHIP_KEYS.indexOf(k) < 0) return false;
+      hat = true;
+    }
+    return hat;
+  }
+  function flottenMarke(m, x, y, angle, farbe, bergbauArt){
     const comp = m.composition || (m.shipKey ? { [m.shipKey]: m.qty || 0 } : null);
+    /* Konvoi-Form nur, wenn BEIDES stimmt: Die Missionsart ist Bergbau UND es fliegt wirklich
+       nichts Bewaffnetes mit. Wer seine Abbauflotte mit Jaegern begleitet, schickt eben doch eine
+       bewaffnete Flotte - dann ist der Keil die ehrlichere Auskunft. */
+    const bergbau = !!bergbauArt && istBergbauflotte(comp);
     const anzahl = flottenSchiffe(comp);
     const key = flottenFlaggschiff(comp);
     const url = key ? flottenBildUrl(key) : null;
@@ -64219,21 +64240,47 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const k = 11;                       // die der Begleiter
     let g = `<circle cx="${px}" cy="${py}" r="10" fill="${farbe}" opacity="0.16" pointer-events="none"/>`;
     g += `<g transform="translate(${px},${py}) rotate(${(angle - 90).toFixed(1)})" pointer-events="none">`;
-    // Die Begleiter fliegen HINTER dem Flaggschiff, leicht versetzt - ein Geleit, keine Reihe.
     const be = flottenBegleiter(anzahl);
-    const plaetze = [[-13, -7], [-13, 7], [-21, 0]];
-    for (let i = 0; i < be; i++){
-      g += `<image href="${url}" x="${(plaetze[i][0] - k/2).toFixed(1)}" y="${(plaetze[i][1] - k/2).toFixed(1)}" width="${k}" height="${k}" opacity="0.85"/>`;
+    /* ZWEI FORMATIONEN, und der Unterschied ist der eigentliche Auftrag vom 08.09.2026: „soll ein
+       anderes Symbol sein wie eine Kampfflotte". Der Rumpf allein reicht dafuer nicht - ein
+       Bergungsfrachter ist auf 22 Karteneinheiten von einem Zerstoerer kaum zu unterscheiden, und
+       wer eine Eskorte mitschickt, saehe ohnehin dessen Rumpf.
+       Die FORM traegt die Aussage, nicht das Detail:
+         Kampfflotte  Geleit im Keil hinter dem Flaggschiff - eine Formation, die schuetzt.
+         Bergbau      eine REIHE hintereinander, alle gleich gross, in gleichem Abstand: ein
+                      Konvoi. Kein Flaggschiff, weil im Abbau keines fuehrt.
+       Das ist auch auf einem Handybildschirm und im Vorbeisehen zu unterscheiden, waehrend zwei
+       verschiedene Ruempfe es nicht sind. */
+    if (bergbau){
+      const F = 15;                     // alle gleich gross - im Konvoi fuehrt niemand
+      const reihe = 1 + be;             // Zugmaschine plus so viele, wie die Groesse hergibt
+      const abstand = 13;
+      for (let i = 0; i < reihe; i++){
+        const dx = -i * abstand;
+        g += `<image href="${url}" x="${(dx - F/2).toFixed(1)}" y="${(-F/2).toFixed(1)}" width="${F}" height="${F}"`
+           + (i === 0 ? '' : ' opacity="0.88"') + `/>`;
+      }
+    } else {
+      // Die Begleiter fliegen HINTER dem Flaggschiff, leicht versetzt - ein Geleit, keine Reihe.
+      const plaetze = [[-13, -7], [-13, 7], [-21, 0]];
+      for (let i = 0; i < be; i++){
+        g += `<image href="${url}" x="${(plaetze[i][0] - k/2).toFixed(1)}" y="${(plaetze[i][1] - k/2).toFixed(1)}" width="${k}" height="${k}" opacity="0.85"/>`;
+      }
+      g += `<image href="${url}" x="${(-G/2).toFixed(1)}" y="${(-G/2).toFixed(1)}" width="${G}" height="${G}"/>`;
     }
-    g += `<image href="${url}" x="${(-G/2).toFixed(1)}" y="${(-G/2).toFixed(1)}" width="${G}" height="${G}"/>`;
     g += `</g>`;
     return g;
   }
   /* Die Beschriftung nennt auf dem HINFLUG die Schiffszahl - das ist die Auskunft, die man auf
      der Karte sucht - und auf dem RUECKFLUG die Richtung, denn dort ist der Zusammenhang die
      Frage und nicht die Staerke. Die Farbe traegt die Richtung ohnehin (MISSION_LINIEN). */
-  function flottenBeschriftung(m, art, returning){
+  function flottenBeschriftung(m, art, returning, wartet){
     const name = m.fleetName || art.was;
+    /* WAEHREND DER STANDZEIT sagt die Beschriftung, was gerade passiert, statt die Schiffszahl zu
+       wiederholen. Die Flotte steht dann still am Vorkommen - ohne diesen Zweig staende dort
+       minutenlang „N Schiffe" an einer Marke, die sich nicht bewegt, und das sieht aus wie ein
+       haengengebliebener Marker statt wie Arbeit. */
+    if (wartet) return name + ' · fördert';
     if (art.rundflug && returning) return name + ' · Rückflug';
     const n = flottenSchiffe(m.composition || (m.shipKey ? { [m.shipKey]: m.qty || 0 } : null));
     if (!n) return art.rundflug ? name + ' · Hinflug' : (m.fleetName ? name + ' · ' + art.was : art.was);
@@ -64288,7 +64335,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
     'vorposten-bau':      { hin:'#5dcaa5', rueck:'#5dcaa5', rundflug:true,  was:'Vorposten-Bau' },
     'vorposten-angriff':  { hin:'#e0667a', rueck:'#5dcaa5', rundflug:true,  was:'Vorposten-Angriff' },
     'vorposten-defend':   { hin:'#5dcaa5', rueck:null,      rundflug:false, was:'Garnison' },
-    'vorposten-rueckruf': { hin:'#5dcaa5', rueck:null,      rundflug:false, was:'Garnison-Rückkehr' }
+    'vorposten-rueckruf': { hin:'#5dcaa5', rueck:null,      rundflug:false, was:'Garnison-Rückkehr' },
+    /* BERGBAU (08.09.2026, Fehlerbericht Sascha: „bei einer reinen Bergbauflotte wird die Route
+       nicht angezeigt"). Gemessen stimmte das: 'mining' und 'mining-escort' standen in dieser
+       Tabelle nicht, und die Zeichenschleife filtert ueber sie - eine Abbauflotte hatte also nie
+       eine Bahn, nicht erst seit einer Regression.
+       `bergbau:true` ist die Unterscheidung, die der Bericht verlangt: Eine reine Fracht- und
+       Recyclerflotte soll NICHT aussehen wie ein Angriff. Sie traegt deshalb die Erzfarbe und
+       fliegt als Konvoi statt in Kampfformation (siehe flottenMarke).
+       `warten:true` sagt dem Zeichner, dass zwischen Hin- und Rueckweg ETWAS PASSIERT: Die Flotte
+       steht am Vorkommen und foerdert. Ohne das haette die Bahn genau den Fehler bekommen, vor dem
+       der Kommentar bei der Schuerfrecht-Anfechtung ausdruecklich warnt - „der Kartenzeichner
+       kennt hinBis nicht und halbiert stur bei frac>=0.5". Bei einer Abbaumission liegt die Haelfte
+       der Gesamtzeit mitten im Abbau; die Flotte waere auf dem Rueckweg gezeichnet worden,
+       waehrend sie noch am Brocken haengt. */
+    mining:          { hin:'#d9a441', rueck:'#5dcaa5', rundflug:true,  was:'Abbau',   bergbau:true, warten:true },
+    'mining-escort': { hin:'#c9b48a', rueck:null,      rundflug:false, was:'Eskorte', bergbau:true }
   };
   // Zielposition einer Mission im aktuell gezeigten System. Gibt zusätzlich zurück, ob das Ziel
   // ueberhaupt im Blick liegt - liegt es das nicht, nutzt der Zeichner die Sonne als Platzhalter
@@ -64308,7 +64370,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
        ein Gefecht - obwohl der Hilfetext das Schuerfrecht ausdruecklich mit aufzaehlt.
        Eine Flugbahn bekommt sie dadurch NICHT: Die Linien-Schleife filtert ueber MISSION_LINIEN,
        und dort steht 'asteroid-contest' nicht. */
-    if (m.type === 'asteroid-contest'){
+    /* Abbau und Eskorte zielen auf denselben GUERTELPLATZ wie die Anfechtung und tragen dieselbe
+       targetId-Form `sysId + ':' + platz`. Eine gemeinsame Zeile statt drei Zweigen: Wer den
+       vierten Guertelplatz-Missionstyp ergaenzt, traegt ihn hier ein statt anderswo einen vierten
+       Zweig zu schreiben. */
+    if (m.type === 'asteroid-contest' || m.type === 'mining' || m.type === 'mining-escort'){
       const pl = (m.platz !== undefined && m.platz !== null) ? m.platz : String(m.targetId || '').split(':')[1];
       if (pl === undefined) return null;
       return { system: m.system, pos: asteroidPlatzXY(String(pl)) };
@@ -65671,9 +65737,31 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const totalDur = Math.max(1000, m.endTime - (m.startTime || (m.endTime - fallbackDur)));
         const st = m.endTime - totalDur;
         const frac = Math.max(0, Math.min(1, (now-st)/totalDur));
-        // Einwegflug (Kolonisierung, Mondlandung, Verlegung): die volle Zeit ist der Hinweg.
-        const returning = art.rundflug && frac >= 0.5;
-        const f2 = art.rundflug ? (returning ? (frac-0.5)/0.5 : frac/0.5) : frac;
+        /* DREI PHASEN statt zwei, wenn die Mission eine Standzeit am Ziel hat (`warten`).
+           Bis zum 08.09.2026 kannte diese Schleife nur „erste Haelfte hin, zweite zurueck" - der
+           Kommentar bei der Schuerfrecht-Anfechtung nennt das ausdruecklich als Falle. Fuer die
+           Abbaumission stimmt die Halbierung nicht: Sie traegt `hinBis` (Ankunft am Vorkommen) und
+           `abbauBis` (Ende der Foerderung), und dazwischen bewegt sich die Flotte NICHT.
+           Gerechnet wird deshalb aus diesen beiden Zeitpunkten statt aus der halben Gesamtdauer;
+           fehlen sie (jede andere Art, und alte Spielstaende), bleibt es bei der Halbierung. */
+        const hatStand = !!(art.warten && m.hinBis && m.abbauBis && m.abbauBis > m.hinBis && m.endTime > m.abbauBis);
+        let returning, f2, wartet = false;
+        if (hatStand){
+          if (now < m.hinBis){
+            returning = false;
+            f2 = Math.max(0, Math.min(1, (now - st) / Math.max(1, m.hinBis - st)));
+          } else if (now < m.abbauBis){
+            // Am Ziel, foerdernd: Die Marke steht auf dem Vorkommen und wandert nicht.
+            returning = false; f2 = 1; wartet = true;
+          } else {
+            returning = true;
+            f2 = Math.max(0, Math.min(1, (now - m.abbauBis) / Math.max(1, m.endTime - m.abbauBis)));
+          }
+        } else {
+          // Einwegflug (Kolonisierung, Mondlandung, Verlegung): die volle Zeit ist der Hinweg.
+          returning = art.rundflug && frac >= 0.5;
+          f2 = art.rundflug ? (returning ? (frac-0.5)/0.5 : frac/0.5) : frac;
+        }
         const fromX = returning ? targetPos.x : originX, fromY = returning ? targetPos.y : originY;
         const toX = returning ? originX : targetPos.x, toY = returning ? originY : targetPos.y;
         const shipX = fromX + (toX-fromX)*f2;
@@ -65682,8 +65770,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const color = returning ? art.rueck : art.hin;
         inner += `
           <line x1="${originX.toFixed(1)}" y1="${originY.toFixed(1)}" x2="${targetPos.x.toFixed(1)}" y2="${targetPos.y.toFixed(1)}" stroke="${color}" stroke-opacity="0.5" stroke-width="1.5"/>
-          ${flottenMarke(m, shipX, shipY, angle, color)}
-          <text class="planet-label" pointer-events="none" x="${shipX.toFixed(1)}" y="${(shipY-14).toFixed(1)}" text-anchor="middle" style="fill:${color};">${flottenBeschriftung(m, art, returning)}</text>
+          ${flottenMarke(m, shipX, shipY, angle, color, art.bergbau)}
+          <text class="planet-label" pointer-events="none" x="${shipX.toFixed(1)}" y="${(shipY-14).toFixed(1)}" text-anchor="middle" style="fill:${color};">${flottenBeschriftung(m, art, returning, wartet)}</text>
         `;
       }
     }
