@@ -8882,6 +8882,7 @@
     '<strong>Der koordinierte Angriff nennt wieder sein Ziel.</strong> In der Flottenposition stand „Musterangriff auf [?]", im Allianz-Chat „gegen [null] gestartet" und „gegen [undefined] erfolgreich". Der Grund: Seit es Nester, Festungen und Vorposten als Verbandsziel gibt, hat ein solcher Angriff gar kein Allianz-K&uuml;rzel mehr &ndash; f&uuml;nf Anzeigestellen bauten ihren Text aber genau daraus. Jetzt nennen alle dasselbe: „Alien-Nest bei Halvar-Weite (Die Vergl&uuml;hten)".',
     'Auch die Systemnamen stimmen wieder: Im Chat stand die rohe Kennung („bei sys_halvar_weite"), und die Ank&uuml;ndigung schrieb „das Alien-Nest der <em>Die</em> Vergl&uuml;hten".',
     '<strong>Dein angeschlossener Verband f&uuml;hrt dich zum Ziel.</strong> Die Zeile ist antippbar: Die Karte springt ins Zielsystem und legt ein <strong>rotes Fadenkreuz</strong> auf das Ziel, mit der Einschlagszeit dar&uuml;ber. Und nach dem Abflug z&auml;hlt die Zeile herunter, statt nur „gebunden" zu zeigen &ndash; die Ankunftszeit stand l&auml;ngst im Verbandsdokument, sie wurde nur nie gelesen.',
+    'Das Fadenkreuz trifft dabei <em>genau</em> das gemeinte Nest, auch wenn mehrere im selben System stehen &ndash; und steht die Kartenebene „Ereignisse" gerade aus, wird sie daf&uuml;r eingeblendet, statt dich auf ein leeres System zu schicken.',
   ]},
   { version:'8.706.0', date:'08.09.2026', changes:[
     '<strong>Deine Flotten fliegen jetzt durch dein Sprungtor.</strong> Wer am Vorposten ein Sprungtor gebaut hat, sah bisher trotzdem jede ankommende Flotte am Sonnenrand ins Bild kommen – als g&auml;be es das Tor nicht. Kommt eine Mission von au&szlig;erhalb des ge&ouml;ffneten Systems, beginnt ihre Flugbahn jetzt <strong>am Tor</strong> statt am Systemrand. Das gilt f&uuml;r Erkundung, Kolonisierung, Vorposten-Bau und Abbau – also f&uuml;r genau die Fl&uuml;ge, denen das Tor die Strecke abnimmt.',
@@ -46354,15 +46355,31 @@ async function claimPendingRewards(){
   /* Der Klick aus der Verbandszeile: Karte auf, System auf, Fadenkreuz setzen. Die Meldung sagt
      ausdruecklich, WAS dort liegt - der Selektor allein trifft im System das erste Objekt seiner
      Art, und bei zwei Nestern waere sonst offen, welches gemeint ist. */
-  function zeigeVerbandsziel(system, selektor, was, ankunft){
+  function zeigeVerbandsziel(system, selektor, was, ankunft, ebene){
     if (!system || !selektor) return false;
+    /* DIE EBENE MUSS AN SEIN, SONST ZEIGT DER SPRUNG EIN LEERES SYSTEM (Befund der Durchsicht
+       08.09.2026). Der Nest-Block der Systemebene liegt unter dem Schalter „Ereignisse"; steht er
+       aus, entsteht weder der Marker noch der Merkpunkt fuer das Fadenkreuz - die Meldung haette
+       trotzdem behauptet, das Ziel sei jetzt zu sehen. Genau die Fehlerklasse „eine Sicherung,
+       deren Ausfall wie Normalbetrieb aussieht".
+       Eingeschaltet wird sie, statt den Klick abzulehnen: Wer ausdruecklich sein Ziel sehen will,
+       will es sehen. Gesagt wird es trotzdem - eine Ebene, die sich stillschweigend selbst
+       umlegt, waere die naechste Ueberraschung. */
+    let ebeneAngemacht = false;
+    if (ebene && !karteEbeneAn(ebene)){
+      state.karteEbenen = state.karteEbenen || {};
+      state.karteEbenen[ebene] = true;
+      ebeneAngemacht = true;
+      save();
+    }
     karteZielMarke = { system, selektor, ankunft: ankunft || 0,
                        verfaellt: (ankunft && ankunft > Date.now()) ? (ankunft + 60000) : (Date.now() + KARTE_ZIELMARKE_DAUER) };
     const sysName = (STAR_SYSTEMS.find(x => x.id === system) || { name: system }).name;
     springeZuKartenziel(system, selektor);
-    log(ankunft && ankunft > Date.now()
+    log((ankunft && ankunft > Date.now()
         ? was + ' – Einschlag in ' + fmtDuration((ankunft - Date.now())/1000) + ' bei ' + sysName + '.'
-        : was + ' – das Ziel liegt bei ' + sysName + '.', 'ti-target');
+        : was + ' – das Ziel liegt bei ' + sysName + '.')
+        + (ebeneAngemacht ? ' Die Ebene „Ereignisse" wurde dafür wieder eingeblendet.' : ''), 'ti-target');
     return true;
   }
   function springeZuKartenziel(system, selektor){
@@ -49150,12 +49167,34 @@ async function claimPendingRewards(){
      EINE FREMDE ALLIANZBASIS HAT KEINEN ORT AUF DIESER KARTE - dort steht bewusst null statt eines
      geratenen Systems: Ein Klick, der irgendwohin springt, waere schlechter als kein Klick (dieselbe
      Begruendung wie bei Expedition und Abgrund in FP_OHNE_KARTENORT). */
+  /* WELCHE KENNUNG IN DEN SELEKTOR GEHOERT, gemessen an den Markern (08.09.2026):
+       data-map-nest="<id>"       - MEHRERE je System moeglich, die Kennung ist noetig
+       data-map-festung="1"       - genau eine je System
+       data-map-vorposten="<id>"  - genau einer je System (vorpostenAn gibt einen zurueck)
+     Ein Befund der Durchsicht: Ohne die Nest-Kennung trifft der Sprung IMMER das erste Nest im
+     System - bei zwei Nestern also mit 50 % Wahrscheinlichkeit das falsche, und nachdem das echte
+     Ziel gefallen ist, ein voellig unbeteiligtes.
+     WELCHE EBENE DAS ZIEL BRAUCHT, ebenfalls gemessen: Der Nest-Block der Systemebene liegt unter
+     `karteEbeneAn('ereignisse')`; Festung und Vorposten liegen unter keinem Schalter. Steht der
+     Schalter aus, wird das Nest gar nicht gezeichnet - und ohne diese Angabe haette der Klick
+     gemeldet „hier ist dein Ziel" und ein leeres System gezeigt. */
   function musterZielOrt(doc){
     if (!doc) return null;
-    if (doc.zielArt === 'alien-nest') return doc.nestSystem ? { system: doc.nestSystem, selektor: '[data-map-nest]' } : null;
-    if (doc.zielArt === 'festung')    return doc.festungSystem ? { system: doc.festungSystem, selektor: '[data-map-festung]' } : null;
-    if (doc.zielArt === 'vorposten')  return doc.vorpostenSystem ? { system: doc.vorpostenSystem, selektor: '[data-map-vorposten]' } : null;
+    if (doc.zielArt === 'alien-nest'){
+      if (!doc.nestSystem) return null;
+      return { system: doc.nestSystem, selektor: kartenSelektorMitId('data-map-nest', doc.nestId), ebene: 'ereignisse' };
+    }
+    if (doc.zielArt === 'festung')    return doc.festungSystem ? { system: doc.festungSystem, selektor: '[data-map-festung]', ebene: null } : null;
+    if (doc.zielArt === 'vorposten')  return doc.vorpostenSystem ? { system: doc.vorpostenSystem, selektor: kartenSelektorMitId('data-map-vorposten', doc.vorpostenId), ebene: null } : null;
     return null;
+  }
+  /* Eine Kennung aus einem Server-Dokument darf nicht ungeprueft in einen CSS-Selektor: Ein
+     Anfuehrungszeichen darin macht aus dem Selektor etwas anderes, und querySelector wirft dann.
+     Nur die Zeichen, aus denen die Kennungen dieses Spiels bestehen; alles andere faellt auf den
+     Selektor OHNE Kennung zurueck, statt den Sprung ganz zu verlieren. */
+  function kartenSelektorMitId(attr, id){
+    const roh = (id === undefined || id === null) ? '' : String(id);
+    return /^[A-Za-z0-9_:.-]+$/.test(roh) ? ('[' + attr + '="' + roh + '"]') : ('[' + attr + ']');
   }
   /* Wann schlaegt der Verband ein? Erst mit dem Abflug (`phase === 'enroute'`) steht die Zeit fest;
      waehrend der Sammelphase gibt es sie noch nicht, und eine erfundene waere schlechter als keine. */
@@ -60368,6 +60407,7 @@ async function claimPendingRewards(){
     if (!e || !e.zielOrt || !e.zielOrt.system || !e.zielOrt.selektor) return '';
     return ' data-fp-vziel="' + escapeHtml(e.zielOrt.system) + '|' + escapeHtml(e.zielOrt.selektor) + '"'
          + ' data-fp-vzeit="' + Math.round(e.zielAnkunft || 0) + '"'
+         + ' data-fp-vebene="' + escapeHtml(e.zielOrt.ebene || '') + '"'
          + ' data-fp-vwas="' + escapeHtml(e.ziel || 'Ziel') + '" style="cursor:pointer;"'
          + ' title="' + escapeHtml((e.ziel || 'Ziel') + ' – antippen zeigt das Ziel auf der Karte') + '"';
   }
@@ -60391,7 +60431,7 @@ async function claimPendingRewards(){
     return `
       <div class="card-row" style="flex-direction:column; align-items:stretch;"${verbandKlickAttr(e)} title="Angeschlossen: ${fleetBreakdownHtml(e.composition)}">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div class="bname"><i class="ti ti-users" aria-hidden="true" style="color:${farbe};"></i>${e.ziel} · ${fmt(schiffe)} Schiffe</div>
+          <div class="bname"><i class="ti ti-users" aria-hidden="true" style="color:${farbe};"></i>${escapeHtml(e.ziel || '')} · ${fmt(schiffe)} Schiffe</div>
           ${imAnflug ? `<span class="lvl-pill">${fmtDuration(rest/1000)}</span>`
                      : zielRest ? `<span class="lvl-pill" style="color:${farbe};">Einschlag in ${fmtDuration(zielRest/1000)}</span>`
                      : `<span class="lvl-pill" style="color:${farbe};">gebunden</span>`}
@@ -65568,7 +65608,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const sichtR = r * 2.0;
         const coord = kbMarkerFrei(nestMarkerXY(i), sysPlanets, activeSunType.r, sichtR, platzierteMarker);
         platzierteMarker.push({ x: coord.x, y: coord.y, r: sichtR });
-        // Das ERSTE Nest im System - derselbe Griff, den auch der Selektor [data-map-nest] tut.
+        /* ZWEI Schluessel je Nest: der mit Kennung fuer ein bestimmtes Nest (musterZielOrt), der
+           allgemeine fuer Aufrufer, die keine Kennung haben (missionsKartenziel beim
+           Nest-Angriff). Ohne den Schluessel MIT Kennung landete das Fadenkreuz in einem System
+           mit zwei Nestern immer auf dem ersten. */
+        zielPunkte[kartenSelektorMitId('data-map-nest', nest.id)] = { x: coord.x, y: coord.y, r: sichtR };
         if (!zielPunkte['[data-map-nest]']) zielPunkte['[data-map-nest]'] = { x: coord.x, y: coord.y, r: sichtR };
         const anteil = Math.max(0, Math.min(1, (nest.lp || 0) / Math.max(1, nest.lpMax || 1)));
         const b = r * 1.15;
@@ -65705,6 +65749,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         if (vorpostenDarfMitwirken(vp)) sprungtorPos = vorpostenSprungtorXY(vp, posV.x, posV.y, rV) || sprungtorPos;
         platzierteMarker.push({ x: posV.x, y: posV.y, r: sichtV });
         zielPunkte['[data-map-vorposten]'] = { x: posV.x, y: posV.y, r: sichtV };
+        zielPunkte[kartenSelektorMitId('data-map-vorposten', vp.id)] = { x: posV.x, y: posV.y, r: sichtV };
         const farbeV = vp.eigener ? VORPOSTEN_FARBE_EIGEN : VORPOSTEN_FARBE_FREMD;
         const anteilV = Math.max(0, Math.min(1, ((vp.kern||{}).lp||0) / Math.max(1, (vp.kern||{}).lpMax||1)));
         const bV = rV * 1.15;
@@ -73506,7 +73551,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
             const e = m.eintrag;
             icon = 'ti-users'; color = e.art === 'raid' ? '#c98bdb' : '#e24b4a';
             const anz = Object.values(e.composition).reduce((a,b)=>a+(typeof b==='number'?b:0),0);
-            label = e.ziel+' · '+fmt(anz)+' Schiffe';
+            /* ESCAPEN, WEIL DER TEXT EINEN FREMDEN SPIELERNAMEN ENTHALTEN KANN (Befund P1 der
+               Durchsicht 08.09.2026). Bei zielArt 'vorposten' steckt in der Bezeichnung
+               `vorpostenBesitzerName` - vom Server geliefert, aber vom Besitzer frei gewaehlt.
+               Beide Anzeigestellen schreiben per innerHTML; ohne escapeHtml haette der Besitzer
+               eines angegriffenen Vorpostens Markup auf die Seite JEDES Teilnehmers gebracht.
+               Der Rest der Datei macht es an genau solchen Stellen ebenso (siehe die
+               Vorposten-Zeile im Kartenmenue). */
+            label = escapeHtml(e.ziel || '')+' · '+fmt(anz)+' Schiffe';
             shipsTooltip = 'Angeschlossen: '+fleetBreakdownHtml(e.composition)
                          + (e.ankunft > nowT ? ' – im Anflug auf den Sammelpunkt.'
                                              : ' – am Sammelpunkt, gebunden bis die Welle ausgefochten ist.');
@@ -73681,7 +73733,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
             if (trenner < 0) return;
             zeigeVerbandsziel(roh.slice(0, trenner), roh.slice(trenner + 1),
                               el.getAttribute('data-fp-vwas') || 'Ziel',
-                              Number(el.getAttribute('data-fp-vzeit')) || 0);
+                              Number(el.getAttribute('data-fp-vzeit')) || 0,
+                              el.getAttribute('data-fp-vebene') || null);
           };
         });
         fpList.querySelectorAll('[data-fp-mziel]').forEach(el => {
