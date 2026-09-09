@@ -51,7 +51,7 @@ const MUSS_FALLEN = {
      weil der Plan jetzt auch den Atem mitfuehrt. Die Gegenprobe fuer die Pruefungen 1a bis 6e ist
      beim Bau von Paket A gegen 15d075b gemessen und im Commit festgehalten; sie hier gegen einen
      Stand zu fahren, der das Paket schon hat, wuerde nichts belegen. */
-  alt:     ['4a','7a','7b','7c','7d','7e','7f'],
+  alt:     ['4a','7a','7b','7c','7d','7e','7f','7g','7h'],
   nachher: ['1b'],
   // Je ein gezielter Rueckbau der drei P1-Befunde: Der Waechter muss GENAU den einen fangen.
   pool:    ['6a'],
@@ -63,7 +63,12 @@ const MUSS_FALLEN = {
   altmission:   ['7e'],   // Rueckfall wieder auf den Grundwert statt „kein Riegel"
   zaehlervor:   ['7c'],   // a.tauchgaenge wieder VOR den Atem-Riegel
   kielkomp:     ['7f'],   // Nullkiel wieder an der schrumpfenden Flotte
-  deckelklein:  ['7a']    // deckel:1 im Werkstattzweig - der Fuenferplan waere unerreichbar
+  deckelklein:  ['7a'],   // deckel:1 im Werkstattzweig - der Fuenferplan waere unerreichbar
+  // Befunde der zweiten Durchsicht, ebenfalls je einzeln zurueckgebaut.
+  vorschauflach:['7g'],   // `i > 0` weg: „kehrt nach 0 Sektoren um" bei einem Waechter als erstem
+  bedarfbreak:  ['7g'],   // Summe hinter den Riegel: die Warnung verschwindet bei langen Routen
+  pilleroh:     ['7d'],   // anzeigeBasis aus dem Markup: wieder „Stufe 0 · 0 Sektoren"
+  sonderoh:     ['7h']    // Sonde wieder auf den rohen Sektor: markiert den falschen
 };
 
 /* Der Aufloesungsblock wird am Klammernpaar begrenzt, nicht bis Dateiende geschnitten: Denselben
@@ -354,10 +359,50 @@ merke('7f: Folgesektoren kommen aus einer Rechnung, und der Nullkiel ist an der 
     startNutzt: startQ.indexOf('abgrundPlanFolgeSektor(') >= 0,
     vorschauNutzt: boxFolge.indexOf('abgrundPlanFolgeSektor(') >= 0 });
 
+/* 7g: DIE VORSCHAU-REGEL SELBST. Die Atem-Schleife in renderAbgrundBox war bis hierher voellig
+   ungedeckt - `grep atemBedarf tests/` fand nichts, und 7d prueft nur, dass die Zeichenkette
+   „Atem der Hülle:" irgendwo steht. Zwei Sabotagen waeren damit gruen durchgegangen:
+   das `i > 0` streichen (dann behauptet die Anzeige bei einem Waechter als erstem Sektor
+   „kehrt nach 0 Sektoren um", waehrend der Tauchgang normal laeuft) und `atemBedarf += k` hinter
+   den Riegel schieben (dann faellt die Teilsumme wieder unter den Vorrat und die Warnung
+   verschwindet ausgerechnet bei der laengsten Route). Beides steht jetzt fest - samt der Lage,
+   denn die Summe MUSS vor dem Riegel stehen. */
+const boxAtem = (() => {
+  const q = fnAus('renderAbgrundBox');
+  const i = q.indexOf('let atemBedarf = 0');
+  // Bis zum Ende der Schleife, nicht auf eine getippte Zeichenzahl: Ein zu enges Fenster (900)
+  // schnitt den Riegel ab, indexOf lieferte -1, und die Lagepruefung war aus dem falschen Grund
+  // rot. Dieselbe Fehlerklasse wie der Byte-Fensteranker in test_konstellationen.
+  const bis = i >= 0 ? q.indexOf('\n    }', i) : -1;
+  return (i >= 0 && bis > i) ? q.slice(i, bis) : '';
+})();
+const iSumme = boxAtem.indexOf('atemBedarf += k;');
+const iVRiegel = boxAtem.indexOf('if (i > 0 && k > atemRestV)');
+merke('7g: die Vorschau rechnet den Atem nach derselben Regel wie die Abrechnung',
+  boxAtem.length > 0
+    && iVRiegel >= 0
+    && iSumme >= 0
+    && iSumme < iVRiegel
+    && /atemRestV -= k;/.test(boxAtem),
+  { blockDa: boxAtem.length > 0, summeAb: iSumme, riegelAb: iVRiegel });
+
+/* 7h: DIE SONDE ZEIGT DENSELBEN SEKTOR, DEN DER PLAN ANLAEUFT. Sie las bis zur Durchsicht den
+   ROHEN Sektor, waehrend Vorschau, Start und Abrechnung den mit Nullkiel nehmen - mit 25+ Kielen
+   stand „doppelter Atem" in der Sonde und „reicht" im Tauchreiter darunter, gleichzeitig, und der
+   Tauchreiter hatte recht. Ausgerechnet Hilfe und Patchnote verweisen auf die Sonde. */
+merke('7h: die Tiefensonde markiert den doppelten Atem am selben Sektor wie der Tauchplan',
+  /vorschau\.push\(abgrundPlanFolgeSektor\(tiefe \+ i, flotte\)\)/.test(js)
+    && /abgrundAtemKosten\(v\) > 1 \?/.test(js),
+  {});
+
 merke('7d: Vorschau und Hilfe nennen den Atem, bevor jemand abtaucht',
   /Atem der Hülle:/.test(js)
     && /Der Atem der Hülle – wie weit ein Tauchplan wirklich reicht/.test(js)
-    && /key:'atem'/.test(js),
+    && /key:'atem'/.test(js)
+    // Die Werkstatt-Pille muss den Grundwert auch BENUTZEN. Ohne diesen Anker konnte
+    // `(def.anzeigeBasis||0) +` aus dem Markup verschwinden und die Pille wieder
+    // „Stufe 0 · 0 Sektoren" zeigen, obwohl die Huelle zwei traegt - alle Tests gruen.
+    && /\(def\.anzeigeBasis\|\|0\) \+ Math\.min\(/.test(js),
   {});
 
 // ---- 5) Sichtbar -----------------------------------------------------------------------------

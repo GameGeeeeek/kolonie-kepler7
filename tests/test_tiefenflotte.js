@@ -227,14 +227,21 @@ check('5: und nie ueber die Obergrenze', AD(100000, 5, {}) === 4*3600);
 {
   const sendeQ5 = fnAus('sendeAbgrundMission');
   const boxQ5 = fnAus('renderAbgrundBox');
-  /* Seit v8.714.0 wird zusaetzlich gemessen, WOHER die Sektoren 2..n kommen: aus
+  /* Seit v8.713.0 wird zusaetzlich gemessen, WOHER die Sektoren 2..n kommen: aus
      `abgrundPlanFolgeSektor`. Vorher baute jede der beiden Stellen sie selbst - und beide ohne den
      Nullkiel, den die Abrechnung sehr wohl anlegt. Der Kiel streicht in jedem Sektor einen
      Mutator, also auch dessen Dauer-Faktor; die angezeigte Gesamtzeit war damit bei 25+ Kielen
      eine andere als die gerechnete. Die Schleifenform wird bewusst NICHT mehr festgenagelt - genau
      daran ist diese Pruefung beim Umbau gefallen, auf richtigem Code. */
+  /* DIE ARGUMENTE BLEIBEN FESTGENAGELT. Ein Zwischenstand liess nur noch `+= abgrundAnflugdauer(`
+     stehen - damit waren drei echte Fehler gruen: dieselbe Tiefe fuer jeden Sektor
+     (`abgrundAnflugdauer(tiefe, …)`), derselbe Dauer-Faktor fuer jeden (`planSektoren[0]`) und ein
+     Index-Versatz. Alle drei zeigen einem Fuenferplan eine falsche Gesamtzeit an. Zugelassen sind
+     genau die zwei Schreibweisen, die es gibt; eine dritte muss hier bewusst eingetragen werden. */
+  const dauerZeile = q => /\+= abgrundAnflugdauer\(t, sek[A-Za-z]*\.mods\.dur, [A-Za-z]*[Ff]lotte\)/.test(q)
+                       || /\+= abgrundAnflugdauer\(tiefe \+ i, planSektoren\[i\]\.mods\.dur, [A-Za-z]*[Ff]lotte\)/.test(q);
   const summe = q => q.indexOf('abgrundPlanTiefen(tiefe, planTiefen)') >= 0
-                  && /\+= abgrundAnflugdauer\(/.test(q)
+                  && dauerZeile(q)
                   && /\(t === tiefe\) \? sektor : abgrundPlanFolgeSektor\(/.test(q);
   check('5: Vorschau und Start rechnen mit DERSELBEN Funktion und der Flotte',
     sendeQ5.length > 0 && boxQ5.length > 0 && summe(sendeQ5) && summe(boxQ5),
@@ -385,15 +392,23 @@ check('6: die Beute bleibt Sache des Bergungskrans',
   // Alle DREI Aufrufstellen muessen den Kiel durchreichen - Start, Vorschau, Abrechnung. Genau
   // hier ist in Phase 1 schon einmal eine Stelle vergessen worden (zwei Sektor-Bauer).
   /* GEZAEHLT WIRD NICHT MEHR AUF EINE FESTE ZAHL, sondern gemessen, dass KEINE Aufrufstelle den
-     Kiel vergisst. Die alte Fassung verlangte genau drei und fiel, als v8.714.0 die gemeinsame
-     Rechnung `abgrundPlanFolgeSektor` als vierte hinzufuegte - also genau dann, als die Regel,
-     die sie schuetzen soll, verstaerkt wurde. Eine Zahl in einem Test altert; die Aussage nicht. */
+     Kiel vergisst. Die alte Fassung verlangte genau drei und fiel, als v8.713.0 die gemeinsame
+     Rechnung `abgrundPlanFolgeSektor` hinzufuegte - also genau dann, als die Regel, die sie
+     schuetzen soll, verstaerkt wurde. Eine Zahl in einem Test altert; die Aussage nicht.
+     WAS SIE DAFUER NICHT MEHR FAENGT: eine Stelle, die den Sektor gar nicht ueber
+     abgrundSektorMitBann baut (der Fehler von v8.713.0 - die Vorschau rief blank `abgrundSektor`).
+     Dafuer sind Pruefung 5 hier und 7f in test_tauchplan zustaendig; das ist ausdruecklich so
+     aufgeteilt und nicht vergessen. */
   const alleMitBann = [];
   for (let i = js.indexOf('abgrundSektorMitBann('); i >= 0; i = js.indexOf('abgrundSektorMitBann(', i+1)){
     const zeilenAnfang = js.lastIndexOf('\n', i) + 1;
     const davor = js.slice(zeilenAnfang, i);
     // Weder die Definition noch eine Erwaehnung im Kommentar ist eine Aufrufstelle.
-    if (/function \s*$/.test(davor) || davor.indexOf('//') >= 0 || davor.indexOf('*') >= 0) continue;
+    /* Aufrufstelle heisst: es steht wirklich Code davor. Ein zeilenlokaler Kommentarfilter
+       (`//`/`*` in derselben Zeile) reichte nicht - Folgezeilen eines Blockkommentars tragen hier
+       oft keinen Stern, und eine kuenftige Erwaehnung darin haette die Pruefung ohne Codefehler
+       rot gefaerbt. Verlangt wird deshalb positiv ein Anweisungsanfang. */
+    if (!/(^|[={:,(]|\b(const|let|var|return)\b)\s*$/.test(davor)) continue;
     const bis = js.indexOf(';', i);
     if (bis > i) alleMitBann.push(js.slice(i, bis+1));
   }
