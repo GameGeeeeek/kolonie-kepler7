@@ -3496,6 +3496,12 @@
           <div class="hstat" title="Erforschte Technologiestufen von allen verfügbaren"><i class="ti ti-flask" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Forschung</span><span id="heroResearch" class="hstat-value">0/17</span></div></div>
           <div class="hstat" title="Aktive Expeditionen des aktuell gewählten Planeten (Forschungsschiffe im Einsatz)"><i class="ti ti-map-2" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Expedition</span><span id="heroExpedition" class="hstat-value">0/0</span></div></div>
           <div class="hstat" title="Kampfpunkte: Wertung aus gewonnenen Kämpfen und Duellen (nicht dasselbe wie Angriffs-/Verteidigungspunkte)"><i class="ti ti-trophy" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Kampfpunkte</span><span id="heroBP" class="hstat-value">0</span></div></div>
+          <!-- Spielerzahl: NUR fuer das Betreiberkonto, deshalb von Haus aus verborgen. Sie steht
+               absichtlich in derselben Reihe wie Level und Punktestand und nicht in einem eigenen
+               Kasten: Es ist eine Kennzahl wie die anderen, nur eine, die sonst niemanden angeht.
+               Sichtbar wird sie erst, wenn der Server geantwortet hat - ein Abzeichen mit einem
+               Platzhalter statt einer Zahl waere eine Behauptung ohne Deckung. -->
+          <div class="hstat" id="heroOnlineChip" style="display:none;"><i class="ti ti-users" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Online</span><span id="heroOnline" class="hstat-value">0 / 0</span></div></div>
         </div>
       </div>
 
@@ -36760,6 +36766,67 @@ async function claimPendingRewards(){
       if (countEl) countEl.textContent = (data.reports||[]).length;
     } catch(e){}
   }
+  /* DIE SPIELERZAHL IN DER KOPFZEILE (Wunsch Sascha, 09.09.2026): wie viele Spieler gerade
+     online sind, von wie vielen registrierten - und zwar NUR beim Betreiberkonto.
+
+     DIE SPERRE STEHT IM SERVER, nicht hier. `GET /api/admin/spielerzahl` antwortet einem fremden
+     Konto mit 403 und ohne Anmeldung mit 401; diese Pruefung hier entscheidet nur, ob das
+     Abzeichen ueberhaupt Platz belegt. Ein Abzeichen, das der Client bloss versteckt, waere keine
+     Rechteprueung, sondern eine Bitte.
+
+     "Online" ist die Definition des Servers (`userIsOnline`, Zeitstempel der Bestenliste gegen
+     REMINDER_ONLINE_THRESHOLD_MS) - hier wird nichts nachgerechnet. Auch die Schwelle im
+     Hinweistext kommt von dort und ist nicht eingetippt: Zwei Stellen mit derselben Zahl laufen
+     beim naechsten Umbau auseinander.
+
+     DER ABSTAND ist Absicht. `render()` laeuft oft; ein Aufruf je Durchgang waere ein Dauerfeuer
+     auf eine Route, deren Zahl sich fruehestens im Minutentakt aendert. 30 Sekunden liegen
+     deutlich unter der Online-Schwelle des Servers, die Anzeige hinkt also nie sichtbar nach. */
+  const SPIELERZAHL_ABSTAND_MS = 30000;
+  let spielerzahlStand = null;      // { online, registriert, schwelleMs } - erst nach der Antwort
+  let spielerzahlGeholt = 0;        // Zeitpunkt des letzten VERSUCHS, nicht des letzten Erfolgs
+  let spielerzahlLaeuft = false;
+  function istBetreiberKonto(){
+    return !!(useBackend() && accountUsername && accountUsername.toLowerCase() === 'gamegeeeeek');
+  }
+  async function holeSpielerzahl(){
+    if (spielerzahlLaeuft) return;
+    if (spielerzahlGeholt && Date.now() - spielerzahlGeholt < SPIELERZAHL_ABSTAND_MS) return;
+    spielerzahlLaeuft = true;
+    try {
+      const res = await backendFetch('/admin/spielerzahl');
+      if (res.ok){
+        const d = await res.json();
+        if (d && typeof d.online === 'number' && typeof d.registriert === 'number') spielerzahlStand = d;
+      }
+    } catch(e){
+      // Bewusst still: Eine Kennzahl fuer eine Person darf keinen Fehlerdialog ausloesen. Der
+      // Zaehler unten sorgt dafuer, dass ein dauerhaft toter Server trotzdem nur alle 30 s
+      // angefragt wird.
+    } finally {
+      spielerzahlLaeuft = false;
+      spielerzahlGeholt = Date.now();
+    }
+  }
+  function zeigeSpielerzahl(){
+    const chip = document.getElementById('heroOnlineChip');
+    if (!chip) return;
+    if (!istBetreiberKonto()){
+      chip.style.display = 'none';
+      // Zuruecksetzen, damit ein Kontowechsel im selben Tab nicht die Zahlen des vorigen zeigt.
+      spielerzahlStand = null; spielerzahlGeholt = 0;
+      return;
+    }
+    holeSpielerzahl();
+    if (!spielerzahlStand){ chip.style.display = 'none'; return; }
+    chip.style.display = '';
+    setBoxText(document.getElementById('heroOnline'),
+      fmt(spielerzahlStand.online)+' / '+fmt(spielerzahlStand.registriert));
+    const min = Math.max(1, Math.round((spielerzahlStand.schwelleMs||0)/60000));
+    chip.title = 'Spieler online von allen registrierten Konten. Als online z\u00e4hlt, wer in den '
+      + 'letzten '+min+' Minute'+(min===1?'':'n')+' gespeichert hat \u2013 ein offener Tab tut das '
+      + 'von selbst. Nur f\u00fcr dich sichtbar.';
+  }
   async function openAdminPanel(){
     document.getElementById('adminPanelOverlay').style.display = 'flex';
     switchAdminTab('reports');
@@ -55458,7 +55525,15 @@ async function claimPendingRewards(){
     // Stroemung haengt am selben Riegel - sie gehoert zu genau diesem einen Kampf.
     if (!a.waechterTage[tiefe]){
       a.waechterTage[tiefe] = abgrundHeuteKurz();
-      if (typeof stroemung === 'number' && isFinite(stroemung)) a.waechterStrom[tiefe] = stroemung;
+      /* Beide Felder werden IMMER zusammen gesetzt. Der erste Entwurf schrieb die Stroemung nur
+         bei einer brauchbaren Zahl - dann haette ein Eintrag den Tag getragen und die Stroemung
+         nicht, und der Kartenraum haette fuer eine FRISCHE Eroberung den Sektor von vor v8.710.0
+         behauptet, ohne dass irgendwo etwas auffaellt. Der Fall ist heute unerreichbar (der
+         einzige Aufrufer gibt `sektor.stroemung`, und die kommt aus `Math.floor`); genau deshalb
+         waere er beim naechsten Umbau auch niemandem aufgefallen. Kommt keine Zahl an, ist die
+         von JETZT die beste wahre Naeherung - der Kampf hat gerade stattgefunden. */
+      a.waechterStrom[tiefe] = (typeof stroemung === 'number' && isFinite(stroemung))
+        ? stroemung : abgrundStroemung();
     }
   }
   // Wie weit die Karte reicht: bis zur naechsten Waechtertiefe HINTER dem Rekord, mindestens aber
@@ -59024,7 +59099,10 @@ async function claimPendingRewards(){
           // rueckwirkend haerter machen.
           // Die Stroemung kommt aus der MISSION, aus demselben Grund wie der Bann eine Zeile
           // darueber: Was beim Start galt, gilt bei der Ankunft. Ein Tauchgang, der noch aus der
-          // Zeit vor der Stroemung unterwegs ist, traegt keine - dann gilt die von jetzt.
+          // Zeit vor v8.710.0 unterwegs ist, traegt keine - dann gilt die RECHNUNG VON VORHER
+          // (ABGRUND_STROEMUNG_ALT), nicht die von jetzt. Genau die naemlich hatte seine
+          // Abflug-Vorschau benutzt; die heutige haette Verteidigung, Mutatoren, Beute und
+          // Verluste mitten im Flug geaendert.
           const sektor = abgrundSektorMitBann(abgrundSektor(tiefe, !!m.ruf, abgrundStroemungVonFrueher(m.stroemung)), m.bann || null, !!m.spule, nullkielAktiv(m.composition || fleet));
           const rohkraft = m.power || attackPower(fleet);
           const kraft = abgrundKampfkraft(rohkraft, sektor, m.composition || fleet);
@@ -75083,7 +75161,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }
     const cooldownNote = document.getElementById('nameChangeCooldownNote');
     const adminSectionRow = document.getElementById('adminSectionRow');
-    const istBetreiber = useBackend() && accountUsername && accountUsername.toLowerCase() === 'gamegeeeeek';
+    const istBetreiber = istBetreiberKonto();
     if (adminSectionRow){
       adminSectionRow.style.display = istBetreiber ? 'block' : 'none';
       if (istBetreiber) refreshAdminReportCount();
@@ -75983,6 +76061,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     setBoxText(document.getElementById('heroLevel'), commanderLevel(state.xp||0)+(state.prestige?' · P'+state.prestige:''));
     setBoxText(document.getElementById('heroBP'), String(state.battlePoints));
     setBoxText(document.getElementById('heroScore'), fmt(computeScore()));
+    zeigeSpielerzahl();
 
     document.querySelectorAll('[data-build]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-build');
