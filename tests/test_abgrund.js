@@ -719,7 +719,7 @@ function aufloesungsAufruf(quelle){
    sie vorher unbemerkt danebenstehen konnte. */
   const kompQuellen = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
   check('11: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
-    kompQuellen === 1 && /nullkielAktiv\(komp\)/.test(zeile), { quellen: kompQuellen });
+    kompQuellen === 1 && /nullkielAktiv\(kompStart\)/.test(zeile), { quellen: kompQuellen });
 }
 // Vorschau und Kampf muessen denselben Bann anwenden.
 {

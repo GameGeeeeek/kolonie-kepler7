@@ -168,7 +168,7 @@ check('3: und reisen in der Mission mit', /composition: flotte, fleetName: sekto
    sie vorher unbemerkt danebenstehen konnte. */
   const kompQuellenG = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
   check('3: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
-    kompQuellenG === 1 && /nullkielAktiv\(komp\)/.test(zeile), { quellen: kompQuellenG });
+    kompQuellenG === 1 && /nullkielAktiv\(kompStart\)/.test(zeile), { quellen: kompQuellenG });
   /* Die Grundberuehrung steht seit v8.712.0 hinter `erster &&` - sie ist ein Gegenstand fuer EINEN
      Sektor, nicht fuer alle fuenf eines Tauchplans. Geprueft bleibt die Aussage: Sie kommt aus der
      MISSION (`m.grund`), nicht aus dem aktuellen Zustand. */
