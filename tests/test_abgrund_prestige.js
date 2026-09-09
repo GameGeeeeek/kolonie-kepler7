@@ -123,7 +123,9 @@ const voll = {
     'relikte','waechterTage','waechterStrom','werkstatt','woche','wochePraemie','allianzMarken','gegenmassnahmen',
     'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler','meilensteine',
     // Tauchplan (v8.712.0): Einstellung, kein Fortschritt - ueberlebt den Aufstieg, siehe Pruefung 2.
-    'planTiefen','planLinie']);
+    // Die Fund-Vorgabe (v8.715.0) ist dasselbe: eine Vorab-Entscheidung, kein Besitz. Wer sie beim
+    // Aufstieg verloere, taucht danach einmal mit einer Einstellung ab, die er nicht gewaehlt hat.
+    'planTiefen','planLinie','planFunde']);
   const neu = [...new Set(felder)].filter(f => !bekannt.has(f));
   check('3: ensureAbgrund fuehrt keine dem Reset unbekannten Felder',
     neu.length === 0, { unbekannt:neu, hinweis:'Neues Feld? In abgrundUeberReset entscheiden, ob es den Aufstieg ueberlebt.' });
