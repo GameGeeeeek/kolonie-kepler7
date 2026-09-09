@@ -217,9 +217,23 @@ check('5: mit Lotsenboot wird sie kuerzer', AD(10, 1, {lotsenboot:10}) < AD(10, 
   { ohne:AD(10,1,{}), mit:AD(10,1,{lotsenboot:10}) });
 check('5: sie faellt nie unter die Untergrenze von 120 Sekunden', AD(1, 0.1, {lotsenboot:1e6}) >= 120);
 check('5: und nie ueber die Obergrenze', AD(100000, 5, {}) === 4*3600);
-check('5: Vorschau und Start rechnen mit DERSELBEN Funktion und der Flotte',
-  (js.match(/abgrundAnflugdauer\(tiefe, sektor\.mods\.dur, flotte\)/g)||[]).length === 2,
-  { vorkommen:(js.match(/abgrundAnflugdauer\(tiefe, sektor\.mods\.dur, flotte\)/g)||[]).length });
+/* GEPRUEFT WIRD DIE REGEL: Vorschau und Start bilden die Anflugdauer ueber DIESELBE Route, mit
+   derselben Funktion, und beide nehmen fuer den ERSTEN Sektor den gebannten `sektor` statt eines
+   frisch gebauten. Der erste Entwurf zaehlte eine Zeichenkette und verlangte sie zweimal; als der
+   Tauchplan (v8.712.0) aus beiden Einzelaufrufen eine Summenschleife machte, fiel er - und deckte
+   dabei einen echten Fehler auf: Die Vorschau rechnete den ersten Sektor OHNE Bann und zeigte
+   damit bei gesetzter Gegenmassnahme eine andere Gesamtzeit als der Start. Deshalb misst die
+   Pruefung jetzt die Fallunterscheidung selbst - an beiden Stellen. */
+{
+  const sendeQ5 = fnAus('sendeAbgrundMission');
+  const boxQ5 = fnAus('renderAbgrundBox');
+  const summe = q => /for \(const t of abgrundPlanTiefen\(tiefe, planTiefen\)\)\{/.test(q)
+                  && /\+= abgrundAnflugdauer\(t, sek[A-Za-z]*\.mods\.dur, [A-Za-z]*[Ff]lotte\)/.test(q)
+                  && /\(t === tiefe\) \? sektor :/.test(q);
+  check('5: Vorschau und Start rechnen mit DERSELBEN Funktion und der Flotte',
+    sendeQ5.length > 0 && boxQ5.length > 0 && summe(sendeQ5) && summe(boxQ5),
+    { start: summe(sendeQ5), vorschau: summe(boxQ5) });
+}
 
 // Kessel und Kran an ihren Verrechnungsstellen.
 check('5: der Kessel senkt die Verluste multiplikativ, nicht in derselben Gruppe',
@@ -372,10 +386,49 @@ check('6: die Beute bleibt Sache des Bergungskrans',
   // Wert dazukam (abgrundSektor(tiefe, !!m.ruf)) - also genau dann, als die Regel, die sie schuetzen
   // soll, VERSTAERKT wurde. Vierte Kopie derselben Zeile; die drei anderen stehen in
   // test_abgrund.js und test_abgrund_gegenstaende.js und sind am selben Tag umgestellt worden.
-  const aufrufAbrechnung = js.split('\n').find(z => z.includes('abgrundSektorMitBann(') && z.includes('m.bann')) || '';
+/* DIE ANWEISUNG, NICHT DIE ZEILE. Der Aufruf ist seit v8.712.0 auf drei Zeilen umgebrochen (die
+   Verbrauchsgegenstaende gelten nur fuer den ersten Sektor, das passt nicht mehr in eine Zeile).
+   Jeder zeilenbasierte Anker riss damit auseinander und meldete einen Fehler auf voellig richtigem
+   Code - viermal am 09.09.2026. Geschnitten wird deshalb vom `const sektor =` bis zum
+   abschliessenden Semikolon; der Anker wird vorher auf Existenz geprueft, sonst liefe der Slice
+   ueber die halbe Datei und die Pruefung waere aus dem falschen Grund gruen. */
+function aufloesungsAufruf(quelle){
+  /* Es gibt ZWEI solche Anweisungen: eine beim Abtauchen (sendeAbgrundMission, mit `roh`) und eine
+     bei der Aufloesung (mit `m.`). Gesucht ist die zweite - erkennbar daran, dass sie aus der
+     MISSION liest, nicht an ihrer Reihenfolge in der Datei. */
+  const treffer = [];
+  let i = quelle.indexOf('const sektor = abgrundSektorMitBann(');
+  while (i >= 0){
+    const bis = quelle.indexOf(';', i);
+    if (bis > i) treffer.push(quelle.slice(i, bis + 1));
+    i = quelle.indexOf('const sektor = abgrundSektorMitBann(', i + 1);
+  }
+  return treffer.filter(t => t.indexOf('m.') >= 0)[0] || '';
+}
+  const aufrufAbrechnung = aufloesungsAufruf(js);
   check('7: die Abrechnungs-Aufrufstelle ist auffindbar', !!aufrufAbrechnung);
+  /* SEIT v8.712.0 (Tauchplan) kommt die mitgeflogene Flotte nicht mehr in jeder Zeile einzeln aus
+   `m.composition`, sondern GENAU EINMAL: Der Plan fuehrt sie in `komp` mit und kuerzt sie zwischen
+   den Sektoren um die Verluste. Geprueft wird deshalb die gemeinsame Quelle (genau eine, und die
+   liest die Mission) UND dass die Abrechnungszeile sie benutzt. Das ist strenger als die alte
+   Fassung: Eine zweite Quelle - etwa ein Rueckfall auf die Flotte daheim - fiele jetzt auf, waehrend
+   sie vorher unbemerkt danebenstehen konnte. */
+  const kompQuellenT = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
+  check('7: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
+    kompQuellenT === 1 && /nullkielAktiv\(komp\)/.test(aufrufAbrechnung), { quellen: kompQuellenT });
+  /* „Nicht die daheim" wird jetzt am ganzen Aufloesungsblock gemessen statt an einer Zeile: KEINE
+     Modul-, Schiffs- oder Frachtabfrage darf die Flotte am Standort lesen. `fleet` selbst kommt
+     darin weiterhin vor, und zwar zu Recht - die Verluste werden dort abgezogen, weil die Schiffe
+     dort stehen, und `m.power || attackPower(fleet)` ist der alte Rueckfall fuer eine Mission ohne
+     eingefrorene Kraft. Geprueft wird deshalb nicht das Wort, sondern die Art der Abfrage. */
+  const vonBlock = js.indexOf("} else if (m.type === 'abgrund'){");
+  const bisBlock = vonBlock >= 0 ? js.indexOf("} else if (m.type === 'intercept-pirates'", vonBlock) : -1;
+  const block = (vonBlock >= 0 && bisBlock > vonBlock) ? js.slice(vonBlock, bisBlock) : '';
+  const daheim = ['nullkielAktiv(fleet', 'abgrundSchiffsmodul(fleet', 'tiefenschiffBonus(fleet',
+                  'fleetCargoCapacity(fleet', 'abgrundBeuteFaktor(fleet', 'abgrundSplitterFaktor(fleet',
+                  'drucklotAktiv(fleet'].filter(x => block.indexOf(x) >= 0);
   check('7: und die Abrechnung nimmt die MITGEFLOGENE Flotte, nicht die daheim',
-    aufrufAbrechnung.includes('nullkielAktiv(m.composition || fleet)'), aufrufAbrechnung.trim().slice(0, 200));
+    block.length > 0 && daheim.length === 0, { blockDa: block.length > 0, daheim });
 }
 // Grundgaenger: hebt den Wiederholungsabschlag an - dauerhaft, aber nur teilweise.
 {

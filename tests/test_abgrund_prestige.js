@@ -72,7 +72,10 @@ const voll = {
   // Die Stroemung, unter der der Waechter fiel (v8.710.0). Sie gehoert zum selben Eintrag wie
   // der Tag darueber und muss den Aufstieg genauso ueberleben - sonst zeigte der Kartenraum
   // nach jedem Aufstieg wieder den Sektor von heute statt den des Kampfes.
-  waechterStrom:{ 10:20240, 20:20247 }, werkstatt:{ druckhuelle:14, echolot:9 },
+  waechterStrom:{ 10:20240, 20:20247 },
+  // Der Tauchplan ist eine Einstellung und kein Fortschritt: Er ueberlebt den Aufstieg, damit
+  // niemand nach jedem Aufstieg dieselbe Wahl erneut treffen muss.
+  planTiefen:4, planLinie:0.5, werkstatt:{ druckhuelle:14, echolot:9 },
   woche:{ key:'2026-07-27', best:64 }, wochePraemie:{ key:'2026-07-20', tiefe:60 },
   allianzMarken:{ '2026-07-27|50':true }, gegenmassnahmen:7, bann:'sog',
   lotBis:74, spule:true, ruf:true, grund:true, werkstattGesehen:true, allianzMeldungFehler:null,
@@ -86,7 +89,7 @@ const voll = {
 {
   const rest = UR({ abgrund: voll })(false);
   // Was bleiben MUSS - die Aufzeichnungen.
-  for (const [feld, wert] of [['best',87], ['tauchgaenge',412]]){
+  for (const [feld, wert] of [['best',87], ['tauchgaenge',412], ['planTiefen',4], ['planLinie',0.5]]){
     check('2: der Aufstieg behaelt '+feld.padEnd(12), rest[feld] === wert, rest[feld]);
   }
   for (const feld of ['gesehen','konstGesehen','relikte','waechterTage','waechterStrom','meilensteine']){
@@ -118,7 +121,9 @@ const voll = {
   const felder = [...eA.matchAll(/a\.([a-zA-ZäöüÄÖÜ]+)\s*(?:=|!==|===)/g)].map(m => m[1]);
   const bekannt = new Set(['tiefe','best','splitter','bergung','tauchgaenge','gesehen','konstGesehen',
     'relikte','waechterTage','waechterStrom','werkstatt','woche','wochePraemie','allianzMarken','gegenmassnahmen',
-    'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler','meilensteine']);
+    'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler','meilensteine',
+    // Tauchplan (v8.712.0): Einstellung, kein Fortschritt - ueberlebt den Aufstieg, siehe Pruefung 2.
+    'planTiefen','planLinie']);
   const neu = [...new Set(felder)].filter(f => !bekannt.has(f));
   check('3: ensureAbgrund fuehrt keine dem Reset unbekannten Felder',
     neu.length === 0, { unbekannt:neu, hinweis:'Neues Feld? In abgrundUeberReset entscheiden, ob es den Aufstieg ueberlebt.' });

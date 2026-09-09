@@ -103,6 +103,10 @@ function baueKontext(zustand){
     // abgrundSektor beim ersten Aufruf.
     fnAus('abgrundStroemung'),
     fnAus('abgrundRng'), fnAus('abgrundSektor'), fnAus('abgrundMutatorAnzahl'),
+    // ensureAbgrund liest seit v8.712.0 den Deckel des Tauchplans UND die Liste der
+    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist).
+    konstAus('ABGRUND_PLAN_MAX'),
+    'const ABGRUND_PLAN_LINIEN = '+block('ABGRUND_PLAN_LINIEN')+';',
     fnAus('ensureAbgrund'), fnAus('abgrundMaxTiefe'), fnAus('abgrundGewaehlteTiefe'),
     fnAus('abgrundWiederholungsFaktor'), fnAus('abgrundWerkstattStufe'),
     fnAus('abgrundWerkstattKosten'), fnAus('abgrundWerkstattBonus'),
@@ -404,8 +408,21 @@ const keepOpen = (boxQuelle.match(/<details[^>]*data-keep-open="/g) || []).lengt
 check('8: jedes <details> der Abgrund-Box hat data-keep-open',
   details > 0 && details === keepOpen, { details, keepOpen });
 // Und die Tauchtiefe darf nicht nur im DOM stehen - sonst ist sie beim naechsten Tick weg.
+/* DIE REGEL, NICHT DER STELLVERTRETER: Jede Bedienung der Abgrund-Box muss ihren Wert in den
+   SPIELSTAND schreiben - sonst ist er beim naechsten Tick weg. Der erste Entwurf verbot dafuer
+   pauschal `<select>`; das war eine Faustregel, kein Mass. Als der Tauchplan (v8.712.0) eine
+   Auswahlliste fuer die Sicherheitslinie bekam, deren Wert sehr wohl im Spielstand liegt und
+   deren `selected` daraus gerendert wird, fiel die Pruefung auf richtigem Code durch.
+   Gemessen wird jetzt beides: die Tiefe liegt im Spielstand, UND jede Auswahlliste der Box hat
+   einen Handler, der in den Zustand schreibt und speichert. */
+const auswahlListen = (boxQuelle.match(/<select data-[a-z-]+/g) || [])
+  .map(x => x.replace('<select data-', ''));
+const listenVerdrahtet = auswahlListen.filter(n =>
+  new RegExp("\\[data-" + n + "\\]'\\)[\\s\\S]{0,600}?save\\(\\)").test(js));
 check('8: die gewaehlte Tauchtiefe liegt im Spielstand, nicht nur im DOM',
-  /z\.tiefe = Math\.max\(1, Math\.min\(abgrundMaxTiefe\(\)/.test(boxQuelle) && !/<select/.test(boxQuelle));
+  /z\.tiefe = Math\.max\(1, Math\.min\(abgrundMaxTiefe\(\)/.test(boxQuelle)
+    && auswahlListen.length === listenVerdrahtet.length,
+  { auswahllisten: auswahlListen, verdrahtet: listenVerdrahtet });
 // Hilfe und Patchnotes: neue Mechanik ohne Erklaerung ist halbe Arbeit (CLAUDE.md Punkt 5).
 // Seit v8.326.0 ist die Abgrund-Hilfe ein EIGENER Abschnitt mit mehreren Eintraegen, kein
 // Sammelabsatz mehr unter "Grundlagen". Vorher war es ein einziger Eintrag mit 581 Woertern, an
@@ -523,6 +540,10 @@ const aktuelleWoche = G.weekKeyOf(Date.now());
 function markenKontext(zustand, summe){
   const quelle = [
     block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : '',
+    // ensureAbgrund liest seit v8.712.0 den Deckel des Tauchplans UND die Liste der
+    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist).
+    konstAus('ABGRUND_PLAN_MAX'),
+    'const ABGRUND_PLAN_LINIEN = '+block('ABGRUND_PLAN_LINIEN')+';',
     fnAus('weekKeyOf'), fnAus('ensureAbgrund'), fnAus('abgrundWochenpflege'),
     'function abgrundAllianzSumme(){ return SUMME; }'.replace('SUMME', String(summe)),
     fnAus('abgrundAllianzMarkeErreicht'), fnAus('holeAbgrundAllianzMarke'),
@@ -667,10 +688,38 @@ check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkeh
 // pruefen wollen. Geprueft wird deshalb: In der Zeile, die den Sektor bei der RUECKKEHR nachbaut
 // (erkennbar an `m.`, nicht an ihrer Reihenfolge), kommt jeder Wert aus der Mission.
 {
-  const zeile = (js.match(/abgrundSektorMitBann\([^\n]*/g) || []).filter(z => z.indexOf('m.') >= 0)[0] || '';
+/* DIE ANWEISUNG, NICHT DIE ZEILE. Der Aufruf ist seit v8.712.0 auf drei Zeilen umgebrochen (die
+   Verbrauchsgegenstaende gelten nur fuer den ersten Sektor, das passt nicht mehr in eine Zeile).
+   Jeder zeilenbasierte Anker riss damit auseinander und meldete einen Fehler auf voellig richtigem
+   Code - viermal am 09.09.2026. Geschnitten wird deshalb vom `const sektor =` bis zum
+   abschliessenden Semikolon; der Anker wird vorher auf Existenz geprueft, sonst liefe der Slice
+   ueber die halbe Datei und die Pruefung waere aus dem falschen Grund gruen. */
+function aufloesungsAufruf(quelle){
+  /* Es gibt ZWEI solche Anweisungen: eine beim Abtauchen (sendeAbgrundMission, mit `roh`) und eine
+     bei der Aufloesung (mit `m.`). Gesucht ist die zweite - erkennbar daran, dass sie aus der
+     MISSION liest, nicht an ihrer Reihenfolge in der Datei. */
+  const treffer = [];
+  let i = quelle.indexOf('const sektor = abgrundSektorMitBann(');
+  while (i >= 0){
+    const bis = quelle.indexOf(';', i);
+    if (bis > i) treffer.push(quelle.slice(i, bis + 1));
+    i = quelle.indexOf('const sektor = abgrundSektorMitBann(', i + 1);
+  }
+  return treffer.filter(t => t.indexOf('m.') >= 0)[0] || '';
+}
+  const zeile = aufloesungsAufruf(js);
   check('11: die Aufloesung baut den Sektor aus der Mission nach', zeile.length > 40, zeile.slice(0, 140));
-  const fehlend = ['m.bann', 'm.spule', 'm.composition'].filter(x => zeile.indexOf(x) < 0);
+  const fehlend = ['m.bann', 'm.spule'].filter(x => zeile.indexOf(x) < 0);
   check('11: der Bann kommt bei der Aufloesung aus der MISSION', fehlend.length === 0, { fehlend });
+  /* SEIT v8.712.0 (Tauchplan) kommt die mitgeflogene Flotte nicht mehr in jeder Zeile einzeln aus
+   `m.composition`, sondern GENAU EINMAL: Der Plan fuehrt sie in `komp` mit und kuerzt sie zwischen
+   den Sektoren um die Verluste. Geprueft wird deshalb die gemeinsame Quelle (genau eine, und die
+   liest die Mission) UND dass die Abrechnungszeile sie benutzt. Das ist strenger als die alte
+   Fassung: Eine zweite Quelle - etwa ein Rueckfall auf die Flotte daheim - fiele jetzt auf, waehrend
+   sie vorher unbemerkt danebenstehen konnte. */
+  const kompQuellen = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
+  check('11: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
+    kompQuellen === 1 && /nullkielAktiv\(komp\)/.test(zeile), { quellen: kompQuellen });
 }
 // Vorschau und Kampf muessen denselben Bann anwenden.
 {

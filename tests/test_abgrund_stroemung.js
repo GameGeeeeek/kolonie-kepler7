@@ -136,6 +136,8 @@ function baueKontext(){
     stroemungQuelle, vonFrueherQuelle,
     fnAus('abgrundRng'), fnAus('abgrundMutatorAnzahl'),
     fnAus('abgrundBergungsgut'), fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'),
+    // ensureAbgrund liest seit v8.712.0 ABGRUND_PLAN_MAX (Deckel des Tauchplans).
+    konstAus('ABGRUND_PLAN_MAX'),
     fnAus('abgrundWaechterDef'), fnAus('ensureAbgrund'), fnAus('abgrundSektor'),
     'return { abgrundSektor, abgrundStroemung, abgrundWaechterDef, abgrundRng,'
       + ' abgrundStroemungVonFrueher, ABGRUND_STROEMUNG_ALT };'
@@ -211,7 +213,10 @@ const sendRumpf = (vonSend >= 0 && bisSend > vonSend) ? js.slice(vonSend, bisSen
 const legtAb = /const stroemung = abgrundStroemung\(\);/.test(sendRumpf)
   && /abgrundSektor\(tiefe, undefined, stroemung\)/.test(sendRumpf)
   && /\bstroemung,/.test(sendRumpf);
-const liestAus = /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js);
+/* Der Waechterruf steht seit v8.712.0 hinter `erster ?` - er gilt nur fuer den ERSTEN Sektor eines
+   Tauchplans. Gemessen wird deshalb, dass die Stroemung ueber `abgrundStroemungVonFrueher` aus der
+   MISSION kommt, egal wie das Ruf-Argument davor aussieht; das ist die Aussage dieser Pruefung. */
+const liestAus = /abgrundSektor\(tiefe, [^,]+, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js);
 merke('3a: die Mission legt die Stroemung ab, die Aufloesung liest sie von dort',
   sendRumpf.length > 0 && legtAb && liestAus,
   { rumpfDa: sendRumpf.length > 0, legtAb, liestAus });
@@ -287,7 +292,7 @@ merke('5a: die Stroemung von frueher IST der Seed von vorher, und Fehlendes fael
     beiStrom: seedBeiStrom, alt: G.ABGRUND_STROEMUNG_ALT });
 
 merke('5b: Tauchgang und Station von vorher nehmen sie - und der Aufstieg traegt sie mit',
-  /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js)
+  /abgrundSektor\(tiefe, [^,]+, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js)
     && /function merkeWaechterSieg\(tiefe, stroemung\)/.test(js)
     && /merkeWaechterSieg\(tiefe, sektor\.stroemung\)/.test(js)
     // Die Schreibstelle setzt BEIDE Felder zusammen; ein Zweig, der nur den Tag setzt, waere ein

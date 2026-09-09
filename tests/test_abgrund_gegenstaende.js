@@ -140,15 +140,40 @@ check('3: und reisen in der Mission mit', /composition: flotte, fleetName: sekto
   // erkennbar ist er daran, dass er ueberhaupt mit einer Mission arbeitet - nicht an seiner
   // Reihenfolge in der Datei. Beim ersten Anlauf hat mein Anker den Abtauch-Aufruf erwischt und
   // gemeldet, alle vier Werte fehlten.
-  const alleAufrufe = js.match(/abgrundSektorMitBann\([^\n]*/g) || [];
-  const zeile = alleAufrufe.filter(z => z.indexOf('m.') >= 0)[0] || '';
+/* DIE ANWEISUNG, NICHT DIE ZEILE - siehe die ausfuehrliche Begruendung in test_abgrund.js:
+   Der Aufruf ist seit v8.712.0 mehrzeilig, jeder zeilenbasierte Anker riss auseinander. */
+  const aufloesungsAufruf = (() => {
+    // Zwei Anweisungen: Abtauchen (mit `roh`) und Aufloesung (mit `m.`). Gesucht ist die zweite.
+    const treffer = [];
+    let i = js.indexOf('const sektor = abgrundSektorMitBann(');
+    while (i >= 0){
+      const bis = js.indexOf(';', i);
+      if (bis > i) treffer.push(js.slice(i, bis + 1));
+      i = js.indexOf('const sektor = abgrundSektorMitBann(', i + 1);
+    }
+    return treffer.filter(t => t.indexOf('m.') >= 0)[0] || '';
+  })();
+  const alleAufrufe = js.match(/abgrundSektorMitBann\(/g) || [];
+  const zeile = aufloesungsAufruf;
   check('3: die Aufloesung baut den Sektor ueberhaupt nach', zeile.length > 40,
     { gefunden: alleAufrufe.length, ausgewaehlt: zeile.slice(0, 130) });
-  const fehlend = ['m.bann', 'm.spule', 'm.composition', 'm.ruf'].filter(x => zeile.indexOf(x) < 0);
+  const fehlend = ['m.bann', 'm.spule', 'm.ruf'].filter(x => zeile.indexOf(x) < 0);
   check('3: die Aufloesung liest sie AUS DER MISSION, nicht aus dem aktuellen Zustand',
     fehlend.length === 0, { fehlend, zeile: zeile.slice(0, 160) });
+  /* SEIT v8.712.0 (Tauchplan) kommt die mitgeflogene Flotte nicht mehr in jeder Zeile einzeln aus
+   `m.composition`, sondern GENAU EINMAL: Der Plan fuehrt sie in `komp` mit und kuerzt sie zwischen
+   den Sektoren um die Verluste. Geprueft wird deshalb die gemeinsame Quelle (genau eine, und die
+   liest die Mission) UND dass die Abrechnungszeile sie benutzt. Das ist strenger als die alte
+   Fassung: Eine zweite Quelle - etwa ein Rueckfall auf die Flotte daheim - fiele jetzt auf, waehrend
+   sie vorher unbemerkt danebenstehen konnte. */
+  const kompQuellenG = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
+  check('3: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
+    kompQuellenG === 1 && /nullkielAktiv\(komp\)/.test(zeile), { quellen: kompQuellenG });
+  /* Die Grundberuehrung steht seit v8.712.0 hinter `erster &&` - sie ist ein Gegenstand fuer EINEN
+     Sektor, nicht fuer alle fuenf eines Tauchplans. Geprueft bleibt die Aussage: Sie kommt aus der
+     MISSION (`m.grund`), nicht aus dem aktuellen Zustand. */
   check('3: dasselbe fuer den Wiederholungsfaktor',
-    /abgrundWiederholungsFaktor\(tiefe, !!m\.grund, m\.composition \|\| fleet\)/.test(js));
+    /abgrundWiederholungsFaktor\(tiefe, [^,]*m\.grund, komp\)/.test(js));
 }
 // Die Spule braucht einen gewaehlten Bann - sonst haette sie nichts zu streichen und wuerde beim
 // Abtauchen still verpuffen.

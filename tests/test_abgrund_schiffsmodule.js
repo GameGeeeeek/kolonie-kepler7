@@ -110,8 +110,11 @@ check('2: die Schwarmoptik liest die Vielfalt, statt sie global anzuheben',
   /fleetDiversityMult\(flotte\) - 1/.test(fnAus('abgrundKampfkraft')) &&
   !/vielfalt/.test(fnAus('fleetDiversityMult')));
 // Die Bergungsklaue darf fleetCargoCapacity nicht anfassen - die speist auch die Lagerkapazitaet.
+  // Seit v8.712.0 (Tauchplan) fuehrt die Aufloesung die mitgeflogene Flotte in `komp` mit und
+  // kuerzt sie zwischen den Sektoren. Die Quelle ist weiterhin die Mission - dass es genau EINE
+  // gibt und keine Abfrage die Flotte daheim liest, pruefen test_abgrund 11 und test_tiefenflotte 7.
 check('2: die Bergungsklaue erweitert den Frachtraum nur an der Abgrund-Stelle',
-  /Math\.round\(fleetCargoCapacity\(m\.composition \|\| fleet\) \* \(1 \+ klaue\)\)/.test(js));
+  /Math\.round\(fleetCargoCapacity\(komp\) \* \(1 \+ klaue\)\)/.test(js));
 
 // ---- 3) Die Klassenbedingung, ausgefuehrt ----
 // Ein Tiefenkiel im Schlachtschiff-Slot soll nichts bewirken, wenn kein Schlachtschiff mitfliegt.
@@ -175,7 +178,7 @@ check('4: die Kampfkraft-Gruppe ist gedeckelt',
 // Vorschau und Aufloesung MUESSEN dieselbe Funktion mit derselben Flotte fuettern.
 check('4: Vorschau und Aufloesung geben beide die Flotte mit',
   /abgrundKampfkraft\(rohkraft, sektor, flotte\)/.test(js) &&
-  /abgrundKampfkraft\(rohkraft, sektor, m\.composition \|\| fleet\)/.test(js));
+  /abgrundKampfkraft\(rohkraft, sektor, komp\)/.test(js));
 
 // ---- 5) Tiefenkiel: Verluste ----
 // Fenster grosszuegig: Seit v8.337.0 steht der Kessel-Kommentar zwischen Kiel-Definition und
