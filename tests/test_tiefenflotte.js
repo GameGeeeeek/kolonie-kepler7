@@ -217,9 +217,23 @@ check('5: mit Lotsenboot wird sie kuerzer', AD(10, 1, {lotsenboot:10}) < AD(10, 
   { ohne:AD(10,1,{}), mit:AD(10,1,{lotsenboot:10}) });
 check('5: sie faellt nie unter die Untergrenze von 120 Sekunden', AD(1, 0.1, {lotsenboot:1e6}) >= 120);
 check('5: und nie ueber die Obergrenze', AD(100000, 5, {}) === 4*3600);
-check('5: Vorschau und Start rechnen mit DERSELBEN Funktion und der Flotte',
-  (js.match(/abgrundAnflugdauer\(tiefe, sektor\.mods\.dur, flotte\)/g)||[]).length === 2,
-  { vorkommen:(js.match(/abgrundAnflugdauer\(tiefe, sektor\.mods\.dur, flotte\)/g)||[]).length });
+/* GEPRUEFT WIRD DIE REGEL: Vorschau und Start bilden die Anflugdauer ueber DIESELBE Route, mit
+   derselben Funktion, und beide nehmen fuer den ERSTEN Sektor den gebannten `sektor` statt eines
+   frisch gebauten. Der erste Entwurf zaehlte eine Zeichenkette und verlangte sie zweimal; als der
+   Tauchplan (v8.712.0) aus beiden Einzelaufrufen eine Summenschleife machte, fiel er - und deckte
+   dabei einen echten Fehler auf: Die Vorschau rechnete den ersten Sektor OHNE Bann und zeigte
+   damit bei gesetzter Gegenmassnahme eine andere Gesamtzeit als der Start. Deshalb misst die
+   Pruefung jetzt die Fallunterscheidung selbst - an beiden Stellen. */
+{
+  const sendeQ5 = fnAus('sendeAbgrundMission');
+  const boxQ5 = fnAus('renderAbgrundBox');
+  const summe = q => /for \(const t of abgrundPlanTiefen\(tiefe, planTiefen\)\)\{/.test(q)
+                  && /\+= abgrundAnflugdauer\(t, sek[A-Za-z]*\.mods\.dur, [A-Za-z]*[Ff]lotte\)/.test(q)
+                  && /\(t === tiefe\) \? sektor :/.test(q);
+  check('5: Vorschau und Start rechnen mit DERSELBEN Funktion und der Flotte',
+    sendeQ5.length > 0 && boxQ5.length > 0 && summe(sendeQ5) && summe(boxQ5),
+    { start: summe(sendeQ5), vorschau: summe(boxQ5) });
+}
 
 // Kessel und Kran an ihren Verrechnungsstellen.
 check('5: der Kessel senkt die Verluste multiplikativ, nicht in derselben Gruppe',

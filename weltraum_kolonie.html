@@ -56664,9 +56664,16 @@ async function claimPendingRewards(){
     const planTiefen = Math.max(1, Math.min(ABGRUND_PLAN_MAX, Math.floor(a.planTiefen) || 1));
     const planLinie = ABGRUND_PLAN_LINIEN.some(l => l.wert === a.planLinie) ? a.planLinie : 0;
     const planFlotte = buildTauchgangFlotte(state.activeBasePlanet, currentFleet() || {});
+    /* DER ERSTE SEKTOR IST DER GEBANNTE. Der erste Entwurf rechnete hier `abgrundSektor(t)` fuer
+       jede Tiefe - also auch fuer die erste, und damit OHNE die vorgemerkte Gegenmassnahme. Da der
+       Bann die Mutatoren streicht und mit ihnen den Dauer-Faktor, zeigte die Vorschau bei gesetzter
+       Gegenmassnahme eine andere Gesamtzeit an, als der Start hinterher wirklich rechnet. Genau
+       dieselbe Fallunterscheidung steht in sendeAbgrundMission; gemeldet hat den Fehler
+       test_tiefenflotte 5, das Vorschau und Start gegeneinander misst. */
     let planDauer = 0;
     for (const t of abgrundPlanTiefen(tiefe, planTiefen)){
-      planDauer += abgrundAnflugdauer(t, abgrundSektor(t).mods.dur, planFlotte);
+      const sekV = (t === tiefe) ? sektor : abgrundSektor(t);
+      planDauer += abgrundAnflugdauer(t, sekV.mods.dur, planFlotte);
     }
     const stroemungRestText = stroemungRestStd >= 1
       ? 'in ' + stroemungRestStd + ' Stunde' + (stroemungRestStd === 1 ? '' : 'n')

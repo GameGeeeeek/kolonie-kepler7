@@ -165,7 +165,8 @@ const stellen = [
   ['Wrackleser → Truemmerabbau', /fleet\.recycler \* 8 \* \(1 \+ Math\.min\(ABGRUND_WRACK_DECKEL, moduleBonusTotal\('wrack'\)\)/],
   ['Prisenwaage → Prisengut-Auszahlung', /const waage = 1 \+ Math\.min\(ABGRUND_PRISE_DECKEL, moduleBonusTotal\('prise'\)\);/],
   ['Drucklot → Bann', /function drucklotAktiv\(flotte\)\{[\s\S]{0,200}'raffiniert', 'drucklot'/],
-  ['Ballastspiegel → Niederlage', /Math\.min\(ABGRUND_BALLAST_DECKEL, abgrundSchiffsmodul\(m\.composition \|\| fleet, 'frachter', 'ballast'\)\)/]
+  // Seit v8.712.0 liest die Aufloesung die mitgefuehrte Flotte `komp` (siehe test_abgrund 11).
+  ['Ballastspiegel → Niederlage', /Math\.min\(ABGRUND_BALLAST_DECKEL, abgrundSchiffsmodul\(komp, 'frachter', 'ballast'\)\)/]
 ];
 for (const [name, re] of stellen) check('verrechnet: '+name, re.test(js));
 // Jeder Deckel als benannte Konstante, damit ihn der naechste Balance-Pass findet.
