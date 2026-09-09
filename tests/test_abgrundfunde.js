@@ -41,11 +41,18 @@ const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefine
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_ABGRUNDFUNDE_GEGENPROBE || '';
 const MUSS_FALLEN = {
-  alt:     ['1a','1b','2a','2b','2c','3a','3b','3c','3d','4a'],
-  zeit:    ['3a'],
-  letzter: ['3b'],
-  zustand: ['3c'],
-  abbruch: ['3d']
+  alt:      ['1a','1b','2a','2b','2c','3a','3b','3c','3d','4a','4b','4c','4d','4e'],
+  zeit:     ['3a'],
+  letzter:  ['3b'],
+  zustand:  ['3c'],
+  abbruch:  ['3d'],
+  // Die Befunde der Durchsicht, je einzeln zurueckgebaut.
+  ohnefeld: ['4a'],   // das Auswahlfeld fehlt - der Ist-Zustand vor dieser Runde
+  ohnezeile:['4b'],   // der Fund unter der aktuellen Tiefe wird wieder nicht gezeigt
+  ohnesicht:['4e'],   // die Vorschau zaehlt die Funde nicht mit
+  gratis:   ['1b'],   // ABGRUND_FUND_ATEM = 0 - Bergen kostet nichts
+  flach:    ['2c'],   // ein Ertragszweig waechst nicht mit der Tiefe
+  sektorseed:['2b']   // der Fund haengt am Sektor-Wurf
 };
 
 function fnAus(name){
@@ -64,6 +71,29 @@ function tabelleAus(name){
 }
 const konstAus = n => { const m = js.match(new RegExp('^\\s*const '+n+' = .*$','m')); return m ? m[0].trim() : ''; };
 
+/* DER KONTEXT WIRD GANZ OBEN GEBAUT: Pruefung 1b liest ihn seit dieser Runde mit (sie haelt
+   fest, dass Bergen wirklich Atem kostet), und eine `let`-Deklaration weiter unten waere fuer sie
+   die temporale Todeszone gewesen - genau der Fehler, den das Projekt im Spielcode zweimal
+   hatte. */
+let G = null, G_FEHLER = '';
+try {
+  const quelle = [
+    konstAus('ABGRUND_FUND_CHANCE'), konstAus('ABGRUND_FUND_ATEM'),
+    tabelleAus('ABGRUND_FUNDE'),
+    fnAus('abgrundRng'),
+    "function abgrundStroemung(){ return 0; }",
+    // Der Ertrag liest seit dieser Runde die echten Sektorwerte und die Ausbau-Faktoren. Das
+    // Bergungsgut kommt aus der Spieldatei; die beiden Faktoren sind Attrappen mit 1, also der
+    // Zustand OHNE jeden Ausbau - gemessen wird das Wachstum mit der Tiefe, nicht die Werkstatt.
+    konstAus('ABGRUND_FUND_WERT'), fnAus('abgrundBergungsgut'),
+    "function abgrundBeuteFaktor(){ return 1; }",
+    "function abgrundSplitterFaktor(){ return 1; }",
+    fnAus('abgrundFundZwischen'), fnAus('abgrundFundErtrag'),
+    "return { fund: abgrundFundZwischen, ertrag: abgrundFundErtrag, chance: ABGRUND_FUND_CHANCE, atem: ABGRUND_FUND_ATEM };"
+  ].join('\n');
+  G = new Function(quelle)();
+} catch(e){ G = null; G_FEHLER = e.message; }
+
 // ---- 1) Die Tabellen -------------------------------------------------------------------------
 const fundTab = tabelleAus('ABGRUND_FUNDE');
 const eintraege = [...fundTab.matchAll(/\{ key:'([a-z]+)', name:'([^']+)', icon:'([a-z0-9-]+)'/g)]
@@ -81,23 +111,14 @@ merke('1a: es gibt Funde, jeder mit Schluessel, Namen, Icon und einer Gabe, die 
 
 const vorgabeTab = tabelleAus('ABGRUND_FUND_VORGABEN');
 const werte = [...vorgabeTab.matchAll(/wert:'([a-z]+)'/g)].map(m => m[1]);
-merke('1b: die Vorgabe kennt genau zwei Werte',
-  werte.length === 2 && werte.indexOf('bergen') >= 0 && werte.indexOf('vorbei') >= 0,
-  { werte });
+merke('1b: die Vorgabe kennt genau zwei Werte, und Bergen kostet wirklich Atem',
+  werte.length === 2 && werte.indexOf('bergen') >= 0 && werte.indexOf('vorbei') >= 0
+    // ABGRUND_FUND_ATEM = 0 waere durch alle uebrigen Pruefungen gefallen: 3a und 3d vergleichen
+    // nur Zeichenketten. Die zentrale Zusage des Pakets ist „kostet einen Sektor" - hier steht sie.
+    && !!G && G.atem >= 1,
+  { werte, atem: G && G.atem });
 
 // ---- 2) Berechnet, nicht gewuerfelt ----------------------------------------------------------
-let G = null, G_FEHLER = '';
-try {
-  const quelle = [
-    konstAus('ABGRUND_FUND_CHANCE'), konstAus('ABGRUND_FUND_ATEM'),
-    tabelleAus('ABGRUND_FUNDE'),
-    fnAus('abgrundRng'),
-    "function abgrundStroemung(){ return 0; }",
-    fnAus('abgrundFundZwischen'), fnAus('abgrundFundErtrag'),
-    "return { fund: abgrundFundZwischen, ertrag: abgrundFundErtrag, chance: ABGRUND_FUND_CHANCE };"
-  ].join('\n');
-  G = new Function(quelle)();
-} catch(e){ G = null; G_FEHLER = e.message; }
 
 // Gemessen ueber einen breiten Bereich, nicht an einer einzelnen Tiefe: Eine einzelne koennte
 // zufaellig leer sein und die Pruefung waere aus dem falschen Grund gruen.
@@ -120,24 +141,35 @@ merke('2a: ein Fund wird berechnet, nicht gewuerfelt - und die Stroemung aendert
     chance: G && G.chance, aendertSichMitStroemung: andereStroemung,
     kontextFehler: G_FEHLER || undefined });
 
-/* 2b: Ein Fund darf nicht mit der Waechtertiefe wandern. Gemessen wird der Anteil der
-   Waechtertiefen mit Fund gegen den Anteil aller Tiefen - laege der Fund am selben Wurf wie der
-   Sektor, waeren beide Anteile identisch oder eines von beiden 0 bzw. 1. */
-const waechterTiefen = tiefen.filter(t => t % 10 === 0);
-const waechterMitFund = G ? waechterTiefen.filter(t => G.fund(t, 0)).length : 0;
-const quoteAlle = mitFund.length / tiefen.length;
-const quoteW = waechterTiefen.length ? waechterMitFund / waechterTiefen.length : 0;
-merke('2b: der Fund haengt nicht am selben Wurf wie der Sektor darueber',
-  !!G && waechterMitFund > 0 && waechterMitFund < waechterTiefen.length
-    && Math.abs(quoteW - quoteAlle) < 0.25,
-  { quoteAlle: Math.round(quoteAlle*100)/100, quoteWaechter: Math.round(quoteW*100)/100 });
+/* 2b MISST JETZT DIE SEEDS, NICHT EINE QUOTE. Der erste Entwurf verglich die Fundquote auf
+   Waechtertiefen mit der Gesamtquote bei 0,25 Toleranz - und die behauptete Sabotage (Fund am
+   SEKTOR-Seed) laege bei 0,017 Abstand, waere also gruen geblieben. Der Grund ist strukturell:
+   Ob eine Tiefe einen Waechter traegt, entscheidet `abgrundIstWaechter` allein aus der Tiefe,
+   nie der Wurf - eine Quotengleichheit kann darum gar nicht entstehen. Verglichen werden deshalb
+   die Konstanten selbst: Der Fund-Seed darf keine der drei Sektor-Konstanten benutzen. */
+const sektorQ = fnAus('abgrundSektor');
+const mSek = sektorQ.match(/abgrundRng\(([^)]*)\)/);
+const fundQ = fnAus('abgrundFundZwischen');
+const mFund = fundQ.match(/abgrundRng\(([^)]*)\)/);
+const zahlen = t => (t ? (t.match(/\d+/g) || []) : []);
+const sekZahlen = zahlen(mSek && mSek[1]);
+const fundZahlen = zahlen(mFund && mFund[1]);
+const geteilt = fundZahlen.filter(z => sekZahlen.indexOf(z) >= 0);
+merke('2b: der Fund-Wurf teilt keine einzige Konstante mit dem Sektor-Wurf',
+  sekZahlen.length >= 3 && fundZahlen.length >= 3 && geteilt.length === 0,
+  { sektor: sekZahlen, fund: fundZahlen, geteilt });
 
-const e10 = G ? G.ertrag(G.fund(10,0) || { gabe:'bergung' }, 10) : null;
-const e200 = G ? G.ertrag(G.fund(10,0) || { gabe:'bergung' }, 200) : null;
-merke('2c: der Ertrag waechst mit der Tiefe und ist nie null',
-  !!e10 && !!e200 && e10.menge >= 1 && e200.menge > e10.menge
+/* ALLE DREI ZWEIGE, nicht nur einer. Der erste Entwurf rief zweimal denselben Fund und lief
+   damit durch genau ein `if` - `menge: 1` im Splitter-Zweig waere gruen geblieben, solange der
+   gezogene Fund zufaellig ein anderer war. */
+const zweige = ['bergung','splitter','fragmente'];
+const ertraege = G ? zweige.map(g => ({ g, klein: G.ertrag({ gabe:g }, 10).menge,
+                                           gross: G.ertrag({ gabe:g }, 200).menge })) : [];
+merke('2c: JEDER Ertragszweig waechst mit der Tiefe und ist nie null',
+  ertraege.length === 3
+    && ertraege.every(e => e.klein >= 1 && e.gross > e.klein)
     && !G.ertrag(null, 10),
-  { tiefe10: e10 && e10.menge, tiefe200: e200 && e200.menge });
+  { ertraege });
 
 // ---- 3) Die Abrechnung -----------------------------------------------------------------------
 function klammer(quelle, start, auf, zu){
@@ -196,13 +228,46 @@ merke('3d: reicht der Atem nicht, wird vorbeigezogen statt abgebrochen',
   { keinAbbruch: fundBlock.indexOf('planAbbruch') < 0, keinBreak: fundBlock.indexOf('break;') < 0 });
 
 // ---- 4) Sichtbar -----------------------------------------------------------------------------
-merke('4a: Bedienung, Sonde, Hilfe und eine eigene Meldung',
-  /data-abgrund-funde/.test(js)
-    && /fundeVoraus\[v\.tiefe\]/.test(js)
-    && /Funde im Abstieg – was zwischen zwei Sektoren liegt/.test(js)
-    // Eine EIGENE Zeile, nicht an die Abbruchmeldung gehaengt: Es gibt Funde auch dann, wenn der
-    // Plan ganz durchlaeuft - dann steht dort gar keine Abbruchmeldung.
-    && /if \(fundText && showLog !== false\) log\('Zwischen den Sektoren:'\+fundText/.test(js),
+/* 4a WAR DIE PRUEFUNG, DIE DAS PAKET RETTEN SOLLTE - und sie war vacuous. Sie suchte
+   `data-abgrund-funde` irgendwo in der Datei, und dieser Text steht auch im HANDLER
+   (`box.querySelector('[data-abgrund-funde]')`). Das Auswahlfeld selbst fehlte komplett: Der
+   Handler suchte ein Element, das es nicht gab, `onchange` wurde nie gebunden, und jeder Spieler
+   barg fuer immer - waehrend Hilfe und Patchnote zusagten, er koenne waehlen. Gepruft wird jetzt
+   das MARKUP, und die vier Aussagen stehen einzeln statt in einem &&-Turm: Faellt eine, sagt der
+   Name welche. */
+merke('4a: das Auswahlfeld existiert wirklich und ist an die Vorgaben gebunden',
+  /<select data-abgrund-funde/.test(js)
+    && /ABGRUND_FUND_VORGABEN\.map\(v =>/.test(js)
+    && /v\.wert===planFunde\?' selected'/.test(js)
+    && /const fundeWahl = box\.querySelector\('\[data-abgrund-funde\]'\);/.test(js)
+    && /fundeWahl\.onchange/.test(js),
+  { markup: /<select data-abgrund-funde/.test(js),
+    handler: /fundeWahl\.onchange/.test(js) });
+
+merke('4b: die Tiefensonde zeigt auch den Fund unter der GEWAEHLTEN Tiefe',
+  // Der einzige Zwischenraum eines Zweierplans - und der ist ohne Werkstatt-Ausbau der Normalfall.
+  // Er wurde berechnet und von niemandem gelesen; die Sondenliste beginnt erst bei Tiefe+1.
+  /const fundHier = fundeVoraus\[tiefe\];/.test(js)
+    && /\$\{fundHierHtml\}/.test(js)
+    && /fundeVoraus\[v\.tiefe\]/.test(js),
+  {});
+
+merke('4c: die Hilfe erklaert die Funde',
+  /Funde im Abstieg – was zwischen zwei Sektoren liegt/.test(js), {});
+
+merke('4d: die Fundmeldung steht in einer EIGENEN Zeile',
+  // Es gibt Funde auch dann, wenn der Plan ganz durchlaeuft - dann steht keine Abbruchmeldung da,
+  // und ein Anhang an sie waere spurlos gewesen.
+  /if \(fundText && showLog !== false\) log\('Zwischen den Sektoren:'\+fundText/.test(js), {});
+
+/* 4e: DIE VORSCHAU RECHNET DIE FUNDE MIT. Sie liegen deterministisch fest und die Sonde zeigt
+   sie - eine Vorschau ohne sie sagte „Route kostet 2" bei Atem 2 und liess den Verband trotzdem
+   nach einem Sektor umkehren. Genau die Klasse Fehler, die der Code an drei anderen Stellen
+   selbst verbietet. */
+merke('4e: die Atem-Vorschau zaehlt die geborgenen Funde mit',
+  /planFunde === 'bergen' && abgrundFundZwischen\(tiefe \+ i - 1\)/.test(js)
+    && /atemFunde \+= ABGRUND_FUND_ATEM;/.test(js)
+    && /davon \$\{atemFunde\} für Funde/.test(js),
   {});
 
 if (SAB){

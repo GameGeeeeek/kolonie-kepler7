@@ -332,8 +332,15 @@ check('6: der Echoschnitter liegt in der additiven Splitter-Gruppe, nicht als ei
   /1 \+ abgrundKanalBonus\('splitter'\) \+ tiefenschiffBonus\(flotte, 'echoschnitter'\) \+ hafen/.test(fnAus('abgrundSplitterFaktor')));
 check('6: und wirkt an genau einer Stelle',
   (js.match(/tiefenschiffBonus\([^)]*'echoschnitter'\)/g)||[]).length === 1);
+/* GEMESSEN WIRD DIE AUSSAGE, NICHT DIE ZAHL. Die alte Fassung verlangte genau drei
+   `abgrundSplitterFaktor(`-Stellen und fiel, als v8.715.0 eine vierte hinzufuegte (der Fund im
+   Abstieg holt seinen Ertrag aus derselben Funktion) - also genau dann, als die Regel, die sie
+   schuetzen soll, MEHR Leser bekam. Die Aussage lautet: Es gibt EINE Rechnung, und niemand baut
+   die additive Gruppe daneben noch einmal. Genau das steht jetzt da. */
 check('6: Vorschau und Abrechnung holen die Splitter aus derselben Funktion',
-  (js.match(/abgrundSplitterFaktor\(/g)||[]).length === 3);
+  fnAus('abgrundSplitterFaktor').length > 0
+  && (js.match(/abgrundKanalBonus\('splitter'\)/g)||[]).length === 1
+  && (js.match(/abgrundSplitterFaktor\(/g)||[]).length >= 3);
 // Die Beute-Zeile daneben darf er NICHT anfassen - dort sitzt der Bergungskran. Zwei Schiffe auf
 // denselben Kanal waere die Art Doppelung, die dieses Projekt sonst erst beim Spieler auffaellt.
 check('6: die Beute bleibt Sache des Bergungskrans',
