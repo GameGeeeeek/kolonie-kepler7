@@ -97,6 +97,13 @@ umnummerieren, dann Pflichtprüfungen plus die Tests der Bereiche, die der fremd
 anfasst — die Auswahl aus dem Diff **gemessen**, nicht geraten. Was gelaufen ist und was nicht,
 gehört ausdrücklich in den PR-Text.
 
+**Während `pruflauf.js` läuft, ist auch das NACHBAR-REPO tabu** (gemessen am 09.09.2026): Er
+überwacht nicht nur `weltraum_kolonie.html`, sondern auch die `server.js` des Backend-Klons — die
+Paritätstests lesen sie. Eine Änderung dort mitten im Lauf entwertet ihn (Code **2**), auch wenn
+alle Prüfungen grün sind: Die vier Stücke haben dann verschiedene Stände gemessen. Wer die
+Wartezeit im Nachbar-Repo nutzen will, tut das *lesend* — committen und pushen kosten einen
+kompletten Lauf.
+
 **Während `pruflauf.js` läuft, keinen zweiten Browser-Test starten.** Seine Einzel-Nachprüfung ist
 der Teil, der ohne Last stattfinden muss; wer daneben etwas startet, macht sie wertlos (gemessen am
 04.09.2026: ein Test fiel „einzeln rot" und war danach dreimal grün).

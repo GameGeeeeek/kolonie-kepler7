@@ -99,6 +99,9 @@ function baueKontext(zustand){
     farbstationenQuelle(),
     konstAus('ABGRUND_FARB_WENDE'), konstAus('ABGRUND_FARB_TIEF'),
     fnAus('abgrundTiefenFarben'),
+    // Die Stroemung (Abgrund-Paket B) ist die zweite Achse des Sektor-Seeds - ohne sie wirft
+    // abgrundSektor beim ersten Aufruf.
+    fnAus('abgrundStroemung'),
     fnAus('abgrundRng'), fnAus('abgrundSektor'), fnAus('abgrundMutatorAnzahl'),
     fnAus('ensureAbgrund'), fnAus('abgrundMaxTiefe'), fnAus('abgrundGewaehlteTiefe'),
     fnAus('abgrundWiederholungsFaktor'), fnAus('abgrundWerkstattStufe'),
@@ -126,7 +129,7 @@ function baueKontext(zustand){
     fnAus('abgrundBergungsgut'),
     block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
     fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
-    'return { abgrundSektor, abgrundAnflugdauer, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
+    'return { abgrundSektor, abgrundStroemung, abgrundAnflugdauer, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',
     '  ABGRUND_MUTATOREN, ABGRUND_WERKSTATT, ABGRUND_CHRONIK, ABGRUND_WIEDERHOLUNG,',
@@ -157,7 +160,13 @@ check('0: die echten Funktionen wurden aus der Spieldatei geladen',
   { tiefe1Staerke: G.abgrundSektor(1).defense });
 
 // ---- 1) Determinismus ----
-const s7a = G.abgrundSektor(7), s7b = G.abgrundSektor(7);
+/* DIE STROEMUNG WIRD FESTGEHALTEN (Abgrund-Paket B). Seit sie den Seed mitbestimmt, misst ein
+   Aufruf ohne sie die UHR mit: Zwei Aufrufe beiderseits einer lokalen Mitternacht liefern
+   verschiedene Sektoren, und dieser Test kippte einmal im Jahr um Mitternacht ohne jeden Fehler
+   im Code. Gemessen wird hier der Determinismus, nicht der Kalender - also eine feste Zahl.
+   Dass die Stroemung ueberhaupt wirkt, weist test_abgrund_stroemung.js nach. */
+const STR = 20000;
+const s7a = G.abgrundSektor(7, undefined, STR), s7b = G.abgrundSektor(7, undefined, STR);
 check('1: dieselbe Tiefe ergibt exakt denselben Sektor',
   s7a.name === s7b.name && s7a.defense === s7b.defense &&
   s7a.mutatoren.map(m=>m.key).join() === s7b.mutatoren.map(m=>m.key).join(), { name:s7a.name });
@@ -165,12 +174,13 @@ check('1: dieselbe Tiefe ergibt exakt denselben Sektor',
 // Sektor doch am Spielstand und waere nicht spieleruebergreifend vergleichbar.
 const G2 = baueKontext(neuerZustand());
 check('1: der Sektor haengt NICHT am Spielstand (anderer Kontext, gleiches Ergebnis)',
-  G2.abgrundSektor(47).name === G.abgrundSektor(47).name, { name:G.abgrundSektor(47).name });
+  G2.abgrundSektor(47, undefined, STR).name === G.abgrundSektor(47, undefined, STR).name,
+  { name:G.abgrundSektor(47, undefined, STR).name });
 const namen = new Set();
-for (let t=1; t<=300; t++) namen.add(G.abgrundSektor(t).name);
+for (let t=1; t<=300; t++) namen.add(G.abgrundSektor(t, undefined, STR).name);
 check('1: 300 Tiefen ergeben (nahezu) 300 verschiedene Namen', namen.size >= 295, { verschieden:namen.size, von:300 });
 check('1: der Name enthaelt griechischen Buchstaben und Katalognummer',
-  /[α-ω]-\d{4}$/.test(G.abgrundSektor(13).name), { probe:G.abgrundSektor(13).name });
+  /[α-ω]-\d{4}$/.test(G.abgrundSektor(13, undefined, STR).name), { probe:G.abgrundSektor(13, undefined, STR).name });
 
 // ---- 2) Mutatoren ----
 const MUT = G.ABGRUND_MUTATOREN;

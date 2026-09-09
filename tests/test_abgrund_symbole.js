@@ -251,8 +251,10 @@ check('7: der Eroberungstag ist eine Zeichenkette im Format JJJJ-MM-TT, keine Za
   typeof heute === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(heute), heute);
 check('7: merkeWaechterSieg ueberschreibt einen vorhandenen Tag NICHT (Ersteroberung zaehlt)',
   /if \(!a\.waechterTage\[tiefe\]\)/.test(fnAus('merkeWaechterSieg')));
+// Seit v8.710.0 wandert die Stroemung des gekaempften Sektors mit - aus `sektor`, nicht aus der
+// Uhr: Ein Tauchgang ueber Mitternacht kaempfte unter der Stroemung des Aufbruchs.
 check('7: der Tag wird bei der AUFLOESUNG gesetzt, nicht beim Rendern',
-  /merkeWaechterSieg\(tiefe\)/.test(js) && !/merkeWaechterSieg\(/.test(fnAus('renderAbgrundBox')));
+  /merkeWaechterSieg\(tiefe, sektor\.stroemung\)/.test(js) && !/merkeWaechterSieg\(/.test(fnAus('renderAbgrundBox')));
 
 // ---- 8) Tauchgang-Streifen (Entwurf 07) ----
 const boxQuelle = fnAus('renderAbgrundBox');
