@@ -476,6 +476,48 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
     await ctx.close();
   }
 
+  /* ---- 11) DER TAUCHPLAN WIRD AUSGEFUEHRT, NICHT DURCHSUCHT ----------------------------------
+     DIE LEHRE AUS v8.712.0: Der erste Entwurf schrieb `fmtDur(planDauer)` statt `fmtDuration` -
+     eine Funktion, die es im ganzen Projekt nicht gibt. Ein Klick auf „+" haette
+     renderAbgrundBox mit einem ReferenceError abgebrochen und alles danach in render() gleich mit
+     (Missionsliste, Verteidigung, Tagesaufgaben, Punkte). Der Zustand ist gespeichert, der Spieler
+     saesse dauerhaft vor einer halben Seite.
+     EIN VOLLER PRUEFLAUF MIT 442 GRUENEN PRUEFUNGEN HAT DAS NICHT GEFUNDEN: Der Waechter des
+     Pakets suchte nur die Zeichenketten `data-abgrund-plan` und `data-abgrund-linie` im Quelltext.
+     Eine Bedienung, die nie gedrueckt wird, ist nicht geprueft - sie ist nur vorhanden. */
+  {
+    const { ctx, page, errs, store } = await starte(browser, basisStand({ research:{ rsingularitaet:1 } }));
+    await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-plan="1"]'); if(b) b.click(); });
+    await page.waitForTimeout(600);
+    const nachKlick = await page.evaluate(()=>{
+      const box = document.getElementById('abgrundBox');
+      return {
+        routeDa: !!(box && /Route: Tiefe \d+ bis \d+/.test(box.innerText)),
+        // „Anflug insgesamt" muss eine ZEIT nennen, nicht "undefined" oder "NaN".
+        dauerDa: !!(box && /Anflug insgesamt \s*\d/.test(box.innerText.replace(/\u00a0/g,' '))),
+        linieDa: !!(box && box.querySelector('[data-abgrund-linie]')),
+        // Und der Rest von render() muss weiterlaufen: die Missionsliste steht NACH der Box.
+        restLaeuft: !!document.getElementById('fleetPositionList')
+      };
+    });
+    check('11: ein Klick auf den Tauchplan zeichnet die Route samt Anflugzeit',
+      nachKlick.routeDa && nachKlick.dauerDa && nachKlick.linieDa, nachKlick);
+    check('11: und alles, was render() danach zeichnet, laeuft weiter',
+      nachKlick.restLaeuft && errs.length === 0, { restLaeuft: nachKlick.restLaeuft, fehler: errs.slice(0,3) });
+    /* Die Sicherheitslinie liegt im SPIELSTAND, nicht nur im DOM. Gemessen wird beides: der
+       gespeicherte Wert UND dass er einen erneuten Aufbau der Box ueberlebt - waere er nur im DOM,
+       zeichnete der naechste render() die Liste wieder auf den Zustandswert zurueck. */
+    await page.evaluate(()=>{ const s=document.querySelector('[data-abgrund-linie]'); if(s){ s.value='0.5'; s.dispatchEvent(new Event('change')); } });
+    await page.waitForTimeout(600);
+    const imStand = ((gespeichert(store).abgrund)||{}).planLinie;
+    await page.evaluate(()=>{ const b=document.querySelector('[data-abgrund-plan="1"]'); if(b) b.click(); });
+    await page.waitForTimeout(600);
+    const nachNeuaufbau = await page.evaluate(()=>{ const s=document.querySelector('[data-abgrund-linie]'); return s ? s.value : null; });
+    check('11: die gewaehlte Sicherheitslinie liegt im Spielstand und ueberlebt den Neuaufbau',
+      imStand === 0.5 && nachNeuaufbau === '0.5', { imStand, nachNeuaufbau });
+    await ctx.close();
+  }
+
   await browser.close();
   console.log(fail ? '\nFAIL' : '\nPASS');
   process.exit(fail ? 1 : 0);

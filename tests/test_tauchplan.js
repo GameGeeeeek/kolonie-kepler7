@@ -45,7 +45,13 @@ let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_TAUCHPLAN_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a','1b','2a','2b','3a','3b','4a','4b','5a'], nachher: ['1b'] };
+const MUSS_FALLEN = {
+  alt:     ['1a','1b','2a','2b','3a','3b','4a','4b','5a','5b','6a','6b','6c','6d','6e'],
+  nachher: ['1b'],
+  // Je ein gezielter Rueckbau der drei P1-Befunde: Der Waechter muss GENAU den einen fangen.
+  pool:    ['6a'],
+  rufalle: ['6b']
+};
 
 /* Der Aufloesungsblock wird am Klammernpaar begrenzt, nicht bis Dateiende geschnitten: Denselben
    Anker gibt es zweimal (Aufloesung und Missionsliste). `a.konstGesehen` darin belegt, dass es die
@@ -60,8 +66,15 @@ const block = vonBlock >= 0 ? klammer(vonBlock, '{', '}') : '';
 const istAufloesung = /a\.konstGesehen\[/.test(block);
 
 // ---- 1) Die Schleife und was darin steht -----------------------------------------------------
-const vonSchleife = block.indexOf('for (const tiefe of planTiefen){');
-const schleife = vonSchleife >= 0 ? klammer(vonBlock + vonSchleife, '{', '}') : '';
+/* DER ANKER WIRD IN `js` GESUCHT, nicht in `block`: Der erste Entwurf addierte einen Index aus
+   `block` auf den Index des Ankerstrings in `js` und lag damit 32 Zeichen daneben. `klammer` sucht
+   ab dort die naechste `{` und landete zufaellig doch auf der richtigen - kaeme in diese 32 Zeichen
+   je eine `{`, schnitte die Pruefung stillschweigend einen falschen Bereich, und 1b/3a/3b/4b waeren
+   aus dem falschen Grund gruen. Dass der Fund im Aufloesungsblock liegt, wird mitgeprueft. */
+const vonSchleifeJs = js.indexOf('for (const tiefe of planTiefen){');
+const schleifeImBlock = vonSchleifeJs >= 0 && vonSchleifeJs > vonBlock && vonSchleifeJs < vonBlock + block.length;
+const schleife = schleifeImBlock ? klammer(vonSchleifeJs, '{', '}') : '';
+const vonSchleife = schleifeImBlock ? vonSchleifeJs : -1;
 merke('1a: die Aufloesung laeuft ueber eine Liste von Tiefen, ohne Plan ueber genau eine',
   block.length > 0 && istAufloesung && vonSchleife >= 0 && schleife.length > 0
     && /abgrundPlanTiefen\(Math\.max\(1, m\.targetId \|\| 1\), \(m\.plan && m\.plan\.tiefen\) \|\| 1\)/.test(block),
@@ -148,6 +161,53 @@ merke('4b: die erreichbare Grenze wird JE SEKTOR gemessen, nicht einmal beim Pla
   schleife.length > 0 && /if \(tiefe > abgrundMaxTiefe\(\)\)\{/.test(schleife),
   { schleifeDa: schleife.length > 0 });
 
+/* ---- 6) Was die adversarische Durchsicht gefunden hat ----------------------------------------
+   Drei P1 in einem Stand, den ein voller Prueflauf mit 442 gruenen Pruefungen durchgewinkt hat.
+   Jeder bekommt hier seinen Waechter. */
+/* Gezaehlt statt zeichengenau verglichen: Der Rumpf hat genau zwei Verlustrechnungen (Sieg und
+   Niederlage), und BEIDE muessen `komp` als Pool nehmen. Das fuenfte Argument sagt, WORAUF die
+   Quote gerechnet wird; blieb es `m.composition`, wurde in Sektor 3 derselbe Prozentsatz von der
+   vollen Startflotte gezogen - in der Spitze mehr Schiffe, als ueberhaupt mitgeflogen sind. */
+const verluste = (schleife.match(/applyCombatLosses\(fleet, ATTACK_SHIP_KEYS,/g) || []).length;
+const mitKomp = (schleife.match(/, planetKey, komp\);/g) || []).length;
+merke('6a: die Verlustquote wird auf die MITGEFUEHRTE Flotte gerechnet, nicht auf die Startflotte',
+  schleife.length > 0 && verluste === 2 && mitKomp === 2
+    && schleife.indexOf('planetKey, m.composition)') < 0,
+  { verlustrechnungen: verluste, mitKomp });
+
+/* 6b: `abgrundWaechterDef(tiefe, true)` macht JEDE Tiefe zur Waechtertiefe. Ein einziger
+   Waechterruf haette bei einem Fuenferplan fuenf Waechter erzeugt - dreifache Splitter,
+   garantiertes Modul und 160% Staerke je Sektor, und keine Vorschau haette davon etwas gesagt.
+   Dieselbe Unterscheidung gilt fuer Bann, Spule und Grundberuehrung: Es sind Gegenstaende fuer
+   EINEN Sektor. `false` statt `undefined` ist dabei wesentlich - sonst befragt abgrundSektor doch
+   wieder den aktuellen Zustand. */
+merke('6b: Ruf, Bann, Spule und Grundberuehrung gelten nur fuer den ERSTEN Sektor',
+  schleife.length > 0
+    && /const erster = \(tiefe === planTiefen\[0\]\);/.test(schleife)
+    && /abgrundSektor\(tiefe, erster \? !!m\.ruf : false,/.test(schleife)
+    && /erster \? \(m\.bann \|\| null\) : null, erster && !!m\.spule,/.test(schleife)
+    && /abgrundWiederholungsFaktor\(tiefe, erster && !!m\.grund, komp\)/.test(schleife),
+  { schleifeDa: schleife.length > 0 });
+
+merke('6c: eine Wiedergabe je Tauchgang, und der Bericht traegt eine Kopie der Flotte',
+  schleife.length > 0
+    // im Rumpf wird nur gemerkt, aufgerufen wird EINMAL dahinter
+    && schleife.indexOf('maybeAutoWatchBattle(') < 0
+    && /if \(letzterBericht\) maybeAutoWatchBattle\(letzterBericht\);/.test(block)
+    // der Bericht darf nicht auf `komp` zeigen - die naechste Zeile kuerzt genau dieses Objekt
+    && schleife.indexOf('fleet:komp,') < 0
+    && (schleife.match(/fleet:Object\.assign\(\{\}, komp\),/g)||[]).length === 2,
+  { schleifeDa: schleife.length > 0 });
+
+merke('6d: der Vier-Stunden-Deckel gilt fuer den ganzen Tauchgang, nicht je Sektor',
+  /dauer = Math\.min\(ABGRUND_MAX_FLUG_SEK, dauer\);/.test(sendeQ)
+    && /planDauer = Math\.min\(ABGRUND_MAX_FLUG_SEK, planDauer\);/.test(js),
+  { start: /dauer = Math\.min\(ABGRUND_MAX_FLUG_SEK, dauer\);/.test(sendeQ) });
+
+merke('6e: die Missionsliste nennt den Plan, nicht nur die erste Tiefe',
+  /planLaenge > 1 \? '–'\+\(\(m\.targetId\|\|1\)\+planLaenge-1\)\+' \(Tauchplan\)' : ''/.test(js),
+  {});
+
 // ---- 5) Sichtbar -----------------------------------------------------------------------------
 const boxQ = fnAus('renderAbgrundBox');
 merke('5a: Bedienung und Hilfe erklaeren den Plan',
@@ -156,6 +216,15 @@ merke('5a: Bedienung und Hilfe erklaeren den Plan',
     && /Der Tauchplan – mehrere Tiefen in einem Anlauf/.test(js)
     && /Sicherheitslinie/.test(js),
   { boxDa: boxQ.length > 0 });
+
+/* Und die Hilfe sagt die WAHRHEIT ueber die Flugzeit. Der erste Entwurf versprach „die Flotte
+   kommt heim", als koennte ein Abbruch den Rueckflug verkuerzen - er kann es nicht: `endTime` steht
+   beim Abtauchen fest. Ein Text, der mehr verspricht als der Code haelt, ist dieselbe Sorte
+   Falschaussage wie eine erfundene Zahl. */
+merke('5b: die Hilfe sagt, dass die Flugzeit beim Abtauchen feststeht',
+  /Die Flugzeit steht beim Abtauchen fest/.test(js)
+    && js.indexOf('bricht der Plan ab und die Flotte kommt heim') < 0,
+  {});
 
 if (SAB){
   const soll = MUSS_FALLEN[SAB] || [];
