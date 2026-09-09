@@ -55388,16 +55388,23 @@ async function claimPendingRewards(){
   // und wird deshalb zwischengespeichert. Ohne diesen Zwischenspeicher liefe er bei jedem Rendern
   // der Box erneut - also einmal pro Sekunde.
   const ABGRUND_SUCHE_WEITE = 3000;
-  let abgrundSucheCache = { von:null, treffer:null };
+  let abgrundSucheCache = { von:null, stroemung:null, treffer:null };
   function abgrundKonstellationsSuche(vonTiefe){
     const von = Math.max(1, vonTiefe|0);
-    if (abgrundSucheCache.von === von) return abgrundSucheCache.treffer;
+    /* DER SCHLUESSEL TRAEGT DIE STROEMUNG MIT (Durchsicht an PR #615, bestaetigt). Der Zwischen-
+       speicher hing allein an der Starttiefe - richtig, solange die Fundstellen fuer immer
+       feststanden. Seit der Stroemung wandern sie taeglich: Ein Spieler, der das Spiel ueber
+       Mitternacht offen laesst, bekaeme bis zum naechsten Tiefenwechsel oder Neuladen die
+       Fundstellen von GESTERN genannt - und startete einen Tauchgang auf eine Konstellation, die
+       dort nicht mehr liegt. Genau die Sorte Anzeige, die ohne Not luegt. */
+    const str = abgrundStroemung();
+    if (abgrundSucheCache.von === von && abgrundSucheCache.stroemung === str) return abgrundSucheCache.treffer;
     const treffer = {};
     for (let t = von; t < von + ABGRUND_SUCHE_WEITE; t++){
-      const k = abgrundKonstellationFuer(abgrundSektor(t).mutatoren);
+      const k = abgrundKonstellationFuer(abgrundSektor(t, undefined, str).mutatoren);
       if (k && treffer[k.key] === undefined) treffer[k.key] = t;
     }
-    abgrundSucheCache = { von, treffer };
+    abgrundSucheCache = { von, stroemung: str, treffer };
     return treffer;
   }
   // ---- Der Kartenraum (v8.328.0, Entwurf 06) ----
@@ -55416,6 +55423,24 @@ async function claimPendingRewards(){
   function abgrundHeuteKurz(){
     const d = new Date();
     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  /* DIE STROEMUNG DES EROBERUNGSTAGES (Durchsicht an PR #615, bestaetigt). Der Kartenraum ist
+     ausdruecklich „die Geschichte des Kontos" - und er zeigt zu jeder bezwungenen Station den
+     SEKTORNAMEN und das Siegel. Beide kommen aus `abgrundSektor(t)`; ohne Stroemung waere das
+     ab sofort die von HEUTE, und die Geschichte schriebe sich jede Mitternacht um. Genau die
+     Zusage, die dieses Paket gibt („Kabinett und Kartenraum bleiben, wie sie sind"), waere damit
+     gebrochen.
+     KEIN NEUES FELD noetig: Der Tag der Ersteroberung steht laengst da, und die Stroemung ist
+     eine reine Funktion eines Zeitpunkts. Aus `2026-09-09` wird derselbe Index, den
+     `abgrundStroemung` fuer jeden Zeitpunkt dieses Tages liefert - lokal gerechnet, wie dort.
+     FEHLT DER TAG (Konten, die vor v8.328.0 schon Waechter bezwungen hatten), gibt es keinen
+     ehrlichen Sektornamen: Die Station traegt dann wie bisher nur „bezwungen", jetzt eben ohne
+     einen Namen, der eine Geschichte behauptet, die niemand kennt. Einen aus der heutigen
+     Stroemung zu zeigen waere genau diese Behauptung. */
+  function abgrundStroemungAmTag(tag){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(tag||''));
+    if (!m) return null;
+    return abgrundStroemung(new Date(+m[1], +m[2]-1, +m[3], 12, 0, 0).getTime());
   }
   function merkeWaechterSieg(tiefe){
     const a = ensureAbgrund();
@@ -56713,14 +56738,18 @@ async function claimPendingRewards(){
     const waechterTage = a.waechterTage || {};
     const kartenraumHtml = abgrundKartenraumTiefen(a.best||0).map(t => {
       const geschafft = (a.best||0) >= t;
-      const sek = abgrundSektor(t);
       const tag = waechterTage[t];
+      /* Bezwungene Stationen zeigen den Sektor IHRES Tages, noch offene den von heute - die sind
+         keine Geschichte, sondern ein Blick nach unten, und da ist der aktuelle richtig. */
+      const tagStrom = geschafft ? abgrundStroemungAmTag(tag) : null;
+      const sek = abgrundSektor(t, undefined, geschafft ? tagStrom : undefined);
+      const sektorText = (!geschafft || tagStrom !== null) ? escapeHtml(sek.name) : '';
       return `<div class="kartenraum-station${geschafft?'':' offen'}">
         <div class="kartenraum-marke" style="color:${geschafft?'#e24b4a':'#3a3f56'};">${geschafft ? abgrundWaechterBild(t, 38) : '<i class="ti ti-lock" aria-hidden="true" style="font-size:20px;"></i>'}</div>
         <div style="min-width:0; flex:1;">
           <div class="bname" style="color:${geschafft?'#c3bef5':'#5a5f78'};">Tiefe ${t} · ${geschafft ? escapeHtml(sek.waechter.name) : 'unbekannter Wächter'}</div>
           <div class="bmeta">${geschafft
-            ? escapeHtml(sek.name) + (tag ? ' · bezwungen am '+escapeHtml(tag) : ' · bezwungen')
+            ? (sektorText ? sektorText + ' · bezwungen am '+escapeHtml(tag) : 'bezwungen')
             : 'Noch nicht erreicht – deine Rekordtiefe ist '+(a.best||0)+'.'}</div>
         </div>
         ${geschafft ? abgrundSiegel(sek, 30) : ''}

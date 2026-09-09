@@ -27,6 +27,16 @@
 //       Ankommen - ohne Einfrieren koennte ein Tauchgang unter der einen Stroemung starten und
 //       unter der naechsten ankommen, und die Vorschau haette gelogen. Gemessen am Quelltext:
 //       `sendeAbgrundMission` legt die Zahl in die Mission, die Aufloesung liest `m.stroemung`.
+//   4a  DER SUCHCACHE HAENGT AN DER STROEMUNG (Durchsicht an PR #615). `abgrundKonstellationsSuche`
+//       speicherte seine Fundstellen allein nach Starttiefe zwischen - richtig, solange sie fuer
+//       immer feststanden. Wer das Spiel ueber Mitternacht offen laesst, bekaeme sonst die
+//       Fundstellen von GESTERN genannt und startete einen Tauchgang auf eine Konstellation, die
+//       dort nicht mehr liegt.
+//   4b  DER KARTENRAUM ZEIGT DEN SEKTOR DES EROBERUNGSTAGES (Durchsicht an PR #615). Er ist
+//       ausdruecklich die Geschichte des Kontos; ohne die Stroemung des damaligen Tages schriebe
+//       sich jeder Stationsname jede Mitternacht um - genau die Zusage, die dieses Paket gibt.
+//       Fehlt der Tag (Konten von vor v8.328.0), gibt es keinen ehrlichen Namen: dann steht dort
+//       keiner, statt einen aus der heutigen Stroemung zu erfinden.
 //   3b  Und die Anzeige sagt es. Eine Mechanik, von der der Spieler nichts weiss, ist keine - er
 //       saehe nur, dass „seine" Tiefe ploetzlich anders aussieht, und hielte es fuer einen Fehler.
 //
@@ -44,7 +54,7 @@ let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_STROEMUNG_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1b', '1c', '2b', '3a', '3b'] };
+const MUSS_FALLEN = { alt: ['1b', '1c', '2b', '3a', '3b', '4a', '4b'], cache: ['4a', '4b'] };
 
 /* Dieselben Ausschneider wie test_abgrund.js. Sie stehen hier bewusst noch einmal statt in einer
    gemeinsamen Datei: Beide Tests schneiden die Spieldatei fuer ihren EIGENEN Zweck zurecht, und
@@ -179,6 +189,31 @@ merke('3b: die Anzeige nennt die Stroemung, ihre Restzeit und das Einfrieren',
     && /behält seinen/.test(js)
     && /Die Strömung – warum dieselbe Tiefe morgen anders aussieht/.test(js),
   { restzeit: /abgrundStroemungWechsel/.test(js), hilfe: /Die Strömung – warum/.test(js) });
+
+// ---- 4) Die zweiten Anzeigestellen -----------------------------------------------------------
+/* Beide am QUELLTEXT gemessen: Der Suchcache lebt in einer Modulvariablen, die kein Testkontext
+   ueber eine echte Mitternacht hinweg beobachten kann, und der Kartenraum haengt an einem
+   Spielstand mit Eroberungstagen. Die Anker werden vorher auf Existenz geprueft. */
+const vonSuche = js.indexOf('function abgrundKonstellationsSuche(');
+const bisSuche = vonSuche >= 0 ? js.indexOf('function ', vonSuche + 10) : -1;
+const sucheRumpf = (vonSuche >= 0 && bisSuche > vonSuche) ? js.slice(vonSuche, bisSuche) : '';
+merke('4a: der Suchcache haengt an Starttiefe UND Stroemung',
+  sucheRumpf.length > 0
+    && /abgrundSucheCache\.stroemung === str/.test(sucheRumpf)
+    && /abgrundSektor\(t, undefined, str\)/.test(sucheRumpf)
+    && /abgrundSucheCache = \{ von, stroemung: str, treffer \}/.test(sucheRumpf),
+  { rumpfDa: sucheRumpf.length > 0 });
+
+const vonRaum = js.indexOf('const kartenraumHtml = abgrundKartenraumTiefen(');
+const bisRaum = vonRaum >= 0 ? js.indexOf('}).join(\'\');', vonRaum) : -1;
+const raumRumpf = (vonRaum >= 0 && bisRaum > vonRaum) ? js.slice(vonRaum, bisRaum) : '';
+merke('4b: der Kartenraum zeigt den Sektor des Eroberungstages, sonst gar keinen',
+  raumRumpf.length > 0
+    && /abgrundStroemungAmTag\(tag\)/.test(raumRumpf)
+    && /abgrundSektor\(t, undefined, geschafft \? tagStrom : undefined\)/.test(raumRumpf)
+    && /tagStrom !== null/.test(raumRumpf)
+    && /function abgrundStroemungAmTag\(/.test(js),
+  { rumpfDa: raumRumpf.length > 0, helferDa: /function abgrundStroemungAmTag\(/.test(js) });
 
 if (SAB){
   const soll = MUSS_FALLEN[SAB] || [];
