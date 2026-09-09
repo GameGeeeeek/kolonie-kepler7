@@ -136,6 +136,8 @@ function baueKontext(){
     stroemungQuelle, vonFrueherQuelle,
     fnAus('abgrundRng'), fnAus('abgrundMutatorAnzahl'),
     fnAus('abgrundBergungsgut'), fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'),
+    // ensureAbgrund liest seit v8.712.0 ABGRUND_PLAN_MAX (Deckel des Tauchplans).
+    konstAus('ABGRUND_PLAN_MAX'),
     fnAus('abgrundWaechterDef'), fnAus('ensureAbgrund'), fnAus('abgrundSektor'),
     'return { abgrundSektor, abgrundStroemung, abgrundWaechterDef, abgrundRng,'
       + ' abgrundStroemungVonFrueher, ABGRUND_STROEMUNG_ALT };'

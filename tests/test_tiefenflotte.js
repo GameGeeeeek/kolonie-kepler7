@@ -374,8 +374,28 @@ check('6: die Beute bleibt Sache des Bergungskrans',
   // test_abgrund.js und test_abgrund_gegenstaende.js und sind am selben Tag umgestellt worden.
   const aufrufAbrechnung = js.split('\n').find(z => z.includes('abgrundSektorMitBann(') && z.includes('m.bann')) || '';
   check('7: die Abrechnungs-Aufrufstelle ist auffindbar', !!aufrufAbrechnung);
+  /* SEIT v8.712.0 (Tauchplan) kommt die mitgeflogene Flotte nicht mehr in jeder Zeile einzeln aus
+   `m.composition`, sondern GENAU EINMAL: Der Plan fuehrt sie in `komp` mit und kuerzt sie zwischen
+   den Sektoren um die Verluste. Geprueft wird deshalb die gemeinsame Quelle (genau eine, und die
+   liest die Mission) UND dass die Abrechnungszeile sie benutzt. Das ist strenger als die alte
+   Fassung: Eine zweite Quelle - etwa ein Rueckfall auf die Flotte daheim - fiele jetzt auf, waehrend
+   sie vorher unbemerkt danebenstehen konnte. */
+  const kompQuellenT = (js.match(/const kompStart = Object\.assign\(\{\}, m\.composition \|\| fleet\);/g) || []).length;
+  check('7: die mitgeflogene Flotte hat genau eine Quelle, und die ist die Mission',
+    kompQuellenT === 1 && /nullkielAktiv\(komp\)/.test(aufrufAbrechnung), { quellen: kompQuellenT });
+  /* „Nicht die daheim" wird jetzt am ganzen Aufloesungsblock gemessen statt an einer Zeile: KEINE
+     Modul-, Schiffs- oder Frachtabfrage darf die Flotte am Standort lesen. `fleet` selbst kommt
+     darin weiterhin vor, und zwar zu Recht - die Verluste werden dort abgezogen, weil die Schiffe
+     dort stehen, und `m.power || attackPower(fleet)` ist der alte Rueckfall fuer eine Mission ohne
+     eingefrorene Kraft. Geprueft wird deshalb nicht das Wort, sondern die Art der Abfrage. */
+  const vonBlock = js.indexOf("} else if (m.type === 'abgrund'){");
+  const bisBlock = vonBlock >= 0 ? js.indexOf("} else if (m.type === 'intercept-pirates'", vonBlock) : -1;
+  const block = (vonBlock >= 0 && bisBlock > vonBlock) ? js.slice(vonBlock, bisBlock) : '';
+  const daheim = ['nullkielAktiv(fleet', 'abgrundSchiffsmodul(fleet', 'tiefenschiffBonus(fleet',
+                  'fleetCargoCapacity(fleet', 'abgrundBeuteFaktor(fleet', 'abgrundSplitterFaktor(fleet',
+                  'drucklotAktiv(fleet'].filter(x => block.indexOf(x) >= 0);
   check('7: und die Abrechnung nimmt die MITGEFLOGENE Flotte, nicht die daheim',
-    aufrufAbrechnung.includes('nullkielAktiv(m.composition || fleet)'), aufrufAbrechnung.trim().slice(0, 200));
+    block.length > 0 && daheim.length === 0, { blockDa: block.length > 0, daheim });
 }
 // Grundgaenger: hebt den Wiederholungsabschlag an - dauerhaft, aber nur teilweise.
 {
