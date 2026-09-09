@@ -291,10 +291,19 @@ check('7: der Sucher laeuft nur bei geoeffnetem Feld',
     && /konstOffen \? abgrundKonstellationsSuche\(tiefe\) : null/.test(boxQuelle));
 check('7: erlebte Konstellationen werden im Spielstand mitgezaehlt',
   /a\.konstGesehen\[sektor\.konstellation\.key\]/.test(js));
-// Gezaehlt werden muss der Sektor MIT Bann - ein aufgeloestes Sternbild hat man nicht erlebt.
-const aufloesung = js.slice(js.indexOf("} else if (m.type === 'abgrund'){"));
+/* Gezaehlt werden muss der Sektor MIT Bann - ein aufgeloestes Sternbild hat man nicht erlebt.
+   GEPRUEFT WIRD DIE REGEL, NICHT EIN BYTE-FENSTER: Die ERSTE Zuweisung an `sektor` im
+   Aufloesungsblock muss ueber abgrundSektorMitBann laufen. Der erste Entwurf sah in den ersten
+   1200 Zeichen nach und fiel am 09.09.2026 auf voellig richtigem Code durch, weil ein Kommentar
+   darueber um drei Zeilen wuchs - ein Fenster in Zeichen misst die Kommentarlaenge mit. Der Anker
+   wird vorher auf Existenz geprueft: `indexOf` liefert sonst -1, der Slice liefe fast ueber die
+   ganze Datei und die Pruefung waere aus dem falschen Grund gruen. */
+const vonAufloesung = js.indexOf("} else if (m.type === 'abgrund'){");
+const aufloesung = vonAufloesung >= 0 ? js.slice(vonAufloesung) : '';
+const ersteSektorZuweisung = (aufloesung.match(/const sektor = [A-Za-z]+/) || [])[0] || '';
 check('7: gezaehlt wird der tatsaechlich gekaempfte Sektor, nicht der ungebannte',
-  /const sektor = abgrundSektorMitBann/.test(aufloesung.slice(0, 1200)));
+  aufloesung.length > 0 && ersteSektorZuweisung === 'const sektor = abgrundSektorMitBann',
+  { ankerDa: vonAufloesung >= 0, ersteZuweisung: ersteSektorZuweisung });
 check('7: es gibt einen Erfolg fuer alle Konstellationen',
   /key:'abgrundkonst'/.test(js) && /ABGRUND_KONSTELLATIONEN\.every/.test(js));
 // Regel 6: Die Hilfe muss dieselbe Zahl nennen wie das Array, sonst veraltet sie beim naechsten Zuwachs.
