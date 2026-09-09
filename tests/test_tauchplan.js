@@ -46,11 +46,29 @@ const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefine
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_TAUCHPLAN_GEGENPROBE || '';
 const MUSS_FALLEN = {
-  alt:     ['1a','1b','2a','2b','3a','3b','4a','4b','5a','5b','6a','6b','6c','6d','6e'],
+  /* `alt` heisst „der Stand vor dem JUENGSTEN Paket". Seit v8.712.0 live ist, traegt origin/main
+     den Tauchplan selbst - dort fallen also nur noch die Pruefungen des Atems (Paket D) und 4a,
+     weil der Plan jetzt auch den Atem mitfuehrt. Die Gegenprobe fuer die Pruefungen 1a bis 6e ist
+     beim Bau von Paket A gegen 15d075b gemessen und im Commit festgehalten; sie hier gegen einen
+     Stand zu fahren, der das Paket schon hat, wuerde nichts belegen. */
+  alt:     ['4a','7a','7b','7c','7d','7e','7f','7g','7h'],
   nachher: ['1b'],
   // Je ein gezielter Rueckbau der drei P1-Befunde: Der Waechter muss GENAU den einen fangen.
   pool:    ['6a'],
-  rufalle: ['6b']
+  rufalle: ['6b'],
+  // Paket D: je ein gezielter Rueckbau des Atems.
+  ohneriegel:   ['7c'],
+  kostenflach:  ['7b'],
+  // Die vier Befunde der adversarischen Durchsicht vom 09.09.2026, je einzeln zurueckgebaut.
+  altmission:   ['7e'],   // Rueckfall wieder auf den Grundwert statt „kein Riegel"
+  zaehlervor:   ['7c'],   // a.tauchgaenge wieder VOR den Atem-Riegel
+  kielkomp:     ['7f'],   // Nullkiel wieder an der schrumpfenden Flotte
+  deckelklein:  ['7a'],   // deckel:1 im Werkstattzweig - der Fuenferplan waere unerreichbar
+  // Befunde der zweiten Durchsicht, ebenfalls je einzeln zurueckgebaut.
+  vorschauflach:['7g'],   // `i > 0` weg: „kehrt nach 0 Sektoren um" bei einem Waechter als erstem
+  bedarfbreak:  ['7g'],   // Summe hinter den Riegel: die Warnung verschwindet bei langen Routen
+  pilleroh:     ['7d'],   // anzeigeBasis aus dem Markup: wieder „Stufe 0 · 0 Sektoren"
+  sonderoh:     ['7h']    // Sonde wieder auf den rohen Sektor: markiert den falschen
 };
 
 /* Der Aufloesungsblock wird am Klammernpaar begrenzt, nicht bis Dateiende geschnitten: Denselben
@@ -153,7 +171,8 @@ merke('3b: die Sicherheitslinie kommt aus der Mission und wird gegen den gemesse
 // ---- 4) Eingefroren und begrenzt -------------------------------------------------------------
 merke('4a: der Plan reist in der Mission mit, wie Bann, Spule, Ruf und Stroemung',
   sendeQ.length > 0
-    && /const plan = \{ tiefen: planTiefen, linie: planLinie \};/.test(sendeQ)
+    // Seit v8.713.0 traegt der Plan auch den Atem - eingefroren wie alles andere.
+    && /const plan = \{ tiefen: planTiefen, linie: planLinie, atem: abgrundAtemMax\(\) \};/.test(sendeQ)
     && /bann, spule, grund, ruf, stroemung, plan,/.test(sendeQ),
   { sendeDa: sendeQ.length > 0 });
 
@@ -206,6 +225,184 @@ merke('6d: der Vier-Stunden-Deckel gilt fuer den ganzen Tauchgang, nicht je Sekt
 
 merke('6e: die Missionsliste nennt den Plan, nicht nur die erste Tiefe',
   /planLaenge > 1 \? '–'\+\(\(m\.targetId\|\|1\)\+planLaenge-1\)\+' \(Tauchplan\)' : ''/.test(js),
+  {});
+
+/* ---- 7) Der Atem (Paket D) -------------------------------------------------------------------
+   Ein Vorrat, der nur INNERHALB eines Tauchgangs zaehlt. Er gibt der Kette aus Paket A ihre
+   natuerliche Grenze; ohne ihn waere ein Fuenferplan ein Startgeschenk. */
+/* Der Kontext wird EINMAL gebaut und die Werkstattstufe als Parameter hereingereicht - der erste
+   Entwurf baute zwei Rahmen, von denen der eine eine freie Variable las und still scheiterte;
+   beide Pruefungen waren dann aus dem falschen Grund rot. */
+let atemFn = null, atemKostenFn = null, atemBasis = null;
+try {
+  const quelle = [
+    konstAus('ABGRUND_ATEM_BASIS'), konstAus('ABGRUND_ATEM_ZAEH'), konstAus('ABGRUND_PLAN_MAX'),
+    'function abgrundWerkstattBonus(){ return stufe; }',
+    fnAus('abgrundAtemMax'), fnAus('abgrundAtemKosten'),
+    'return { max: abgrundAtemMax, kosten: abgrundAtemKosten, basis: ABGRUND_ATEM_BASIS };'
+  ].join('\n');
+  const bau = stufe => new Function('stufe', quelle)(stufe);
+  const g0 = bau(0);
+  atemFn = stufe => bau(stufe).max();
+  atemKostenFn = g0.kosten;
+  atemBasis = g0.basis;
+} catch(e){ atemFn = null; }
+
+/* DER STUB IST UNGEDECKELT (`return stufe;`) - er misst deshalb nur die Klammer
+   `Math.min(ABGRUND_PLAN_MAX, ...)` in abgrundAtemMax(), NICHT den Deckel des Werkstattzweigs.
+   Gemessen am 09.09.2026: mit `deckel:1` im Zweig - maximal erreichbarer Atem damit 3 statt 5, der
+   Fuenferplan also dauerhaft unerreichbar - blieb die ganze Datei gruen. Der Deckel wird deshalb
+   aus ABGRUND_WERKSTATT gelesen und die Invariante direkt gemessen: Grundwert plus Deckel ergibt
+   genau ABGRUND_PLAN_MAX. Zu klein heisst „ein Teil des Plans ist nie erreichbar", zu gross heisst
+   „die letzte Stufe kostet Splitter und verschwindet im Math.min" - beides faellt in keinem
+   Kampf auf. */
+let atemDeckel = null, atemAnzeigeBasis = null;
+try {
+  const iZweig = js.indexOf("{ key:'atem',");
+  const zweig = iZweig >= 0 ? js.slice(iZweig, js.indexOf('}', iZweig)) : '';
+  const mD = zweig.match(/deckel:\s*([^,]+),/);
+  const mB = zweig.match(/anzeigeBasis:\s*([^,]+),/);
+  const konst = konstAus('ABGRUND_PLAN_MAX')+'\n'+konstAus('ABGRUND_ATEM_BASIS')+'\n';
+  if (mD) atemDeckel = new Function(konst+'return ('+mD[1]+');')();
+  // `anzeigeBasis` ist der Grundwert, den die Werkstatt-Pille dem Ausbau zuschlaegt. Steht dort
+  // etwas anderes als ABGRUND_ATEM_BASIS, liest der Spieler eine falsche Reichweite - und zwar
+  // ohne dass irgendeine Rechnung im Spiel davon abweicht.
+  if (mB) atemAnzeigeBasis = new Function(konst+'return ('+mB[1]+');')();
+} catch(e){ atemDeckel = null; }
+
+merke('7a: der Atem beginnt beim Grundwert und waechst mit der Werkstatt, gedeckelt am Plan',
+  !!atemFn && atemBasis === 2
+    && atemFn(0) === atemBasis
+    && atemFn(1) === atemBasis + 1
+    && atemFn(99) === planMax   // voller Ausbau traegt genau einen Plan ueber ABGRUND_PLAN_MAX
+    && typeof atemDeckel === 'number'
+    && atemBasis + atemDeckel === planMax
+    && atemAnzeigeBasis === atemBasis,
+  { basis: atemBasis, ohneAusbau: atemFn && atemFn(0), eineStufe: atemFn && atemFn(1),
+    voll: atemFn && atemFn(99), deckelDesZweigs: atemDeckel, planMax: planMax,
+    anzeigeBasis: atemAnzeigeBasis });
+
+/* 7b misst die REGEL, nicht eine Momentaufnahme: Waechter und zaeher Sektor kosten doppelt, alles
+   andere einfach. Ohne die doppelten Kosten waere der Atem eine blosse Zaehlung von Sektoren. */
+merke('7b: Waechtersektor und zaeher Sektor kosten doppelt, ein gewoehnlicher einfach',
+  !!atemKostenFn
+    && atemKostenFn({ mods:{ dur:1 } }) === 1
+    && atemKostenFn({ mods:{ dur:1.5 } }) === 2
+    && atemKostenFn({ mods:{ dur:2 } }) === 2
+    && atemKostenFn({ waechter:{ name:'X' }, mods:{ dur:1 } }) === 2
+    && atemKostenFn(null) === 1,
+  { gewoehnlich: atemKostenFn && atemKostenFn({ mods:{dur:1} }),
+    zaeh: atemKostenFn && atemKostenFn({ mods:{dur:1.5} }),
+    waechter: atemKostenFn && atemKostenFn({ waechter:{}, mods:{dur:1} }) });
+
+/* 7c: Der ERSTE Sektor findet immer statt - dort ist der Verband schon. Ohne diese Ausnahme
+   koennte ein Waechter als erster Sektor (Kosten 2 bei Grundwert 2) den Tauchgang beenden, bevor
+   ueberhaupt gekaempft wurde, und ein gewoehnlicher Tauchgang auf eine einzige Tiefe waere
+   betroffen - genau die Zusage „ohne Plan aendert sich nichts". */
+/* 7c misst zusaetzlich die LAGE. Eine reine Anwesenheitspruefung faengt das Entfernen des
+   Riegels, nicht sein Verschieben - und gemessen am 09.09.2026 blieb sie gruen, als der ganze
+   Atem-Block HINTER `a.gesehen`/`a.konstGesehen` stand, wo ein nie angelaufener Sektor Bestiarium
+   und Konstellationen mitgebucht haette. Dieselbe Fehlerklasse wie in 1b, also dieselbe Messung:
+   Der Riegel steht VOR jeder Buchung. `a.tauchgaenge` ist der teuerste davon - er speist die
+   Fraktionsaufgabe „Bestehe N Gefechte im Abgrund" und die Tagesaufgabe `abgrundtauch`. */
+const iRiegel = schleife.indexOf('atemKosten > atemRest');
+const nachRiegel = ['a.tauchgaenge', 'a.gesehen[', 'a.konstGesehen['].filter(
+  t => { const i = schleife.indexOf(t); return i >= 0 && i > iRiegel; });
+merke('7c: der erste Sektor findet immer statt, und keine Buchung steht vor dem Riegel',
+  schleife.length > 0
+    && /if \(!erster && atemKosten > atemRest\)\{/.test(schleife)
+    && /atemRest -= atemKosten;/.test(schleife)
+    && /m\.plan && typeof m\.plan\.atem === 'number'/.test(block)
+    && iRiegel >= 0
+    && nachRiegel.length === 3,
+  { riegelAb: iRiegel, hinterDemRiegel: nachRiegel });
+
+/* 7e: EINE MISSION VON VOR v8.713.0 KENNT DEN RIEGEL NICHT - also darf er sie nicht treffen.
+   Sie traegt einen Plan (bis zu fuenf Tiefen), aber kein `plan.atem`. Mit dem Grundwert als
+   Rueckfall haette die Ankunft ihr drei Sektoren gestrichen, obwohl die Flugzeit fuer alle fuenf
+   bezahlt und die Flotte bis zu vier Stunden gebunden war. Gemessen wird der Ausdruck selbst,
+   nicht sein Wortlaut. Dieselbe Zusage wie `abgrundStroemungVonFrueher` beim Stroemungs-Umbau. */
+let atemRestVon = null;
+try {
+  const mA = block.match(/let atemRest = ([\s\S]*?);\n/);
+  if (mA) atemRestVon = new Function('m', konstAus('ABGRUND_ATEM_BASIS')
+    + '\nlet atemRest = '+mA[1]+';\nreturn atemRest;');
+} catch(e){ atemRestVon = null; }
+merke('7e: ein Tauchgang ohne mitgereisten Atem wird nicht nachtraeglich gekappt',
+  !!atemRestVon
+    && atemRestVon({ plan:{ tiefen:5 } }) > planMax * 2
+    && atemRestVon({}) > planMax * 2
+    && atemRestVon({ plan:{ tiefen:5, atem:2 } }) === 2,
+  // String(), nicht die Zahl: JSON.stringify(Infinity) ist `null` - die Diagnose haette bei einem
+  // echten Fehlschlag genauso ausgesehen wie bei einem fehlenden Ausdruck.
+  { ohneAtem: atemRestVon && String(atemRestVon({ plan:{tiefen:5} })),
+    ohnePlan: atemRestVon && String(atemRestVon({})),
+    mitAtem: atemRestVon && String(atemRestVon({ plan:{tiefen:5, atem:2} })) });
+
+/* 7f: VORSCHAU, START UND ABRECHNUNG BAUEN DIE FOLGESEKTOREN GLEICH. Der Nullkiel haengt an der
+   mitgeflogenen Flotte und streicht in JEDEM Sektor einen Mutator; Vorschau und Start bauten die
+   Sektoren 2..n bis v8.713.0 ohne ihn. Das verschob die angezeigte Anflugdauer - und seit dem Atem
+   eine ganzzahlige Zusage („kehrt nach 1 Sektor um"), die der Spieler nachpruefen kann. Gemessen:
+   es gibt genau eine Rechnung dafuer, beide Vorschau-Stellen rufen sie, und die Abrechnung friert
+   den Kiel an der STARTflotte ein (`kompStart`) statt an der schrumpfenden `komp`. */
+const folgeFn = fnAus('abgrundPlanFolgeSektor');
+const startQ = fnAus('sendeAbgrundMission');
+const boxFolge = fnAus('renderAbgrundBox');
+merke('7f: Folgesektoren kommen aus einer Rechnung, und der Nullkiel ist an der Startflotte eingefroren',
+  folgeFn.length > 0
+    && /nullkielAktiv\(flotte\)/.test(folgeFn)
+    && startQ.indexOf('abgrundPlanFolgeSektor(') >= 0
+    && boxFolge.indexOf('abgrundPlanFolgeSektor(') >= 0
+    && /nullkielAktiv\(kompStart\)/.test(schleife)
+    && !/nullkielAktiv\(komp\)/.test(schleife),
+  { helferDa: folgeFn.length > 0,
+    startNutzt: startQ.indexOf('abgrundPlanFolgeSektor(') >= 0,
+    vorschauNutzt: boxFolge.indexOf('abgrundPlanFolgeSektor(') >= 0 });
+
+/* 7g: DIE VORSCHAU-REGEL SELBST. Die Atem-Schleife in renderAbgrundBox war bis hierher voellig
+   ungedeckt - `grep atemBedarf tests/` fand nichts, und 7d prueft nur, dass die Zeichenkette
+   „Atem der Hülle:" irgendwo steht. Zwei Sabotagen waeren damit gruen durchgegangen:
+   das `i > 0` streichen (dann behauptet die Anzeige bei einem Waechter als erstem Sektor
+   „kehrt nach 0 Sektoren um", waehrend der Tauchgang normal laeuft) und `atemBedarf += k` hinter
+   den Riegel schieben (dann faellt die Teilsumme wieder unter den Vorrat und die Warnung
+   verschwindet ausgerechnet bei der laengsten Route). Beides steht jetzt fest - samt der Lage,
+   denn die Summe MUSS vor dem Riegel stehen. */
+const boxAtem = (() => {
+  const q = fnAus('renderAbgrundBox');
+  const i = q.indexOf('let atemBedarf = 0');
+  // Bis zum Ende der Schleife, nicht auf eine getippte Zeichenzahl: Ein zu enges Fenster (900)
+  // schnitt den Riegel ab, indexOf lieferte -1, und die Lagepruefung war aus dem falschen Grund
+  // rot. Dieselbe Fehlerklasse wie der Byte-Fensteranker in test_konstellationen.
+  const bis = i >= 0 ? q.indexOf('\n    }', i) : -1;
+  return (i >= 0 && bis > i) ? q.slice(i, bis) : '';
+})();
+const iSumme = boxAtem.indexOf('atemBedarf += k;');
+const iVRiegel = boxAtem.indexOf('if (i > 0 && k > atemRestV)');
+merke('7g: die Vorschau rechnet den Atem nach derselben Regel wie die Abrechnung',
+  boxAtem.length > 0
+    && iVRiegel >= 0
+    && iSumme >= 0
+    && iSumme < iVRiegel
+    && /atemRestV -= k;/.test(boxAtem),
+  { blockDa: boxAtem.length > 0, summeAb: iSumme, riegelAb: iVRiegel });
+
+/* 7h: DIE SONDE ZEIGT DENSELBEN SEKTOR, DEN DER PLAN ANLAEUFT. Sie las bis zur Durchsicht den
+   ROHEN Sektor, waehrend Vorschau, Start und Abrechnung den mit Nullkiel nehmen - mit 25+ Kielen
+   stand „doppelter Atem" in der Sonde und „reicht" im Tauchreiter darunter, gleichzeitig, und der
+   Tauchreiter hatte recht. Ausgerechnet Hilfe und Patchnote verweisen auf die Sonde. */
+merke('7h: die Tiefensonde markiert den doppelten Atem am selben Sektor wie der Tauchplan',
+  /vorschau\.push\(abgrundPlanFolgeSektor\(tiefe \+ i, flotte\)\)/.test(js)
+    && /abgrundAtemKosten\(v\) > 1 \?/.test(js),
+  {});
+
+merke('7d: Vorschau und Hilfe nennen den Atem, bevor jemand abtaucht',
+  /Atem der Hülle:/.test(js)
+    && /Der Atem der Hülle – wie weit ein Tauchplan wirklich reicht/.test(js)
+    && /key:'atem'/.test(js)
+    // Die Werkstatt-Pille muss den Grundwert auch BENUTZEN. Ohne diesen Anker konnte
+    // `(def.anzeigeBasis||0) +` aus dem Markup verschwinden und die Pille wieder
+    // „Stufe 0 · 0 Sektoren" zeigen, obwohl die Huelle zwei traegt - alle Tests gruen.
+    && /\(def\.anzeigeBasis\|\|0\) \+ Math\.min\(/.test(js),
   {});
 
 // ---- 5) Sichtbar -----------------------------------------------------------------------------
