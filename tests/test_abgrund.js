@@ -34,8 +34,8 @@ const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 // v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
 // stuerzt der Aufbau mit ReferenceError ab statt eine Pruefung zu melden. EINE Fassung fuer alle
 // fuenf Tests, die sie brauchen; sie wirft bei fehlendem Anker, statt still '' zu liefern.
-const { regelQuelle } = require('./lib/regelquelle');
-const regelQuelleAus = () => regelQuelle(js, fnAus);
+const { abgrundTabellen } = require('./lib/abgrundtabellen');
+const regelQuelleAus = () => abgrundTabellen(js, fnAus);
 
 let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
@@ -546,9 +546,13 @@ function markenKontext(zustand, summe){
   const quelle = [
     block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : '',
     // ensureAbgrund liest seit v8.712.0 den Deckel des Tauchplans UND die Liste der
-    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist).
+    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist), seit v8.715.0
+    // ausserdem die Fund-Vorgaben. Der ZWEITE Kontext dieser Datei wurde beim Paket E zuerst
+    // vergessen - der erste bekam den Helfer, dieser nicht, und der Test stuerzte weiter ab.
+    // Beide Aufbauten brauchen dieselben Tabellen; wer einen anfasst, prueft den anderen mit.
     konstAus('ABGRUND_PLAN_MAX'),
     'const ABGRUND_PLAN_LINIEN = '+block('ABGRUND_PLAN_LINIEN')+';',
+    regelQuelleAus(),
     fnAus('weekKeyOf'), fnAus('ensureAbgrund'), fnAus('abgrundWochenpflege'),
     'function abgrundAllianzSumme(){ return SUMME; }'.replace('SUMME', String(summe)),
     fnAus('abgrundAllianzMarkeErreicht'), fnAus('holeAbgrundAllianzMarke'),

@@ -51,7 +51,12 @@ const MUSS_FALLEN = {
      weil der Plan jetzt auch den Atem mitfuehrt. Die Gegenprobe fuer die Pruefungen 1a bis 6e ist
      beim Bau von Paket A gegen 15d075b gemessen und im Commit festgehalten; sie hier gegen einen
      Stand zu fahren, der das Paket schon hat, wuerde nichts belegen. */
-  alt:     ['4a','7a','7b','7c','7d','7e','7f','7g','7h'],
+  /* `alt` heisst „der Stand vor dem JUENGSTEN Paket" und wandert deshalb mit jedem mit. Seit
+     v8.714.0 live ist, traegt origin/main den Atem selbst - dort faellt also nur noch 4a, weil der
+     Plan seit v8.715.0 zusaetzlich die Fund-Vorgabe mitfuehrt. Die Gegenproben fuer 7a-7h sind
+     beim Bau von Paket D gegen e5d597f gemessen und im Commit festgehalten; sie hier gegen einen
+     Stand zu fahren, der das Paket schon hat, wuerde nichts belegen. */
+  alt:     ['4a'],
   nachher: ['1b'],
   // Je ein gezielter Rueckbau der drei P1-Befunde: Der Waechter muss GENAU den einen fangen.
   pool:    ['6a'],
@@ -171,8 +176,14 @@ merke('3b: die Sicherheitslinie kommt aus der Mission und wird gegen den gemesse
 // ---- 4) Eingefroren und begrenzt -------------------------------------------------------------
 merke('4a: der Plan reist in der Mission mit, wie Bann, Spule, Ruf und Stroemung',
   sendeQ.length > 0
-    // Seit v8.713.0 traegt der Plan auch den Atem - eingefroren wie alles andere.
-    && /const plan = \{ tiefen: planTiefen, linie: planLinie, atem: abgrundAtemMax\(\) \};/.test(sendeQ)
+    /* Seit v8.713.0 traegt der Plan auch den Atem, seit v8.715.0 die Fund-Vorgabe - beide
+       eingefroren wie alles andere. Geprueft werden die FELDER einzeln, nicht die Zeile
+       zeichengenau: Die alte Fassung nagelte den ganzen Ausdruck fest und fiel bei jedem neuen
+       Feld, also genau dann, wenn der Plan MEHR mitfuehrt statt weniger. */
+    && /const plan = \{ tiefen: planTiefen,/.test(sendeQ)
+    && /linie: planLinie/.test(sendeQ)
+    && /atem: abgrundAtemMax\(\)/.test(sendeQ)
+    && /funde: planFunde/.test(sendeQ)
     && /bann, spule, grund, ruf, stroemung, plan,/.test(sendeQ),
   { sendeDa: sendeQ.length > 0 });
 
