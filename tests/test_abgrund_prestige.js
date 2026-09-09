@@ -68,7 +68,11 @@ const UR = new Function('state', fnAus('abgrundUeberReset')+'; return abgrundUeb
 const voll = {
   tiefe:64, best:87, splitter:41200, bergung:1330, tauchgaenge:412,
   gesehen:{ sog:12, kristallader:3 }, konstGesehen:{ wanderer:1 }, relikte:{ erster:true, chor:true },
-  waechterTage:{ 10:'2026-07-01', 20:'2026-07-08' }, werkstatt:{ druckhuelle:14, echolot:9 },
+  waechterTage:{ 10:'2026-07-01', 20:'2026-07-08' },
+  // Die Stroemung, unter der der Waechter fiel (v8.710.0). Sie gehoert zum selben Eintrag wie
+  // der Tag darueber und muss den Aufstieg genauso ueberleben - sonst zeigte der Kartenraum
+  // nach jedem Aufstieg wieder den Sektor von heute statt den des Kampfes.
+  waechterStrom:{ 10:20240, 20:20247 }, werkstatt:{ druckhuelle:14, echolot:9 },
   woche:{ key:'2026-07-27', best:64 }, wochePraemie:{ key:'2026-07-20', tiefe:60 },
   allianzMarken:{ '2026-07-27|50':true }, gegenmassnahmen:7, bann:'sog',
   lotBis:74, spule:true, ruf:true, grund:true, werkstattGesehen:true, allianzMeldungFehler:null,
@@ -85,7 +89,7 @@ const voll = {
   for (const [feld, wert] of [['best',87], ['tauchgaenge',412]]){
     check('2: der Aufstieg behaelt '+feld.padEnd(12), rest[feld] === wert, rest[feld]);
   }
-  for (const feld of ['gesehen','konstGesehen','relikte','waechterTage','meilensteine']){
+  for (const feld of ['gesehen','konstGesehen','relikte','waechterTage','waechterStrom','meilensteine']){
     check('2: der Aufstieg behaelt '+feld.padEnd(12),
       JSON.stringify(rest[feld]) === JSON.stringify(voll[feld]), rest[feld]);
   }
@@ -113,7 +117,7 @@ const voll = {
   const eA = fnAus('ensureAbgrund');
   const felder = [...eA.matchAll(/a\.([a-zA-ZäöüÄÖÜ]+)\s*(?:=|!==|===)/g)].map(m => m[1]);
   const bekannt = new Set(['tiefe','best','splitter','bergung','tauchgaenge','gesehen','konstGesehen',
-    'relikte','waechterTage','werkstatt','woche','wochePraemie','allianzMarken','gegenmassnahmen',
+    'relikte','waechterTage','waechterStrom','werkstatt','woche','wochePraemie','allianzMarken','gegenmassnahmen',
     'bann','lotBis','spule','ruf','grund','werkstattGesehen','allianzMeldungFehler','meilensteine']);
   const neu = [...new Set(felder)].filter(f => !bekannt.has(f));
   check('3: ensureAbgrund fuehrt keine dem Reset unbekannten Felder',

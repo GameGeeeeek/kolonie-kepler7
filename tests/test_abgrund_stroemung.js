@@ -32,18 +32,30 @@
 //       immer feststanden. Wer das Spiel ueber Mitternacht offen laesst, bekaeme sonst die
 //       Fundstellen von GESTERN genannt und startete einen Tauchgang auf eine Konstellation, die
 //       dort nicht mehr liegt.
-//   4b  DER KARTENRAUM ZEIGT DEN SEKTOR DES EROBERUNGSTAGES (Durchsicht an PR #615). Er ist
-//       ausdruecklich die Geschichte des Kontos; ohne die Stroemung des damaligen Tages schriebe
-//       sich jeder Stationsname jede Mitternacht um - genau die Zusage, die dieses Paket gibt.
-//       Fehlt der Tag (Konten von vor v8.328.0), gibt es keinen ehrlichen Namen: dann steht dort
-//       keiner, statt einen aus der heutigen Stroemung zu erfinden.
+//   4b  DER KARTENRAUM ZEIGT DEN SEKTOR DES KAMPFES (Durchsicht an PR #615, zweite Runde). Er ist
+//       ausdruecklich die Geschichte des Kontos; ohne die damalige Stroemung schriebe sich jeder
+//       Stationsname jede Mitternacht um - genau die Zusage, die dieses Paket gibt. Der erste
+//       Versuch rechnete sie aus dem EroberungsTAG zurueck; dieser Weg ist hier ausdruecklich
+//       ausgeschlossen, denn er ist fuer jeden bestehenden Eintrag falsch (die alten Sektoren
+//       hatten gar keinen Datumsanteil) und fuer einen neuen Sieg ueber Mitternacht ebenfalls
+//       (gekaempft wird unter der Stroemung des Aufbruchs, gespeichert der Tag der Ankunft).
+//   5a  DIE STROEMUNG 0 IST DER SEED VON VORHER, gemessen und nicht behauptet: `abgrundRng` muss
+//       fuer `t*7919+104729` und fuer `t*7919+104729+0*15485863` dieselbe Folge liefern. Nur
+//       deshalb darf ein Vorgang „aus der Zeit davor" auf sie zurueckfallen, statt die heutige zu
+//       nehmen. Dazu die Rueckfallregel selbst: fehlt/keine Zahl -> 0, echte Zahl -> unveraendert.
+//   5b  UND DIE BEIDEN STELLEN NUTZEN SIE. Die Aufloesung eines Tauchgangs, der schon vor diesem
+//       Paket unterwegs war (P1 der Durchsicht: sonst aendern sich Verteidigung, Mutatoren,
+//       Beute und Verluste mitten im Flug), und der Kartenraum ueber die am Sieg festgehaltene
+//       Zahl - die auch den Aufstieg ueberlebt, wie `waechterTage` daneben.
 //   3b  Und die Anzeige sagt es. Eine Mechanik, von der der Spieler nichts weiss, ist keine - er
 //       saehe nur, dass „seine" Tiefe ploetzlich anders aussieht, und hielte es fuer einen Fehler.
 //
 // GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor dem Paket, Aufruf mit
-// KEPLER_STROEMUNG_GEGENPROBE=alt. Dort fallen 1b, 1c, 2b, 3a und 3b - die Stroemung gibt es
-// nicht. 1a und 2a bleiben gruen: Sie halten fest, was das Paket NICHT anfassen darf, und sind
-// damit keine Belege fuer die Stroemung, sondern die Waechter ueber ihre Auflagen.
+// KEPLER_STROEMUNG_GEGENPROBE=alt. Dort fallen 1b, 1c, 2b, 3a, 3b, 4a, 4b, 5a und 5b - die
+// Stroemung gibt es nicht. 1a und 2a bleiben gruen: Sie halten fest, was das Paket NICHT anfassen
+// darf, und sind damit keine Belege fuer die Stroemung, sondern die Waechter ueber ihre Auflagen.
+// Mit KEPLER_STROEMUNG_GEGENPROBE=cache laeuft dieselbe Datei gegen den Stand VOR den beiden
+// Durchsichts-Behebungen; dort fallen 4a, 4b, 5a und 5b.
 const fs = require('fs');
 const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8');
@@ -54,7 +66,14 @@ let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_STROEMUNG_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1b', '1c', '2b', '3a', '3b', '4a', '4b'], cache: ['4a', '4b'] };
+const MUSS_FALLEN = {
+  alt:   ['1b', '1c', '2b', '3a', '3b', '4a', '4b', '5a', '5b'],
+  cache: ['4a', '4b', '5a', '5b'],
+  // Der Stand, den die zweite Durchsicht gesehen hat: Suchcache schon behoben, aber der
+  // Kartenraum rechnete noch aus dem Tag zurueck und ein Tauchgang von vorher bekam die
+  // heutige Stroemung. Genau die beiden Befunde - und nur die - muessen hier fallen.
+  durchsicht2: ['4b', '5a', '5b']
+};
 
 /* Dieselben Ausschneider wie test_abgrund.js. Sie stehen hier bewusst noch einmal statt in einer
    gemeinsamen Datei: Beide Tests schneiden die Spieldatei fuer ihren EIGENEN Zweck zurecht, und
@@ -88,6 +107,14 @@ function fnAus(name, pflicht){
    statt am Aufbau zu sterben. Ein Test, der in der Gegenprobe abstuerzt, belegt nichts. */
 const hatStroemung = js.indexOf('function abgrundStroemung(') >= 0;
 const stroemungQuelle = hatStroemung ? fnAus('abgrundStroemung') : 'function abgrundStroemung(){ return 0; }';
+/* Dieselbe Ueberlegung fuer den Rueckfall auf die Rechnung von vorher: Am alten Stand gibt es ihn
+   nicht. Die Attrappe liefert `null` statt `0` - damit laeuft der Aufbau durch, und 5a faellt aus
+   dem RICHTIGEN Grund (der Rueckfall fehlt), statt zufaellig gruen zu werden, weil `null * x`
+   ebenfalls 0 ergibt. */
+const hatVonFrueher = js.indexOf('function abgrundStroemungVonFrueher(') >= 0;
+const vonFrueherQuelle = hatVonFrueher
+  ? konstAus('ABGRUND_STROEMUNG_ALT') + '\n' + fnAus('abgrundStroemungVonFrueher')
+  : 'const ABGRUND_STROEMUNG_ALT = null;\nfunction abgrundStroemungVonFrueher(){ return null; }';
 
 function baueKontext(){
   const quelle = [
@@ -101,11 +128,12 @@ function baueKontext(){
     konstAus('ABGRUND_WAECHTER_ALLE'), konstAus('ABGRUND_WAECHTER_STAERKE'),
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'),
     'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';',
-    stroemungQuelle,
+    stroemungQuelle, vonFrueherQuelle,
     fnAus('abgrundRng'), fnAus('abgrundMutatorAnzahl'),
     fnAus('abgrundBergungsgut'), fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'),
     fnAus('abgrundWaechterDef'), fnAus('ensureAbgrund'), fnAus('abgrundSektor'),
-    'return { abgrundSektor, abgrundStroemung, abgrundWaechterDef };'
+    'return { abgrundSektor, abgrundStroemung, abgrundWaechterDef, abgrundRng,'
+      + ' abgrundStroemungVonFrueher, ABGRUND_STROEMUNG_ALT };'
   ].join('\n');
   const state = { research:{}, abgrund:null };
   return new Function('state', quelle)(state);
@@ -178,7 +206,7 @@ const sendRumpf = (vonSend >= 0 && bisSend > vonSend) ? js.slice(vonSend, bisSen
 const legtAb = /const stroemung = abgrundStroemung\(\);/.test(sendRumpf)
   && /abgrundSektor\(tiefe, undefined, stroemung\)/.test(sendRumpf)
   && /\bstroemung,/.test(sendRumpf);
-const liestAus = /abgrundSektor\(tiefe, !!m\.ruf, m\.stroemung\)/.test(js);
+const liestAus = /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js);
 merke('3a: die Mission legt die Stroemung ab, die Aufloesung liest sie von dort',
   sendRumpf.length > 0 && legtAb && liestAus,
   { rumpfDa: sendRumpf.length > 0, legtAb, liestAus });
@@ -207,13 +235,42 @@ merke('4a: der Suchcache haengt an Starttiefe UND Stroemung',
 const vonRaum = js.indexOf('const kartenraumHtml = abgrundKartenraumTiefen(');
 const bisRaum = vonRaum >= 0 ? js.indexOf('}).join(\'\');', vonRaum) : -1;
 const raumRumpf = (vonRaum >= 0 && bisRaum > vonRaum) ? js.slice(vonRaum, bisRaum) : '';
-merke('4b: der Kartenraum zeigt den Sektor des Eroberungstages, sonst gar keinen',
+merke('4b: der Kartenraum zeigt den Sektor des Kampfes, nicht den von heute',
   raumRumpf.length > 0
-    && /abgrundStroemungAmTag\(tag\)/.test(raumRumpf)
-    && /abgrundSektor\(t, undefined, geschafft \? tagStrom : undefined\)/.test(raumRumpf)
-    && /tagStrom !== null/.test(raumRumpf)
-    && /function abgrundStroemungAmTag\(/.test(js),
-  { rumpfDa: raumRumpf.length > 0, helferDa: /function abgrundStroemungAmTag\(/.test(js) });
+    && /const waechterStrom = a\.waechterStrom \|\| \{\};/.test(js)
+    && /abgrundSektor\(t, undefined, geschafft \? abgrundStroemungVonFrueher\(waechterStrom\[t\]\) : undefined\)/.test(raumRumpf)
+    // Der Rueckrechenweg ueber den Tag ist ausdruecklich AUSGESCHLOSSEN, nicht nur ungenutzt:
+    // Er war fuer jeden bestehenden Eintrag falsch, und ein spaeterer Umbau darf ihn nicht
+    // versehentlich wieder einfuehren.
+    && !/abgrundStroemungAmTag/.test(js),
+  { rumpfDa: raumRumpf.length > 0, rueckrechnerWeg: !/abgrundStroemungAmTag/.test(js) });
+
+// ---- 5) Was schon lief und was schon geschafft ist -------------------------------------------
+/* 5a ist der einzige Beleg dafuer, dass der Rueckfall UEBERHAUPT erlaubt ist: Waere die Stroemung
+   0 irgendetwas anderes als der Seed von vorher, wuerde jeder Rueckfall den Sektor genauso
+   veraendern wie die heutige Stroemung - nur unauffaelliger. Gemessen an `abgrundRng` selbst. */
+const altRng = G.abgrundRng(47 * 7919 + 104729);
+const nullRng = G.abgrundRng(47 * 7919 + 104729 + G.ABGRUND_STROEMUNG_ALT * 15485863);
+let rngGleich = true;
+for (let i = 0; i < 8; i++) if (altRng() !== nullRng()) rngGleich = false;
+merke('5a: die Stroemung von frueher IST der Seed von vorher, und Fehlendes faellt auf sie zurueck',
+  G.ABGRUND_STROEMUNG_ALT === 0
+    && rngGleich
+    && G.abgrundStroemungVonFrueher(undefined) === 0
+    && G.abgrundStroemungVonFrueher(null) === 0
+    && G.abgrundStroemungVonFrueher(NaN) === 0
+    && G.abgrundStroemungVonFrueher('20706') === 0
+    && G.abgrundStroemungVonFrueher(20706) === 20706,
+  { alt: G.ABGRUND_STROEMUNG_ALT, rngGleich, fehlend: G.abgrundStroemungVonFrueher(undefined) });
+
+merke('5b: Tauchgang und Station von vorher nehmen sie - und der Aufstieg traegt sie mit',
+  /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js)
+    && /function merkeWaechterSieg\(tiefe, stroemung\)/.test(js)
+    && /merkeWaechterSieg\(tiefe, sektor\.stroemung\)/.test(js)
+    && /a\.waechterStrom\[tiefe\] = stroemung;/.test(js)
+    && /waechterStrom: a\.waechterStrom\|\|\{\}/.test(js),
+  { aufloesung: /abgrundStroemungVonFrueher\(m\.stroemung\)/.test(js),
+    aufstieg: /waechterStrom: a\.waechterStrom\|\|\{\}/.test(js) });
 
 if (SAB){
   const soll = MUSS_FALLEN[SAB] || [];
