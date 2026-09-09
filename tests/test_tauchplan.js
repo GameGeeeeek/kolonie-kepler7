@@ -46,11 +46,19 @@ const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefine
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_TAUCHPLAN_GEGENPROBE || '';
 const MUSS_FALLEN = {
-  alt:     ['1a','1b','2a','2b','3a','3b','4a','4b','5a','5b','6a','6b','6c','6d','6e'],
+  /* `alt` heisst „der Stand vor dem JUENGSTEN Paket". Seit v8.712.0 live ist, traegt origin/main
+     den Tauchplan selbst - dort fallen also nur noch die Pruefungen des Atems (Paket D) und 4a,
+     weil der Plan jetzt auch den Atem mitfuehrt. Die Gegenprobe fuer die Pruefungen 1a bis 6e ist
+     beim Bau von Paket A gegen 15d075b gemessen und im Commit festgehalten; sie hier gegen einen
+     Stand zu fahren, der das Paket schon hat, wuerde nichts belegen. */
+  alt:     ['4a','7a','7b','7c','7d'],
   nachher: ['1b'],
   // Je ein gezielter Rueckbau der drei P1-Befunde: Der Waechter muss GENAU den einen fangen.
   pool:    ['6a'],
-  rufalle: ['6b']
+  rufalle: ['6b'],
+  // Paket D: je ein gezielter Rueckbau des Atems.
+  ohneriegel:   ['7c'],
+  kostenflach:  ['7b']
 };
 
 /* Der Aufloesungsblock wird am Klammernpaar begrenzt, nicht bis Dateiende geschnitten: Denselben
@@ -153,7 +161,8 @@ merke('3b: die Sicherheitslinie kommt aus der Mission und wird gegen den gemesse
 // ---- 4) Eingefroren und begrenzt -------------------------------------------------------------
 merke('4a: der Plan reist in der Mission mit, wie Bann, Spule, Ruf und Stroemung',
   sendeQ.length > 0
-    && /const plan = \{ tiefen: planTiefen, linie: planLinie \};/.test(sendeQ)
+    // Seit v8.713.0 traegt der Plan auch den Atem - eingefroren wie alles andere.
+    && /const plan = \{ tiefen: planTiefen, linie: planLinie, atem: abgrundAtemMax\(\) \};/.test(sendeQ)
     && /bann, spule, grund, ruf, stroemung, plan,/.test(sendeQ),
   { sendeDa: sendeQ.length > 0 });
 
@@ -206,6 +215,64 @@ merke('6d: der Vier-Stunden-Deckel gilt fuer den ganzen Tauchgang, nicht je Sekt
 
 merke('6e: die Missionsliste nennt den Plan, nicht nur die erste Tiefe',
   /planLaenge > 1 \? '–'\+\(\(m\.targetId\|\|1\)\+planLaenge-1\)\+' \(Tauchplan\)' : ''/.test(js),
+  {});
+
+/* ---- 7) Der Atem (Paket D) -------------------------------------------------------------------
+   Ein Vorrat, der nur INNERHALB eines Tauchgangs zaehlt. Er gibt der Kette aus Paket A ihre
+   natuerliche Grenze; ohne ihn waere ein Fuenferplan ein Startgeschenk. */
+/* Der Kontext wird EINMAL gebaut und die Werkstattstufe als Parameter hereingereicht - der erste
+   Entwurf baute zwei Rahmen, von denen der eine eine freie Variable las und still scheiterte;
+   beide Pruefungen waren dann aus dem falschen Grund rot. */
+let atemFn = null, atemKostenFn = null, atemBasis = null;
+try {
+  const quelle = [
+    konstAus('ABGRUND_ATEM_BASIS'), konstAus('ABGRUND_ATEM_ZAEH'), konstAus('ABGRUND_PLAN_MAX'),
+    'function abgrundWerkstattBonus(){ return stufe; }',
+    fnAus('abgrundAtemMax'), fnAus('abgrundAtemKosten'),
+    'return { max: abgrundAtemMax, kosten: abgrundAtemKosten, basis: ABGRUND_ATEM_BASIS };'
+  ].join('\n');
+  const bau = stufe => new Function('stufe', quelle)(stufe);
+  const g0 = bau(0);
+  atemFn = stufe => bau(stufe).max();
+  atemKostenFn = g0.kosten;
+  atemBasis = g0.basis;
+} catch(e){ atemFn = null; }
+
+merke('7a: der Atem beginnt beim Grundwert und waechst mit der Werkstatt, gedeckelt am Plan',
+  !!atemFn && atemBasis === 2
+    && atemFn(0) === atemBasis
+    && atemFn(1) === atemBasis + 1
+    && atemFn(99) === 5,   // ABGRUND_PLAN_MAX - voller Ausbau traegt genau einen Fuenferplan
+  { basis: atemBasis, ohneAusbau: atemFn && atemFn(0), eineStufe: atemFn && atemFn(1), voll: atemFn && atemFn(99) });
+
+/* 7b misst die REGEL, nicht eine Momentaufnahme: Waechter und zaeher Sektor kosten doppelt, alles
+   andere einfach. Ohne die doppelten Kosten waere der Atem eine blosse Zaehlung von Sektoren. */
+merke('7b: Waechtersektor und zaeher Sektor kosten doppelt, ein gewoehnlicher einfach',
+  !!atemKostenFn
+    && atemKostenFn({ mods:{ dur:1 } }) === 1
+    && atemKostenFn({ mods:{ dur:1.5 } }) === 2
+    && atemKostenFn({ mods:{ dur:2 } }) === 2
+    && atemKostenFn({ waechter:{ name:'X' }, mods:{ dur:1 } }) === 2
+    && atemKostenFn(null) === 1,
+  { gewoehnlich: atemKostenFn && atemKostenFn({ mods:{dur:1} }),
+    zaeh: atemKostenFn && atemKostenFn({ mods:{dur:1.5} }),
+    waechter: atemKostenFn && atemKostenFn({ waechter:{}, mods:{dur:1} }) });
+
+/* 7c: Der ERSTE Sektor findet immer statt - dort ist der Verband schon. Ohne diese Ausnahme
+   koennte ein Waechter als erster Sektor (Kosten 2 bei Grundwert 2) den Tauchgang beenden, bevor
+   ueberhaupt gekaempft wurde, und ein gewoehnlicher Tauchgang auf eine einzige Tiefe waere
+   betroffen - genau die Zusage „ohne Plan aendert sich nichts". */
+merke('7c: der erste Sektor findet immer statt, und der Atem kommt aus der Mission',
+  schleife.length > 0
+    && /if \(!erster && atemKosten > atemRest\)\{/.test(schleife)
+    && /atemRest -= atemKosten;/.test(schleife)
+    && /m\.plan && typeof m\.plan\.atem === 'number'/.test(block),
+  { schleifeDa: schleife.length > 0 });
+
+merke('7d: Vorschau und Hilfe nennen den Atem, bevor jemand abtaucht',
+  /Atem der Hülle:/.test(js)
+    && /Der Atem der Hülle – wie weit ein Tauchplan wirklich reicht/.test(js)
+    && /key:'atem'/.test(js),
   {});
 
 // ---- 5) Sichtbar -----------------------------------------------------------------------------
