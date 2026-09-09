@@ -54,8 +54,8 @@
 // KEPLER_STROEMUNG_GEGENPROBE=alt. Dort fallen 1b, 1c, 2b, 3a, 3b, 4a, 4b, 5a und 5b - die
 // Stroemung gibt es nicht. 1a und 2a bleiben gruen: Sie halten fest, was das Paket NICHT anfassen
 // darf, und sind damit keine Belege fuer die Stroemung, sondern die Waechter ueber ihre Auflagen.
-// Mit KEPLER_STROEMUNG_GEGENPROBE=cache laeuft dieselbe Datei gegen den Stand VOR den beiden
-// Durchsichts-Behebungen; dort fallen 4a, 4b, 5a und 5b.
+// Mit =cache laeuft dieselbe Datei gegen den Stand vor der ERSTEN Durchsichts-Behebung (dort
+// fallen 3a, 4a, 4b, 5a, 5b), mit =durchsicht2 gegen den vor der ZWEITEN (3a, 4b, 5a, 5b).
 const fs = require('fs');
 const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8');
@@ -66,13 +66,18 @@ let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_STROEMUNG_GEGENPROBE || '';
+/* Alle drei Listen sind GEMESSEN, nicht gedacht - und die Pruefung unten belegt beide Richtungen:
+   dass jede genannte faellt UND dass keine ungenannte mitfaellt. Der erste Entwurf tippte sie und
+   vergass `3a` bei zwei Staenden: Diese Pruefung hat in diesem Auftrag ihren Anker mitverschaerft
+   (sie liest die Aufloesung jetzt durch `abgrundStroemungVonFrueher` hindurch) und misst damit
+   denselben P1-Befund wie `5b`. */
 const MUSS_FALLEN = {
   alt:   ['1b', '1c', '2b', '3a', '3b', '4a', '4b', '5a', '5b'],
-  cache: ['4a', '4b', '5a', '5b'],
+  cache: ['3a', '4a', '4b', '5a', '5b'],
   // Der Stand, den die zweite Durchsicht gesehen hat: Suchcache schon behoben, aber der
   // Kartenraum rechnete noch aus dem Tag zurueck und ein Tauchgang von vorher bekam die
-  // heutige Stroemung. Genau die beiden Befunde - und nur die - muessen hier fallen.
-  durchsicht2: ['4b', '5a', '5b']
+  // heutige Stroemung.
+  durchsicht2: ['3a', '4b', '5a', '5b']
 };
 
 /* Dieselben Ausschneider wie test_abgrund.js. Sie stehen hier bewusst noch einmal statt in einer
@@ -232,12 +237,15 @@ merke('4a: der Suchcache haengt an Starttiefe UND Stroemung',
     && /abgrundSucheCache = \{ von, stroemung: str, treffer \}/.test(sucheRumpf),
   { rumpfDa: sucheRumpf.length > 0 });
 
-const vonRaum = js.indexOf('const kartenraumHtml = abgrundKartenraumTiefen(');
+/* Der Anker beginnt bei den Deklarationen, nicht erst bei der Schleife: `waechterStrom` steht
+   eine Zeile darueber, und ein Test, der sie in der GANZEN Datei sucht, bliebe gruen, wenn sie
+   in eine andere Funktion wandert - waehrend renderAbgrundBox mit einem ReferenceError abbricht. */
+const vonRaum = js.indexOf('const waechterTage = a.waechterTage || {};');
 const bisRaum = vonRaum >= 0 ? js.indexOf('}).join(\'\');', vonRaum) : -1;
 const raumRumpf = (vonRaum >= 0 && bisRaum > vonRaum) ? js.slice(vonRaum, bisRaum) : '';
 merke('4b: der Kartenraum zeigt den Sektor des Kampfes, nicht den von heute',
   raumRumpf.length > 0
-    && /const waechterStrom = a\.waechterStrom \|\| \{\};/.test(js)
+    && /const waechterStrom = a\.waechterStrom \|\| \{\};/.test(raumRumpf)
     && /abgrundSektor\(t, undefined, geschafft \? abgrundStroemungVonFrueher\(waechterStrom\[t\]\) : undefined\)/.test(raumRumpf)
     // Der Rueckrechenweg ueber den Tag ist ausdruecklich AUSGESCHLOSSEN, nicht nur ungenutzt:
     // Er war fuer jeden bestehenden Eintrag falsch, und ein spaeterer Umbau darf ihn nicht
@@ -248,20 +256,35 @@ merke('4b: der Kartenraum zeigt den Sektor des Kampfes, nicht den von heute',
 // ---- 5) Was schon lief und was schon geschafft ist -------------------------------------------
 /* 5a ist der einzige Beleg dafuer, dass der Rueckfall UEBERHAUPT erlaubt ist: Waere die Stroemung
    0 irgendetwas anderes als der Seed von vorher, wuerde jeder Rueckfall den Sektor genauso
-   veraendern wie die heutige Stroemung - nur unauffaelliger. Gemessen an `abgrundRng` selbst. */
-const altRng = G.abgrundRng(47 * 7919 + 104729);
-const nullRng = G.abgrundRng(47 * 7919 + 104729 + G.ABGRUND_STROEMUNG_ALT * 15485863);
-let rngGleich = true;
-for (let i = 0; i < 8; i++) if (altRng() !== nullRng()) rngGleich = false;
+   veraendern wie die heutige Stroemung - nur unauffaelliger.
+   DIE SEED-FORMEL WIRD GELESEN, NICHT GETIPPT. Der erste Entwurf rechnete
+   `abgrundRng(47*7919 + 104729 + ABGRUND_STROEMUNG_ALT * 15485863)` gegen
+   `abgrundRng(47*7919 + 104729)` - das sind bei einer Konstante 0 buchstaeblich dieselben
+   Zeichen, und der Nachbarterm prueft die 0 ohnehin. Die Pruefung konnte nur rot werden, wenn
+   die Konstante nicht 0 ist, und haette einen Umbau auf etwa `(str+1) * 15485863` glatt
+   durchgelassen (eigene Durchsicht an PR #615). Jetzt kommt der Ausdruck aus dem Quelltext von
+   `abgrundSektor`; abgetippt ist nur noch die ALTE Formel, und die ist Geschichte und aendert
+   sich nicht mehr. */
+const seedAusdruck = (fnAus('abgrundSektor').match(/const rng = abgrundRng\(([^;]*)\);/) || [])[1] || '';
+let seedBeiNull = null, seedBeiStrom = null;
+if (seedAusdruck){
+  try {
+    const seedFn = new Function('t', 'str', 'return (' + seedAusdruck + ');');
+    seedBeiNull = seedFn(47, 0); seedBeiStrom = seedFn(47, 20706);
+  } catch(e){}
+}
 merke('5a: die Stroemung von frueher IST der Seed von vorher, und Fehlendes faellt auf sie zurueck',
-  G.ABGRUND_STROEMUNG_ALT === 0
-    && rngGleich
+  !!seedAusdruck
+    && seedBeiNull === 47 * 7919 + 104729      // bei Stroemung 0 bleibt die Rechnung von vorher
+    && seedBeiStrom !== seedBeiNull            // und eine echte Stroemung bewegt den Seed wirklich
+    && G.ABGRUND_STROEMUNG_ALT === 0
     && G.abgrundStroemungVonFrueher(undefined) === 0
     && G.abgrundStroemungVonFrueher(null) === 0
     && G.abgrundStroemungVonFrueher(NaN) === 0
     && G.abgrundStroemungVonFrueher('20706') === 0
     && G.abgrundStroemungVonFrueher(20706) === 20706,
-  { alt: G.ABGRUND_STROEMUNG_ALT, rngGleich, fehlend: G.abgrundStroemungVonFrueher(undefined) });
+  { ausdruck: seedAusdruck, beiNull: seedBeiNull, altFormel: 47 * 7919 + 104729,
+    beiStrom: seedBeiStrom, alt: G.ABGRUND_STROEMUNG_ALT });
 
 merke('5b: Tauchgang und Station von vorher nehmen sie - und der Aufstieg traegt sie mit',
   /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js)
@@ -272,13 +295,23 @@ merke('5b: Tauchgang und Station von vorher nehmen sie - und der Aufstieg traegt
   { aufloesung: /abgrundStroemungVonFrueher\(m\.stroemung\)/.test(js),
     aufstieg: /waechterStrom: a\.waechterStrom\|\|\{\}/.test(js) });
 
+/* Die Gegenprobe prueft BEIDE Richtungen. Der erste Entwurf filterte nur `soll` und belegte
+   damit, dass die genannten Pruefungen fallen - nie, dass NUR die genannten fallen. Gemessen
+   (eigene Durchsicht an PR #615): `3a` fiel an zwei Staenden mit, ohne in der Liste zu stehen,
+   weil dieser Auftrag ihren Anker mitverschaerft hat. Wer die Gegenprobe beim naechsten Umbau
+   faehrt, haelt so ein zusaetzliches Rot fuer erwartet und uebersieht eine echte Regression.
+   Genau davor warnt die Hausregel („Pruefnamen beider Laeufe vergleichen, nicht zaehlen"). */
 if (SAB){
   const soll = MUSS_FALLEN[SAB] || [];
-  const gefallen = soll.filter(n => ergebnis[n] === false);
-  console.log('GEGENPROBE ' + SAB + ': ' + gefallen.length + '/' + soll.length + ' gefallen (' +
-    soll.map(n => n + '=' + (ergebnis[n] === false ? 'rot' : 'gruen')).join(' ') + ')');
-  if (gefallen.length !== soll.length){
-    console.log('FAIL - Gegenprobe unvollstaendig: ' + soll.filter(n => ergebnis[n] !== false).join(', ') + ' blieben gruen');
+  const gefallen = Object.keys(ergebnis).filter(n => ergebnis[n] === false);
+  const fehlend = soll.filter(n => ergebnis[n] !== false);
+  const unerwartet = gefallen.filter(n => soll.indexOf(n) < 0);
+  console.log('GEGENPROBE ' + SAB + ': ' + (soll.length - fehlend.length) + '/' + soll.length + ' gefallen (' +
+    soll.map(n => n + '=' + (ergebnis[n] === false ? 'rot' : 'gruen')).join(' ') + ')' +
+    (unerwartet.length ? ' | ZUSAETZLICH rot: ' + unerwartet.join(', ') : ''));
+  if (fehlend.length || unerwartet.length){
+    if (fehlend.length) console.log('FAIL - Gegenprobe unvollstaendig: ' + fehlend.join(', ') + ' blieben gruen');
+    if (unerwartet.length) console.log('FAIL - Gegenprobe ueberzaehlig: ' + unerwartet.join(', ') + ' fielen, stehen aber nicht in MUSS_FALLEN');
     process.exit(1);
   }
   process.exit(0);
