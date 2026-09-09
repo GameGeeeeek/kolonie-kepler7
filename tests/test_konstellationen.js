@@ -86,6 +86,9 @@ const G = new Function(`
   ${fnAus('abgrundKonstellationsEmblem')}
   ${fnAus('abgrundKonstellationsSuche')}
   ${fnAus('abgrundBergungsgut')}
+  // Die Stroemung (Abgrund-Paket B) ist die zweite Achse des Sektor-Seeds - ohne sie wirft
+  // abgrundSektor beim ersten Aufruf.
+  ${fnAus('abgrundStroemung')}
   ${fnAus('abgrundSektor')}
   ${fnAus('abgrundSektorMitBann')}
   return { ABGRUND_KONSTELLATIONEN, ABGRUND_MUTATOREN, ABGRUND_GRENZEN, ABGRUND_SUCHE_WEITE,
@@ -164,15 +167,40 @@ check('3: keine Konstellation hebt einen Sektor ueber die Deckelung hinaus',
   ausserhalb.length === 0, ausserhalb.slice(0,4));
 // Und sie muss WIRKEN: derselbe Mutatorensatz mit und ohne Konstellationsrechnung darf sich nicht
 // gleichen. Gemessen an einem echten Fundort statt an einem gebauten Beispiel.
-const fundort = (() => { for (let t = START; t < START+N; t++){ const s = G.abgrundSektor(t); if (s.konstellation && !s.waechter) return s; } })();
-check('3: es gibt einen echten Fundort zum Messen', !!fundort, fundort && { tiefe:fundort.tiefe, konst:fundort.konstellation.key });
-if (fundort){
+/* DER FUNDORT WIRD GEWAEHLT, NICHT GENOMMEN (nachgezogen 09.09.2026). Hier stand „der erste
+   Sektor mit Konstellation" - und die anschliessende Pruefung verlangte, dass JEDES Feld der
+   Wirkung sich aendert. Das ist mehr, als der Entwurf zusagt: Die Konstellation wird ABSICHTLICH
+   vor der Deckelung eingerechnet (Kommentar an `abgrundSektor`: „Sie soll den Sektor zuspitzen
+   duerfen, aber nicht aus dem Rahmen heben"), und liegt ein Feld schon am Deckel, schluckt der
+   Deckel ihren Faktor. Solange der Sektor allein an der Tiefe hing, war der erste Fundort
+   zufaellig keiner davon; mit der Stroemung (Abgrund-Paket B) fiel die Pruefung auf voellig
+   richtigem Code durch - gemessen an einem `nest` mit `def` am Deckel 2.
+   Gesucht wird deshalb ein Fundort, an dem die Wirkung UEBERHAUPT messbar ist. Das schwaecht die
+   Zusage nicht: Waere die Konstellationsrechnung kaputt, gaebe es gar keinen solchen Fundort, und
+   die Vorbedingung darunter faellt laut statt still. */
+function ohneKonstellation(s){
   const ohne = { atk:1, def:1, loot:1, shards:1, dur:1, loss:1 };
-  for (const m of fundort.mutatoren) for (const f of Object.keys(ohne)) if (typeof m[f] === 'number') ohne[f] *= m[f];
+  for (const m of s.mutatoren) for (const f of Object.keys(ohne)) if (typeof m[f] === 'number') ohne[f] *= m[f];
   for (const f of Object.keys(ohne)){
     const [u,o] = G.ABGRUND_GRENZEN[f];
     ohne[f] = Math.max(u, Math.min(o, ohne[f]));
   }
+  return ohne;
+}
+let gesehen = 0;
+const fundort = (() => {
+  for (let t = START; t < START+N; t++){
+    const s = G.abgrundSektor(t);
+    if (!s.konstellation || s.waechter) continue;
+    gesehen++;
+    const ohne = ohneKonstellation(s);
+    if (Object.keys(s.konstellation.wirkung).every(f => Math.abs(ohne[f] - s.mods[f]) >= 1e-9)) return s;
+  }
+})();
+check('3: es gibt einen echten Fundort zum Messen', !!fundort,
+  fundort ? { tiefe:fundort.tiefe, konst:fundort.konstellation.key, gesehen } : { gesehen });
+if (fundort){
+  const ohne = ohneKonstellation(fundort);
   const felder = Object.keys(fundort.konstellation.wirkung);
   const unveraendert = felder.filter(f => Math.abs(ohne[f] - fundort.mods[f]) < 1e-9);
   check('3: die Wirkung der Konstellation schlaegt sich wirklich in den Kennzahlen nieder',

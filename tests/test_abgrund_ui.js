@@ -21,7 +21,26 @@
 //   8) Wochenlauf abrechenbar, Tiefensonde zeigt kommende Sektoren, Allianz-Beitrag unter eigenem Schluessel
 //   9) die Werkstatt ist ohne Zutun sichtbar, ein bewusstes Zuklappen ueberlebt
 // Konsolenfehler werden in jedem Abschnitt mitgeprueft.
-const { starteBrowser, devices, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
+const fsUI = require('fs');
+const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
+
+/* DIE MUTATORNAMEN WERDEN AUS DER SPIELDATEI GELESEN, nicht getippt (nachgezogen 09.09.2026).
+   Hier stand eine handgeschriebene Liste aus 18 Namen - von 24. Solange der Sektor allein an der
+   Tiefe hing, zog Tiefe 1 immer denselben Mutator, und der stand zufaellig in der Liste. Seit der
+   Stroemung (Abgrund-Paket B) zieht dieselbe Tiefe je nach Tag einen anderen, und die Pruefung
+   fiel auf voellig richtigem Code durch: gemessen `treffer: 0`.
+   Das war eine Momentaufnahme, keine Regel. Die Zusage lautet „ein Mutator steht mit NAMEN da",
+   nicht „einer aus diesen achtzehn". Gelesen wird deshalb der echte Bestand; faende die Suche
+   keinen einzigen Namen, faellt die Vorbedingung und nicht still die Pruefung. */
+const mutatorNamen = (() => {
+  const quelle = fsUI.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8');
+  const i = quelle.indexOf('const ABGRUND_MUTATOREN = [');
+  if (i < 0) return [];
+  let d = 0, start = quelle.indexOf('[', i), k = start;
+  for (; k < quelle.length; k++){ if (quelle[k] === '[') d++; else if (quelle[k] === ']'){ d--; if (!d) break; } }
+  return [...quelle.slice(start, k+1).matchAll(/name:'([^']+)'/g)].map(m => m[1]);
+})();
+const mutatorMuster = new RegExp('^(' + mutatorNamen.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')');
 
 function backend(store){ return async r => {
   const req=r.request(); const p=req.url().split('/api/')[1].split('?')[0];
@@ -140,10 +159,13 @@ const boxText = page => page.evaluate(()=>{ const b=document.getElementById('abg
       !!txt && /Tiefe 1/.test(txt) && /Gegnerst/i.test(txt) && /[α-ω]-\d{4}/.test(txt),
       txt ? txt.split('\n').slice(0,4) : null);
     // Tiefe 1 zieht genau einen Mutator - er muss mit Beschreibung dastehen, nicht nur als Name.
-    const mutZeilen = await page.evaluate(()=>{
+    const mutZeilen = await page.evaluate((muster)=>{
       const b=document.getElementById('abgrundBox'); if(!b) return 0;
-      return Array.from(b.querySelectorAll('div')).filter(d => /^(Ionensturm|Gravitationstrichter|Dichtes|Echokammer|Leerenstille|Kristallsporen|Dunkelstr|Panzerschwarm|Sensorblindheit|Hitzeblase|Wracklinie|Resonanzader|Nullzone|Splitterregen|Spiegelfeld|Tiefendruck|Phosphorwolke|Altes Signal)/.test(d.innerText||'')).length;
-    });
+      const re = new RegExp(muster);
+      return Array.from(b.querySelectorAll('div')).filter(d => re.test(d.innerText||'')).length;
+    }, mutatorMuster.source);
+    check('2-vorab: die Mutatornamen sind aus der Spieldatei gelesen', mutatorNamen.length >= 20,
+      { gelesen: mutatorNamen.length });
     check('2: mindestens ein Mutator wird mit Namen angezeigt', mutZeilen > 0, { treffer:mutZeilen });
 
     // ---- 3) Tiefenwahl ----
