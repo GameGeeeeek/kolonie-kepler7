@@ -290,7 +290,10 @@ merke('5b: Tauchgang und Station von vorher nehmen sie - und der Aufstieg traegt
   /abgrundSektor\(tiefe, !!m\.ruf, abgrundStroemungVonFrueher\(m\.stroemung\)\)/.test(js)
     && /function merkeWaechterSieg\(tiefe, stroemung\)/.test(js)
     && /merkeWaechterSieg\(tiefe, sektor\.stroemung\)/.test(js)
-    && /a\.waechterStrom\[tiefe\] = stroemung;/.test(js)
+    // Die Schreibstelle setzt BEIDE Felder zusammen; ein Zweig, der nur den Tag setzt, waere ein
+    // Kartenraum, der fuer eine frische Eroberung den alten Sektor behauptet.
+    && /a\.waechterStrom\[tiefe\] = \(typeof stroemung === 'number' && isFinite\(stroemung\)\)/.test(js)
+    && /\? stroemung : abgrundStroemung\(\);/.test(js)
     && /waechterStrom: a\.waechterStrom\|\|\{\}/.test(js),
   { aufloesung: /abgrundStroemungVonFrueher\(m\.stroemung\)/.test(js),
     aufstieg: /waechterStrom: a\.waechterStrom\|\|\{\}/.test(js) });
