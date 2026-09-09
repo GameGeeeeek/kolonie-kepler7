@@ -295,15 +295,20 @@ check('7: erlebte Konstellationen werden im Spielstand mitgezaehlt',
    GEPRUEFT WIRD DIE REGEL, NICHT EIN BYTE-FENSTER: Die ERSTE Zuweisung an `sektor` im
    Aufloesungsblock muss ueber abgrundSektorMitBann laufen. Der erste Entwurf sah in den ersten
    1200 Zeichen nach und fiel am 09.09.2026 auf voellig richtigem Code durch, weil ein Kommentar
-   darueber um drei Zeilen wuchs - ein Fenster in Zeichen misst die Kommentarlaenge mit. Der Anker
-   wird vorher auf Existenz geprueft: `indexOf` liefert sonst -1, der Slice liefe fast ueber die
-   ganze Datei und die Pruefung waere aus dem falschen Grund gruen. */
+   darueber um drei Zeilen wuchs - ein Fenster in Zeichen misst die Kommentarlaenge mit.
+   DER BLOCK WIRD EXAKT BEGRENZT, nicht bis Dateiende geschnitten: Denselben Anker gibt es ZWEIMAL
+   (Aufloesung und Missionsliste), und ein Slice bis zum Ende faende die richtige Zeile auch dann
+   noch, wenn sie aus dem Block herausgewandert waere. `klammer` schneidet den Rumpf am
+   Klammernpaar ab; dass es wirklich die Aufloesung ist und nicht die Liste, belegt `a.konstGesehen`
+   darin - genau die Buchung, um die es hier geht. Die Regex ist gegenueber Leerraum tolerant, sonst
+   maesse sie wieder Formatierung statt Regel. */
 const vonAufloesung = js.indexOf("} else if (m.type === 'abgrund'){");
-const aufloesung = vonAufloesung >= 0 ? js.slice(vonAufloesung) : '';
-const ersteSektorZuweisung = (aufloesung.match(/const sektor = [A-Za-z]+/) || [])[0] || '';
+const aufloesung = vonAufloesung >= 0 ? klammer(vonAufloesung, '{', '}') : '';
+const istAufloesung = /a\.konstGesehen\[/.test(aufloesung);
+const ersteSektorZuweisung = (aufloesung.match(/const\s+sektor\s*=\s*([A-Za-z_$][\w$]*)/) || [])[1] || '';
 check('7: gezaehlt wird der tatsaechlich gekaempfte Sektor, nicht der ungebannte',
-  aufloesung.length > 0 && ersteSektorZuweisung === 'const sektor = abgrundSektorMitBann',
-  { ankerDa: vonAufloesung >= 0, ersteZuweisung: ersteSektorZuweisung });
+  aufloesung.length > 0 && istAufloesung && ersteSektorZuweisung === 'abgrundSektorMitBann',
+  { ankerDa: vonAufloesung >= 0, istAufloesung, laenge: aufloesung.length, ersteZuweisung: ersteSektorZuweisung });
 check('7: es gibt einen Erfolg fuer alle Konstellationen',
   /key:'abgrundkonst'/.test(js) && /ABGRUND_KONSTELLATIONEN\.every/.test(js));
 // Regel 6: Die Hilfe muss dieselbe Zahl nennen wie das Array, sonst veraltet sie beim naechsten Zuwachs.
