@@ -39,7 +39,11 @@ const ergebnis = {};
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_RAUB_GEGENPROBE || '';
-const MUSS_FALLEN = { alt: ['1a', '1b', '3a', '3b'], mond: ['3a'], heimatmond: ['3b'] };
+/* GEMESSEN, nicht gesetzt: Am Stand vor KS-8 gibt es gar kein Mond-Abzeichen, also fallen 3a bis
+   3d dort mit; `flaeche` ist der Stand mit der ALTEN Platzierung unten links, dort verlieren beide
+   Abzeichen Punkte an die Beschriftung (der Heimatmond vier von fuenf). */
+const MUSS_FALLEN = { alt: ['1a', '1b', '3a', '3b', '3c', '3d'], mond: ['3a'], heimatmond: ['3b'],
+                      flaeche: ['3c', '3d'] };
 /* Der Traeger des Mondes wird aus der Spieldatei GELESEN, nicht erfunden: Ein erfundener
    Schluessel liefert keinen Kartenknoten, und die Pruefung waere still leer. */
 const fsM = require('fs');
@@ -117,7 +121,24 @@ async function messen(mitRaub, browser, mond){
     return { marker:true,
       zeichen: t ? (t.textContent || '').trim() : '',
       puls: g.querySelectorAll('animate').length,
-      klickziele: svg.querySelectorAll('[data-map-debris]').length };
+      klickziele: svg.querySelectorAll('[data-map-debris]').length,
+      /* TREFFERFLAECHE: Rechtecke des Abzeichens und der naechstliegenden Beschriftung, dazu das
+         Element, das ein Tipp auf die Abzeichenmitte wirklich trifft. Beides am gerenderten
+         Bild, nicht gerechnet. */
+      flaeche: (() => {
+        /* Der Puls laeuft weit ueber die Scheibe hinaus, `getBoundingClientRect()` der Gruppe
+           waere also viel zu gross. Gemessen wird die SCHEIBE - das ist, was der Spieler trifft. */
+        const scheibe = g.querySelector('circle');
+        const r = scheibe.getBoundingClientRect();
+        const mx = r.left + r.width/2, my = r.top + r.height/2, d = r.width/4;
+        const punkte = [[mx,my],[mx-d,my],[mx+d,my],[mx,my-d],[mx,my+d]];
+        const treffer = punkte.map(([x,y]) => {
+          const e = document.elementFromPoint(x, y);
+          return e ? (e.closest('[data-map-debris]') ? 'abzeichen'
+                   : (e.tagName + '.' + (e.getAttribute('class')||''))) : 'nichts';
+        });
+        return { treffer, eigene: treffer.filter(t => t === 'abzeichen').length, punkte: punkte.length };
+      })() };
   }, mond || null);
   /* Der Klicktext kommt aus dem VORHANDENEN Klickziel - dasselbe, das der Spieler antippt. Der
      Klick loest `pushToast(...)` aus (gemessen an der Verdrahtung), also wird der TOAST gelesen und
@@ -175,6 +196,20 @@ async function messen(mitRaub, browser, mond){
       && /Piraten plündern dieses Trümmerfeld/.test(heimatmond.text || ''),
     { marker: heimatmond.marker, zeichen: heimatmond.zeichen, puls: heimatmond.puls,
       auszug: (heimatmond.text || '').slice(0, 90) });
+  /* 3c/3d: DIE TREFFERFLAECHE (fuenfte Durchsicht an PR #614). Ein Abzeichen, dessen Flaeche eine
+     SPAETER gezeichnete Beschriftung abfaengt, hat seinen Klicktext nur auf dem Papier -
+     `.planet-label` setzt kein `pointer-events`. Gemessen wird die Zusage selbst: Ein Tipp auf das
+     Abzeichen landet IM Abzeichen, an fuenf Punkten seiner Scheibe (Mitte und vier Richtungen),
+     nicht nur in der Mitte - ein halb verdecktes Abzeichen faellt sonst nicht auf.
+     BEWUSST NICHT geprueft wird, ob irgendeine Beschriftung sein Rechteck SCHNEIDET: Der
+     Beschriftungs-Entflechter nimmt als Hindernis nur die gezeichneten Koerper, nie Abzeichen -
+     das ist eine ausdrueckliche Entscheidung (Kommentar an `kbLabelsEntflechten`), und kein
+     Abzeichen dieser Karte erfuellt sie. Eine Pruefung, die mehr verlangt als der Entwurf
+     einloest, misst nicht die Zusage, sondern eine Wunschvorstellung. */
+  merke('3c: jeder Punkt des Mond-Abzeichens faengt seinen eigenen Tipp',
+    !!mond.flaeche && mond.flaeche.eigene === mond.flaeche.punkte, mond.flaeche);
+  merke('3d: dasselbe am Heimatmond', 
+    !!heimatmond.flaeche && heimatmond.flaeche.eigene === heimatmond.flaeche.punkte, heimatmond.flaeche);
   merke('2c: keine Skriptfehler', (mit.errs||[]).length === 0 && (ohne.errs||[]).length === 0,
     { mit: (mit.errs||[]).slice(0,2), ohne: (ohne.errs||[]).slice(0,2) });
 

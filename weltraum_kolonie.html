@@ -66463,7 +66463,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
          PR #614). Die Heimatbasis wird getrennt von der Planetenschleife gezeichnet, und ihr
          Truemmerzeichen oben fragt nur `debrisFields.home` - ein Raub an `moon_home` stand
          deshalb auch nach dem letzten Nachtrag nirgends. Zwei Zeichenwege, dieselbe Zusage:
-         Beide brauchen ihn. */
+         Beide brauchen ihn - und beide setzen ihn auf die LINKE FLANKE, aus demselben Grund wie
+         in der Planetenschleife: Unten links steht „Deine Basis", und eine Beschriftung ohne
+         `pointer-events` faengt den Tipp ab (gemessen: `treffer: "text.planet-label"`). */
       const heimatMondFeld = state.debrisFields['moon_home'] && Object.keys(state.debrisFields['moon_home']).length;
       const hcx = hc.x.toFixed(1), hcy = hc.y.toFixed(1);
       const homeOrbS = orbitalStationOf('home');
@@ -66499,7 +66501,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             : `<circle cx="${hcx}" cy="${hcy}" r="10" fill="rgba(126,119,221,0.3)"/>`) + sysSchatten('home', hc.x, hc.y, 10, 0.72) + ringVorne; })()}
           <circle cx="${hcx}" cy="${hcy}" r="10" fill="none" stroke="#7f77dd" stroke-width="1.5"/>
           ${homeTfInProgress ? `<circle cx="${hcx}" cy="${hcy}" r="12" fill="none" stroke="${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).color||'#5dcaa5'}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"><title>Terraforming Stufe ${homeTfState.level}/${TERRAFORM_MAX_LEVEL} Richtung ${(PLANET_TYPE_INFO[homeTfState.targetType]||{}).label||''}</title></circle>` : ''}
-          ${heimatMondFeld ? `<g data-map-debris="moon_home">${truemmerRaubPuls(hc.x-13, hc.y+13, 6, truemmerRaubAn('moon_home'))}<circle cx="${(hc.x-13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="6" fill="${truemmerRaubAn('moon_home') ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(hc.x-13).toFixed(1)}" y="${(hc.y+16).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn('moon_home') ? '\u2620' : '\u263e'}</text></g>` : ''}
+          ${heimatMondFeld ? `<g data-map-debris="moon_home">${truemmerRaubPuls(hc.x-20, hc.y, 6, truemmerRaubAn('moon_home'))}<circle cx="${(hc.x-20).toFixed(1)}" cy="${hcy}" r="6" fill="${truemmerRaubAn('moon_home') ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(hc.x-20).toFixed(1)}" y="${(hc.y+3).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn('moon_home') ? '\u2620' : '\u263e'}</text></g>` : ''}
           ${homeHasMoon ? sysMondbahn(hc.x, hc.y, 13) + `<g data-map-moon="home" style="cursor:pointer;"><title>${planetDisplayName('moon_home')}${state.colonies['moon_home']?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_home' ? `<circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(hc.x+13).toFixed(1)}" cy="${(hc.y+13).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(hc.x+11.5).toFixed(1)}" cy="${(hc.y+12).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
@@ -66522,7 +66524,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
          nirgends. Das Abzeichen steht unten LINKS, diagonal gegenueber dem des Planeten und auf
          der dem Mond abgewandten Seite - der Mond selbst sitzt unten rechts. Denselben
          `data-map-debris`-Haken wie der Planet, damit der vorhandene Klickweg ihn ohne
-         Sonderfall bedient. */
+         Sonderfall bedient.
+         ES SITZT AUF DER LINKEN FLANKE, auf Hoehe des Koerpers - nicht unten links, wo der erste
+         Entwurf es hatte (fuenfte Durchsicht an PR #614, gemessen): Dort schnitt die Beschriftung
+         sein Rechteck, und `.planet-label` setzt kein `pointer-events`. Die Beschriftung wird
+         SPAETER gezeichnet, faengt den Tipp also ab - ein Abzeichen mit Klicktext, den man nicht
+         antippen kann. Oben links liegt das ★ der eigenen Kolonie, oben rechts das Abzeichen des
+         Planeten, unten rechts der Mond; die linke Flanke ist der einzige freie Platz. */
       const mondSchluessel = 'moon_' + p.id;
       const hasMoonDebris = state.debrisFields[mondSchluessel] && Object.keys(state.debrisFields[mondSchluessel]).length;
       const hasMoon = state.moons && state.moons[p.id];
@@ -66578,7 +66586,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="none" stroke="#fff" stroke-opacity="0.3" stroke-dasharray="2,2"/>`}
           ${isMine ? `<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="6" fill="#5dcaa5" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700;">★</text>` : ''}
           ${hasDebris ? `<g data-map-debris="${p.id}">${truemmerRaubPuls(pos.x+r+2, pos.y-r-2, 7, truemmerRaubAn(p.id))}<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y-r-2).toFixed(1)}" r="7" fill="${truemmerRaubAn(p.id) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x+r+2).toFixed(1)}" y="${(pos.y-r+1).toFixed(1)}" text-anchor="middle" style="font-size:8px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(p.id) ? '\u2620' : 'T'}</text></g>` : ''}
-          ${hasMoonDebris ? `<g data-map-debris="${mondSchluessel}">${truemmerRaubPuls(pos.x-r-2, pos.y+r+2, 6, truemmerRaubAn(mondSchluessel))}<circle cx="${(pos.x-r-2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="6" fill="${truemmerRaubAn(mondSchluessel) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-2).toFixed(1)}" y="${(pos.y+r+5).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(mondSchluessel) ? '\u2620' : '\u263e'}</text></g>` : ''}
+          ${hasMoonDebris ? `<g data-map-debris="${mondSchluessel}">${truemmerRaubPuls(pos.x-r-12, pos.y, 6, truemmerRaubAn(mondSchluessel))}<circle cx="${(pos.x-r-12).toFixed(1)}" cy="${pos.y.toFixed(1)}" r="6" fill="${truemmerRaubAn(mondSchluessel) ? '#e0a548' : '#c9c7bd'}" stroke="#0a0d1a" stroke-width="1.5"/><text x="${(pos.x-r-12).toFixed(1)}" y="${(pos.y+3).toFixed(1)}" text-anchor="middle" style="font-size:7px; fill:#0a0d1a; font-weight:700; pointer-events:none;">${truemmerRaubAn(mondSchluessel) ? '\u2620' : '\u263e'}</text></g>` : ''}
           ${hasMoon ? sysMondbahn(pos.x, pos.y, r+2) + `<g data-map-moon="${p.id}" style="cursor:pointer;"><title>${planetDisplayName('moon_'+p.id)}${state.colonies['moon_'+p.id]?' (kolonisiert - anklicken für das Menü)':' (noch nicht kolonisiert - anklicken zum Kolonisieren)'}</title>
             ${state.activeBasePlanet==='moon_'+p.id ? `<circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="7.5" fill="none" stroke="#5dcaa5" stroke-width="1.5"/>` : ''}
             <circle cx="${(pos.x+r+2).toFixed(1)}" cy="${(pos.y+r+2).toFixed(1)}" r="5.5" fill="#e2e4f0" stroke="#0a0d1a" stroke-width="1.5"/><circle cx="${(pos.x+r+2-1.5).toFixed(1)}" cy="${(pos.y+r+2-1).toFixed(1)}" r="3.2" fill="#aeb1c4"/>
