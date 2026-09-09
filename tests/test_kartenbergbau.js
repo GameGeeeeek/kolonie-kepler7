@@ -41,7 +41,13 @@ const SAB = process.env.KEPLER_BERGBAU_GEGENPROBE || '';
    und ohne KA-3 ist dort nie etwas zu sehen. Es belegt also nichts ueber KA-3; scharf wird es
    erst am neuen Stand, wo etwas zu sehen sein KANN. Dieselbe Ueberlegung wie bei 2a/3a in
    test_kampfanimation.js. */
-const MUSS_FALLEN = { alt: ['1a', '1b', '2a'] };
+/* `strahl` ist der Stand vor KA-2 (08.09.2026): Die Marke liegt dort EXAKT auf dem Vorkommen,
+   einen Foerderstrahl gibt es nicht -> 2d und 2e fallen. 2a bleibt dort gruen und ist damit kein
+   Beleg fuer KA-2, sondern die mitgezogene Zusage: Auf dem Vorkommen zu stehen war ja nie falsch,
+   falsch waere die halbe Strecke. */
+/* `sprung` ist der erste KA-2-Entwurf (de06f5b): Er zog den Halteabstand erst im Zeichnen ab, die
+   Marke flog also bis in die Brockenmitte und sprang bei `hinBis` zurueck -> 2f faellt. */
+const MUSS_FALLEN = { alt: ['1a', '1b', '2a'], strahl: ['2d', '2e'], sprung: ['2f'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
@@ -105,7 +111,14 @@ async function messeMarke(page, farbe){
     const g = gruppen[0];
     const mt = (g.getAttribute('transform')||'').match(/translate\(([-\d.]+),([-\d.]+)\)\s*rotate\(([-\d.]+)\)/);
     const bilder = [...g.querySelectorAll('image')];
-    const linien = [...svg.querySelectorAll('line')].filter(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray'));
+    /* DIE BAHN WIRD AN IHREM MERKMAL ERKANNT, nicht an ihrer Strichstaerke (KB-31, 08.09.2026).
+       Vorher stand hier ein Filter ueber "stroke-width 1.5 und kein dasharray" und danach
+       linien[0]. Dieselbe Signatur tragen zwei Linien der Vorposten-Silhouette (Peilstrahl des
+       Tiefenhorchens, Mast zum Sprungtor), und die stehen VOR den Routen im Markup - steht ein
+       Vorposten im System, mass der Waechter dessen Mast. Gefallen ist er nie, weil kein Fixture
+       hier einen Vorposten setzt; die Pruefung war also seit ihrem ersten Tag von der Abwesenheit
+       eines Vorpostens abhaengig, ohne dass das irgendwo stand. */
+    const linien = [...svg.querySelectorAll('line[data-kb-bahn]')];
     let bahn = null;
     if (linien.length){
       const l = linien[0];
@@ -163,7 +176,22 @@ async function markenOrt(page){
     const ast = document.querySelector('[data-map-asteroid]');
     let ziel = null;
     if (ast){ const b = ast.getBBox(); ziel = { x: b.x + b.width/2, y: b.y + b.height/2 }; }
-    return mt ? { x:+mt[1], y:+mt[2], ziel } : null;
+    /* DER ANFANG DER BAHN wird mitgemessen, weil 2a seit KA-2 die REGEL prueft und nicht mehr
+       einen Schwellwert: „am Vorkommen und nicht auf halbem Rueckweg" laesst sich nur gegen den
+       Ort messen, an den der halbierende Fehler die Marke setzen wuerde - die MITTE der Route. */
+    /* RUECKFALL AUF DAS ALTE SUCHMUSTER, wenn es `data-kb-bahn` noch nicht gibt: Das Merkmal kam
+       erst mit KB-31 (08.09.2026). Ohne diesen Zweig maesse 2a an einem aelteren Stand gar nichts
+       und faellt dann aus dem falschen Grund - der Gegenprobe-Lauf haette es als Beleg fuer KA-2
+       gelesen, obwohl es nur die fehlende Bahn-Kennung war. Dieses Fixture setzt keinen Vorposten,
+       das alte Muster ist hier also eindeutig. */
+    const bahn = (svg && svg.querySelector('line[data-kb-bahn]'))
+      || (svg && [...svg.querySelectorAll('line')].find(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray')))
+      || null;
+    const start = bahn ? { x:+bahn.getAttribute('x1'), y:+bahn.getAttribute('y1') } : null;
+    const strahl = svg ? [...svg.querySelectorAll('[data-kb-foerderstrahl] line')].map(l => ({
+      x1:+l.getAttribute('x1'), y1:+l.getAttribute('y1'), x2:+l.getAttribute('x2'), y2:+l.getAttribute('y2'),
+      animiert: !!l.querySelector('animate'), zeiger: l.closest('[data-kb-foerderstrahl]').getAttribute('pointer-events') })) : [];
+    return mt ? { x:+mt[1], y:+mt[2], ziel, start, strahl } : null;
   });
 }
 
@@ -228,11 +256,85 @@ async function markenOrt(page){
       { art: gemischt.art, reihe: gemischt.eineReihe, groessen: gemischt.groessen });
 
     // ---- 2) Waehrend der Foerderung steht sie am Vorkommen ----------------------------------
+    /* 2a prueft die REGEL, nicht einen Schwellwert (nachgezogen mit KA-2, 08.09.2026).
+       Bis dahin stand hier `abstand < 6`. Das war richtig, solange die Marke waehrend der
+       Foerderung EXAKT auf dem Vorkommen lag - seit dem Foerderstrahl haelt der Konvoi bewusst
+       Abstand, sonst haette der Strahl Laenge null. Die Zahl 6 war aber nie die Zusage; die Zusage
+       lautet „am Vorkommen und nicht auf halbem Rueckweg", und der Kommentar am Code nennt genau
+       diesen Fehler: „der Kartenzeichner kennt hinBis nicht und halbiert stur bei frac>=0.5".
+       GEMESSEN WIRD DESHALB GEGEN DIE ROUTENMITTE - den Ort, an den der halbierende Fehler die
+       Marke setzen wuerde. Die Marke muss NAEHER am Vorkommen stehen als an dieser Mitte - bei
+       genau dem Fehler, den 2a faengt, waere der Abstand zur Mitte NULL und der zum Vorkommen die
+       halbe Strecke. Damit zieht die Pruefung bei jeder kuenftigen Abstandsaenderung mit, ohne
+       ihre Kraft zu verlieren.
+       KEIN VIELFACHES als Schwelle: Ein erster Entwurf verlangte „viermal weiter zur Mitte" und
+       fiel auf richtigem Code durch - ein Abbauflug bleibt IM System und ist kurz (gemessen: rund
+       50 Einheiten), die Mitte liegt also nur 25 Einheiten entfernt. Die Schwelle haette den
+       Standabstand verboten statt den Fehler. */
+    const routenMitte = (ortB && ortB.start && ortB.ziel)
+      ? { x: (ortB.start.x + ortB.ziel.x)/2, y: (ortB.start.y + ortB.ziel.y)/2 } : null;
+    const dZiel  = (ortB && ortB.ziel) ? Math.hypot(ortB.x - ortB.ziel.x, ortB.y - ortB.ziel.y) : null;
+    const dMitte = routenMitte ? Math.hypot(ortB.x - routenMitte.x, ortB.y - routenMitte.y) : null;
     check('2a: waehrend der Foerderung steht die Marke AM VORKOMMEN, nicht auf halbem Rueckweg',
-      !!(ortB && ortB.ziel) && Math.hypot(ortB.x - ortB.ziel.x, ortB.y - ortB.ziel.y) < 6,
-      ortB ? { marke: { x:+ortB.x.toFixed(1), y:+ortB.y.toFixed(1) },
-               ziel: ortB.ziel ? { x:+ortB.ziel.x.toFixed(1), y:+ortB.ziel.y.toFixed(1) } : null,
-               abstand: ortB.ziel ? +Math.hypot(ortB.x-ortB.ziel.x, ortB.y-ortB.ziel.y).toFixed(1) : null } : null);
+      dZiel !== null && dMitte !== null && dZiel < dMitte,
+      { abstandZumVorkommen: dZiel === null ? null : +dZiel.toFixed(1),
+        abstandZurRoutenmitte: dMitte === null ? null : +dMitte.toFixed(1),
+        verhaeltnis: (dZiel && dMitte) ? +(dMitte/dZiel).toFixed(1) : null });
+
+    /* KA-2: DER STRAHL SELBST. Der Auftrag lautete woertlich „wenn eine flotte fördert soll das
+       grafisch angezeigt werden z.b ein laserstrahl auf dem asteroiden". */
+    const str = (ortB && ortB.strahl) || [];
+    const trifft = str.length > 0 && ortB.ziel
+      && str.every(l => Math.hypot(l.x2 - ortB.ziel.x, l.y2 - ortB.ziel.y) < 3
+                     && Math.hypot(l.x1 - ortB.x, l.y1 - ortB.y) < 3);
+    check('2d: ein Strahl laeuft von der Flotte auf das Vorkommen',
+      str.length >= 2 && trifft && Math.hypot(str[0].x2-str[0].x1, str[0].y2-str[0].y1) > 8,
+      { teile: str.length, laenge: str.length ? +Math.hypot(str[0].x2-str[0].x1, str[0].y2-str[0].y1).toFixed(1) : null });
+    /* Eine ruhende Linie saehe aus wie eine Verbindung, nicht wie eine Taetigkeit - die Bewegung
+       IST die Aussage. Und `pointer-events="none"`, weil der Strahl sonst genau die beiden
+       Trefferflaechen abfinge, die dort etwas oeffnen sollen. */
+    /* 2f: KEIN SPRUNG AN DER PHASENGRENZE. Der erste Entwurf von KA-2 zog den Halteabstand erst
+       im Zeichnen ab - er wirkte damit NUR waehrend der Foerderung. Die Marke flog bis in die
+       Brockenmitte, sprang bei `hinBis` um rund siebzehn Einheiten zurueck und beim Abflug wieder
+       vor: zwei sichtbare Spruenge, die kein Test gesehen haette.
+       GEMESSEN WIRD DER ANFLUG KURZ VOR SEINEM ENDE: Steht die Marke dort schon nahe am
+       Halteplatz, kann sie beim Umschalten nicht mehr springen. Ein Vergleich der beiden
+       Zustaende waere die ehrlichere Messung, ginge aber nur mit zwei Laeufen, deren Uhren sich
+       um Millisekunden unterscheiden - dieser eine Lauf misst dieselbe Zusage an einer Stelle,
+       an der sie entscheidet. */
+    /* KURZ VOR DER ANKUNFT: hinBis liegt eine Sekunde VOR uns, der Anflug ist also zu 99,8 %
+       durch. Alle anderen Zeiten bleiben wie im Hauptlauf - der einzige Unterschied ist die
+       Phase, sonst maesse 2f etwas, das sich auch aus einem anderen Grund unterscheiden koennte. */
+    /* KURZ VOR DER ANKUNFT heisst hier: der Anflug ist zu 99,94 % durch. Das ist gemessen und
+       nicht grosszuegig gewaehlt - ein erster Entwurf setzte `hinBis` nur eine Sekunde voraus, bei
+       einem 30-Sekunden-Anflug sind das aber erst 96,8 %, und dort liegt AUCH der springende Stand
+       rund siebzehn Einheiten entfernt. Die Pruefung war damit gruen, ohne zu unterscheiden.
+       Der lange Anflug (zehn Stunden) loest beides zugleich: Der Rest-Anteil wird winzig, und
+       `hinBis` bleibt trotzdem weit genug in der Zukunft, dass der Seitenaufbau ihn nicht
+       ueberholt - sonst maesse der Lauf die Foerderphase und 2f waere eine Kopie von 2a. */
+    const t5 = await karte(browser, { [SAVE_KEY]: stand({
+      zeiten: { startTime: jetzt - 36000000, hinBis: jetzt + 120000,
+                abbauBis: jetzt + 870000, endTime: jetzt + 900000 } }) });
+    const ortV = await markenOrt(t5.page);
+    /* BELEGEN, DASS WIRKLICH DER ANFLUG GEMESSEN WURDE. Ein erster Entwurf setzte `hinBis` nur
+       zwanzig Sekunden voraus - der Seitenaufbau samt Regionssuche brauchte laenger, der Lauf mass
+       also die FOERDERPHASE und 2f war eine Kopie von 2a: gruen auf beiden Staenden, ohne je zu
+       unterscheiden. Die Beschriftung sagt die Phase: „foerdert" steht nur waehrend des Abbaus. */
+    const formV = await messeForm(t5.page);
+    await t5.ctx.close();
+    const imAnflug = !(formV.texte || []).some(t => /fördert/.test(t));
+    check('2f-vorab: der Lauf hat wirklich den ANFLUG gemessen, nicht die Foerderung',
+      imAnflug === true, { texte: (formV.texte || []).filter(t => /Erzzug/.test(t)) });
+    const dVor = (ortV && ortV.ziel) ? Math.hypot(ortV.x - ortV.ziel.x, ortV.y - ortV.ziel.y) : null;
+    check('2f: schon kurz vor der Ankunft steht die Marke am Halteplatz - kein Sprung beim Umschalten',
+      imAnflug === true && dZiel !== null && dVor !== null && Math.abs(dVor - dZiel) < 3,
+      { kurzVorAnkunft: dVor === null ? null : +dVor.toFixed(1),
+        waehrendFoerderung: dZiel === null ? null : +dZiel.toFixed(1),
+        unterschied: (dVor !== null && dZiel !== null) ? +Math.abs(dVor - dZiel).toFixed(1) : null });
+
+    check('2e: er bewegt sich und faengt keine Klicks ab',
+      str.some(l => l.animiert) && str.every(l => l.zeiger === 'none'),
+      { animiert: str.filter(l => l.animiert).length, zeiger: str.map(l => l.zeiger) });
 
     check('2b: und die Beschriftung sagt, was sie tut',
       (bergbau.texte || []).some(t => /Erzzug/.test(t) && /fördert/.test(t)),

@@ -155,6 +155,49 @@ function backend(store) {
   check('6: die Systemebene zeichnet keine Territoriums-Fläche mehr und der Routen-Knopf ist wieder sichtbar',
     !imSystem.terr && imSystem.leisteSichtbar && imSystem.routen.sichtbar === true, imSystem);
 
+  /* ---- 7) KS-4: DIE LEISTE STEHT AUCH AUF DER REGIONSUEBERSICHT --------------------------
+     Bis zum 08.09.2026 blendete `buildGalaxyMap` sie dort aus (`karteSektorOffen ? '' : 'none'`),
+     WAEHREND ihre Schalter dort weiterwirkten: `sektorUebersichtBauen` ruft `karteSystemBadges`
+     und `systemDominanz`, und beide filtern ueber `karteEbeneAn`. Wer in der Sektoransicht
+     „Ereignisse" ausschaltete und zurueckging, sah eine duennere Uebersicht ohne sichtbaren
+     Grund und ohne Bedienelement - und der Zustand ueberlebt den Spielstand.
+     GEMESSEN WIRD BEIDES, und nur zusammen ist es ein Beleg: dass die Schalter dort WIRKEN
+     (die Uebersicht aendert sich messbar) und dass sie dort ERREICHBAR sind. Die halbe Messung
+     waere aus dem falschen Grund gruen - eine unsichtbare Leiste ueber einer Ansicht, auf die
+     sie gar nicht wirkt, waere ja richtig. */
+  /* ZWEI SCHRITTE, nicht einer: Pruefung 6 hat ein System geoeffnet. Der ⌂-Knopf ist ein
+     Kartenknoten der SEKTOR-Ansichten und existiert in der Systemebene gar nicht - erst schliesst
+     `galaxyBackBtn` das System, dann traegt ⌂ zur Uebersicht. Der erste Entwurf sprang direkt auf
+     ⌂ und mass `istUebersicht:false`, also gar nicht die Uebersicht. */
+  await page.evaluate(() => {
+    const b = document.getElementById('galaxyBackBtn');
+    if (b && b.style.display !== 'none') b.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await page.waitForTimeout(900);
+  await page.evaluate(() => {
+    const h = document.querySelector('#galaxyMapSvg [data-kb-knopf="heimweg"]');
+    if (h) h.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await page.waitForTimeout(900);
+  const uebersicht = () => page.evaluate(() => {
+    const svg = document.getElementById('galaxyMapSvg');
+    const l = document.getElementById('karteEbenenLeiste');
+    const k = l && l.querySelector('[data-karte-ebene="ereignisse"]');
+    return { istUebersicht: !!svg.querySelector('[data-sektor]'),
+             leisteSichtbar: !!l && l.style.display !== 'none' && l.getClientRects().length > 0,
+             knopfSichtbar: !!k && k.style.display !== 'none' && k.getClientRects().length > 0,
+             zeichen: (svg.textContent || '').length };
+  });
+  const uebAn = await uebersicht();
+  check('7: auf der Regionsuebersicht ist die Ebenen-Leiste erreichbar',
+    uebAn.istUebersicht && uebAn.leisteSichtbar && uebAn.knopfSichtbar, uebAn);
+  await page.evaluate(() => document.querySelector('#karteEbenenLeiste [data-karte-ebene="ereignisse"]').click());
+  await page.waitForTimeout(900);
+  const uebAus = await uebersicht();
+  check('7a: und ihr Schalter wirkt dort wirklich - die Uebersicht wird messbar duenner',
+    uebAus.istUebersicht && uebAus.zeichen < uebAn.zeichen,
+    { mitEreignissen: uebAn.zeichen, ohne: uebAus.zeichen });
+
   check('6: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
   await ende(async () => browser.close());
 })();

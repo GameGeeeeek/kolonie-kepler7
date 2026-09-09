@@ -218,7 +218,7 @@ async function tab(browser, stand, opt){
   await t2.ctx.close();
 
   // ------------------------------------------------- 3) Die Vorschau MISST (Paar-Messung)
-  async function vorschauText(mitPlan){
+  async function vorschauText(mitPlan, schalterAus){
     const t = await tab(browser, grundstand(mitPlan ? { belagerungsplan:true } : {}));
     await klick(t.page, '.tab-btn[data-tab="karte"]');
     await t.page.waitForTimeout(800);
@@ -231,6 +231,13 @@ async function tab(browser, stand, opt){
       if (b) b.click();
     });
     await t.page.waitForTimeout(1400);
+    /* KS-7: Der Schalter „für diesen Schlag verwenden" wird HIER umgelegt, im selben offenen
+       Dialog - so misst 3e denselben Lauf einmal mit und einmal ohne, statt zwei Laeufe zu
+       vergleichen, die sich auch aus anderen Gruenden unterscheiden koennten. */
+    if (schalterAus){
+      await t.page.evaluate(() => { const b = document.querySelector('[data-fest-plan]'); if (b) b.click(); });
+      await t.page.waitForTimeout(500);
+    }
     const txt = await t.page.evaluate(() => {
       const o = document.getElementById('fwahlOverlay');
       return o ? (o.innerText || '') : '';
@@ -240,6 +247,7 @@ async function tab(browser, stand, opt){
   }
   const vOhne = await vorschauText(false);
   const vMit  = await vorschauText(true);
+  const vAbgewaehlt = await vorschauText(true, true);
   const spanne = t => (t.match(/rechne mit rund (\d+)[–-](\d+)%/) || []).slice(1, 3).join('-');
   const sOhne = spanne(vOhne), sMit = spanne(vMit);
   check('3-vorab: beide Laeufe zeigen ueberhaupt eine Verlustspanne', !!sOhne && !!sMit, { sOhne, sMit });
@@ -251,6 +259,24 @@ async function tab(browser, stand, opt){
     /Belagerungsplan vorgemerkt/.test(vMit) && new RegExp('ohne ihn wären es ' + sOhne.replace('-', '[–-]')).test(vMit),
     { auszug: (vMit.match(/Belagerungsplan[^\n]*/) || [''])[0] });
   check('3c: ohne Vormerkung steht die Zeile NICHT da', !/Belagerungsplan vorgemerkt/.test(vOhne));
+
+  /* ---- KS-7: DER PLAN IST FUER DIESEN SCHLAG WAEHLBAR --------------------------------------
+     Bis zum 08.09.2026 wurde eine Vormerkung bedingungslos am NAECHSTEN Festungsschlag
+     verbraucht - ein episches Fundstueck mit 1,2 % Chance verpuffte also an der Schanze, wenn die
+     zufaellig vor der Sternenfeste dran war. */
+  const spanneAb = spanne(vAbgewaehlt);
+  check('3d: der Schalter steht im Dialog, sobald eine Vormerkung da ist',
+    /Belagerungsplan f\u00fcr diesen Schlag verwenden/.test(vMit) && !/Belagerungsplan f\u00fcr diesen Schlag verwenden/.test(vOhne),
+    { mit: /Belagerungsplan f\u00fcr diesen Schlag verwenden/.test(vMit), ohne: /Belagerungsplan f\u00fcr diesen Schlag verwenden/.test(vOhne) });
+  /* Die eigentliche Zusage ist die ZAHL, nicht der Knopf: Abgewaehlt muss die Verlustspanne wieder
+     die ungekuerzte sein. Eine Pruefung auf den Knopftext waere auch bei voellig wirkungslosem
+     Schalter gruen - derselbe Grund, aus dem 3a die Spanne misst. */
+  check('3e: abgewaehlt zeigt die Vorschau wieder die ungekuerzte Spanne',
+    !!spanneAb && spanneAb === sOhne && spanneAb !== sMit,
+    { ohnePlan: sOhne, mitPlan: sMit, abgewaehlt: spanneAb });
+  check('3f: und sagt, was mit der Vormerkung dann geschieht',
+    /bleibt f\u00fcr ein lohnenderes Ziel vorgemerkt/.test(vAbgewaehlt),
+    { auszug: (vAbgewaehlt.match(/Belagerungsplan f\u00fcr diesen Schlag[^\n]*/) || [''])[0] });
 
   // ------------------------------------------------- 4) Die gebuchten Verluste (Paar-Messung)
   async function schlag(mitPlan){

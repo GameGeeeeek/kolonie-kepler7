@@ -18,7 +18,14 @@
 //   NICHTS zu sehen sein - das ist die Haelfte, die eine Aufklaerung ueberhaupt erst zu einer
 //   Aufklaerung macht. 3a belegt, dass die eigene Praesenz sie oeffnet.
 //
+// KB-31 (1g): Der Bahn-Waechter erkennt die Flugbahn an `data-kb-bahn` statt an ihrer
+//   Strichstaerke. 1g stellt die Falle selbst auf - ein Vorposten mit zwei Projektlinien
+//   derselben Signatur - und misst BEIDE Wege nebeneinander, damit der Befund belegt ist und
+//   nicht behauptet.
+//
 // GEGENPROBE: KEPLER_KAF_GEGENPROBE=alt gegen den Stand vor KA-2/KA-3.
+//   KEPLER_KAF_GEGENPROBE=bahn gegen den Stand vor KB-31: dort gibt es kein `data-kb-bahn`,
+//   1d und 1g fallen beide.
 const fs = require('fs');
 const { starteBrowser, SPIELDATEI, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -32,12 +39,35 @@ const SAB = process.env.KEPLER_KAF_GEGENPROBE || '';
    und ohne KA-3 ist dort nie etwas zu sehen. Es belegt also nichts ueber KA-3; scharf wird es
    erst am neuen Stand, wo etwas zu sehen sein KANN. Dieselbe Ueberlegung wie bei 2a/3a in
    test_kampfanimation.js. */
-const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '1d', '1e', '3a', '3b'] };
+const MUSS_FALLEN = { alt: ['1a', '1b', '1c', '1d', '1e', '3a', '3b'], bahn: ['1d', '1g'] };
 
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
 
-function backend(store){
+/* EIN VORPOSTEN MIT ZWEI KOEDERLINIEN (KB-31). `tiefenhorchen` und `sprungtor` zeichnen je eine
+   <line> mit stroke-width 1.5 und ohne dasharray - dieselbe Signatur, die der Bahn-Waechter hier
+   frueher als Suchmuster benutzte. Sie stehen VOR den Routen im Markup, also traf `linien[0]` sie
+   und nicht die Flugbahn. Das Fixture stellt genau diese Falle auf. */
+function vorpostenAntwort(){
+  const jetzt = Date.now();
+  const stufen = [1,2,3,4,5,6,7,8].map(n => ({ stufe:n, name:'Stufe '+n, kernLp: 20000*n, verteidigung: 2500*n,
+    garnisonMax: 300*n, flug:0.06, prod:0.015, scan:1, kosten: n===1?null:{ erz:1000 } }));
+  return { ok:true, aktiv:true, bauAktiv:true, maxJeKonto:3, schutzMs:43200000, abklingMs:14400000,
+    ausbauMs:43200000, garnisonFaktor:0.5, stufen, zweigAb:4, maxStufe:8, eigene:1,
+    zweige:[{ key:'werft', name:'Werft', kurz:'x', namen:{4:'Werftgerüst',5:'Dockring',6:'Schiffsschmiede',7:'Flottenwerft',8:'Sternenwerft'}, mult:{} }],
+    modulDefs:[], modulSeltenheiten:{}, modulBestand:{}, modulSlotsMax:5, projektDefs:[], projekteAktiv:true,
+    flugDeckel:0.5, abbauMs:86400000, abbauAktiv:true, lagerAktiv:true, dockMax:7,
+    liste:[{ id:'vp-k', sys:SYS, besitzer:'u', besitzerName:'A', seit: jetzt-86400000,
+      stufe:8, name:'Sternenwerft', zweig:'werft', zweigName:'Werft', maxStufe:8,
+      kern:{ lp:100000, lpMax:100000 }, verteidigung:20000,
+      garnisonAnzahl:0, garnisonMax:3000, garnison:{},
+      slots:5, module:[], modulBoni:null, projekte:['tiefenhorchen','sprungtor'], projektBoni:null,
+      lager:{}, lagerVollAb: jetzt+36e5, dockBereit:0,
+      abbauAb:null, schutzBis:0, ausbauAb: jetzt-1000,
+      nutzen:{ flug:0.2, prod:0.05, scan:3, flugDeckel:0.5 }, eigener:true,
+      anflug:[], meinLetzterSchlag:0, letzterKampf:null, kampfverlauf:[], naechsteStufe:null }] };
+}
+function backend(store, mitVorposten){
   return async r => {
     const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body: JSON.stringify(o) });
@@ -46,6 +76,7 @@ function backend(store){
     if (p === 'galaxy') return j({ npcEmpireStrength:1, marketTrend:1, unlockedAlienRaces:[], collapsedSystems:{},
       activeWormhole:null, news:[], controlledSystems:{}, factions:{}, alienNester: [] });
     if (p === 'asteroid/field') return j({ systeme:[SYS], felder:{ [SYS]: { plaetze:{} } } });
+    if (p === 'vorposten' && mitVorposten) return j(vorpostenAntwort());
     if (p === 'storage-list') return j({ keys: Object.keys(store).filter(k => k.indexOf('__') !== 0) });
     if (p.startsWith('storage/')){
       const k = decodeURIComponent(p.slice(8));
@@ -59,12 +90,12 @@ function backend(store){
     return j({});
   };
 }
-async function karte(browser, store){
+async function karte(browser, store, mitVorposten){
   const ctx = await browser.newContext({ viewport: { width:1280, height:900 } });
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', e => errs.push(String(e)));
-  await page.route('**/api/**', backend(store));
+  await page.route('**/api/**', backend(store, !!mitVorposten));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(4000);
@@ -92,7 +123,20 @@ async function messeMarke(page, farbe){
     const g = gruppen[0];
     const mt = (g.getAttribute('transform')||'').match(/translate\(([-\d.]+),([-\d.]+)\)\s*rotate\(([-\d.]+)\)/);
     const bilder = [...g.querySelectorAll('image')];
-    const linien = [...svg.querySelectorAll('line')].filter(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray'));
+    /* DIE BAHN WIRD AN IHREM MERKMAL ERKANNT, nicht an ihrer Strichstaerke (KB-31, 08.09.2026).
+       Vorher stand hier ein Filter ueber "stroke-width 1.5 und kein dasharray" und danach
+       linien[0]. Dieselbe Signatur tragen zwei Linien der Vorposten-Silhouette (Peilstrahl des
+       Tiefenhorchens, Mast zum Sprungtor), und die stehen VOR den Routen im Markup - steht ein
+       Vorposten im System, mass der Waechter dessen Mast. Gefallen ist er nie, weil kein Fixture
+       hier einen Vorposten setzt; die Pruefung war also seit ihrem ersten Tag von der Abwesenheit
+       eines Vorpostens abhaengig, ohne dass das irgendwo stand. */
+    const linien = [...svg.querySelectorAll('line[data-kb-bahn]')];
+    /* DER ALTE WEG WIRD MITGEMESSEN, nicht nur ersetzt. Sonst belegte die Pruefung zwar, dass der
+       neue Weg funktioniert, aber nie, dass der alte falsch war - und der Befund waere eine
+       Behauptung geblieben. `koeder` ist die Zahl der Linien, die das alte Suchmuster traf. */
+    const alteTreffer = [...svg.querySelectorAll('line')].filter(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray'));
+    const winkelVon = l => Math.round(Math.atan2(+l.getAttribute('y2') - +l.getAttribute('y1'), +l.getAttribute('x2') - +l.getAttribute('x1')) * 180/Math.PI);
+    const bahnAlt = alteTreffer.length ? winkelVon(alteTreffer[0]) : null;
     let bahn = null;
     if (linien.length){
       const l = linien[0];
@@ -102,7 +146,7 @@ async function messeMarke(page, farbe){
     const kasten = g.getBoundingClientRect();
     return { svg:true, marke:true, pfeile, bilder: bilder.length,
       groessen: bilder.map(i => Number(i.getAttribute('width'))).sort((a,b) => a-b),
-      winkel: w, bahn, abweichung: (w !== null && bahn !== null) ? Math.round(((w - bahn) % 360 + 540) % 360 - 180) : null,
+      winkel: w, bahn, bahnAlt, koeder: alteTreffer.length, bahnZahl: linien.length, abweichung: (w !== null && bahn !== null) ? Math.round(((w - bahn) % 360 + 540) % 360 - 180) : null,
       breite: Math.round(kasten.width), hoehe: Math.round(kasten.height),
       texte: [...svg.querySelectorAll('text')].map(t => (t.textContent||'').trim()).filter(t => /Schiffe?$|Rückflug/.test(t)) };
   }, farbe || '');
@@ -167,6 +211,29 @@ async function messeFremde(page){
       mk.marke === true && mg.marke === true && mg.bilder > mk.bilder,
       { klein: mk.bilder, gross: mg.bilder, groessenGross: mg.groessen });
     await t2.ctx.close();
+
+    /* 1g: KB-31 - DIE BAHN WIRD AN IHREM MERKMAL ERKANNT, nicht an ihrer Strichstaerke.
+       Derselbe Lauf wie 1a-1f, nur steht jetzt ein eigener Vorposten mit den Projekten
+       `tiefenhorchen` und `sprungtor` im System. Beide zeichnen eine <line> mit stroke-width 1.5
+       und ohne dasharray - dieselbe Signatur, ueber die dieser Waechter die Flugbahn frueher
+       suchte - und sie stehen VOR den Routen im Markup.
+       GEMESSEN WERDEN BEIDE WEGE NEBENEINANDER, und das ist der Kern: `bahnAlt` ist der Winkel,
+       den das alte Suchmuster geliefert haette, `bahn` der des neuen. Sind sie verschieden, ist
+       der Befund belegt statt behauptet - der alte Weg mass wirklich den falschen Strich. Und die
+       Flottenmarke steht auf dem NEUEN, nicht auf dem alten.
+       Der Fall ist nie aufgefallen, weil kein Fixture dieser drei Waechter einen Vorposten setzt:
+       Die Pruefung hing seit ihrem ersten Tag an der Abwesenheit eines Vorpostens, ohne dass das
+       irgendwo stand. */
+    const sVp = { [SAVE_KEY]: stand({ comp: { spaeher: 3 } }) };
+    const t2b = await karte(browser, sVp, true);
+    const mv = await messeMarke(t2b.page);
+    check('1g: mit einem Vorposten im System findet der Waechter die BAHN und nicht dessen Projektlinien',
+      mv.marke === true && mv.bahnZahl >= 1 && mv.koeder > mv.bahnZahl
+      && mv.bahnAlt !== mv.bahn && mv.abweichung === 0,
+      { koeder: mv.koeder, bahnen: mv.bahnZahl, winkelAltesMuster: mv.bahnAlt,
+        winkelBahn: mv.bahn, markenwinkel: mv.winkel, abweichung: mv.abweichung });
+    check('1h: und dabei keine Skriptfehler', t2b.errs.length === 0, t2b.errs.slice(0, 2));
+    await t2b.ctx.close();
 
     // ---- 2) KA-3: ohne Praesenz sieht man NICHTS ---------------------------------------------
     const sOhne = { [SAVE_KEY]: stand({}), 'missions:x9': fremdeMeldung };

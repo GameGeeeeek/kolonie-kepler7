@@ -97,7 +97,14 @@ async function messeMarke(page, farbe){
     const g = gruppen[0];
     const mt = (g.getAttribute('transform')||'').match(/translate\(([-\d.]+),([-\d.]+)\)\s*rotate\(([-\d.]+)\)/);
     const bilder = [...g.querySelectorAll('image')];
-    const linien = [...svg.querySelectorAll('line')].filter(l => Number(l.getAttribute('stroke-width')) === 1.5 && !l.getAttribute('stroke-dasharray'));
+    /* DIE BAHN WIRD AN IHREM MERKMAL ERKANNT, nicht an ihrer Strichstaerke (KB-31, 08.09.2026).
+       Vorher stand hier ein Filter ueber "stroke-width 1.5 und kein dasharray" und danach
+       linien[0]. Dieselbe Signatur tragen zwei Linien der Vorposten-Silhouette (Peilstrahl des
+       Tiefenhorchens, Mast zum Sprungtor), und die stehen VOR den Routen im Markup - steht ein
+       Vorposten im System, mass der Waechter dessen Mast. Gefallen ist er nie, weil kein Fixture
+       hier einen Vorposten setzt; die Pruefung war also seit ihrem ersten Tag von der Abwesenheit
+       eines Vorpostens abhaengig, ohne dass das irgendwo stand. */
+    const linien = [...svg.querySelectorAll('line[data-kb-bahn]')];
     let bahn = null;
     if (linien.length){
       const l = linien[0];

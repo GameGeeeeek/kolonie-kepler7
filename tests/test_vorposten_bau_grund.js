@@ -24,9 +24,22 @@ const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const ICH = 'u-ich';
 
 // ---- 0) Quelltext -------------------------------------------------------------------------------
+/* 0a prueft die REGEL, nicht den Wortlaut der Bedingung (nachgezogen 08.09.2026): Die erste
+   Fassung pinnte `${grundB ? …}` zeichengenau fest und fiel, als eine zweite Sperrlage
+   dazukam (`(grundB || slotsVoll)`) - obwohl die Zusage unveraendert galt. Die Zusage lautet:
+   Der Knopf wird nur OPTISCH gedaempft (aria-disabled + opacity), nie mit `disabled`, denn ein
+   gesperrter Knopf feuert keinen Klick und der Grund kaeme nie beim Spieler an. Gemessen wird
+   deshalb der Knopf-Bauplan als Ganzes - der Anker wird vorher auf Existenz geprueft, sonst
+   waere die Pruefung an einem umbenannten Knopf still gruen. */
+const bauAnker = src.indexOf('data-vorposten-bau="1"');
+const bauMarkup = bauAnker >= 0 ? src.slice(bauAnker, src.indexOf('</button>', bauAnker)) : '';
 check('0a: der Bau-Knopf ist NICHT mehr disabled (ein gesperrter Knopf feuert keinen Klick)',
-  /data-vorposten-bau="1" \$\{grundB \? 'aria-disabled="true" style="opacity:0\.55;"' : ''\}/.test(src)
-  && !/data-vorposten-bau="1" \$\{grundB \? 'disabled' : ''\}/.test(src));
+  bauMarkup.length > 0
+  && /aria-disabled="true" style="opacity:0\.55;"/.test(bauMarkup)
+  && / \? '/.test(bauMarkup)
+  /* Die Verneinung darf `aria-disabled` NICHT treffen - ein `\b` vor `disabled` tut das, weil
+     der Bindestrich eine Wortgrenze ist (gemessen: die Pruefung fiel auf richtigem Code). */
+  && !/(?<![-\w])disabled/.test(bauMarkup));
 check('0b: vorpostenBauStarten meldet den Grund als warn (9 s, wartet auf freie Sicht)',
   /if \(grund\)\{ log\(grund, 'ti-alert-triangle', 'warn'\); return; \}/.test(src));
 check('0c: ein Lager, das die Baukosten nie fasst, wird als solches benannt (mit Ausweg)',
