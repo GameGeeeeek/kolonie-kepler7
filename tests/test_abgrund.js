@@ -103,8 +103,10 @@ function baueKontext(zustand){
     // abgrundSektor beim ersten Aufruf.
     fnAus('abgrundStroemung'),
     fnAus('abgrundRng'), fnAus('abgrundSektor'), fnAus('abgrundMutatorAnzahl'),
-    // ensureAbgrund liest seit v8.712.0 ABGRUND_PLAN_MAX (Deckel des Tauchplans).
+    // ensureAbgrund liest seit v8.712.0 den Deckel des Tauchplans UND die Liste der
+    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist).
     konstAus('ABGRUND_PLAN_MAX'),
+    'const ABGRUND_PLAN_LINIEN = '+block('ABGRUND_PLAN_LINIEN')+';',
     fnAus('ensureAbgrund'), fnAus('abgrundMaxTiefe'), fnAus('abgrundGewaehlteTiefe'),
     fnAus('abgrundWiederholungsFaktor'), fnAus('abgrundWerkstattStufe'),
     fnAus('abgrundWerkstattKosten'), fnAus('abgrundWerkstattBonus'),
@@ -538,8 +540,10 @@ const aktuelleWoche = G.weekKeyOf(Date.now());
 function markenKontext(zustand, summe){
   const quelle = [
     block('ABGRUND_ALLIANZ_MARKEN') ? 'const ABGRUND_ALLIANZ_MARKEN = '+block('ABGRUND_ALLIANZ_MARKEN')+';' : '',
-    // ensureAbgrund liest seit v8.712.0 ABGRUND_PLAN_MAX (Deckel des Tauchplans).
+    // ensureAbgrund liest seit v8.712.0 den Deckel des Tauchplans UND die Liste der
+    // Sicherheitslinien (es prueft, ob der gespeicherte Wert einer davon ist).
     konstAus('ABGRUND_PLAN_MAX'),
+    'const ABGRUND_PLAN_LINIEN = '+block('ABGRUND_PLAN_LINIEN')+';',
     fnAus('weekKeyOf'), fnAus('ensureAbgrund'), fnAus('abgrundWochenpflege'),
     'function abgrundAllianzSumme(){ return SUMME; }'.replace('SUMME', String(summe)),
     fnAus('abgrundAllianzMarkeErreicht'), fnAus('holeAbgrundAllianzMarke'),
@@ -684,7 +688,26 @@ check('11: die Gegenmassnahme wird beim START verbraucht, nicht bei der Rueckkeh
 // pruefen wollen. Geprueft wird deshalb: In der Zeile, die den Sektor bei der RUECKKEHR nachbaut
 // (erkennbar an `m.`, nicht an ihrer Reihenfolge), kommt jeder Wert aus der Mission.
 {
-  const zeile = (js.match(/abgrundSektorMitBann\([^\n]*/g) || []).filter(z => z.indexOf('m.') >= 0)[0] || '';
+/* DIE ANWEISUNG, NICHT DIE ZEILE. Der Aufruf ist seit v8.712.0 auf drei Zeilen umgebrochen (die
+   Verbrauchsgegenstaende gelten nur fuer den ersten Sektor, das passt nicht mehr in eine Zeile).
+   Jeder zeilenbasierte Anker riss damit auseinander und meldete einen Fehler auf voellig richtigem
+   Code - viermal am 09.09.2026. Geschnitten wird deshalb vom `const sektor =` bis zum
+   abschliessenden Semikolon; der Anker wird vorher auf Existenz geprueft, sonst liefe der Slice
+   ueber die halbe Datei und die Pruefung waere aus dem falschen Grund gruen. */
+function aufloesungsAufruf(quelle){
+  /* Es gibt ZWEI solche Anweisungen: eine beim Abtauchen (sendeAbgrundMission, mit `roh`) und eine
+     bei der Aufloesung (mit `m.`). Gesucht ist die zweite - erkennbar daran, dass sie aus der
+     MISSION liest, nicht an ihrer Reihenfolge in der Datei. */
+  const treffer = [];
+  let i = quelle.indexOf('const sektor = abgrundSektorMitBann(');
+  while (i >= 0){
+    const bis = quelle.indexOf(';', i);
+    if (bis > i) treffer.push(quelle.slice(i, bis + 1));
+    i = quelle.indexOf('const sektor = abgrundSektorMitBann(', i + 1);
+  }
+  return treffer.filter(t => t.indexOf('m.') >= 0)[0] || '';
+}
+  const zeile = aufloesungsAufruf(js);
   check('11: die Aufloesung baut den Sektor aus der Mission nach', zeile.length > 40, zeile.slice(0, 140));
   const fehlend = ['m.bann', 'm.spule'].filter(x => zeile.indexOf(x) < 0);
   check('11: der Bann kommt bei der Aufloesung aus der MISSION', fehlend.length === 0, { fehlend });

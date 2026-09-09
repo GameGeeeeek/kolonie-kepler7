@@ -386,7 +386,26 @@ check('6: die Beute bleibt Sache des Bergungskrans',
   // Wert dazukam (abgrundSektor(tiefe, !!m.ruf)) - also genau dann, als die Regel, die sie schuetzen
   // soll, VERSTAERKT wurde. Vierte Kopie derselben Zeile; die drei anderen stehen in
   // test_abgrund.js und test_abgrund_gegenstaende.js und sind am selben Tag umgestellt worden.
-  const aufrufAbrechnung = js.split('\n').find(z => z.includes('abgrundSektorMitBann(') && z.includes('m.bann')) || '';
+/* DIE ANWEISUNG, NICHT DIE ZEILE. Der Aufruf ist seit v8.712.0 auf drei Zeilen umgebrochen (die
+   Verbrauchsgegenstaende gelten nur fuer den ersten Sektor, das passt nicht mehr in eine Zeile).
+   Jeder zeilenbasierte Anker riss damit auseinander und meldete einen Fehler auf voellig richtigem
+   Code - viermal am 09.09.2026. Geschnitten wird deshalb vom `const sektor =` bis zum
+   abschliessenden Semikolon; der Anker wird vorher auf Existenz geprueft, sonst liefe der Slice
+   ueber die halbe Datei und die Pruefung waere aus dem falschen Grund gruen. */
+function aufloesungsAufruf(quelle){
+  /* Es gibt ZWEI solche Anweisungen: eine beim Abtauchen (sendeAbgrundMission, mit `roh`) und eine
+     bei der Aufloesung (mit `m.`). Gesucht ist die zweite - erkennbar daran, dass sie aus der
+     MISSION liest, nicht an ihrer Reihenfolge in der Datei. */
+  const treffer = [];
+  let i = quelle.indexOf('const sektor = abgrundSektorMitBann(');
+  while (i >= 0){
+    const bis = quelle.indexOf(';', i);
+    if (bis > i) treffer.push(quelle.slice(i, bis + 1));
+    i = quelle.indexOf('const sektor = abgrundSektorMitBann(', i + 1);
+  }
+  return treffer.filter(t => t.indexOf('m.') >= 0)[0] || '';
+}
+  const aufrufAbrechnung = aufloesungsAufruf(js);
   check('7: die Abrechnungs-Aufrufstelle ist auffindbar', !!aufrufAbrechnung);
   /* SEIT v8.712.0 (Tauchplan) kommt die mitgeflogene Flotte nicht mehr in jeder Zeile einzeln aus
    `m.composition`, sondern GENAU EINMAL: Der Plan fuehrt sie in `komp` mit und kuerzt sie zwischen
