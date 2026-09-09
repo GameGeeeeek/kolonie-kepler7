@@ -249,8 +249,12 @@ check('5: und nie ueber die Obergrenze', AD(100000, 5, {}) === 4*3600);
 }
 
 // Kessel und Kran an ihren Verrechnungsstellen.
+// Seit v8.714.0 in abgrundSchiffsschutz zusammengefuehrt (die Gegenschlag-Waechterregel braucht
+// denselben Wert). Geprueft wird jetzt die Funktion UND ihr Aufruf in der Abrechnung - eine zweite
+// Kopie daneben faellt damit auf, die alte Fassung haette sie durchgelassen.
 check('5: der Kessel senkt die Verluste multiplikativ, nicht in derselben Gruppe',
-  /\* \(1 - kesselSchutz\)/.test(js));
+  /\* \(1 - tiefenschiffBonus\(flotte, 'kessel'\)\)/.test(fnAus('abgrundSchiffsschutz'))
+  && /abgrundSchiffsschutz\(komp, tiefe\)/.test(js));
 check('5: der Kran traegt eigenen Laderaum, ohne fleetCargoCapacity anzufassen',
   /kraene \* CARGO_PER_BERGUNGSKRAN/.test(js) && !/bergungskran/.test(fnAus('fleetCargoCapacity')));
 // Seit v8.343.0 steht die Beute-Formel in abgrundBeuteFaktor() statt zweimal inline - deshalb

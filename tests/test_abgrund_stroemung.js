@@ -60,6 +60,11 @@ const fs = require('fs');
 const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
+// v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
+// stuerzt der Aufbau mit ReferenceError ab statt eine Pruefung zu melden. EINE Fassung fuer alle
+// fuenf Tests, die sie brauchen; sie wirft bei fehlendem Anker, statt still '' zu liefern.
+const { regelQuelle } = require('./lib/regelquelle');
+const regelQuelleAus = () => regelQuelle(js, fnAus);
 
 const ergebnis = {};
 let fail = false;
@@ -138,7 +143,7 @@ function baueKontext(){
     fnAus('abgrundBergungsgut'), fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'),
     // ensureAbgrund liest seit v8.712.0 ABGRUND_PLAN_MAX (Deckel des Tauchplans).
     konstAus('ABGRUND_PLAN_MAX'),
-    fnAus('abgrundWaechterDef'), fnAus('ensureAbgrund'), fnAus('abgrundSektor'),
+    regelQuelleAus(), fnAus('abgrundWaechterDef'), fnAus('ensureAbgrund'), fnAus('abgrundSektor'),
     'return { abgrundSektor, abgrundStroemung, abgrundWaechterDef, abgrundRng,'
       + ' abgrundStroemungVonFrueher, ABGRUND_STROEMUNG_ALT };'
   ].join('\n');

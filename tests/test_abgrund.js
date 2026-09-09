@@ -31,6 +31,11 @@ const path = require('path');
 const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
+// v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
+// stuerzt der Aufbau mit ReferenceError ab statt eine Pruefung zu melden. EINE Fassung fuer alle
+// fuenf Tests, die sie brauchen; sie wirft bei fehlendem Anker, statt still '' zu liefern.
+const { regelQuelle } = require('./lib/regelquelle');
+const regelQuelleAus = () => regelQuelle(js, fnAus);
 
 let fail = false;
 const check = (n, c, x) => { console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail = fail || !c; };
@@ -132,7 +137,7 @@ function baueKontext(zustand){
     konstAus('ABGRUND_WAECHTER_SPLITTER'), konstAus('ABGRUND_WAECHTER_BERGUNG'), konstAus('ABGRUND_GEGEN_KOSTEN'),
     fnAus('abgrundBergungsgut'),
     block('ABGRUND_WAECHTER_NAMEN') ? 'const ABGRUND_WAECHTER_NAMEN = '+block('ABGRUND_WAECHTER_NAMEN')+';' : (()=>{throw new Error('ABGRUND_WAECHTER_NAMEN fehlt')})(),
-    fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
+    regelQuelleAus(), fnAus('abgrundIstWaechter'), fnAus('abgrundRufAktiv'), fnAus('abgrundWaechterDef'), fnAus('abgrundSektorMitBann'),
     'return { abgrundSektor, abgrundStroemung, abgrundAnflugdauer, abgrundMutatorAnzahl, ensureAbgrund, abgrundMaxTiefe, abgrundGewaehlteTiefe,',
     '  abgrundWiederholungsFaktor, abgrundWerkstattStufe, abgrundWerkstattKosten, abgrundWerkstattBonus,',
     '  abgrundTiefenBonus, abgrundChronikOffen, abgrundFreigeschaltet, abgrundKampfkraft,',

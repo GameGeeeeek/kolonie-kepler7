@@ -154,8 +154,12 @@ check('C: der Kampfkraft-Deckel greift wirklich (kleiner als die Summe seiner Qu
 // Verluste sind der einzige Kanal, der MULTIPLIKATIV verrechnet wird - dort darf die Summe der
 // Einzelwerte ueber 1 liegen, ohne dass die Verluste je auf null fallen. Das steht so im Code und
 // muss auch so bleiben; addierte man sie, waeren Verluste bei genug Ausbau exakt null.
+// Seit v8.714.0 stehen Kiel und Kessel in abgrundSchiffsschutz; die Aussage bleibt dieselbe und
+// wird an beiden Enden gemessen - die Funktion multipliziert, und die Abrechnung multipliziert den
+// Werkstattschutz darauf.
 check('C: die Verluste bleiben multiplikativ verrechnet (nie exakt null)',
-  /\(1 - abgrundKanalBonus\('verlust'\)\) \* \(1 - Math\.min\(0\.5, kiel\)\) \* \(1 - kesselSchutz\)/.test(js));
+  /const panzer = \(1 - abgrundKanalBonus\('verlust'\)\) \* abgrundSchiffsschutz\(komp, tiefe\);/.test(js)
+  && /\(1 - Math\.min\(0\.5, kiel\)\) \* \(1 - tiefenschiffBonus\(flotte, 'kessel'\)\)/.test(js));
 
 // ---- D) DER ANREIZ: was bringt Abtauchen ausserhalb des Abgrunds? ----
 // Nur ZWEI Dinge wirken oben: der Tiefenbonus auf die Produktion und die vier Abgrund-

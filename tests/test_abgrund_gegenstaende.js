@@ -25,6 +25,11 @@ const path = require('path');
 const { SPIELDATEI } = require('./lib/spieldatei');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
+// v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
+// stuerzt der Aufbau mit ReferenceError ab statt eine Pruefung zu melden. EINE Fassung fuer alle
+// fuenf Tests, die sie brauchen; sie wirft bei fehlendem Anker, statt still '' zu liefern.
+const { regelQuelle } = require('./lib/regelquelle');
+const regelQuelleAus = () => regelQuelle(js, fnAus);
 
 let fail=false;
 const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | '+JSON.stringify(x):'')); fail=fail||!c; };
@@ -232,7 +237,7 @@ check('6: ein leerer Spielstand stuerzt nicht ab', RUF({})(1) === false);
    auch dann einen Waechter ergeben, wenn im Zustand keiner mehr steht. */
 {
   const WD = new Function('state, abgrundIstWaechter, abgrundRufAktiv, ABGRUND_WAECHTER_ALLE, ABGRUND_WAECHTER_NAMEN',
-    fnAus('abgrundWaechterDef') + '; return abgrundWaechterDef;');
+    regelQuelleAus() + fnAus('abgrundWaechterDef') + '; return abgrundWaechterDef;');
   const NAMEN = [{ name:'Pruefwaechter', text:'x' }];
   const ALLE = zahl('ABGRUND_WAECHTER_ALLE') || 10;
   // Ein Zustand OHNE Ruf - genau die Lage bei der Rueckkehr, nachdem der Ruf verbraucht wurde.

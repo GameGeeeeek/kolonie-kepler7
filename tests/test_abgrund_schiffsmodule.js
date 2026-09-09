@@ -181,18 +181,30 @@ check('4: Vorschau und Aufloesung geben beide die Flotte mit',
   /abgrundKampfkraft\(rohkraft, sektor, komp\)/.test(js));
 
 // ---- 5) Tiefenkiel: Verluste ----
-// Fenster grosszuegig: Seit v8.337.0 steht der Kessel-Kommentar zwischen Kiel-Definition und
-// Verlustzeile. Ein zu enges Fenster haette die Pruefung stillschweigend ins Leere laufen lassen.
-const kielStelle = js.slice(js.indexOf("const kiel = abgrundSchiffsmodul"), js.indexOf("const kiel = abgrundSchiffsmodul")+1200);
-check('5: der Kiel skaliert mit der Tiefe', /Math\.min\(1, tiefe\/50\)/.test(kielStelle), kielStelle.split('\n')[0]);
-check('5: er ist eigenstaendig gedeckelt', /Math\.min\(0\.5, kiel\)/.test(kielStelle));
+/* SEIT v8.714.0 STEHT DER SCHIFFSSEITIGE SCHUTZ IN EINER FUNKTION. Kiel und Kessel wurden
+   bis dahin in der Abrechnung inline gerechnet; die Gegenschlag-Waechterregel braucht denselben
+   Wert, um ihn aufzuheben, und haette ihn sonst ein zweites Mal hingeschrieben. Gemessen wird
+   deshalb die FUNKTION - und zusaetzlich, dass die Abrechnung sie auch wirklich ruft. Das ist
+   strenger als vorher: Die alte Fassung haette eine zweite, abweichende Kopie danebenstehen
+   lassen, solange nur die eine Zeile passte. */
+const schutzFn = (() => {
+  const i = js.indexOf('function abgrundSchiffsschutz(');
+  if (i < 0) return '';
+  let d=0, a=js.indexOf('{', i), k=a;
+  for(;k<js.length;k++){ if(js[k]==='{')d++; else if(js[k]==='}'){d--; if(!d)break;} }
+  return js.slice(i, k+1);
+})();
+check('5: der Kiel skaliert mit der Tiefe', /Math\.min\(1, \(tiefe\|\|1\)\/50\)/.test(schutzFn),
+  schutzFn.split('\n')[1]);
+check('5: er ist eigenstaendig gedeckelt', /Math\.min\(0\.5, kiel\)/.test(schutzFn));
 // Multiplikativ AUF den Werkstattschutz: eine gemeinsame additive Gruppe wuerde die 60%-Deckelung
 // der Tiefenpanzerung still aushebeln.
 // Seit v8.337.0 haengt der Kessel als DRITTER Faktor daran. Die Aussage bleibt dieselbe: drei
 // Quellen, die denselben Wert senken, wirken multiplikativ statt in einer gemeinsamen additiven
 // Gruppe - addiert laendeten sie schnell bei 100%, multiplikativ naehern sie sich der Null an.
 check('5: er wirkt multiplikativ auf den Werkstatt-/Reliquienschutz, nicht in derselben Gruppe',
-  /\(1 - abgrundKanalBonus\('verlust'\)\) \* \(1 - Math\.min\(0\.5, kiel\)\) \* \(1 - kesselSchutz\)/.test(js));
+  /\(1 - Math\.min\(0\.5, kiel\)\) \* \(1 - tiefenschiffBonus\(flotte, 'kessel'\)\)/.test(schutzFn)
+  && /const panzer = \(1 - abgrundKanalBonus\('verlust'\)\) \* abgrundSchiffsschutz\(komp, tiefe\);/.test(js));
 
 // ---- 6) Stillgaenger: Sondenreichweite ----
 const SR = new Function('abgrundWerkstattBonus, shipModuleBonusFor, ABGRUND_STILLGAENGER_MAX, state, lotsenbootSicht',
