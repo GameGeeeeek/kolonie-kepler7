@@ -526,3 +526,34 @@ Mega-Ausbaustufen steht damit noch; sie ist die nächste Ausbaustufe derselben M
 
 **Wenn nur eine kleine Sache passiert:** die **Verteidigungs-Erfolge** (4.3). Null von 102 ist eine
 Lücke, die jeder Verteidiger spürt, und die Zähler dafür laufen seit Monaten mit.
+
+---
+
+## 10. Paket vom 11.09.2026: sieben Bindungs-Features (Auftrag Sascha: „Alles umgesetzt, aber nicht Freiflug")
+
+Anlass war die Frage, welche Features noch Spielspaß und Bindung bringen. Die Inventur ergab: Tages-,
+Wochen- und Saisonschleifen, Allianzen, Endgame und Kosmetik sind längst da; was fehlte, waren
+**gemeinsame Ziele, Rivalität mit Einsatz und drei halbfertige Bausteine**. Alle sieben sind in
+EINEM Paket gebaut (Frontend-Zweig `claude/kolonie-teppler-gameplay-features-p1qyl7`, Backend
+gleichnamig); die Backend-Hälfte geht **zuerst** live, danach das Frontend – bei A, B, C und G
+entstehen sonst Belohnungen mit neuem Typ, die ein alter Client als „Dankeschön vom Team … Bug-Report"
+meldet.
+
+| # | Feature | Was es ist | Wo es liegt | Wächter |
+|---|---|---|---|---|
+| A | **Galaxie-Ziel der Woche** | Alle Spieler füllen einen Balken (Nest-, Festungs-, Konvoi- oder Weltboss-Schläge, Rotation je Woche, Zielhöhe aus der Zahl aktiver Spieler). Wer beigetragen hat, bekommt am Wochenende Kredite und Sternenstaub. Der Server zählt nur, was er selbst gewürfelt hat. | Backend `db.galaxy.galaxieZiel`, `docs/galaxie-ziel.md`; Karte im Galaxie-Nachrichten-Kasten | `test_galaxie_ziel_http.js` (3273), `test_galaxie_ziel.js` |
+| B | **Saison-Auftragsbuch** | Monatlicher Stufenplan (20 Stufen) aus serverbeobachteten Taten – Angriffe, Abwehr, Festung, Nest, Konvoi, Weltboss, Vorposten, Markt – mit Tagesdeckel je Art. Belohnungen: Kredite, Fragmente, Sternenstaub, Titel „Chronist der Saison". Der frühere Wochenpass scheiterte an klientenautoritativen Zählern; dieses Buch zählt ausschließlich am Nutzerobjekt. | Backend `user.auftragsbuch`, `GET/POST /api/auftragsbuch`, `docs/auftragsbuch.md`; Box unter der Saison-Liga | `test_auftragsbuch_http.js` (3274), `test_auftragsbuch.js` |
+| C | **Allianzkriege mit Einsatz** | Kriegspunkte vergibt der **Server** in `/api/attack` und `/api/vorposten/angriff` (Sieg 10, Niederlage 2, Abwehr 6, Vorposten 8, Tagesriegel 3 je Ziel); Client-Schreibzugriffe auf `wars`/`warmeta`/`warscore`/`warcontrib` sind zu. Erklärung und Frieden über Routen (7 Tage, höchstens zwei Kriege). Sieg zahlt 1200 Kredite + 15 Staub, Niederlage 200 Kredite; Allianz-Ruhm (Siege/Niederlagen) und Titel „Kriegsherren" ab drei Siegen. | Backend `docs/allianzkriege.md`; Kriegspanel im Allianz-Tab | `test_allianzkrieg_http.js` (3275), `test_allianzkrieg.js` |
+| D | **Vergeltungsschlag** | Nach jedem erlittenen Angriff 24 h lang ein Rachrecht: der Gegenschlag bringt +25 % Beuteanteil (nie über den Bestand) und +10 Kampfpunkte, das Recht ist mit dem Sieg verbraucht. Knopf im Bericht „Überfallen", Hinweis in der Angriffsvorschau, Zusatz im Push-Text. Anfängerschutz und Sockel-Regel unverändert. | Backend `user.rache`, `/api/me.rache`, `docs/rache.md` | `test_rache_http.js` (3276), `test_rache.js` |
+| E | **Vorposten-Endprojekte** | `VP_ENDPROJEKTE_AKTIV` umgelegt (Sternendock, Sternenmarkt, Sperrfeuerleitstand, Dominanz). Im Spiel nachgezogen: Sperrfeuer in der Angriffsvorschau, Endprojekt-Wirkung und Dominanz an der Station und auf der Karte, Sternenmarkt-Plätze in der Börse, Hilfe. | Backend `docs/vorposten.md` (V6, umgelegt 11.09.2026) | `test_vorposten_endprojekte_http.js` (3259, plus 0d), `test_vorposten_endprojekte.js` |
+| F | **Aufstieg eskalierend + Aufstiegs-Chronik** | Voraussetzung wächst mit jedem Aufstieg: Prestige 3 + ⌊n/3⌋, Punkte 50.000 × 1,6^min(n,10). Jeder Aufstieg schreibt einen Chronik-Eintrag (Nr., Datum, Punkte, Prestige, Essenz, gerettete Bastion) – sichtbar im Aufstiegs-Abschnitt, überlebt Prestige und Aufstieg. Erledigt damit **4.6**. | nur Frontend | `test_aufstieg_eskalation.js` |
+| G | **Patenschaft** | Wer über einen Einladungslink kommt, hat 30 Tage einen Paten. Fünf serverbeobachtete Meilensteine (erster Sieg, erste Abwehr, erster Nest-/Festungsschlag, erster Handel, fünf Tage Serie) zahlen **beiden** Seiten Kredite und Sternenstaub. Karte unter Einstellungen → Freunde einladen. | Backend `user.pate`/`user.schuetzlinge`, `GET /api/patenschaft`, `docs/patenschaft.md` | `test_patenschaft_http.js` (3277), `test_patenschaft.js` |
+
+**Nachgemessen und korrigiert:** Punkt **4.5** (Abgrund zweite Reihe) war bereits am 22.08.2026 mit
+C2 erledigt – `ABGRUND_RELIKTE` und `ABGRUND_WAECHTER_NAMEN` haben je 18 Einträge, die
+Tiefen-Meilensteine zahlen Sternenessenz; nur der Kommentar in `abgrundReliktDef` nannte noch
+Tiefe 120 (jetzt 180). Der Kommentar „Kriegspunkte: rein kosmetisch" im Backend war seit dem
+serverseitigen `war-victory`-Reward ebenfalls überholt; mit C stimmt beides wieder.
+
+**Bewusst nicht gebaut: Freiflug** (Entscheidung Sascha, 11.09.2026). `freiflug-konzept.md` bleibt
+als Bestandsaufnahme stehen.
