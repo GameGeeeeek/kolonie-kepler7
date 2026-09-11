@@ -4560,6 +4560,43 @@
   // Ablaufzeitpunkt des serverseitigen Angriffs-Schutzschilds (0 = keiner). Wird aus /api/me gesetzt und
   // beim eigenen Angriff sofort lokal geleert (Server bricht ihn dort ebenfalls).
   let myAttackShieldUntil = 0;
+  // ===== Vergeltung / Rache-Knopf (Feature D, 11.09.2026) =====
+  // Kopie-Familie mit dem Backend (RACHE_FENSTER_MS, RACHE_BEUTE_BONUS, RACHE_KAMPFPUNKTE in
+  // server.js) - tests/test_rache.js haelt die drei Zahlen zusammen. Das Fenster entscheidet hier
+  // nur, wie lange der Knopf im Bericht steht; OB ein Schlag ein Vergeltungsschlag ist, entscheidet
+  // allein der Server (er markiert den Bericht mit `rache`).
+  const RACHE_FENSTER_MS = 24 * 3600 * 1000;
+  const RACHE_BEUTE_BONUS = 0.25;
+  const RACHE_KAMPFPUNKTE = 10;
+  // Die gueltigen Rachrechte aus /api/me - DREI Zustaende (Hausregel 35): null = Server kennt das
+  // Feld nicht (alt) oder noch nicht geladen -> keine Hinweiszeile, kein Versprechen; [] = keine
+  // Rechte; [...] = Rechte. Bewusst NICHT in `state`: dieselbe Begruendung wie beim
+  // Unterstuetzer-Rang darunter - der Server ist die Autoritaet, ein Spielstand bringt nichts mit.
+  let meineRache = null;
+  function racheRechtGegen(id){
+    if (!Array.isArray(meineRache) || !id) return null;
+    const jetzt = Date.now();
+    return meineRache.find(e => e && e.gegnerId === id && e.bis > jetzt) || null;
+  }
+  function racheUhrzeit(ts){ return new Date(ts).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+  // Zusatz fuer die Angriffs-Meldungen (Kopie des Server-Push-Textes): nur, wenn der Server das
+  // Recht auch fuehrt - sonst verspraeche die Meldung etwas, das es auf diesem Server nicht gibt.
+  function racheHinweisText(){ return Array.isArray(meineRache) ? ' Vergeltung '+Math.round(RACHE_FENSTER_MS/3600000)+' h möglich.' : ''; }
+  // Die EINE Hinweiszeile fuer beide Angriffsvorschauen (Kampf-Unterreiter und Flottenwahl).
+  function racheVorschauZeile(id){
+    const rr = racheRechtGegen(id);
+    if (!rr) return '';
+    return '<div class="bmeta" style="color:#e0a548;"><i class="ti ti-sword" aria-hidden="true"></i> <strong>Vergeltung:</strong> +'+Math.round(RACHE_BEUTE_BONUS*100)+' % Beute und +'+RACHE_KAMPFPUNKTE+' Kampfpunkte bei Sieg – möglich bis '+racheUhrzeit(rr.bis)+'.</div>';
+  }
+  // Steht der Rache-Knopf an diesem Bericht? Renderer UND Signatur fragen HIER - eine zweite
+  // Fassung der Bedingung waere genau die Stelle, an der die Box veraltet (Signatur-Cache-Muster).
+  // Kennt der Client die Rechte (Liste geladen) und fuehrt sie diesen Angreifer nicht mehr, ist das
+  // Recht verbraucht oder abgelaufen - dann keine Zusage, die der Server nicht einloesen wuerde.
+  function racheKnopfMoeglich(r){
+    if (!r || r.type !== 'attack-received' || !r.attackerId || r.keinKampf) return false;
+    if (!((Date.now() - (r.time||0)) < RACHE_FENSTER_MS)) return false;
+    return meineRache === null || !!racheRechtGegen(r.attackerId);
+  }
   // Unveränderlicher Registrierungs-Benutzername (13.07.2026, Bugfix-Fund) - getrennt vom änderbaren
   // "Kommandantenname" (state.player.name, alle 30 Tage änderbar). Der Einladungscode MUSS den
   // unveränderlichen Namen nutzen, da die Backend-Suche (db.users) nur darüber funktioniert - eine
@@ -4604,6 +4641,9 @@
         log('Tagesgutschrift: +'+me.staub.neu+' Sternenstaub'+((me.staub.serie||0) > 1 ? ' (Serie: '+me.staub.serie+' Tage)' : '')+'. Ausgeben kannst du ihn im Fortschritt-Tab unter „Aussehen".', 'ti-sparkles', 'good');
       }
     }
+    // Vergeltung: aus demselben Grund HIER (siehe den Absatz ueber dem Sternenstaub). Fehlt das
+    // Feld, bleibt null - der Server ist alt oder der Schalter aus, und das Spiel verspricht nichts.
+    meineRache = (me && Array.isArray(me.rache)) ? me.rache : null;
   }
   // Die EINE Stelle, die "darf dieser Spieler die Automatiken nutzen" beantwortet. Schalter,
   // Beschriftung und die drei Mechaniken fragen alle hierher - eine zweite Stelle wäre genau die
@@ -35379,6 +35419,7 @@ async function claimPendingRewards(){
     const gewaehlt = pvpZielFuerTarget(target.id, st.liste);
     const ziel = st.liste.find(x => x.key === gewaehlt) || st.liste[0];
     let html = '';
+    html += racheVorschauZeile(target.id);   // Vergeltung: dieselbe Zeile wie im Kampf-Unterreiter
     if (st.bekannt && st.liste.length > 1){
       html += `<div class="bmeta" style="margin-top:2px;"><i class="ti ti-target" aria-hidden="true"></i> <strong>Standort wählen</strong>`
             + `${st.frisch ? '' : ` <span style="color:#e0a548;">(Aufklärung ${fmtDuration(st.alter/1000)} alt)</span>`}`
@@ -36052,7 +36093,7 @@ async function claimPendingRewards(){
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
-    'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
+    'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'+racheHinweisText()):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!'+racheHinweisText()) },
     // Die Anfechtung eines Schürfrechts (Phase 5). Der Verteidiger bekommt vom Server KEINEN
     // Bericht - der Server schreibt grundsätzlich keinen fremden Spielstand -, er erfährt den
     // Angriff also nur hier und am Felddokument. Ohne diesen Eintrag stünde im Postfach eine leere
@@ -45033,6 +45074,10 @@ async function claimPendingRewards(){
       { title:'Kopfgeld', body:'Jede Woche liegt ein <strong>Kopfgeld auf dem aktuellen Bestenlisten-Ersten</strong> – dem stärksten Spieler der Galaxie. Wer ihn in dieser Woche als Erster im Kampf schlägt, kassiert eine <strong>Kredit-Prämie</strong> (die Belohnung wird beim nächsten Login gutgeschrieben). Danach ist das Kopfgeld für diese Woche vergeben; ein neues wird zum Wochenwechsel ausgesetzt. Auf sich selbst kann man kein Kopfgeld kassieren. Das aktuelle Kopfgeld siehst du oben im Galaxie-Tab unter „Nachrichten". Bist du selbst der Gejagte, weist dich ein roter Hinweis darauf hin – Zeit, die Verteidigung hochzufahren. Nur mit eigenem Server.' },
       { title:'Angriffsziel wählen: Heimat, Kolonie oder Mond', body:'Ein Angriff auf einen Mitspieler traf früher immer sein <strong>gesamtes Reich</strong>: Du kämpftest gegen die Verteidigung aller seiner Standorte zusammen. Seit der Standort-Zielwahl greifst du <strong>einen bestimmten Ort</strong> an – seine Heimatbasis, eine Kolonie oder einen Mond –, und es zählt nur, was <em>dort</em> steht: die Verteidigungsanlagen dieses Standorts und die Flotte, die dort stationiert ist. Auch die Verluste beim Verteidiger treffen nur diesen einen Ort, und zerstört werden ausschließlich Anlagen dort.<br><br><strong>Der Preis dafür ist die Beute.</strong> Die Ressourcen deines Ziels liegen in <em>einem</em> gemeinsamen Konto, nicht je Planet. Damit ein schwach verteidigter Außenposten nicht zum Hintereingang zum ganzen Vermögen wird, hängt am Standort ein fester Beutefaktor: <strong>Heimatbasis ×'+STANDORT_BEUTE_FAKTOR.heimat.toFixed(2)+'</strong> (voller Satz), <strong>Kolonie ×'+STANDORT_BEUTE_FAKTOR.kolonie.toFixed(2)+'</strong>, <strong>Mond ×'+STANDORT_BEUTE_FAKTOR.mond.toFixed(2)+'</strong>. Die Heimat bleibt also das fetteste Ziel – dafür ist sie am besten verteidigt und trägt zusätzlich ihren Heimatbonus. Eine schwache Kolonie ist der leichte Weg mit halbem Ertrag. Genau diese Abwägung ist der Sinn der Sache.<br><br><strong>Du musst die Standorte erst finden.</strong> Angezeigt wird nur, was eine <strong>Aufklärung</strong> aufgedeckt hat – ohne sie kennst du bloß die Heimatbasis. Der Späh-Bericht listet jeden Standort mit seiner Verteidigung und seinem Beutefaktor auf; die Angaben altern mit der Aufklärung und werden nach sechs Stunden nicht mehr angeboten. Wurde dein Späher dabei <em>entdeckt</em>, sind auch diese Zahlen aufgebläht – die Spionageabwehr des Ziels verfälscht sie genauso wie die Gesamtverteidigung.<br><br><strong>Was sich NICHT je Standort ändert:</strong> Der Angriffs-Schutzschild gilt weiterhin für das ganze Konto – du kannst die Standorte eines Spielers also nicht nacheinander abklappern. Ebenso der Anti-Farming-Abschlag und die Sperre gegen viel schwächere Ziele. Und die <strong>Flugzeit</strong> hängt am Spieler, nicht am Ort: Ein Mond ist genauso weit weg wie seine Heimat.' },
       { title:'Angriffs-Schutzschild (Anti-Ganking)', body:'Wirst du erfolgreich <strong>überfallen (mit Beute) oder sabotiert</strong>, erhältst du automatisch einen <strong>Angriffs-Schutzschild für 30 Minuten</strong>: In dieser Zeit prallen weitere Spieler-Angriffe und Störmanöver gegen dich ab (keine Beute, kein Schaden). Das gibt dir Zeit, wieder aufzubauen, statt im Minutentakt weitergefarmt zu werden. <strong>Anfängerschutz:</strong> Frisch registrierte Konten starten zusätzlich mit einem <strong>4 Tage langen Schild</strong>, damit du in Ruhe aufbauen kannst, bevor dich etablierte Spieler angreifen dürfen. Ein aktiver Schild wird oben im <strong>Verteidigung-Tab</strong> mit Countdown angezeigt. <strong>Wichtig:</strong> Sobald du selbst offensiv wirst (ein eigener Angriff oder ein eigenes Störmanöver), verfällt dein Schild sofort – der Schutz ist als Erholung/Startphase gedacht, nicht als Deckung, um selbst gefahrlos zuzuschlagen. Der Schild wird serverseitig vergeben und geprüft.' },
+      /* Vergeltung (Feature D, 11.09.2026). Die Zahlen sind aus den RACHE_*-Konstanten ABGELEITET, nicht
+         eingetippt - sie stehen weit oben in der Datei, der Zugriff ist hier sicher (wie bei den
+         Gefechtsvorraeten); test_rache.js haelt die Konstanten mit server.js zusammen. */
+      { title:'Vergeltung', body:'Wirst du von einem Spieler angegriffen – egal, ob er gewinnt oder abprallt –, hast du <strong>'+Math.round(RACHE_FENSTER_MS/3600000)+' Stunden</strong> lang ein <strong>Rachrecht</strong> gegen ihn. Im Bericht „Überfallen" bzw. „Erfolgreich abgewehrt" steht dann der Knopf <strong>„Vergeltungsschlag"</strong>, der ihn direkt als Angriffsziel markiert; in der Angriffsvorschau siehst du den Hinweis „Vergeltung". <strong>Gewinnst du</strong> den Vergeltungsschlag, bekommst du <strong>+'+Math.round(RACHE_BEUTE_BONUS*100)+' % Beute</strong> (auf deinen Beuteanteil – nie mehr, als das Ziel tatsächlich hat) und <strong>+'+RACHE_KAMPFPUNKTE+' Kampfpunkte</strong> zusätzlich; das Recht ist damit verbraucht. Verlierst du, bleibt es bis zum Ablauf bestehen. Der Angriffs-Schutzschild des Ziels gilt weiterhin – auch für Vergeltung –, und ein Angriff unter dem PvP-Mindesteinsatz löst keine Vergeltung aus. Je Spieler werden höchstens fünf Rachrechte gleichzeitig geführt; wer dich mehrfach angreift, verlängert damit nur sein eigenes Risiko.' },
       { title:'Echte NPC-Flotten', body:'NPC-Gegner im Galaxie-Tab haben eine <strong>konkrete Flottenzusammensetzung</strong> (in der Angriffsvorschau sichtbar), deren Gesamt-Angriffskraft ihrem Verteidigungswert entspricht. Bei einem Sieg wird ein Teil dieser Flotte zerstört – je überlegener dein Angriff, desto mehr (40–90%), der Rest flieht. <strong>Das Trümmerfeld entsteht aus den tatsächlich zerstörten Gegner-Schiffen</strong> (dieselbe Formel wie bei allen anderen Kämpfen) statt aus einer Pauschale – schwere Gegner-Schiffe hinterlassen entsprechend mehr Trümmer. Nach jedem Sieg formiert sich der Gegner neu und stärker (Skalierung).' },
       { title:'Die acht Statthalter', body:'In <strong>jeder der acht Regionen</strong> sitzt genau ein benannter Gegner: ein <strong>Statthalter</strong>. Auf der Karte trägt sein System ein <strong>🚩</strong>, in der Detailtafel steht er in einem eigenen Chip, und ein Tipp auf den Marker zeigt seine <strong>Chronik</strong> - einen Text, der sich ändert, je öfter du ihn geschlagen hast (nach dem ersten Sieg, ab dem dritten und ab dem zehnten). Er merkt sich also, wer du bist. <strong>Warum es sie gibt:</strong> Die übrigen Gegner sitzen zu zehnt allein im Kepler-Kern; Obsidian-Saum, Meridian-Weiten und Ilyra-Tiefen hatten überhaupt keinen. Wer dorthin reiste, fand Planeten und sonst nichts. <strong>Wo einer steht und wie stark er ist</strong>, folgt zwei festen Regeln: Er sitzt im Sternsystem, das dem Mittelpunkt seiner Region am nächsten liegt und noch keinen anderen Gegner beherbergt - und seine Stärke wächst mit der <strong>Entfernung seiner Region vom Kepler-Kern</strong>. Der schwächste (Verteidigung 260) ist deshalb früh erreichbar, der stärkste (10.500) steht am äußersten Ostrand. Alle acht liegen in den Lücken der bekannten Gegner-Leiter, keiner darüber. <strong>Jeder fürchtet eine andere Schiffsklasse</strong> als die übrigen Gegner seiner Region - die Schwäche steht im Kartenmenü und bringt wie überall <strong>+25% Angriffskraft</strong>. <strong>Der erste Sieg</strong> über einen Statthalter zahlt einmalig <strong>3 Sternenessenz und 40 Kampfpunkte</strong>; das gilt je Statthalter genau einmal und überlebt Prestige und Aufstieg, wird also nicht wieder auszahlbar. Alle acht zusammen füllen die Kompendium-Kategorie <strong>Statthalter der Regionen</strong>. Nach einem Prestige beginnt ihre Chronik dagegen wieder von vorn - der Zähler wird zurückgesetzt, die Erstsieg-Prämie nicht.' },
       { title:'Bonus-Deckel bei Angriffs-/Verteidigungskraft', body:'Doktrin, Stance, Forschung und ortsgebundene Boni (Planeten-Rolle, Orbitalring, Heimatbonus u.a.) wirken weiterhin unabhängig voneinander. Alle übrigen "kleinen" Boni aus investierbaren Systemen (Prestige-Perks, Aufstieg, Fähigkeitsbaum, Allianz-Kampftechs, Offizier Admiral, Veteranenrang, Module, Piratenketten-Prestige, Megaprojekt, Artefakt) werden dagegen addiert statt multipliziert und sind zusammen bei <strong>+100%</strong> gedeckelt - dieselbe Logik wie beim Produktions-Bonus (siehe dort). Verhindert, dass sich bei einem weit entwickelten Spieler viele kleine Boni gegenseitig unbegrenzt aufschaukeln. Der Deckel ist dabei <strong>weich</strong>: Was darüber liegt, verpufft nicht, sondern läuft aus - bis zu einem Viertel des Deckels kommt zusätzlich an. Und er ist <strong>verschiebbar</strong>: Der Aufstiegs-Zweig „Verschobene Grenzen" hebt ihn um 3% je Stufe. Was für dich gilt, steht in der Boni-Bilanz im Fortschritt-Tab und in der Kampfbonus-Übersicht im Offiziere-Tab.' },
@@ -45696,7 +45741,11 @@ async function claimPendingRewards(){
     // Signatur gleich, die Box würde nicht neu geschrieben, und der Spieler sähe das Logbuch erst
     // nach einem Filterwechsel - dieselbe Falle wie bei den vier Zusätzen darüber.
     const kiSig = reportsCache.map(r => (typeof r.kiText === 'string' && r.kiText ? r.id+':'+r.kiText.length : '')).filter(Boolean).join(',');
-    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig+'|'+archivHtml+'|'+kiSig;
+    // Der Rache-Knopf gehoert in die Signatur (Feature D, 11.09.2026): Er faellt nach 24 h von selbst
+    // weg und mit dem Verbrauch des Rechts (naechstes /api/me) - beides ohne neuen Bericht. Nur der
+    // Knopf-Zustand geht ein, nicht die Uhrzeit: Die ist je Bericht fest.
+    const racheSig = reportsCache.map(r => racheKnopfMoeglich(r) ? r.id : '').filter(Boolean).join(',');
+    const reportsSig = statsHtml+'|'+reportsCache.map(r=>r.id+':'+(r.targetId ? spyIntelEdge(r.targetId) : 0)).join(',')+'|'+reportsFilterCategory+'|'+reportsFilterResult+'|'+truemmerSig+'|'+bildSig+'|'+archivHtml+'|'+kiSig+'|'+racheSig;
     if (reportsSig === lastReportsSig) return;
     lastReportsSig = reportsSig;
     if (!useBackend()){
@@ -45756,6 +45805,10 @@ async function claimPendingRewards(){
         body += formationReportLine(r.formation, r.formationMult, 'des Ziels');
         body += battlePhaseReportHtml(r.phasen);
         if (won && r.stolen) body += '<br>Erbeutet: '+rewardHtml(r.stolen);
+        // Vergeltung (Feature D): Der Server markiert einen GEWONNENEN Vergeltungsschlag mit `rache`.
+        // Die Beutehoehe kommt aus dem Bericht (racheBonus) - er ist Historie und zeigt den Satz von
+        // damals; die Punkte nennt die Konstante, weil der Server sie nicht mitschickt.
+        if (r.rache) body += '<br><span style="color:#5dcaa5;"><i class="ti ti-sword" aria-hidden="true"></i> Vergeltungsschlag: <strong>+'+Math.round((r.racheBonus != null ? r.racheBonus : RACHE_BEUTE_BONUS)*100)+' % Beute, +'+RACHE_KAMPFPUNKTE+' Kampfpunkte</strong>.</span>';
         if (r.defenseBefore) body += '<br>Verteidigung des Ziels: '+defenseBreakdownHtml(r.defenseBefore, r.destroyedBuilding);
         body += kiLogbuchHtml(r.kiText);   // Logbuch des Kommandanten (E2): nur MIT Text, wie beim NPC-Angriff
       } else if (r.type === 'attack-received'){
@@ -45784,6 +45837,17 @@ async function claimPendingRewards(){
         // zu diesem Zeitpunkt noch gar nicht feststanden. Ohne diese Zeile wüsste ein Spieler, der
         // nur den Server-Bericht liest, nichts von seinen Schiffsverlusten.
         if (!won && r.defenderLossPct > 0) body += '<br><i class="ti ti-alert-triangle" aria-hidden="true" style="color:#e24b4a;"></i> Deine Verteidigungsflotte hat rund '+String(Math.round(r.defenderLossPct*1000)/10).replace('.',',')+'% ihrer Schiffe verloren – die genauen Stückzahlen stehen im Bericht „Flottenverluste durch Spielerangriff".';
+        // Vergeltung (Feature D): War der Angriff selbst ein Vergeltungsschlag (der Angreifer hatte
+        // ein Rachrecht gegen dich), sagt der Bericht das - sonst sieht der Spieler nur, dass er
+        // mehr verloren hat als sonst, ohne zu wissen warum.
+        if (r.rache) body += '<br><i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> Das war ein <strong>Vergeltungsschlag</strong>: Du hattest '+escapeHtml(r.attackerName||'diesen Spieler')+' zuvor angegriffen (+'+Math.round((r.racheBonus != null ? r.racheBonus : RACHE_BEUTE_BONUS)*100)+' % Beute für den Angreifer).';
+        // Der Rache-Knopf: 24 h ab dem Angriff, nur mit attackerId (alter Server schickt keine) und
+        // nur, solange der Server das Recht noch fuehrt (racheKnopfMoeglich). Er benutzt DENSELBEN
+        // data-goto-attack-Weg wie "Direkt Angriff" im Spionagebericht - keine zweite Verdrahtung.
+        if (racheKnopfMoeglich(r)){
+          body += '<br><span style="color:#e0a548;"><i class="ti ti-clock" aria-hidden="true"></i> Vergeltung möglich bis <strong>'+racheUhrzeit((r.time||0) + RACHE_FENSTER_MS)+'</strong> – +'+Math.round(RACHE_BEUTE_BONUS*100)+' % Beute und +'+RACHE_KAMPFPUNKTE+' Kampfpunkte, wenn du gewinnst.</span>';
+          actionsHtml += `<div style="margin-top:8px;"><button data-goto-attack="${escapeHtml(r.attackerId)}" data-goto-attack-name="${escapeHtml(r.attackerName||'')}" data-rache-knopf="${r.id}" style="font-size:10.5px; padding:5px 9px;"><i class="ti ti-sword" aria-hidden="true" style="margin-right:3px;"></i>Vergeltungsschlag</button></div>`;
+        }
         body += kiLogbuchHtml(r.kiText);   // Logbuch des Kommandanten (E2): nur MIT Text, wie beim NPC-Angriff
       } else if (r.type === 'sabotage-sent'){
         title = (won?'Störmanöver erfolgreich':'Störmanöver fehlgeschlagen')+' – gegen '+escapeHtml(r.targetName||'Unbekannt');
@@ -74717,6 +74781,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
               <div class="bmeta"><i class="ti ti-target" aria-hidden="true" style="color:#e24b4a;"></i> Markiertes Ziel: <strong style="color:#fff;">${pendingAttackTarget.name}</strong></div>
               <button aria-label="Angriff abbrechen" data-cancel-pending-attack style="font-size:10px; padding:4px 7px;"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
+            ${racheVorschauZeile(pendingAttackTarget.id)}
             <button class="buy ${pendingSperre?'':'affordable'}" id="pendingAttackBtn"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Spieler angreifen</button>
             ${pendingSperre ? `<div class="bmeta">${escapeHtml(pendingSperre)}</div>` : (totalSelectedForTarget < 1 ? `<div class="bmeta">Tippe auf „Spieler angreifen" – dort stellst du deine Angriffsflotte zusammen.</div>` : `<div class="bmeta">Wird mit ${ATTACK_SHIP_KEYS.filter(k=>(attackFleetForTarget[k]||0)>0).map(k=>attackFleetForTarget[k]+' '+(k==='superschlachtschiff'?'Superschlachtschiff':SHIP_DEFS.find(d=>d.key===k).name)).join(', ')} angegriffen · Angriffskraft ${attackPower(attackFleetForTarget, state.activeBasePlanet)}</div>`)}
           </div>
