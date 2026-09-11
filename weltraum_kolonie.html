@@ -18519,6 +18519,48 @@
         + '<div class="lore-text" style="white-space:pre-line;">' + escapeHtml(chr.text.trim()) + '</div>'
         + '</div>';
     }
+    /* GALAXIE-ZIEL DER WOCHE (Feature A, 11.09.2026). Ein gemeinsames Wochenziel ALLER Spieler -
+       "Schlagt diese Woche zusammen N-mal gegen Alien-Nester" -, gezaehlt und bezahlt vom Server
+       (db.galaxy, nur aus den Erfolgspfaden der Angriffsrouten). Die Karte steht zwischen Chronik und
+       Weltlage: Sie gilt fuer die ganze Woche, die Meldungen darunter sind Minuten alt.
+       DREI ZUSTAENDE (Hausregel 35): Fehlt `galaxieZiel` in der Antwort - alter Server, Notaus, oder
+       die Woche ist gerade gewechselt und der Server-Takt noch nicht gelaufen -, gibt es KEINE Karte:
+       kein leerer Rahmen, keine Fehlermeldung. `erreicht` bekommt den gruenen Rahmen; die Belohnung
+       kommt erst zum Wochenwechsel ueber die Warteschlange (claimPendingRewards, Zweig 'galaxie-ziel').
+       DAS SYMBOL kommt vom Server als ti-Klasse und wird gegen ein MUSTER geprueft statt escaped: Es
+       landet in einem Attribut, und eine fremde Klasse waere dort kein Text, sondern Wirkung.
+       Die Restzeit steht minutengenau in der Signatur, damit "endet in" mitlaeuft, ohne den Kasten
+       jede Sekunde neu zu bauen. */
+    let zielHtml = '', zielSig = 'none';
+    const gz = galaxyCache.galaxieZiel;
+    if (gz && typeof gz.ziel === 'number' && gz.ziel > 0){
+      const zielStand = Math.max(0, Math.floor(gz.stand || 0)), zielSoll = Math.floor(gz.ziel);
+      const zielPct = Math.max(0, Math.min(100, Math.round(zielStand / zielSoll * 100)));
+      const zielRest = Math.max(0, Math.floor(((gz.ende || 0) - Date.now()) / 1000));
+      const zielErreicht = !!gz.erreicht;
+      const meinBeitrag = Math.max(0, Math.floor(gz.meinBeitrag || 0));
+      const beitragende = Math.max(0, Math.floor(gz.beitragende || 0));
+      const zielIcon = /^ti-[a-z0-9-]+$/.test(String(gz.icon || '')) ? gz.icon : 'ti-target';
+      const zielFarbe = zielErreicht ? '#5dcaa5' : '#fac775';
+      zielSig = 'gz:' + (gz.woche || '') + ':' + (gz.art || '') + ':' + zielStand + ':' + zielSoll + ':' + (zielErreicht ? 1 : 0)
+              + ':' + meinBeitrag + ':' + beitragende + ':' + Math.floor(zielRest / 60);
+      zielHtml = '<div id="galaxieZielKarte" class="card-row" style="flex-direction:column; align-items:stretch; padding:0.6rem 0.7rem; background:'
+        + (zielErreicht ? 'rgba(93,202,165,0.12)' : 'rgba(250,199,117,0.10)') + '; border-color:' + (zielErreicht ? 'rgba(93,202,165,0.5)' : 'rgba(250,199,117,0.4)') + ';">'
+        + '<div class="bmeta"><i class="ti ' + zielIcon + '" aria-hidden="true" style="color:' + zielFarbe + '; margin-right:6px;"></i>'
+        + '<strong style="color:' + zielFarbe + ';">Galaxie-Ziel der Woche:</strong> ' + escapeHtml(gz.name || '') + '</div>'
+        + '<div class="bmeta" style="color:#c7cbe0;">' + escapeHtml(gz.beschreibung || '') + '</div>'
+        + '<div class="progress-outer" style="height:6px; margin:6px 0 4px;"><div class="progress-inner" style="width:' + zielPct + '%; background:' + zielFarbe + ';"></div></div>'
+        + '<div class="bmeta"><strong>' + fmt(zielStand) + ' / ' + fmt(zielSoll) + '</strong>'
+        + ' · dein Beitrag: <strong>' + fmt(meinBeitrag) + '</strong>'
+        + ' · ' + (beitragende === 1 ? 'ein Kommandant' : fmt(beitragende) + ' Kommandanten') + ' beteiligt'
+        + ' · endet in ' + fmtDuration(zielRest) + '</div>'
+        + (zielErreicht
+          ? '<div class="bmeta" style="color:#5dcaa5;"><strong>Erreicht – Belohnung am Wochenende.</strong> Wer beigetragen hat, findet sie nach dem Wochenwechsel beim nächsten Login.</div>'
+          : (typeof gz.tagesDeckel === 'number' && gz.tagesDeckel > 0
+              ? '<div class="bmeta" style="font-size:10px;">Höchstens ' + fmt(gz.tagesDeckel) + ' Beiträge je Kommandant und Tag zählen – das Ziel ist eine Gemeinschaftsleistung.</div>'
+              : ''))
+        + '</div>';
+    }
     let weltlageHtml = '', weltlageSig = 'none';
     if (typeof galaxyCache.npcStaerkeZiel === 'number'){
       const ist = galaxyCache.npcEmpireStrength || 1, ziel = galaxyCache.npcStaerkeZiel;
@@ -18554,11 +18596,11 @@
           : `<div class="card-row" style="padding:0.5rem 0.7rem; background:rgba(250,199,117,0.14); border-color:rgba(250,199,117,0.5);"><div class="left"><i class="ti ti-award" aria-hidden="true" style="color:#fac775; font-size:15px; margin-right:8px;"></i><div class="bmeta"><strong style="color:#fac775;">Kopfgeld: ${fmt(b.reward||0)} Kredite</strong> auf <strong>${escapeHtml(b.targetName||'?')}</strong> (aktueller Bestenlisten-Erster). Schlage ihn im Kampf, um die Prämie zu kassieren – nur der Erste bekommt sie.</div></div></div>`;
       }
     }
-    if (!news.length){ const emptySig='empty|'+chronikSig+'|'+weltlageSig+'|'+bountySig; if (lastGalaxyNewsSig !== emptySig){ box.innerHTML = chronikHtml + weltlageHtml + bountyHtml + '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = emptySig; } return; }
-    const newsSig = chronikSig+'||'+weltlageSig+'||'+bountySig+'||'+news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
+    if (!news.length){ const emptySig='empty|'+chronikSig+'|'+zielSig+'|'+weltlageSig+'|'+bountySig; if (lastGalaxyNewsSig !== emptySig){ box.innerHTML = chronikHtml + zielHtml + weltlageHtml + bountyHtml + '<div class="bmeta">Noch keine galaktischen Ereignisse.</div>'; lastGalaxyNewsSig = emptySig; } return; }
+    const newsSig = chronikSig+'||'+zielSig+'||'+weltlageSig+'||'+bountySig+'||'+news.slice(0,12).map(n=>n.time+'|'+n.text).join(';');
     if (newsSig === lastGalaxyNewsSig) return;
     lastGalaxyNewsSig = newsSig;
-    box.innerHTML = chronikHtml + weltlageHtml + bountyHtml + news.slice(0, 12).map(n => {
+    box.innerHTML = chronikHtml + zielHtml + weltlageHtml + bountyHtml + news.slice(0, 12).map(n => {
       n = Object.assign({}, n, { text: systemNamenErsetzen(n.text) });
       const when = new Date(n.time).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
       return `<div class="card-row" style="padding:0.5rem 0.7rem;"><div class="left"><i class="ti ${n.icon}" aria-hidden="true" style="color:#c3bef5; font-size:15px; margin-right:8px;"></i><div><div class="bmeta" style="color:#c7cbe0;">${n.text}</div><div class="bmeta" style="font-size:10px;">${when}</div></div></div></div>`;
@@ -31938,6 +31980,28 @@ async function claimPendingRewards(){
             }
             save();
           }
+          continue;
+        }
+        /* Galaxie-Ziel der Woche (Feature A, 11.09.2026). Der Server hat beim Wochenwechsel abgerechnet:
+           Kredite nach eigenem Beitrag, dazu Sternenstaub - den hat der SERVER bereits gebucht
+           (staubGutschreiben), `r.staub` ist hier nur die Zahl fuer die Meldung. Der eigene Zweig ist
+           PFLICHT: Ohne ihn fiele die Belohnung in den Rueckfall unten und meldete "Dankeschoen vom
+           Team: +… Kredite fuer deinen Bug-Report". Jeder Wert einzeln gefiltert, weil die Schleife in
+           einem stillen try/catch laeuft und der Eintrag serverseitig schon weg ist. */
+        if (r.type === 'galaxie-ziel'){
+          const gzCredits = Math.max(0, Math.round(Number(r.credits) || 0));
+          const gzStaub = Math.max(0, Math.round(Number(r.staub) || 0));
+          const gzBeitrag = Math.max(0, Math.round(Number(r.beitrag) || 0));
+          const gzName = String(r.name || 'Galaxie-Ziel').slice(0, 80);
+          if (gzCredits > 0) state.credits = (state.credits||0) + gzCredits;
+          log('Galaxie-Ziel der Woche erreicht („'+gzName+'"): +'+fmt(gzCredits)+' Kredite'+(gzStaub ? ' und +'+fmt(gzStaub)+' Sternenstaub' : '')
+              +' für '+(gzBeitrag === 1 ? 'deinen Beitrag' : 'deine '+fmt(gzBeitrag)+' Beiträge')+'.', 'ti-target', 'ok');
+          playSound('achieve');
+          // Der Bericht ist die BLEIBENDE Auskunft - log() ueberschreibt sich mit der naechsten Meldung.
+          pushReport({ type:'galaxie-ziel', name: gzName, art: String(r.art || '').slice(0, 40), woche: String(r.woche || '').slice(0, 10),
+                       ziel: Math.max(0, Math.round(Number(r.ziel) || 0)), stand: Math.max(0, Math.round(Number(r.stand) || 0)),
+                       beitrag: gzBeitrag, credits: gzCredits, staub: gzStaub });
+          save();
           continue;
         }
         if (r.type === 'bounty'){
@@ -45345,6 +45409,7 @@ async function claimPendingRewards(){
       { title:'Private Nachrichten', body:'Über das <strong>Profil eines Spielers</strong> (Bestenliste antippen) oder direkt bei einer erhaltenen Nachricht im Berichte-Tab ("Antworten") kannst du einem einzelnen Spieler schreiben - unabhängig von Allianz und ohne den öffentlichen Chat. Erhaltene Nachrichten stehen im Berichte-Tab, die letzten 60 werden aufgehoben. Nur mit eigenem Server verfügbar.' },
       { title:'Saison-Liga', body:'Zusätzlich zur Wochenliga läuft ein <strong>monatlicher</strong> Wettbewerb mit dauerhaften Belohnungen. Jeden Kalendermonat merkt der Server deinen Score als Startwert; deine <strong>Saison-Punkte</strong> sind alles, was seitdem dazukam. Am Monatsende teilt der Server alle Teilnehmer nach Rang in <strong>fünf Ligen</strong> ein – ab 5 Teilnehmern nach Fünfteln (Top 20% <strong>Diamant</strong>, dann Platin, Gold, Silber, Bronze), bei weniger nach Plätzen. Jede Liga schaltet einen <strong>exklusiven, dauerhaften Saison-Titel</strong> frei: Diamant „Saison-Champion", Platin „Saison-Meister", Gold „Saison-Veteran", Silber „Saison-Kämpfer", Bronze „Saison-Teilnehmer" – dazu Kredite und Modulfragmente je nach Liga (Diamant 5.000 Kr + 12 Fragmente … Bronze 400 Kr + 1 Fragment). Danach beginnt automatisch eine neue Saison, in der wieder jeder eine Chance auf Platz 1 hat. Alles serverseitig bestimmt (Rang, Liga, Belohnung – nichts manipulierbar). Deine aktuelle Saison, der Countdown, deine Saison-Punkte, deine gesammelten Titel und die Liga-Belohnungen stehen im <strong>Fortschritt-Tab</strong> unter „Saison-Liga".' },
       { title:'Wochenliga', body:'Jede Woche (Montag 00:00 bis Sonntag 24:00) zählt nur dein <strong>Punktezuwachs</strong> - beim Wochenstart wird dein Score als Startwert gemerkt, deine Wochenpunkte sind alles, was seitdem dazukam. Niemand hat durch alten Besitz einen Vorsprung. Alle Spieler werden über die geteilte Bestenliste in eine Wochen-Rangliste einsortiert: ab 8 Teilnehmern nach Vierteln (Top 25% <strong>Platin</strong>, dann Gold, Silber, Bronze), bei weniger nach Plätzen (1. Platin, 2. Gold, 3. Silber). Die Abrechnung läuft jetzt <strong>serverseitig</strong>: Genau am Wochenwechsel bestimmt der Server aus den (bereits serverseitig geprüften) Punktezuwächsen die Platzierung und legt deine Liga-Belohnung bereit – niemand kann sich mehr selbst eine höhere Liga oder Belohnung zuweisen. Beim nächsten Login wird sie automatisch gutgeschrieben: <strong>Platin</strong> 1.500 Kredite + 12 Min. Produktion aller Ressourcen, <strong>Gold</strong> 800 + 6 Min., <strong>Silber</strong> 400 + 3 Min., <strong>Bronze</strong> 150 Kredite. Die Produktionsanteile skalieren mit deiner echten Rate. Ersetzt die frühere kleine Top-3-Wochenbelohnung.' },
+      { title:'Galaxie-Ziel der Woche', body:'Ein <strong>gemeinsames Wochenziel aller Spieler</strong>, zu sehen im Galaxie-Tab unter „Nachrichten" (zwischen Chronik und Weltlage): zum Beispiel „Schlagt diese Woche zusammen 30-mal gegen Alien-Nester". Die Art wechselt jede Woche (Montag 00:00) reihum zwischen <strong>Alien-Nestern, Asteroidenfestungen, Wrackkonvois und dem Weltboss</strong>; die Höhe legt der Server beim Wochenstart aus der Zahl der aktiven Kommandanten fest und sie bleibt dann für die Woche stehen (mindestens 10, höchstens 400). <strong>Gezählt wird nur ein gewerteter Schlag</strong> – einer, den der Server tatsächlich ausgewertet hat (kein Abklingzeit-Fehler, keine verpasste Ankunft); ob das Ziel dabei fällt, spielt keine Rolle. <strong>Höchstens 10 Beiträge je Kommandant und Tag</strong> zählen, damit niemand das Ziel allein erfüllt. Die Karte zeigt Stand und Ziel als Balken, deinen eigenen Beitrag, wie viele Kommandanten beteiligt sind und wann die Woche endet; ist das Ziel erreicht, wird sie grün. <strong>Belohnung:</strong> Beim Wochenwechsel bekommt <strong>jeder, der mindestens einmal beigetragen hat</strong>, 200 Kredite plus 50 je Beitrag (höchstens 600 Kredite) und 5 Sternenstaub – aber nur, wenn die Gemeinschaft das Ziel erreicht hat. Ein verfehltes Ziel zahlt nichts. Die Belohnung liegt dann beim nächsten Login bereit und erscheint als Bericht. Ohne eigenen Server gibt es kein Galaxie-Ziel.' },
       { title:'Was das ist', body:'Ein gemeinsamer Zustand, der sich für ALLE Spieler gleich weiterentwickelt – läuft dauerhaft im Hintergrund auf dem Server, auch wenn niemand gerade online ist. Alle 15 Minuten passiert ein neuer Simulationsschritt.' },
       { title:'NPC-Reiche: die Wehrkraft der Galaxie', body:'Ein globaler Multiplikator (gedeckelt bei 2,5x) macht alle NPC-Verteidigungswerte für jeden Spieler härter – zusätzlich zur persönlichen Steigerung durch eigene Kämpfe. Er ist <strong>kein Zeitzähler mehr</strong>: Der Server leitet aus dem <strong>Bestand an Alien-Nestern</strong> einen Zielwert ab und lässt die Wehrkraft langsam dorthin laufen (spürbar innerhalb eines Tages, ein einzelner Schlag ändert die Weltlage nicht). Wer den Schwarm zurückdrängt, macht die Galaxie <strong>für alle</strong> leichter; wer die Nester wachsen lässt, bezahlt es mit härteren NPC-Gegnern. Wohin sie gerade läuft und warum, steht oben im Galaxie-Tab.' },
       { title:'Handelsmarkt', body:'Ein gemeinsamer Markttrend (0,75x bis 1,30x) schwankt langsam und beeinflusst die Angebote des Schwarzmarkt-Händlers – in guten Marktphasen bekommt man mehr für seine Ware.' },
@@ -45510,7 +45575,7 @@ async function claimPendingRewards(){
      Spiels; sie trug rote Pille, roten Streifen und ein Warndreieck ueber 38k angekommenem Erz und
      stand im Filter unter "Nur Rueckschlaege". */
   const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout',
-                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk'];
+                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk','galaxie-ziel'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
   const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
@@ -46259,6 +46324,15 @@ async function claimPendingRewards(){
         body = '<i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
              + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
              + '<br>Bonuscodes gibt es gelegentlich auf den Kanälen des Spiels – jeder gilt nur eine Weile und nur einmal je Konto.';
+      } else if (r.type === 'galaxie-ziel'){
+        title = 'Galaxie-Ziel der Woche erreicht' + (r.name ? ': ' + escapeHtml(r.name) : '');
+        const gzWoche = /^\d{4}-\d{2}-\d{2}$/.test(String(r.woche || ''))
+          ? new Date(r.woche + 'T00:00:00').toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }) : '';
+        body = '<i class="ti ti-target" aria-hidden="true" style="color:#5dcaa5;"></i> Gemeinsam geschafft: <strong>' + fmt(r.stand||0) + ' / ' + fmt(r.ziel||0) + '</strong>'
+             + ' · dein Beitrag: <strong>' + fmt(r.beitrag||0) + '</strong>'
+             + '<br>Gutgeschrieben: <strong>+' + fmt(r.credits||0) + ' Kredite</strong>'
+             + (r.staub ? ' und <strong>+' + fmt(r.staub) + ' Sternenstaub</strong> (direkt auf dein Konto gebucht)' : '')
+             + '<br><span class="bmeta">' + (gzWoche ? 'Woche ab ' + gzWoche + ' – d' : 'D') + 'as nächste Ziel steht im Galaxie-Tab unter „Nachrichten".</span>';
       } else if (r.type === 'geschenk'){
         title = 'Geschenk vom Team';
         body = '<i class="ti ti-sparkles" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
@@ -46562,6 +46636,7 @@ async function claimPendingRewards(){
         : (r.type==='deckelausgleich' || r.type==='deckelkappung') ? 'ti-pick'
         : r.type==='bonuscode' ? 'ti-award'
         : r.type==='geschenk' ? 'ti-sparkles'
+        : r.type==='galaxie-ziel' ? 'ti-target'
         /* `positive`, NICHT `won` (v8.597.0): `won` prueft nur `result` gegen 'win'/'destroyed'
            und ist damit eine ZWEITE Wahrheit ueber "Erfolg". Die KI-Abfangautomatik trug deshalb
            ein WARNDREIECK ueber vertriebenen Piraten - derselbe Spieler-Report, andere Stelle.
