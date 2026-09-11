@@ -298,12 +298,29 @@ function reinText(html){
 }
 function xmlText(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function cdata(s){ return '<![CDATA[' + String(s).replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>'; }
-// dd.mm.yyyy -> RFC 822, bewusst 12:00 UTC: Der Eintrag traegt nur einen Tag, und ein Mittag
-// verschiebt in keiner Zeitzone das Datum.
+// dd.mm.yyyy -> RFC 822, und zwar MITTERNACHT in Europe/Berlin - der Zeitzone, in der die Eintraege
+// datiert werden. Nie in der Zukunft (Codex-Review am PR, 11.09.2026): Der erste Entwurf nahm
+// 12:00 UTC, und fuer einen Vormittags-Release lag der Eintrag damit stundenlang in der Zukunft -
+// Reader, die kuenftige Eintraege zurueckhalten oder lastBuildDate zum Abfragen nutzen, haetten ihn
+// versteckt. Ein echter Release-Zeitpunkt ist nicht ueberliefert (die Eintraege tragen nur den Tag);
+// die lokale Mitternacht ist der spaeteste Zeitpunkt, der sicher VOR dem Release liegt.
+// Deterministisch, damit ein Lauf ohne neue Version die Datei nicht aendert.
+function berlinMitternacht(jahr, monat, tag){
+  const rohUtc = Date.UTC(jahr, monat - 1, tag, 0, 0, 0);
+  // Der Versatz zu Berlin ist +1 h (Winter) oder +2 h (Sommer): den Kandidaten nehmen, der in
+  // Berlin als 0 Uhr desselben Tages gelesen wird - so muss hier keine Sommerzeitregel stehen.
+  const lesen = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23', day: 'numeric' });
+  for (const stunden of [2, 1]){
+    const kandidat = new Date(rohUtc - stunden * 3600000);
+    const teile = Object.fromEntries(lesen.formatToParts(kandidat).map(t => [t.type, t.value]));
+    if (Number(teile.hour) === 0 && Number(teile.day) === tag) return kandidat;
+  }
+  return new Date(rohUtc - 3600000);
+}
 function rfc822(date){
   const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(date || '');
   if (!m) return null;
-  return new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12, 0, 0)).toUTCString();
+  return berlinMitternacht(Number(m[3]), Number(m[2]), Number(m[1])).toUTCString();
 }
 function feedTitel(n){
   const erste = (n.changes && n.changes[0]) || '';

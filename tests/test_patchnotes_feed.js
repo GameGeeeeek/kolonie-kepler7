@@ -77,14 +77,21 @@ const datenKaputt = items.filter(t => {
   return !p || Number.isNaN(Date.parse(p));
 });
 check('1i: jeder Eintrag hat ein lesbares pubDate (RFC 822)', datenKaputt.length === 0, datenKaputt.length);
-// Das Datum des Eintrags (dd.mm.yyyy) ist der Tag des pubDate - keine Verschiebung ueber Mitternacht.
+// Das Datum des Eintrags (dd.mm.yyyy) ist der Tag des pubDate IN BERLINER ZEIT - und der Zeitpunkt
+// ist die lokale Mitternacht, also nie spaeter als der Release (Codex-Review am PR: 12:00 UTC lag
+// fuer einen Vormittags-Release in der Zukunft).
 const eintraegeImSpiel = [...block.matchAll(/\{ version:'([\d.]+)', date:'(\d{2})\.(\d{2})\.(\d{4})'/g)].map(m => ({ v: m[1], tag: m[4] + '-' + m[3] + '-' + m[2] }));
+const berlinTag = d => d.toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
+const berlinUhr = d => d.toLocaleTimeString('en-GB', { timeZone: 'Europe/Berlin', hour12: false });
 const tagFalsch = items.map((t, i) => {
   const p = new Date((t.match(/<pubDate>([^<]+)<\/pubDate>/) || [])[1]);
   const e = eintraegeImSpiel[i];
-  return e && p.toISOString().slice(0, 10) !== e.tag ? { v: e.v, erwartet: e.tag, feed: p.toISOString().slice(0, 10) } : null;
+  return e && (berlinTag(p) !== e.tag || berlinUhr(p) !== '00:00:00') ? { v: e.v, erwartet: e.tag + ' 00:00:00', feed: berlinTag(p) + ' ' + berlinUhr(p) } : null;
 }).filter(Boolean);
-check('1j: der Tag des pubDate ist der Tag des Eintrags', tagFalsch.length === 0, tagFalsch.slice(0, 2));
+check('1j: jedes pubDate ist die Berliner Mitternacht des Eintragstags', tagFalsch.length === 0, tagFalsch.slice(0, 2));
+const zukunft = items.map(t => new Date((t.match(/<pubDate>([^<]+)<\/pubDate>/) || [])[1])).filter(p => p.getTime() > Date.now());
+const lastBuild = new Date((xml.match(/<lastBuildDate>([^<]+)<\/lastBuildDate>/) || [])[1]);
+check('1m: kein pubDate und kein lastBuildDate liegt in der Zukunft', zukunft.length === 0 && lastBuild.getTime() <= Date.now(), { zukunft: zukunft.length, lastBuild: lastBuild.toISOString() });
 
 const titelKaputt = items.filter((t, i) => {
   const titel = (t.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
