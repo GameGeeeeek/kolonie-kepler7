@@ -3962,6 +3962,10 @@
         <div class="bmeta" style="margin-bottom:6px;">Folge dem Spiel – dort erscheinen neue Versionen, Kampf-Videos und Ausblicke:</div>
         <div id="socialProfileRow" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
         <div id="referralAlreadyRedeemed" style="display:none;" class="bmeta"></div>
+        <!-- Patenschaft (Feature G, 11.09.2026): Pate, Schuetzlinge, Meilenstein-Haekchen. Gefuellt von
+             renderPatenschaftBox(); bleibt unsichtbar, solange kein Server bzw. ein alter Server (404)
+             antwortet - kein leerer Rahmen, keine Fehlermeldung (Hausregel 35). -->
+        <div id="patenschaftBox" style="display:none;"></div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-award" aria-hidden="true"></i>Bonuscode einlösen</div>
         <div class="bmeta" style="margin-bottom:8px;">Gelegentlich gibt es Codes auf den Kanälen des Spiels. Groß- und Kleinschreibung, Bindestriche und Leerzeichen sind egal. Jeder Code gilt nur eine Weile und nur <strong>einmal je Konto</strong> - nur mit eigenem Server verfügbar.</div>
         <div id="bonusCodeRow" style="display:none; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
@@ -31977,6 +31981,28 @@ async function claimPendingRewards(){
           save();
           continue;
         }
+        /* Patenschaft (Feature G, 11.09.2026): Meilenstein des Schuetzlings, beide Seiten bekommen
+           einen Reward - `rolle` sagt, welche Seite dieser hier ist. Kredite bucht der Client,
+           den Sternenstaub hat der SERVER schon gebucht (`staub` ist nur die Anzeige). Eigener
+           Zweig aus demselben Grund wie beim Bonuscode: Der Rueckfall meldet sonst "Bug-Report". */
+        if (r.type === 'patenschaft'){
+          const credits = Math.max(0, Math.round(r.credits || 0));
+          if (credits > 0) state.credits = (state.credits||0) + credits;
+          const staub = Math.max(0, Math.round(r.staub || 0));
+          const partner = String(r.partnerName || '').slice(0, 40);
+          const ms = String(r.name || r.meilenstein || 'Meilenstein').slice(0, 80);
+          const gabe = '+' + fmt(credits) + ' Kredite' + (staub > 0 ? ' und +' + staub + ' Sternenstaub' : '');
+          const istPate = r.rolle === 'pate';
+          log(istPate
+            ? 'Patenschaft: Dein Schützling ' + partner + ' hat „' + ms + '" geschafft – ' + gabe + ' für dich.'
+            : 'Patenschaft: „' + ms + '" geschafft – ' + gabe + ' für dich, und dein Pate ' + partner + ' bekommt ebenfalls etwas.',
+            'ti-users', 'ok');
+          playSound('achieve');
+          pushReport({ type:'patenschaft', rolle: istPate ? 'pate' : 'schuetzling', meilenstein: ms, partnerName: partner, credits, staub });
+          save();
+          if (activeTab === 'einstellungen') ladePatenschaft();
+          continue;
+        }
         if (r.credits) state.credits = (state.credits||0) + r.credits;
         log('Dankeschön vom Team: +'+fmt(r.credits)+' Kredite für deinen Bug-Report!', 'ti-award');
         save();
@@ -36051,6 +36077,9 @@ async function claimPendingRewards(){
     'weltboss-kill': { icon:'ti-skull', color:'#e24b4a', text:(p)=>'Leviathan Stufe '+(p.level||1)+' wurde besiegt - dein Beitrag: '+(p.share||0)+'%.' },
     'raid-incoming': { icon:'ti-alert-triangle', color:'#f0997b', text:(p)=>'Ein Überfall auf '+(p.planet?planetDisplayName(p.planet):'einen deiner Standorte')+' ist eingetroffen (oder steht kurz bevor).' },
     'referral-redeemed': { icon:'ti-award', color:'#5dcaa5', text:(p)=>(p.username||'Ein Spieler')+' hat deinen Einladungscode eingelöst - +50 Kredite für dich!' },
+    // Patenschaft (Feature G): der Pate erfaehrt hier vom Meilenstein seines Schuetzlings; der Sprung
+    // fuehrt in die Einstellungen zur Karte. Namen kommen vom Server, deshalb escapeHtml.
+    'patenschaft': { icon:'ti-users', color:'#5dcaa5', text:(p)=>'Dein Schützling '+escapeHtml(p.schuetzling||'?')+' hat „'+escapeHtml(p.name||'einen Meilenstein')+'" geschafft - +'+(p.credits||0)+' Kredite und +'+(p.staub||0)+' Sternenstaub für dich.' },
     'spy-detected': { icon:'ti-target', color:'#e0a548', text:(p)=>(p.fromName||'Ein Spieler')+' hat deine Kolonie ausgespäht'+(p.deep?' (Tiefen-Aufklärung inkl. Beute-Schätzung).':'.')+' Prüfe deine Spionageabwehr-Forschung.' },
     'attack-received': { icon:'ti-sword', color:'#e24b4a', text:(p)=>p.defended?((p.attackerName||'Ein Spieler')+' hat dich angegriffen - deine Verteidigung hat gehalten. Details im Berichte-Tab.'):((p.attackerName||'Ein Spieler')+' hat deine Kolonie überfallen'+(p.looted?' und Ressourcen erbeutet':'')+'. Rüste auf oder schlage zurück!') },
     // Die Anfechtung eines Schürfrechts (Phase 5). Der Verteidiger bekommt vom Server KEINEN
@@ -38876,6 +38905,82 @@ async function claimPendingRewards(){
      Kopie, die beim naechsten Umbau veraltet. */
   function einladungsLink(){
     return location.origin + location.pathname + '?ref=' + encodeURIComponent(accountUsername || '');
+  }
+  /* PATENSCHAFT (Feature G, 11.09.2026). Wer sich ueber den Einladungs-Link registriert, ist 30
+     Tage lang der Schuetzling seines Einladenden; jeder Meilenstein, den er zum ersten Mal schafft,
+     zahlt beiden Seiten Kredite und Sternenstaub - der Server entscheidet und zahlt (Reward-Typ
+     'patenschaft' in claimPendingRewards), die Karte hier zeigt nur den Stand von GET /api/patenschaft.
+
+     DREI ZUSTAENDE (Hausregel 35): 200 -> Karte; 404 (alter Server oder Schalter aus) -> Karte
+     ersatzlos weg, kein leerer Rahmen, keine Meldung; anderer Fehler -> eine Zeile mit dem
+     Servertext, damit die Flaeche nicht still tot ist. Geladen beim Oeffnen der Einstellungen
+     (switchTab) und nach einer Patenschafts-Belohnung, wenn die Einstellungen gerade offen sind. */
+  let patenschaftCache = null;     // null = keine Karte
+  let patenschaftFehler = null;    // Servertext bei einem Fehler, der KEIN 404 ist
+  async function ladePatenschaft(){
+    if (!useBackend()){ patenschaftCache = null; patenschaftFehler = null; renderPatenschaftBox(); return; }
+    try {
+      const res = await backendFetch('/patenschaft');
+      if (res.status === 404){ patenschaftCache = null; patenschaftFehler = null; }
+      else {
+        const daten = await res.json().catch(() => null);
+        if (res.ok && daten && daten.aktiv){ patenschaftCache = daten; patenschaftFehler = null; }
+        else { patenschaftCache = null; patenschaftFehler = (daten && daten.error) || ('Server antwortete mit Status ' + res.status); }
+      }
+    } catch(e){ patenschaftCache = null; patenschaftFehler = 'Server nicht erreichbar.'; }
+    renderPatenschaftBox();
+  }
+  function patenschaftRestText(bis){
+    const rest = (bis || 0) - Date.now();
+    if (rest <= 0) return 'abgelaufen';
+    const tage = Math.ceil(rest / 86400000);
+    return tage <= 1 ? 'endet heute' : 'noch ' + tage + ' Tage';
+  }
+  /* Ein Chip je Meilenstein des Katalogs, in der Reihenfolge des Servers. ti-check und ti-clock
+     sind im Icon-Subset (beide stehen schon in der Referral-Statuszeile darueber). */
+  function patenschaftChips(katalog, meilensteine){
+    const ms = meilensteine || {};
+    return (katalog || []).map(m => {
+      const da = !!ms[m.key];
+      return '<span data-ms="' + escapeHtml(m.key) + '" data-erreicht="' + (da ? 1 : 0) + '" title="' + escapeHtml(m.name) + (da ? ' – geschafft' : ' – offen') + '" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:3px 8px; border-radius:999px; border:1px solid ' + (da ? '#5dcaa5' : 'rgba(255,255,255,0.14)') + '; color:' + (da ? '#5dcaa5' : '#9aa0b8') + ';"><i class="ti ' + (da ? 'ti-check' : 'ti-clock') + '" aria-hidden="true"></i>' + escapeHtml(m.name) + '</span>';
+    }).join('');
+  }
+  function renderPatenschaftBox(){
+    const box = document.getElementById('patenschaftBox');
+    if (!box) return;
+    if (!patenschaftCache && !patenschaftFehler){ box.style.display = 'none'; setBoxHtml(box, 'patenschaftBox', ''); return; }
+    box.style.display = 'block';
+    if (!patenschaftCache){
+      setBoxHtml(box, 'patenschaftBox', '<div class="bmeta" data-patenschaft-fehler><i class="ti ti-alert-triangle" aria-hidden="true"></i> Patenschaft: konnte nicht geladen werden – ' + escapeHtml(patenschaftFehler) + '</div>');
+      return;
+    }
+    const d = patenschaftCache;
+    const tage = d.dauerTage || 30;
+    const katalog = Array.isArray(d.katalog) ? d.katalog : [];
+    const s1 = katalog[0] && katalog[0].credits ? katalog[0].credits : { schuetzling: 200, pate: 150 };
+    const staub = katalog[0] && typeof katalog[0].staub === 'number' ? katalog[0].staub : 3;
+    let html = '<div style="border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 12px; margin:10px 0;">'
+      + '<div style="font-weight:600; margin-bottom:4px;"><i class="ti ti-users" aria-hidden="true" style="margin-right:5px;"></i>Patenschaft</div>'
+      + '<div class="bmeta" style="margin-bottom:8px;">Wer sich über deinen Einladungs-Link registriert, ist ' + tage + ' Tage lang dein Schützling. Jeder Meilenstein, den er in dieser Zeit zum ersten Mal schafft, bringt euch beiden etwas: ' + fmt(s1.schuetzling) + ' Kredite für den Schützling, ' + fmt(s1.pate) + ' für den Paten, dazu je ' + staub + ' Sternenstaub.</div>';
+    if (d.pate){
+      html += '<div data-patenschaft-pate style="margin-bottom:8px;">'
+        + '<div style="font-size:13px;"><i class="ti ti-user" aria-hidden="true" style="margin-right:4px;"></i>Dein Pate: <strong>' + escapeHtml(d.pate.name || '?') + '</strong> <span class="bmeta">· ' + patenschaftRestText(d.pate.bis) + '</span></div>'
+        + '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:5px;">' + patenschaftChips(katalog, d.pate.meilensteine) + '</div></div>';
+    }
+    const liste = Array.isArray(d.schuetzlinge) ? d.schuetzlinge : [];
+    if (liste.length){
+      html += '<div class="bmeta" style="margin:6px 0 4px;">Deine Schützlinge (' + liste.length + '):</div>';
+      for (const sch of liste){
+        html += '<div data-patenschaft-schuetzling style="margin-bottom:6px;">'
+          + '<div style="font-size:13px;"><i class="ti ti-users" aria-hidden="true" style="margin-right:4px;"></i><strong>' + escapeHtml(sch.name || '?') + '</strong> <span class="bmeta">· ' + patenschaftRestText(sch.bis) + '</span></div>'
+          + '<div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:5px;">' + patenschaftChips(katalog, sch.meilensteine) + '</div></div>';
+      }
+    }
+    if (!d.pate && !liste.length){
+      html += '<div class="bmeta" data-patenschaft-leer>Noch keine Patenschaft – teile deinen Einladungs-Link, dann erscheint hier dein erster Schützling.</div>';
+    }
+    html += '</div>';
+    setBoxHtml(box, 'patenschaftBox', html);
   }
   /* Teilen ueber das native Blatt des Geraets - dort erscheinen TikTok, Instagram, WhatsApp
      usw., sofern installiert. Es gibt KEINE Web-Schnittstelle, um bei TikTok oder Instagram
@@ -44907,7 +45012,7 @@ async function claimPendingRewards(){
       { title:'Zuletzt angemeldet & alle Sitzungen beenden', body:'Unter <strong>Einstellungen → Sitzung &amp; Sicherheit</strong> steht, wann die aktuell laufende Sitzung begonnen hat. Passt dieser Zeitpunkt nicht zu deiner eigenen letzten Anmeldung, hat sich jemand anderes an deinem Konto angemeldet. Dort findest du auch <strong>„Alle Sitzungen beenden"</strong> (Passwort-Bestätigung nötig): Das macht <strong>jede</strong> bisherige Anmeldung dieses Kontos ungültig – auch die auf dem Gerät, an dem du es auslöst, du wirst also sofort abgemeldet. Dein Spielstand wird vorher gespeichert. <strong>Wichtig:</strong> Das allein hilft nur kurzfristig, wenn jemand dein Passwort kennt – er kann sich damit direkt wieder anmelden. Ändere in dem Fall anschließend unbedingt dein Passwort. Nur mit eigenem Server verfügbar.' },
       { title:'E-Mail ändern', body:'In den Einstellungen unter „E-Mail" kannst du deine Adresse jederzeit ändern (Passwort-Bestätigung nötig). Die neue Adresse wird erst aktiv, nachdem du den Bestätigungslink geklickt hast, der dorthin geschickt wird – deine bisherige Adresse bleibt bis dahin gültig, damit du nicht ausgesperrt wirst.' },
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
-      { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.' },
+      { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.<br><br><strong>Patenschaft:</strong> Wer sich über deinen Link registriert, ist <strong>30 Tage</strong> lang dein <strong>Schützling</strong> – und du sein <strong>Pate</strong>. Schafft der Schützling in dieser Zeit einen Meilenstein zum ersten Mal (erster gewonnener Spielerangriff, erste abgewehrte Attacke, erster Schlag gegen ein Nest oder eine Festung, erster Handel am Markt, fünf Tage in Folge angemeldet), bekommt ihr <strong>beide</strong> etwas: 200 Kredite und 3 Sternenstaub für den Schützling, 150 Kredite und 3 Sternenstaub für den Paten – jeder Meilenstein genau einmal. Den Stand mit Häkchen zeigt die Karte „Patenschaft" unter Einstellungen → Freunde einladen; ein Pate kann bis zu zehn Schützlinge gleichzeitig haben.' },
       { title:'Bonuscodes', body:'Gelegentlich gibt es <strong>Bonuscodes</strong> auf den Kanälen des Spiels (TikTok, Instagram, YouTube, Discord). Eingelöst werden sie unter <strong>Einstellungen → Bonuscode einlösen</strong>. Groß- und Kleinschreibung, Bindestriche und Leerzeichen sind dabei egal - wer „sternen-staub 25" tippt, hat den Code. <strong>Jeder Code gilt nur eine begrenzte Zeit</strong> (meist ein paar Tage) und <strong>nur einmal je Konto</strong>; manche gelten außerdem nur für die ersten N Spieler, die schnell genug sind. Klappt es nicht, sagt dir die Zeile unter dem Feld auch warum - abgelaufen, schon eingelöst, aufgebraucht oder schlicht unbekannt. Die Belohnung landet über die Belohnungs-Warteschlange auf deinem Konto und steht danach dauerhaft als <strong>Bericht</strong> unter „Sonstiges". Nur mit eigenem Server verfügbar.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
       { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. '+KOMFORT_GRENZEN.freunde.standard+', mit Unterstützer-Rang '+KOMFORT_GRENZEN.freunde.unterstuetzer+'), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
@@ -45473,7 +45578,7 @@ async function claimPendingRewards(){
      Spiels; sie trug rote Pille, roten Streifen und ein Warndreieck ueber 38k angekommenem Erz und
      stand im Filter unter "Nur Rueckschlaege". */
   const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout',
-                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk'];
+                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk','patenschaft'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
   const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
@@ -46228,6 +46333,14 @@ async function claimPendingRewards(){
              + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
              + (r.text ? '<br>„' + escapeHtml(r.text) + '"' : '')
              + '<br><span class="bmeta">Ein Geschenk an alle Kommandanten – zum Beispiel als Entschädigung nach einem Ausfall.</span>';
+      } else if (r.type === 'patenschaft'){
+        const istPate = r.rolle === 'pate';
+        title = 'Patenschaft: ' + (istPate ? 'Dein Schützling hat einen Meilenstein geschafft' : 'Meilenstein geschafft');
+        body = '<i class="ti ti-users" aria-hidden="true" style="color:#5dcaa5;"></i> <strong>' + escapeHtml(r.meilenstein || 'Meilenstein') + '</strong>'
+             + (istPate ? ' – geschafft von deinem Schützling <strong>' + escapeHtml(r.partnerName || '?') + '</strong>'
+                        : ' – dein Pate <strong>' + escapeHtml(r.partnerName || '?') + '</strong> bekommt ebenfalls etwas')
+             + '<br>Gutgeschrieben: <strong>+' + fmt(r.credits || 0) + ' Kredite</strong>' + (r.staub ? ' und <strong>+' + fmt(r.staub) + ' Sternenstaub</strong>' : '')
+             + '<br><span class="bmeta">Eine Patenschaft läuft 30 Tage ab der Einladung – der Stand steht unter Einstellungen → Freunde einladen.</span>';
       } else if (r.type === 'item-found'){
         title = (r.rare?'Seltener Fund: ':'Item gefunden: ')+r.itemName;
         body = 'Gefunden bei: <strong>'+(r.foundAt||'unbekannt')+'</strong>'+(r.rare?'':' · liegt im Inventar (Fortschritt-Tab) bereit');
@@ -46525,6 +46638,7 @@ async function claimPendingRewards(){
         : (r.type==='deckelausgleich' || r.type==='deckelkappung') ? 'ti-pick'
         : r.type==='bonuscode' ? 'ti-award'
         : r.type==='geschenk' ? 'ti-sparkles'
+        : r.type==='patenschaft' ? 'ti-users'
         /* `positive`, NICHT `won` (v8.597.0): `won` prueft nur `result` gegen 'win'/'destroyed'
            und ist damit eine ZWEITE Wahrheit ueber "Erfolg". Die KI-Abfangautomatik trug deshalb
            ein WARNDREIECK ueber vertriebenen Piraten - derselbe Spieler-Report, andere Stelle.
@@ -70417,7 +70531,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (tab === 'hilfe') renderHelpBox();
     if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
     if (tab === 'berichte'){ loadNotificationEvents(); if (myAllianceTag() && useBackend()) loadSharedIntel().then(() => { lastIntelSig = null; renderIntelBox(); }); }
-    if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); }
+    if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); ladePatenschaft(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceChronicle(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
     if (tab === 'karte'){ loadPlayersInSystem(); }
     if (tab === 'sammlung') renderSammlung();
@@ -79500,6 +79614,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
       playSound('achieve');
     } else {
       log('Einladungscode von '+data.referrerName+' verknüpft - der Bonus wird automatisch gutgeschrieben, sobald du Kommandanten-Level '+(data.levelNeeded||5)+' erreichst.', 'ti-users');
+    }
+    // Patenschaft (Feature G): Der Server nennt den Paten nur beim ERSTEN Verknuepfen - und nur,
+    // wenn er die Patenschaft kennt. Ein alter Server schickt das Feld nicht, dann steht hier nichts.
+    if (data.patenschaft && data.patenschaft.name){
+      log('Dein Pate: '+data.patenschaft.name+' – '+(data.patenschaft.tage||30)+' Tage gemeinsame Meilensteine (Stand unter Einstellungen → Freunde einladen).', 'ti-users', 'info');
     }
   }
   /* WOHER EIN BESUCHER KAM (03.09.2026) - erfasst beim ERSTEN Aufruf, mitgeschickt bei der
