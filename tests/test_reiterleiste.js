@@ -280,7 +280,14 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
                titel: gruppen.map(x => { const t = x.querySelector('.tab-gruppe-titel'); return t ? (t.textContent || '').trim() : null; }),
                trenner: bar.querySelectorAll('.tab-group-divider').length };
     });
-    check('Desktop: vier .tab-gruppe mit sichtbarem Titel', g.anzahl === 4 && g.mitTitel === 4, g);
+    // `trenner` wird seit dem Umbau gemessen, aber bis zum 11.09.2026 nicht AUSGEWERTET - damit
+    // hatte diese Datei die zweite Hälfte ihrer alten Aussage still verloren (die alte Prüfung
+    // hiess „die drei Domänen-Trenner sind weiterhin sichtbar"). Dass test_reitergruppen.js es mit
+    // V3 ebenfalls auffängt, ist kein Grund, hier einen gemessenen Wert ungenutzt liegen zu lassen:
+    // Genau auf diese Halbierung zielt die Hausregel, nach Konflikten in Testdateien zu prüfen,
+    // dass keine Prüfungen verloren gingen.
+    check('Desktop: vier .tab-gruppe mit sichtbarem Titel und kein .tab-group-divider mehr',
+      g.anzahl === 4 && g.mitTitel === 4 && g.trenner === 0, g);
     await ctx.close();
   }
 

@@ -37,13 +37,16 @@
 //     Datei - eine eingetippte Liste wäre bei jedem neuen Reiter falsch.
 //   * Die Leistenhöhen des Ausgangsstands misst der Test IM SELBEN LAUF auf einer zweiten Seite.
 //
-// DER VERGLEICHSSTAND: normalerweise die Kopie des Ausgangsstands (v8.722.0), die über
-// KEPLER_REITERGRUPPEN_ALT benannt wird. Liegt sie nicht (mehr) da - ein Prüflauf auf einem
-// anderen Rechner, ein eingesammelter Container -, baut der Test sich den Vergleichsstand aus der
-// AKTUELLEN Spieldatei: dieselbe Datei plus eine angehängte Regel, die die Gruppenflächen bei
-// JEDER Breite auflöst. Das ist layouttechnisch derselbe Zustand wie „gar keine Flächen" -
-// `display:contents` erzeugt keine Box -, und die Höhenprüfung behält ihre Aussage auch dann noch,
-// wenn der historische Stand längst weg ist. Welcher Stand benutzt wurde, sagt V7.
+// DER VERGLEICHSSTAND: im REGELFALL baut der Test ihn sich aus der AKTUELLEN Spieldatei -
+// dieselbe Datei plus eine angehängte Regel, die die Gruppenflächen bei JEDER Breite auflöst. Das
+// ist layouttechnisch derselbe Zustand wie „gar keine Flächen" (`display:contents` erzeugt keine
+// Box), und die Höhenprüfung 6 behält ihre Aussage damit auch dann, wenn der historische Stand
+// längst weg ist. Die Kopie des Ausgangsstands (v8.722.0) kommt nur noch dazu, wenn sie über
+// KEPLER_REITERGRUPPEN_ALT ausdrücklich benannt wird; einen Vorgabepfad gibt es seit dem
+// 11.09.2026 nicht mehr (er war ein absoluter Sitzungspfad und griff auf keinem anderen Rechner).
+// Welcher Stand benutzt wurde, sagt V7 - und V7 wertet OBERHALB der Schwelle aus, weil sich nur
+// dort die drei möglichen Lagen unterscheiden (siehe dort). Abgeräumt wird die abgeleitete Kopie
+// am Ende des Laufs, auch im Abbruchfall (aufraeumenVergleich).
 //
 // GEGENPROBEN (KEPLER_REITERGRUPPEN_GEGENPROBE=<stand>, Spieldatei per KEPLER_SPIELDATEI umlenken):
 //   =alt         v8.722.0 unverändert - dort fällt der ganze Kern
@@ -54,6 +57,7 @@
 //   =sabotageE   ein --grp-dom-Wert auf eine falsche Farbe gesetzt
 //   =sabotageF   .tab-gruppe bekommt overflow:hidden
 //   =sabotageG   ein Knopf in die falsche Gruppe verschoben (Flotte zu Erkundung)
+//   =sabotageH   der linke Farbrand der Gruppe entfernt (border-left)
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst laufen lassen, dann eingetragen), nicht geraten.
 // Eine Sabotage, die grün bleibt, ist ein Befund über die Prüfung - nicht über die Sabotage.
 const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
@@ -67,24 +71,35 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_REITERGRUPPEN_GEGENPROBE || '';
+// GEMESSEN am 11.09.2026 (erst mit leeren Listen laufen lassen, dann eingetragen, dann alle
+// Staende erneut gefahren, bis jeder Exit 0 lieferte). Was seit der Durchsicht dazukam:
+//   * 2f faellt jetzt bei `alt` (dort gibt es die Flaeche gar nicht), bei sabotageE (falsche
+//     --grp-dom-Farbe faerbt auch den linken Rand falsch) und als EINZIGE Pruefung bei sabotageH.
+//   * 3b faellt bei sabotageB weiterhin - jetzt aber ueber die ausgeschriebene BESTAND-Reihe und
+//     nicht mehr ueber einen Vergleich der Datei mit sich selbst.
 const MUSS_FALLEN = {
-  alt:       ['V3','V4','1a','1b','1c','1d','2a','2b','2c','2d','2e','3a','5a','5b','7b'],
+  alt:       ['V3','V4','1a','1b','1c','1d','2a','2b','2c','2d','2f','2e','3a','5a','5b','7b'],
   sabotageA: ['5b','6a','8','9b'],
   sabotageB: ['1c','3b'],
   sabotageC: ['5b','6a'],
   sabotageD: ['2b'],
-  sabotageE: ['2c','2d'],
+  sabotageE: ['2c','2d','2f'],
   sabotageF: ['7b'],
-  sabotageG: ['3a']
+  sabotageG: ['3a'],
+  sabotageH: ['2f']
 };
 
 // Die Breiten, an denen gemessen wird. 1600 liegt über der Schwelle, 1560 genau darauf
 // (max-width schließt den Wert ein), der Rest darunter; 390 ist das Handy-Raster.
-const BREITEN = [1900, 1600, 1560, 1400, 1200, 1000, 390];
+// 1561 ist die SCHMALSTE Breite MIT Kacheln, und dort ist die Reserve laut dem CSS-Kommentar der
+// Spieldatei nur 26 px (bei 1600 px sind es 66 px). Genau dort kippt die Kachelbauart zuerst -
+// deshalb wird dort gemessen und nicht nur bei 1600/1900 px (gemessen 11.09.2026: 102 px und zwei
+// Knopfzeilen bei 1561/1600/1620/1900 px, Vergleichsstand überall 94 px).
+const BREITEN = [1900, 1600, 1561, 1560, 1400, 1200, 1000, 390];
 const UEBER_DER_SCHWELLE = 1600;
 const UNTER_DER_SCHWELLE = [1560, 1400, 1200, 1000, 390];
 const HOEHE_GLEICH = [1400, 1200, 1000, 390];   // hier darf die Leiste keinen Millimeter wachsen
-const HOEHE_TOLERANZ = [1900, 1600];            // hier sind die Flächen sichtbar: höchstens +8 px
+const HOEHE_TOLERANZ = [1900, 1600, 1561];      // hier sind die Flächen sichtbar: höchstens +8 px
 const ABZEICHEN_BREITEN = [1900, 1600, 1400, 390];
 
 function backend(store){ return async r => {
@@ -163,6 +178,14 @@ const TITEL = { kolonie:'Kolonie', erkundung:'Erkundung', gemeinschaft:'Gemeinsc
 // der Datei - auseinanderlaufen duerfen sie nicht.
 const GRUPPEN_REIHE = ['kolonie', 'erkundung', 'gemeinschaft', 'meta'];
 
+// Die Reihenfolge der BESTANDS-Reiter ist ebenfalls Muskelerinnerung - und seit der Vorgabepfad
+// weg ist, ist der Ersatzstand der Normalfall; ein Vergleich der Datei mit sich selbst kann ein
+// Umsortieren gar nicht bemerken. Deshalb hier dieselbe ausgeschriebene Liste wie in
+// tests/test_nav.js, mit derselben Bauart: PRAEFIX statt Gleichheit (ein ANGEHAENGTER vierzehnter
+// Reiter verletzt die Muskelerinnerung nicht, ein umsortierter sehr wohl) plus die Gegenrichtung,
+// dass keiner verschwindet. Der historische Stand kommt in 3b nur noch als Zusatzbeleg dazu.
+const BESTAND = 'basis,verteidigung,forschung,flotte,expedition,karte,galaxie,allianz,offiziere,markt,punkte,fortschritt'.split(',');
+
 // Steht eine Fundstelle innerhalb eines Kommentars? Gemessen über die letzte Kommentar-Öffnung vor
 // der Stelle: liegt sie hinter dem letzten Kommentar-Ende, ist die Fundstelle drin.
 function inKommentar(quelle, pos){
@@ -185,17 +208,32 @@ function fundstellenAusserhalbKommentar(quelle, text){
 }
 
 // ---- Der Vergleichsstand ------------------------------------------------------------------------
-const ALT_VORGABE = '/tmp/claude-0/-home-user/58fcba72-4194-591c-baec-14d429b80bb8/scratchpad/alt_8722.html';
+// KEIN VORGABEPFAD. Hier stand bis zum 11.09.2026 ein absoluter Sitzungspfad auf eine Kopie von
+// v8.722.0 - auf jedem anderen Rechner griff damit immer der Ersatzweg, und die Datei trug einen
+// Pfad, den lib/umgebung.js ausdrücklich abgeschafft hat. Der historische Stand kommt jetzt nur
+// noch über KEPLER_REITERGRUPPEN_ALT; der NORMALFALL ist damit der Ersatzstand.
+// Weil der Ersatzstand der Normalfall ist, darf keine Prüfung ihre Aussage allein aus ihm ziehen:
+// Prüfung 3b steht deshalb auf einer ausgeschriebenen Knopfreihe (BESTAND, Vorbild
+// tests/test_nav.js) und nimmt den historischen Stand nur noch als ZUSATZbeleg dazu, wenn er da ist.
 function vergleichsstand(){
-  const benannt = process.env.KEPLER_REITERGRUPPEN_ALT || ALT_VORGABE;
-  try { if (fs.statSync(benannt).size > 0) return { pfad:benannt, art:'Ausgangsstand' }; } catch (e) {}
+  const benannt = process.env.KEPLER_REITERGRUPPEN_ALT || '';
+  try { if (benannt && fs.statSync(benannt).size > 0) return { pfad:benannt, art:'Ausgangsstand', historisch:true, ordner:null }; } catch (e) {}
   // Ersatz: dieselbe Spieldatei, aber die Gruppenflächen bei jeder Breite aufgelöst. Das ist
   // derselbe Layout-Zustand, den die Schwelle unterhalb von 1561 px herstellt.
+  // Der Ordner wird am Ende des Laufs wieder abgeräumt (aufraeumenVergleich), auch wenn der Lauf
+  // abbricht: ohne das blieben je Lauf 6,7 MB liegen - gemessen fünf Läufe, 33 MB.
   const ordner = fs.mkdtempSync(path.join(os.tmpdir(), 'kepler-reitergruppen-'));
   const ziel = path.join(ordner, 'vergleich.html');
   fs.writeFileSync(ziel, QUELLE + '\n<style>.tabs .tab-gruppe{display:contents !important;}' +
     '.tabs .tab-gruppe-titel{display:none !important;}</style>\n');
-  return { pfad:ziel, art:'aus der Spieldatei abgeleitet (ohne Gruppenflächen)' };
+  return { pfad:ziel, art:'aus der Spieldatei abgeleitet (ohne Gruppenflächen)', historisch:false, ordner };
+}
+let VERGLEICH = null;
+function aufraeumenVergleich(){
+  if (VERGLEICH && VERGLEICH.ordner){
+    try { fs.rmSync(VERGLEICH.ordner, { recursive:true, force:true }); } catch (e) {}
+    VERGLEICH.ordner = null;
+  }
 }
 
 // ---- Was auf einer Seite je Breite gemessen wird -------------------------------------------------
@@ -218,19 +256,29 @@ const MESSEN = () => {
     gruppenGesamt: alleGruppen.length,
     gruppenSchluessel: direkt.map(g => g.getAttribute('data-tab-gruppe')),
     gruppenAnzeige: alleGruppen.map(g => getComputedStyle(g).display),
-    // Beschneidet die Gruppe, oder hebt sie sich in einen eigenen Stapelkontext? Beides wuerde die
-    // .tab-badge-Punkte kosten, ohne dass ihre Rechtecke sich verschieben - deshalb hier die
-    // gerechneten Eigenschaften und nicht nur die Geometrie. clip-path ist bewusst NICHT dabei:
-    // Der Eckenschnitt ist gewollt (dieselbe Stufe wie .tab-btn) und trifft die obere linke und
-    // untere rechte Ecke, der Punkt sitzt oben rechts.
+    // Zwei Fragen in EINER Messung:
+    // (a) Beschneidet die Gruppe ihren Inhalt, oder hebt sie sich per overflow/z-index/transform/
+    //     filter/isolation/opacity/mix-blend-mode heraus? Beides wuerde die .tab-badge-Punkte
+    //     kosten, ohne dass ihre Rechtecke sich verschieben - deshalb die gerechneten
+    //     Eigenschaften und nicht nur die Geometrie (Pruefung 7b).
+    // (b) Ist die Flaeche ueberhaupt eine Flaeche? Hintergrund, linker Farbrand und Eckenschnitt
+    //     sind die drei Zusagen des Aenderungssatzes, und bis zum 11.09.2026 las sie KEINE
+    //     Pruefung: man haette alle drei entfernen koennen, und der Test waere gruen geblieben
+    //     (Pruefung 2f).
     gruppenKasten: alleGruppen.map(g => { const c = getComputedStyle(g);
       return { gruppe:g.getAttribute('data-tab-gruppe'), overflow:c.overflow, zIndex:c.zIndex,
                transform:c.transform, filter:c.filter, isolation:c.isolation,
-               opacity:c.opacity, mischung:c.mixBlendMode }; }),
+               opacity:c.opacity, mischung:c.mixBlendMode,
+               hintergrund:c.backgroundColor, randLinksBreite:c.borderLeftWidth,
+               randLinksFarbe:c.borderLeftColor, eckenschnitt:c.clipPath }; }),
     gruppenInhalt: direkt.map(g => ({ gruppe:g.getAttribute('data-tab-gruppe'),
                                       tabs:[...g.querySelectorAll('.tab-btn')].map(b => b.getAttribute('data-tab')) })),
     knoepfeAusserhalb: knoepfe.filter(b => !b.closest('.tab-gruppe')).map(b => b.getAttribute('data-tab')),
     knopfReihe: knoepfe.map(b => b.getAttribute('data-tab')),
+    // Die ZEILENZAHL ist schriftunabhaengiger als eine Pixelhoehe: sie faellt, sobald ein
+    // vierzehnter Reiter oder eine laengere Beschriftung die Reserve aufbraucht, und sie bleibt
+    // auch dann aussagekraeftig, wenn eine andere Schrift jede Zeile um ein paar Pixel aendert.
+    zeilen: [...new Set(knoepfe.map(b => Math.round(b.getBoundingClientRect().top)))].length,
     titel: alleGruppen.map(g => {
       const ts = [...g.querySelectorAll('.tab-gruppe-titel')];
       return { gruppe:g.getAttribute('data-tab-gruppe'), anzahl:ts.length,
@@ -289,7 +337,7 @@ async function warteBisRuhe(page){
 
 (async () => {
   const browser = await starteBrowser();
-  const VERGLEICH = vergleichsstand();
+  VERGLEICH = vergleichsstand();
 
   async function seite(browser, url, store){
     const ctx = await browser.newContext({ viewport:{ width:UEBER_DER_SCHWELLE, height:1000 } });
@@ -325,15 +373,29 @@ async function warteBisRuhe(page){
     const store = { 'kepler7-save-v3': SPEICHER };
     const { ctx, page, errs } = await seite(browser, 'file://' + VERGLEICH.pfad, store);
     for (const w of BREITEN) vergleich[w] = await beiBreite(page, w);
-    const v = vergleich[1400];
-    merke('V7: Vergleichsstand geladen, Leiste ohne eigene Gruppenflächen (' + VERGLEICH.art + ')',
-      !!v && v.knopfReihe.length === KNOEPFE_AUS_DATEI.length && v.gruppenAnzeige.every(d => d === 'contents'),
-      { pfad:VERGLEICH.pfad, art:VERGLEICH.art, knoepfe: v ? v.knopfReihe.length : null, anzeige: v ? v.gruppenAnzeige : null });
+    // AUSGEWERTET WIRD OBERHALB DER SCHWELLE, und das ist der ganze Witz dieser Prüfung.
+    // Bis zum 11.09.2026 stand hier vergleich[1400] und verlangte 4x 'contents'. Bei 1400 px sind
+    // die Gruppen aber auch im NEUEN Stand aufgelöst - die Bedingung war fuer DREI verschiedene
+    // Lagen wahr, darunter der Unfall, dass jemand die aktuelle Spieldatei als Vergleichsstand
+    // benennt. Dann messen 6a, 6b und 3b die Datei gegen sich selbst und sagen nichts mehr.
+    // Oberhalb der Schwelle trennen sich die drei Lagen sauber:
+    //   Ausgangsstand v8.722.0   gar keine .tab-gruppe          -> Länge 0
+    //   Ersatzstand              aufgelöst per angehängter Regel -> 4x 'contents'
+    //   versehentlich die Spieldatei selbst                      -> 4x 'flex', faellt hier
+    // Dazu der direkte Pfadvergleich: derselbe path.resolve wie die Spieldatei faellt ebenfalls.
+    const v = vergleich[UEBER_DER_SCHWELLE];
+    const selbeDatei = path.resolve(VERGLEICH.pfad) === path.resolve(SPIELDATEI);
+    const ohneKacheln = !!v && (v.gruppenAnzeige.length === 0 ||
+      (v.gruppenAnzeige.length === 4 && v.gruppenAnzeige.every(d => d === 'contents')));
+    merke('V7: Vergleichsstand geladen, Leiste oberhalb der Schwelle ohne eigene Gruppenflächen (' + VERGLEICH.art + ')',
+      !!v && v.knopfReihe.length === KNOEPFE_AUS_DATEI.length && ohneKacheln && !selbeDatei,
+      { pfad:VERGLEICH.pfad, art:VERGLEICH.art, selbeDateiWieSpieldatei:selbeDatei,
+        knoepfe: v ? v.knopfReihe.length : null, anzeigeBei1600: v ? v.gruppenAnzeige : null });
     merke('J0: keine JS-Fehler am Vergleichsstand', errs.length === 0, errs.slice(0, 3));
     await ctx.close();
   }
 
-  // ---- Neuer Stand: eine Seite, sieben Breiten ---------------------------------------------------
+  // ---- Neuer Stand: eine Seite, acht Breiten -----------------------------------------------------
   {
     const store = { 'kepler7-save-v3': SPEICHER };
     const { ctx, page, errs } = await seite(browser, SPIEL_URL, store);
@@ -354,9 +416,14 @@ async function warteBisRuhe(page){
     merke('V6: Vorbedingung - 13 Knöpfe mit data-tab-domain aus der Datei gelesen, vier Blöcke',
       KNOEPFE_AUS_DATEI.length === 13 && BLOECKE.length === 4,
       { knoepfe: KNOEPFE_AUS_DATEI.length, bloecke: BLOECKE.map(b => b.domaene + ':' + b.tabs.join('+')) });
-    const punkte = ABZEICHEN_BREITEN.reduce((n, w) => n + (messung[w] ? messung[w].abzeichen.length : 0), 0);
-    merke('V8: Vorbedingung - es gibt überhaupt sichtbare .tab-badge zu prüfen', punkte > 0,
-      ABZEICHEN_BREITEN.map(w => w + 'px:' + (messung[w] ? messung[w].abzeichen.length : '?')).join(' '));
+    // JE BREITE, nicht in Summe. Bis zum 11.09.2026 wurden die vier Breiten zusammengezählt und
+    // nur `> 0` verlangt: Fiele die Zahl bei EINER Breite auf null, bliebe 7a fuer genau diese
+    // Breite ueber einer leeren Menge trivial gruen, und die Summe haette es zugedeckt.
+    // (Pruefung 8 haengt NICHT an den Abzeichen, sondern an `treffer` mit 13 festen Eintraegen je
+    // Breite - sie ist von dieser Luecke nie betroffen gewesen.)
+    const abzProBreite = ABZEICHEN_BREITEN.map(w => w + 'px:' + (messung[w] ? messung[w].abzeichen.length : '?'));
+    merke('V8: Vorbedingung - bei JEDER Prüfbreite gibt es sichtbare .tab-badge zu prüfen',
+      ABZEICHEN_BREITEN.every(w => messung[w] && messung[w].abzeichen.length > 0), abzProBreite.join(' '));
 
     // ---- 1: Struktur bei 1600 px ---------------------------------------------------------------
     merke('1a: genau vier div.tab-gruppe in der Leiste', !!m && m.gruppenGesamt === 4, m ? m.gruppenGesamt : null);
@@ -385,6 +452,23 @@ async function warteBisRuhe(page){
     merke('2d: die --grp-dom-Werte der Datei sind zeichengleich zu den --tab-dom-Werten',
       Object.keys(DOM_FARBEN).length === 4 && Object.keys(GRP_FARBEN).length === 4 &&
       Object.keys(DOM_FARBEN).every(d => GRP_FARBEN[d] === DOM_FARBEN[d]), { DOM_FARBEN, GRP_FARBEN });
+    // 2f: DIE FLAECHE SELBST. Von der ganzen benannten Flaeche war bis zum 11.09.2026 nur messbar,
+    // dass oberhalb der Schwelle ein Titel sichtbar ist - Hintergrund, linker Farbrand und
+    // Eckenschnitt, die drei Zusagen des Aenderungssatzes, las keine einzige Pruefung. Man haette
+    // alle drei entfernen koennen, und der Test waere gruen geblieben.
+    // Die Randfarbe wird gegen dieselbe hexZuRgb-Rechnung geprueft wie in 2c, also gegen den
+    // --tab-dom-Block der Datei - nicht gegen einen eingetippten Farbwert.
+    const flaecheFehler = !m ? ['keine Messung'] : m.gruppenKasten.flatMap(k => {
+      const f = [];
+      if (!(parseFloat(k.randLinksBreite) >= 2)) f.push(k.gruppe + ': linker Rand ' + k.randLinksBreite + ' statt >= 2px');
+      if (k.randLinksFarbe !== hexZuRgb(DOM_FARBEN[k.gruppe])) f.push(k.gruppe + ': Randfarbe ' + k.randLinksFarbe + ' statt ' + hexZuRgb(DOM_FARBEN[k.gruppe]));
+      if (/^(transparent|rgba\(0, 0, 0, 0\))$/.test(String(k.hintergrund))) f.push(k.gruppe + ': Hintergrund durchsichtig (' + k.hintergrund + ')');
+      if (!k.eckenschnitt || k.eckenschnitt === 'none') f.push(k.gruppe + ': kein Eckenschnitt (clip-path ' + k.eckenschnitt + ')');
+      return f;
+    });
+    merke('2f: jede Gruppe ist eine Fläche - eigener Hintergrund, linker Farbrand in der Domänenfarbe (>=2 px), Eckenschnitt',
+      !!m && m.gruppenKasten.length === 4 && flaecheFehler.length === 0, flaecheFehler);
+
     merke('2e: der Titel ist aria-hidden, nicht fokussierbar, und die Fokusreihenfolge der Leiste sind genau die 13 Knöpfe',
       !!m && m.titel.length === 4 && m.titel.every(t => t.aria === 'true' && t.tabIndex < 0) && m.fokuskette.length === 13 &&
       m.fokuskette.every(f => f.startsWith('button:')),
@@ -395,9 +479,23 @@ async function warteBisRuhe(page){
     const istInhalt = !m ? '(keine Messung)' : m.gruppenInhalt.map(g => g.gruppe + '=' + g.tabs.join('+')).join(' | ');
     merke('3a: je Gruppe genau die Knöpfe ihres data-tab-domain-Blocks', istInhalt === sollInhalt,
       { gemessen:istInhalt, erwartet:sollInhalt });
-    merke('3b: die Reihenfolge von .tab-btn ist zeichengleich zum Vergleichsstand',
-      !!m && !!vergleich[UEBER_DER_SCHWELLE] && m.knopfReihe.join(',') === vergleich[UEBER_DER_SCHWELLE].knopfReihe.join(','),
-      { neu: m ? m.knopfReihe.join(',') : null, vergleich: vergleich[UEBER_DER_SCHWELLE] ? vergleich[UEBER_DER_SCHWELLE].knopfReihe.join(',') : null });
+    // 3b steht auf der AUSGESCHRIEBENEN Knopfreihe (BESTAND, oben), nicht mehr allein auf dem
+    // Vergleichsstand: seit der Vorgabepfad weg ist, ist der Ersatzstand der Normalfall, und der
+    // stammt aus derselben Datei - er kann ein Umsortieren gar nicht bemerken. Der historische
+    // Stand bleibt ZUSATZbeleg, wenn er ueber KEPLER_REITERGRUPPEN_ALT benannt wurde.
+    const reiheFehler = [];
+    if (!m) reiheFehler.push('keine Messung');
+    else {
+      BESTAND.forEach((t, i) => { if (m.knopfReihe[i] !== t) reiheFehler.push('Platz ' + i + ': ' + m.knopfReihe[i] + ' statt ' + t); });
+      BESTAND.filter(t => m.knopfReihe.indexOf(t) < 0).forEach(t => reiheFehler.push('verschwunden: ' + t));
+      const vg = vergleich[UEBER_DER_SCHWELLE];
+      if (VERGLEICH.historisch && vg && m.knopfReihe.join(',') !== vg.knopfReihe.join(','))
+        reiheFehler.push('weicht vom historischen Stand ab: ' + vg.knopfReihe.join(','));
+    }
+    merke('3b: die Reiterreihe beginnt mit den zwölf Bestands-Reitern in unveränderter Reihenfolge',
+      reiheFehler.length === 0,
+      { fehler:reiheFehler, gemessen: m ? m.knopfReihe.join(',') : null, erwartetesPraefix:BESTAND.join(','),
+        historischerStand: VERGLEICH.historisch });
 
     // ---- 5: Die Schwelle -----------------------------------------------------------------------
     merke('5a: über der Schwelle (1600 px) sind die Flächen echte Kacheln und alle vier Titel sichtbar',
@@ -420,9 +518,20 @@ async function warteBisRuhe(page){
       { fehler:hoheGleichFehler, gemessen: HOEHE_GLEICH.map(w => w + ':' + (messung[w] ? messung[w].hoehe : '?') + '/' + (vergleich[w] ? vergleich[w].hoehe : '?')) });
     const hoheTolFehler = HOEHE_TOLERANZ.filter(w => !messung[w] || !vergleich[w] || messung[w].hoehe - vergleich[w].hoehe > 8 || messung[w].hoehe < vergleich[w].hoehe)
       .map(w => w + 'px: neu ' + (messung[w] ? messung[w].hoehe : '?') + ' gegen ' + (vergleich[w] ? vergleich[w].hoehe : '?'));
-    merke('6b: bei 1900/1600 px wächst die Leiste um höchstens 8 px',
+    merke('6b: bei 1900/1600/1561 px wächst die Leiste um höchstens 8 px',
       hoheTolFehler.length === 0,
       { fehler:hoheTolFehler, gemessen: HOEHE_TOLERANZ.map(w => w + ':' + (messung[w] ? messung[w].hoehe : '?') + '/' + (vergleich[w] ? vergleich[w].hoehe : '?')) });
+    // 6c misst die ZEILENZAHL statt der Pixelhoehe, und zwar ueber die verschiedenen gerundeten
+    // top-Werte der Knoepfe. Das ist schriftunabhaengiger als eine Hoehe in Pixeln: eine andere
+    // Schrift aendert jede Zeile um ein paar Pixel, aber nicht die Frage, wie viele Zeilen die
+    // Leiste braucht. 1561 px ist dabei der eigentliche Pruefstein - die schmalste Breite MIT
+    // Kacheln, laut CSS-Kommentar der Spieldatei nur 26 px Reserve. Ein vierzehnter Reiter oder
+    // eine laengere Beschriftung braucht die auf, und dann faellt genau hier zuerst etwas.
+    const zeilenFehler = HOEHE_TOLERANZ.filter(w => !messung[w] || messung[w].zeilen > 2)
+      .map(w => w + 'px: ' + (messung[w] ? messung[w].zeilen + ' Knopfzeilen' : 'keine Messung'));
+    merke('6c: oberhalb der Schwelle (1561/1600/1900 px) steht die Leiste in höchstens zwei Knopfzeilen',
+      zeilenFehler.length === 0,
+      { fehler:zeilenFehler, gemessen: HOEHE_TOLERANZ.map(w => w + ':' + (messung[w] ? messung[w].zeilen : '?')) });
 
     // ---- 7: Die Abzeichen ----------------------------------------------------------------------
     const abzFehler = ABZEICHEN_BREITEN.flatMap(w => (messung[w] ? messung[w].abzeichen : [])
@@ -432,13 +541,23 @@ async function warteBisRuhe(page){
     // 7a allein genuegt NICHT, und das ist gemessen: Ein overflow:hidden an der Gruppe verschiebt
     // kein einziges Rechteck (der Punkt sitzt 2 px innerhalb des Knopfes, die Gruppe hat 8 px
     // Innenabstand) - die Sabotage F blieb damit vollstaendig gruen. Beschnitten wuerde erst der
-    // Schein des Punktes, und den misst kein getBoundingClientRect. Deshalb hier die Zusage selbst:
-    // Die Gruppe ist eine Flaeche, kein Rahmen mit Schere und kein eigener Stapelkontext.
+    // Schein des Punktes, und den misst kein getBoundingClientRect. Deshalb hier die Zusage selbst.
+    //
+    // DER NAME DIESER PRUEFUNG WAR BIS ZUM 11.09.2026 ZU GROSS. Er hiess "... und bildet keinen
+    // eigenen Stapelkontext", gemessen wird aber genau die Liste unten. Die Gruppe BILDET sehr wohl
+    // einen eigenen Stapelkontext: `.tab-gruppe` steht bewusst in der clip-path-Sammelregel, und
+    // ein gerechneter clip-path ungleich `none` erzeugt laut Spezifikation einen. Das ist hier in
+    // Ordnung, weil der Eckenschnitt die obere LINKE und die untere RECHTE Ecke nimmt (Stufe
+    // --cut-sm), der .tab-badge-Punkt aber oben RECHTS im Knopf sitzt - beschnitten wird also
+    // nichts, und ein Stapelkontext an der Gruppe hebt die Punkte gemeinsam mit ihren Knoepfen,
+    // nicht gegen sie. Pruefung 2f verlangt den Eckenschnitt sogar ausdruecklich.
+    // Wer diese Zeilen als Freibrief liest, irrt trotzdem: Was hier gemessen wird, ist genau die
+    // Liste - overflow, z-index, transform, filter, isolation, Deckkraft, Mischmodus.
     const kastenFehler = !m ? ['keine Messung'] : m.gruppenKasten.filter(k =>
       k.overflow !== 'visible' || k.zIndex !== 'auto' || k.transform !== 'none' ||
       k.filter !== 'none' || k.isolation !== 'auto' || k.opacity !== '1' || k.mischung !== 'normal')
       .map(k => k.gruppe + ': ' + JSON.stringify(k));
-    merke('7b: keine Gruppe beschneidet ihren Inhalt oder bildet einen eigenen Stapelkontext',
+    merke('7b: keine Gruppe setzt overflow, z-index, transform, filter, isolation, Deckkraft oder Mischmodus',
       !!m && m.gruppenKasten.length === 4 && kastenFehler.length === 0, kastenFehler);
 
     // ---- 8: Treffbarkeit -----------------------------------------------------------------------
@@ -459,7 +578,7 @@ async function warteBisRuhe(page){
     // ---- 10: Kein Querscrollen, keine Fehler ---------------------------------------------------
     merke('10: bei 390 px scrollt das Dokument nicht in die Breite',
       !!h && h.scrollBreite <= h.fensterBreite, h ? { scroll:h.scrollBreite, fenster:h.fensterBreite } : null);
-    merke('J1: keine JS-Fehler beim Messen der sieben Breiten', errs.length === 0, errs.slice(0, 3));
+    merke('J1: keine JS-Fehler beim Messen der acht Breiten', errs.length === 0, errs.slice(0, 3));
     await ctx.close();
   }
 
@@ -496,6 +615,7 @@ async function warteBisRuhe(page){
   }
 
   await browser.close();
+  aufraeumenVergleich();
 
   if (SAB){
     const soll = MUSS_FALLEN[SAB] || [];
@@ -509,4 +629,10 @@ async function warteBisRuhe(page){
   }
   console.log(fail ? '\nFAIL' : '\nPASS');
   process.exit(fail ? 1 : 0);
-})().catch(e => { console.log('FAIL - Testlauf abgebrochen: ' + e.message); process.exit(1); });
+})().catch(e => {
+  // Auch im catch-Zweig abraeumen - sonst bleibt genau dann eine 6,7-MB-Kopie liegen, wenn der
+  // Lauf abbricht, und das ist der Fall, der sich im Betrieb wiederholt.
+  aufraeumenVergleich();
+  console.log('FAIL - Testlauf abgebrochen: ' + e.message);
+  process.exit(1);
+});

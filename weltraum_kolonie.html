@@ -1233,13 +1233,15 @@
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
     .tab-btn { background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.1); color:#c7cbe0; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
-       identische Reiter konkurrierten um dieselbe Aufmerksamkeit - nichts sagte, dass "Basis"
-       täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich merken
-       konnte. Die vorhandenen .tab-group-divider markierten zwar schon vier Gruppen, waren aber mit
-       1px bei 14% Weiss praktisch unsichtbar UND gehen beim Zeilenumbruch verloren (bei 12 Reitern
-       der Normalfall). Farbe überlebt den Umbruch, ein Trennstrich nicht - deshalb tragen jetzt die
-       Reiter selbst die Gruppenfarbe.
-       Die Gruppierung übernimmt EXAKT die schon vorhandenen Divider-Positionen, und die Reihenfolge
+       identische Reiter - heute 13 - konkurrierten um dieselbe Aufmerksamkeit; nichts sagte, dass
+       "Basis" täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich
+       merken konnte. Die DAMALS vorhandenen .tab-group-divider markierten zwar schon vier Gruppen,
+       waren aber mit 1px bei 14% Weiss praktisch unsichtbar UND gingen beim Zeilenumbruch verloren
+       (bei 13 Reitern erst recht der Normalfall). Farbe überlebt den Umbruch, ein Trennstrich nicht
+       - deshalb tragen jetzt die Reiter selbst die Gruppenfarbe. Die Trenner selbst gibt es seit
+       Etappe 3a (11.09.2026) nicht mehr; was an ihrer Stelle steht, sagt der Block „Reiter-Gruppen
+       als benannte Flächen" weiter unten.
+       Die Gruppierung übernahm EXAKT die damaligen Divider-Positionen, und die Reihenfolge
        der Reiter bleibt unverändert: Umsortieren würde die Muskelerinnerung bestehender Spieler
        zerstören - ein realer Verlust, dem kein Gewinn gegenübersteht. */
     .tab-btn[data-tab-domain="kolonie"]      { --tab-dom:#7f77dd; }
@@ -1280,10 +1282,22 @@
        läge in derselben Richtung und fast auf derselben Höhe wie der Farbfuß der Knöpfe
        (.tab-btn::after, bottom:3px) - zwei waagerechte Farbstriche übereinander, die dasselbe
        sagen. Der linke Rand markiert stattdessen, WO eine Gruppe anfängt, und das ist genau die
-       Information, die der alte Trennstrich getragen hat. Er kostet außerdem keine Höhe. */
-    .tab-gruppe { border-left:2px solid var(--grp-dom); }
+       Information, die der alte Trennstrich getragen hat. Er kostet außerdem keine Höhe.
+       Die Breite kommt aus --bw-rail: das ist genau die Stufe für eine Akzentleiste, die eine
+       Kategorie markiert (siehe die Erklärung der --bw-Skala oben). Eine getippte 2px wäre eine
+       Zahl neben der Skala - der Formensprache-Wächter liest sie und fällt darüber. */
+    .tab-gruppe { border-left:var(--bw-rail) solid var(--grp-dom); }
+    /* KEINE Deckkraft unter 1 an diesem Titel - das ist eine Lesbarkeitsgrenze, keine Vorliebe.
+       Gemessen am 11.09.2026 (getComputedStyle der Titelfarbe, Gruppenfläche als Bildpunkt aus dem
+       gerenderten Bild gelesen, weil der Seitenhintergrund ein Farbverlauf ist; WCAG-Formel):
+       mit opacity:0.85 lag Kolonie (#7f77dd auf rgb(15,18,31)) bei 3,91:1 - bei 9,5 px verlangt
+       WCAG AA 4,5:1. Erkundung 8,93 / Gemeinschaft 8,80 / Spieler 7,02 lagen darüber.
+       Mit opacity:1 steigt Kolonie auf 4,96, Erkundung auf 12,07, Gemeinschaft auf 11,89 und
+       Spieler auf 9,37 - alle vier über 4,5. (Die letzte Stelle wandert um rund ±0,1, je nachdem
+       welcher Bildpunkt der Fläche getroffen wird: der Seitenhintergrund ist ein Farbverlauf.) Die Leistenhöhe ändert sich dadurch nicht
+       (nachgemessen 102 px bei 1561/1600/1900 px, unverändert). */
     .tab-gruppe-titel { font-size:9.5px; letter-spacing:.09em; text-transform:uppercase;
-      color:var(--grp-dom); opacity:0.85; white-space:nowrap; padding:0 2px; font-weight:600; }
+      color:var(--grp-dom); opacity:1; white-space:nowrap; padding:0 2px; font-weight:600; }
     /* Dieselben vier Werte wie --tab-dom oben - bewusst ausgeschrieben statt vererbt: --tab-dom
        hängt am Knopf, nicht am Container, und wäre hier nicht sichtbar. */
     .tab-gruppe[data-tab-gruppe="kolonie"]      { --grp-dom:#7f77dd; }
@@ -45569,7 +45583,7 @@ async function claimPendingRewards(){
   // werden, sonst wird genau das Problem reproduziert, das diese Seite eigentlich lösen soll.
   const HELP_SECTIONS = [
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
-      { title:'Die vier Reiter-Gruppen', body:'Die Reiter über dem Spielfeld sind in <strong>vier Gruppen</strong> geordnet: <strong>Kolonie</strong> (Basis, Verteidigung, Forschung, Flotte) · <strong>Erkundung</strong> (Expedition, Sektorkarte, Galaxie) · <strong>Gemeinschaft</strong> (Allianz, Offiziere) · <strong>Spieler</strong> (Markt, Punktestand, Fortschritt, Sammlung).<br><br>Jede Gruppe hat eine eigene Farbe, und diese <strong>Farbe gehört zur Gruppe, nicht zum einzelnen Reiter</strong>: Der schmale Farbstreifen unter einem Reiter sagt dir also, in welchem Bereich du gerade bist – auch dann noch, wenn die Leiste in mehrere Zeilen umbricht. Auf einem breiten Bildschirm steht der Gruppenname zusätzlich links neben den Reitern der Gruppe; ist das Fenster schmaler oder spielst du am Handy, entfällt der Name und die Farbe allein trägt die Einteilung. Die <strong>Reihenfolge</strong> der Reiter ist in allen Fällen dieselbe.' },
+      { title:'Die vier Reiter-Gruppen', body:'Die Reiter über dem Spielfeld sind in <strong>vier Gruppen</strong> geordnet: <strong>Kolonie</strong> (Basis, Verteidigung, Forschung, Flotte) · <strong>Erkundung</strong> (Expedition, Sektorkarte, Galaxie) · <strong>Gemeinschaft</strong> (Allianz, Offiziere) · <strong>Spieler</strong> (Markt, Punktestand, Fortschritt, Sammlung).<br><br>Jede Gruppe hat eine eigene Farbe, und diese <strong>Farbe gehört zur Gruppe, nicht zum einzelnen Reiter</strong>: Der schmale Farbstreifen unter einem Reiter sagt dir also, in welchem Bereich du gerade bist – auch dann noch, wenn die Leiste in mehrere Zeilen umbricht. <strong>Ab 1561 px Fensterbreite</strong> steht der Gruppenname zusätzlich links neben den Reitern der Gruppe; darunter - und damit auf den verbreiteten Laptop-Auflösungen 1366, 1440 und 1536 px sowie am Handy - entfällt der Name und die Farbe allein trägt die Einteilung. Die <strong>Reihenfolge</strong> der Reiter ist in allen Fällen dieselbe.' },
       { title:'Wo ist gerade etwas offen? Die Punkte an den Reitern', body:'An jedem Reiter kann ein kleiner Punkt sitzen, und er hat <strong>zwei Bedeutungen</strong>, die sich an der Farbe unterscheiden.<br><br><strong>Bernstein</strong> heißt: hier ist etwas <em>offen</em>. Der Punkt bleibt, bis du es tatsächlich getan hast. Dieselbe Farbe wie eine vollgelaufene Ressource, und aus demselben Grund – in beiden Fällen verpufft gerade Fortschritt. Gemeldet werden: eine leere Bau-Wunschliste, keine laufende Forschung und keine Schiffe im Bau (jeweils nur, wenn du etwas davon gerade bezahlen könntest), eine offene Offizier-Talentwahl, nicht verteilte Fähigkeitspunkte, ein noch nicht begonnener Wochen-Tiefenlauf, ein ungenutztes Wochenangebot und ein Event-Schiff, das genug Teile hat.<br><br><strong>Rot</strong> heißt: hier ist etwas <em>passiert</em>. Der Punkt verschwindet, sobald du hingesehen hast – so wie bisher bei neuen Expeditionsmeldungen. Ein offener <strong>Leerenriss</strong> lässt zusätzlich den ganzen Reiter pulsieren; diese lautere Stufe bleibt ihm allein vorbehalten, weil er das einzige zeitlich harte Ereignis ist.<br><br>Dieselben Punkte findest du ausgeschrieben unter <strong>„Nächstes Ziel"</strong> auf der Basis und – nach einer Pause – im Fenster <strong>„Willkommen zurück"</strong> unter „Das wartet auf dich", dort direkt anklickbar. Ist nirgends ein Punkt zu sehen, läuft alles.' },
       { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
