@@ -42,7 +42,7 @@ const TAGE = 14;
   check('0b: der Geschenk-Bericht traegt keine Gewonnen/Verloren-Pille', /REPORT_SPECIAL_GREEN_TYPES = \[[^\]]*'geschenk'/.test(JS));
   const helfer = (JS.match(/function belohnungGabenBuchen\(/g) || []).length;
   const aufrufe = (JS.match(/= belohnungGabenBuchen\(r\)/g) || []).length;
-  // Drei Aufrufer seit v8.719.0: Bonuscode, Geschenk und die Stimmen-Belohnung (verzeichnis-stimme) -
+  // Drei Aufrufer seit v8.720.0: Bonuscode, Geschenk und die Stimmen-Belohnung (verzeichnis-stimme) -
   // dieselbe Gabenform, derselbe Helfer. Die Zahl ist die Kopie-Familie: Wer einen vierten Zweig
   // baut, traegt ihn hier ein, statt eine eigene Schleife zu schreiben.
   check('0c: EIN Buchungs-Helfer, von Bonuscode, Geschenk UND Stimme benutzt (keine zweite Schleife)', helfer === 1 && aufrufe === 3, { helfer, aufrufe });
