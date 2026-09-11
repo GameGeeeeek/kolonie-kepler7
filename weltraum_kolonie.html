@@ -1233,13 +1233,15 @@
     .tabs { display:flex; gap:6px; margin-bottom:1.1rem; flex-wrap:wrap; }
     .tab-btn { background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.1); color:#c7cbe0; padding:8px 14px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
     /* Navigation nach Domäne farbcodiert (Grafik-Audit 24.07.2026, Entwurf B). Zwölf optisch
-       identische Reiter konkurrierten um dieselbe Aufmerksamkeit - nichts sagte, dass "Basis"
-       täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich merken
-       konnte. Die vorhandenen .tab-group-divider markierten zwar schon vier Gruppen, waren aber mit
-       1px bei 14% Weiss praktisch unsichtbar UND gehen beim Zeilenumbruch verloren (bei 12 Reitern
-       der Normalfall). Farbe überlebt den Umbruch, ein Trennstrich nicht - deshalb tragen jetzt die
-       Reiter selbst die Gruppenfarbe.
-       Die Gruppierung übernimmt EXAKT die schon vorhandenen Divider-Positionen, und die Reihenfolge
+       identische Reiter - heute 13 - konkurrierten um dieselbe Aufmerksamkeit; nichts sagte, dass
+       "Basis" täglich und "Fortschritt" selten gebraucht wird, und es gab kein Muster, das man sich
+       merken konnte. Die DAMALS vorhandenen .tab-group-divider markierten zwar schon vier Gruppen,
+       waren aber mit 1px bei 14% Weiss praktisch unsichtbar UND gingen beim Zeilenumbruch verloren
+       (bei 13 Reitern erst recht der Normalfall). Farbe überlebt den Umbruch, ein Trennstrich nicht
+       - deshalb tragen jetzt die Reiter selbst die Gruppenfarbe. Die Trenner selbst gibt es seit
+       Etappe 3a (11.09.2026) nicht mehr; was an ihrer Stelle steht, sagt der Block „Reiter-Gruppen
+       als benannte Flächen" weiter unten.
+       Die Gruppierung übernahm EXAKT die damaligen Divider-Positionen, und die Reihenfolge
        der Reiter bleibt unverändert: Umsortieren würde die Muskelerinnerung bestehender Spieler
        zerstören - ein realer Verlust, dem kein Gewinn gegenübersteht. */
     .tab-btn[data-tab-domain="kolonie"]      { --tab-dom:#7f77dd; }
@@ -1261,11 +1263,70 @@
     .tab-btn.active[data-tab-domain="erkundung"]    { background:rgba(92,225,255,0.18);  border-color:#5ce1ff; box-shadow:inset 0 0 14px rgba(92,225,255,0.28); }
     .tab-btn.active[data-tab-domain="gemeinschaft"] { background:rgba(250,199,117,0.18); border-color:#fac775; box-shadow:inset 0 0 14px rgba(250,199,117,0.28); }
     .tab-btn.active[data-tab-domain="meta"]         { background:rgba(93,202,165,0.18);  border-color:#5dcaa5; box-shadow:inset 0 0 14px rgba(93,202,165,0.28); }
-    /* Dezente Gruppentrenner in der Tab-Leiste (13.07.2026, Übersichtlichkeit-Feature-Wunsch) - macht
-       die bereits bestehende logische Reihenfolge (Aufbau/Erkundung/Sozial/Meta) sichtbar, ohne
-       irgendetwas an der Reihenfolge selbst zu ändern (kein Risiko fürs eingespielte Muskelgedächtnis
-       bestehender Spieler). */
-    .tab-group-divider { flex-shrink:0; width:1px; align-self:stretch; background:rgba(255,255,255,0.14); margin:2px 1px; }
+    /* ===== Reiter-Gruppen als benannte Flächen (Gleichmaß Etappe 3a) ==========================
+       Bis hierher trennte ein 1-px-Strich (.tab-group-divider, 13.07.2026) die vier Domänen. Er
+       war mit 14 % Weiß kaum zu sehen UND ging bei jedem Zeilenumbruch verloren - und der Umbruch
+       ist bei 13 Reitern der Normalfall (gemessen 11.09.2026: zwei Zeilen ab 1600 px, drei
+       darunter). Ersetzt durch eine echte Fläche je Domäne MIT NAMEN; Strich und Regel sind
+       ersatzlos entfallen, auch im Handy-Block weiter unten.
+       Die Knöpfe selbst bleiben unangetastet: ihr Farbfuß (.tab-btn::after, oben) trägt die
+       Gruppenzugehörigkeit weiterhin allein, sobald die Fläche aufgelöst ist - deshalb ERSETZT
+       der Rand der Gruppe den Farbfuß nicht, er kommt dazu.
+       Der Eckenschnitt kommt aus der clip-path-Sammelregel weiter unten (Stufe --cut-sm, dieselbe
+       wie .tab-btn); bewusst dort und nicht hier, damit es die Formel im Dokument nur EINMAL gibt.
+       KEIN overflow:hidden und kein eigener Stapelkontext: Die .tab-badge-Punkte sitzen absolut in
+       der oberen rechten Ecke des Knopfes und würden sonst beschnitten oder überdeckt. */
+    .tab-gruppe { display:flex; align-items:center; gap:6px; padding:1px 8px 1px 6px;
+      background:rgba(255,255,255,0.03); border:var(--bw-1) solid rgba(255,255,255,0.09); }
+    /* ENTSCHEIDUNG zwischen Fuß und linkem Rand: der linke Rand. Ein 2-px-Fuß unter der Gruppe
+       läge in derselben Richtung und fast auf derselben Höhe wie der Farbfuß der Knöpfe
+       (.tab-btn::after, bottom:3px) - zwei waagerechte Farbstriche übereinander, die dasselbe
+       sagen. Der linke Rand markiert stattdessen, WO eine Gruppe anfängt, und das ist genau die
+       Information, die der alte Trennstrich getragen hat. Er kostet außerdem keine Höhe.
+       Die Breite kommt aus --bw-rail: das ist genau die Stufe für eine Akzentleiste, die eine
+       Kategorie markiert (siehe die Erklärung der --bw-Skala oben). Eine getippte 2px wäre eine
+       Zahl neben der Skala - der Formensprache-Wächter liest sie und fällt darüber. */
+    .tab-gruppe { border-left:var(--bw-rail) solid var(--grp-dom); }
+    /* KEINE Deckkraft unter 1 an diesem Titel - das ist eine Lesbarkeitsgrenze, keine Vorliebe.
+       Gemessen am 11.09.2026 (getComputedStyle der Titelfarbe, Gruppenfläche als Bildpunkt aus dem
+       gerenderten Bild gelesen, weil der Seitenhintergrund ein Farbverlauf ist; WCAG-Formel):
+       mit opacity:0.85 lag Kolonie (#7f77dd auf rgb(15,18,31)) bei 3,91:1 - bei 9,5 px verlangt
+       WCAG AA 4,5:1. Erkundung 8,93 / Gemeinschaft 8,80 / Spieler 7,02 lagen darüber.
+       Mit opacity:1 steigt Kolonie auf 4,96, Erkundung auf 12,07, Gemeinschaft auf 11,89 und
+       Spieler auf 9,37 - alle vier über 4,5. (Die letzte Stelle wandert um rund ±0,1, je nachdem
+       welcher Bildpunkt der Fläche getroffen wird: der Seitenhintergrund ist ein Farbverlauf.)
+       Die Leistenhöhe ändert sich dadurch nicht - nachgemessen 102 px bei 1561/1600/1900 px,
+       vorher wie nachher. */
+    .tab-gruppe-titel { font-size:9.5px; letter-spacing:.09em; text-transform:uppercase;
+      color:var(--grp-dom); opacity:1; white-space:nowrap; padding:0 2px; font-weight:600; }
+    /* Dieselben vier Werte wie --tab-dom oben - bewusst ausgeschrieben statt vererbt: --tab-dom
+       hängt am Knopf, nicht am Container, und wäre hier nicht sichtbar. */
+    .tab-gruppe[data-tab-gruppe="kolonie"]      { --grp-dom:#7f77dd; }
+    .tab-gruppe[data-tab-gruppe="erkundung"]    { --grp-dom:#5ce1ff; }
+    .tab-gruppe[data-tab-gruppe="gemeinschaft"] { --grp-dom:#fac775; }
+    .tab-gruppe[data-tab-gruppe="meta"]         { --grp-dom:#5dcaa5; }
+    /* ===== Ab wann die Flächen sich lohnen - und wann sie zu teuer sind =======================
+       Eine Gruppenfläche ist eine geschlossene Kachel: die Leiste darf nur noch ZWISCHEN den
+       Gruppen umbrechen, nicht mehr zwischen beliebigen Knöpfen. Nachgemessen am 11.09.2026:
+       Kolonie 544 + Erkundung 472 brauchen mit der Lücke 1022 px, Gemeinschaft 338 + Spieler 567
+       zusammen 911 px; die Leiste selbst ist in diesem Bereich Fensterbreite minus 512 px. Zwei
+       Zeilen gehen also erst ab rund 1534 px Fenster auf. Darunter kostet die Kachel ganze
+       Zeilen - mit abgeschalteter Schwelle nachgemessen: 156 px statt 94 px bei 1400 px (drei
+       Zeilen statt zwei), 210 px statt 144 px bei 1200 px und 224 px statt 158 px bei 1000 px
+       (je vier Zeilen statt drei). Die Leiste klebt im kompakten Kopf oben fest; das wären rund
+       65 px Dauerbelag über jedem Bildschirminhalt, und zwar auf den kleineren Geräten.
+       Deshalb lösen sich die Flächen unterhalb der Schwelle auf (display:contents): die Knöpfe
+       werden wieder direkte Kinder von .tabs, die Leiste bricht wie vorher zwischen beliebigen
+       Knöpfen um, und die Gruppe zeigt weiterhin die Farbe am Reiter. Schwelle 1560 statt 1534:
+       die 1022 px sind eine SCHRIFTBREITE, und die fällt auf fremden Rechnern anders aus. Die
+       Reserve ist an der Schwelle selbst 26 px und bei 1600 px Fenster 66 px (6 %). Nachgemessen
+       bei 1570, 1620, 1750, 1900 px: überall zwei Zeilen und 102 px.
+       DIESER BLOCK GILT AUCH FÜRS HANDY (≤700 px liegt unter 1560 px) und ist damit der Grund,
+       warum das 6-Spalten-Raster weiter unten unverändert funktioniert. */
+    @media (max-width: 1560px) {
+      .tabs .tab-gruppe { display:contents; }
+      .tabs .tab-gruppe-titel { display:none; }
+    }
     /* Geprägtes 3D-Icon-Badge, nur in der Haupt-Tab-Leiste (Balance-/Feature-Wunsch 13.07.2026,
        Entwurf "Neumorph" nach Freigabe). Ruhezustand wirkt aus der dunklen Fläche herausgedrückt
        (raised), aktiver Tab wirkt hineingedrückt (inset) - verstärkt visuell "hier bist du gerade". */
@@ -1307,10 +1368,13 @@
        Genau so gemessen, bevor der Block hierher wanderte. */
     @media (max-width: 700px) {
       .tabs { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; flex-wrap:nowrap; overflow-x:visible; }
-      /* Die Trenner zwischen den vier Domänen sind fürs Fluss-Layout gedacht und würden im Raster
-         eigene Zellen belegen. Die Gruppierung trägt hier der farbige Balken, den .tab-btn über
+      /* Die vier Gruppenflächen sind hier bereits aufgelöst - der 1560-px-Block weiter oben setzt
+         .tab-gruppe auf display:contents, und 700 px liegen darunter. Das ist die Bedingung, an
+         der das Raster hängt: repeat(6,1fr) und die Sonderregel für „Sammlung" weiter unten
+         wirken nur auf DIREKTE Rasterkinder. Bewusst kein zweites display:contents an dieser
+         Stelle - zwei Regeln mit demselben Wert laufen beim nächsten Schwellenwert auseinander.
+         Die Gruppierung trägt hier wie vorher der farbige Balken, den .tab-btn über
          data-tab-domain ohnehin hat. */
-      .tabs .tab-group-divider { display:none; }
       .tab-btn { flex-shrink:1; min-width:0; flex-direction:column; gap:3px;
                  padding:6px 2px 5px; font-size:8.5px; line-height:1.1; text-align:center;
                  letter-spacing:-0.01em; }
@@ -2703,7 +2767,7 @@
        und der Eingabefeld-Fokus auf inset umgestellt.
        ============================================================================================ */
     .hud-cut,
-    button, select, .tab-btn, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
+    button, select, .tab-btn, .tab-gruppe, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
     .bicon, .bicon-def, .tab-icon-badge, .rescard, .icon-badge,
     .raid-banner, .event-banner, .summary-bar,
     .fp-colony-btn, .login-teaser-item, .help-category, .help-jump-btn,
@@ -2714,7 +2778,7 @@
       border-radius: 0;
     }
     /* Zuordnung der vier Stufen: je größer die Fläche, desto größer der Schnitt. */
-    button, select, .tab-btn, .jumpnav, .hstat, .bicon, .tab-icon-badge, .rescard,
+    button, select, .tab-btn, .tab-gruppe, .jumpnav, .hstat, .bicon, .tab-icon-badge, .rescard,
     .login-tabs, .login-tab, .ll-fac-sig, .ach-summary, .ach-rank,
     input[type=text], input[type=email], input[type=password], input[type=number], textarea { --cut: var(--cut-sm); }
     .chip, .jumpnav a, .icon-badge, .help-jump-btn,
@@ -3659,25 +3723,39 @@
       <div class="resbar werkstoffe" id="tier2ResBadges" style="margin-bottom:0;"></div>
       <div id="dailyQuestBar" style="margin-bottom:0.75rem;"></div>
 
-      <!-- Die vier data-tab-domain-Gruppen entsprechen exakt den Abschnitten zwischen den
-           tab-group-divider-Elementen. Reihenfolge bewusst unverändert (Muskelerinnerung). -->
+      <!-- Die vier Reiter-Gruppen sind jetzt eigene Flächen MIT NAMEN (Gleichmaß Etappe 3a).
+           Bis hierher standen sie nur als unsichtbarer 1-px-Strich (.tab-group-divider) zwischen
+           den Knöpfen - gemessen 14 % Weiß, und beim Zeilenumbruch (der Normalfall bei 13
+           Reitern) ging der Strich ganz verloren. Die Zuordnung selbst ist unverändert: dieselben
+           vier data-tab-domain-Blöcke in derselben Reihenfolge (Muskelerinnerung).
+           WICHTIG: Die Klick-Handler werden GENAU EINMAL beim Laden über
+           document.querySelectorAll('.tab-btn') verdrahtet, es gibt keine Delegation. Die Knöpfe
+           dürfen deshalb nur hier im festen Markup umgehängt und niemals zur Laufzeit neu
+           erzeugt werden. Der Gruppentitel ist aria-hidden und nicht fokussierbar - er benennt,
+           was die Farbe am Reiter ohnehin schon sagt, und darf die Reiterliste für die
+           Tastatur- und Vorlesebedienung nicht um vier tote Halte verlängern. -->
       <div class="tabs">
-        <button class="tab-btn active" data-tab="basis" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis<span class="tab-badge" data-tab-need="basis" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="verteidigung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" data-tab-need="verteidigung" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="forschung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung<span class="tab-badge" data-tab-need="forschung" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="flotte" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte<span class="tab-badge" data-tab-need="flotte" style="display:none;"></span></button>
-        <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="expedition" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><svg class="tab-svg-icon" viewBox="0 0 24 24" aria-hidden="true" style="color:#f0997b;"><circle cx="12" cy="12" r="9"/><path d="M8.6 15.4l2.2-6.4 6.4-2.2-2.2 6.4z"/><path d="M12 3.2v1.4M12 19.4v1.4M3.2 12h1.4M19.4 12h1.4"/></svg></span>Expedition<span id="expeditionBadge" class="tab-badge" data-tab-need="expedition" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="karte" data-tab-domain="erkundung"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#af9ce6;"></i></span>Sektorkarte</button>
-        <button class="tab-btn" data-tab="galaxie" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-users" aria-hidden="true" style="color:#ed93b1;"></i></span>Galaxie<span class="tab-badge" data-tab-need="galaxie" style="display:none;"></span></button>
-        <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="allianz" data-tab-domain="gemeinschaft"><span class="tab-icon-badge"><i class="ti ti-flag" aria-hidden="true" style="color:#378add;"></i></span>Allianz</button>
-        <button class="tab-btn" data-tab="offiziere" data-tab-domain="gemeinschaft" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-user-circle" aria-hidden="true" style="color:#b39ef0;"></i></span>Offiziere<span class="tab-badge" data-tab-need="offiziere" style="display:none;"></span></button>
-        <div class="tab-group-divider" aria-hidden="true"></div>
-        <button class="tab-btn" data-tab="markt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-truck" aria-hidden="true" style="color:#ef9f27;"></i></span>Markt<span class="tab-badge" data-tab-need="markt" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="punkte" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
-        <button class="tab-btn" data-tab="fortschritt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt<span class="tab-badge" data-tab-need="fortschritt" style="display:none;"></span></button>
-        <button class="tab-btn" data-tab="sammlung" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-backpack" aria-hidden="true" style="color:#5ce1ff;"></i></span>Sammlung</button>
+        <div class="tab-gruppe" data-tab-gruppe="kolonie"><span class="tab-gruppe-titel" aria-hidden="true">Kolonie</span>
+          <button class="tab-btn active" data-tab="basis" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-building-factory-2" aria-hidden="true" style="color:#fac775;"></i></span>Basis<span class="tab-badge" data-tab-need="basis" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="verteidigung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-shield" aria-hidden="true" style="color:#e24b4a;"></i></span>Verteidigung<span id="voidRiftTabBadge" class="tab-badge" data-tab-need="verteidigung" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="forschung" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-flask" aria-hidden="true" style="color:#85b7eb;"></i></span>Forschung<span class="tab-badge" data-tab-need="forschung" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="flotte" data-tab-domain="kolonie" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-rocket" aria-hidden="true" style="color:#5dcaa5;"></i></span>Flotte<span class="tab-badge" data-tab-need="flotte" style="display:none;"></span></button>
+        </div>
+        <div class="tab-gruppe" data-tab-gruppe="erkundung"><span class="tab-gruppe-titel" aria-hidden="true">Erkundung</span>
+          <button class="tab-btn" data-tab="expedition" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><svg class="tab-svg-icon" viewBox="0 0 24 24" aria-hidden="true" style="color:#f0997b;"><circle cx="12" cy="12" r="9"/><path d="M8.6 15.4l2.2-6.4 6.4-2.2-2.2 6.4z"/><path d="M12 3.2v1.4M12 19.4v1.4M3.2 12h1.4M19.4 12h1.4"/></svg></span>Expedition<span id="expeditionBadge" class="tab-badge" data-tab-need="expedition" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="karte" data-tab-domain="erkundung"><span class="tab-icon-badge"><i class="ti ti-map-2" aria-hidden="true" style="color:#af9ce6;"></i></span>Sektorkarte</button>
+          <button class="tab-btn" data-tab="galaxie" data-tab-domain="erkundung" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-users" aria-hidden="true" style="color:#ed93b1;"></i></span>Galaxie<span class="tab-badge" data-tab-need="galaxie" style="display:none;"></span></button>
+        </div>
+        <div class="tab-gruppe" data-tab-gruppe="gemeinschaft"><span class="tab-gruppe-titel" aria-hidden="true">Gemeinschaft</span>
+          <button class="tab-btn" data-tab="allianz" data-tab-domain="gemeinschaft"><span class="tab-icon-badge"><i class="ti ti-flag" aria-hidden="true" style="color:#378add;"></i></span>Allianz</button>
+          <button class="tab-btn" data-tab="offiziere" data-tab-domain="gemeinschaft" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-user-circle" aria-hidden="true" style="color:#b39ef0;"></i></span>Offiziere<span class="tab-badge" data-tab-need="offiziere" style="display:none;"></span></button>
+        </div>
+        <div class="tab-gruppe" data-tab-gruppe="meta"><span class="tab-gruppe-titel" aria-hidden="true">Spieler</span>
+          <button class="tab-btn" data-tab="markt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-truck" aria-hidden="true" style="color:#ef9f27;"></i></span>Markt<span class="tab-badge" data-tab-need="markt" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="punkte" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-star" aria-hidden="true" style="color:#fbe08f;"></i></span>Punktestand</button>
+          <button class="tab-btn" data-tab="fortschritt" data-tab-domain="meta" style="position:relative;"><span class="tab-icon-badge"><i class="ti ti-award" aria-hidden="true" style="color:#9fe1cb;"></i></span>Fortschritt<span class="tab-badge" data-tab-need="fortschritt" style="display:none;"></span></button>
+          <button class="tab-btn" data-tab="sammlung" data-tab-domain="meta"><span class="tab-icon-badge"><i class="ti ti-backpack" aria-hidden="true" style="color:#5ce1ff;"></i></span>Sammlung</button>
+        </div>
       </div>
 
       <!-- Kontextbezogener Ersthinweis: erscheint EINMAL je Tab, wenn man ihn zum ersten Mal
@@ -9069,8 +9147,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.722.0';
+  const VERSION = '8.723.0';
   const PATCHNOTES = [
+  { version:'8.723.0', date:'11.09.2026', changes:[
+    '<strong>Die Reiterleiste hat vier benannte Bereiche.</strong> Die 13 Reiter oben waren bisher nur durch drei haarfeine Striche in Gruppen geteilt &ndash; kaum zu sehen, und sobald die Leiste umbrach (bei 13 Reitern der Normalfall), war der Strich ganz weg. Jetzt stehen die Reiter in vier Fl&auml;chen mit Namen: <strong>Kolonie</strong> (Basis, Verteidigung, Forschung, Flotte), <strong>Erkundung</strong> (Expedition, Sektorkarte, Galaxie), <strong>Gemeinschaft</strong> (Allianz, Offiziere) und <strong>Spieler</strong> (Markt, Punktestand, Fortschritt, Sammlung). Jede Fl&auml;che tr&auml;gt links den Farbstreifen ihres Bereichs &ndash; dieselbe Farbe, die der Reiter schon immer als Fu&szlig; zeigte, jetzt aber mit Beschriftung dazu. Reihenfolge und Bedienung der Reiter sind unver&auml;ndert.',
+    '<strong>Auf schmalen Bildschirmen bleibt alles wie bisher.</strong> Eine benannte Fl&auml;che ist eine geschlossene Kachel, und die Leiste kann dann nur noch zwischen den Bereichen umbrechen statt zwischen beliebigen Reitern &ndash; nachgemessen kostete das unter 1561&nbsp;px Fensterbreite eine ganze zus&auml;tzliche Zeile (bei 1200&nbsp;px vier statt drei). Deshalb l&ouml;sen sich die Fl&auml;chen darunter wieder auf: am Handy und am Laptop ist die Leiste exakt so hoch wie vorher, die Einteilung tr&auml;gt dort weiterhin der Farbfu&szlig; am Reiter. Am breiten Bildschirm w&auml;chst sie um 8&nbsp;px. Neuer Hilfeeintrag &bdquo;Die vier Reiter-Gruppen&ldquo;, der die Grenze als Zahl nennt.',
+    '<strong>Behoben: Der Gruppenname &bdquo;Kolonie&ldquo; war zu blass.</strong> Bei 9,5&nbsp;px Schriftgr&ouml;&szlig;e lag sein Kontrast zum Hintergrund unter der Lesbarkeitsmarke, w&auml;hrend die drei anderen Bereiche deutlich dar&uuml;ber lagen. Alle vier Namen stehen jetzt mit voller Deckkraft.',
+  ] },
   { version:'8.722.0', date:'11.09.2026', changes:[
     '<strong>Geb&auml;ude im Raster, nach Gruppen geordnet.</strong> Der Reiter Basis &rsaquo; Geb&auml;ude zeigt die 29 Geb&auml;ude nicht mehr als eine lange Wand aus Karten voller Breite, sondern in drei Gruppen &ndash; <strong>Produktion, Veredelung, Nutzgeb&auml;ude</strong> &ndash; als Kachelraster: zwei Spalten am PC, drei ab 1600&nbsp;px Fensterbreite, eine am Handy. Jeder Gruppenkopf z&auml;hlt, wie viele Geb&auml;ude fertig ausgebaut sind; die Knopfleiste (Ausbauen, Warteschlange) sitzt jetzt unter dem Text statt rechts im Leeren. Die Karten selbst sind unver&auml;ndert: Bausatz, Stufe, Details-Aufklapper, Kosten. Die Verteidigungsanlagen stehen in einem zweispaltigen Raster, damit die Kennwert-Balken lesbar bleiben.',
     '<strong>Bau-Warteschlange als Streifen mit Zielstufe.</strong> Statt drei Zeilen voller Breite und gestrichelter &bdquo;&ndash; frei &ndash;&ldquo;-Pl&auml;tze steht je Eintrag ein Chip: Position, Geb&auml;ude, Standort und die <strong>Zielstufe</strong> (&bdquo;&rarr; Lv. 31&ldquo;), die das Spiel ohnehin schon rechnete, aber nie zeigte. Behoben nebenbei: Eintr&auml;ge auf einem Mond nannten den Standort &bdquo;(undefined)&ldquo;, eigene Kolonienamen wurden ignoriert. Neuer Hilfeeintrag &bdquo;Geb&auml;ude-Raster und Bau-Warteschlange&ldquo;.',
@@ -9173,15 +9256,11 @@
     '<strong>Der Knopf „Routen" tut jetzt etwas.</strong> Er wird nur eingeblendet, wenn ein System geöffnet ist – gewirkt hat er dort aber nie, weil er nur die Linien <em>zwischen</em> Systemen ausblendete, und die zeichnet die Übersicht. Wer ihn drückte, sah seinen Zustand umspringen und im Bild passierte nichts. Jetzt blendet er aus, was zur eigenen Mission gehört: Flugbahn, Flottenmarke und das Gefecht am Ziel.',
     '<strong>Fremde Flottenbewegungen hängen am Knopf „Aufklärung".</strong> Getrennt mit Absicht: Wer den eigenen Verkehr ausblendet, um die Planeten zu sehen, will trotzdem wissen, wer auf ihn zufliegt – und umgekehrt.',
   ]},
-  { version:'8.703.0', date:'07.09.2026', changes:[
-    '<strong>Namen legen sich nicht mehr auf die Mitte eines Asteroiden-Vorkommens.</strong> In den Gürtelsystemen steht die Bahn eng, und ein Planetenname wich bisher nur <em>nach unten</em> aus – also genau in den Gürtel hinein. Fand er dort keinen Platz, blieb er auf dem Brocken liegen. Jetzt darf er auch nach oben über seinen eigenen Planeten hinweg, und wenn wirklich nichts frei ist, wählt er die Stelle, an der er am wenigsten verdeckt.',
-    '<strong>Eine verdeckte Marker-Mitte wiegt dabei am schwersten</strong> – dort ist ein Ziel nicht nur schlecht zu erkennen, dort fängt die Schrift auch den Tipp darauf ab. Ausgewichen wird nur auf Plätze, die nichts Neues verdecken: keine zusätzliche Planetenscheibe, keine zweite Beschriftung, keine weitere Marker-Mitte.',
-  ]},
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1125;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1126;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -45506,6 +45585,7 @@ async function claimPendingRewards(){
   // werden, sonst wird genau das Problem reproduziert, das diese Seite eigentlich lösen soll.
   const HELP_SECTIONS = [
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
+      { title:'Die vier Reiter-Gruppen', body:'Die Reiter über dem Spielfeld sind in <strong>vier Gruppen</strong> geordnet: <strong>Kolonie</strong> (Basis, Verteidigung, Forschung, Flotte) · <strong>Erkundung</strong> (Expedition, Sektorkarte, Galaxie) · <strong>Gemeinschaft</strong> (Allianz, Offiziere) · <strong>Spieler</strong> (Markt, Punktestand, Fortschritt, Sammlung).<br><br>Jede Gruppe hat eine eigene Farbe, und diese <strong>Farbe gehört zur Gruppe, nicht zum einzelnen Reiter</strong>: Der schmale Farbstreifen unter einem Reiter sagt dir also, in welchem Bereich du gerade bist – auch dann noch, wenn die Leiste in mehrere Zeilen umbricht. <strong>Ab 1561 px Fensterbreite</strong> steht der Gruppenname zusätzlich links neben den Reitern der Gruppe; darunter - und damit auf den verbreiteten Laptop-Auflösungen 1366, 1440 und 1536 px sowie am Handy - entfällt der Name und die Farbe allein trägt die Einteilung. Die <strong>Reihenfolge</strong> der Reiter ist in allen Fällen dieselbe.' },
       { title:'Wo ist gerade etwas offen? Die Punkte an den Reitern', body:'An jedem Reiter kann ein kleiner Punkt sitzen, und er hat <strong>zwei Bedeutungen</strong>, die sich an der Farbe unterscheiden.<br><br><strong>Bernstein</strong> heißt: hier ist etwas <em>offen</em>. Der Punkt bleibt, bis du es tatsächlich getan hast. Dieselbe Farbe wie eine vollgelaufene Ressource, und aus demselben Grund – in beiden Fällen verpufft gerade Fortschritt. Gemeldet werden: eine leere Bau-Wunschliste, keine laufende Forschung und keine Schiffe im Bau (jeweils nur, wenn du etwas davon gerade bezahlen könntest), eine offene Offizier-Talentwahl, nicht verteilte Fähigkeitspunkte, ein noch nicht begonnener Wochen-Tiefenlauf, ein ungenutztes Wochenangebot und ein Event-Schiff, das genug Teile hat.<br><br><strong>Rot</strong> heißt: hier ist etwas <em>passiert</em>. Der Punkt verschwindet, sobald du hingesehen hast – so wie bisher bei neuen Expeditionsmeldungen. Ein offener <strong>Leerenriss</strong> lässt zusätzlich den ganzen Reiter pulsieren; diese lautere Stufe bleibt ihm allein vorbehalten, weil er das einzige zeitlich harte Ereignis ist.<br><br>Dieselben Punkte findest du ausgeschrieben unter <strong>„Nächstes Ziel"</strong> auf der Basis und – nach einer Pause – im Fenster <strong>„Willkommen zurück"</strong> unter „Das wartet auf dich", dort direkt anklickbar. Ist nirgends ein Punkt zu sehen, läuft alles.' },
       { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },

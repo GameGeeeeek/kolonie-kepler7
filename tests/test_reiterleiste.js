@@ -242,12 +242,52 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
       const btn = bar.querySelector('.tab-btn');
       return { anzeige: getComputedStyle(bar).display,
                schrift: getComputedStyle(btn).fontSize,
-               richtung: getComputedStyle(btn).flexDirection,
-               trenner: [...bar.querySelectorAll('.tab-group-divider')].filter(d => d.getBoundingClientRect().width > 0).length };
+               richtung: getComputedStyle(btn).flexDirection };
     });
     check('Desktop: weiterhin Fluss-Layout, kein Raster', m.anzeige === 'flex', m);
     check('Desktop: weiterhin volle Schriftgröße', parseFloat(m.schrift) >= 12, m.schrift);
-    check('Desktop: die drei Domänen-Trenner sind weiterhin sichtbar', m.trenner === 3, m.trenner);
+    await ctx.close();
+  }
+
+  // ---- 5: Die vier benannten Gruppenflächen (Gleichmaß Etappe 3a, 11.09.2026) ------------------
+  // Hier stand bis zum 11.09.2026 „Desktop: die drei Domänen-Trenner sind weiterhin sichtbar".
+  // Die drei div.tab-group-divider sind mit Etappe 3a ersatzlos entfallen: Sie waren mit 1 px bei
+  // 14 % Weiß kaum zu sehen UND gingen bei jedem Zeilenumbruch verloren - bei 13 Reitern der
+  // Normalfall. An ihre Stelle treten vier benannte Flächen (div.tab-gruppe mit
+  // span.tab-gruppe-titel), und die Prüfung misst jetzt die, statt auf einem Element zu bestehen,
+  // das es nicht mehr gibt.
+  //
+  // EIGENE BREITE, UND DAS IST KEINE KÜR: Die Flächen lösen sich unterhalb von 1561 px wieder auf
+  // (@media (max-width: 1560px) { .tabs .tab-gruppe { display:contents } }), weil eine geschlossene
+  // Kachel die Leiste sonst ganze Zeilen kostet - gemessen 156 px statt 94 px bei 1400 px Fenster.
+  // Bei den 1440 px des Blocks darüber stünde diese Prüfung also am falschen Ort und erklärte eine
+  // korrekte Umsetzung für kaputt. Die beiden Prüfungen darüber bleiben bei 1440 px: Fluss-Layout
+  // und Schriftgröße hängen an der 700-px-Grenze, nicht an dieser.
+  //
+  // Schwelle, Leistenhöhe, Klickbarkeit aller 13 Knöpfe und die Abzeichen hält
+  // tests/test_reitergruppen.js fest; hier bleibt nur die Frage, die diese Datei schon immer an
+  // den PC gestellt hat: Ist die Gruppierung dort sichtbar?
+  {
+    const { ctx, page } = await oeffne(1600, 900);
+    const g = await page.evaluate(() => {
+      const bar = document.querySelector('.tabs');
+      const gruppen = [...bar.querySelectorAll('.tab-gruppe')];
+      return { anzahl: gruppen.length,
+               mitTitel: gruppen.filter(x => {
+                 const t = x.querySelector('.tab-gruppe-titel');
+                 return !!t && t.getBoundingClientRect().width > 0 && (t.textContent || '').trim().length > 0;
+               }).length,
+               titel: gruppen.map(x => { const t = x.querySelector('.tab-gruppe-titel'); return t ? (t.textContent || '').trim() : null; }),
+               trenner: bar.querySelectorAll('.tab-group-divider').length };
+    });
+    // `trenner` wird seit dem Umbau gemessen, aber bis zum 11.09.2026 nicht AUSGEWERTET - damit
+    // hatte diese Datei die zweite Hälfte ihrer alten Aussage still verloren (die alte Prüfung
+    // hiess „die drei Domänen-Trenner sind weiterhin sichtbar"). Dass test_reitergruppen.js es mit
+    // V3 ebenfalls auffängt, ist kein Grund, hier einen gemessenen Wert ungenutzt liegen zu lassen:
+    // Genau auf diese Halbierung zielt die Hausregel, nach Konflikten in Testdateien zu prüfen,
+    // dass keine Prüfungen verloren gingen.
+    check('Desktop: vier .tab-gruppe mit sichtbarem Titel und kein .tab-group-divider mehr',
+      g.anzahl === 4 && g.mitTitel === 4 && g.trenner === 0, g);
     await ctx.close();
   }
 
