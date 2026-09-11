@@ -125,9 +125,12 @@ const AUSGABE = { woche: '2026-KW36', text: 'Die Festung bei Chronos fiel.\n\nDa
       JS.slice(leerSig, leerSig + 120).includes('chronikSig'), { zeile: JS.slice(leerSig, leerSig + 90) });
     check('6b: die Signatur des vollen Falls ebenfalls',
       JS.slice(vollSig, vollSig + 120).includes('chronikSig'), { zeile: JS.slice(vollSig, vollSig + 90) });
+    // Seit dem Galaxie-Ziel (11.09.2026) steht dessen Karte ZWISCHEN Chronik und Weltlage
+    // (`chronikHtml + zielHtml + weltlageHtml`) - die Chronik bleibt ganz oben, und genau das
+    // misst diese Pruefung: der Kasten haengt in beiden Ausgabewegen, an erster Stelle.
     check('6c: und der Kasten wird in BEIDE Ausgabewege eingehaengt',
-      (JS.match(/chronikHtml \+ weltlageHtml \+ bountyHtml/g) || []).length === 2,
-      { treffer: (JS.match(/chronikHtml \+ weltlageHtml \+ bountyHtml/g) || []).length });
+      (JS.match(/chronikHtml \+ (?:zielHtml \+ )?weltlageHtml \+ bountyHtml/g) || []).length === 2,
+      { treffer: (JS.match(/chronikHtml \+ (?:zielHtml \+ )?weltlageHtml \+ bountyHtml/g) || []).length });
   }
 }
 
