@@ -42,7 +42,10 @@ const TAGE = 14;
   check('0b: der Geschenk-Bericht traegt keine Gewonnen/Verloren-Pille', /REPORT_SPECIAL_GREEN_TYPES = \[[^\]]*'geschenk'/.test(JS));
   const helfer = (JS.match(/function belohnungGabenBuchen\(/g) || []).length;
   const aufrufe = (JS.match(/= belohnungGabenBuchen\(r\)/g) || []).length;
-  check('0c: EIN Buchungs-Helfer, von Bonuscode UND Geschenk benutzt (keine zweite Schleife)', helfer === 1 && aufrufe === 2, { helfer, aufrufe });
+  // Drei Aufrufer seit v8.720.0: Bonuscode, Geschenk und die Stimmen-Belohnung (verzeichnis-stimme) -
+  // dieselbe Gabenform, derselbe Helfer. Die Zahl ist die Kopie-Familie: Wer einen vierten Zweig
+  // baut, traegt ihn hier ein, statt eine eigene Schleife zu schreiben.
+  check('0c: EIN Buchungs-Helfer, von Bonuscode, Geschenk UND Stimme benutzt (keine zweite Schleife)', helfer === 1 && aufrufe === 3, { helfer, aufrufe });
   check('0d: notifPrefsCache kennt die Kategorie verdacht', /notifPrefsCache = \{[^}]*verdacht:true/.test(JS));
   check('0e: der Geschenk-Knopf wird per onclick verdrahtet', /adminGeschenkSendenBtn\.onclick *=/.test(JS) && !/adminGeschenkSendenBtn\.addEventListener/.test(JS));
   check('0f: der Konto-Reiter laedt die Uebersicht beim Oeffnen', /tab:'konto'[^\n]*laden:\(\) => loadAdminAktivitaet\(\)/.test(JS));

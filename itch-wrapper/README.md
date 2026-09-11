@@ -122,3 +122,12 @@ Die Seite im echten itch.io-Rahmen öffnen und den Knopf drücken.
 
 Der Knopf zeigt **keine** Warnung mehr an. Erscheint dort eine, ist der alte `window.open`-Abfang
 zurück; `tests/test_itch_startkarte.js` schlägt dann an (Prüfungen `1a`, `2b`, `2c`).
+
+## Weitere Verzeichnisse: dieselbe Kulisse
+
+`theme-bauen.js` rendert seit dem 11.09.2026 auch die Bilder für **browsermmorpg.com** – aus
+`bmmo-hauptbild.html` (864×384, das Hauptbild der Spielseite und ihr og:image) und `bmmo-mini.html`
+(180×75, das kleine Listenbild). Beide Maße stehen wörtlich im Upload-Formular des Kontos, deshalb
+werden sie exakt gerendert (`skala: 1`). Die Begründung steht im Kopf der jeweiligen Vorlage; welche
+Felder das Konto sonst verlangt, in `docs/marketing-einreichungen.md`. Ein weiteres Verzeichnis ist
+eine Vorlage plus eine Zeile in der Tabelle von `theme-bauen.js`, kein zweites Skript.

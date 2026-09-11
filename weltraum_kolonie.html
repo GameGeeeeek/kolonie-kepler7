@@ -3090,6 +3090,26 @@
     </div>
   </div>
 
+  <!-- Stimmen-Erinnerung (v8.720.0, Auftrag Sascha): alle sechs Stunden - dem Abstimm-Takt von
+       browsermmorpg.com - eine Bitte um eine Stimme, mit Belohnung ueber den Rueckruf des
+       Verzeichnisses (Backend: GET /api/stimme/rueckruf). WANN sie erscheint, sagt der Server
+       (/api/me -> stimme.naechsteAb, am Konto gerechnet); das Spiel merkt sich nur, wann es zuletzt
+       gefragt hat (state.stimmeErinnertZuletzt). Der Knopf ist ein NACKTER Link in neuem Tab - kein
+       Skript des Verzeichnisses im Spiel (siehe die Verzeichnis-Stimme in der Landing-Fusszeile).
+       Waechter: tests/test_stimme_erinnerung.js -->
+  <div id="stimmeOverlay" class="login-overlay" style="display:none;">
+    <div class="login-card" style="text-align:left; max-width:460px; position:relative;">
+      <div style="font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:.22em; text-transform:uppercase; color:#9fe1cb; font-size:11px; margin-bottom:6px;">Verzeichnis &middot; browsermmorpg.com</div>
+      <div class="login-title" style="font-size:22px;">Eine Stimme für die Galaxie</div>
+      <div class="bmeta" style="font-size:13px; line-height:1.55; margin:8px 0 10px;">Kolonie Kepler-7 steht bei <strong>browsermmorpg.com</strong>, einem Verzeichnis für Browserspiele, das nach Stimmen sortiert. Jede Stimme bringt neue Kommandanten in die Galaxie – sie dauert zehn Sekunden und braucht dort kein Konto.</div>
+      <div id="stimmeBelohnungText" class="bmeta" style="font-size:13px; line-height:1.55; margin:0 0 14px; color:#c3bef5;"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <a id="stimmeLink" class="buy affordable" href="https://browsermmorpg.com/vote.php?id=1799" target="_blank" rel="noopener" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; padding:8px 14px;"><i class="ti ti-star" aria-hidden="true"></i>Jetzt abstimmen</a>
+        <button id="stimmeSpaeterBtn" style="padding:8px 14px;">Später</button>
+      </div>
+    </div>
+  </div>
+
   <div id="welcomeNewOverlay" class="login-overlay" style="display:none;">
     <div class="login-card" style="text-align:left; max-width:520px; position:relative;">
       <div style="font-family:ui-monospace,Menlo,Consolas,monospace; letter-spacing:.22em; text-transform:uppercase; color:#9fe1cb; font-size:11px; display:flex; align-items:center; gap:8px; margin-bottom:10px;"><span style="width:8px; height:8px; border-radius:50%; background:#5dcaa5; box-shadow:0 0 10px #5dcaa5;"></span>Erstkontakt · Neue Kolonie</div>
@@ -3289,6 +3309,13 @@
        <a href="https://instagram.com/GameGeeeeek" target="_blank" rel="me noopener noreferrer">Instagram</a> &middot;
        <a href="https://www.youtube.com/@GameGeeeeek" target="_blank" rel="me noopener noreferrer">YouTube</a> &middot;
        <a href="https://discord.gg/8naCt3yEfG" target="_blank" rel="noopener noreferrer">Discord</a></span><br>
+      <!-- Verzeichnis-Stimme (v8.719.0): browsermmorpg.com listet das Spiel (#1799) und sortiert nach
+           Stimmen. Bewusst ein NACKTER LINK und nicht deren Abstimmungs-Widget: Das Widget ist ein
+           Fremdskript, und diese Seite haelt das Sitzungs-Token in localStorage (connect-src 'self',
+           tests/test_csp_verbindung.js). Das Widget lebt deshalb in einem Sandkasten-Rahmen auf den
+           Themenseiten (bmmo-karte.html); hier reicht der Link auf dieselbe Abstimmungsseite -
+           dort geht es ohne Konto, alle sechs Stunden. Waechter: tests/test_bewertungskarte.js -->
+      <span class="ll-bewerten">Gef&auml;llt dir das Spiel? <a href="https://browsermmorpg.com/vote.php?id=1799" target="_blank" rel="noopener">Stimme auf browsermmorpg.com f&uuml;r Kolonie Kepler-7</a> &ndash; ohne Konto, in zehn Sekunden.</span><br>
      <!-- Interne Verlinkung der Themenseiten (v8.317.0): Seiten, die nur in der sitemap.xml stehen und
           von nirgends verlinkt sind, gelten als verwaist und werden schlechter bewertet. Sie brauchen
           einen echten Weg von der Startseite aus - hier im Footer und zusätzlich im FAQ-Abschnitt. -->
@@ -3300,8 +3327,9 @@
      /* Social-Zeile in der Landing-Fusszeile (v8.471.0): etwas heller als der uebrige Fusstext,
         damit sie zwischen Rechtstexten nicht untergeht - aber ohne Knopf-Optik, sie soll den
         beiden Aktionsknoepfen darueber nicht die Aufmerksamkeit nehmen. */
-     .ll-social { display:inline-block; margin:7px 0 3px; color:#a9a3e0; }
-     .ll-social a { color:#c3bef5; font-weight:600; }
+     .ll-social, .ll-bewerten { display:inline-block; margin:7px 0 3px; color:#a9a3e0; }
+     .ll-social a, .ll-bewerten a { color:#c3bef5; font-weight:600; }
+     .ll-bewerten { margin-top:0; }
    </style>
    <div class="ll-modal" id="loginModal">
     <div class="ll-modal-inner">
@@ -4656,6 +4684,11 @@
     // Vergeltung: aus demselben Grund HIER (siehe den Absatz ueber dem Sternenstaub). Fehlt das
     // Feld, bleibt null - der Server ist alt oder der Schalter aus, und das Spiel verspricht nichts.
     meineRache = (me && Array.isArray(me.rache)) ? me.rache : null;
+    // Stimmen-Belohnung (v8.720.0): reist ebenfalls in /api/me mit - aus demselben Grund HIER und
+    // nicht in einer eigenen Funktion (siehe den Absatz ueber dem Sternenstaub). Fehlt das Feld,
+    // ist der Server alt: kein Fenster, kein Versprechen.
+    stimmeInfo = (me && me.stimme && typeof me.stimme === 'object') ? me.stimme : null;
+    if (stimmeInfo) stimmeTaktStarten();
   }
   // Die EINE Stelle, die "darf dieser Spieler die Automatiken nutzen" beantwortet. Schalter,
   // Beschriftung und die drei Mechaniken fragen alle hierher - eine zweite Stelle wäre genau die
@@ -8936,8 +8969,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.718.0';
+  const VERSION = '8.720.0';
   const PATCHNOTES = [
+  { version:'8.720.0', date:'11.09.2026', changes:[
+    '<strong>Eine Stimme f&uuml;r die Galaxie &ndash; mit Dankesch&ouml;n.</strong> Alle sechs Stunden erinnert dich das Spiel daran, auf browsermmorpg.com f&uuml;r Kolonie Kepler-7 abzustimmen: Ein Klick, kein Konto, und jede Stimme bringt neue Kommandanten in die Galaxie. Sobald deine Stimme dort gez&auml;hlt ist, landet als Dank eine kleine Gutschrift (Kredite) in deinem Belohnungsfach &ndash; die H&ouml;he steht im Fenster. „Sp&auml;ter" verschiebt die Erinnerung um sechs Stunden; sie erscheint nie &uuml;ber einem anderen Fenster.',
+    '<strong>Patchnotes als RSS-Feed.</strong> Unter <em>gamegeeeeek.de/patchnotes.xml</em> gibt es die Patchnotes jetzt zum Abonnieren &ndash; f&uuml;r Feedreader, Discord-Bots und Spieleverzeichnisse. Der Feed entsteht aus derselben Quelle wie die Patchnotes-Seite und verlinkt jede Version direkt.',
+  ] },
+  { version:'8.719.0', date:'11.09.2026', changes:[
+    '<strong>Eine Stimme f&uuml;r Kepler-7 auf browsermmorpg.com.</strong> Das Spiel steht in diesem Verzeichnis f&uuml;r Browserspiele, und dort z&auml;hlen Stimmen. Auf der Startseite gibt es jetzt den Link zur Abstimmung &ndash; ohne Konto, in zehn Sekunden, alle sechs Stunden &ndash;, und die vier Themenseiten zeigen die Bewertungskarte des Verzeichnisses. Sie l&auml;uft in einem abgeschotteten Rahmen ohne Zugriff auf die Seite oder dein Spielkonto; im Spiel selbst wird weiterhin nichts Fremdes geladen.',
+  ] },
   { version:'8.718.0', date:'11.09.2026', changes:[
     '<strong>Behoben: Nest und Wrackkonvoi sagen wieder, wie viele schon dran waren.</strong> Seit 8.717.0 fehlte im Kartenmen&uuml; von Alien-Nest und Wrackkonvoi still die Zeile mit der Zahl der Kommandanten, die dort schon Schaden gemacht haben, und deinem bisherigen Anteil &ndash; ohne Fehlermeldung, die Zeile war einfach weg. Wer angriff, sah nicht mehr, ob er allein war oder Dritter im Bunde, obwohl die Beute nach Schadensanteil geteilt wird. Jetzt steht sie wieder da, mit derselben Rechnung wie an der Asteroidenfestung.'
   ] },
@@ -9043,21 +9083,11 @@
     '<strong>Der Ring am Schürfrecht sagt jetzt, wie stark die Eskorte ist.</strong> Aus dem Ring wird ein Bogen \u2013 je länger, desto mehr Schiffe stehen dort. Unbewacht bleibt der gestrichelte Ring: eine offene Einladung, und man sieht es auf der Karte.',
     'Darunter steht, <strong>wem das Recht gehört</strong> \u2013 Allianz-Tag oder Namenskürzel. Und solange nach einem Besitzwechsel die zweistündige Schutzfrist läuft, <strong>pulst der Marker</strong>: In diesem Fenster lässt sich das Recht gar nicht anfechten. Die genauen Zahlen stehen weiterhin im Kartenmenü.'
   ] },
-  { version:'8.700.0', date:'07.09.2026', changes:[
-    '<strong>Rufst du einen Allianz-Verband aus, kannst du deine eigene Flotte sofort anschlie\u00dfen.</strong> Direkt nach dem Aufruf steht die Flottenwahl offen \u2013 kein Umweg mehr \u00fcber den Allianz-Tab, wo du den Angriff erst wieder heraussuchen musstest.',
-    'Das gilt f\u00fcr alle Verbandsziele: Sternenfeste, Alien-Nest, fremder Vorposten und Wrackkonvoi.',
-    'Wer nur ausrufen und selbst nicht mitfliegen will, schlie\u00dft die Flottenwahl einfach \u2013 der Verband steht trotzdem, und die anderen Mitglieder k\u00f6nnen sich w\u00e4hrend der Sammelphase wie bisher anschlie\u00dfen.'
-  ] },
-  { version:'8.699.0', date:'07.09.2026', changes:[
-    '<strong>Der Wrackkonvoi sieht endlich aus wie einer.</strong> Statt drei gleicher blauer Rauten treiben dort jetzt drei aufgebrochene Schiffe \u2013 ein Gro\u00dffrachter, ein Tr\u00e4gerschiff und ein Kreuzer, jeder an einer gezackten Bruchkante entzweigerissen, mit freiliegenden Spanten und Brandspuren.',
-    'Dazwischen liegt ein Feld kleiner Tr\u00fcmmer, am gr\u00f6\u00dften St\u00fcck tritt Gas aus, und eine Notbake blinkt \u2013 das Einzige an diesem Konvoi, was noch Strom hat. Sie ist auch der Grund, warum er sich \u00fcberhaupt orten l\u00e4sst.',
-    'Der Peilring dreht sich weiter wie bisher, und am Rumpfbalken siehst du unver\u00e4ndert, wie viel von dem Konvoi noch \u00fcbrig ist.'
-  ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1121;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1123;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -32183,6 +32213,17 @@ async function claimPendingRewards(){
         /* Geschenk an alle (01.09.2026): dieselbe Gabenform wie der Bonuscode, deshalb derselbe
            Buchungs-Helfer. Ein EIGENER Zweig ist Pflicht - ein unbekannter Typ faellt unten in den
            Rueckfall und meldet woertlich "+500 Kredite fuer deinen Bug-Report". */
+        /* Stimme auf browsermmorpg.com (v8.720.0): dieselbe Gabenform wie Bonuscode und Geschenk,
+           deshalb derselbe Buchungs-Helfer - und ein EIGENER Zweig, weil der Rueckfall unten
+           woertlich "fuer deinen Bug-Report" meldet. */
+        if (r.type === 'verzeichnis-stimme'){
+          const teile = belohnungGabenBuchen(r);
+          log('Danke für deine Stimme auf browsermmorpg.com: '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-award', 'ok');
+          playSound('achieve');
+          pushReport({ type:'verzeichnis-stimme', gaben: teile });
+          save();
+          continue;
+        }
         if (r.type === 'geschenk'){
           const teile = belohnungGabenBuchen(r);
           const text = String(r.text || '').slice(0, 200);
@@ -32241,7 +32282,7 @@ async function claimPendingRewards(){
      Abwesenheit angekommen ist, wird beim Start aufgeloest - sein Toast ging HINTER dem
      Willkommen-zurueck- und dem Update-Overlay auf und war nach 4,2 s weg, bevor der Spieler eines
      davon geschlossen hatte. Uebrig blieb nur das Abzeichen am Berichte-Reiter. */
-  const TOAST_OVERLAYS = ['welcomeBackOverlay','welcomeNewOverlay','updateNoticeOverlay','tutorialOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'];
+  const TOAST_OVERLAYS = ['welcomeBackOverlay','welcomeNewOverlay','updateNoticeOverlay','tutorialOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay','stimmeOverlay'];
   function toastOverlayOffen(){
     if (typeof document === 'undefined') return false;
     return TOAST_OVERLAYS.some(id => { const o = document.getElementById(id); return !!o && getComputedStyle(o).display !== 'none'; });
@@ -39245,6 +39286,70 @@ async function claimPendingRewards(){
     try { await navigator.clipboard.writeText(link); log('Einladungs-Link kopiert – füg ihn in deinen Beitrag ein.', 'ti-check', 'ok'); }
     catch(e){ log('Einladungs-Link: '+link, 'ti-users'); }
   }
+  /* ===== Stimmen-Erinnerung (v8.720.0) =====
+     Auftrag Sascha: "Spieler sollen nach 6 Stunden ein Popup bekommen bitte voten fuer mehr Spieler
+     und vergib nach dem Voten dem Spieler eine kleine Belohnung."
+     WER RECHNET WAS: Der Server sagt in /api/me (stimme.naechsteAb), ab wann eine belohnte Stimme
+     moeglich ist - sechs Stunden nach der letzten belohnten Stimme oder nach der Registrierung, am
+     KONTO gerechnet. Das Spiel merkt sich nur, wann es zuletzt gefragt hat, damit "Spaeter" sechs
+     Stunden gilt (state.stimmeErinnertZuletzt). Beides muss stimmen, sonst bleibt das Fenster zu.
+     DER PARAMETER: Das Verzeichnis reicht den Spieler ueber die Vote-Adresse an seinen Rueckruf
+     durch; STIMME_LINK_PARAM ist die EINE Stelle, an der der Name dieses Parameters steht. Es reist
+     der REGISTRIERUNGSNAME (accountUsername), nicht der aenderbare Kommandantenname - dieselbe
+     Entscheidung wie beim Einladungs-Link. */
+  const STIMME_VOTE_URL = 'https://browsermmorpg.com/vote.php?id=1799';
+  const STIMME_LINK_PARAM = 'username';
+  const STIMME_ABSTAND_MS = 6 * 3600 * 1000;
+  const STIMME_ERSTE_PRUEFUNG_MS = 8000;      // nach dem Start erst laden lassen, dann fragen
+  const STIMME_PRUEFTAKT_MS = 5 * 60 * 1000;
+  let stimmeInfo = null;                      // { belohnung:{credits}|null, naechsteAb } aus /api/me
+  let stimmeTaktGestartet = false;
+  let stimmeVerdrahtet = false;
+  function stimmeLink(){ return STIMME_VOTE_URL + '&' + STIMME_LINK_PARAM + '=' + encodeURIComponent(accountUsername || ''); }
+  // Nie ueber einem anderen Fenster: Willkommen, Tutorial, Konflikt, Profil ... sind alle .login-overlay.
+  function stimmeAnderesFensterOffen(){
+    return Array.from(document.querySelectorAll('.login-overlay')).some(el => el.id !== 'stimmeOverlay' && getComputedStyle(el).display !== 'none');
+  }
+  function maybeShowStimmeErinnerung(){
+    if (!useBackend() || !accountUsername || !stimmeInfo) return false;
+    if (!state.tutorialSeen) return false;
+    if (Date.now() < (Number(stimmeInfo.naechsteAb) || 0)) return false;
+    if (Date.now() - (Number(state.stimmeErinnertZuletzt) || 0) < STIMME_ABSTAND_MS) return false;
+    const ov = document.getElementById('stimmeOverlay');
+    if (!ov || stimmeAnderesFensterOffen()) return false;
+    const a = document.getElementById('stimmeLink'); if (a) a.href = stimmeLink();
+    const bel = document.getElementById('stimmeBelohnungText');
+    if (bel){
+      const cr = stimmeInfo.belohnung ? (Math.floor(Number(stimmeInfo.belohnung.credits)) || 0) : 0;
+      bel.innerHTML = cr
+        ? 'Als Dank gibt es <strong>+'+fmt(cr)+' Kredite</strong>, sobald deine Stimme gezählt ist – alle sechs Stunden möglich.'
+        : 'Abstimmen ist alle sechs Stunden möglich.';
+    }
+    if (!stimmeVerdrahtet){
+      stimmeVerdrahtet = true;
+      if (a) a.addEventListener('click', () => stimmeErinnerungSchliessen(true));
+      const sp = document.getElementById('stimmeSpaeterBtn');
+      if (sp) sp.addEventListener('click', () => stimmeErinnerungSchliessen(false));
+    }
+    ov.style.display = 'flex';
+    return true;
+  }
+  function stimmeErinnerungSchliessen(geklickt){
+    const ov = document.getElementById('stimmeOverlay'); if (ov) ov.style.display = 'none';
+    state.stimmeErinnertZuletzt = Date.now();
+    if (geklickt) state.stimmeGeklicktZuletzt = Date.now();
+    save();
+  }
+  function stimmeTaktStarten(){
+    if (stimmeTaktGestartet) return;
+    stimmeTaktGestartet = true;
+    setTimeout(maybeShowStimmeErinnerung, STIMME_ERSTE_PRUEFUNG_MS);
+    setInterval(maybeShowStimmeErinnerung, STIMME_PRUEFTAKT_MS);
+  }
+  // Messpunkt fuer tests/test_stimme_erinnerung.js (wie window.__karteAufbauten): Die Pruefung laeuft
+  // im Fuenf-Minuten-Takt, und ein Test kann den nicht abwarten - er stoesst sie hierueber an,
+  // nachdem er die Start-Fenster geschlossen hat, und liest die Antwort (true = geoeffnet).
+  window.__stimmeErinnerungPruefen = maybeShowStimmeErinnerung;
   let welcomeWired = false;
   function maybeShowNewbieWelcome(){
     if (state.newbieWelcomeSeen) return false;
@@ -45263,6 +45368,7 @@ async function claimPendingRewards(){
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:'Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.<br><br><strong>Patenschaft:</strong> Wer sich über deinen Link registriert, ist <strong>30 Tage</strong> lang dein <strong>Schützling</strong> – und du sein <strong>Pate</strong>. Schafft der Schützling in dieser Zeit einen Meilenstein zum ersten Mal (erster gewonnener Spielerangriff, erste abgewehrte Attacke, erster Schlag gegen ein Nest oder eine Festung, erster Handel am Markt, fünf Tage in Folge angemeldet), bekommt ihr <strong>beide</strong> etwas: 200 Kredite und 3 Sternenstaub für den Schützling, 150 Kredite und 3 Sternenstaub für den Paten – jeder Meilenstein genau einmal. Den Stand mit Häkchen zeigt die Karte „Patenschaft" unter Einstellungen → Freunde einladen; ein Pate kann bis zu zehn Schützlinge gleichzeitig haben.' },
       { title:'Bonuscodes', body:'Gelegentlich gibt es <strong>Bonuscodes</strong> auf den Kanälen des Spiels (TikTok, Instagram, YouTube, Discord). Eingelöst werden sie unter <strong>Einstellungen → Bonuscode einlösen</strong>. Groß- und Kleinschreibung, Bindestriche und Leerzeichen sind dabei egal - wer „sternen-staub 25" tippt, hat den Code. <strong>Jeder Code gilt nur eine begrenzte Zeit</strong> (meist ein paar Tage) und <strong>nur einmal je Konto</strong>; manche gelten außerdem nur für die ersten N Spieler, die schnell genug sind. Klappt es nicht, sagt dir die Zeile unter dem Feld auch warum - abgelaufen, schon eingelöst, aufgebraucht oder schlicht unbekannt. Die Belohnung landet über die Belohnungs-Warteschlange auf deinem Konto und steht danach dauerhaft als <strong>Bericht</strong> unter „Sonstiges". Nur mit eigenem Server verfügbar.' },
+      { title:'Stimme auf browsermmorpg.com', body:'Kolonie Kepler-7 steht im Spiele-Verzeichnis <strong>browsermmorpg.com</strong>, das nach Stimmen sortiert – jede Stimme bringt neue Kommandanten in die Galaxie. Alle <strong>sechs Stunden</strong> erinnert dich das Spiel daran; abstimmen dauert zehn Sekunden und braucht dort kein Konto. Sobald deine Stimme gezählt ist, landet als Dank eine kleine Gutschrift (Kredite) in deinem Belohnungsfach – die Höhe steht in der Erinnerung. „Später" verschiebt die Erinnerung um sechs Stunden.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
       { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. '+KOMFORT_GRENZEN.freunde.standard+', mit Unterstützer-Rang '+KOMFORT_GRENZEN.freunde.unterstuetzer+'), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
@@ -45767,7 +45873,7 @@ async function claimPendingRewards(){
   // hinter dem Overlay unbemerkt „verbraucht" - deshalb erst danach.
   function tabHintBlocked(){
     if (!state.tutorialSeen) return true;
-    for (const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']){
+    for (const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','stimmeOverlay']){
       const ov = document.getElementById(id);
       if (ov && ov.style.display && ov.style.display !== 'none') return true;
     }
@@ -45833,7 +45939,7 @@ async function claimPendingRewards(){
      Spiels; sie trug rote Pille, roten Streifen und ein Warndreieck ueber 38k angekommenem Erz und
      stand im Filter unter "Nur Rueckschlaege". */
   const REPORT_SPECIAL_GREEN_TYPES = ['item-found','weekly-reward','system-discovered','spy-report','random-event','raid-scout',
-                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk','galaxie-ziel','auftragsbuch','patenschaft'];
+                                      'mining','peilung','debris-cleared','deckelausgleich','bonuscode','geschenk','verzeichnis-stimme','galaxie-ziel','auftragsbuch','patenschaft'];
   /* Ausgaenge, die auch OHNE `result` ein Rueckschlag sind. Die Liste ist die Ausnahme zur Regel
      eine Zeile weiter unten - sie ist kurz und muss es bleiben. */
   const REPORT_OHNE_ERGEBNIS_NEGATIV = ['pvp-fleet-loss','deckelkappung'];
@@ -46610,6 +46716,11 @@ async function claimPendingRewards(){
              + '<br>Gutgeschrieben: <strong>+' + fmt(r.credits||0) + ' Kredite</strong>'
              + (r.staub ? ' und <strong>+' + fmt(r.staub) + ' Sternenstaub</strong> (direkt auf dein Konto gebucht)' : '')
              + '<br><span class="bmeta">' + (gzWoche ? 'Woche ab ' + gzWoche + ' – d' : 'D') + 'as nächste Ziel steht im Galaxie-Tab unter „Nachrichten".</span>';
+      } else if (r.type === 'verzeichnis-stimme'){
+        title = 'Danke für deine Stimme';
+        body = '<i class="ti ti-award" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
+             + escapeHtml((r.gaben || []).join(', ') || 'nichts') + '</strong>'
+             + '<br><span class="bmeta">Für deine Stimme auf browsermmorpg.com – alle sechs Stunden möglich, jede bringt neue Kommandanten in die Galaxie.</span>';
       } else if (r.type === 'geschenk'){
         title = 'Geschenk vom Team';
         body = '<i class="ti ti-sparkles" aria-hidden="true" style="color:#5dcaa5;"></i> Gutgeschrieben: <strong>'
@@ -46932,6 +47043,7 @@ async function claimPendingRewards(){
         : (r.type==='deckelausgleich' || r.type==='deckelkappung') ? 'ti-pick'
         : r.type==='bonuscode' ? 'ti-award'
         : r.type==='geschenk' ? 'ti-sparkles'
+        : r.type==='verzeichnis-stimme' ? 'ti-award'
         : r.type==='galaxie-ziel' ? 'ti-target'
         : r.type==='patenschaft' ? 'ti-users'
         /* `positive`, NICHT `won` (v8.597.0): `won` prueft nur `result` gegen 'win'/'destroyed'

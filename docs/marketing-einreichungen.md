@@ -169,6 +169,71 @@ nützt.
 
 Menschliche Freigabe – der Eintrag erscheint nicht sofort.
 
+**Stand 11.09.2026 – am eigenen Konto und an der öffentlichen Seite gemessen, nicht am Formular:**
+Der Eintrag ist `https://browsermmorpg.com/game-kolonie-kepler-7--1799` (Nummer **1799**, angelegt
+21.08.2026, zwei Stimmen, 20 positiv) und steht auf **„Delisted"**. Das Konto nennt genau einen Grund:
+„Banner image was not uploaded". Daneben offen: „Verify ownership" und das Abstimmungs-Widget.
+
+- **Vier Bilder fehlen; ohne Banner bleibt der Eintrag „Delisted".** Die Checkliste im Konto
+  („Listing approved: Missing – pending staff review, usually within 24–48h. **Verification unlocks
+  once approved**") verlangt: „Small index image (mini)", „Main image (preview)", „Banner image –
+  wide banner used in featured spots", „Screenshots – at least one in-game screenshot". Die Maße
+  stehen **wörtlich im Upload-Formular** (11.09.2026), nicht auf der öffentlichen Seite:
+
+  | Feld | Formular | Datei |
+  |---|---|---|
+  | Small index image (mini) | „should be **180x75px**", max. 1024 kB, jpg/webp/png/gif/svg | `node itch-wrapper/theme-bauen.js bmmo-mini` → `presse-bilder/browsermmorpg-mini.png` (exakt 180×75) |
+  | Main image (preview) | „should be **864x384px**", max. 8192 kB (der Platzhalter daneben sagt „600 x 250 px or bigger but same proportions" – das ist 2,4:1 statt 2,25:1; der Text ist die Prüfung) | `… bmmo-hauptbild` → `presse-bilder/browsermmorpg-hauptbild.jpg` (exakt 864×384) |
+  | Banner image | **noch abzulesen** – der Abschnitt stand nicht auf dem Screenshot | folgt als dritte Zeile in `theme-bauen.js` |
+  | Screenshots | „at least one in-game screenshot" | `node marketing-screenshots.js` → `presse-bilder/kepler7-*.png` (16:9, 3200×1800) |
+
+  Gemessen an der Auslieferung passt das zusammen: Das og:image jeder Spielseite kommt als
+  `w=864,h=384,fit=cover` (also das Hauptbild), die Listenkacheln zeigen dasselbe Bild als
+  `w=240,h=100,fit=cover` (Klasse `bmm-card-banner`), die Galerie auf der Spielseite `800×600
+  fit=contain` mit Daumennägeln `120×90 fit=crop`. Der erste Anlauf hatte daraus eine 240×100-Kachel
+  und ein 4:3-Hauptbild abgeleitet – beides falsch, weil die Auslieferung nicht das Formular ist.
+  **Die Maße kommen aus dem Formular, das die Datei annimmt oder ablehnt; die Auslieferung sagt nur,
+  wie das Bild danach beschnitten wird.**
+- **„Verify ownership" wird erst nach der Freigabe freigeschaltet** (Checkliste: „Verification unlocks
+  once approved") und läuft über die bei der Registrierung angegebene E-Mail („Must be reachable — we
+  verify ownership through it"). Gemessen am 11.09.2026: `gamegeeeeek.de` kann derzeit keine Mail
+  **empfangen** – bei Resend ist die Domain nur fürs Senden eingerichtet („Receiving: disabled"), und
+  der MX-Eintrag zeigt auf `mail.gamegeeeeek.de` = dieselbe Adresse wie der Pi. Ohne Postfach kommt
+  die Bestätigungsmail nirgends an. Zwei Wege: Empfang bei Resend einschalten (Domain → Receiving,
+  den dort genannten MX-Eintrag setzen; die Mails liegen dann im Resend-Dashboard) – oder ein
+  Postfach beim Domain-Anbieter anlegen. Erst danach lohnt der Klick auf „Verify ownership".
+- **Das Abstimmungs-Widget** (`rating_card.js`, gemessen am Skript): ein GET auf
+  `browsermmorpg.com/ajax/rating_card.php?id=1799` ohne Cookies, dann ein „Vote"-Link auf
+  `vote.php?id=1799` – dort „Did you like this game? Yes/No", ohne Konto, alle sechs Stunden;
+  registrierte Stimmen zählen zehnfach. Es steht **nicht im Spiel**: Dort verbietet `connect-src
+  'self'` den Abruf (`tests/test_csp_verbindung.js`), und ein Fremdskript neben dem Sitzungs-Token in
+  `localStorage` wäre der eigentliche Schaden – das gilt für JEDE Seite der Herkunft, auch eine ohne
+  Anmeldemaske. Deshalb lebt es in `bmmo-karte.html` und wird auf den vier Themenseiten als
+  Sandkasten-Rahmen ohne `allow-same-origin` eingebettet (gemessen: `localStorage` und `document.cookie`
+  werfen dort `SecurityError`). Die Startseite des Spiels trägt nur den nackten Link auf die
+  Abstimmungsseite. Die Farbattribute des Einbettungscodes sind eine Premium-Funktion des
+  Verzeichnisses – die Karte bleibt weiß. Wächter: `tests/test_bewertungskarte.js`.
+- **Stimmen werden belohnt (Auftrag Sascha, 11.09.2026):** Das Spiel erinnert alle sechs Stunden mit
+  einem Fenster („Eine Stimme für die Galaxie", Link mit dem Registrierungsnamen als Parameter), und
+  der Server belohnt eine gezählte Stimme über den **Postback** des Verzeichnisses („pay players for
+  voting") mit Kredite ins Belohnungsfach – Backend `GET /api/stimme/rueckruf`, Doku
+  `kolonie-kepler7-backend/docs/verzeichnis-stimme.md`. Was noch aus dem Konto dort abzulesen ist:
+  der **Platzhalter für den Spielernamen** in der Postback-Adresse und der Parameter, den das
+  Verzeichnis an die Vote-Adresse anhängt (`STIMME_LINK_PARAM` im Spiel, Vorgabe `username`). Ein
+  Skript, das selbst abstimmt, gibt es bewusst nicht – Captcha, Takt und die eigene Regel „keine
+  künstlichen Metriken" schließen es aus.
+- **Patchnotes als RSS-Feed (11.09.2026, Auftrag Sascha):** `https://www.gamegeeeeek.de/patchnotes.xml` –
+  ein Erzeugnis von `build-patchnotes.js`, dieselbe Quelle wie die Patchnotes-Seite, die 20 neuesten
+  Versionen mit Anker je Version. Für browsermmorpg.com („Submit articles → Add General News") und jeden
+  Feedreader; ob das Verzeichnis einen Feed selbst abholt, steht nicht auf der Verwaltungsseite – dort
+  werden Artikel von Hand angelegt, der Feed liefert dafür den fertigen Text. Wächter:
+  `tests/test_patchnotes_feed.js` (baut den Feed an einer Kopie nach und vergleicht Byte für Byte).
+- **Nebenbefund, gemessen an der Produktion:** `https://www.gamegeeeeek.de/seiten.css` lieferte die
+  Spieldatei (6,9 MB, Catch-all von nginx) – die Datei war nie live, weil der Deploy-Webhook `*.html` und
+  `*.png` kopiert, aber keine `.css`. Alle vier Themenseiten und `patchnotes.html` liefen damit ohne
+  Stylesheet. Korrektur im Backend (`DEPLOY_WEB_COPY` + gzip-Liste), erst dann greift die Anzeige
+  der Bewertungskarte wie gebaut.
+
 ### thebigmmorpglist.com/submit-game/
 
 Elf Felder, **kein Captcha, kein Bildupload, keine Zeichenlimits** (am Formular geprüft, 21.08.2026).

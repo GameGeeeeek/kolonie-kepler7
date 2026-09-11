@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Erzeugt patchnotes.html, patchnotes-archiv.json und version.txt aus den Patchnotes in
+// Erzeugt patchnotes.html, patchnotes.xml (RSS), patchnotes-archiv.json und version.txt aus den Patchnotes in
 // weltraum_kolonie.html - und haelt dabei den PATCHNOTES-Block im Spiel klein.
 //
 // WARUM ALS GENERATOR und nicht als handgepflegte Seite: Die Landeseite verlinkte an zwei Stellen
@@ -216,6 +216,7 @@ const seite = `<!DOCTYPE html>
 <title>Patchnotes – Kolonie Kepler-7</title>
 <meta name="description" content="Alle Änderungen an Kolonie Kepler-7: ${notes.length} Versionen von ${notes[notes.length-1].version} bis ${notes[0].version}, vollständig und unverändert seit dem ersten Tag.">
 <link rel="canonical" href="https://www.gamegeeeeek.de/patchnotes.html">
+<link rel="alternate" type="application/rss+xml" title="Kolonie Kepler-7 – Patchnotes" href="https://www.gamegeeeeek.de/patchnotes.xml">
 <meta name="theme-color" content="#0a0d1a">
 <meta property="og:title" content="Patchnotes – Kolonie Kepler-7">
 <meta property="og:description" content="Jede Änderung am Spiel, seit dem ersten Tag. ${notes.length} Versionen.">
@@ -261,7 +262,7 @@ ${neu.map(blockHtml).join('\n')}
 <p>Vollständig erhalten, nach Tag zusammengefasst.</p>
 ${alteBloecke}
 
-<p style="margin-top:2.5rem;"><a href="/">Zurück zum Spiel</a> &middot; <a href="spielanleitung.html">Spielanleitung</a> &middot; <a href="impressum.html">Impressum</a></p>
+<p style="margin-top:2.5rem;"><a href="/">Zurück zum Spiel</a> &middot; <a href="spielanleitung.html">Spielanleitung</a> &middot; <a href="patchnotes.xml">RSS-Feed</a> &middot; <a href="impressum.html">Impressum</a></p>
 </main>
 
 </body>
@@ -269,6 +270,86 @@ ${alteBloecke}
 `;
 
 fs.writeFileSync(ZIEL, seite);
+
+// ---------------------------------------------------------------- 5. patchnotes.xml (RSS 2.0)
+// Auftrag Sascha (11.09.2026): "kannst du den rss feed anbinden an die patchnotes?" - ein Feed, den
+// browsermmorpg.com, Discord-Bots und Feedreader abonnieren koennen. DIESELBE Quelle wie die Seite
+// (notes), dieselben Anker (#v8-718-0), die OFFEN neuesten Versionen - kein zweiter Datenweg, der
+// beim naechsten Umbau veraltet. Der Feed ist deterministisch (lastBuildDate = Datum des neuesten
+// Eintrags, nicht die Uhrzeit des Laufs): Ein Lauf ohne neue Version aendert die Datei nicht, und
+// tests/test_patchnotes_feed.js baut ihn an einer Kopie nach und vergleicht Byte fuer Byte.
+// Titel je Meldung: "v<Version> - <Kernaussage>", die Kernaussage ist das <strong> am Anfang des
+// ersten Eintrags als reiner Text (die Autoren schreiben genau dort die Ueberschrift der Version).
+// Die Aenderungen selbst reisen als HTML in CDATA, so wie die Seite sie zeigt.
+const FEED = path.join(WURZEL, 'patchnotes.xml');
+const SEITEN_URL = 'https://www.gamegeeeeek.de/patchnotes.html';
+const FEED_URL = 'https://www.gamegeeeeek.de/patchnotes.xml';
+// Entities, die in den Eintraegen vorkommen (HTML-Schreibweise der Autoren) - fuer den REINEN Text
+// der Titel. Unbekannte bleiben stehen und fallen im Test auf (1k), statt still zu verschwinden.
+const ENTITIES = { auml:'ä', ouml:'ö', uuml:'ü', Auml:'Ä', Ouml:'Ö', Uuml:'Ü', szlig:'ß', ndash:'–', mdash:'—',
+  hellip:'…', nbsp:' ', quot:'"', amp:'&', lt:'<', gt:'>', middot:'·', rarr:'→', larr:'←', times:'×', euro:'€',
+  deg:'°', bdquo:'„', ldquo:'“', rdquo:'”', lsquo:'‘', rsquo:'’', laquo:'«', raquo:'»', apos:"'" };
+function reinText(html){
+  return String(html || '').replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (m, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-zA-Z]+);/g, (m, e) => (e in ENTITIES) ? ENTITIES[e] : m)
+    .replace(/\s+/g, ' ').trim();
+}
+function xmlText(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function cdata(s){ return '<![CDATA[' + String(s).replace(/\]\]>/g, ']]]]><![CDATA[>') + ']]>'; }
+// dd.mm.yyyy -> RFC 822, und zwar MITTERNACHT in Europe/Berlin - der Zeitzone, in der die Eintraege
+// datiert werden. Nie in der Zukunft (Codex-Review am PR, 11.09.2026): Der erste Entwurf nahm
+// 12:00 UTC, und fuer einen Vormittags-Release lag der Eintrag damit stundenlang in der Zukunft -
+// Reader, die kuenftige Eintraege zurueckhalten oder lastBuildDate zum Abfragen nutzen, haetten ihn
+// versteckt. Ein echter Release-Zeitpunkt ist nicht ueberliefert (die Eintraege tragen nur den Tag);
+// die lokale Mitternacht ist der spaeteste Zeitpunkt, der sicher VOR dem Release liegt.
+// Deterministisch, damit ein Lauf ohne neue Version die Datei nicht aendert.
+function berlinMitternacht(jahr, monat, tag){
+  const rohUtc = Date.UTC(jahr, monat - 1, tag, 0, 0, 0);
+  // Der Versatz zu Berlin ist +1 h (Winter) oder +2 h (Sommer): den Kandidaten nehmen, der in
+  // Berlin als 0 Uhr desselben Tages gelesen wird - so muss hier keine Sommerzeitregel stehen.
+  const lesen = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour: 'numeric', hourCycle: 'h23', day: 'numeric' });
+  for (const stunden of [2, 1]){
+    const kandidat = new Date(rohUtc - stunden * 3600000);
+    const teile = Object.fromEntries(lesen.formatToParts(kandidat).map(t => [t.type, t.value]));
+    if (Number(teile.hour) === 0 && Number(teile.day) === tag) return kandidat;
+  }
+  return new Date(rohUtc - 3600000);
+}
+function rfc822(date){
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(date || '');
+  if (!m) return null;
+  return berlinMitternacht(Number(m[3]), Number(m[2]), Number(m[1])).toUTCString();
+}
+function feedTitel(n){
+  const erste = (n.changes && n.changes[0]) || '';
+  const strong = /<strong>([\s\S]*?)<\/strong>/.exec(erste);
+  const kern = reinText(strong ? strong[1] : erste).replace(/[.:!\s]+$/, '');
+  return 'v' + n.version + (kern ? ' – ' + kern.slice(0, 120) : '');
+}
+const feedEintraege = notes.slice(0, OFFEN).map(n => {
+  const datum = rfc822(n.date);
+  return '  <item>\n' +
+    '    <title>' + xmlText(feedTitel(n)) + '</title>\n' +
+    '    <link>' + SEITEN_URL + '#v' + n.version.replace(/\./g, '-') + '</link>\n' +
+    '    <guid isPermaLink="false">kolonie-kepler7-v' + n.version + '</guid>\n' +
+    (datum ? '    <pubDate>' + datum + '</pubDate>\n' : '') +
+    '    <description>' + cdata('<ul>' + (n.changes || []).map(c => '<li>' + c + '</li>').join('') + '</ul>') + '</description>\n' +
+    '  </item>';
+}).join('\n');
+const feedDatum = rfc822(notes[0].date);
+const feed = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+  '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n<channel>\n' +
+  '  <title>Kolonie Kepler-7 – Patchnotes</title>\n' +
+  '  <link>' + SEITEN_URL + '</link>\n' +
+  '  <description>Was sich im Weltraum-Browsergame Kolonie Kepler-7 geändert hat – jede Version, sobald sie live ist.</description>\n' +
+  '  <language>de</language>\n' +
+  '  <atom:link href="' + FEED_URL + '" rel="self" type="application/rss+xml"/>\n' +
+  (feedDatum ? '  <lastBuildDate>' + feedDatum + '</lastBuildDate>\n' : '') +
+  feedEintraege + '\n</channel>\n</rss>\n';
+fs.writeFileSync(FEED, feed);
+console.log('patchnotes.xml geschrieben: ' + Math.min(OFFEN, notes.length) + ' Versionen, ' + Math.round(feed.length / 1024) + ' kB');
 console.log('patchnotes.html geschrieben: ' + notes.length + ' Versionen, ' + eintraege +
   ' Einträge, ' + Math.round(seite.length / 1024) + ' kB');
 console.log('  offen: ' + neu.length + ' · zusammengeklappt: ' + alt.length + ' in ' + gruppen.size + ' Tagesgruppen');
