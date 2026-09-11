@@ -1595,6 +1595,51 @@
 
     .buildings, .fleet, .research-list, .planet-list, .npc-list, .leaderboard { display:flex; flex-direction:column; gap:9px; }
     .card-row { background: var(--elev-1); border:var(--bw-1) solid var(--line-1); padding: 0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:background 0.15s ease, border-color 0.15s ease, transform 0.12s ease-out, box-shadow 0.12s ease-out; }
+    /* Gleichmaß Etappe 2: Gebäude-Raster mit Gruppenköpfen (Basis) und zweispaltige Verteidigung.
+       WARUM ein Raster: 29 Gebäude untereinander waren am PC eine 4.000 px lange Wand, in der
+       jede Karte die volle Breite für zwei Zeilen Text nahm. Als Kachel wird die Karte ein Block
+       - die Knopfspalte rückt unter den Text, die Karten stehen zu zweit (ab 1400 px zu dritt)
+       nebeneinander. Alle Regeln sind auf .gebaeude-raster begrenzt: .card-row ist an rund 330
+       weiteren Stellen (Forschung, Flotte, Offiziere, Wischleisten) eine waagerechte Zeile und
+       bleibt es dort. Die Gruppenköpfe sind bewusst KEINE .card-row und tragen keinen .bname,
+       damit Zähler und Suchen über die Gebäudekarten sie nicht mitzählen.
+       align-items:start und KEINE feste Höhe: eine fertige Karte (nur Name, Stufe, Max-Abzeichen)
+       darf nicht auf die Höhe einer höheren Nachbarkarte gestreckt werden. */
+    .gebaeude-gruppe { display:flex; flex-direction:column; gap:8px; }
+    .gebaeude-gruppe-kopf { display:flex; align-items:baseline; gap:10px; padding:6px 2px 0; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#aeb1c4; }
+    .gebaeude-gruppe-titel { color:#e2e0da; font-weight:600; }
+    .gebaeude-gruppe-zaehler { text-transform:none; letter-spacing:0; color:#7d8199; font-variant-numeric:tabular-nums; }
+    .gebaeude-gruppe-leer { font-size:11px; color:#7d8199; padding:2px 2px 6px; }
+    .gebaeude-raster { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:9px; align-items:start; }
+    @media (min-width:1400px) { #buildings .gebaeude-raster { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+    @media (max-width:700px) { .gebaeude-raster { grid-template-columns:minmax(0,1fr); } }
+    /* Verteidigung: die Kennwert-Balken (.ship-stats, selbst zweispaltig) brauchen Breite - höchstens
+       zwei Kacheln nebeneinander, unter 880 px eine. */
+    #defenseBuildings .gebaeude-raster { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    @media (max-width:879px) { #defenseBuildings .gebaeude-raster { grid-template-columns:minmax(0,1fr); } }
+    /* Kachel im Raster: die Knopfspalte rückt unter den Text, die Karte wird ein Block. Der
+       Inline-Style der Knopfspalte sagt flex-direction:column - im Raster ist die Zeile gewollt,
+       darum !important. :not(.left) hält die Textspalte der gesperrten Karten heraus, bei denen
+       sie das letzte Kind ist (Mond-Gebäude ohne Knopf). */
+    .gebaeude-raster .card-row { flex-wrap:wrap; align-items:flex-start; }
+    .gebaeude-raster .card-row > .left { flex:1 1 100%; min-width:0; }
+    .gebaeude-raster .card-row > div:last-child:not(.left) { flex:1 1 100%; flex-direction:row !important; flex-wrap:wrap; gap:6px; }
+    .gebaeude-raster .card-row > div:last-child:not(.left) > button { flex:1 1 auto; }
+    /* Dreispaltig sind die Textspalten rund 190 px schmal; „Deuteriumsynthetisierer" (23 Zeichen
+       Monospace) lief dort 3 px über die Kante (gemessen bei 1400 px). Eine Schriftgröße kleiner
+       passt der längste Name hinein; overflow-wrap:anywhere ist nur das Netz für eigene
+       Kolonienamen, die noch länger sind - ein Bruch im Wort ist besser als eine abgeschnittene Kante. */
+    .gebaeude-raster .bname { overflow-wrap:anywhere; }
+    @media (min-width:1400px) { #buildings .gebaeude-raster .bname { font-size:13px; } }
+    /* Bau-Warteschlange als Chip-Streifen (statt drei Karten mit „– frei –"-Platzhaltern): ein
+       Chip je Eintrag mit Position, Name, Ort und Zielstufe. Die Chips umbrechen per flex-wrap,
+       nichts scrollt. min-height hält den Platz, damit der erste Eintrag die Gebäudeliste nicht
+       wegschiebt (derselbe Grund, aus dem es die Platzhalter gab). */
+    .bauschlange-streifen { display:flex; flex-wrap:wrap; gap:6px; min-height:36px; margin-bottom:1rem; align-items:center; }
+    .bauschlange-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 8px; background:var(--elev-1); border:var(--bw-1) solid var(--line-1); font-size:12px; clip-path:polygon(var(--cut-xs) 0, 100% 0, 100% calc(100% - var(--cut-xs)), calc(100% - var(--cut-xs)) 100%, 0 100%, 0 var(--cut-xs)); }
+    .bauschlange-ziel { color:#5dcaa5; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .bauschlange-chip > button { font-size:10px; padding:3px 6px; min-height:0; }
+    @media (max-width:700px) { .bauschlange-chip > button { min-height:32px; min-width:32px; } }
 
     /* ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) - standardmäßig alle aus, aktuelles
        Layout bleibt unverändert der Standard. Wirkt aktuell nur in den Tabs "Punktestand" und
@@ -5692,6 +5737,15 @@
     // Die Stufen aller Botschaftsviertel im Imperium zaehlen zusammen (wie beim Fusions-Werftkern),
     // Plaetze und Wirkung sind hart gedeckelt (EMBASSY_SLOT_AT, EMBASSY_EFFECT_CAP).
     { key:'botschaft', name:'Botschaftsviertel', icon:'ti-building-bank', produces:null, baseRate:0, baseCost:{erz:9000, kristalle:6500, deuterium:3200, credits:400}, costMult:1.5, bg:'rgba(133,183,235,0.16)', fg:'#85b7eb', effectDesc:'Bietet Botschaftsplätze für NPC-Fraktionen: eine Fraktion mit Botschaft dreht genau den Hebel um, an dem sie als Feind ziehen würde, und ihr Ruf verfällt nicht mehr. Die Stufen aller Botschaftsviertel zählen imperiumsweit zusammen – der erste Platz ab Stufe 1, der zweite ab 6, der dritte ab 12; mehr als drei gibt es nie.', category:'utility', maxLevel:12, buildTime:1200, buildTimePerLevelMult:1.6 }
+  ];
+  // Gleichmaß Etappe 2: die Nicht-Verteidigungsgebäude stehen im Basis-Reiter in drei festen
+  // Gruppen als Kachelraster. Reihenfolge und Titel sind hier festgelegt, die Zuordnung kommt
+  // aus def.category - ein Gebäude mit unbekannter Kategorie landet in „Weitere", damit nie
+  // eines still aus der Liste verschwindet.
+  const GEBAEUDE_GRUPPEN = [
+    { key:'production', titel:'Produktion' },
+    { key:'refine', titel:'Veredelung' },
+    { key:'utility', titel:'Nutzgebäude' }
   ];
 
   const ICONS = {
@@ -45486,6 +45540,7 @@ async function claimPendingRewards(){
          Syntax-Check faende das NICHT (new Function parst nur). Gemessen, nicht geschaetzt
          (Arbeitsregel 38). Wer die Stufenzahl aendert, aendert sie HIER mit. */
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 8 Stufen bauen (Basis-Tab); die Stufen 4-5 sind Endgame-Ausbauten und benötigen Leerentechnologie Stufe 3 sowie 3 bzw. 5 Leerensplitter, die Stufen <strong>6-8</strong> zusätzlich die Forschung <em>Kausalanker-Theorie</em> und Tier-3-Material (6 Hohlraumgitter für Stufe 6, 10 Hohlraumgitter + 8 Kausalanker für Stufe 7, 12 Hohlraumgitter + 10 Kausalanker + <strong>60 Protomaterie</strong> für Stufe 8) - die hängen über die Baukosten ihrer Fabriken am Asteroiden-Bergbau. Stufe 8 ist die erste Stufe, die Protomaterie direkt verlangt: Sie kommt ausschließlich von den Urmateriekernen im Asteroidengürtel, und sie wird einmalig je Standort fällig, nicht laufend. Die Stufen 1-5 sind dabei unverändert geblieben: gleiche Kosten, gleiche Wirkung. Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (Basis 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium, zusätzlich Imperiums-Skalierung: +25% je weiterem Standort), Bauzeit 5-25 Minuten. Auf der <strong>Sektorkarte</strong> wird jede Orbitalstation als sichtbarer Ring um den Planeten dargestellt, in der Farbe des gewählten Fokus - Stufe 1 ein einzelner dünner Ring, Stufe 2 zwei Ringe, Stufe 3 drei Ringe mit kleinen Modul-Knoten und leichtem Leuchtpuls. So ist die Ausbaustufe auf einen Blick erkennbar, ohne das Baumenü zu öffnen.<br><br><strong>Seit dem 02.08.2026 gibt es einen vierten Fokus, den Signalring:</strong> +3% Expeditionsausbeute je Stufe, aber nur für Expeditionen, die von <em>dieser</em> Welt starten (bis +24% bei Vollausbau). Das ist der erste ortsgebundene Ausbeute-Bonus für Expeditionen überhaupt – bis dahin war es gleichgültig, von welcher Welt man losfliegt. Er zahlt in dieselbe additive, gedeckelte Gruppe ein wie Kodex, Forschung und Module. <strong>Nebenbei behoben:</strong> Die Fokus-Karte rechnete für den Produktionsring +4% je Stufe und zeigte bei Stufe 5 „+20% Produktion" an, während die Beschreibung daneben +3% sagte und die Rechnung real +15% gab – eine alte Balance-Änderung hatte diese eine Anzeigestelle nicht mitgenommen.' },
+      { title:'Gebäude-Raster und Bau-Warteschlange', body:'Die Gebäude stehen in drei Gruppen – <strong>Produktion</strong>, <strong>Veredelung</strong>, <strong>Nutzgebäude</strong> – als Kachelraster; jeder Gruppenkopf zählt, wie viele Gebäude fertig ausgebaut sind. Der Filter „Fertig Ausgebautes ausblenden" über den Gruppen lässt fertige Kacheln verschwinden, der Kopf mit dem Zähler bleibt. Die <strong>Bau-Warteschlange</strong> über der Liste zeigt je Eintrag die Zielstufe (→ Lv. N) – derselbe Bau zweimal in der Schlange heißt zwei aufeinanderfolgende Stufen. Verteidigungsanlagen stehen im Verteidigungs-Tab in demselben Raster, zwei nebeneinander.' },
       { title:'Bau-Warteschlange (Schiffe & Verteidigungsgebäude)', body:'Schiffe und Verteidigungsgebäude werden auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort in die Warteschlange aufgenommen - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei ist (nur ein aktiver Bau je Art/Planet gleichzeitig). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr die ganze Warteschlange. So werden Ressourcen effizient genutzt. Dasselbe Prinzip gilt auch für die Gebäude-Wunschliste (Knopf "Warteschlange" bei normalen Gebäuden).' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Chat-Benachrichtigung & Live-Chat', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss. Ein geöffnetes Chat-Panel aktualisiert sich alle paar Sekunden von selbst; du siehst neue Nachrichten also live, ohne das Panel zu schließen und neu zu öffnen. Wer im Verlauf hochgescrollt hat, bleibt dabei an seiner Lesestelle. Über „Ältere anzeigen" am Kopf des Verlaufs lädst du schrittweise bis zu 300 Nachrichten Historie je Kanal nach; Tages-Trennzeilen (Heute/Gestern/Datum) zeigen, wo ein Tag endet.' },
@@ -72334,36 +72389,37 @@ function sekSternUse(key, x, y, k, unentdeckt){
 
     const qBox = document.getElementById('buildQueueBox');
     if (qBox){
-      // Feste Mindesthöhe: die Box reserviert immer mindestens 3 Zeilen (leere Platzhalter statt
-      // komplett zu verschwinden), damit das Hinzufügen des ersten Eintrags nicht die Gebäudeliste
-      // darunter wegschiebt - fühlte sich vorher wie ein ungewolltes Auto-Scrollen an
-      // (Vorschlag holyhenning, 13.07.2026). Ab mehr als 3 Einträgen wächst die Box normal weiter.
+      // Gleichmaß Etappe 2: die Einträge sind Chips in einem umbrechenden Streifen, keine Karten
+      // mehr. Die frühere Mindesthöhe (drei „– frei –"-Platzhalter, Vorschlag holyhenning,
+      // 13.07.2026, damit der erste Eintrag die Gebäudeliste nicht wegschiebt) hält jetzt die
+      // min-height von .bauschlange-streifen. Die Zielstufe je Eintrag kommt aus derselben
+      // Stufen-Simulation wie die Gesamtkosten: derselbe Schlüssel zweimal in der Schlange heißt
+      // Lv. n+1 und Lv. n+2, nicht zweimal dieselbe Stufe.
       const bq = state.buildQueue || [];
       const levelSim = {};
       const totalQCost = {};
+      const zielStufen = [];
       for (const q of bq){
         const def = BUILDING_DEFS.find(d=>d.key===q.key);
-        if (!def) continue;
+        if (!def){ zielStufen.push(null); continue; }
         const simKey = q.planet+':'+q.key;
         const curLvl = levelSim[simKey] !== undefined ? levelSim[simKey] : (buildingSetFor(q.planet)[q.key]||0);
         const c = costFor(def, curLvl);
         for (const [r,a] of Object.entries(c)) totalQCost[r] = (totalQCost[r]||0)+a;
         levelSim[simKey] = curLvl+1;
+        zielStufen.push(curLvl+1);
       }
-      const qMinSlots = 3;
-      const qPlaceholders = Math.max(0, qMinSlots - bq.length);
       setBoxHtml(qBox, 'buildQueueBox', `
         <div class="section-title" style="font-size:12px;"><i class="ti ti-list-details" aria-hidden="true"></i>Bau-Warteschlange (${bq.length}/${komfortGrenze('warteschlange')})</div>
         <div class="bmeta" style="margin-bottom:0.5rem;">${bq.length ? 'Geschätzte Gesamtkosten: '+costHtml(totalQCost) : 'Noch leer - Gebäude über "Warteschlange" hinzufügen.'}</div>
-        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:1rem;">
+        <div class="bauschlange-streifen">
           ${bq.map((q,i) => {
             const def = BUILDING_DEFS.find(d=>d.key===q.key) || {};
-            return `<div class="card-row" style="padding:0.5rem 0.85rem;">
-              <div class="left"><span class="lvl-pill">${i+1}</span><span class="bname" style="font-size:12.5px;">${def.name||q.key}${q.planet!=='home'?' ('+(PLANETS.find(p=>p.id===q.planet)||{}).name+')':''}</span></div>
-              <button aria-label="Aus Bauwarteschlange entfernen" data-buildqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
-            </div>`;
+            // planetDisplayName statt PLANETS.find: kennt eigene Kolonienamen und Monde (vorher
+            // stand bei einem Mond-Schlüssel „(undefined)").
+            const ortText = q.planet!=='home' ? ' ('+planetDisplayName(q.planet)+')' : '';
+            return `<span class="bauschlange-chip"><span class="lvl-pill">${i+1}</span><span class="bauschlange-name">${def.name||q.key}${ortText}</span>${zielStufen[i]!==null?`<span class="bauschlange-ziel">→ Lv. ${zielStufen[i]}</span>`:''}<button type="button" aria-label="Aus Bauwarteschlange entfernen" data-buildqueue-remove="${i}"><i class="ti ti-x" aria-hidden="true"></i></button></span>`;
           }).join('')}
-          ${Array.from({length: qPlaceholders}).map(() => `<div class="card-row" style="padding:0.5rem 0.85rem; opacity:0.35; border-style:dashed;"><span class="bmeta">– frei –</span></div>`).join('')}
         </div>
       `);
     }
@@ -72790,9 +72846,25 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const basisFertig = basisDefs.filter(buildingIstMax).length;
       // Wie im Verteidigungs-Reiter: die gezeichneten Kacheln nur setzen, wenn setBoxHtml die
       // Karten wirklich neu geschrieben hat - innerHTML ersetzt dabei alle Canvas-Elemente.
+      // Gleichmaß Etappe 2: drei Gruppen (GEBAEUDE_GRUPPEN) mit Kopf und Kachelraster, alles im
+      // selben setBoxHtml-String hinter Leerlaufkarte und Filter-Chip. Der Zähler im Kopf nennt
+      // alle Gebäude der Gruppe (unabhängig vom Filter) und, falls vorhanden, die fertigen - keine
+      // tickabhängigen Werte, sonst würde die Box jede Sekunde neu geschrieben. Eine Kategorie, die
+      // in keiner Gruppe steht, sammelt sich unter „Weitere", damit kein Gebäude verschwindet.
+      const basisGruppen = GEBAEUDE_GRUPPEN.map(g => ({ titel:g.titel, key:g.key, defs:basisDefs.filter(d=>d.category===g.key) }));
+      const basisRest = basisDefs.filter(d=>!GEBAEUDE_GRUPPEN.some(g=>g.key===d.category));
+      if (basisRest.length) basisGruppen.push({ titel:'Weitere', key:'weitere', defs:basisRest });
+      const basisGruppenHtml = basisGruppen.filter(g=>g.defs.length).map(g => {
+        const fertig = g.defs.filter(buildingIstMax).length;
+        const sichtbar = g.defs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d));
+        return `<section class="gebaeude-gruppe" data-kategorie="${g.key}">
+          <div class="gebaeude-gruppe-kopf"><span class="gebaeude-gruppe-titel">${g.titel}</span><span class="gebaeude-gruppe-zaehler">${g.defs.length} Gebäude${fertig>0?` · ${fertig} fertig`:''}</span></div>
+          ${sichtbar.length ? `<div class="gebaeude-raster">${sichtbar.map(buildingRowHtml).join('')}</div>` : `<div class="gebaeude-gruppe-leer">alle fertig – ausgeblendet</div>`}
+        </section>`;
+      }).join('');
       const basisNeu = setBoxHtml(document.getElementById('buildings'), 'buildings', leerlaufKarte('basis')
         + ((basisFertig>0 || state.uiHideMaxed) ? hideMaxedChip(basisFertig) : '')
-        + basisDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
+        + basisGruppenHtml);
       if (basisNeu) refreshBuildingIcons(document.getElementById('buildings'));
       const roleBox = document.getElementById('planetRoleBox');
       if (roleBox){
@@ -73077,9 +73149,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
         constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense'));
       const defDefs = BUILDING_DEFS.filter(d=>d.category==='defense');
       const defFertig = defDefs.filter(buildingIstMax).length;
+      // Gleichmaß Etappe 2: die 24 Anlagen in EINEM zweispaltigen Raster (alle eine Kategorie,
+      // darum ohne Gruppenkopf); der Filter-Chip bleibt davor als erstes Kind.
       const defNeu = setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',
         ((defFertig>0 || state.uiHideMaxed) ? hideMaxedChip(defFertig) : '')
-        + defDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join(''));
+        + '<div class="gebaeude-raster">' + defDefs.filter(d=>!state.uiHideMaxed || !buildingIstMax(d)).map(buildingRowHtml).join('') + '</div>');
       if (defNeu) refreshDefenseMiniIcons();
       renderAbhorchpostenBox();
     }
