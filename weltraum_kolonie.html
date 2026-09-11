@@ -1598,7 +1598,8 @@
     /* Gleichmaß Etappe 2: Gebäude-Raster mit Gruppenköpfen (Basis) und zweispaltige Verteidigung.
        WARUM ein Raster: 29 Gebäude untereinander waren am PC eine 4.000 px lange Wand, in der
        jede Karte die volle Breite für zwei Zeilen Text nahm. Als Kachel wird die Karte ein Block
-       - die Knopfspalte rückt unter den Text, die Karten stehen zu zweit (ab 1400 px zu dritt)
+       - die Knopfspalte rückt unter den Text, die Karten stehen zu zweit (ab 1600 px zu dritt;
+       bei 1400 px ist die Spielspalte erst 930 px breit, drei Spalten stapelten dort die Kostenchips)
        nebeneinander. Alle Regeln sind auf .gebaeude-raster begrenzt: .card-row ist an rund 330
        weiteren Stellen (Forschung, Flotte, Offiziere, Wischleisten) eine waagerechte Zeile und
        bleibt es dort. Die Gruppenköpfe sind bewusst KEINE .card-row und tragen keinen .bname,
@@ -1611,7 +1612,7 @@
     .gebaeude-gruppe-zaehler { text-transform:none; letter-spacing:0; color:#7d8199; font-variant-numeric:tabular-nums; }
     .gebaeude-gruppe-leer { font-size:11px; color:#7d8199; padding:2px 2px 6px; }
     .gebaeude-raster { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:9px; align-items:start; }
-    @media (min-width:1400px) { #buildings .gebaeude-raster { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+    @media (min-width:1600px) { #buildings .gebaeude-raster { grid-template-columns:repeat(3, minmax(0,1fr)); } }
     @media (max-width:700px) { .gebaeude-raster { grid-template-columns:minmax(0,1fr); } }
     /* Verteidigung: die Kennwert-Balken (.ship-stats, selbst zweispaltig) brauchen Breite - höchstens
        zwei Kacheln nebeneinander, unter 880 px eine. */
@@ -1625,12 +1626,12 @@
     .gebaeude-raster .card-row > .left { flex:1 1 100%; min-width:0; }
     .gebaeude-raster .card-row > div:last-child:not(.left) { flex:1 1 100%; flex-direction:row !important; flex-wrap:wrap; gap:6px; }
     .gebaeude-raster .card-row > div:last-child:not(.left) > button { flex:1 1 auto; }
-    /* Dreispaltig sind die Textspalten rund 190 px schmal; „Deuteriumsynthetisierer" (23 Zeichen
-       Monospace) lief dort 3 px über die Kante (gemessen bei 1400 px). Eine Schriftgröße kleiner
-       passt der längste Name hinein; overflow-wrap:anywhere ist nur das Netz für eigene
-       Kolonienamen, die noch länger sind - ein Bruch im Wort ist besser als eine abgeschnittene Kante. */
-    .gebaeude-raster .bname { overflow-wrap:anywhere; }
-    @media (min-width:1400px) { #buildings .gebaeude-raster .bname { font-size:13px; } }
+    /* Dreispaltig (ab 1600 px) ist die Textspalte rund 270 px breit; „Deuteriumsynthetisierer"
+       (23 Zeichen Monospace) passt mit einer Schriftgröße kleiner sicher hinein. break-word ist nur
+       das Netz für eigene Kolonienamen, die noch länger sind - es bricht erst, wenn ein Wort
+       nirgends mehr passt (die Projektregel gegen anywhere steht bei .bname). */
+    .gebaeude-raster .bname { overflow-wrap:break-word; }
+    @media (min-width:1600px) { #buildings .gebaeude-raster .bname { font-size:13px; } }
     /* Bau-Warteschlange als Chip-Streifen (statt drei Karten mit „– frei –"-Platzhaltern): ein
        Chip je Eintrag mit Position, Name, Ort und Zielstufe. Die Chips umbrechen per flex-wrap,
        nichts scrollt. min-height hält den Platz, damit der erste Eintrag die Gebäudeliste nicht
@@ -72425,8 +72426,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }
     const rqBox = document.getElementById('researchQueueBox');
     if (rqBox){
-      // Gleiche Platzhalter-Lösung wie bei der Bau-Warteschlange direkt darüber (siehe Kommentar
-      // dort) - verhindert denselben Layout-Sprung beim ersten Eintrag.
+      // Platzhalter-Lösung (wie sie die Bau-Warteschlange bis Gleichmaß Etappe 2 hatte; die ist seither
+      // ein Chip-Streifen mit min-height) - verhindert den Layout-Sprung beim ersten Eintrag.
       const rq = state.researchQueue || [];
       const rLevelSim = {};
       // Bug behoben (danke an holyhenning für den Report): Lief eine Forschung gerade aktiv (bereits
@@ -72831,11 +72832,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
               ${maxed ? '' : `<div class="bcost">${costHtml(cost)}${def.category==='defense'?` · <i class="ti ti-clock" aria-hidden="true"></i> ${fmtDuration(Math.round(effectiveBuildTimeEach('building', state.activeBasePlanet, def.buildTime||20)*qty))}`:''} · <i class="ti ti-star" aria-hidden="true" style="color:#c3bef5;"></i> +${scorePoints} Punkte${affordEtaHtml(cost)}</div>`}
             </div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">
+          ${/* Ohne Knopf keine Knopfspalte: Bei fertigen Basis-Gebäuden stand hier ein leeres div, das im
+                Raster als eigene Flexzeile den 12-px-Abstand zog und die Kachel unten leer wirken ließ. */''}
+          ${(maxed && !(def.category==='defense' && lvl>0)) ? '' : '<div style="display:flex; flex-direction:column; gap:6px; align-items:stretch;">'}
             ${maxed ? '' : `<button class="buy ${ok?'affordable':''}" data-build="${def.key}" ${ok?'':'disabled'}><i class="ti ti-arrow-up" aria-hidden="true" style="margin-right:4px;"></i>Ausbauen (+${qty})</button>
             <button data-queue="${def.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-list-details" aria-hidden="true" style="margin-right:3px;"></i>Warteschlange</button>`}
             ${(def.category==='defense' && lvl>0) ? `<button data-scrapbuilding="${def.key}" style="font-size:10.5px; padding:4px 8px;"><i class="ti ti-trash" aria-hidden="true" style="margin-right:3px;"></i>Abreißen (-1)</button>` : ''}
-          </div>
+          ${(maxed && !(def.category==='defense' && lvl>0)) ? '' : '</div>'}
         </div>
       `;
     }
@@ -73149,7 +73152,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         constructionProgressCards(j=>j.kind==='building' && j.planet===state.activeBasePlanet && (BUILDING_DEFS.find(d=>d.key===j.key)||{}).category==='defense'));
       const defDefs = BUILDING_DEFS.filter(d=>d.category==='defense');
       const defFertig = defDefs.filter(buildingIstMax).length;
-      // Gleichmaß Etappe 2: die 24 Anlagen in EINEM zweispaltigen Raster (alle eine Kategorie,
+      // Gleichmaß Etappe 2: alle Anlagen (23) in EINEM zweispaltigen Raster (alle eine Kategorie,
       // darum ohne Gruppenkopf); der Filter-Chip bleibt davor als erstes Kind.
       const defNeu = setBoxHtml(document.getElementById('defenseBuildings'), 'defenseBuildings',
         ((defFertig>0 || state.uiHideMaxed) ? hideMaxedChip(defFertig) : '')

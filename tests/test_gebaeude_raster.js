@@ -38,13 +38,11 @@
 //   =sabotageE   Verteidigung ohne .gebaeude-raster-Wrapper          -> 3d/3e/9a
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst laufen lassen, dann eingetragen), nicht geraten.
 //
-// OFFENER BEFUND (gemessen 11.09.2026 am Umsetzungsstand, ROT_AM_NEUEN_STAND unten): 5a ist rot.
-// Bei 1400 px (3 Spalten) ist die Textspalte einer Karte 177 px breit; die .costitem-Chips der
-// Kostenzeile (108 px + 8 px Lücke + 69 px) passen nicht zu zweit in eine Zeile und stapeln sich zu
-// einer Zeile je Ressource (.bcost 75-107 px bei drei bis vier Kostenarten). Unfertige Karten der
-// Stufe 0 werden damit 183-224 px hoch, der Median liegt bei 183 px statt unter 170 px. Bei 1000 px
-// (2 Spalten) liegt derselbe Median bei 142 px (5d, grün) - der Befund gehört zur Dreispaltigkeit.
-// Am alten Stand (eine Spalte) war 5a grün.
+// BEFUND UND BEHEBUNG (11.09.2026): Am ersten Umsetzungsstand griff die dritte Spalte schon ab 1400 px
+// Fensterbreite - dort ist die Spielspalte erst 930 px breit, die Textspalte einer Karte 177 px, die
+// Kostenchips stapelten sich und der Median der unfertigen Karten lag bei 183 px (5a rot). Seitdem
+// greift die dritte Spalte erst ab 1600 px (Textspalte rund 270 px); dieser Test misst beides:
+// 1400 px zwei Spalten, 1600 px drei Spalten, an beiden Breiten Median unter 170 px.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
 
@@ -53,18 +51,31 @@ let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_GEBAEUDERASTER_GEGENPROBE || '';
+// GEMESSEN am 11.09.2026 (erst laufen lassen, dann eingetragen):
+//   alt        v8.721.0 ohne Raster/Chips
+//   sabotageA  Gruppenreihenfolge refine vor production (GEBAEUDE_GRUPPEN)          -> 1a
+//   sabotageB  Zähler „fertig" immer 0 im Basis-Zweig                               -> 1d, 6b
+//   sabotageC  Klasse gebaeude-raster aus dem Basis-Markup entfernt                  -> Raster-/Lage-Prüfungen
+//   sabotageD  span.bauschlange-ziel im Chip weggelassen                             -> 8c, 8e
+//   sabotageE  Verteidigung ohne div.gebaeude-raster-Wrapper                        -> 3d, 3e, 9a
+//   sabotageG  Regel „Knopfspalte als Zeile unter dem Text" entfernt                 -> 4d, 4f und die Median-Höhen
+//   sabotageJ  Standortname wieder per PLANETS.find statt planetDisplayName          -> 8c, 8e
+//   sabotageK  „– frei –"-Platzhalterkarte bei leerer Schlange wieder eingebaut     -> 8g
 const MUSS_FALLEN = {
-  alt:       ['1a','1b','1c','1d','2a','3a','4a','5c','6a','6b','6c','3b','4b','3c','4c','3d','3e','9a','8b','8c','8d','8e','8g'],
+  alt:       ['1a','1b','1c','1d','2a','3a','4a','4d','5c','3f','4f','6a','6b','6c','3b','4b','3c','4c','3d','3e','9a','8b','8c','8d','8e','8g'],
   sabotageA: ['1a'],
   sabotageB: ['1d','6b'],
-  sabotageC: ['1c','3a','4a','6c','3b','4b','3c','4c'],
+  sabotageC: ['1c','3a','4a','4d','3f','4f','6c','3b','4b','3c','4c'],
   sabotageD: ['8c','8e'],
-  sabotageE: ['3d','3e','9a']
+  sabotageE: ['3d','3e','9a'],
+  sabotageG: ['4d','4f','5e','5d'],
+  sabotageJ: ['8c','8e'],
+  sabotageK: ['8g']
 };
 // Prüfungen, die am NEUEN Stand rot sind (offener Befund an der Umsetzung, siehe Kopfkommentar). Der
 // normale Lauf bleibt damit rot; nur die Gegenproben lassen sie außen vor, weil ihr Fall nichts über
 // die Sabotage aussagt. Leer, sobald der Befund behoben ist.
-const ROT_AM_NEUEN_STAND = ['5a'];
+const ROT_AM_NEUEN_STAND = [];
 
 // ---- Erwartungswerte aus der Spieldatei MESSEN: BUILDING_DEFS-Einträge je Kategorie ---------------
 // Zeilenweise (jeder Eintrag beginnt mit „{ key:'"), weil ein Kommentar im Block den Text
@@ -97,7 +108,9 @@ function kategorienAusDatei(){
 // jeder teureren Karte stünde „übersteigt dein Lager" - die Höhenmessung (5a) misst dann den
 // Hinweistext statt des Rasters. Lagerkomplex 31 kostet 120*1.25^30 = 97k Erz, ist also leistbar.
 // Die Werkstoffe liegen unter ihren Kettendeckeln (200 + 150 je Fabrikstufe).
-const LAGER_STUFE = 30, SOLAR_STUFE = 18;
+// Der Kolonie-Eintrag muss so teuer sein, dass processQueue ihn in den Sekunden bis zur Messung nicht
+// bezahlt (ein Solarkraftwerk Stufe 2 für 14 Erz war nach dem ersten Tick gebaut und weg).
+const LAGER_STUFE = 30, SOLAR_STUFE = 18, KOLONIE_LAGER = 28, KOLONIE_NAME = 'Rheahafen';
 const FORSCHUNG = { rnanotech:1, rquantenphysik:1, rhochenergie:1, rfusionskerne:1, rkitech:1, rmetamaterial:1,
                     rsingularitaet:1, rhohlraum:1, rkausalanker:1, rminentechnik:1 };
 const GEBAEUDE = { solar:SOLAR_STUFE, mine:25, raffinerie:25, synth:10, fusionsreaktor:3,
@@ -131,11 +144,16 @@ const save = (art, extra) => JSON.stringify(Object.assign({ ...ruhigeUhren(), tu
   buildings: Object.assign({}, GEBAEUDE),
   research: Object.assign({}, FORSCHUNG),
   fleet: { jaeger: 100, frachter: 1000, ships: 3, missions: [] },
-  discovered: { rhea: true, aion: true }, colonies: {}, activeBasePlanet: 'home',
+  discovered: { rhea: true, aion: true },
+  colonies: art === 'schlange' ? { rhea: { buildings: { lager: KOLONIE_LAGER } } } : {},
+  colonyNames: art === 'schlange' ? { rhea: KOLONIE_NAME } : {},
+  activeBasePlanet: 'home',
   uiJumpNav: art === 'raster',
-  buildQueue: art === 'schlange' ? [{ planet:'home', key:'lager' }, { planet:'home', key:'lager' }, { planet:'home', key:'solar' }] : [],
+  // Vierter Eintrag auf einer Kolonie MIT eigenem Namen: Der Chip muss planetDisplayName nehmen
+  // (Kolonienamen, Monde), nicht PLANETS.find - das zeigte bei Mond-Schlüsseln „(undefined)".
+  buildQueue: art === 'schlange' ? [{ planet:'home', key:'lager' }, { planet:'home', key:'lager' }, { planet:'home', key:'solar' }, { planet:'rhea', key:'lager' }] : [],
   player: { id: 'u', name: 'A', avatarKey: null }, xp: 9e5, credits: 5e5,
-  buffs: [], lastTick: Date.now(), colonyNames: {}, colonyNotes: {}, modules: {}, shipModules: {} }, extra || {}));
+  buffs: [], lastTick: Date.now(),  colonyNotes: {}, modules: {}, shipModules: {} }, extra || {}));
 
 async function seite(browser, spielstand, opts){
   opts = opts || {};
@@ -182,7 +200,15 @@ const LESEN_BASIS = () => {
     };
   });
   const alleKarten = Array.from(box.querySelectorAll('.card-row'));
-  const knoepfeAusserhalb = alleKarten.filter(k => Array.from(k.querySelectorAll('button.buy')).some(b => !imKasten(b.getBoundingClientRect(), k.getBoundingClientRect()))).map(k => (k.querySelector('.bname') || {}).textContent);
+  // ALLE Knöpfe der Karte (Ausbauen, Warteschlange, Abreißen, Freischalten), nicht nur button.buy.
+  const knoepfeAusserhalb = alleKarten.filter(k => Array.from(k.querySelectorAll('button')).some(b => !imKasten(b.getBoundingClientRect(), k.getBoundingClientRect()))).map(k => (k.querySelector('.bname') || {}).textContent);
+  // Knopfspalte: im Raster eine ZEILE unter dem Text (flex-direction:row, oben nicht über der Unterkante von .left).
+  const mitKnopfspalte = alleKarten.filter(k => { const l = k.lastElementChild; return l && l.tagName === 'DIV' && !l.classList.contains('left') && l.querySelector('button'); });
+  const knopfspalteFalsch = mitKnopfspalte.filter(k => { const l = k.lastElementChild, left = k.querySelector(':scope > .left'); if (!left) return false;
+    return getComputedStyle(l).flexDirection !== 'row' || l.getBoundingClientRect().top < left.getBoundingClientRect().bottom - 1; }).map(k => (k.querySelector('.bname') || {}).textContent);
+  // Textüberlauf: Inhalt darf die Karte nicht verlassen (Grid-Spuren halten die Karte, nicht ihren Inhalt).
+  const textUeberlauf = alleKarten.filter(k => { const r = k.getBoundingClientRect(); if (k.scrollWidth > k.clientWidth + 1) return true;
+    return Array.from(k.querySelectorAll('.bname, .bcost')).some(e => e.getBoundingClientRect().right > r.right + 1); }).map(k => (k.querySelector('.bname') || {}).textContent);
   const unfertigKarten = alleKarten.filter(k => k.querySelector('.bname') && !k.querySelector('.badge-done'));
   const unfertig = unfertigKarten.map(k => k.getBoundingClientRect().height).sort((a, b) => a - b);
   const unfertigBeleg = unfertigKarten.map(k => ({ n: ((k.querySelector('.bname') || {}).textContent || '').replace(/\s+/g, ' ').trim().slice(0, 22), h: Math.round(k.getBoundingClientRect().height), bcost: k.querySelector('.bcost') ? Math.round(k.querySelector('.bcost').getBoundingClientRect().height) : null }));
@@ -203,7 +229,7 @@ const LESEN_BASIS = () => {
     bauKartenVertrag: mitBauKnopf.filter(k => k.querySelector('details.karten-info') && k.querySelector('.bcost') && !k.querySelector('details .bcost') && k.querySelector('button.buy') && !k.querySelector('details button.buy')).length,
     fertigKarten: fertigKarten.length,
     fertigKartenVertrag: fertigKarten.filter(k => k.querySelector('details.karten-info') && !k.querySelector('.bcost')).length,
-    knoepfeAusserhalb,
+    knoepfeAusserhalb, knopfspalteFalsch, mitKnopfspalte: mitKnopfspalte.length, textUeberlauf,
     unfertigMedian: unfertig.length ? unfertig[Math.floor(unfertig.length / 2)] : null, unfertigAnzahl: unfertig.length, unfertigBeleg,
     qcfHoehe: qcfKarte ? Math.round(qcfKarte.getBoundingClientRect().height) : null, qcfFertig: !!qcfKarte && !!qcfKarte.querySelector('.badge-done'),
     chipAnzahl: chips.length, chipIdx, chipText: chips.length ? chips[0].textContent.replace(/\s+/g, ' ').trim() : '',
@@ -249,6 +275,7 @@ const LESEN_SCHLANGE = () => {
     titel: ((box.querySelector('.section-title') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
     text: box.textContent.replace(/\s+/g, ' ').trim(),
     streifenDa: !!streifen, streifenHoehe: streifen ? Math.round(streifen.getBoundingClientRect().height) : 0,
+    streifenFremd: streifen ? streifen.querySelectorAll('.card-row, .bname').length : 0,
     chips: chips.map(c => ({
       name: ((c.querySelector('.bauschlange-name') || {}).textContent || '').trim(),
       ziel: (() => { const m = /→ Lv\. (\d+)/.exec(((c.querySelector('.bauschlange-ziel') || {}).textContent || '')); return m ? Number(m[1]) : null; }),
@@ -297,7 +324,7 @@ const LESEN_SCHLANGE = () => {
     merke('2a: kein Gruppenkopf ist .section-title oder .card-row oder enthält .bname; alle liegen in #buildings',
       g.length === 3 && g.every(x => x.kopfDa && !x.kopfSectionTitle && !x.kopfCardRow && !x.kopfBname && x.kopfInBuildings),
       g.map(x => ({ kopf: x.kopfDa, st: x.kopfSectionTitle, cr: x.kopfCardRow, bn: x.kopfBname, in: x.kopfInBuildings })));
-    merke('2b: die Sprungleiste #jumpnav-basis ist an, hat Einträge und nennt keinen der drei Gruppentitel',
+    merke('2b: die Sprungleiste #jumpnav-basis ist an und hat Einträge (Gruppenköpfe liegen in #buildings, nicht als Panel-Überschrift - den Schutz trägt 2a)',
       z0.jumpAn && z0.jumpEintraege.length > 0 && !z0.jumpEintraege.some(t => /^(Produktion|Veredelung|Nutzgebäude)$/.test(t)),
       { an: z0.jumpAn, eintraege: z0.jumpEintraege });
 
@@ -308,11 +335,13 @@ const LESEN_SCHLANGE = () => {
       { bau: z0.bauKarten, bauOk: z0.bauKartenVertrag, fertig: z0.fertigKarten, fertigOk: z0.fertigKartenVertrag, offen: z0.detailsOffen });
 
     // ---- 3/4/5) 1400x1000
-    merke('3a: bei 1400 px ist jedes Basis-Raster ein Grid mit 3 Spalten',
-      g.length === 3 && g.every(x => x.rasterDisplay === 'grid' && x.spalten === 3), g.map(x => ({ d: x.rasterDisplay, s: x.spalten })));
-    merke('4a: bei 1400 px liegt jede Karte ganz in ihrem Raster und jeder button.buy in seiner Karte',
-      g.length === 3 && g.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z0.knoepfeAusserhalb.length === 0,
-      { ausserhalb: g.map(x => x.kartenAusserhalb), knoepfe: z0.knoepfeAusserhalb });
+    merke('3a: bei 1400 px (Spielspalte 930 px) ist jedes Basis-Raster ein Grid mit 2 Spalten',
+      g.length === 3 && g.every(x => x.rasterDisplay === 'grid' && x.spalten === 2), g.map(x => ({ d: x.rasterDisplay, s: x.spalten })));
+    merke('4a: bei 1400 px liegt jede Karte ganz in ihrem Raster, jeder Knopf in seiner Karte, kein Text läuft über die Kante',
+      g.length === 3 && g.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z0.knoepfeAusserhalb.length === 0 && z0.textUeberlauf.length === 0,
+      { ausserhalb: g.map(x => x.kartenAusserhalb), knoepfe: z0.knoepfeAusserhalb, ueberlauf: z0.textUeberlauf });
+    merke('4d: bei 1400 px ist die Knopfspalte jeder Karte eine Zeile UNTER dem Text (flex-direction row, nicht rechts daneben)',
+      z0.mitKnopfspalte >= 5 && z0.knopfspalteFalsch.length === 0, { karten: z0.mitKnopfspalte, falsch: z0.knopfspalteFalsch });
     merke('5a: bei 1400 px liegt die Median-Höhe der unfertigen Basis-Karten unter 170 px',
       z0.unfertigAnzahl > 0 && z0.unfertigMedian !== null && z0.unfertigMedian < 170, { median: z0.unfertigMedian, anzahl: z0.unfertigAnzahl, karten: z0.unfertigBeleg });
     merke('5b: die fertige Quantenchipfabrik ist unter 120 px hoch (nicht auf Nachbarhöhe gestreckt)',
@@ -324,6 +353,19 @@ const LESEN_SCHLANGE = () => {
       imFenster = ((await page.evaluate(LESEN_BASIS)) || {}).kartenGanzImFenster;
     } catch (e) { console.log('   (Scroll fehlgeschlagen: ' + e.message + ')'); }
     merke('5c: nach dem Scroll zur ersten Gruppe stehen mindestens 9 Karten ganz im 1000-px-Fenster', imFenster >= 9, { imFenster });
+
+    // ---- 3f/4f/5e) 1600x1000: erst hier drei Spalten (Spielspalte 1130 px, Textspalte ~270 px)
+    await page.setViewportSize({ width: 1600, height: 1000 }); await page.waitForTimeout(600);
+    const z16 = (await page.evaluate(LESEN_BASIS)) || { gruppen: [], knoepfeAusserhalb: [], textUeberlauf: [], knopfspalteFalsch: [] };
+    merke('3f: bei 1600 px ist jedes Basis-Raster ein Grid mit 3 Spalten',
+      z16.gruppen.length === 3 && z16.gruppen.every(x => x.rasterDisplay === 'grid' && x.spalten === 3), z16.gruppen.map(x => x.spalten));
+    merke('4f: bei 1600 px liegt jede Karte ganz in ihrem Raster, jeder Knopf in seiner Karte, kein Text läuft über, Knopfspalte unter dem Text',
+      z16.gruppen.length === 3 && z16.gruppen.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0)
+      && z16.knoepfeAusserhalb.length === 0 && z16.textUeberlauf.length === 0 && z16.knopfspalteFalsch.length === 0,
+      { ausserhalb: z16.gruppen.map(x => x.kartenAusserhalb), knoepfe: z16.knoepfeAusserhalb, ueberlauf: z16.textUeberlauf, knopfspalte: z16.knopfspalteFalsch });
+    merke('5e: bei 1600 px (3 Spalten) liegt die Median-Höhe der unfertigen Basis-Karten unter 170 px',
+      z16.unfertigAnzahl > 0 && z16.unfertigMedian !== null && z16.unfertigMedian < 170, { median: z16.unfertigMedian, anzahl: z16.unfertigAnzahl, karten: z16.unfertigBeleg });
+    await page.setViewportSize({ width: 1400, height: 1000 }); await page.waitForTimeout(600);
 
     // ---- 6) Filter AN
     const zaehlerVorher = g.map(x => x.zaehlerText);
@@ -357,19 +399,19 @@ const LESEN_SCHLANGE = () => {
       z1.gruppen.length === 3 && z1.gruppen.every(x => x.rasterDisplay === 'grid' && x.spalten === 2), z1.gruppen.map(x => x.spalten));
     merke('5d: bei 1000 px (2 Spalten) liegt die Median-Höhe der unfertigen Basis-Karten unter 170 px',
       z1.unfertigAnzahl > 0 && z1.unfertigMedian !== null && z1.unfertigMedian < 170, { median: z1.unfertigMedian, anzahl: z1.unfertigAnzahl });
-    merke('4b: bei 1000 px liegt jede Karte ganz in ihrem Raster und jeder button.buy in seiner Karte',
-      z1.gruppen.length === 3 && z1.gruppen.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z1.knoepfeAusserhalb.length === 0,
-      { ausserhalb: z1.gruppen.map(x => x.kartenAusserhalb), knoepfe: z1.knoepfeAusserhalb });
+    merke('4b: bei 1000 px liegt jede Karte ganz in ihrem Raster, jeder Knopf in seiner Karte, kein Text läuft über',
+      z1.gruppen.length === 3 && z1.gruppen.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z1.knoepfeAusserhalb.length === 0 && z1.textUeberlauf.length === 0,
+      { ausserhalb: z1.gruppen.map(x => x.kartenAusserhalb), knoepfe: z1.knoepfeAusserhalb, ueberlauf: z1.textUeberlauf });
 
     // ---- 3c/4c) 390x844 (Handy)
     await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(600);
     const z2 = (await page.evaluate(LESEN_BASIS)) || { gruppen: [], knoepfeAusserhalb: [] };
     merke('3c: bei 390 px hat jedes Basis-Raster 1 Spalte',
       z2.gruppen.length === 3 && z2.gruppen.every(x => x.rasterDisplay === 'grid' && x.spalten === 1), z2.gruppen.map(x => x.spalten));
-    merke('4c: bei 390 px liegt jede Karte ganz in ihrem Raster, jeder button.buy in seiner Karte, keine Querscroll-Breite',
-      z2.gruppen.length === 3 && z2.gruppen.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z2.knoepfeAusserhalb.length === 0
+    merke('4c: bei 390 px liegt jede Karte ganz in ihrem Raster, jeder Knopf in seiner Karte, kein Text läuft über, keine Querscroll-Breite',
+      z2.gruppen.length === 3 && z2.gruppen.every(x => x.karten > 0 && x.kartenOhneHoehe === 0 && x.kartenAusserhalb.length === 0) && z2.knoepfeAusserhalb.length === 0 && z2.textUeberlauf.length === 0
       && z2.scrollWidth > 0 && z2.scrollWidth <= z2.innerWidth,
-      { ausserhalb: z2.gruppen.map(x => x.kartenAusserhalb), knoepfe: z2.knoepfeAusserhalb, scroll: z2.scrollWidth, innen: z2.innerWidth });
+      { ausserhalb: z2.gruppen.map(x => x.kartenAusserhalb), knoepfe: z2.knoepfeAusserhalb, ueberlauf: z2.textUeberlauf, scroll: z2.scrollWidth, innen: z2.innerWidth });
 
     // ---- 3d/3e/9) Verteidigung: erst am Handy (1 Spalte), dann 1000 und 1400 px (2 Spalten)
     await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="verteidigung"]'); if (b) b.click(); });
@@ -398,16 +440,17 @@ const LESEN_SCHLANGE = () => {
   {
     const { ctx, page, errs } = await seite(browser, save('schlange'));
     const s0 = (await page.evaluate(LESEN_SCHLANGE)) || { chips: [], titel: '', text: '' };
-    merke('V3: Vorbedingung - #buildQueueBox ist da und die drei Einträge liegen noch in der Schlange (processQueue hat sie nicht bezahlt)',
-      s0.streifenDa !== undefined && /Bau-Warteschlange \(3\//.test(s0.titel), { titel: s0.titel });
-    merke('8a: die Kopfzeile passt auf /Bau-Warteschlange \\(3\\/\\d+\\)/', /Bau-Warteschlange \(3\/\d+\)/.test(s0.titel), { titel: s0.titel });
-    merke('8b: genau 3 .bauschlange-chip, kein „– frei –"-Platzhalter, kein Chip ist .card-row oder trägt .bname',
-      s0.chips.length === 3 && !/– frei –/.test(s0.text) && s0.chips.every(c => !c.cardRow && !c.bname), { chips: s0.chips.length, frei: /– frei –/.test(s0.text) });
-    merke('8c: Zielstufen: Lagerkomplex Lv. ' + (LAGER_STUFE + 1) + ' und Lv. ' + (LAGER_STUFE + 2) + ' (zweimal derselbe Schlüssel), Solarkraftwerk Lv. ' + (SOLAR_STUFE + 1),
-      s0.chips.length === 3 && s0.chips[0].name === 'Lagerkomplex' && s0.chips[0].ziel === LAGER_STUFE + 1
+    merke('V3: Vorbedingung - #buildQueueBox ist da und die vier Einträge liegen noch in der Schlange (processQueue hat sie nicht bezahlt)',
+      s0.streifenDa !== undefined && /Bau-Warteschlange \(4\//.test(s0.titel), { titel: s0.titel });
+    merke('8a: die Kopfzeile passt auf /Bau-Warteschlange \\(4\\/\\d+\\)/', /Bau-Warteschlange \(4\/\d+\)/.test(s0.titel), { titel: s0.titel });
+    merke('8b: genau 4 .bauschlange-chip, kein .card-row/.bname im Streifen',
+      s0.chips.length === 4 && s0.streifenFremd === 0 && s0.chips.every(c => !c.cardRow && !c.bname), { chips: s0.chips.length, fremd: s0.streifenFremd });
+    merke('8c: Zielstufen: Lagerkomplex Lv. ' + (LAGER_STUFE + 1) + ' und Lv. ' + (LAGER_STUFE + 2) + ' (zweimal derselbe Schlüssel), Solarkraftwerk Lv. ' + (SOLAR_STUFE + 1) + ', Kolonie-Eintrag mit eigenem Namen „(' + KOLONIE_NAME + ')" und Lv. ' + (KOLONIE_LAGER + 1),
+      s0.chips.length === 4 && s0.chips[0].name === 'Lagerkomplex' && s0.chips[0].ziel === LAGER_STUFE + 1
       && s0.chips[1].name === 'Lagerkomplex' && s0.chips[1].ziel === LAGER_STUFE + 2
-      && s0.chips[2].name === 'Solarkraftwerk' && s0.chips[2].ziel === SOLAR_STUFE + 1, s0.chips);
-    merke('8d: [data-buildqueue-remove] ist indexbasiert 0,1,2 in Array-Reihenfolge', s0.chips.map(c => c.remove).join(',') === '0,1,2', s0.chips.map(c => c.remove));
+      && s0.chips[2].name === 'Solarkraftwerk' && s0.chips[2].ziel === SOLAR_STUFE + 1
+      && s0.chips[3].name === 'Lagerkomplex (' + KOLONIE_NAME + ')' && s0.chips[3].ziel === KOLONIE_LAGER + 1 && !/undefined/.test(s0.text), s0.chips);
+    merke('8d: [data-buildqueue-remove] ist indexbasiert 0,1,2,3 in Array-Reihenfolge', s0.chips.map(c => c.remove).join(',') === '0,1,2,3', s0.chips.map(c => c.remove));
     merke('8f: „Geschätzte Gesamtkosten" steht bei gefüllter Schlange in der Box', /Geschätzte Gesamtkosten/.test(s0.text), { text: s0.text.slice(0, 120) });
 
     let s1 = { chips: [] };
@@ -416,21 +459,23 @@ const LESEN_SCHLANGE = () => {
       await page.waitForTimeout(800);
       s1 = (await page.evaluate(LESEN_SCHLANGE)) || { chips: [] };
     } catch (e) { console.log('   (Entfernen-Klick fehlgeschlagen: ' + e.message + ')'); }
-    merke('8e: Klick auf Index 1 entfernt genau den zweiten Eintrag - 2 Chips, Lagerkomplex Lv. ' + (LAGER_STUFE + 1) + ' und Solarkraftwerk bleiben',
-      s1.chips.length === 2 && s1.chips[0].name === 'Lagerkomplex' && s1.chips[0].ziel === LAGER_STUFE + 1
-      && s1.chips[1].name === 'Solarkraftwerk' && s1.chips[1].ziel === SOLAR_STUFE + 1 && s1.chips.map(c => c.remove).join(',') === '0,1', s1.chips);
+    merke('8e: Klick auf Index 1 entfernt genau den zweiten Eintrag - 3 Chips, Lagerkomplex Lv. ' + (LAGER_STUFE + 1) + ', Solarkraftwerk und der Kolonie-Eintrag bleiben',
+      s1.chips.length === 3 && s1.chips[0].name === 'Lagerkomplex' && s1.chips[0].ziel === LAGER_STUFE + 1
+      && s1.chips[1].name === 'Solarkraftwerk' && s1.chips[1].ziel === SOLAR_STUFE + 1
+      && s1.chips[2].name === 'Lagerkomplex (' + KOLONIE_NAME + ')' && s1.chips[2].ziel === KOLONIE_LAGER + 1 && s1.chips.map(c => c.remove).join(',') === '0,1,2', s1.chips);
 
     let s2 = { chips: [] };
     try {
-      for (let i = 0; i < 2; i++){
+      for (let i = 0; i < 3; i++){
         await page.evaluate(() => { const b = document.querySelector('#buildQueueBox [data-buildqueue-remove="0"]'); if (b) b.click(); });
         await page.waitForTimeout(600);
       }
       s2 = (await page.evaluate(LESEN_SCHLANGE)) || { chips: [] };
     } catch (e) { console.log('   (Leeren fehlgeschlagen: ' + e.message + ')'); }
-    merke('8g: leere Schlange - 0 Chips, Kopfzeile 0/N, Hinweis „Noch leer", der Streifen bleibt mindestens 36 px hoch',
-      s2.chips.length === 0 && /Bau-Warteschlange \(0\/\d+\)/.test(s2.titel || '') && /Noch leer/.test(s2.text || '') && s2.streifenDa && s2.streifenHoehe >= 36,
-      { chips: s2.chips.length, titel: s2.titel, streifen: s2.streifenHoehe });
+    merke('8g: leere Schlange - 0 Chips, Kopfzeile 0/N, Hinweis „Noch leer", kein „– frei –"-Platzhalter und keine .card-row im Streifen, der Streifen bleibt mindestens 36 px hoch',
+      s2.chips.length === 0 && /Bau-Warteschlange \(0\/\d+\)/.test(s2.titel || '') && /Noch leer/.test(s2.text || '') && !/– frei –/.test(s2.text || '')
+      && s2.streifenDa && s2.streifenFremd === 0 && s2.streifenHoehe >= 36,
+      { chips: s2.chips.length, titel: s2.titel, frei: /– frei –/.test(s2.text || ''), fremd: s2.streifenFremd, streifen: s2.streifenHoehe });
 
     merke('J2: keine JS-Fehler (Warteschlange)', errs.length === 0, errs.slice(0, 3));
     await ctx.close();
