@@ -174,16 +174,24 @@ Der Eintrag ist `https://browsermmorpg.com/game-kolonie-kepler-7--1799` (Nummer 
 21.08.2026, zwei Stimmen, 20 positiv) und steht auf **„Delisted"**. Das Konto nennt genau einen Grund:
 „Banner image was not uploaded". Daneben offen: „Verify ownership" und das Abstimmungs-Widget.
 
-- **Banner ist die Sperre.** Die Seite nennt keine Maße; gemessen an der Auslieferung einer gelisteten
-  Spielseite: Banner `w=864,h=384,fit=cover` (das og:image jeder Spielseite), Startseiten-Kachel
-  („Small index image") `w=240,h=100,fit=cover`, Galerie („Main image"/Screenshots) `800×600
-  fit=contain` mit Daumennägeln `120×90 fit=crop`. `fit=cover` schneidet abweichende Verhältnisse zu.
-  Beide Bilder kommen aus derselben Kulisse wie die itch.io-Bilder:
-  `node itch-wrapper/theme-bauen.js bmmo-banner` → `presse-bilder/browsermmorpg-banner.jpg` (1728×768)
-  und `… bmmo-index` → `presse-bilder/browsermmorpg-kachel.png` (720×300). Screenshots wie gehabt über
-  `node marketing-screenshots.js` (16:9, werden in die 4:3-Galerie eingepasst).
-- **„Verify ownership" läuft über die bei der Registrierung angegebene E-Mail** („Must be reachable —
-  we verify ownership through it"). Gemessen am 11.09.2026: `gamegeeeeek.de` kann derzeit keine Mail
+- **Vier Bilder fehlen, das Banner ist die Sperre.** Die Checkliste im Konto („Listing approved:
+  Missing – pending staff review, usually within 24–48h. **Verification unlocks once approved**")
+  verlangt: „Small index image (mini) – tiny **square**", „Main image (preview)", „Banner image –
+  wide", „Screenshots – at least one". Die Seite nennt keine Maße; gemessen an der Auslieferung:
+  Banner `w=864,h=384,fit=cover` (das og:image jeder Spielseite; in den Listen dieselbe Datei als
+  `w=240,h=100,fit=cover`, Klasse `bmm-card-banner`), Hauptbild `800×600 fit=contain` (passt ein,
+  schneidet nicht), Screenshot-Daumennägel `120×90 fit=crop`. `fit=cover` schneidet abweichende
+  Verhältnisse zu, deshalb exakt 9:4 bzw. 4:3.
+
+  | Feld | Datei |
+  |---|---|
+  | Banner image | `node itch-wrapper/theme-bauen.js bmmo-banner` → `presse-bilder/browsermmorpg-banner.jpg` (1728×768) |
+  | Main image (preview) | `… bmmo-main` → `presse-bilder/browsermmorpg-hauptbild.jpg` (1600×1200) |
+  | Small index image (mini) | `icon-512.png` – das PWA-Icon, quadratisch, liegt im Repo und live |
+  | Screenshots | `node marketing-screenshots.js` → `presse-bilder/kepler7-*.png` (16:9, 3200×1800) |
+- **„Verify ownership" wird erst nach der Freigabe freigeschaltet** (Checkliste: „Verification unlocks
+  once approved") und läuft über die bei der Registrierung angegebene E-Mail („Must be reachable — we
+  verify ownership through it"). Gemessen am 11.09.2026: `gamegeeeeek.de` kann derzeit keine Mail
   **empfangen** – bei Resend ist die Domain nur fürs Senden eingerichtet („Receiving: disabled"), und
   der MX-Eintrag zeigt auf `mail.gamegeeeeek.de` = dieselbe Adresse wie der Pi. Ohne Postfach kommt
   die Bestätigungsmail nirgends an. Zwei Wege: Empfang bei Resend einschalten (Domain → Receiving,

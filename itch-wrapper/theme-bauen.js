@@ -35,10 +35,13 @@ const BILDER = [
   { name: 'embed',       vorlage: 'theme-embed.html',      datei: 'itch-embed-bg.jpg',    b: 960,  h: 600,  typ: 'jpeg', qualitaet: 90, zweck: 'Embed-BG (nur bei "Click to play")' },
   // browsermmorpg.com (11.09.2026) - dieselbe Kulisse, damit das Spiel in jedem Verzeichnis gleich
   // aussieht. Die Masse sind an der AUSLIEFERUNG der Seite gemessen, nicht am Formular (das nennt
-  // keine): Banner "w=864,h=384,fit=cover" (og:image jeder Spielseite), Startseiten-Kachel
-  // "w=240,h=100,fit=cover". fit=cover schneidet abweichende Verhaeltnisse zu, deshalb exakt.
-  { name: 'bmmo-banner', vorlage: 'bmmo-banner.html',      datei: 'browsermmorpg-banner.jpg', b: 864, h: 384, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Banner (9:4)' },
-  { name: 'bmmo-index',  vorlage: 'bmmo-index.html',       datei: 'browsermmorpg-kachel.png', b: 240, h: 100, skala: 3, zweck: 'browsermmorpg.com Startseiten-Kachel (12:5)' }
+  // keine): Banner "w=864,h=384,fit=cover" (og:image jeder Spielseite; in den Listen zeigt es
+  // dieselbe Datei als "w=240,h=100,fit=cover", Klasse bmm-card-banner), Hauptbild der Spielseite
+  // "w=800,h=600,fit=contain" (passt ein statt zu schneiden - ein 16:9-Screenshot bekaeme Balken).
+  // Das dritte Bild dort, das "Small index image", ist ein QUADRAT - dafuer ist icon-512.png (das
+  // PWA-Icon) die richtige Datei, keine neue Vorlage.
+  { name: 'bmmo-banner', vorlage: 'bmmo-banner.html',      datei: 'browsermmorpg-banner.jpg',   b: 864, h: 384, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Banner (9:4)' },
+  { name: 'bmmo-main',   vorlage: 'bmmo-main.html',        datei: 'browsermmorpg-hauptbild.jpg', b: 800, h: 600, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Hauptbild (4:3)' }
 ];
 
 // Nahtlosigkeit MESSEN statt behaupten. Ein gekacheltes Bild zeigt genau dann eine Kante,
