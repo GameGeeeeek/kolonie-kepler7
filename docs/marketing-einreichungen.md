@@ -222,6 +222,12 @@ Der Eintrag ist `https://browsermmorpg.com/game-kolonie-kepler-7--1799` (Nummer 
   Verzeichnis an die Vote-Adresse anhängt (`STIMME_LINK_PARAM` im Spiel, Vorgabe `username`). Ein
   Skript, das selbst abstimmt, gibt es bewusst nicht – Captcha, Takt und die eigene Regel „keine
   künstlichen Metriken" schließen es aus.
+- **Patchnotes als RSS-Feed (11.09.2026, Auftrag Sascha):** `https://www.gamegeeeeek.de/patchnotes.xml` –
+  ein Erzeugnis von `build-patchnotes.js`, dieselbe Quelle wie die Patchnotes-Seite, die 20 neuesten
+  Versionen mit Anker je Version. Für browsermmorpg.com („Submit articles → Add General News") und jeden
+  Feedreader; ob das Verzeichnis einen Feed selbst abholt, steht nicht auf der Verwaltungsseite – dort
+  werden Artikel von Hand angelegt, der Feed liefert dafür den fertigen Text. Wächter:
+  `tests/test_patchnotes_feed.js` (baut den Feed an einer Kopie nach und vergleicht Byte für Byte).
 - **Nebenbefund, gemessen an der Produktion:** `https://www.gamegeeeeek.de/seiten.css` lieferte die
   Spieldatei (6,9 MB, Catch-all von nginx) – die Datei war nie live, weil der Deploy-Webhook `*.html` und
   `*.png` kopiert, aber keine `.css`. Alle vier Themenseiten und `patchnotes.html` liefen damit ohne
