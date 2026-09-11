@@ -1526,3 +1526,44 @@ steht, fällt `10a` an der neuen Vorlage. Das ist die Prüfung, die die Reihenfo
 sie zu erinnern.
 
 Wächter: `tests/test_vorposten_platz_ui.js` (21 Prüfungen, sechs Browser-Durchläufe).
+
+## Etappe V6 im Spiel: Die Endprojekte werden sichtbar (11.09.2026)
+
+Das Backend legt `VP_ENDPROJEKTE_AKTIV` am selben Tag um. Die Frontend-Hälfte stand zum größeren
+Teil schon seit dem 07.09.2026 — Projektfenster mit Grund je Endprojekt, das Sternendock am Griff
+des Lagers samt Buchung der Kreuzer in die Flotte (auch über den Transportverband), die Dock-Zeile
+an der Station. Nachgemessen nach dem Skill `anzeigestellen` fehlten **vier** Stellen:
+
+- **Die Angriffsvorschau** nannte für jede Station „6–45 % Verluste" — auch gegen einen
+  Sperrfeuerleitstand, der den Grundverlust um acht Punkte hebt. Sie liest jetzt
+  `projektBoni.verlust` (kommt fertig vom Server, zweig- und schaltergeprüft) und nennt den
+  Leitstand mit Aufschlag und verschobener Spanne (`data-vp-sperrfeuer`). Die Spanne selbst steht
+  als `VORPOSTEN_VERLUST_GRUND`/`VORPOSTEN_VERLUST_MAX` benannt im Spiel — eine Kopie-Familie mit
+  `VORPOSTEN_VERLUST` und dem Deckel in `vorpostenSchlagAusfuehren`, seither gewacht (1d).
+- **Die Stationstafel** nannte fertige Endprojekte nur beim Namen. Jetzt steht die Wirkung dabei,
+  für jeden Betrachter wie bei den Sets — und ob sie überhaupt eintritt: Gelesen wird
+  `projektBoni`, nicht die Definition, denn ein Sternendock an einer zum Festungsring umgerüsteten
+  Station steht in `projekte`, wirkt aber nicht („ruht – wirkt nur als Werft"). Welche drei
+  Schlüssel ein Endprojekt ausmachen, weiß `vpProjektWirkungText` schon; `vpEndprojektZeilen`
+  liest dieselbe Liste (`VP_ENDPROJEKT_KANAELE`, Parität 1b).
+- **Die Dominanz.** `dominiert` reiste seit V6 zu jedem Client und wurde von keinem gelesen. Jetzt
+  Stationstafel (`data-vp-dominiert`), Kartenzeichen-Tooltip und der Chip in der rechten Leiste —
+  dort auch in der Signatur, sonst friert er ein (die Falle aus #50/#51). Gerechnet wird nichts
+  nach: kein `stufe >= maxStufe` im Spiel, die Regel gehört dem Server.
+- **Die Börsen-Kopfzeile** sagte „+5 Angebotsplätze", ohne den Sternenmarkt zu nennen. Die
+  Platzzahl bleibt die des Servers (markt_ui 0d); dazu kommt die Herkunft aus
+  `projektBoni.marktPlaetze` der eigenen Stationen, gedeckelt auf die Zahl davor.
+- Dazu der **Hilfetext**: die drei Endprojekte mit Ausrichtung, Takt, Stapel, Plätzen, Punkten
+  und Dauer — alle Zahlen gegen die Server-Defs gehalten (1f/1g), damit ein geänderter Takt nicht
+  still im Hilfetext stehen bleibt.
+
+Wächter: `tests/test_vorposten_endprojekte.js` (27 Prüfungen, ein Seitenaufruf mit fünf Stationen
+in fünf Systemen). Gegenprobe gegen v8.715.0 gemessen: 15 fallen, 11 bleiben mit Absicht grün
+(Messvorrichtung, reine Serverprüfungen und Verhalten, das sich nicht ändern darf) — die Liste
+steht am Fuß der Datei.
+
+**Ein alter Client** sieht mit dem umgelegten Backend nichts Falsches: Das Fenster zeigt die
+Endprojekte mit Grund und Wirkung, der Lager-Reward mit `schiffe` wird gebucht, `dominiert` und
+`projektBoni` ignoriert er still. Einzige Lücke bis zum Frontend-Merge: Seine Vorschau nennt gegen
+einen Leitstand weiter „6–45 %" — um acht Punkte zu niedrig, kein Bruch, und der Bericht danach
+zeigt die echten Verluste.
