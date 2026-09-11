@@ -61,8 +61,9 @@ const SAB = process.env.KEPLER_GEBAEUDERASTER_GEGENPROBE || '';
 //   sabotageG  Regel „Knopfspalte als Zeile unter dem Text" entfernt                 -> 4d, 4f und die Median-Höhen
 //   sabotageJ  Standortname wieder per PLANETS.find statt planetDisplayName          -> 8c, 8e
 //   sabotageK  „– frei –"-Platzhalterkarte bei leerer Schlange wieder eingebaut     -> 8g
+//   sabotageL  Vorbelegung aus laufenden Bauaufträgen entfernt                      -> 8h
 const MUSS_FALLEN = {
-  alt:       ['1a','1b','1c','1d','2a','3a','4a','4d','5c','3f','4f','6a','6b','6c','3b','4b','3c','4c','3d','3e','9a','8b','8c','8d','8e','8g'],
+  alt:       ['1a','1b','1c','1d','2a','3a','4a','4d','5c','3f','4f','6a','6b','6c','3b','4b','3c','4c','3d','3e','9a','8b','8c','8d','8e','8g','8h'],
   sabotageA: ['1a'],
   sabotageB: ['1d','6b'],
   sabotageC: ['1c','3a','4a','4d','3f','4f','6c','3b','4b','3c','4c'],
@@ -70,7 +71,8 @@ const MUSS_FALLEN = {
   sabotageE: ['3d','3e','9a'],
   sabotageG: ['4d','4f','5e','5d'],
   sabotageJ: ['8c','8e'],
-  sabotageK: ['8g']
+  sabotageK: ['8g'],
+  sabotageL: ['8h']
 };
 // Prüfungen, die am NEUEN Stand rot sind (offener Befund an der Umsetzung, siehe Kopfkommentar). Der
 // normale Lauf bleibt damit rot; nur die Gegenproben lassen sie außen vor, weil ihr Fall nichts über
@@ -477,6 +479,16 @@ const LESEN_SCHLANGE = () => {
       && s2.streifenDa && s2.streifenFremd === 0 && s2.streifenHoehe >= 36,
       { chips: s2.chips.length, titel: s2.titel, frei: /– frei –/.test(s2.text || ''), fremd: s2.streifenFremd, streifen: s2.streifenHoehe });
 
+    // 8h) Laufende Bauaufträge zählen in der Zielstufen-Rechnung mit. Verteidigungs-Einträge liegen nur
+    // einen Tick in der Wunschliste (processQueue schiebt sie in die Bauwarteschlange), ein Browserlauf
+    // misst das nicht verlässlich - deshalb am Quelltext: der Block vor der bq-Schleife belegt levelSim
+    // aus state.constructionQueue mit kind === 'building' und j.qty.
+    const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+    const qA = quelle.indexOf("const bq = state.buildQueue || [];"), qB = quelle.indexOf("const zielStufen = [];", qA);
+    const vorlauf = (qA >= 0 && qB > qA) ? quelle.slice(qA, qB) : '';
+    merke('8h: die Zielstufen-Rechnung belegt levelSim aus laufenden Bauaufträgen vor (constructionQueue, kind building, qty)',
+      /state\.constructionQueue/.test(vorlauf) && /kind !== 'building'/.test(vorlauf) && /levelSim\[jk\] = basis \+ \(j\.qty\|\|1\)/.test(vorlauf),
+      { anker: qA >= 0 && qB > qA, laenge: vorlauf.length });
     merke('J2: keine JS-Fehler (Warteschlange)', errs.length === 0, errs.slice(0, 3));
     await ctx.close();
   }

@@ -72402,6 +72402,17 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // Lv. n+1 und Lv. n+2, nicht zweimal dieselbe Stufe.
       const bq = state.buildQueue || [];
       const levelSim = {};
+      /* Laufende Bauauftraege (Verteidigungsanlagen wandern aus der Wunschliste in die echte
+         Bauwarteschlange) zaehlen fuer Zielstufe und Kosten mit: Steht eine Anlage schon im Bau und
+         liegt dieselbe noch einmal in der Wunschliste, ist deren Zielstufe eins hoeher als die des
+         laufenden Auftrags - genau wie die Forschungs-Warteschlange activeResearch.targetLevel
+         vorrechnet (Codex-Review am PR #626, 11.09.2026). */
+      for (const j of (state.constructionQueue || [])){
+        if (j.kind !== 'building') continue;
+        const jk = j.planet+':'+j.key;
+        const basis = levelSim[jk] !== undefined ? levelSim[jk] : (buildingSetFor(j.planet)[j.key]||0);
+        levelSim[jk] = basis + (j.qty||1);
+      }
       const totalQCost = {};
       const zielStufen = [];
       for (const q of bq){
