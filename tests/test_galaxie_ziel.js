@@ -157,7 +157,7 @@ const zuGalaxie = async t => {
 };
 const ZIEL = (extra) => Object.assign({ woche:'2026-09-07', art:'nestschlaege', name:'Schläge gegen Alien-Nester',
   beschreibung:'Jeder gewertete Angriff auf ein Alien-Nest zählt – egal, ob das Nest dabei fällt.', icon:'ti-alien',
-  ziel:12, stand:7, erreicht:false, ende: Date.now() + 2*86400000 + 3600000, meinBeitrag:2, beitragende:3, tagesDeckel:10 }, extra || {});
+  ziel:12, stand:7, erreicht:false, ende: Date.now() + 2*86400000 + 3600000, meinBeitrag:2, kommandanten:3, tagesDeckel:10 }, extra || {});
 const NEWS = [{ id:'n1', time: Date.now() - 60000, icon:'ti-truck', text:'Marktlage normalisiert.' }];
 
 (async () => {

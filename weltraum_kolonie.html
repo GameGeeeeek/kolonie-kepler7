@@ -12637,8 +12637,8 @@
      Ziel systematisch zum schlechter zahlenden, ein Wegweiser dorthin waere ein schlechter Rat. */
   function pveBeitragZeile(ziel){
     const d = festungBeitragDaten(ziel);
-    if (!d.beitragende) return '';
-    const wer = d.beitragende === 1 ? 'Ein Kommandant hat' : d.beitragende + ' Kommandanten haben';
+    if (!d.kommandanten) return '';
+    const wer = d.kommandanten === 1 ? 'Ein Kommandant hat' : d.kommandanten + ' Kommandanten haben';
     const meins = d.meinSchaden > 0
       ? ' Dein Anteil bisher: ' + fmt(Math.round(d.meinSchaden)) + ' Schaden (' + Math.round(d.anteil*100) + '%).'
       : ' Du warst noch nicht dabei.';
@@ -18643,7 +18643,7 @@
       const zielRest = Math.max(0, Math.floor(((gz.ende || 0) - Date.now()) / 1000));
       const zielErreicht = !!gz.erreicht;
       const meinBeitrag = Math.max(0, Math.floor(gz.meinBeitrag || 0));
-      const beitragende = Math.max(0, Math.floor(gz.beitragende || 0));
+      const beitragende = Math.max(0, Math.floor(gz.kommandanten || 0));   // Server-Feld heisst kommandanten (nicht beitragende - Randkriegs-Wache)
       const zielIcon = /^ti-[a-z0-9-]+$/.test(String(gz.icon || '')) ? gz.icon : 'ti-target';
       const zielFarbe = zielErreicht ? '#5dcaa5' : '#fac775';
       zielSig = 'gz:' + (gz.woche || '') + ':' + (gz.art || '') + ':' + zielStand + ':' + zielSoll + ':' + (zielErreicht ? 1 : 0)
@@ -39185,7 +39185,7 @@ async function claimPendingRewards(){
     const ms = meilensteine || {};
     return (katalog || []).map(m => {
       const da = !!ms[m.key];
-      return '<span data-ms="' + escapeHtml(m.key) + '" data-erreicht="' + (da ? 1 : 0) + '" title="' + escapeHtml(m.name) + (da ? ' – geschafft' : ' – offen') + '" style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; padding:3px 8px; border-radius:999px; border:1px solid ' + (da ? '#5dcaa5' : 'rgba(255,255,255,0.14)') + '; color:' + (da ? '#5dcaa5' : '#9aa0b8') + ';"><i class="ti ' + (da ? 'ti-check' : 'ti-clock') + '" aria-hidden="true"></i>' + escapeHtml(m.name) + '</span>';
+      return '<span data-ms="' + escapeHtml(m.key) + '" data-erreicht="' + (da ? 1 : 0) + '" title="' + escapeHtml(m.name) + (da ? ' – geschafft' : ' – offen') + '" class="lvl-pill" style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; color:' + (da ? '#5dcaa5' : '#9aa0b8') + (da ? '; border-color:#5dcaa5' : '') + ';"><i class="ti ' + (da ? 'ti-check' : 'ti-clock') + '" aria-hidden="true"></i>' + escapeHtml(m.name) + '</span>';
     }).join('');
   }
   function renderPatenschaftBox(){
@@ -39202,7 +39202,8 @@ async function claimPendingRewards(){
     const katalog = Array.isArray(d.katalog) ? d.katalog : [];
     const s1 = katalog[0] && katalog[0].credits ? katalog[0].credits : { schuetzling: 200, pate: 150 };
     const staub = katalog[0] && typeof katalog[0].staub === 'number' ? katalog[0].staub : 3;
-    let html = '<div style="border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 12px; margin:10px 0;">'
+    // Hausklasse statt Inline-Rahmen (test_formensprache: kein px-Rahmen, keine px-Rundung in JS-Vorlagen).
+    let html = '<div class="card-row" style="flex-direction:column; align-items:stretch; padding:10px 12px; margin:10px 0;">'
       + '<div style="font-weight:600; margin-bottom:4px;"><i class="ti ti-users" aria-hidden="true" style="margin-right:5px;"></i>Patenschaft</div>'
       + '<div class="bmeta" style="margin-bottom:8px;">Wer sich über deinen Einladungs-Link registriert, ist ' + tage + ' Tage lang dein Schützling. Jeder Meilenstein, den er in dieser Zeit zum ersten Mal schafft, bringt euch beiden etwas: ' + fmt(s1.schuetzling) + ' Kredite für den Schützling, ' + fmt(s1.pate) + ' für den Paten, dazu je ' + staub + ' Sternenstaub.</div>';
     if (d.pate){

@@ -69,10 +69,16 @@ const FN = ['loadOrInitRandkriege', 'rkTagesSchluessel', 'rkTagesKonto', 'rkDegr
   // oben ankuendigt: Bekommt die geschnittene Funktion eine neue Abhaengigkeit, faellt es
   // HIER auf ("chronikAusClient is not defined") - und zwar in einem Frontend-Test, waehrend
   // die Backend-Tests gruen blieben. Das ist die Kopie-Familie ueber die Repo-Grenze.
-  'chronikAusClient', 'chronikAusgabeFuerClient', 'notAusGesetzt'];
+  'chronikAusClient', 'chronikAusgabeFuerClient', 'notAusGesetzt',
+  // Seit dem Galaxie-Ziel der Woche (11.09.2026, Feature A) haengt galaxyFuerClient die
+  // Wochenziel-Karte ueber galaxieZielFuerClient() an, und die fragt spawnAktiv('galaxieziel')
+  // (Grundstellung + Notaus). Derselbe Fall wie bei der Chronik eine Zeile darueber - gefallen im
+  // Prueflauf mit "galaxieZielFuerClient is not defined". Ohne Ziel im Fixture kehrt die Funktion
+  // vor GALAXIE_ZIEL_ARTEN um; deshalb reichen die drei Funktionen und die eine Konstante.
+  'galaxieZielFuerClient', 'spawnAktiv', 'spawnAktivImCode'];
 const KONST = ['FACTION_RIVALS', 'RK_FRONT_PAARE', 'RK_OBEN', 'RK_UNTEN', 'RK_TAGESSTUFEN',
   'RK_BOLLWERK_ERFOLG', 'RK_BOLLWERK_FEHLSCHLAG', 'RK_BEITRAG_FENSTER', 'RK_HANDLUNGEN',
-  'RK_MARKE_JE_PUNKTE', 'RK_MARKEN_WOCHE', 'RK_DIENSTGRADE', 'CHRONIK_AKTIV'];
+  'RK_MARKE_JE_PUNKTE', 'RK_MARKEN_WOCHE', 'RK_DIENSTGRADE', 'CHRONIK_AKTIV', 'GALAXIE_ZIEL_AKTIV'];
 const fnQ = FN.map(n => ({ n, q: holeFunktion(n) }));
 const kQ = KONST.map(n => ({ n, q: holeKonstante(n) }));
 for (const { n, q } of fnQ) check(n + ' gefunden', !!q && q.length > 40, q ? q.length : 0);
