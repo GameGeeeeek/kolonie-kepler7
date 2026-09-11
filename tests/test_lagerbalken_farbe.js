@@ -216,7 +216,13 @@ const sollBreite = (k) => (k && k.deckel > 0 && k.bestand !== null) ? Math.min(1
   } catch (e) { console.log('Unterschieben fehlgeschlagen: ' + e.message); }
   check('0e: Vorbedingung - die Fremdfarbe steht wirklich am Balken, bevor der nächste Tick läuft',
     !!untergeschoben && untergeschoben.erz === FREMD && untergeschoben.kristalle === FREMD, untergeschoben);
-  await page.waitForTimeout(1600);
+  // Auf den naechsten Tick WARTEN statt 1,6 s zu raten: Der Tick ist ein 1000-ms-setInterval, und unter
+  // Vierfach-Last des gestuckelten Pruflaufs kann er spaeter kommen. Am alten Stand (und bei Sabotage B)
+  // ueberschreibt niemand die Fremdfarbe - dann laeuft das Warten in den Timeout und 5b/5c fallen.
+  await page.waitForFunction((fremd) => {
+    const f = document.querySelector('#resbar .rescard[data-res="erz"] .t2-fill');
+    return !!f && getComputedStyle(f).backgroundColor !== fremd;
+  }, FREMD, { timeout: 5000 }).catch(() => null);
   let m3 = null;
   try { m3 = await page.evaluate(messung); } catch (e) { console.log('Messung 3 fehlgeschlagen: ' + e.message); }
   const k3 = (m3 && m3.karten) || {};

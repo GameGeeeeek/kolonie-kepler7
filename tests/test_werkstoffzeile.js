@@ -31,8 +31,10 @@
 //   =sabotageA   Ketten-Symbol zurück auf das Tabler-<i>            -> 3a/3b
 //   =sabotageB   'W:'-Teil aus der Signatur entfernt                -> 9a
 //   =sabotageC   Vorgabe uiWerkstoffeOffen = true                   -> Vorgabe-Prüfungen
+//   =sabotageD   Kopfzeile ans ENDE der Leiste statt an den Anfang  -> 1a
+//   =sabotageE   Protomaterie zählt nicht als „Lager voll"           -> 6d
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst laufen lassen, dann eingetragen), nicht geraten.
-const { starteBrowser, SPIEL_URL } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
 
 const ergebnis = {};
 let fail = false;
@@ -40,10 +42,12 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_WERKSTOFFZEILE_GEGENPROBE || '';
 const MUSS_FALLEN = {
-  alt:       ['1a','1b','1c','1d','2a','2b','2c','2d','3a','3b','4a','4b','4c','4d','4e','5a','5b','6b','7a','8a','8b','9a'],
+  alt:       ['V2','1a','1b','1c','1d','2a','2b','2g','2c','2d','3a','3b','8a','8b','4a','4b','4c','5a','4d','4e','9a','5b','6b','6d','7a'],
   sabotageA: ['3a','3b'],
   sabotageB: ['9a'],
-  sabotageC: ['2a','2b','2c','2d','4a','4b','4c','4d','4e','5a','8a','8b']
+  sabotageC: ['2a','2b','2c','2d','8a','8b','4a','4b','4c','5a','4d','4e'],
+  sabotageD: ['1a'],
+  sabotageE: ['6d']
 };
 
 // Nanolegierungsfabrik Stufe 15: Deckel 200 + 15*150 = 2450 - der Bestand liegt genau am Deckel,
@@ -75,9 +79,9 @@ function backend(store, sendungen){ return async r => {
 };}
 
 // art: 'fabrik' (Nano am Deckel, Chips gedrosselt), 'einsteiger' (keine Fabrik, kein Bestand).
-const save = (art, extra) => JSON.stringify(Object.assign({ tutorialSeen:true, newbieWelcomeSeen:true,
+const save = (art, extra) => JSON.stringify(Object.assign({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources: art === 'fabrik'
-    ? { energie:9e8, erz:9e8, kristalle:9e8, deuterium:0.01, antimaterie:9e6, forschungspunkte:3e4, nanolegierungen:NANO_DECKEL }
+    ? { energie:9e8, erz:9e8, kristalle:9e8, deuterium:0.01, antimaterie:9e6, forschungspunkte:3e4, nanolegierungen:NANO_DECKEL, hochenergiekristalle:10 }
     : { energie:500, erz:500, kristalle:200, deuterium:50, antimaterie:0, forschungspunkte:0 },
   buildings: art === 'fabrik'
     ? { solar:30, mine:28, labor:20, lager:60, werft:14, nanolegierungsfabrik:15, quantenchipfabrik:5 }
@@ -85,9 +89,7 @@ const save = (art, extra) => JSON.stringify(Object.assign({ tutorialSeen:true, n
   research: art === 'fabrik' ? { rnanotech:5, rquantenphysik:1 } : {},
   colonies:{}, activeBasePlanet:'home',
   player:{id:'u',name:'A',avatarKey:null}, xp: art === 'fabrik' ? 9e5 : 0, credits: art === 'fabrik' ? 5e5 : 0,
-  buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{},
-  // Ereignis-Uhren in die Zukunft, damit keine Meldung die Messung überlagert.
-  nextPlanetEventCheck: Date.now() + 36e5, nextTraderCheck: Date.now() + 36e5 }, extra || {}));
+  buffs:[], lastTick:Date.now(), colonyNames:{}, modules:{}, shipModules:{} }, extra || {}));
 
 async function seite(browser, spielstand, opts){
   opts = opts || {};
@@ -124,10 +126,10 @@ const LESEN = () => {
   const karten = Array.from(el.querySelectorAll('.rescard'));
   const rect = el.getBoundingClientRect();
   const farbe = (sel) => { const k = el.querySelector(sel); return k ? getComputedStyle(k).color : null; };
-  const label = el.querySelector('.rescard .label');
   const nano = el.querySelector('.rescard[data-res="nanolegierungen"]');
   return {
     kopfDa: !!kopf,
+    kopfErstes: !!kopf && el.firstElementChild === kopf,
     kopfText: kopf ? kopf.textContent.replace(/\s+/g,' ').trim() : '',
     kopfHoehe: kopf ? kopf.getBoundingClientRect().height : 0,
     ariaExpanded: kopf ? kopf.getAttribute('aria-expanded') : null,
@@ -139,7 +141,9 @@ const LESEN = () => {
     voll: karten.filter(k => k.classList.contains('t2-full')).length,
     drossel: karten.filter(k => k.classList.contains('t2-drossel')).length,
     keys: karten.map(k => k.getAttribute('data-res')),
-    labelDisplay: label ? getComputedStyle(label).display : null,
+    labelDisplays: Array.from(el.querySelectorAll('.rescard:not([data-gesperrt]) .label')).map(l => getComputedStyle(l).display),
+    gesperrtLabelDisplay: (() => { const l = el.querySelector('.rescard[data-gesperrt] .label'); return l ? getComputedStyle(l).display : null; })(),
+    titel: karten.filter(k => k.getAttribute('data-res') !== 'protomaterie').map(k => ({ key: k.getAttribute('data-res'), label: (k.querySelector('.label')||{}).textContent || '', wert: ((k.querySelector('.value')||{}).textContent || '').replace(/\s+/g,' ').trim(), titel: k.getAttribute('title') || '' })),
     kartenHoehen: karten.map(k => Math.round(k.getBoundingClientRect().height)),
     nanoTeile: nano ? ['.label','.value','.rate','.t2-fill'].filter(s => !!nano.querySelector(s)) : [],
     badges: Array.from(el.querySelectorAll('.icon-badge')).map(b => ({ svg: !!b.querySelector('svg'), ti: !!b.querySelector('i.ti') })),
@@ -159,22 +163,23 @@ const LESEN = () => {
   {
     const { ctx, page, errs, sendungen } = await seite(browser, save('fabrik'));
     const z = await page.evaluate(LESEN);
-    check('Vorbedingung: #tier2ResBadges ist da', !!z);
+    merke('V1: Vorbedingung - #tier2ResBadges ist da', !!z);
     const z0 = z || {};
     // Das Fixture muss BEIDE Zähler > 0 liefern, sonst prüft 1b/1c ins Leere. Wird hier gemessen,
     // nicht angenommen: Der Zustand entsteht aus tier2Step, nicht aus dem Spielstand allein.
-    check('Vorbedingung: mindestens ein volles Lager und eine gedrosselte Kette im Fixture',
-      z0.voll > 0 && z0.drossel > 0, { voll: z0.voll, drossel: z0.drossel, keys: z0.keys });
-    check('Vorbedingung: der Haken hat den Spielstand gefangen (Speichern nach dem Laden)',
+    merke('V2: Vorbedingung - mindestens ein volles Lager, eine gedrosselte und eine normal laufende Kette im Fixture',
+      z0.voll > 0 && z0.drossel > 0 && z0.anzahl > z0.voll + z0.drossel + 1, { voll: z0.voll, drossel: z0.drossel, keys: z0.keys });
+    merke('V3: Vorbedingung - der Haken hat den Spielstand gefangen (Speichern nach dem Laden)',
       z0.offenImState !== 'kein Haken', { sendungen: sendungen.length, state: z0.offenImState });
 
     // ---- 1) Kopfzeile zählt, was in der Leiste steht
-    // textContent klebt die Spans ohne Leerzeichen zusammen („Werkstoffe· 3") - deshalb \s*.
-    const mN = /Werkstoffe\s*·\s*(\d+)/.exec(z0.kopfText || '');
+    // Streng mit Leerzeichen: Der Knopf wird vorgelesen, und ohne Trenner zwischen den Spans klebte
+    // „Werkstoffe·3" bzw. „gedrosseltAufklappen" zusammen (gemessen 11.09.2026, seitdem getrennt).
+    const mN = /Werkstoffe · (\d+)/.exec(z0.kopfText || '');
     const mV = /(\d+) Lager voll/.exec(z0.kopfText || '');
     const mG = /(\d+) gedrosselt/.exec(z0.kopfText || '');
     merke('1a: Kopfzeile ist ein Knopf als erstes Kind und nennt die Zahl der Karten',
-      z0.kopfDa && !!mN && Number(mN[1]) === z0.anzahl, { text: z0.kopfText, karten: z0.anzahl });
+      z0.kopfDa && z0.kopfErstes && !!mN && Number(mN[1]) === z0.anzahl, { text: z0.kopfText, erstes: z0.kopfErstes, karten: z0.anzahl });
     merke('1b: „N Lager voll" = Zahl der .t2-full-Karten', !!mV && Number(mV[1]) === z0.voll, { text: z0.kopfText, voll: z0.voll });
     merke('1c: „N gedrosselt" = Zahl der .t2-drossel-Karten', !!mG && Number(mG[1]) === z0.drossel, { text: z0.kopfText, drossel: z0.drossel });
     merke('1d: Container behält id, Klasse resbar und bekommt werkstoffe; #resbar steht davor',
@@ -183,7 +188,12 @@ const LESEN = () => {
     // ---- 2) Vorgabe: eingeklappt
     merke('2a: Vorgabe ist kompakt (Klasse werkstoffe-kompakt, aria-expanded=false)',
       z0.kompakt && z0.ariaExpanded === 'false', { kompakt: z0.kompakt, aria: z0.ariaExpanded });
-    merke('2b: eingeklappt ist .label ausgeblendet', z0.labelDisplay === 'none', z0.labelDisplay);
+    merke('2b: eingeklappt ist jedes .label der Ketten ausgeblendet', z0.labelDisplays.length > 0 && z0.labelDisplays.every(d => d === 'none'), z0.labelDisplays);
+    merke('2f: die gesperrte Protomaterie-Karte behaelt eingeklappt ihren Namen', z0.gesperrtLabelDisplay !== null && z0.gesperrtLabelDisplay !== 'none', z0.gesperrtLabelDisplay);
+    // Tooltip: eingeklappt ist er die einzige Namensquelle des Chips - auch bei einer Kette OHNE Statussatz.
+    merke('2g: jede Ketten-Karte hat einen Tooltip, der mit Name und „Bestand / Deckel" beginnt',
+      z0.titel.length > 0 && z0.titel.every(k => k.titel.indexOf(k.label.trim() + ' · ' + k.wert.replace(' / ', ' / ')) === 0),
+      z0.titel.map(k => k.titel.slice(0, 60)));
     merke('2c: eingeklappt ist jede Karte höchstens 40 px hoch', z0.anzahl > 0 && z0.kartenHoehen.every(h => h <= 40), z0.kartenHoehen);
     merke('2d: uiWerkstoffeOffen ist im Spielstand als false vorbelegt', z0.offenImState === false, z0.offenImState);
     merke('2e: DOM-Vertrag der Altwächter: Nano-Karte trägt .label, .value, .rate und .t2-fill auch eingeklappt',
@@ -207,19 +217,19 @@ const LESEN = () => {
     } catch (e) { console.log('   (Klick 1 fehlgeschlagen: ' + e.message + ')'); }
     merke('4a: Klick auf die Kopfzeile klappt auf (Klasse weg, aria-expanded=true)',
       z1.kompakt === false && z1.ariaExpanded === 'true', { kompakt: z1.kompakt, aria: z1.ariaExpanded });
-    merke('4b: aufgeklappt ist .label sichtbar', !!z1.labelDisplay && z1.labelDisplay !== 'none', z1.labelDisplay);
+    merke('4b: aufgeklappt ist jedes .label sichtbar', !!z1.labelDisplays && z1.labelDisplays.length > 0 && z1.labelDisplays.every(d => d !== 'none'), z1.labelDisplays);
     merke('4c: state.uiWerkstoffeOffen ist nach dem Klick true', z1.offenImState === true, z1.offenImState);
+    // ---- 5a) Persistenz: save() laeuft synchron aus dem onclick, die PUT-Sendung kommt binnen
+    // Millisekunden. Gemessen wird deshalb im 400-ms-Fenster direkt nach dem Klick - ein weites Fenster
+    // wuerde unter Pruflauf-Last vom 10-s-Autosave gerettet, und ein fehlendes save() im Klickpfad
+    // bliebe unsichtbar (Befund der Durchsicht, 11.09.2026).
+    const neueSendungen = sendungen.slice(sendungenVorKlick);
+    merke('5a: binnen 400 ms nach dem Aufklappen wurde ein Spielstand mit uiWerkstoffeOffen:true gesendet',
+      neueSendungen.length > 0 && neueSendungen.some(s => /"uiWerkstoffeOffen":true/.test(s)), { sendungen: neueSendungen.length });
     // Ein Tick mit render() darf den Zustand nicht zurückdrehen (Signatur-Cache vs. Neuaufbau).
     await page.waitForTimeout(2500);
     z2 = (await page.evaluate(LESEN)) || {};
     merke('4d: nach 2,5 s (mindestens ein Tick mit render) weiterhin offen', z2.kompakt === false && z2.ariaExpanded === 'true', { kompakt: z2.kompakt, aria: z2.ariaExpanded });
-
-    // ---- 5a) Persistenz: die Wahl geht in den gespeicherten Spielstand
-    await page.waitForTimeout(1500);
-    const neueSendungen = sendungen.slice(sendungenVorKlick);
-    const letzte = neueSendungen.length ? neueSendungen[neueSendungen.length - 1] : '';
-    merke('5a: nach dem Aufklappen enthält der zuletzt gesendete Spielstand uiWerkstoffeOffen:true',
-      neueSendungen.length > 0 && /"uiWerkstoffeOffen":true/.test(letzte), { sendungen: neueSendungen.length, treffer: /"uiWerkstoffeOffen":true/.test(letzte) });
 
     try {
       const kopf = await page.$('#tier2ResBadges > #werkstoffeToggle');
@@ -239,7 +249,7 @@ const LESEN = () => {
     merke('9a: state.uiWerkstoffeOffen = true ohne Klick zeichnet beim nächsten Tick offen (Auf/Zu steht in der Signatur)',
       z9.offenImState === true && z9.kompakt === false && z9.ariaExpanded === 'true', { state: z9.offenImState, kompakt: z9.kompakt, aria: z9.ariaExpanded });
 
-    check('keine JS-Fehler (Fabrik)', errs.length === 0, errs.slice(0,3));
+    merke('J1: keine JS-Fehler (Fabrik)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
@@ -248,9 +258,9 @@ const LESEN = () => {
     const { ctx, page, errs } = await seite(browser, save('fabrik', { uiWerkstoffeOffen: true }));
     const z = (await page.evaluate(LESEN)) || {};
     merke('5b: Spielstand mit uiWerkstoffeOffen:true startet aufgeklappt',
-      z.kopfDa && z.kompakt === false && z.ariaExpanded === 'true' && z.labelDisplay !== 'none',
-      { kompakt: z.kompakt, aria: z.ariaExpanded, label: z.labelDisplay });
-    check('keine JS-Fehler (offen geladen)', errs.length === 0, errs.slice(0,3));
+      z.kopfDa && z.kompakt === false && z.ariaExpanded === 'true' && z.labelDisplays.length > 0 && z.labelDisplays.every(d => d !== 'none'),
+      { kompakt: z.kompakt, aria: z.ariaExpanded, label: z.labelDisplays });
+    merke('J2: keine JS-Fehler (offen geladen)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
@@ -262,7 +272,20 @@ const LESEN = () => {
       z.anzahl === 1 && z.keys[0] === 'protomaterie', z.keys);
     merke('6b: dazu genau ein Hinweis „Weitere Werkstoffe …"',
       z.hinweise.length === 1 && /Weitere Werkstoffe/.test(z.hinweise[0]), z.hinweise);
-    check('keine JS-Fehler (Einsteiger)', errs.length === 0, errs.slice(0,3));
+    merke('J3: keine JS-Fehler (Einsteiger)', errs.length === 0, errs.slice(0,3));
+    await ctx.close();
+  }
+
+  // ============================== 6d) Protomaterie freigeschaltet UND voll: zaehlt in der Kopfzeile mit
+  {
+    const { ctx, page, errs } = await seite(browser, save('einsteiger', {
+      research: { rminentechnik: 1 },
+      resources: { energie:500, erz:500, kristalle:200, deuterium:50, antimaterie:0, forschungspunkte:0, protomaterie: 500 } }));
+    const z = (await page.evaluate(LESEN)) || {};
+    // Deckel 500 ohne Aufbereitung (PROTOMATERIE_LAGER_BASIS) - gemessen: die Karte traegt t2-full.
+    merke('6d: freigeschaltete, volle Protomaterie zaehlt als „1 Lager voll" und traegt t2-full',
+      z.anzahl === 1 && z.voll === 1 && /1 Lager voll/.test(z.kopfText || ''), { text: z.kopfText, voll: z.voll });
+    merke('J5: keine JS-Fehler (Protomaterie voll)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
@@ -273,7 +296,7 @@ const LESEN = () => {
     merke('7a: am Handy ist die Kopfzeile mindestens 44 px hoch (Tippziel)', z.kopfDa && z.kopfHoehe >= 44, z.kopfHoehe);
     merke('7b: am Handy keine Querscroll-Breite', z.scrollWidth > 0 && z.scrollWidth <= z.innerWidth, { scroll: z.scrollWidth, innen: z.innerWidth });
     merke('7c: am Handy liegt jede Karte ganz innerhalb von #tier2ResBadges', z.anzahl > 0 && z.kartenAusserhalb.length === 0, z.kartenAusserhalb);
-    check('keine JS-Fehler (Handy)', errs.length === 0, errs.slice(0,3));
+    merke('J4: keine JS-Fehler (Handy)', errs.length === 0, errs.slice(0,3));
     await ctx.close();
   }
 
