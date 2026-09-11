@@ -110,7 +110,7 @@ function kategorienAusDatei(){
 // Die Werkstoffe liegen unter ihren Kettendeckeln (200 + 150 je Fabrikstufe).
 // Der Kolonie-Eintrag muss so teuer sein, dass processQueue ihn in den Sekunden bis zur Messung nicht
 // bezahlt (ein Solarkraftwerk Stufe 2 für 14 Erz war nach dem ersten Tick gebaut und weg).
-const LAGER_STUFE = 30, SOLAR_STUFE = 18, KOLONIE_LAGER = 28, KOLONIE_NAME = 'Rheahafen';
+const LAGER_STUFE = 30, SOLAR_STUFE = 18, KOLONIE_LAGER = 28, KOLONIE_NAME = 'Rhea<hafen>';  // spitze Klammern: der Name muss als TEXT erscheinen (escapeHtml), nicht als Markup
 const FORSCHUNG = { rnanotech:1, rquantenphysik:1, rhochenergie:1, rfusionskerne:1, rkitech:1, rmetamaterial:1,
                     rsingularitaet:1, rhohlraum:1, rkausalanker:1, rminentechnik:1 };
 const GEBAEUDE = { solar:SOLAR_STUFE, mine:25, raffinerie:25, synth:10, fusionsreaktor:3,
