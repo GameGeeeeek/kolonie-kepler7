@@ -12,9 +12,11 @@
 //      Balken wieder unsichtbar. Gemessen wird der GERECHNETE Hintergrund im Browser, nicht nur der
 //      Quelltext, und verglichen mit dem fg-Wert, der in RES_DEFS steht (aus der Datei gelesen).
 //   b) Der Teil-Update-Pfad (jeder Tick nach dem Erstaufbau) hört auf, die Farbe mitzuziehen. Ein
-//      Test, der nur den Erstaufbau misst, wäre dann trivial grün - deshalb wird der Bestand NACH
-//      dem Laden umgestellt (Erz voll, Kristalle halb) und erst nach einem Tick gemessen: Dieser
-//      Farbwechsel kann nur aus dem Teil-Update-Pfad kommen.
+//      Test, der nur den Erstaufbau misst, wäre dann trivial grün - deshalb wird dem Balken NACH
+//      dem Laden eine Fremdfarbe (rgb(1, 2, 3)) und eine falsche Breite untergeschoben und erst nach
+//      einem Tick gemessen: Nur der Teil-Update-Pfad kann sie wieder überschreiben. (Den Bestand per
+//      state umzustellen geht nicht - der Spielcode liegt in einer IIFE, state ist aus
+//      page.evaluate nicht erreichbar; gemessen beim Bau dieses Tests.)
 //   c) Die Bernstein-Regel bei vollem Lager (gab es vorher schon) und die Vorwarnstufe t2-near
 //      bleiben erhalten.
 //
