@@ -4145,6 +4145,7 @@
             <div style="min-width:0;">
               <div class="alliance-hero-name" id="allianceNameDisplay">Keine Allianz</div>
               <div class="alliance-hero-meta" id="allianceMetaLine">Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen</div>
+              <div class="alliance-hero-meta" id="allianceRuhmLine" style="display:none;"></div>
             </div>
           </div>
           <div class="alliance-hero-body">
@@ -4194,7 +4195,7 @@
           <div class="leaderboard" id="allianceMembersBox"><div class="bmeta">lädt…</div></div>
 
           <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-skull" aria-hidden="true"></i>Allianz-Kriege</div>
-          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Ein Krieg läuft <strong>7 Tage</strong>: Jeder erfolgreiche Angriff auf ein Mitglied der gegnerischen Allianz gibt +50% Kampfpunkte und zählt für den gemeinsamen Kriegspunktestand. Am Ende gewinnt die Allianz mit mehr Kriegspunkten – ihre beteiligten Kämpfer erhalten je eine Kredit-Siegprämie (serverseitig ausgeschüttet). Nur Admins können Krieg erklären oder vorzeitig Frieden schließen.</div>
+          <div class="lb-note" style="margin-bottom:0.75rem;"><i class="ti ti-info-circle" aria-hidden="true"></i>Ein Krieg läuft <strong>7 Tage</strong>. Die Kriegspunkte vergibt der <strong>Server</strong>: gewonnener Angriff auf ein Mitglied der Gegner +10, verlorener +2, erfolgreiche Abwehr +6 für die Verteidiger, ein gefallener Vorposten der Gegner +8 – je Angreifer und Ziel höchstens 3 gewertete Angriffe am Tag. Erfolgreiche Kriegsangriffe geben zusätzlich +50% Kampfpunkte. Am Ende gewinnt die Allianz mit mehr Kriegspunkten: ihre Beitragenden erhalten 1.200 Kredite und 15 Sternenstaub, die Beitragenden der Verlierer 200 Kredite Trostpreis; Siege und Niederlagen zählen als Kriegsruhm. Nur der Anführer kann Krieg erklären oder vorzeitig Frieden schließen.</div>
           <div id="allianceWarsBox"><div class="bmeta">lädt…</div></div>
           <div class="card-row" style="flex-direction:column; align-items:stretch; gap:6px; margin-top:0.5rem;" id="allianceWarDeclareRow">
             <div style="display:flex; gap:6px;">
@@ -15182,6 +15183,7 @@
       }
       state.vorpostenStats = state.vorpostenStats || { schlaege:0, geschleift:0 };
       state.vorpostenStats.schlaege = (state.vorpostenStats.schlaege||0) + 1;
+      if (daten.allianzkrieg) logAllianzkriegVermerk(daten.allianzkrieg);   // Feature C: +8, wenn ein Vorposten der Kriegsgegner faellt
       if (daten.gefallen) state.vorpostenStats.geschleift = (state.vorpostenStats.geschleift||0) + 1;
       pushReport({ type:'vorposten-angriff', fleetName:m.fleetName, system:m.system, systemName:sysName, targetPlanet:planetKey,
         besitzerName:daten.besitzerName||m.besitzerName||'', stufeName:m.stufeName||'Vorposten',
@@ -31854,9 +31856,20 @@ async function claimPendingRewards(){
         if (r.type === 'war-victory'){
           state.credits = (state.credits||0) + (r.credits||0);
           state.warsWon = (state.warsWon||0) + 1; // für Erfolg "Kriegsheld"
-          log('KRIEG GEWONNEN gegen Allianz ['+(r.enemyTag||'?')+']! Siegprämie: +'+fmt(r.credits||0)+' Kredite. '+(r.myScore!=null?'Endstand '+r.myScore+':'+r.theirScore+'.':''), 'ti-trophy', 'ok');
+          // Sternenstaub (Feature C) hat der SERVER schon gebucht - hier nur die Zahl nennen, nie addieren.
+          const staubTxt = r.staub ? ', +'+r.staub+' Sternenstaub' : '';
+          log('KRIEG GEWONNEN gegen Allianz ['+(r.enemyTag||'?')+']! Siegprämie: +'+fmt(r.credits||0)+' Kredite'+staubTxt+'. '+(r.myScore!=null?'Endstand '+r.myScore+':'+r.theirScore+'.':''), 'ti-trophy', 'ok');
           playSound('achieve');
-          pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Kriegssieg gegen ['+(r.enemyTag||'?')+']: +'+fmt(r.credits||0)+' Kredite' });
+          pushReport({ type:'weekly-reward', rank:1, rewardLabel: 'Kriegssieg gegen ['+(r.enemyTag||'?')+']: +'+fmt(r.credits||0)+' Kredite'+staubTxt });
+          save();
+          continue;
+        }
+        if (r.type === 'war-defeat'){
+          // Der Trostpreis der Verliererseite (Feature C) - ein eigener Typ, damit die Niederlage nicht als
+          // "Dankeschoen vom Team" im Rueckfall landet. Kredite bucht der Client, wie bei jedem Reward.
+          state.credits = (state.credits||0) + (r.credits||0);
+          log('Krieg gegen Allianz ['+(r.enemyTag||'?')+'] verloren'+(r.myScore!=null?' – Endstand '+r.myScore+':'+r.theirScore:'')+'. Trostpreis für deinen Einsatz: +'+fmt(r.credits||0)+' Kredite.', 'ti-skull', 'warn');
+          pushReport({ type:'war-defeat', result:'loss', enemyTag: r.enemyTag||'?', myScore: r.myScore, theirScore: r.theirScore, credits: r.credits||0 });
           save();
           continue;
         }
@@ -35760,7 +35773,9 @@ async function claimPendingRewards(){
           logScoreChange(bpGained*3, 'Angriff auf '+name+' gewonnen (+'+bpGained+' Kampfpunkte)'+(warTag?' [Krieg]':''), 'ti-sword');
         }
         // Kriegspunkte sind ebenfalls ein Ertrag - ein Nadelstich soll keinen Krieg entscheiden.
-        if (warTag && !ertragSockel){ addWarScore(warTag, 1); state.warVictories = (state.warVictories||0)+1; }
+        // Kriegspunkte vergibt seit Feature C der Server (Antwortfeld allianzkrieg) - lokal zaehlt nur der Erfolg.
+        if (warTag && !ertragSockel){ state.warVictories = (state.warVictories||0)+1; }
+        if (data.allianzkrieg) logAllianzkriegVermerk(data.allianzkrieg);
         /* Im Sockel gab es gar keine Beute zu tragen. Ein Hinweis auf fehlende Frachter nennte
            dann eine Ursache, die nicht die Ursache war - genau die Sorte zweiter Anzeigestelle,
            die in diesem Projekt regelmaessig die alte Annahme behaelt. */
@@ -35782,6 +35797,7 @@ async function claimPendingRewards(){
           awardBattlePoints(3);
           logScoreChange(3*3, 'Angriff auf '+name+' verloren (+3 Kampfpunkte Trostpreis)', 'ti-shield');
         }
+        if (data.allianzkrieg) logAllianzkriegVermerk(data.allianzkrieg);   // Feature C: +2 / +6 Abwehr fuer die Gegner
         const ownLostLossBackend = applyDefeatLoss();
         const ownLostLossTxt = lostCountsToText(ownLostLossBackend);
         // Auch hier der Grund: Ohne ihn fehlten dem Spieler die 3 Trostpunkte ohne jede Erklaerung.
@@ -35848,7 +35864,7 @@ async function claimPendingRewards(){
         const gained = Math.round((15 + Math.floor(Math.random()*20)) * (warTag?1.5:1));
         awardBattlePoints(gained);
         logScoreChange(gained*3, 'Duell gegen '+name+' gewonnen (+'+gained+' Kampfpunkte)'+(warTag?' [Krieg]':''), 'ti-sword');
-        if (warTag){ addWarScore(warTag, 1); state.warVictories = (state.warVictories||0)+1; }
+        if (warTag){ state.warVictories = (state.warVictories||0)+1; }   // Kriegspunkte nur vom Server (Feature C) - das Duell ohne Server bringt keine
         const ownLostWinSim = applyWinLoss();
         const ownLossTxt = lostCountsToText(ownLostWinSim);
         if (showLog !== false){
@@ -45151,7 +45167,7 @@ async function claimPendingRewards(){
       { title:'Allianz-Flottenparade', body:'Reine Live-Anzeige (im Allianz-Tab, direkt unter den koordinierten Angriffen) der gemeinsamen Flotte ALLER Mitglieder - bewusst KEIN Beitritts-Fenster und keine Kampf-/Belohnungsmechanik wie bei den koordinierten Angriffen, sondern ein fortlaufend aktualisiertes Schaufenster wie die Allianz-Dominanz oder -Chronik. Jedes Mitglied meldet automatisch alle paar Minuten seine aktuelle Flottenstärke; die Box zeigt die addierten Schiffszahlen aller Mitglieder als Icon-Übersicht, die gemeinsame <strong>Paradestärke</strong> (Summe der individuellen Punktzahlen, dieselbe Formel wie beim eigenen Punktestand) sowie die Top-Beitragenden. Erreicht die Allianz einen neuen Bestwert bei der Paradestärke, gibt es dafür eine Feier-Meldung in der Allianz-Chronik - der Bestwert bleibt dauerhaft erhalten, auch wenn später Mitglieder austreten.' },
       { title:'Allianz-Einsätze: Tag/Woche/Monat (ab Basis-Stufe 3/6/10)', body:'Drei parallele Kadenzen desselben Prinzips (im Allianz-Tab unterhalb der Basis): <strong>Tages-Einsatz</strong> (ab Stufe 3), <strong>Wochenprojekt</strong> (ab Stufe 6, ~5× größeres Ziel, ~4× Belohnung, garantiert zusätzlich mind. ein <strong>Episches</strong> Modul) und <strong>Großprojekt</strong> (ab Stufe 10, ~18× größeres Ziel, ~12× Belohnung, garantiert mind. ein <strong>Legendäres</strong> Modul mit kleiner Chance auf <strong>Mythisch</strong>; neben der Mythischen Modulschmiede und dem hochstufigen Allianz-Raid eine der wenigen Quellen für diese beiden Seltenheitsstufen). Jeder Einsatz ist zufällig einer von fünf Typen: <strong>Versorgungskonvoi</strong> (Erz liefern), <strong>Kristall-Kontingent</strong>, <strong>Treibstoff-Depot</strong> (Deuterium), <strong>Kampfoperation</strong> (gemeinsam Kämpfe gewinnen - NPCs, Piraten, Abwehr und Leerenrisse zählen automatisch) oder <strong>Forschungsvorstoß</strong> (gemeinsam Expeditionen abschließen). Einsatz und Ziel sind für alle Mitglieder identisch und skalieren zusätzlich mit der <strong>aktiven Mitgliederzahl</strong> der Allianz (Referenz 10 Mitglieder), damit kleine Allianzen nicht benachteiligt sind. Ist das Team-Ziel erreicht, holt sich jeder mit <strong>mindestens 1% eigenem Beitrag zum Ziel</strong> die Belohnung ab: Kredite + Kampfpunkte + XP, ab Basis-Stufe 8 zusätzlich Leerensplitter. Wer nicht (ausreichend) beigetragen hat, geht leer aus - auch wer die Allianz vor Abschluss verlässt. Kampf-/Expeditions-Fortschritt wird beim Öffnen des Allianz-Tabs übertragen. Eine zerstörte Basis pausiert den Einsatzbetrieb bis zur Reparatur.' },
       { title:'Allianzpunkte & Allianz-Projekte', body:'Jeder abgeschlossene Einsatz (Tag/Woche/Monat) füllt zusätzlich einen gemeinsamen Vorrat an <strong>Allianzpunkten</strong> - unabhängig von der persönlichen Belohnung, einmal pro Einsatz für die ganze Allianz. Admins/Offiziere geben diese Punkte im Allianz-Tab für <strong>Allianz-Projekte</strong> aus: dauerhafte Boni für alle Mitglieder, aktuell <strong>Kriegsrat</strong> (+1% Angriffs- UND Verteidigungspunkte je Stufe, bis Stufe 10, fließt in die bestehende gedeckelte Kampf-Bonus-Gruppe ein).<br><br><strong>Seit dem 02.08.2026 gibt es eine zweite, WIEDERHOLBARE Ausgabe: den Werftkonvoi.</strong> Für 150 Allianzpunkte zieht 24 Stunden lang ein Konvoi mobiler Werftmeister durch die Allianz – der Umbau von Werftmarken dauert in dieser Zeit für <em>jedes</em> Mitglied nur die Hälfte. Er lässt sich beliebig oft wiederholen und verlängern (Restzeit wird addiert, höchstens eine Woche im Voraus). Der Grund: Der Kriegsrat kostet über alle zehn Stufen 2.050 Punkte, eine aktive Allianz verdient je nach Basis-Stufe rund 300 bis 460 Punkte im Monat – nach vier bis sieben Monaten war er fertig und die Währung damit tot, obwohl weiter Punkte hereinkamen. Ein Projekt ohne Maximalstufe kann nicht fertig werden.' },
-      { title:'Allianz-Ehrentitel', body:'Jedes abgeschlossene <strong>Großprojekt</strong> vergibt zusätzlich einen zufälligen, noch nicht besessenen Ehrentitel aus einem Pool von fünf (Sternenbezwinger, Großadmiral der Allianz, Leerenwächter, Kriegsherr des Monats, Legende der Allianz) - rein kosmetisch, aber ausschließlich über diesen Weg erhältlich. Gesammelte Titel bleiben dauerhaft im Besitz und lassen sich im <strong>Fortschritt-Tab</strong> (Bereich "Allianz-Ehrentitel", direkt unter der Galaktischen Dominanz) als Anzeige-Titel auswählen - der gewählte Titel erscheint dann im Spielerprofil, sichtbar für andere Spieler.' },
+      { title:'Allianz-Ehrentitel', body:'Jedes abgeschlossene <strong>Großprojekt</strong> vergibt zusätzlich einen zufälligen, noch nicht besessenen Ehrentitel aus einem Pool von fünf (Sternenbezwinger, Großadmiral der Allianz, Leerenwächter, Kriegsherr des Monats, Legende der Allianz) - rein kosmetisch, aber ausschließlich über diesen Weg erhältlich. Gesammelte Titel bleiben dauerhaft im Besitz und lassen sich im <strong>Fortschritt-Tab</strong> (Bereich "Allianz-Ehrentitel", direkt unter der Galaktischen Dominanz) als Anzeige-Titel auswählen - der gewählte Titel erscheint dann im Spielerprofil, sichtbar für andere Spieler. Zwei weitere Titel haben je eine eigene, exklusive Quelle: „Archivar der Allianz" (Weltprojekt Galaktisches Archiv) und „Kriegsherren" (sobald die Allianz drei Allianzkriege gewonnen hat - Kriegsruhm).' },
       { title:'Allianz-Kriegsschub & seltene Materialien', body:'Wochen- und Großprojekte legen bei Abschluss zusätzlich den exklusiven <strong>Allianz-Kriegsschub</strong> ins Inventar (+40% Angriffskraft UND +40% Verteidigung für 30 Minuten - deutlich stärker als jeder reguläre Booster, über keine andere Quelle erhältlich). Aktivierbar im Fortschritt-Tab unter "Inventar". Großprojekte geben zusätzlich eines der seltenen Endgame-Materialien (Antimateriekern, Kristallherz, Alte Technologie) - dieselben Materialien, die u.a. für die Mondzerstörer-Freischaltung benötigt werden.' },
       { title:'Allianz-Flottenanstriche', body:'Jedes abgeschlossene <strong>Großprojekt</strong> vergibt zusätzlich ein zufälliges, noch nicht besessenes Farbschema für deine Flotten-Icons aus einem Pool von vier (Golden, Smaragdgrün, Violett, Kristallweiß) - rein kosmetisch, aber ausschließlich über diesen Weg erhältlich. Aktivierbar im <strong>Fortschritt-Tab</strong> (Bereich "Allianz-Flottenanstriche", unter den Ehrentiteln) - ein aktivierter Anstrich färbt die Schiffs-Icons überall im Spiel um.' },
       { title:'Beitreten & Chat', body:'Allianzen bündeln mehrere Spieler, mit gemeinsamem Chat und einer geteilten Allianzforschung, zu der Mitglieder Ressourcen beisteuern. Eine Allianz kann <strong>offen</strong> sein (sofortiger Beitritt per Tag-Eingabe) oder <strong>nur auf Bewerbung</strong> - das legt ein Admin im Administration-Bereich fest. Bei geschlossenen Allianzen landet dein Beitrittswunsch als Bewerbung, die ein Admin/Offizier annehmen oder ablehnen muss (Bereich "Offene Bewerbungen"). Die Allianz-Rangliste zeigt neben jedem Tag ein kleines Schloss- (nur Bewerbung) oder Tür-Symbol (offen) sowie Mitgliederzahl/-limit - zum Beitreten/Bewerben einfach eine Zeile antippen.' },
@@ -45161,7 +45177,7 @@ async function claimPendingRewards(){
       { title:'Mitgliederlimit & Rauswurf-Sperrfrist', body:'Jede Allianz startet mit einem Mitgliederlimit von <strong>10</strong>. Höher geht es nur über die Allianz-Forschung "Allianz-Expansion" (5 Stufen, in der Allianz-Forschung, dieselbe Kette wie andere Allianz-Techs) - bis zu 50 bei voller Ausbaustufe. Das Limit ergibt sich automatisch aus der erreichten Forschungsstufe, es lässt sich nicht manuell einstellen. Wer aus einer Allianz entfernt wird (nicht: freiwillig verlässt), kann für <strong>24 Stunden</strong> weder erneut beitreten noch sich bewerben.' },
       { title:'Allianz auflösen', body:'Nur Admins können eine Allianz unwiderruflich auflösen (Administration-Bereich) - alle Mitglieder werden entfernt, der Tag wird danach für eine Neugründung durch irgendjemanden frei. Der letzte verbliebene Admin kann die Allianz nicht einfach verlassen, solange noch andere Mitglieder da sind (das würde die Allianz dauerhaft führungslos zurücklassen) - stattdessen zuerst jemanden befördern oder die Allianz auflösen.' },
       { title:'Aktivitätsprotokoll', body:'Admins und Offiziere sehen im Administration-Bereich ein Protokoll der letzten Beförderungen, Rauswürfe, Einstellungsänderungen und Bewerbungsentscheidungen - für Transparenz bei mehreren Admins/Offizieren in derselben Allianz.' },
-      { title:'Kriege', body:'Ist die eigene Allianz mit einer anderen im Krieg, geben erfolgreiche Angriffe gegen deren Mitglieder +50% Kampfpunkte und zählen für den Kriegspunktestand. Bei jedem Krieg zeigt eine kleine Bestenliste, welche eigenen Mitglieder die meisten Kriegspunkte beigetragen haben.' },
+      { title:'Kriege', body:'Nur der <strong>Anführer</strong> kann einer anderen Allianz den Krieg erklären (Allianz-Tab, Unterreiter „Mitglieder &amp; Kriege"); ein Krieg läuft <strong>7 Tage</strong>, je Allianz höchstens zwei zugleich, und der Anführer jeder Seite kann vorzeitig Frieden schließen (dann ohne Abrechnung). Die <strong>Kriegspunkte vergibt der Server</strong>, nicht dein Spiel: Ein gewonnener Angriff auf ein Mitglied der Gegner bringt deiner Allianz +10, ein verlorener +2, eine erfolgreiche Abwehr +6 für die Verteidiger, ein gefallener Vorposten der Gegner +8. Je Angreifer und Ziel zählen höchstens <strong>3 Angriffe am Tag</strong> (gegen Absprachen); Angriffe ohne Kampfpunkte (Mindesteinsatz) bringen auch keine Kriegspunkte. Erfolgreiche Kriegsangriffe geben dir zusätzlich +50% Kampfpunkte. Am Ende gewinnt die Allianz mit mehr Kriegspunkten: Jeder Beitragende der Sieger erhält <strong>1.200 Kredite und 15 Sternenstaub</strong>, jeder Beitragende der Verlierer 200 Kredite Trostpreis; Sieg, Niederlage und Unentschieden zählen als <strong>Kriegsruhm</strong> im Allianz-Kopf. Ab drei gewonnenen Kriegen erhalten die Mitglieder den Ehrentitel „Kriegsherren". Das Kriegspanel zeigt je Krieg Punktestand, Restzeit, wer den Krieg erklärt hat und die drei größten eigenen Beiträge.' },
       { title:'Handelsabkommen', body:'Die Allianzforschung „Handelsabkommen" (a_trade) gibt bis zu +8% Preisvorteil am galaktischen Markt (Kauf und Verkauf, wächst mit der Stufe) für alle Mitglieder. Kombiniert sich mit dem permanenten Allianzprojekt „Galaktisches Handelsnetzwerk" (bis zu +10%) und einem eigenen Fraktions-Marktrabatt (bis zu +10%), insgesamt gedeckelt bei 30%.' },
       { title:'Allianz-Dominanz', body:'Ein gemeinsames Langzeitziel: die persönlichen Dominanz-Werte (siehe Fortschritt-Tab) aller Allianzmitglieder werden zusammengezählt. Erreicht die Summe eine neue Stufe, kann jedes Mitglied einzeln eine Belohnung (Kredite + Kommandopunkte) abholen. Größere, aktivere Allianzen erreichen neue Stufen schneller.' },
       { title:'Allianzforschung (eigener Baum) und die drei Allianzschiffe', body:'Seit dem 05.08.2026 gibt es im Forschung-Tab einen <strong>zweiten Forschungsbaum</strong>: die <strong>Allianzforschung</strong> mit fünf Zweigen zu je 10 Stufen. <strong>Nicht zu verwechseln mit den Allianz-Technologien darunter:</strong> Die sind ein gemeinsamer Topf, in den die ganze Allianz Rohstoffe einzahlt. Die Allianzforschung dagegen erforscht <strong>jeder für sich selbst</strong>, im eigenen Labor, mit eigener Bauzeit und Kosten aus Rohstoffen <strong>und</strong> Forschungspunkten - sie belegt denselben Forschungsplatz wie die normale Forschung, es läuft also immer nur eines von beidem. Voraussetzung ist einzig, dass du <strong>in einer Allianz bist</strong>. Die fünf Zweige: <strong>Verbundprotokolle</strong> (+0,8% Angriffskraft je Stufe, der Grundstein), <strong>Werftnormung</strong> (−1,2% Schiffsbauzeit je Stufe, ab Verbundprotokolle 3), <strong>Geteiltes Schildnetz</strong> (+1,2% Verteidigung je Stufe, ab Verbundprotokolle 3), <strong>Konvoi-Doktrin</strong> (−1% Dauer aller Missionen je Stufe, ab Werftnormung 3) und <strong>Sternenschmiede</strong> (+1,2% Angriffskraft je Stufe, ab Werftnormung 6 und Schildnetz 6). <strong>Was beim Austritt passiert:</strong> Die erforschten Stufen bleiben - Wissen nimmt man mit -, ihre Wirkung fällt aber auf null, und neue Stufen lassen sich nicht mehr starten. Wer wieder beitritt, hat sofort alles zurück. Darauf bauen drei <strong>Allianzschiffe</strong> auf (Flotte-Tab), die je zwei Tore haben: die eigene Allianzforschung <strong>und</strong> eine Mindeststufe der <strong>Gemeinsamen Flottenwerft</strong>, die die Allianz zusammen hochbaut. Die <strong>Paktkorvette</strong> (40 Angriff, Schild 14, Tempo 115 - der schnellste Großserien-Angreifer) braucht Verbundprotokolle 3 und Flottenwerft 2. Der <strong>Bundeskreuzer</strong> (110 Angriff, Schild 60, Verteidigungsgewicht 1,7 - das zähe Rückgrat) braucht Schildnetz 5, Werftnormung 3 und Flottenwerft 6. Das <strong>Sternenbanner</strong> (240 Angriff, Schild 100 - zwischen Superschlachtschiff und Singularitäts-Vernichter) braucht Sternenschmiede 6 und Flottenwerft 12 und ist damit das Ziel des ganzen Baums. <strong>Bereits gebaute Allianzschiffe bleiben auch nach einem Austritt</strong> und kämpfen normal weiter - nur neue lassen sich dann nicht mehr bauen.' },
@@ -45454,7 +45470,7 @@ async function claimPendingRewards(){
   // Filter-Buttons getrennt zu pflegen.
   const REPORT_CATEGORIES = [
     { key:'all', label:'Alle', icon:'ti-list-details' },
-    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','konvoi-angriff','vorposten-angriff','vorposten-verteidigung','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung'] },
+    { key:'combat', label:'Kämpfe', icon:'ti-sword', types:['attack-sent','attack-received','raid','npc-attack','player-attack','alliance-base-attack','alliance-base-defense','alliance-raid','alliance-muster-attack','pirate-debris-raid','void-rift','asteroid-contest','festung-angriff','nest-angriff','konvoi-angriff','vorposten-angriff','vorposten-verteidigung','moon-siege','moon-siege-defense','pvp-fleet-loss','faction-attack','asteroid-verteidigung','war-defeat'] },
     { key:'expedition', label:'Expeditionen', icon:'ti-map-2', types:['expedition','system-discovered'] },
     { key:'intel', label:'Spionage', icon:'ti-target', types:['spy-report','raid-scout','sabotage-sent','sabotage-received'] },
     { key:'other', label:'Sonstiges', icon:'ti-sparkles', types:['item-found','weekly-reward','debris-cleared','random-event','vorposten-bau','vorposten-garnison'] }
@@ -46235,6 +46251,10 @@ async function claimPendingRewards(){
       } else if (r.type === 'weekly-reward'){
         title = 'Wöchentliche Bestenlisten-Belohnung – Platz '+r.rank;
         body = 'Belohnung erhalten: <strong>'+r.rewardLabel+'</strong>';
+      } else if (r.type === 'war-defeat'){
+        // Feature C: die verlorene Kriegsabrechnung - rot mit Verloren-Pille (result:'loss'), der Trostpreis steht dabei.
+        title = 'Allianz-Krieg verloren – gegen ['+escapeHtml(String(r.enemyTag||'?'))+']';
+        body = 'Endstand '+(r.myScore!=null?fmt(r.myScore)+':'+fmt(r.theirScore):'?')+' Kriegspunkte.<br>Trostpreis für deinen Einsatz: <strong>+'+fmt(r.credits||0)+' Kredite</strong>';
       } else if (r.type === 'expedition'){
         // Mehr Berichtstiefe (Spieler-Wunsch 20.07.2026, "mehr Berichtstiefe bei Expedition"): vorher
         // nur Ausgangspunkt/Eskortstärke/Fundtext - jetzt analog zu den NPC-Kampfberichten mit
@@ -46510,6 +46530,7 @@ async function claimPendingRewards(){
       const positive = reportIsPositive(r);
       const cardIcon = r.type==='item-found' ? (r.itemIcon||'ti-sparkles')
         : r.type==='weekly-reward' ? 'ti-trophy'
+        : r.type==='war-defeat' ? 'ti-skull'
         : r.type==='system-discovered' ? 'ti-sparkles'
         : r.type==='spy-report' ? 'ti-target'
         : r.type==='raid-scout' ? 'ti-target'
@@ -47737,15 +47758,108 @@ async function claimPendingRewards(){
     if (!enemyTag) return false;
     return cachedWarEnemies.includes(String(enemyTag).toUpperCase());
   }
+  // ===== Feature C (11.09.2026): Allianzkriege mit Einsatz - die Kriegspunkte vergibt der Server =====
+  // Das Panel fragt zuerst GET /api/allianzkrieg (Punkte, Zeit, Top-Beitraege, Ruhm). Antwortet der Server
+  // ohne die Route (404 = alter Server) oder ohne `aktiv:true`, bleibt der alte Weg ueber den geteilten
+  // Speicher - Rueckfall ohne Fehlermeldung (drei Zustaende, Hausregel 35). Die Entscheidung merkt sich
+  // allianzkriegServer, damit Erklaerung und Frieden denselben Weg nehmen wie das Panel.
+  let allianzkriegServer = null;   // null = noch nicht gefragt, true = Route da, false = alter Server
+  async function ladeAllianzkriegServer(){
+    if (!useBackend()) return null;
+    try {
+      const res = await backendFetch('/allianzkrieg');
+      if (res.status === 404){ allianzkriegServer = false; return null; }
+      const daten = res.ok ? await res.json().catch(() => null) : null;
+      if (!daten || daten.aktiv !== true){ allianzkriegServer = false; return null; }
+      allianzkriegServer = true;
+      return daten;
+    } catch(e){ return null; }   // Netzfehler: nichts entscheiden, beim naechsten Laden neu fragen
+  }
+  // Eine der beiden Kriegsrouten rufen. Rueckgabe: 'ok', 'abgelehnt' (der Grund des Servers steht im Log)
+  // oder 'alt' (404 = alter Server ohne die Route, oder gar keine Antwort - der Aufrufer nimmt den alten Weg).
+  async function allianzkriegRoute(pfad, gegnerTag){
+    if (!useBackend() || allianzkriegServer === false) return 'alt';
+    const res = await backendFetch(pfad, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ gegnerTag }) }).catch(() => null);
+    if (!res) return 'alt';
+    if (res.status === 404){ allianzkriegServer = false; return 'alt'; }
+    const daten = await res.json().catch(() => null);
+    if (!res.ok){ log((daten && daten.error) || 'Der Server hat das abgelehnt.', 'ti-alert-triangle', 'warn'); return 'abgelehnt'; }
+    allianzkriegServer = true;
+    return 'ok';
+  }
+  // Der Kriegsvermerk aus der Kampfantwort des Servers: was er gerade gutgeschrieben hat (oder warum nicht).
+  function logAllianzkriegVermerk(ak){
+    if (!ak || !ak.gegnerTag) return;
+    if (ak.gedeckelt){ log('Allianzkrieg gegen ['+ak.gegnerTag+']: Tagesdeckel erreicht – höchstens '+(ak.deckel||3)+' gewertete Angriffe je Ziel und Tag.', 'ti-skull'); return; }
+    const teile = [];
+    if (ak.angreifer) teile.push('+'+ak.angreifer+' für ['+(ak.eigeneTag||'?')+']');
+    if (ak.verteidiger) teile.push('+'+ak.verteidiger+' Abwehr für ['+ak.gegnerTag+']');
+    if (teile.length) log('Allianzkrieg gegen ['+ak.gegnerTag+']: Kriegspunkte '+teile.join(', ')+'.', 'ti-skull');
+  }
+  function allianzkriegRuhmText(r){
+    const u = (r.unentschieden||0) ? ' · '+r.unentschieden+' unentschieden' : '';
+    return 'Kriegsruhm: '+(r.siege||0)+' Siege · '+(r.niederlagen||0)+' Niederlagen'+u;
+  }
+  function zeichneAllianzkriegServer(box, ruhmEl, tag, amIAdmin, daten){
+    const ruhm = daten.ruhm || { siege:0, niederlagen:0, unentschieden:0 };
+    if (ruhmEl){
+      ruhmEl.style.display = '';
+      setBoxText(ruhmEl, allianzkriegRuhmText(ruhm) + ((ruhm.siege||0) >= KRIEGSHERREN_SIEGE ? ' · Ehrentitel „Kriegsherren"' : ''));
+    }
+    grantKriegsherrenTitleIfEarned(ruhm);
+    const kriege = Array.isArray(daten.kriege) ? daten.kriege : [];
+    cachedWarEnemies = kriege.filter(k => k.laeuft !== false).map(k => String(k.gegnerTag||'').toUpperCase());
+    if (!kriege.length){ box.innerHTML = `<div class="bmeta">Aktuell mit niemandem im Krieg.</div>`; return; }
+    const regeln = daten.regeln || {};
+    const rows = kriege.map(k => {
+      const my = (k.punkte||{}).eigene||0, their = (k.punkte||{}).gegner||0;
+      const msLeft = (k.endsAt||0) - Date.now();
+      const leadTxt = my>their ? '<span style="color:#5dcaa5;">in Führung</span>' : (my<their ? '<span style="color:#e24b4a;">im Rückstand</span>' : 'Gleichstand');
+      const timeHtml = k.endsAt>0
+        ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-clock" aria-hidden="true" style="margin-right:3px;"></i>${msLeft>0 ? 'Endet in '+fmtDuration(msLeft/1000)+' · '+leadTxt+' · Punkte vergibt der Server' : 'Wird abgerechnet…'}${k.erklaertVon ? ' · erklärt von '+escapeHtml(String(k.erklaertVon)) : ''}</div>`
+        : '';
+      const top = Array.isArray(k.topBeitraege) ? k.topBeitraege : [];
+      const topHtml = top.length
+        ? `<div class="bmeta" style="margin-top:4px; padding-left:24px;"><i class="ti ti-medal" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Top: ${top.map((t,i)=>(i+1)+'. '+escapeHtml(String(t.name||'?'))+' ('+fmt(t.score||0)+')').join(' · ')}${k.meinBeitrag ? ' · dein Beitrag: '+fmt(k.meinBeitrag) : ''}</div>`
+        : '';
+      return `
+        <div class="rank-row" style="flex-direction:column; align-items:stretch;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <i class="ti ti-skull" aria-hidden="true" style="color:#e24b4a;"></i>
+              <span style="font-weight:500;">Krieg gegen [${escapeHtml(String(k.gegnerTag||'?'))}]</span>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <span class="bmeta">${fmt(my)} : ${fmt(their)}</span>
+              ${amIAdmin ? `<button data-make-peace="${escapeHtml(String(k.gegnerTag||''))}" style="font-size:10px; padding:5px 8px;"><i class="ti ti-flag" aria-hidden="true"></i> Frieden</button>` : ''}
+            </div>
+          </div>
+          ${timeHtml}
+          ${topHtml}
+        </div>`;
+    });
+    // Die Regeln kommen VOM SERVER (daten.regeln) - keine zweite Kopie der Zahlen im Spiel.
+    const regelHtml = regeln.tagesdeckel
+      ? `<div class="bmeta" style="margin-top:6px;">Je Angreifer und Ziel höchstens ${regeln.tagesdeckel} gewertete Angriffe am Tag · Siegprämie ${fmt(regeln.siegKredite||0)} Kredite + ${regeln.siegStaub||0} Sternenstaub je Beitragendem · Trostpreis ${fmt(regeln.trostKredite||0)} Kredite</div>`
+      : '';
+    box.innerHTML = rows.join('') + regelHtml;
+    box.querySelectorAll('[data-make-peace]').forEach(btn => { btn.onclick = () => makePeace(btn.getAttribute('data-make-peace')); });
+  }
   async function loadAllianceWars(){
     const box = document.getElementById('allianceWarsBox');
     const declareRow = document.getElementById('allianceWarDeclareRow');
+    const ruhmEl = document.getElementById('allianceRuhmLine');
     if (!box) return;
     const tag = myAllianceTag();
-    if (!tag){ box.innerHTML = `<div class="bmeta">Keiner Allianz beigetreten.</div>`; if (declareRow) declareRow.style.display = 'none'; return; }
+    if (!tag){ box.innerHTML = `<div class="bmeta">Keiner Allianz beigetreten.</div>`; if (declareRow) declareRow.style.display = 'none'; if (ruhmEl) ruhmEl.style.display = 'none'; return; }
     box.innerHTML = `<div class="bmeta">lädt…</div>`;
     const amIAdmin = state.player.allianceRole === 'admin';
     if (declareRow) declareRow.style.display = amIAdmin ? 'flex' : 'none';
+    // Feature C: zuerst den Server fragen. Antwortet er mit seiner Kriegslage, zeichnet sie das Panel;
+    // sonst (404 = alter Server, oder keine Antwort) der alte Weg ueber den geteilten Speicher.
+    const server = await ladeAllianzkriegServer();
+    if (server){ zeichneAllianzkriegServer(box, ruhmEl, tag, amIAdmin, server); return; }
+    if (ruhmEl) ruhmEl.style.display = 'none';
     try {
       const enemies = await getWarList(tag);
       cachedWarEnemies = enemies.map(e=>String(e).toUpperCase());
@@ -47797,7 +47911,19 @@ async function claimPendingRewards(){
     enemyTag = String(enemyTag||'').trim().toUpperCase();
     if (!tag || !enemyTag){ return; }
     if (enemyTag === tag){ log('Man kann sich selbst keinen Krieg erklären.', 'ti-alert-triangle'); return; }
-    if (!confirm('Der Allianz ['+enemyTag+'] wirklich den Krieg erklären? Der Krieg läuft 7 Tage. Angriffe auf ihre Mitglieder geben dann +50% Kampfpunkte für beide Seiten. Am Ende gewinnt die Allianz mit mehr Kriegspunkten – ihre Kämpfer erhalten eine Belohnung.')) return;
+    if (!confirm('Der Allianz ['+enemyTag+'] wirklich den Krieg erklären? Der Krieg läuft 7 Tage. Die Kriegspunkte vergibt der Server: gewonnener Angriff auf ihre Mitglieder +10, verlorener +2, erfolgreiche Abwehr +6 für die Verteidiger, ein gefallener Vorposten +8 (je Ziel höchstens 3 gewertete Angriffe am Tag). Am Ende gewinnt die Allianz mit mehr Kriegspunkten – ihre Beitragenden erhalten 1.200 Kredite und 15 Sternenstaub, die Verlierer 200 Kredite Trostpreis.')) return;
+    // Feature C: die Server-Route zuerst. 404 = alter Server ohne die Route -> der alte Weg unten
+    // (Rueckfall, still); jede andere Ablehnung nennt den Grund des Servers und bricht ab.
+    const ueberServer = await allianzkriegRoute('/allianzkrieg/erklaeren', enemyTag);
+    if (ueberServer === 'abgelehnt') return;
+    if (ueberServer === 'ok'){
+      log('Krieg gegen Allianz ['+enemyTag+'] erklärt! Läuft 7 Tage – die Kriegspunkte vergibt der Server.', 'ti-skull', 'crit');
+      const input = document.getElementById('allianceWarTagInput');
+      if (input) input.value = '';
+      loadAllianceWars();
+      postAllianceBaseNews('☠ Krieg gegen Allianz ['+enemyTag+'] erklärt (von '+(state.player.name||'einem Admin')+')!');
+      return;
+    }
     try {
       const mine = await getWarList(tag);
       if (!mine.includes(enemyTag)){ mine.push(enemyTag); await storageSet('alliance:'+tag+':wars', JSON.stringify({ enemies: mine }), true); }
@@ -47818,7 +47944,15 @@ async function claimPendingRewards(){
     if (state.player.allianceRole !== 'admin') return;
     const tag = myAllianceTag();
     if (!tag || !enemyTag) return;
-    if (!confirm('Frieden mit Allianz ['+enemyTag+'] schließen?')) return;
+    if (!confirm('Frieden mit Allianz ['+enemyTag+'] schließen? Der Krieg endet dann ohne Abrechnung – keine Siegprämie, kein Trostpreis, kein Kriegsruhm.')) return;
+    const ueberServer = await allianzkriegRoute('/allianzkrieg/frieden', enemyTag);
+    if (ueberServer === 'abgelehnt') return;
+    if (ueberServer === 'ok'){
+      log('Frieden mit Allianz ['+enemyTag+'] geschlossen.', 'ti-flag');
+      loadAllianceWars();
+      postAllianceBaseNews('🕊 Frieden mit Allianz ['+enemyTag+'] geschlossen (von '+(state.player.name||'einem Admin')+').');
+      return;
+    }
     try {
       const mine = (await getWarList(tag)).filter(e=>e!==enemyTag);
       await storageSet('alliance:'+tag+':wars', JSON.stringify({ enemies: mine }), true);
@@ -47834,20 +47968,11 @@ async function claimPendingRewards(){
       postAllianceBaseNews('🕊 Frieden mit Allianz ['+enemyTag+'] geschlossen (von '+(state.player.name||'einem Admin')+').');
     } catch(e){ log('Friedensschluss fehlgeschlagen.', 'ti-alert-triangle'); }
   }
-  async function addWarScore(enemyTag, points){
-    const tag = myAllianceTag();
-    if (!tag || !enemyTag || !points) return;
-    try {
-      const r = await storageGet('alliance:'+tag+':warscore:'+enemyTag, true);
-      const cur = r && r.value ? (JSON.parse(r.value).score||0) : 0;
-      await storageSet('alliance:'+tag+':warscore:'+enemyTag, JSON.stringify({ score: cur+points }), true);
-      // Individuellen Beitrag zusätzlich festhalten, für die Top-Kämpfer-Anzeige je Krieg.
-      const ck = 'alliance:'+tag+':warcontrib:'+enemyTag+':'+state.player.id;
-      const cr = await storageGet(ck, true);
-      const curMine = cr && cr.value ? (JSON.parse(cr.value).score||0) : 0;
-      await storageSet(ck, JSON.stringify({ score: curMine+points, name: state.player.name }), true);
-    } catch(e){}
-  }
+  /* addWarScore stand hier bis Feature C (11.09.2026): Der Client schrieb +1 je gewonnenem Angriff selbst in
+     alliance:<TAG>:warscore und :warcontrib - und an diesem Wert hing die Siegpraemie. Seitdem vergibt der
+     SERVER die Punkte in /api/attack und /api/vorposten/angriff (Antwortfeld `allianzkrieg`, siehe
+     logAllianzkriegVermerk), und der geteilte Speicher lehnt Client-Schreibzugriffe auf diese Schluessel
+     ab. Der lokale Zaehler state.warVictories (Erfolg "Kriegsheld", Profil, Punktestand) lebt weiter. */
   // Liefert die Top-3-Kämpfer der eigenen Allianz in einem bestimmten Krieg (nach Kampfpunkten
   // gegen diesen Gegner), fürs Kriegs-Panel im Allianz-Tab.
   async function loadWarTopContributors(tag, enemyTag){
@@ -48966,9 +49091,22 @@ async function claimPendingRewards(){
     { key:'legende_der_allianz', name:'Legende der Allianz', color:'#5dcaa5', icon:'ti-trophy' },
     // exclusiveSource:true - NICHT Teil des zufälligen Großprojekt-Fundpools (siehe
     // grantAllianceMissionTitle unten), einzige Quelle ist das Weltprojekt "Galaktisches Archiv".
-    { key:'archivar_der_allianz', name:'Archivar der Allianz', color:'#8fd9e8', icon:'ti-microscope', exclusiveSource:true }
+    { key:'archivar_der_allianz', name:'Archivar der Allianz', color:'#8fd9e8', icon:'ti-microscope', exclusiveSource:true },
+    // exclusiveSource:true - einzige Quelle sind drei gewonnene Allianzkriege (Kriegsruhm aus GET /api/allianzkrieg,
+    // Feature C, 11.09.2026). Vergeben in grantKriegsherrenTitleIfEarned, sobald das Kriegspanel den Ruhm liest.
+    { key:'kriegsherren', name:'Kriegsherren', color:'#e24b4a', icon:'ti-skull', exclusiveSource:true }
   ];
   function findAllianceTitle(key){ return ALLIANCE_TITLE_DEFS.find(t=>t.key===key); }
+  const KRIEGSHERREN_SIEGE = 3;
+  function grantKriegsherrenTitleIfEarned(ruhm){
+    if (!ruhm || (ruhm.siege||0) < KRIEGSHERREN_SIEGE) return;
+    const owned = state.allianceTitles || (state.allianceTitles = []);
+    if (owned.includes('kriegsherren')) return;
+    owned.push('kriegsherren');
+    if (!state.equippedAllianceTitle) state.equippedAllianceTitle = 'kriegsherren';
+    log('Deine Allianz hat '+KRIEGSHERREN_SIEGE+' Kriege gewonnen – du erhältst den Ehrentitel „Kriegsherren"!', 'ti-skull');
+    save();
+  }
   // Vergibt beim Großprojekt-Abschluss einen zufälligen, noch nicht besessenen Titel - sobald alle
   // gesammelt sind, gibt es keinen weiteren (kein Duplikat-Spam). Erster erhaltener Titel wird
   // automatisch als Anzeige-Titel gesetzt, falls noch keiner gewählt war.
@@ -75933,6 +76071,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const tag = myAllianceTag();
       setBoxText(allianceMetaEl, tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen');
       setBoxText(allianceNameEl, tag ? '['+tag+']' : 'Keine Allianz');
+      // Kriegsruhm (Feature C): die Zeile fuellt loadAllianceWars aus GET /api/allianzkrieg; ohne Allianz weg.
+      const allianceRuhmEl = document.getElementById('allianceRuhmLine');
+      if (allianceRuhmEl && !tag) allianceRuhmEl.style.display = 'none';
     }
 
     const soundIcon = document.getElementById('soundIcon');
