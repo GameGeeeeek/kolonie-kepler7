@@ -31307,6 +31307,10 @@
     if (n >= 1000) return (n/1000).toFixed(1)+'k';
     return Math.floor(n*10)/10;
   }
+  // Volle Zahl mit Tausenderpunkten (11.09.2026): fuer Schwellen und Chronik-Werte, bei denen die
+  // Kurzform von fmt() ("5.50M", "61.5k") das Ziel verschleiert - eine Voraussetzung ist eine
+  // exakte Zahl, kein Groessenordnungs-Hinweis.
+  function fmtVoll(n){ return Math.round(n||0).toLocaleString('de-DE'); }
   // Sicherheitsnetz gegen gespeichertes XSS (Spieler-Wunsch, vor mehr Spielern nachgezogen): zentrale
   // Escape-Funktion für JEDEN von anderen Spielern gesetzten Freitext, der per innerHTML dargestellt
   // wird (Kommandantenname, Allianz-Tag/-Beschreibung, Meldungsgrund, Kampfbericht-Namen, ...) - vorher
@@ -32536,7 +32540,7 @@ async function claimPendingRewards(){
   // tests/test_levelvorboten.js hält beide Richtungen fest.
   //
   // `text` ist bewusst eine FUNKTION, keine Zeichenkette: Die Texte nennen Schwellen wie
-  // PRESTIGE_BASE_COST und ASCENSION_MIN_PRESTIGE, die erst weiter unten deklariert werden. Als
+  // PRESTIGE_BASE_COST und ascensionMinPrestige() (liest ASCENSION_MIN_PRESTIGE), die erst weiter unten deklariert werden. Als
   // fertiger String hier wäre das beim Laden ein "Cannot access before initialization" - derselbe
   // Fehler, der am 01.08.2026 schon einmal das ganze Spiel lahmgelegt hat.
   const VORBOTEN = [
@@ -32568,8 +32572,8 @@ async function claimPendingRewards(){
       text: () => 'Zwischen den Trümmern alter Zivilisationen tauchen Baupläne auf, die niemand mehr lesen kann – Bauwerke von der Größe eines Sonnensystems. Wer sie entziffern will, braucht Alte Technologie, und die findet man nur auf Expeditionen.',
       toast: 'Megaprojekte gibt es – Alte Technologie findest du auf Expeditionen' },
     { key:'aufstieg', level:26, icon:'ti-sparkles',
-      wenn: () => !((state.ascension||{}).count) && (state.prestige||0) < ASCENSION_MIN_PRESTIGE,
-      text: () => 'Es gibt einen Schnitt jenseits des Prestiges: den Aufstieg. Er setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz – der einzigen Währung, die jeden Reset überlebt. Er verlangt Prestige-Stufe '+ASCENSION_MIN_PRESTIGE+' und '+fmt(ASCENSION_MIN_SCORE)+' Punkte.',
+      wenn: () => !((state.ascension||{}).count) && (state.prestige||0) < ascensionMinPrestige(),
+      text: () => 'Es gibt einen Schnitt jenseits des Prestiges: den Aufstieg. Er setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz – der einzigen Währung, die jeden Reset überlebt. Er verlangt Prestige-Stufe '+ascensionMinPrestige()+' und '+fmtVoll(ascensionMinScore())+' Punkte – und mit jedem vollzogenen Aufstieg steigt diese Schwelle.',
       toast: 'Jenseits des Prestiges liegt der Aufstieg' }
   ];
   function maybeShowVorbote(level){
@@ -33866,6 +33870,7 @@ async function claimPendingRewards(){
     if (!state.researchMilestones) state.researchMilestones = {};
     if (!state.ascension) state.ascension = { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0, grenzen:0 } };
     if (!state.ascension.tree) state.ascension.tree = { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0, grenzen:0 };
+    if (!Array.isArray(state.ascension.chronik)) state.ascension.chronik = []; // Aufstiegs-Chronik (11.09.2026): fehlendes Feld = leere Liste
     if (state.warVictories === undefined) state.warVictories = 0;
     if (!state.scoreHistory) state.scoreHistory = [];
     if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -34137,7 +34142,8 @@ async function claimPendingRewards(){
     // Bugfix: state.ascension wurde beim Prestige bisher NICHT übernommen - applyStateDefaults()
     // setzte danach Sternenessenz, Aufstiegs-Zähler und den kompletten Meta-Baum auf 0, obwohl die
     // Hilfe ausdrücklich verspricht, dass diese Boni JEDEN Reset überleben. Da der Aufstieg das
-    // Prestige auf 0 zurücksetzt und der nächste Aufstieg wieder Prestige 3 verlangt, traf der
+    // Prestige auf 0 zurücksetzt und der nächste Aufstieg wieder mindestens Prestige 3 verlangt
+    // (seit dem 11.09.2026 steigend, siehe ascensionMinPrestige()), traf der
     // Verlust jeden Spieler nach dem ersten Aufstieg garantiert. Außerdem greift das
     // Sternensaat-Startpaket ("nach jedem Reset") jetzt auch hier, nicht nur beim Aufstieg selbst.
     const keepAscension = state.ascension;
@@ -34243,8 +34249,30 @@ async function claimPendingRewards(){
   // Härterer Reset: setzt ALLES zurück, auch Prestige-Zähler und Prestige-Perks. Dafür gibt es
   // Sternenessenz (aus Punktzahl, Prestige-Stufen und Kampfpunkten), die einzige Währung, die
   // jeden Reset überlebt. Sie fließt in den permanenten Meta-Baum (Fortschritt-Tab).
+  // Eskalierender Aufstieg (11.09.2026, Feature F): Die Schwelle waechst mit jedem vollzogenen
+  // Aufstieg. Die beiden Konstanten sind die GRUNDWERTE fuer den ersten Aufstieg; wer die
+  // Voraussetzung prueft oder anzeigt, liest die zwei Funktionen darunter - nie die Konstanten.
+  // Sonst nennt eine Anzeigestelle nach dem dritten Aufstieg eine Zahl, die der Knopf nicht mehr
+  // kennt (genau die zweite Anzeigestelle, gegen die der Skill `anzeigestellen` geschrieben ist).
+  //   Prestige: alle ASCENSION_PRESTIGE_JE Aufstiege eine Stufe mehr (3, 3, 3, 4, 4, 4, 5, ...).
+  //   Punkte:   je Aufstieg das ASCENSION_ESKALATION_FAKTOR-fache, gedeckelt beim zehnten
+  //             (rund 5,5 Mio) - ohne den Deckel laege der zwanzigste bei 600 Mio.
+  // Beide lesen `count` aus state.ascension, also die ZAHL DER VOLLZOGENEN Aufstiege: Der erste
+  // Aufstieg (count 0) verlangt die Grundwerte, der vierte (count 3) Prestige 4 und 204.800 Punkte.
   const ASCENSION_MIN_PRESTIGE = 3;
   const ASCENSION_MIN_SCORE = 50000;
+  const ASCENSION_PRESTIGE_JE = 3;
+  const ASCENSION_ESKALATION_FAKTOR = 1.6;
+  const ASCENSION_ESKALATION_DECKEL = 10;
+  const ASCENSION_CHRONIK_MAX = 50;   // Eintraege der Aufstiegs-Chronik, aelteste fallen heraus
+  function ascensionMinPrestige(){
+    const count = (state.ascension||{}).count||0;
+    return ASCENSION_MIN_PRESTIGE + Math.floor(count / ASCENSION_PRESTIGE_JE);
+  }
+  function ascensionMinScore(){
+    const count = (state.ascension||{}).count||0;
+    return Math.round(ASCENSION_MIN_SCORE * Math.pow(ASCENSION_ESKALATION_FAKTOR, Math.min(count, ASCENSION_ESKALATION_DECKEL)));
+  }
   const ASCENSION_TREE_DEFS = [
     { key:'prod', name:'Ewige Industrie', icon:'ti-building-factory-2', desc:'+2% Produktion je Stufe (dauerhaft, additiv zu den globalen Boni)' },
     { key:'speed', name:'Zeitdilatation', icon:'ti-clock', desc:'-2% Bau-, Forschungs- und Flugzeit je Stufe (dauerhaft)' },
@@ -34295,7 +34323,7 @@ async function claimPendingRewards(){
   function ascNodeCost(lvl){
     return lvl < ASCENSION_SOFT_CAP ? lvl + 1 : Math.ceil(Math.pow(lvl + 1, 1.7));
   }
-  function canAscend(){ return (state.prestige||0) >= ASCENSION_MIN_PRESTIGE && computeScore() >= ASCENSION_MIN_SCORE; }
+  function canAscend(){ return (state.prestige||0) >= ascensionMinPrestige() && computeScore() >= ascensionMinScore(); }
   function essenceGainNow(){ return Math.max(5, Math.floor(computeScore()/5000) + (state.prestige||0)*3 + Math.floor((state.battlePoints||0)/200)); }
   function buyAscensionNode(key){
     const asc = state.ascension;
@@ -34356,7 +34384,7 @@ async function claimPendingRewards(){
   ];
   function ascensionPathOf(key){ return ASCENSION_PATHS.find(p=>p.key===key) || null; }
   function doAscension(){
-    if (!canAscend()){ log('Aufstieg erst ab Prestige '+ASCENSION_MIN_PRESTIGE+' und '+fmt(ASCENSION_MIN_SCORE)+' Punkten möglich.', 'ti-alert-triangle'); return; }
+    if (!canAscend()){ log('Aufstieg Nr. '+(((state.ascension||{}).count||0)+1)+' erst ab Prestige '+ascensionMinPrestige()+' und '+fmtVoll(ascensionMinScore())+' Punkten möglich – die Schwelle steigt mit jedem vollzogenen Aufstieg.', 'ti-alert-triangle'); return; }
     // Erst die Wahl, dann die Sicherheitsabfragen - die Entscheidung soll nicht hinter einem
     // "Wirklich sicher?" versteckt liegen.
     const roh = essenceGainNow();
@@ -34423,8 +34451,17 @@ async function claimPendingRewards(){
       }
     }
     const asc = state.ascension || { count:0, essence:0, tree:{prod:0,speed:0,combat:0,start:0,expedition:0,leere:0} };
+    // Aufstiegs-Chronik (11.09.2026, Feature F): Punktestand und Prestige werden HIER gelesen, vor
+    // der state-Neuzuweisung darunter - danach stehen beide auf null. `gerettet` ist der Schluessel
+    // des gewaehlten Pfads (Namen koennen sich aendern, Schluessel nicht); die Anzeige loest ihn
+    // ueber ascensionPathOf() auf. Die Liste faehrt im ascension-Objekt mit, ueberlebt also wie die
+    // Essenz jeden Reset, und ist auf ASCENSION_CHRONIK_MAX Eintraege gedeckelt.
+    const punkteVorher = computeScore(), prestigeVorher = state.prestige||0;
     asc.count = (asc.count||0) + 1;
     asc.essence = (asc.essence||0) + gain;
+    asc.chronik = (Array.isArray(asc.chronik) ? asc.chronik : []).concat([
+      { nr: asc.count, zeit: Date.now(), punkte: punkteVorher, prestige: prestigeVorher, essenz: gain, gerettet: pfad.key }
+    ]).slice(-ASCENSION_CHRONIK_MAX);
     const startLvl = (asc.tree && asc.tree.start) || 0;
     state = {
       resources:{energie:10 + startLvl*300, erz:10 + startLvl*400, kristalle:startLvl*400, deuterium:startLvl*150, antimaterie:0, forschungspunkte:0},
@@ -44942,7 +44979,7 @@ async function claimPendingRewards(){
       { title:'Push-Benachrichtigungen', body:'In den <strong>Einstellungen</strong> lässt sich der Knopf "Push auf diesem Gerät" aktivieren (Browser fragt einmalig um Erlaubnis) - danach schickt der Server für Nachrichten, Pakt-Angebote, Weltboss-Kills, anfliegende Überfälle und Patchnotes echte Benachrichtigungen an dieses Gerät, auch wenn die Seite geschlossen ist. Fünf Kategorien lassen sich einzeln abschalten. Alle Ereignisse landen zusätzlich als geräteübergreifendes Postfach im <strong>Berichte-Tab</strong> unter "Server-Ereignisse" - nur mit eigenem Server verfügbar.' },
       { title:'Feedback: Bugs & Ideen', body:'In den <strong>Einstellungen</strong> gibt es den Bereich "Feedback an den Entwickler": Wähle Bug melden oder Vorschlag einreichen, beschreibe dein Anliegen und sende es ab - die Nachricht geht direkt per E-Mail an den Entwickler (inkl. deiner Spielversion und deinem Spielernamen, damit Rückfragen möglich sind). Optional kannst du einen <strong>Screenshot anhängen</strong> (JPG/PNG) - er wird automatisch verkleinert und der Mail als Anhang beigelegt. Wird dein gemeldeter Bug behoben, bekommst du dafür eine Nachricht vom Team und einmalig eine kleine <strong>Kredit-Belohnung</strong> - erscheint automatisch beim nächsten Einloggen.' },
       { title:'Ewigkeitsforschungen (ohne Maximalstufe)', body:'Die 43 regulären Forschungszweige haben zusammen 584 Stufen - irgendwann sind sie durch. Ab <strong>Singularitätsphysik</strong> öffnen sich vier Zweige, die <strong>nie enden</strong>: <strong>Rekursive Fertigungsoptimierung</strong> (Gesamtproduktion), <strong>Selbstlernende Fertigungsstraßen</strong> (Bau- und Schiffsbauzeit), <strong>Adaptive Panzerungsmatrix</strong> (Verteidigungspunkte) und <strong>Raumfaltungs-Container</strong> (Lagerkapazität). Ihr Nutzen wächst <strong>logarithmisch</strong>: Stufe 5 gibt rund +13%, Stufe 20 rund +22%, Stufe 100 rund +33%. Die Kosten steigen dagegen exponentiell - der Abstand zwischen beiden Kurven wird mit jeder Stufe größer, sodass die Zweige von selbst auslaufen, ohne je abgeschlossen zu sein. Sie wirken bewusst <strong>außerhalb</strong> der gedeckelten Bonus-Gruppen, sonst wären sie bei einem gut ausgebauten Konto sofort wirkungslos. Für den Erfolg „Forschungs-Meister" und den Forschungs-Nexus zählen sie nicht mit - beide bleiben mit den 43 regulären Zweigen erreichbar.' },
-      { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: ab <strong>Prestige 3 und 50.000 Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit '+ASCENSION_TREE_DEFS.length+' Zweigen (Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset), Pfadfinder-Instinkt (+2% Expeditions-Belohnung), Blick in die Leere (+4% Leerensplitter-Ausbeute) und Verschobene Grenzen (+3% auf jede Bonus-Obergrenze). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste. <strong>Seit v8.319.0 haben die Zweige keine Maximalstufe mehr.</strong> Bis Stufe 10 kostet jede Stufe wie bisher (Stufennummer in Essenz) und wirkt voll. Darüber steigen die Kosten steil (Stufe 11 kostet 59, Stufe 20 bereits 163, Stufe 50 dann 774 Essenz), und jede Stufe wirkt nur noch zu einem Fünftel. Der Baum ist damit nie ausgekauft: Sternenessenz behält immer einen Zweck, und der Aufstieg lohnt sich auch beim zwanzigsten Mal. Die Karte zeigt neben der erreichten Stufe die <strong>wirksame</strong> Stufe, damit klar ist, wie viel davon ankommt.<br><br><strong>Seit dem 02.08.2026 triffst du beim Aufstieg eine Entscheidung.</strong> Vorher waren es zwei Sicherheitsabfragen und danach stand alles auf null – und das beim härtesten Reset des Spiels, der auch Offiziere, Kommandopunkte, Fähigkeitsbaum, Flaggschiff, beide Modul-Inventare und alle Werftmarken löscht (Dinge, die das schwächere Prestige ausdrücklich behält). Jetzt rettest du <strong>genau einen Bestand</strong> und bezahlst dafür mit Sternenessenz: <strong>Offiziersstab</strong> (Offiziere, Talente, Kommandopunkte) kostet 30%, <strong>Rüstkammer</strong> (beide Modul-Inventare) 35%, <strong>Werftregister</strong> (alle Werftmarken) 50% – der teuerste Pfad, weil der Weg Mk I bis Mk X allein bei einem Schlachtschiff rund 14,5 Mio Erz kostet. <strong>Reiner Aufstieg</strong> nimmt nichts mit und gibt die volle Essenz; das ist der schnellste Weg zurück in den Baum und eine vollwertige Wahl, kein Verzicht. Du bezahlst also mit genau der Währung, für die du aufgestiegen bist.' },
+      { title:'Aufstieg (Transzendenz) & Meta-Baum', body:'Der <strong>Aufstieg</strong> (Fortschritt-Tab) ist der große Reset über dem Prestige: beim ersten Mal ab <strong>Prestige '+ASCENSION_MIN_PRESTIGE+' und '+fmtVoll(ASCENSION_MIN_SCORE)+' Punkten</strong> verfügbar, setzt er ALLES zurück - auch Prestige-Stufen und Prestige-Boni. Dafür erhältst du <strong>Sternenessenz</strong> (aus Punktzahl, Prestige und Kampfpunkten, mind. 5), die einzige Währung, die jeden Reset überlebt. Sie fließt in den permanenten <strong>Meta-Baum</strong> mit '+ASCENSION_TREE_DEFS.length+' Zweigen (Stufe n kostet n Essenz): Ewige Industrie (+2% Produktion), Zeitdilatation (-2% Bau-/Forschungs-/Flugzeit), Kriegsgedächtnis (+2% Angriffskraft), Sternensaat (Startpaket nach jedem Reset), Pfadfinder-Instinkt (+2% Expeditions-Belohnung), Blick in die Leere (+4% Leerensplitter-Ausbeute) und Verschobene Grenzen (+3% auf jede Bonus-Obergrenze). Jeder Aufstieg bringt außerdem 5000 Punkte und ein goldenes A-Abzeichen in der Bestenliste. <strong>Seit v8.319.0 haben die Zweige keine Maximalstufe mehr.</strong> Bis Stufe 10 kostet jede Stufe wie bisher (Stufennummer in Essenz) und wirkt voll. Darüber steigen die Kosten steil (Stufe 11 kostet 59, Stufe 20 bereits 163, Stufe 50 dann 774 Essenz), und jede Stufe wirkt nur noch zu einem Fünftel. Der Baum ist damit nie ausgekauft: Sternenessenz behält immer einen Zweck, und der Aufstieg lohnt sich auch beim zwanzigsten Mal. Die Karte zeigt neben der erreichten Stufe die <strong>wirksame</strong> Stufe, damit klar ist, wie viel davon ankommt.<br><br><strong>Seit dem 02.08.2026 triffst du beim Aufstieg eine Entscheidung.</strong> Vorher waren es zwei Sicherheitsabfragen und danach stand alles auf null – und das beim härtesten Reset des Spiels, der auch Offiziere, Kommandopunkte, Fähigkeitsbaum, Flaggschiff, beide Modul-Inventare und alle Werftmarken löscht (Dinge, die das schwächere Prestige ausdrücklich behält). Jetzt rettest du <strong>genau einen Bestand</strong> und bezahlst dafür mit Sternenessenz: <strong>Offiziersstab</strong> (Offiziere, Talente, Kommandopunkte) kostet 30%, <strong>Rüstkammer</strong> (beide Modul-Inventare) 35%, <strong>Werftregister</strong> (alle Werftmarken) 50% – der teuerste Pfad, weil der Weg Mk I bis Mk X allein bei einem Schlachtschiff rund 14,5 Mio Erz kostet. <strong>Reiner Aufstieg</strong> nimmt nichts mit und gibt die volle Essenz; das ist der schnellste Weg zurück in den Baum und eine vollwertige Wahl, kein Verzicht. Du bezahlst also mit genau der Währung, für die du aufgestiegen bist.<br><br><strong>Seit dem 11.09.2026 steigt die Voraussetzung mit jedem vollzogenen Aufstieg.</strong> Die Prestige-Stufe wächst alle '+ASCENSION_PRESTIGE_JE+' Aufstiege um eins (der '+(ASCENSION_PRESTIGE_JE+1)+'. Aufstieg verlangt Prestige '+(ASCENSION_MIN_PRESTIGE+1)+', der '+(2*ASCENSION_PRESTIGE_JE+1)+'. Prestige '+(ASCENSION_MIN_PRESTIGE+2)+'), die Punkte wachsen je Aufstieg um das '+String(ASCENSION_ESKALATION_FAKTOR).replace('.', ',')+'-fache: der zweite Aufstieg verlangt '+fmtVoll(ASCENSION_MIN_SCORE*ASCENSION_ESKALATION_FAKTOR)+' Punkte, der vierte '+fmtVoll(ASCENSION_MIN_SCORE*Math.pow(ASCENSION_ESKALATION_FAKTOR, 3))+', ab dem '+(ASCENSION_ESKALATION_DECKEL+1)+'. bleibt die Schwelle bei '+fmtVoll(ASCENSION_MIN_SCORE*Math.pow(ASCENSION_ESKALATION_FAKTOR, ASCENSION_ESKALATION_DECKEL))+' Punkten stehen. Der Aufstiegs-Abschnitt nennt immer die Voraussetzung für deinen <em>nächsten</em> Aufstieg. Die <strong>Aufstiegs-Chronik</strong> darunter (aufklappbar) hält jeden vollzogenen Aufstieg fest – Datum, Nummer, Punktestand und Prestige vor dem Reset, erhaltene Sternenessenz und den gewählten Pfad. Sie überlebt wie die Sternenessenz jeden Reset und behält die letzten '+ASCENSION_CHRONIK_MAX+' Einträge.' },
       { title:'Tagesbilanz & Kampf-Historie', body:'Beim ersten Login eines neuen Tages fasst dir das Spiel den Vortag zusammen (Punktezuwachs, Kämpfe, Kredite, aktuelle Wochenpunkte) - als Log-Eintrag und kurzer Toast. Die letzten 14 Tage landen in der <strong>Kampfbilanz</strong> im Fortschritt-Tab: Gesamtsiege/-niederlagen mit Siegquote und ein Tagesbalken-Diagramm (grün Siege, rot Niederlagen; Balken antippen zeigt Details inkl. Punktezuwachs). Neue Pakt-Angebote melden sich außerdem automatisch per Toast und - bei aktivierten Browser-Benachrichtigungen im Hintergrund - als Systembenachrichtigung.' }
     ]},
     { key:'flotte', icon:'ti-ship', title:'Flotte & Schiffe', entries:[
@@ -45399,7 +45436,7 @@ async function claimPendingRewards(){
     punkte: { icon:'ti-star', help:'fortschritt',
       text:'Dein Punktestand aufgeschlüsselt - woher die Punkte kommen, wie sie sich über die Zeit entwickelt haben und wie deine Kampfbilanz aussieht. Dieselbe Zahl bestimmt deinen Platz in der Bestenliste und ist die Schwelle für Prestige und Aufstieg.' },
     fortschritt: { icon:'ti-trophy', help:'fortschritt',
-      text:'Erfolge, Fähigkeitsbaum, Prestige und Aufstieg. <strong>Prestige</strong> setzt dein Imperium für dauerhafte Boni zurück; der <strong>Aufstieg</strong> darüber (ab Prestige 3 und 50.000 Punkten) setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz, der einzigen Währung, die jeden Reset überlebt.' },
+      text:'Erfolge, Fähigkeitsbaum, Prestige und Aufstieg. <strong>Prestige</strong> setzt dein Imperium für dauerhafte Boni zurück; der <strong>Aufstieg</strong> darüber (beim ersten Mal ab Prestige '+ASCENSION_MIN_PRESTIGE+' und '+fmtVoll(ASCENSION_MIN_SCORE)+' Punkten, danach mit jedem Aufstieg mehr) setzt sogar die Prestige-Stufen zurück und zahlt in Sternenessenz, der einzigen Währung, die jeden Reset überlebt.' },
     sammlung: { icon:'ti-backpack', help:'sammlung',
       text:'Jeder Gegenstand des Spiels an einer Stelle: Standort- und Schiffsmodule, Verbrauchsgüter, seltene Materialien und die Reliquien der Tiefe. Die Zeile mit der Nadel nennt, <strong>wo ein Stück wirklich fällt</strong> - manche fallen ausschließlich im Abgrund, bei einer Raid-Welle oder auf ihrer eigenen Jagd und tauchen in keinem regulären Fundtopf auf, egal wie lange man sucht.' }
   };
@@ -52609,6 +52646,7 @@ async function claimPendingRewards(){
         if (!state.researchMilestones) state.researchMilestones = {};
         if (!state.ascension) state.ascension = { count: 0, essence: 0, tree: { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0, grenzen:0 } };
         if (!state.ascension.tree) state.ascension.tree = { prod:0, speed:0, combat:0, start:0, expedition:0, leere:0, grenzen:0 };
+        if (!Array.isArray(state.ascension.chronik)) state.ascension.chronik = []; // Aufstiegs-Chronik (11.09.2026): fehlendes Feld = leere Liste
         if (state.warVictories === undefined) state.warVictories = 0;
         if (!state.scoreHistory) state.scoreHistory = [];
         if (state.lastScoreSnapshot === undefined) state.lastScoreSnapshot = 0;
@@ -56305,7 +56343,8 @@ async function claimPendingRewards(){
     const i = Math.floor(tiefe / ABGRUND_WAECHTER_ALLE) - 1;
     // Dieselbe zyklische Rechnung wie Name und Portrait - ab der zweiten Wiederkehr faellt also
     // keine neue Reliquie mehr, sie ist ja schon im Kabinett. Genau das ist gewollt: Die Sammlung
-    // ist mit Tiefe 120 vollstaendig und wird nicht endlos.
+    // ist mit Tiefe 180 vollstaendig (zwei Reihen, eine Reliquie je Waechter - gleich lang wie
+    // ABGRUND_WAECHTER_NAMEN, gehalten von test_abgrund_meilensteine 1a) und wird nicht endlos.
     return ABGRUND_RELIKTE[i % ABGRUND_RELIKTE.length] || null;
   }
   function abgrundHatRelikt(key){ return !!(ensureAbgrund().relikte||{})[key]; }
@@ -75643,17 +75682,35 @@ function sekSternUse(key, x, y, k, unentdeckt){
           <button class="buy ${canBuy?'affordable':''}" data-asc-buy="${d.key}" ${canBuy?'':'disabled'}>+1 (${fmt(cost)} <i class="ti ti-sparkles" aria-hidden="true" style="font-size:10px;"></i>)</button>
         </div>`;
       }).join('');
+      // Aufstiegs-Chronik (11.09.2026): juengster Eintrag zuerst, aufklappbar. data-keep-open ist
+      // Pflicht, weil setBoxHtml die Box bei jeder Signatur-Aenderung (Punkte, Essenz) neu schreibt
+      // und ein natives <details> seinen Zustand sonst verlöre (Muster: Chronik des Abstiegs).
+      const chronikListe = (asc.chronik||[]).slice().reverse();
+      const chronikZeilen = chronikListe.length ? chronikListe.map(e => {
+        const wann = e.zeit ? new Date(e.zeit).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }) : '–';
+        const pfadDef = ascensionPathOf(e.gerettet);
+        return `<div class="card-row" style="align-items:flex-start; gap:8px;">
+          <div class="bicon" style="background:rgba(250,199,117,0.15); color:#fac775; flex-shrink:0;"><i class="ti ti-sparkles" aria-hidden="true"></i></div>
+          <div style="flex:1; min-width:0;"><div class="bname" style="font-size:12.5px;">Aufstieg ${fmt(e.nr||0)} · ${wann}</div>
+          <div class="bmeta">${fmtVoll(e.punkte||0)} Punkte · Prestige ${fmt(e.prestige||0)} · <strong style="color:#fac775;">+${fmt(e.essenz||0)} Sternenessenz</strong> · ${escapeHtml(pfadDef ? pfadDef.name : String(e.gerettet||'Reiner Aufstieg'))}</div></div>
+        </div>`;
+      }).join('') : '<div class="bmeta">Noch kein Aufstieg vollzogen – der erste Eintrag entsteht mit dem ersten Aufstieg.</div>';
+      const chronikHtml = `<details data-keep-open="ascensionChronik"${detailsOpenAttr('ascensionChronik')} style="margin-top:10px;">
+        <summary class="bname" style="cursor:pointer;"><i class="ti ti-list-details" aria-hidden="true" style="color:#fac775;"></i> Aufstiegs-Chronik · ${chronikListe.length}</summary>
+        <div style="margin-top:8px;"><div class="bmeta" style="margin-bottom:6px;">Jeder vollzogene Aufstieg mit Datum, Punktestand und Prestige vor dem Reset, der erhaltenen Sternenessenz und dem gewählten Pfad. Die Liste überlebt jeden Reset und behält die letzten ${ASCENSION_CHRONIK_MAX} Einträge.</div>${chronikZeilen}</div>
+      </details>`;
       setBoxHtml(ascensionBox, 'ascension', `
         <div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:9px; border-color:#fac775;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
             <span class="bname"><i class="ti ti-sparkles" aria-hidden="true" style="color:#fac775;"></i> Aufstiege: ${asc.count||0} · Sternenessenz: ${asc.essence||0}</span>
             ${asc.count||asc.essence ? '' : '<span class="bmeta">Noch nie aufgestiegen</span>'}
           </div>
-          <div class="bmeta" style="margin:6px 0;">Der Aufstieg ist der große Reset über dem Prestige: ALLES wird zurückgesetzt - auch Prestige-Stufen und Prestige-Boni. Dafür gibt es <strong>Sternenessenz</strong> für den permanenten Meta-Baum unten, dessen Boni <strong>jeden Reset überleben</strong>. Voraussetzung: Prestige ${ASCENSION_MIN_PRESTIGE} + ${fmt(ASCENSION_MIN_SCORE)} Punkte.</div>
-          <div class="bmeta" style="margin-bottom:8px;">${ready ? 'Bereit! Aktueller Ertrag: <strong style="color:#fac775;">'+essenceGainNow()+' Sternenessenz</strong> (aus Punkten, Prestige und Kampfpunkten).' : 'Noch nicht bereit: Prestige '+(state.prestige||0)+'/'+ASCENSION_MIN_PRESTIGE+' · Punkte '+fmt(computeScore())+'/'+fmt(ASCENSION_MIN_SCORE)+'.'}</div>
+          <div class="bmeta" style="margin:6px 0;">Der Aufstieg ist der große Reset über dem Prestige: ALLES wird zurückgesetzt - auch Prestige-Stufen und Prestige-Boni. Dafür gibt es <strong>Sternenessenz</strong> für den permanenten Meta-Baum unten, dessen Boni <strong>jeden Reset überleben</strong>. Voraussetzung für Aufstieg Nr. ${(asc.count||0)+1}: Prestige ${ascensionMinPrestige()} + ${fmtVoll(ascensionMinScore())} Punkte – die Schwelle steigt mit jedem vollzogenen Aufstieg (alle ${ASCENSION_PRESTIGE_JE} Aufstiege eine Prestige-Stufe mehr, die Punkte je Aufstieg um das ${String(ASCENSION_ESKALATION_FAKTOR).replace('.', ',')}-fache bis zum ${ASCENSION_ESKALATION_DECKEL+1}. Aufstieg).</div>
+          <div class="bmeta" style="margin-bottom:8px;">${ready ? 'Bereit! Aktueller Ertrag: <strong style="color:#fac775;">'+essenceGainNow()+' Sternenessenz</strong> (aus Punkten, Prestige und Kampfpunkten).' : 'Noch nicht bereit: Prestige '+(state.prestige||0)+'/'+ascensionMinPrestige()+' · Punkte '+fmtVoll(computeScore())+'/'+fmtVoll(ascensionMinScore())+'.'}</div>
           <button id="doAscensionBtn" class="${ready?'affordable':''}" ${ready?'':'disabled'}><i class="ti ti-sparkles" aria-hidden="true" style="margin-right:4px;"></i>Aufsteigen${ready?' (bis zu +'+essenceGainNow()+' Essenz)':''}</button>
         </div>
-        ${treeRows}`);
+        ${treeRows}
+        ${chronikHtml}`);
       const ascBtn = document.getElementById('doAscensionBtn');
       if (ascBtn) ascBtn.onclick = doAscension;
       ascensionBox.querySelectorAll('[data-asc-buy]').forEach(b => b.onclick = () => buyAscensionNode(b.getAttribute('data-asc-buy')));
