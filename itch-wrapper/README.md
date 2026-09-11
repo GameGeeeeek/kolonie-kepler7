@@ -122,3 +122,12 @@ Die Seite im echten itch.io-Rahmen öffnen und den Knopf drücken.
 
 Der Knopf zeigt **keine** Warnung mehr an. Erscheint dort eine, ist der alte `window.open`-Abfang
 zurück; `tests/test_itch_startkarte.js` schlägt dann an (Prüfungen `1a`, `2b`, `2c`).
+
+## Weitere Verzeichnisse: dieselbe Kulisse
+
+`theme-bauen.js` rendert seit dem 11.09.2026 auch die Bilder für **browsermmorpg.com** – aus
+`bmmo-banner.html` (864×384, das og:image des Eintrags) und `bmmo-index.html` (240×100, die
+Startseiten-Kachel). Die Maße sind an der Auslieferung des Verzeichnisses gemessen, die Begründung
+steht im Kopf der jeweiligen Vorlage; welche Felder das Konto dort verlangt, in
+`docs/marketing-einreichungen.md`. Ein weiteres Verzeichnis ist eine Vorlage plus eine Zeile in der
+Tabelle von `theme-bauen.js`, kein zweites Skript.

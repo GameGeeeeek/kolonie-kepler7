@@ -1,4 +1,4 @@
-// Rendert ALLE itch.io-Bilder aus den Vorlagen daneben nach presse-bilder/.
+// Rendert ALLE Verzeichnis-Bilder (itch.io, browsermmorpg.com) aus den Vorlagen daneben nach presse-bilder/.
 //
 // EIN Bauer statt vier: Vorher gab es cover-bauen.js nur fuer das Coverbild. Eine zweite Kopie
 // derselben zwanzig Zeilen laeuft beim naechsten Umbau auseinander (Hausregel 43) - deshalb
@@ -32,7 +32,13 @@ const BILDER = [
   // Gemessen ist der Unterschied im gerenderten Bild nicht auszumachen (Sterne sind 1-2 px,
   // der Nebel ist ein weicher Verlauf) - die vierfache Datenmenge zahlt auf nichts ein.
   { name: 'hintergrund', vorlage: 'theme-hintergrund.html', datei: 'itch-hintergrund.png', b: 1600, h: 1000, skala: 1, zweck: 'Seitenhintergrund (kachelt)', nahtlos: true },
-  { name: 'embed',       vorlage: 'theme-embed.html',      datei: 'itch-embed-bg.jpg',    b: 960,  h: 600,  typ: 'jpeg', qualitaet: 90, zweck: 'Embed-BG (nur bei "Click to play")' }
+  { name: 'embed',       vorlage: 'theme-embed.html',      datei: 'itch-embed-bg.jpg',    b: 960,  h: 600,  typ: 'jpeg', qualitaet: 90, zweck: 'Embed-BG (nur bei "Click to play")' },
+  // browsermmorpg.com (11.09.2026) - dieselbe Kulisse, damit das Spiel in jedem Verzeichnis gleich
+  // aussieht. Die Masse sind an der AUSLIEFERUNG der Seite gemessen, nicht am Formular (das nennt
+  // keine): Banner "w=864,h=384,fit=cover" (og:image jeder Spielseite), Startseiten-Kachel
+  // "w=240,h=100,fit=cover". fit=cover schneidet abweichende Verhaeltnisse zu, deshalb exakt.
+  { name: 'bmmo-banner', vorlage: 'bmmo-banner.html',      datei: 'browsermmorpg-banner.jpg', b: 864, h: 384, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Banner (9:4)' },
+  { name: 'bmmo-index',  vorlage: 'bmmo-index.html',       datei: 'browsermmorpg-kachel.png', b: 240, h: 100, skala: 3, zweck: 'browsermmorpg.com Startseiten-Kachel (12:5)' }
 ];
 
 // Nahtlosigkeit MESSEN statt behaupten. Ein gekacheltes Bild zeigt genau dann eine Kante,

@@ -142,6 +142,21 @@ Bei Mechanikänderungen deshalb neben dem Code auch prüfen:
 - Der Versions-Check des Clients (Auto-Reload alle 5 Minuten, Update-Overlay bei Tab-Wechsel) liest `version.txt` (20 Byte) statt der ganzen Spieldatei; die Spieldatei wird nur noch bei einer wirklich neueren Version einmal geholt, für die Patchnotes im Overlay. Da nginx für unbekannte Pfade die Spieldatei selbst liefert (200, text/html), wird die Antwort auf das Versionsmuster geprüft; fehlt `version.txt`, greift höchstens alle 30 Minuten der alte Vollabruf. Wächter: `tests/test_versionscheck.js`.
 - Tests, die den `PATCHNOTES`-Block als Historie ausschneiden, funktionieren unverändert; das Archiv wird von ihnen nicht durchsucht.
 
+## Fremde Skripte: nur im Sandkasten-Rahmen (11.09.2026)
+
+Das Sitzungs-Token liegt in `localStorage`, und `localStorage` gehört der **Herkunft**
+(`https://www.gamegeeeeek.de`), nicht der einzelnen Seite. Ein fremdes Skript, das direkt in irgendeiner
+Seite dieser Herkunft läuft – auch in einer Themenseite ohne Login-Maske –, kann das Token lesen. Die
+CSP des Spiels (`connect-src 'self'`, `tests/test_csp_verbindung.js`) schützt nur die Spieldatei selbst.
+
+Deshalb gilt: Ein Drittanbieter-Widget bekommt eine eigene Datei (`bmmo-karte.html` für die
+Bewertungskarte von browsermmorpg.com) und wird als `<iframe sandbox="allow-scripts allow-popups
+allow-popups-to-escape-sandbox">` eingebettet – **ohne** `allow-same-origin`. Der Rahmen hat dann eine
+undurchsichtige Herkunft: kein `localStorage`, keine Cookies, kein Zugriff auf die einbettende Seite
+(gemessen in `tests/test_bewertungskarte.js`: beides wirft `SecurityError`). Die eigene Datei trägt
+zusätzlich eine CSP, die das Skript auf den Anbieter-Host beschränkt. Ins Spiel selbst kommt kein
+Widget – dort steht höchstens ein nackter Link.
+
 ## Refactoring-Regel
 
 Ein Refactoring ist erst abgeschlossen, wenn:
