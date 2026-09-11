@@ -34,14 +34,13 @@ const BILDER = [
   { name: 'hintergrund', vorlage: 'theme-hintergrund.html', datei: 'itch-hintergrund.png', b: 1600, h: 1000, skala: 1, zweck: 'Seitenhintergrund (kachelt)', nahtlos: true },
   { name: 'embed',       vorlage: 'theme-embed.html',      datei: 'itch-embed-bg.jpg',    b: 960,  h: 600,  typ: 'jpeg', qualitaet: 90, zweck: 'Embed-BG (nur bei "Click to play")' },
   // browsermmorpg.com (11.09.2026) - dieselbe Kulisse, damit das Spiel in jedem Verzeichnis gleich
-  // aussieht. Die Masse sind an der AUSLIEFERUNG der Seite gemessen, nicht am Formular (das nennt
-  // keine): Banner "w=864,h=384,fit=cover" (og:image jeder Spielseite; in den Listen zeigt es
-  // dieselbe Datei als "w=240,h=100,fit=cover", Klasse bmm-card-banner), Hauptbild der Spielseite
-  // "w=800,h=600,fit=contain" (passt ein statt zu schneiden - ein 16:9-Screenshot bekaeme Balken).
-  // Das dritte Bild dort, das "Small index image", ist ein QUADRAT - dafuer ist icon-512.png (das
-  // PWA-Icon) die richtige Datei, keine neue Vorlage.
-  { name: 'bmmo-banner', vorlage: 'bmmo-banner.html',      datei: 'browsermmorpg-banner.jpg',   b: 864, h: 384, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Banner (9:4)' },
-  { name: 'bmmo-main',   vorlage: 'bmmo-main.html',        datei: 'browsermmorpg-hauptbild.jpg', b: 800, h: 600, typ: 'jpeg', qualitaet: 90, zweck: 'browsermmorpg.com Hauptbild (4:3)' }
+  // aussieht. Die Masse stehen WOERTLICH im Upload-Formular des Kontos ("Image dimensions should be
+  // 864x384px" bzw. "180x75px"), deshalb skala 1: exakt das Mass, nicht das Doppelte - ob das
+  // Formular Groesseres annimmt, ist nicht belegt, und die Seite liefert ohnehin 1:1 aus
+  // (og:image "w=864,h=384,fit=cover"). Das Banner ("wide banner used in featured spots") hat ein
+  // eigenes Mass, das noch aus dem Formular abzulesen ist - erst dann kommt seine Zeile hierher.
+  { name: 'bmmo-hauptbild', vorlage: 'bmmo-hauptbild.html', datei: 'browsermmorpg-hauptbild.jpg', b: 864, h: 384, skala: 1, typ: 'jpeg', qualitaet: 92, zweck: 'browsermmorpg.com Hauptbild (Main image, 864x384)' },
+  { name: 'bmmo-mini',      vorlage: 'bmmo-mini.html',      datei: 'browsermmorpg-mini.png',      b: 180, h: 75,  skala: 1, zweck: 'browsermmorpg.com Mini-Bild (180x75)' }
 ];
 
 // Nahtlosigkeit MESSEN statt behaupten. Ein gekacheltes Bild zeigt genau dann eine Kante,

@@ -174,21 +174,26 @@ Der Eintrag ist `https://browsermmorpg.com/game-kolonie-kepler-7--1799` (Nummer 
 21.08.2026, zwei Stimmen, 20 positiv) und steht auf **„Delisted"**. Das Konto nennt genau einen Grund:
 „Banner image was not uploaded". Daneben offen: „Verify ownership" und das Abstimmungs-Widget.
 
-- **Vier Bilder fehlen, das Banner ist die Sperre.** Die Checkliste im Konto („Listing approved:
-  Missing – pending staff review, usually within 24–48h. **Verification unlocks once approved**")
-  verlangt: „Small index image (mini) – tiny **square**", „Main image (preview)", „Banner image –
-  wide", „Screenshots – at least one". Die Seite nennt keine Maße; gemessen an der Auslieferung:
-  Banner `w=864,h=384,fit=cover` (das og:image jeder Spielseite; in den Listen dieselbe Datei als
-  `w=240,h=100,fit=cover`, Klasse `bmm-card-banner`), Hauptbild `800×600 fit=contain` (passt ein,
-  schneidet nicht), Screenshot-Daumennägel `120×90 fit=crop`. `fit=cover` schneidet abweichende
-  Verhältnisse zu, deshalb exakt 9:4 bzw. 4:3.
+- **Vier Bilder fehlen; ohne Banner bleibt der Eintrag „Delisted".** Die Checkliste im Konto
+  („Listing approved: Missing – pending staff review, usually within 24–48h. **Verification unlocks
+  once approved**") verlangt: „Small index image (mini)", „Main image (preview)", „Banner image –
+  wide banner used in featured spots", „Screenshots – at least one in-game screenshot". Die Maße
+  stehen **wörtlich im Upload-Formular** (11.09.2026), nicht auf der öffentlichen Seite:
 
-  | Feld | Datei |
-  |---|---|
-  | Banner image | `node itch-wrapper/theme-bauen.js bmmo-banner` → `presse-bilder/browsermmorpg-banner.jpg` (1728×768) |
-  | Main image (preview) | `… bmmo-main` → `presse-bilder/browsermmorpg-hauptbild.jpg` (1600×1200) |
-  | Small index image (mini) | `icon-512.png` – das PWA-Icon, quadratisch, liegt im Repo und live |
-  | Screenshots | `node marketing-screenshots.js` → `presse-bilder/kepler7-*.png` (16:9, 3200×1800) |
+  | Feld | Formular | Datei |
+  |---|---|---|
+  | Small index image (mini) | „should be **180x75px**", max. 1024 kB, jpg/webp/png/gif/svg | `node itch-wrapper/theme-bauen.js bmmo-mini` → `presse-bilder/browsermmorpg-mini.png` (exakt 180×75) |
+  | Main image (preview) | „should be **864x384px**", max. 8192 kB (der Platzhalter daneben sagt „600 x 250 px or bigger but same proportions" – das ist 2,4:1 statt 2,25:1; der Text ist die Prüfung) | `… bmmo-hauptbild` → `presse-bilder/browsermmorpg-hauptbild.jpg` (exakt 864×384) |
+  | Banner image | **noch abzulesen** – der Abschnitt stand nicht auf dem Screenshot | folgt als dritte Zeile in `theme-bauen.js` |
+  | Screenshots | „at least one in-game screenshot" | `node marketing-screenshots.js` → `presse-bilder/kepler7-*.png` (16:9, 3200×1800) |
+
+  Gemessen an der Auslieferung passt das zusammen: Das og:image jeder Spielseite kommt als
+  `w=864,h=384,fit=cover` (also das Hauptbild), die Listenkacheln zeigen dasselbe Bild als
+  `w=240,h=100,fit=cover` (Klasse `bmm-card-banner`), die Galerie auf der Spielseite `800×600
+  fit=contain` mit Daumennägeln `120×90 fit=crop`. Der erste Anlauf hatte daraus eine 240×100-Kachel
+  und ein 4:3-Hauptbild abgeleitet – beides falsch, weil die Auslieferung nicht das Formular ist.
+  **Die Maße kommen aus dem Formular, das die Datei annimmt oder ablehnt; die Auslieferung sagt nur,
+  wie das Bild danach beschnitten wird.**
 - **„Verify ownership" wird erst nach der Freigabe freigeschaltet** (Checkliste: „Verification unlocks
   once approved") und läuft über die bei der Registrierung angegebene E-Mail („Must be reachable — we
   verify ownership through it"). Gemessen am 11.09.2026: `gamegeeeeek.de` kann derzeit keine Mail

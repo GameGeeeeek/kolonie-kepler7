@@ -126,9 +126,8 @@ zurück; `tests/test_itch_startkarte.js` schlägt dann an (Prüfungen `1a`, `2b`
 ## Weitere Verzeichnisse: dieselbe Kulisse
 
 `theme-bauen.js` rendert seit dem 11.09.2026 auch die Bilder für **browsermmorpg.com** – aus
-`bmmo-banner.html` (864×384, das og:image des Eintrags, in Listen als 240×100 gezeigt) und
-`bmmo-main.html` (800×600, das Hauptbild der Spielseite). Das dritte Bild dort, das quadratische
-„Small index image", ist `icon-512.png` – das PWA-Icon, keine neue Vorlage. Die Maße sind an der
-Auslieferung des Verzeichnisses gemessen, die Begründung steht im Kopf der jeweiligen Vorlage; welche
-Felder das Konto dort verlangt, in `docs/marketing-einreichungen.md`. Ein weiteres Verzeichnis ist
+`bmmo-hauptbild.html` (864×384, das Hauptbild der Spielseite und ihr og:image) und `bmmo-mini.html`
+(180×75, das kleine Listenbild). Beide Maße stehen wörtlich im Upload-Formular des Kontos, deshalb
+werden sie exakt gerendert (`skala: 1`). Die Begründung steht im Kopf der jeweiligen Vorlage; welche
+Felder das Konto sonst verlangt, in `docs/marketing-einreichungen.md`. Ein weiteres Verzeichnis ist
 eine Vorlage plus eine Zeile in der Tabelle von `theme-bauen.js`, kein zweites Skript.
