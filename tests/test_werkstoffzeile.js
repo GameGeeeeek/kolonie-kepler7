@@ -33,6 +33,7 @@
 //   =sabotageC   Vorgabe uiWerkstoffeOffen = true                   -> Vorgabe-Prüfungen
 //   =sabotageD   Kopfzeile ans ENDE der Leiste statt an den Anfang  -> 1a
 //   =sabotageE   Protomaterie zählt nicht als „Lager voll"           -> 6d
+//   =sabotageF   Kopfzeile wird bei jedem Aufbau neu erzeugt          -> 9b
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst laufen lassen, dann eingetragen), nicht geraten.
 const { starteBrowser, SPIEL_URL, ruhigeUhren } = require('./lib/umgebung');
 
@@ -42,12 +43,13 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 const SAB = process.env.KEPLER_WERKSTOFFZEILE_GEGENPROBE || '';
 const MUSS_FALLEN = {
-  alt:       ['V2','1a','1b','1c','1d','2a','2b','2g','2c','2d','3a','3b','8a','8b','4a','4b','4c','5a','4d','4e','9a','5b','6b','6d','7a'],
+  alt:       ['V2','1a','1b','1c','1d','2a','2b','2g','2c','2d','3a','3b','8a','8b','4a','4b','4c','5a','4d','4e','9a','9b','5b','6b','6d','7a'],
   sabotageA: ['3a','3b'],
   sabotageB: ['9a'],
   sabotageC: ['2a','2b','2c','2d','8a','8b','4a','4b','4c','5a','4d','4e'],
   sabotageD: ['1a'],
-  sabotageE: ['6d']
+  sabotageE: ['6d'],
+  sabotageF: ['9b']
 };
 
 // Nanolegierungsfabrik Stufe 15: Deckel 200 + 15*150 = 2450 - der Bestand liegt genau am Deckel,
@@ -130,6 +132,7 @@ const LESEN = () => {
   return {
     kopfDa: !!kopf,
     kopfErstes: !!kopf && el.firstElementChild === kopf,
+    kopfMarke: kopf ? (kopf.dataset.marke || null) : null,
     kopfText: kopf ? kopf.textContent.replace(/\s+/g,' ').trim() : '',
     kopfHoehe: kopf ? kopf.getBoundingClientRect().height : 0,
     ariaExpanded: kopf ? kopf.getAttribute('aria-expanded') : null,
@@ -242,12 +245,17 @@ const LESEN = () => {
     // Wer 'W:' aus der Signatur streicht, sieht hier den eingefrorenen Kompaktzustand.
     let z9 = {};
     try {
-      await page.evaluate(() => { if (window.__spielstandRef) window.__spielstandRef.uiWerkstoffeOffen = true; });
+      // Marke am Knopf: Ueberlebt sie den Neuaufbau, war es derselbe Knoten (Fokus und ein laufender
+      // Klick bleiben erhalten); ein innerHTML-Neuaufbau erzeugt einen neuen Knopf ohne Marke.
+      await page.evaluate(() => { const k = document.querySelector('#tier2ResBadges > .werkstoffe-kopf'); if (k) k.dataset.marke = 'vorher';
+        if (window.__spielstandRef) window.__spielstandRef.uiWerkstoffeOffen = true; });
       await page.waitForTimeout(2500);
       z9 = (await page.evaluate(LESEN)) || {};
     } catch (e) { console.log('   (Signatur-Schritt fehlgeschlagen: ' + e.message + ')'); }
     merke('9a: state.uiWerkstoffeOffen = true ohne Klick zeichnet beim nächsten Tick offen (Auf/Zu steht in der Signatur)',
       z9.offenImState === true && z9.kompakt === false && z9.ariaExpanded === 'true', { state: z9.offenImState, kompakt: z9.kompakt, aria: z9.ariaExpanded });
+    merke('9b: die Kopfzeile ueberlebt den Neuaufbau als derselbe Knoten (Fokus und laufender Klick bleiben)',
+      z9.kompakt === false && z9.kopfMarke === 'vorher', { marke: z9.kopfMarke });
 
     merke('J1: keine JS-Fehler (Fabrik)', errs.length === 0, errs.slice(0,3));
     await ctx.close();

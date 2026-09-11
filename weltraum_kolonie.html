@@ -26581,16 +26581,16 @@
     const kettenGedrosselt = visible.filter(d => (gruende[d.key]||{}).art === 'rohstoffe').length;
     const kartenAnzahl = visible.length + (proto ? 1 : 0);
     const lagerVoll = kettenVoll + (proto && protoFrei && protoVoll ? 1 : 0);
-    const kopfHtml = `<button type="button" class="werkstoffe-kopf" id="werkstoffeToggle" aria-expanded="${offen?'true':'false'}">`
-      + '<span class="werkstoffe-titel">Werkstoffe</span> '
+    const kopfInnen = '<span class="werkstoffe-titel">Werkstoffe</span> '
       + '<span class="werkstoffe-zaehler">· '+kartenAnzahl+(lagerVoll>0?' · '+lagerVoll+' Lager voll':'')+(kettenGedrosselt>0?' · '+kettenGedrosselt+' gedrosselt':'')+'</span> '
       // Das Wort steckt in einem eigenen Span: Am schmalen Handy bleibt nur der Pfeil, sonst braucht die
       // Kopfzeile neben "1 Lager voll · 1 gedrosselt" zwei Zeilen (gemessen bei 390 px).
-      + '<span class="werkstoffe-klapper"><span class="werkstoffe-klapper-wort">'+(offen?'Einklappen':'Aufklappen')+'</span> <span aria-hidden="true">'+(offen?'\u25B4':'\u25BE')+'</span></span></button>';
+      + '<span class="werkstoffe-klapper"><span class="werkstoffe-klapper-wort">'+(offen?'Einklappen':'Aufklappen')+'</span> <span aria-hidden="true">'+(offen?'\u25B4':'\u25BE')+'</span></span>';
+    const kopfHtml = `<button type="button" class="werkstoffe-kopf" id="werkstoffeToggle" aria-expanded="${offen?'true':'false'}">${kopfInnen}</button>`;
     /* Einsteiger sehen nur die Protomaterie-Karte - und sollen wissen, dass hier noch mehr kommt
        und wo der Weg dahin beginnt. Sobald die erste Kette da ist, erklaert sie sich selbst. */
     const hinweisHtml = visible.length ? '' : '<div class="werkstoffe-hinweis">Weitere Werkstoffe erscheinen, sobald die erste Fabrik steht – die Nanolegierungsfabrik nach der Forschung Nanotechnologie.</div>';
-    el.innerHTML = kopfHtml + protoHtml + hinweisHtml + visible.map(d => {
+    const kettenHtml = visible.map(d => {
       const cap = tier2StorageCap(d);
       const stock = state.resources[d.key]||0;
       const full = cap > 0 && stock >= cap - 1e-9;
@@ -26623,11 +26623,19 @@
       <div class="t2-fill" style="width:${fillPct.toFixed(1)}%; background:${full?'#e0a548':d.fg};"></div>
     </div>`;
     }).join('');
-    /* Der Knopf wird bei jedem Neuaufbau frisch erzeugt, also auch frisch verdrahtet. Persistenz
-       wie bei den Umschaltern in den Einstellungen: state aendern, render(), save(). Die Signatur
-       wird geloescht, damit der naechste Aufbau nicht am Cache vorbeilaeuft. */
-    const kopf = document.getElementById('werkstoffeToggle');
-    if (kopf) kopf.onclick = () => { state.uiWerkstoffeOffen = !state.uiWerkstoffeOffen; lastTier2BadgeSig = null; render(); save(); };
+    /* Die Kopfzeile bleibt ueber Neuaufbauten hinweg DERSELBE Knoten; nur ihr Inhalt und aria-expanded
+       werden nachgezogen. Ein kompletter innerHTML-Neuaufbau wuerde den fokussierten Knopf jede Sekunde
+       zerstoeren, sobald eine Kette gedrosselt laeuft (die Signatur bewegt sich dann), und ein Klick,
+       der einen Neuaufbau ueberspannt (mousedown auf dem alten, mouseup auf dem neuen Knoten), feuert
+       gar nicht - gemessen im gestueckelten Pruflauf am 11.09.2026 unter Vierfach-Last. */
+    let kopf = el.querySelector(':scope > .werkstoffe-kopf');
+    if (!kopf){ el.insertAdjacentHTML('afterbegin', kopfHtml); kopf = el.firstElementChild; }
+    else { kopf.setAttribute('aria-expanded', offen ? 'true' : 'false'); kopf.innerHTML = kopfInnen; }
+    for (const kind of Array.from(el.children)) if (kind !== kopf) kind.remove();
+    kopf.insertAdjacentHTML('afterend', protoHtml + hinweisHtml + kettenHtml);
+    /* Persistenz wie bei den Umschaltern in den Einstellungen: state aendern, render(), save(). Die
+       Signatur wird geloescht, damit der naechste Aufbau nicht am Cache vorbeilaeuft. */
+    kopf.onclick = () => { state.uiWerkstoffeOffen = !state.uiWerkstoffeOffen; lastTier2BadgeSig = null; render(); save(); };
   }
   // Ermittelt die Geschwindigkeit des langsamsten an einer Mission beteiligten Schiffstyps
   // (nur Typen mit Bestand > 0 werden berücksichtigt) und leitet daraus einen Dauer-Multiplikator ab.
