@@ -57,6 +57,10 @@
 //   =sabotageA   der harte 9-px-clip-path wieder in den .fleet-subtab-Regelblock geschrieben
 //   =sabotageB   .fleet-subtabs wieder auf grid-template-columns:repeat(3, 1fr)
 //   =sabotageC   das save() aus dem Standort-Modul-Umschalter entfernt
+//   =sabotageD   ein zusaetzlicher AEUSSERER Schein neben dem inneren am aktiven Knopf -
+//                die Sabotage zur Nachschaerfung von 1c (Befund der Durchsicht, 12.09.2026:
+//                die alte Fassung suchte 'inset' irgendwo in der Zeichenkette und war damit
+//                blind fuer einen zweiten, aeusseren Teilschatten daneben)
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst mit leeren Listen laufen lassen, dann eingetragen).
 // Eine Sabotage, die grün bleibt, ist ein Befund über die Prüfung - nicht über die Sabotage.
 const { starteBrowser, SPIEL_URL, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
@@ -75,11 +79,15 @@ const SAB = process.env.KEPLER_UNTERREITERFORM_GEGENPROBE || '';
 //             passend gemacht, nur eben an einer zweiten Stelle.
 //   sabotageB faellt bei 2a UND 2d: die Abgrund-Zeile bekommt drei Spalten fuer vier Knoepfe und
 //             bricht damit in zwei Knopfzeilen um (gemessen 80 statt 46 px Zeilenhoehe).
+//   sabotageD faellt allein bei 1c, und zwar auf allen drei .fleet-subtab-Zeilen. Die alte,
+//             auf blosses Vorkommen von 'inset' pruefende Fassung waere hier gruen geblieben -
+//             gemessen, nicht vermutet.
 const MUSS_FALLEN = {
   alt:       ['1a','1b','2c','3f','3g'],
   sabotageA: ['1a','1b'],
   sabotageB: ['2a','2d'],
-  sabotageC: ['3f']
+  sabotageC: ['3f'],
+  sabotageD: ['1c']
 };
 
 // Die sechs Zeilen der zweiten Ebene. `raster` heißt: gehört zur .fleet-subtabs-Familie und wird
