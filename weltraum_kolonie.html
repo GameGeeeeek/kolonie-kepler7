@@ -1536,15 +1536,36 @@
        deshalb wirkungslos gewesen.
        DIE REPARATUR ist darum keine Stapelnummer, sondern der Klebepunkt: Zwei klebende Baender
        duerfen sich gar nicht erst ueberlappen. Der Abstand ist die GEMESSENE Hoehe der
-       Reiterleiste - dieselbe Zahl, die `sprungAbstandSetzen()` ohnehin jede Sekunde nach
-       `--sprung-abstand` schreibt (Hoehe + 10 px Luft). Eine zweite Quelle fuer dieselbe Zahl
-       waere eine zweite Wahrheit; eine getippte Zahl waere falsch, weil die Leiste mit der
-       Fensterbreite und mit jedem Banner darueber waechst (gemessen 94/159 px).
-       Die Rueckfall-Zahl 128 ist bewusst dieselbe wie bei `scroll-margin-top` daneben: der
-       Startwert fuer den Moment vor dem ersten Takt, keine Entscheidung.
+       Reiterleiste - dieselbe Messung, die `sprungAbstandSetzen()` ohnehin jede Sekunde vornimmt.
+       Eine zweite Quelle fuer dieselbe Zahl waere eine zweite Wahrheit; eine getippte Zahl waere
+       falsch, weil die Leiste mit der Fensterbreite und mit jedem Banner darueber waechst
+       (gemessen 94/158/159 px).
+       DER KLEBEPUNKT IST `--leisten-hoehe`, NICHT `--sprung-abstand` (Nachtrag 12.09.2026):
+       Beide kommen aus derselben Messung in `sprungAbstandSetzen()`, aber `--sprung-abstand` traegt
+       10 px Luft, damit ein Sprungziel UNTER der Leiste anfaengt. Als Klebepunkt erzeugte dieselbe
+       Zahl einen 10 px hohen Streifen zwischen den beiden Baendern, durch den der scrollende Inhalt
+       sichtbar hindurchlief - GEMESSEN: `.tabs` 0-159, Statusleiste 169-219, Spalt 10 px, und
+       `elementFromPoint(195, 164)` traf mitten im Spalt `div.mark-row`. Mit der rohen Hoehe stossen
+       die Baender aneinander (gemessen Spalt 0, Statusleiste 159-209).
+       Die Rueckfall-Zahl 118 ist die 128 von `scroll-margin-top` daneben MINUS derselben 10 px
+       Luft - der Startwert fuer den Moment vor dem ersten Takt, keine Entscheidung.
        NUR unter `body.compact-head`: Am PC klebt `.tabs` nicht (gemessen bei 1400 px:
        position=static), dort bliebe die Statusleiste an ihrem alten Platz. */
-    body.compact-head .fleet-sticky { top: var(--sprung-abstand, 128px); }
+    body.compact-head .fleet-sticky { top: var(--leisten-hoehe, 118px); }
+    /* HANDY QUER: dort klebt nur EIN Band (Nachtrag 12.09.2026).
+       GEMESSEN in der Querlage, Flotte/Werft, Position 1400: bei 844x390 belegten Reiterleiste
+       (158 px) und Statusleiste (32 px) zusammen 190 von 390 px = 48,7 % der Fensterhoehe, bei
+       740x360 sogar 190 von 360 = 52,8 % - mehr als die Haelfte des Bildes, bevor der Spieler eine
+       Zeile Inhalt sieht. Die Statusleiste ist dort also nicht mehr Hilfe, sondern Verlust.
+       WARUM die Statusleiste weicht und nicht die Reiterleiste: Die Reiterleiste ist der haeufigste
+       Handgriff im Spiel und traegt in der Querlage allein schon 158 von 360 px (43,9 %); sie zu
+       schrumpfen hiesse, die Reitergruppen umzubauen - eine eigene Etappe. Die Statusleiste
+       dagegen wiederholt nur Zahlen, die im Panel darunter ohnehin stehen. Sie steht hier wieder
+       IM FLUSS statt unsichtbar zu kleben: Nachher 158 von 360 = 43,9 %.
+       Die Schwelle ist eine HOEHEN-Frage, keine Breiten-Frage - `max-height` statt `orientation`,
+       weil ein niedriges Fenster am PC dasselbe Problem haette. 500 px liegt ueber den gemessenen
+       390/360 und weit unter den 844 der Hochkant-Messung. */
+    @media (max-height: 500px) { body.compact-head .fleet-sticky { position:static; } }
     .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
     @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
@@ -71772,6 +71793,51 @@ function sekSternUse(key, x, y, k, unentdeckt){
     for (const b of knoepfe) if (b.getAttribute(attribut) === wert) return wert;
     return knoepfe[0].getAttribute(attribut);
   }
+  /* Den AKTIVEN Knopf einer wischbaren Unterreiter-Zeile ins Bild holen (UI-5a-Nachtrag,
+     12.09.2026). WARUM ES DAS BRAUCHT: Seit die Galaxie- und die Allianz-Zeile am Handy einzeilig
+     und wischbar sind, startet der Kasten bei `scrollLeft 0`, und die Aktiv-Klasse wird nur
+     GESETZT, nie ins Bild geholt. GEMESSEN bei 390x844 mit einem Spielstand, der den letzten
+     Knopf trug: Galaxie/`info` lag bei 672-783 in einem 348 px breiten Kasten - vollstaendig
+     ausserhalb, nicht einmal angeschnitten; Allianz/`verwaltung` bei 352-458, ebenfalls ganz
+     draussen. Der Spieler sah eine Pillenzeile, in der KEIN Knopf aktiv aussah, waehrend darunter
+     das Panel eines Reiters stand, den er nicht sehen konnte.
+
+     ZWEI RIEGEL, beide gemessen, weil `render()` jede Sekunde laeuft:
+     (1) NUR BEI ECHTEM WECHSEL des Schluessels. Ohne diesen Riegel kaempft der Scroll gegen den
+         Finger: GEMESSEN mit einer Fassung, die nur auf Sichtbarkeit prueft - der Spieler wischt
+         die Zeile auf `scrollLeft 0`, und der naechste Takt zieht sie binnen einer Sekunde auf
+         435 zurueck (drei Messungen, jedes Mal derselbe Wert). Mit dem Riegel bleibt sie bei 0.
+     (2) NUR WENN DER KNOPF NICHT OHNEHIN IM STREIFEN LIEGT. Der Wechsel-Riegel allein wuerde auch
+         dann scrollen, wenn der Knopf schon zu sehen ist - ein Ruck ohne Gewinn.
+     Der Schluessel wird erst gemerkt, wenn die Zeile wirklich ausgemessen ist (`clientWidth > 0`);
+     sonst verbraeuchte ein Durchlauf bei ausgeblendetem Reiter den Wechsel, und der Knopf bliebe
+     beim Oeffnen doch draussen.
+
+     KEIN `scrollIntoView`: Mit `block:'start'` scrollt es die SEITE mit (genau der Fehler, den
+     `scroll-margin-top` oben repariert), und `inline:'nearest'` legt den Knopf an den Rand statt
+     in die Mitte. `scrollLeft` aus den Rechtecken zu rechnen kostet drei Zeilen und beruehrt die
+     Seite nicht (gemessen: window.scrollY unveraendert).
+
+     AM PC TUT DIE FUNKTION NICHTS, und zwar bauartbedingt statt per Breiten-Abfrage: Dort bricht
+     die Zeile um, `scrollWidth` ist gleich `clientWidth` (gemessen bei 1400 px: 888 zu 888), und
+     der Riegel darauf greift. Dieselbe Zeile am Handy: 783 zu 348. */
+  const _unterreiterGezeigt = {};
+  function aktivenKnopfZeigen(leisteSelektor, attribut, schluessel){
+    const leiste = document.querySelector(leisteSelektor);
+    if (!leiste || !leiste.clientWidth) return;
+    if (_unterreiterGezeigt[leisteSelektor] === schluessel) return;
+    _unterreiterGezeigt[leisteSelektor] = schluessel;
+    if (leiste.scrollWidth <= leiste.clientWidth + 2) return;   // nicht wischbar - nichts zu holen
+    let knopf = null;
+    for (const b of leiste.querySelectorAll('[' + attribut + ']')){
+      if (b.getAttribute(attribut) === schluessel){ knopf = b; break; }
+    }
+    if (!knopf) return;
+    const lr = leiste.getBoundingClientRect(), br = knopf.getBoundingClientRect();
+    if (br.left >= lr.left - 1 && br.right <= lr.right + 1) return;   // liegt schon im Streifen
+    const ziel = leiste.scrollLeft + (br.left - lr.left) - Math.max(0, (leiste.clientWidth - br.width) / 2);
+    leiste.scrollLeft = Math.max(0, Math.min(ziel, leiste.scrollWidth - leiste.clientWidth));
+  }
   // Der Abstand fuer Sprungziele haengt an der HOEHE der klebenden Reiterleiste - und die ist
   // keine Konstante: Sie wechselt mit dem Formfaktor (94 px am PC, 118 bzw. 159 px am Handy) und
   // waechst mit jedem Reiter. Gemessen statt nachgerechnet, aus demselben Grund wie bei
@@ -71785,6 +71851,20 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // CSS-Variable stoesst das Layout an.
     if (!h || h === _sprungAbstand) return;
     _sprungAbstand = h;
+    /* ZWEI Variablen aus EINER Messung - die 10 px Luft sind nicht fuer jeden Zweck richtig
+       (UI-5a-Nachtrag, 12.09.2026). `--sprung-abstand` ist bewusst Hoehe + 10: Ein Sprungziel soll
+       UNTER der Leiste anfangen, nicht an ihrer Unterkante kleben. Als KLEBEPUNKT fuer ein zweites
+       Band erzeugt dieselbe Zahl aber einen 10 px hohen Streifen zwischen den Baendern, durch den
+       der scrollende Inhalt sichtbar hindurchlaeuft - GEMESSEN am 12.09.2026 bei 390x844,
+       Flotte/Werft, Position 1400: `.tabs` 0-159, `#fleetStickyBar` 169-219, Spalt 10 px, und
+       `document.elementFromPoint(195, 164)` lieferte mitten im Spalt `div.mark-row`. Bei 700 px und
+       in der Querlage (844x390, 740x360) dasselbe Bild: Spalt 10, im Spalt `div.card-row` bzw.
+       `summary`. Genau diese Erscheinung hat das Projekt am 01.08.2026 schon einmal repariert
+       (Kommentar am deckenden Hintergrund der Reiterleiste) - dort lief der Inhalt DURCH die
+       Leiste, hier zwischen zwei Leisten hindurch.
+       Die ROHE Hoehe steht deshalb als eigene Variable daneben. Eine zweite MESSUNG waere eine
+       zweite Wahrheit; zwei Ableitungen aus derselben Messung sind es nicht. */
+    document.documentElement.style.setProperty('--leisten-hoehe', h + 'px');
     document.documentElement.style.setProperty('--sprung-abstand', (h + 10) + 'px');
   }
   function klappenFrei(){
@@ -73644,6 +73724,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         btn.classList.toggle('on', btn.getAttribute('data-fleet-subtab')===fleetSub);
         btn.onclick = () => { state.fleetSubTab = btn.getAttribute('data-fleet-subtab'); render(); save(); };
       });
+      aktivenKnopfZeigen('#fleetSubtabs', 'data-fleet-subtab', fleetSub);
       const usedFlS = activeFleetMissionCount(), maxFlS = maxConcurrentFleets(), usedSqS = shipQueueCount();
       const missionsNote = document.getElementById('fleetSubtabMissionsNote');
       // „unterwegs" waere falsch, sobald ein Sammelauftrag mitzaehlt: Der fliegt nicht, er steht
@@ -75102,6 +75183,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           btn.classList.toggle('on', btn.getAttribute('data-officer-subtab')===offSub);
           btn.onclick = () => { state.officerSubTab = btn.getAttribute('data-officer-subtab'); render(); save(); };
         });
+        aktivenKnopfZeigen('#officerSubtabs', 'data-officer-subtab', offSub);
       }
       const cpDisplay = document.getElementById('commandPointsDisplay');
       if (cpDisplay) cpDisplay.textContent = fmt(state.commandPoints||0);
@@ -75774,6 +75856,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         btn.classList.toggle('active', btn.getAttribute('data-galaxy-subtab') === galSub);
         btn.onclick = () => { state.galaxySubTab = btn.getAttribute('data-galaxy-subtab'); render(); save(); };
       });
+      aktivenKnopfZeigen('#galaxySubtabBar', 'data-galaxy-subtab', galSub);
     } catch(e){ console.error('Galaxie-Unterreiter-Umschaltung fehlgeschlagen:', e); }
     renderGalaxyNews();
     renderAuftragsbuch();
@@ -77306,6 +77389,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           btn.classList.toggle('active', btn.getAttribute('data-alliance-subtab') === allSub);
           btn.onclick = () => { state.allianceSubTab = btn.getAttribute('data-alliance-subtab'); render(); save(); };
         });
+        aktivenKnopfZeigen('#allianceSubtabBar', 'data-alliance-subtab', allSub);
       } catch(e){ console.error('Allianz-Unterreiter-Umschaltung fehlgeschlagen:', e); }
       // Jede Box EINZELN abgesichert (02.08.2026, Spieler-Report "Allianz-Raid geht nicht").
       //
