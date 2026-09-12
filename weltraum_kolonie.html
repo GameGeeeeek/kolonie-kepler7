@@ -481,8 +481,20 @@
     .fleet-sticky b { color:#5ce1ff; font-weight:600; }
     .fleet-sticky .warn { color:#e24b4a; }
     .fleet-sticky i.ti { margin-right:3px; }
-    .fleet-subtabs { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px; }
-    .fleet-subtab { font-family:inherit; cursor:pointer; text-align:center; padding:9px 6px; font-size:12.5px; letter-spacing:0.5px; border:var(--bw-1) solid rgba(127,119,221,0.35); color:#9aa0b8; background:rgba(13,18,36,0.8); clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px); }
+    /* Die Spaltenzahl folgt der Zahl der Knoepfe: grid-auto-flow:column legt jedes Kind in eine
+       eigene Spalte, grid-auto-columns:1fr macht sie gleich breit. Bis v8.725.0 stand hier
+       repeat(3, 1fr), und die vierspaltige Abgrund-Zeile musste das per Inline-Stil ueberschreiben -
+       eine zweite Wahrheit an genau der Stelle, an der die erste schon stand. Gemessen identisch
+       zum bisherigen Verhalten (390/520/700/1400 px, je eine Knopfzeile, gleiche Knopfbreiten). */
+    .fleet-subtabs { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:8px; margin-bottom:14px; }
+    /* KEIN eigener clip-path: Der Eckenschnitt kommt aus der Sammelregel am Ende des Stylesheets
+       (Stufe --cut-sm = 7 px, dieselbe wie .tab-btn und .planet-pill). Hier stand bis v8.725.0 ein
+       fest eingetippter 9-px-Schnitt - das einzige Vorkommen dieser Formel neben der Sammelregel,
+       und damit schnitt ausgerechnet die zweite Navigationsebene anders als jeder andere Knopf.
+       Der Knopf ist ein <button> und faellt in der Sammelregel ohnehin schon unter --cut-sm; nur
+       die hoehere Spezifitaet der Klasse gewann davor. Der Schein von .fleet-subtab.on liegt
+       INNEN (inset) und geht durch den Schnitt nicht verloren. */
+    .fleet-subtab { font-family:inherit; cursor:pointer; text-align:center; padding:9px 6px; font-size:12.5px; letter-spacing:0.5px; border:var(--bw-1) solid rgba(127,119,221,0.35); color:#9aa0b8; background:rgba(13,18,36,0.8); }
     .fleet-subtab small { display:block; font-size:9px; margin-top:2px; color:#7d8199; letter-spacing:0; }
     .fleet-subtab.on { color:#5ce1ff; border-color:rgba(92,225,255,0.7); background:rgba(92,225,255,0.10); box-shadow:inset 0 0 14px rgba(92,225,255,0.18); }
     .fleet-subtab.on small { color:#8fd8ef; }
@@ -58349,7 +58361,7 @@ async function claimPendingRewards(){
         ${tiefenListe.length ? `<div class="bmeta" style="margin-bottom:6px; color:#7d8199;">${soTief>0 ? soTief+' der geladenen Kommandanten '+(soTief===1?'war':'waren')+' schon mindestens so tief.' : 'Aus den geladenen Eintraegen war hier noch niemand.'}</div>` : ''}
         <button data-abgrund-start>${busy?'Tauchgang läuft ...':'<i class="ti ti-infinity" aria-hidden="true" style="margin-right:4px;"></i>Abtauchen'}</button>
       </div>
-      <div class="fleet-subtabs abgrund-reiter" style="grid-template-columns:repeat(4, 1fr); margin-bottom:12px;">
+      <div class="fleet-subtabs abgrund-reiter" style="margin-bottom:12px;">
         ${ABGRUND_REITER.map(r => `<button type="button" class="fleet-subtab${r.key===reiter?' on':''}" data-abgrund-reiter="${r.key}"><i class="ti ${r.icon}" aria-hidden="true"></i> ${r.name}<small>${r.note}</small></button>`).join('')}
       </div>
       ${reiter!=='ausbau' ? '' : `
@@ -75576,7 +75588,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
         if (html !== lastModuleBoxHtml || !moduleBox.childElementCount){
           lastModuleBoxHtml = html;
           setHtmlPreservingScroll(moduleBox, html);
-          moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); });
+          // render(); save(); wie bei jedem anderen Umschalter (data-planet-switch, die
+          // Unterreiter-Zeilen). Ohne das save() stand die Wahl bis zum naechsten Zehn-Sekunden-
+          // Takt nur im Arbeitsspeicher - gemessen: nach dem Klick 'home' im gespeicherten Stand,
+          // erst nach 14 s 'rhea'. Datenverlust war das nie, nur ein Fenster von bis zu zehn
+          // Sekunden, in dem ein Neuladen die Wahl vergisst.
+          moduleBox.querySelectorAll('[data-module-planet]').forEach(btn => btn.onclick = () => { state.activeBasePlanet = btn.getAttribute('data-module-planet'); render(); save(); });
           const upSlotBtn = moduleBox.querySelector('[data-upgrade-slot]');
           if (upSlotBtn) upSlotBtn.onclick = () => upgradeModuleSlot(pk);
           moduleBox.querySelectorAll('[data-equip-module]').forEach(btn => btn.onclick = () => equipModule(pk, btn.getAttribute('data-equip-module')));
@@ -75848,7 +75865,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
         if (html !== lastShipModuleHtml || !shipModuleBox.childElementCount){
           lastShipModuleHtml = html;
           setHtmlPreservingScroll(shipModuleBox, html);
-          shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); });
+          // Dieselbe Form wie der Standort-Umschalter darueber (gleiche Messung, gleiches Fenster).
+          shipModuleBox.querySelectorAll('[data-shipmodule-class]').forEach(btn => btn.onclick = () => { state.activeShipModuleClass = btn.getAttribute('data-shipmodule-class'); render(); save(); });
           const upShipSlotBtn = shipModuleBox.querySelector('[data-upgrade-shipmodule-slot]');
           if (upShipSlotBtn) upShipSlotBtn.onclick = () => upgradeShipModuleSlot(klasse);
           shipModuleBox.querySelectorAll('[data-equip-shipmodule]').forEach(btn => btn.onclick = () => equipShipModule(klasse, btn.getAttribute('data-equip-shipmodule')));
@@ -79367,6 +79385,30 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // favoritePlanets, collapsedSections, ascension, doctrine, ...) - sonst blieben sie `undefined` und
     // render()/Klick-Handler stürzten ohne Seiten-Reload ab (siehe applyStateDefaults()).
     applyStateDefaults();
+    /* HIER STEHT DAS SPEICHERN VOR DEM ZEICHNEN, und zwar mit Absicht (gemessen 12.09.2026).
+       Das vorangestellte await hat eine echte Wirkung: Der Vollreset ist einseitig und muss beim
+       Server angekommen sein, BEVOR irgendetwas anderes laufen darf. Wuerde render() vorher
+       laufen und dabei stolpern (der Kommentar oben zu applyStateDefaults() beschreibt genau
+       diesen Absturzpfad), bliebe der alte Spielstand auf dem Server stehen, waehrend der lokale
+       schon leer ist - und der naechste Neuladen holte ihn zurueck.
+
+       ZUR REIHENFOLGE IM SPIEL ALLGEMEIN, weil sie gleich ZWEIMAL falsch gezaehlt wurde
+       (gemessen am Stand v8.725.0): Im ausgefuehrten Code stehen 237 Stellen mit
+       render(); save(); und 18 mit save(); render();.
+       Falle 1 - Zeilengrenzen: Eine Suche, die nur einzelne Zeilen sieht, findet von den 18 nur
+       drei; die uebrigen 15 stehen ueber zwei Zeilen verteilt. Das war die erste Fehlzaehlung
+       ("es sind nur drei Ausreisser"), und sie haette fast zu einer Aenderung an 2 von 18 Stellen
+       gefuehrt - der schlechtesten aller Moeglichkeiten.
+       Falle 2 - Kommentare: Ein roher Zaehler ueber die ganze Datei findet 242 statt 237, weil
+       Kommentare wie dieser hier die Zeichenfolge selbst enthalten. Wer zaehlt, muss Kommentare
+       herausnehmen - sonst zaehlt er seine eigene Beschreibung mit.
+
+       Und die Reihenfolge ist an keiner dieser Stellen entscheidend: save() haengt seine Arbeit
+       nur als Microtask an die Speicherkette, serialisiert also ohnehin erst NACH dem synchronen
+       Block, und render() laesst den Zustand unveraendert (gemessen: JSON.stringify(state) vor
+       und nach render() zeichengleich, 15737 Zeichen, auf Basis-, Flotten- und Galaxie-Reiter).
+       Deshalb wurde KEINE der 18 Stellen umgestellt - eine Aenderung ohne gemessenen Nutzen ist
+       keine Verbesserung, und 2 von 18 umzustellen waere die schlechteste aller Moeglichkeiten. */
     await save(); render(); log('Spielstand zurückgesetzt.', 'ti-refresh');
   });
 
