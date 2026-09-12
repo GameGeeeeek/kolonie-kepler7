@@ -9,7 +9,7 @@
 // `.prog-section[data-sec]`-Abschnitte des Panels und springen auf diese. Bis UI-5b war die zweite
 // Haelfte eine handgepflegte Liste, und genau dort sassen zwei Befunde.
 //
-// DREI ZUSAGEN, DREI PRUEFGRUPPEN:
+// FUENF ZUSAGEN, FUENF PRUEFGRUPPEN:
 //
 //   A  Ein Sprung landet so, dass der Abschnittstitel unter der klebenden Reiterleiste steht und
 //      vollstaendig im Bild ist - in allen fuenf Panels. GEMESSEN am Grundstand v8.724.0 bei
@@ -23,10 +23,22 @@
 //      allianztitel, allianzanstrich, dailylogin und aussehen.
 //
 //   D  Ein Knoten mit `role="button"` und `tabindex="0"` laesst sich per Tastatur ausloesen, ohne
-//      dass die Leertaste die Seite wegscrollt - und ohne Skriptfehler, auch wenn er eine
-//      SVG-Gruppe ist. GEMESSEN am Grundstand auf der Sektorkarte: 16 der 34 so ausgezeichneten
-//      Knoten sind `<g>`-Gruppen, bei keiner ist `click` eine Funktion, und ein Enter darauf warf
-//      `TypeError: el.click is not a function`.
+//      dass die Leertaste die Seite wegscrollt - und ein Tastendruck loest GENAU EINE Aktion aus.
+//      Gemessen wird die WIRKUNG, nicht die Abwesenheit eines Fehlers: Ein Enter auf dem
+//      Weiter-Knopf der Sektoransicht muss den DIREKTEN Nachbarsektor erreichen. Eine Pruefung,
+//      die nur auf Skriptfehler sieht, ist auch dann gruen, wenn die Aktion ZWEIMAL laeuft - und
+//      genau das war der Schaden. GEMESSEN am 12.09.2026 mit Zaehlern an beiden Handlern:
+//      Grundstand v8.724.0 eine Aktion je Enter (dazu ein `TypeError: el.click is not a function`
+//      in der Konsole, der die Aktion NICHT verhindert hat), Zwischenstand zwei, Endstand eine.
+//
+//   F  Die Chips der Leiste tragen im TASTATURMODUS einen sichtbaren Fokusring. GEMESSEN am
+//      Zwischenstand (`matches(':focus-visible') === true`): `box-shadow: none`, nur der Ring des
+//      Browsers mit `outline-color rgb(16,16,16)`, und auf dem Chip liegt ein `clip-path`, der
+//      jeden aeusseren Ring wegschneidet. Deshalb wird ein INNENLIEGENDER Schatten verlangt.
+//
+//   G  Nach dem Sprung liegt der Fokus auf dem Abschnittskopf, und der naechste Tabulator-Schritt
+//      geht dort weiter. GEMESSEN am Zwischenstand: Fokus blieb auf dem Link der Leiste, der Kopf
+//      trug keinen `tabindex`, und der naechste Tabulator-Schritt lief wieder in die Leiste.
 //
 // DIE ANSCHLAG-FALLE (Hausregel: erst messen, dann urteilen)
 // ---------------------------------------------------------
@@ -42,6 +54,11 @@
 //   =sabotageA   `.prog-section[data-sec]` aus dem `scroll-margin-top`-Selektor entfernt
 //   =sabotageB   die eingesammelte Abschnittsliste bei 12 Eintraegen abgeschnitten
 //   =sabotageC   die ausloesende Zeile des delegierten keydown-Handlers entfernt
+//   =sabotageD   der Ausstieg fuer Knoten mit eigener Tastaturbedienung entfernt - der
+//                Doppelausschlag ist damit wieder da (ein Enter blaettert zwei Sektoren)
+//   =sabotageE   die Beschriftung der Leiste beim ersten Leerzeichen abgeschnitten - sie bleibt
+//                damit eine TEILZEICHENKETTE des Kopftextes und haette die alte, nur auf
+//                Enthaltensein pruefende Fassung von B3 klaglos bestanden
 // Die MUSS_FALLEN-Listen sind GEMESSEN (erst mit leeren Listen laufen lassen, dann eingetragen),
 // nicht geraten. Eine Sabotage, die gruen bleibt, ist ein Befund ueber die PRUEFUNG - nicht ueber
 // die Sabotage; eine ueberzaehlige rote Pruefung ebenso.
@@ -50,13 +67,24 @@ const { starteBrowser, SPIEL_URL, ruhigeUhren, versionAbfangen } = require('./li
 const DATEI = SPIEL_URL;
 const SAB = process.env.KEPLER_SPRUNGMARKEN_GEGENPROBE || '';
 
-// GEMESSEN am 12.09.2026, je Stand ein eigener Lauf.
+// GEMESSEN am 12.09.2026, je Stand ein eigener Lauf mit LEEREN Listen; erst danach eingetragen.
 const MUSS_FALLEN = {
-  alt:       ['A2', 'B1', 'B3', 'D4'],
+  alt:       ['A2', 'B1', 'B3', 'F1', 'G1', 'G2', 'D5'],
   sabotageA: ['A2'],
   sabotageB: ['B1'],
-  sabotageC: ['D1', 'D2']
+  sabotageC: ['D1', 'D2'],
+  sabotageD: ['D4'],
+  sabotageE: ['B3']
 };
+// Was die Zahlen dazu sagen, in Kurzform:
+//   alt        D4 bleibt GRUEN, und das ist richtig: Am Grundstand lief die Aktion je Tastendruck
+//              genau einmal (Sektor kepler -> wispern, der direkte Nachbar); nur D5 faellt, weil
+//              dabei ein `TypeError: el.click is not a function` in der Konsole landete.
+//   sabotageD  D4 faellt allein: Sektor kepler -> solmark, also ZWEI Schritte statt einem, waehrend
+//              der Weiter-Knopf Wispern-Drift verspricht. Genau die Regression, um die es ging.
+//   sabotageE  B3 faellt allein; die alte, auf Enthaltensein pruefende Fassung waere hier gruen
+//              geblieben (gemessene Beispiele: Leiste "Letzte" statt "Letzte Aenderungen",
+//              "Galaktisches" statt "Galaktisches Kompendium").
 
 const ergebnis = {};
 let fail = false;
@@ -186,10 +214,20 @@ async function oeffneReiter(page, tab){
         const k = s.querySelector('.prog-sec-header');
         const erst = k ? k.firstElementChild : null;
         const chevron = !!(erst && erst.classList && erst.classList.contains('prog-chevron'));
+        const ikonEl = (erst && !chevron) ? erst : null;
+        /* DIESELBE ABLEITUNG WIE IM CODE, Zeichen fuer Zeichen: Kopftext ohne Icon, ohne Chevron,
+           ohne Knoepfe und Links, abgeschnitten am ERSTEN Doppelpunkt. B3 verlangt danach
+           GLEICHHEIT. Die frueher geprueste Teilzeichenkette war wertlos - jede verkuerzte,
+           abgeschnittene oder Ein-Wort-Beschriftung haette sie bestanden (Sabotage E zeigt es). */
+        const sollLabel = k ? [...k.childNodes]
+          .filter(n => n !== ikonEl)
+          .filter(n => n.nodeType === 3 || (n.nodeType === 1 && n.tagName !== 'BUTTON' && n.tagName !== 'A' && !(n.classList && n.classList.contains('prog-chevron'))))
+          .map(n => n.textContent).join('').trim().split(':')[0].trim() : '';
         return { key: s.getAttribute('data-sec'),
                  verborgen: s.style.display === 'none' || getComputedStyle(s).display === 'none',
                  kopfText: k ? k.textContent.replace(/\s+/g, ' ').trim() : '',
-                 ikon: (erst && !chevron) ? erst.outerHTML : '' };
+                 sollLabel,
+                 ikon: ikonEl ? ikonEl.outerHTML : '' };
       });
       return { fehlt:false, sichtbar: leiste.style.display !== 'none' && !!leiste.offsetParent,
                eintraege, abschnitte };
@@ -314,6 +352,10 @@ async function oeffneReiter(page, tab){
   // ---- B3) Icon und Beschriftung stammen aus dem Markup ---------------------------------------
   // Die Regel, nicht die Momentaufnahme: Verglichen wird der Eintrag mit SEINEM Abschnittskopf.
   // Eine gepflegte Liste, die vom Markup abweicht, faellt hier - eine abgelesene nie.
+  // GLEICHHEIT, NICHT ENTHALTENSEIN. Bis zur Durchsicht stand hier `kopfText.indexOf(e.text) >= 0`,
+  // und das prueft die Beschriftung gar nicht: Jede verkuerzte oder Ein-Wort-Beschriftung ist eine
+  // Teilzeichenkette ihres Kopftextes und bestand klaglos. Verglichen wird deshalb gegen
+  // `sollLabel` - dieselbe Ableitung, die der Code benutzt (siehe oben).
   const abweichung = [];
   for (const t of HANDGEPFLEGT){
     for (const e of leisten[t].eintraege){
@@ -321,14 +363,86 @@ async function oeffneReiter(page, tab){
       if (!sec){ abweichung.push({ reiter:t, key:e.key, grund:'kein Abschnitt' }); continue; }
       if (e.ikon !== sec.ikon) abweichung.push({ reiter:t, key:e.key, grund:'Icon', leiste:e.ikon, markup:sec.ikon });
       else if (!e.text) abweichung.push({ reiter:t, key:e.key, grund:'leere Beschriftung' });
-      else if (sec.kopfText.indexOf(e.text) < 0) abweichung.push({ reiter:t, key:e.key, grund:'Beschriftung', leiste:e.text, markup:sec.kopfText });
+      else if (e.text !== sec.sollLabel) abweichung.push({ reiter:t, key:e.key, grund:'Beschriftung ungleich', leiste:e.text, soll:sec.sollLabel, markup:sec.kopfText });
     }
   }
   const mitIkon = HANDGEPFLEGT.reduce((n, t) => n + leisten[t].eintraege.filter(e => e.ikon).length, 0);
-  merke('B3: jeder Eintrag traegt Icon und Beschriftung seines Abschnittskopfs',
+  merke('B3: jeder Eintrag traegt Icon und Beschriftung seines Abschnittskopfs (Gleichheit)',
     abweichung.length === 0 && mitIkon >= 1, { abweichung: abweichung.slice(0, 4), mitIkon });
 
   merke('E1: bis hierher keine Skriptfehler', fehler.length === 0, fehler.slice(0, 2));
+
+  // ---- F1) Fokusring der Chips - GEMESSEN im Tastaturmodus, nicht im Quelltext ----------------
+  /* Die Leiste ist im Fortschritt 20 Links lang und damit die Hauptnavigation dieses Panels.
+     `:focus-visible` greift nur nach einer echten Tastatureingabe - deshalb VOR dem
+     programmatischen Fokussieren ein Tabulator-Schritt; ohne ihn misst die Pruefung den
+     Mausmodus und faellt aus dem falschen Grund.
+     `geschnitten` ist die VORBEDINGUNG und keine Beigabe: Nur weil auf dem Chip ein `clip-path`
+     liegt, der jeden aeusseren Ring wegschneidet, muss der Ring INNEN liegen. Faellt der Schnitt
+     eines Tages weg, sagt diese Pruefung das laut, statt still weiterzulaufen. */
+  await oeffneReiter(page, 'fortschritt');
+  await page.keyboard.press('Tab');
+  const ring = await page.evaluate(() => {
+    const a = document.querySelector('#jumpnav-fortschritt a');
+    if (!a) return { kein:true };
+    a.focus();
+    const cs = getComputedStyle(a);
+    return { kein:false, chips: document.querySelectorAll('#jumpnav-fortschritt a').length,
+             fokus: document.activeElement === a, fokusVisible: a.matches(':focus-visible'),
+             geschnitten: cs.clipPath !== 'none', innen: /inset/.test(cs.boxShadow),
+             boxShadow: cs.boxShadow, outline: cs.outlineStyle + ' ' + cs.outlineWidth + ' ' + cs.outlineColor };
+  });
+  merke('F1: die Sprungmarken tragen im Tastaturmodus einen INNENLIEGENDEN Fokusring',
+    !ring.kein && ring.fokus && ring.fokusVisible && ring.geschnitten && ring.innen, ring);
+
+  // ---- G) Nach dem Sprung wandert der Fokus mit ------------------------------------------------
+  /* Gemessen werden beide Zweige: `fortschritt` faellt in den handgepflegten (Ziel ist eine
+     `.prog-section`, Kopf die `.prog-sec-header`), `basis` in den selbstwartenden (Ziel IST der
+     Abschnittskopf `[data-acc-key]`). scrollY und maxScroll laufen mit, damit sichtbar bleibt,
+     ob die Messung am Seitenanschlag stattfand. */
+  const fokusSprung = {};
+  for (const t of ['fortschritt', 'basis']){
+    await oeffneReiter(page, t);
+    fokusSprung[t] = await page.evaluate(async tt => {
+      window.scrollTo(0, 0);
+      await new Promise(r => setTimeout(r, 350));
+      const as = [...document.querySelectorAll('#jumpnav-' + tt + ' a')];
+      const a = as[Math.min(3, as.length - 1)];
+      if (!a) return { kein:true };
+      const sec = a.getAttribute('data-jump-to');
+      const box = sec ? document.querySelector('.prog-section[data-sec="' + CSS.escape(sec) + '"]')
+                      : document.querySelector('[data-acc-key="' + CSS.escape(a.getAttribute('data-jump-acc')) + '"]');
+      const kopf = sec ? (box && box.querySelector('.prog-sec-header')) : box;
+      window.__ui5bKopf = kopf;
+      a.focus();
+      a.click();
+      await new Promise(r => setTimeout(r, 2400));
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const sy = Math.round(window.scrollY);
+      return { kein:false, key: sec || a.getAttribute('data-jump-acc'),
+               aufKopf: !!kopf && document.activeElement === kopf,
+               aufLeiste: document.activeElement === a,
+               tabindex: kopf ? kopf.getAttribute('tabindex') : null,
+               oben: kopf ? Math.round(kopf.getBoundingClientRect().top) : null,
+               scrollY: sy, maxScroll: Math.round(maxScroll), amAnschlag: sy >= Math.round(maxScroll) - 2 };
+    }, t);
+    // Der naechste Tabulator-Schritt muss beim ZIEL weitergehen - nicht wieder in der Leiste.
+    await page.keyboard.press('Tab');
+    fokusSprung[t].weiter = await page.evaluate(tt => {
+      const leiste = document.getElementById('jumpnav-' + tt);
+      const ae = document.activeElement;
+      const kopf = window.__ui5bKopf;
+      const folgt = !!(kopf && ae && (kopf.compareDocumentPosition(ae) & Node.DOCUMENT_POSITION_FOLLOWING));
+      return { inLeiste: !!leiste && leiste.contains(ae), folgt, tag: ae ? ae.tagName : null };
+    }, t);
+  }
+  const GZWEIGE = ['fortschritt', 'basis'];
+  merke('G1: nach dem Sprung liegt der Fokus auf dem Abschnittskopf (tabindex=-1, beide Zweige)',
+    GZWEIGE.every(t => !fokusSprung[t].kein && fokusSprung[t].aufKopf && fokusSprung[t].tabindex === '-1'),
+    fokusSprung);
+  merke('G2: der naechste Tabulator-Schritt geht hinter dem Ziel weiter, nicht in der Leiste',
+    GZWEIGE.every(t => !fokusSprung[t].kein && !fokusSprung[t].weiter.inLeiste && fokusSprung[t].weiter.folgt),
+    GZWEIGE.map(t => t + '=' + JSON.stringify(fokusSprung[t].weiter)).join(' '));
 
   // ---- D) Tastatur ----------------------------------------------------------------------------
   // Gemessen wird, ob der SCHALTER umspringt - nicht, ob irgendwo ein Handler im Quelltext steht.
@@ -370,28 +484,68 @@ async function oeffneReiter(page, tab){
   merke('D3: keine der beiden Tasten scrollt die Seite weg',
     scrollDelta.every(d => d.delta < grenze), { grenze, gross: scrollDelta.filter(d => d.delta >= grenze) });
 
-  // ---- D4) Dieselbe Zusage fuer die SVG-Gruppen der Sektorkarte -------------------------------
-  // `click()` steht an HTMLElement, nicht an SVGElement. Der delegierte Handler muss das
-  // aushalten; tut er es nicht, sieht der Spieler nichts und die Konsole einen TypeError.
+  // ---- D4/D5) Dieselbe Zusage fuer die SVG-Gruppen der Sektorkarte ----------------------------
+  /* GEMESSEN WIRD DIE WIRKUNG, NICHT DIE ABWESENHEIT EINES FEHLERS.
+     Die frueher hier stehende Pruefung fokussierte die erste SVG-Gruppe, drueckte Enter und
+     urteilte allein danach, ob kein Skriptfehler kam. Sie war damit auch dann gruen, wenn die
+     Aktion ZWEIMAL lief - und genau das war der Schaden: Der Weiter-Knopf blaetterte zwei
+     Sektoren statt einen, weil der Knoten seine Tastatur selbst bedient UND der delegierte
+     Handler noch einen Klick hinterherschickte.
+     Die MARKE, die der Tastendruck nachweislich bewegt, ist der geoeffnete Sektor
+     (`[data-kb-titel]`). Zwei Anker halten fest, dass es der DIREKTE Nachbar ist und nicht der
+     uebernaechste, und beide stammen aus der Seite selbst statt aus einer zweiten Liste:
+       - die Beschriftung des Weiter-Knopfes NENNT den direkten Nachbarn (aria-label),
+       - nach einem Schritt nach rechts muss der Zurueck-Knopf den Sektor nennen, aus dem man kam.
+     Der Sektorname wird dabei NUR aus den Textknoten gelesen: Das `<text>`-Element traegt ein
+     `<title>`-Kind mit Name UND Sektor-Eigenart, `textContent` wuerde beides mischen. */
   await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
   await page.waitForTimeout(2600);
+  // In die Sektoransicht wechseln - die Weiter-Knoepfe gibt es nur dort.
+  const regionen = await page.evaluate(() =>
+    [...document.querySelectorAll('#galaxyMapSvg [data-sektor]')].map(g => g.getAttribute('data-sektor')));
+  await page.evaluate(k => {
+    const g = document.querySelector('#galaxyMapSvg [data-sektor="' + k + '"]');
+    if (g) g.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+  }, regionen[0]);
+  await page.waitForTimeout(1800);
   const svgStand = await page.evaluate(() => {
+    const nurText = el => el ? [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : null;
     const alle = [...document.querySelectorAll('[role="button"][tabindex="0"]')];
     const svg = alle.filter(e => e.ownerSVGElement && e.getBoundingClientRect().width > 1);
-    const g = svg[0];
-    if (!g) return { kein:true, gesamt: alle.length };
-    g.focus();
+    const knopf = document.querySelector('#galaxyMapSvg [data-kb-knopf="rechts"]');
+    const zurueck = document.querySelector('#galaxyMapSvg [data-kb-knopf="links"]');
+    const titel = document.querySelector('#galaxyMapSvg [data-kb-titel]');
+    if (!knopf || !titel || !zurueck) return { kein:true, gesamt: alle.length, svg: svg.length };
+    knopf.focus();
     return { kein:false, gesamt: alle.length, svg: svg.length,
              ohneClickFn: svg.filter(e => typeof e.click !== 'function').length,
-             fokusOk: document.activeElement === g, marke: g.getAttribute('class') };
+             mitEigenemKeydown: svg.filter(e => typeof e.onkeydown === 'function').length,
+             fokusOk: document.activeElement === knopf,
+             knopfIstSvg: !!knopf.ownerSVGElement && typeof knopf.click !== 'function',
+             sektorVor: titel.getAttribute('data-kb-titel'), nameVor: nurText(titel),
+             nachbarRechts: knopf.getAttribute('aria-label') };
   });
   const fehlerVorTaste = fehler.length;
   if (!svgStand.kein) await page.keyboard.press('Enter');
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(1800);
+  const svgNach = await page.evaluate(() => {
+    const nurText = el => el ? [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : null;
+    const titel = document.querySelector('#galaxyMapSvg [data-kb-titel]');
+    const zurueck = document.querySelector('#galaxyMapSvg [data-kb-knopf="links"]');
+    if (!titel || !zurueck) return { kein:true };
+    return { kein:false, sektorNach: titel.getAttribute('data-kb-titel'), nameNach: nurText(titel),
+             nachbarLinks: zurueck.getAttribute('aria-label') };
+  });
   const neueFehler = fehler.slice(fehlerVorTaste);
-  merke('D4: Enter auf einer SVG-Gruppe der Sektorkarte wirft keinen Skriptfehler',
-    !svgStand.kein && svgStand.fokusOk && svgStand.ohneClickFn >= 1 && neueFehler.length === 0,
-    { svgStand, neueFehler: neueFehler.slice(0, 2) });
+  merke('D4: Enter auf dem Weiter-Knopf erreicht den DIREKTEN Nachbarsektor (genau eine Aktion)',
+    !svgStand.kein && !svgNach.kein && svgStand.fokusOk && svgStand.knopfIstSvg &&
+    !!svgStand.sektorVor && svgNach.sektorNach !== svgStand.sektorVor &&
+    svgNach.nameNach === svgStand.nachbarRechts && svgNach.nachbarLinks === svgStand.nameVor,
+    { svgStand, svgNach });
+  merke('D5: dabei faellt kein Skriptfehler an (SVG-Gruppen koennen kein click())',
+    !svgStand.kein && svgStand.ohneClickFn >= 1 && neueFehler.length === 0,
+    { ohneClickFn: svgStand.ohneClickFn, mitEigenemKeydown: svgStand.mitEigenemKeydown,
+      svg: svgStand.svg, gesamt: svgStand.gesamt, neueFehler: neueFehler.slice(0, 2) });
 
   await ctx.close();
   await browser.close();

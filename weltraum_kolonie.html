@@ -1774,6 +1774,16 @@
     .jumpnav { display:flex; gap:6px; flex-wrap:wrap; background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.07); padding:8px; margin-bottom:14px; }
     .jumpnav a { font-size:10px; padding:4px 9px; background:var(--elev-2); color:#9fa3ba; white-space:nowrap; text-decoration:none; }
     .jumpnav a:hover { background:rgba(var(--primary-rgb),0.18); color:#fff; }
+    /* Fokusring der Sprungmarken NACH INNEN (UI-5b, 12.09.2026). Die Leiste ist im Fortschritt
+       20 Links lang und damit die Hauptnavigation dieses Panels - fuer Tastaturnutzer gab es
+       trotzdem keine erkennbare Marke. GEMESSEN im Tastaturmodus, nicht im Quelltext gelesen
+       (`matches(':focus-visible') === true`): `box-shadow: none`, nur der Ring des Browsers mit
+       `outline: 1px auto rgb(16,16,16)` - fast schwarz auf dunklem Grund -, und auf dem Chip liegt
+       `clip-path: polygon(5px 0px, …)` aus dem Eckenschnitt. Der schneidet jeden AEUSSEREN Ring
+       weg; ein `outline-offset` waere danach unsichtbar. Deshalb dieselbe Loesung, die das
+       Projekt fuer die Schalter-Zeilen schon hat: Ring als INNENLIEGENDER Schatten. */
+    .jumpnav a:focus { outline:none; }
+    .jumpnav a:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--c-info), inset 0 0 12px rgba(var(--info-rgb),0.35); }
     .prog-chevron { display:none; margin-left:auto; font-size:12px; transition:transform 0.15s ease; }
     .ui-accordion-on .prog-sec-header { cursor:pointer; }
     .ui-accordion-on .prog-chevron { display:inline-block; }
@@ -72264,6 +72274,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
       }
     }
   }
+  /* NACH DEM SPRUNG LIEGT DER FOKUS AUF DEM ABSCHNITTSKOPF (UI-5b, 12.09.2026).
+     Die Sprungleiste hat das Ziel bis hierher nur ins Bild gescrollt und dort aufgehoert.
+     GEMESSEN am Zwischenstand bei 900x1000: Nach dem Ausloesen lag `document.activeElement` noch
+     immer auf dem Link der Leiste (Fortschritt/eventkalender: Ziel auf Bildpunkt 168, scrollY 3172
+     von maxScroll 19443 - also NICHT am Anschlag), der Abschnittskopf trug weder `tabindex` noch
+     `id`, und die Adresszeile blieb leer. Der naechste Tabulator-Schritt ging deshalb bei der
+     LEISTE weiter, nicht beim Ziel: Wer mit Tastatur oder Vorlesehilfe springt, stand danach
+     genau da, wo er vorher stand.
+     `tabindex="-1"` haelt den Kopf aus der Tabulator-Reihe heraus und macht ihn trotzdem
+     programmatisch fokussierbar. `preventScroll` ist kein Beiwerk: Ohne es scrollt der Fokus das
+     Ziel ein zweites Mal an und ueberschreibt die weiche Bewegung, die gerade laeuft. */
+  function sprungFokusSetzen(kopf){
+    if (!kopf || typeof kopf.focus !== 'function') return;
+    if (kopf.getAttribute('tabindex') === null) kopf.setAttribute('tabindex', '-1');
+    try { kopf.focus({ preventScroll: true }); } catch(e){}
+  }
   function render(){
     applyPowerSaveClass(); // Energiesparmodus-Klasse (billig: ein classList.toggle) - greift auch nach Laden/Sync eines fremden Spielstands
     applyCompactHeadClass(); // dito für die kompakte Kopfzeile - ebenfalls nur ein classList.toggle
@@ -77857,7 +77883,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
               const key = a.getAttribute('data-jump-to');
               if (state.uiCollapsibleSections) state.collapsedSections[key] = false;
               const target = document.querySelector(`.prog-section[data-sec="${key}"]`);
-              if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); }
+              if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); sprungFokusSetzen(target.querySelector('.prog-sec-header')); }
             });
           }
         }
@@ -77932,7 +77958,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
                   render(); save();
                 }
                 const ziel = document.querySelector('[data-acc-key="'+CSS.escape(k)+'"]');
-                if (ziel) ziel.scrollIntoView({ behavior:'smooth', block:'start' });
+                if (ziel){ ziel.scrollIntoView({ behavior:'smooth', block:'start' }); sprungFokusSetzen(ziel); }
               });
             }
           }
@@ -79156,18 +79182,44 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (!el || el.getAttribute('role') !== 'button') return;
     // Native Knoepfe und Links bringen das von sich aus mit - nicht doppelt ausloesen.
     if (el.tagName === 'BUTTON' || el.tagName === 'A') return;
+    /* WER SEINE TASTATUR SELBST BEDIENT, WIRD HIER NICHT ANGEFASST (UI-5b, 12.09.2026).
+       Der Ausstieg steht bewusst VOR `preventDefault()`: Der eigene Handler des Knotens soll das
+       Ereignis unveraendert bekommen, so wie er es vor dieser Delegation bekommen hat.
+
+       GEMESSEN, statt aus dem Quelltext geschlossen. Inventur ueber das GANZE Dokument am
+       12.09.2026: `role="button"` steht 34-mal in der Datei, 23 davon sind echte Markup-Stellen
+       (die uebrigen 11 stehen in Kommentaren und CSS-Selektoren), und alle 23 tragen
+       `tabindex="0"`. Zur Laufzeit ueber ALLE Reiter gemessen - dreizehn Spiel-Reiter, die
+       Einstellungen und zusaetzlich die Sektoransicht der Karte: je Ansicht 36 bis 45 solcher
+       Knoten gleichzeitig, davon bis zu 25 mit EIGENEM `onkeydown` (23 SVG-Gruppen der
+       Sektoransicht plus die zwei Zeilen der Server-Ereignisse).
+
+       KEINER dieser eigenen Handler ruft `stopPropagation()`. Ohne diesen Ausstieg lief die Aktion
+       deshalb ZWEIMAL je Tastendruck - erst im eigenen Handler, dann noch einmal ueber den Klick
+       von hier unten. Gemessen mit Zaehlern an beiden Handlern: Weiter-Knopf der Sektoransicht 2,
+       Region der Sektoren-Uebersicht 2, Zeile der Server-Ereignisse 2, zum Vergleich eine Zeile
+       ohne eigenen Handler (`#uiJumpNavToggleRow`) 1. Ein Enter auf dem Weiter-Knopf blaetterte
+       damit zwei Sektoren statt einen. Nach diesem Ausstieg: ueberall 1.
+       Die Zeile der Server-Ereignisse (`[data-notif-go]`) und die Admin-Uebersicht
+       (`[data-uebersicht-konto]`) tragen dasselbe Muster und doppelten schon VOR UI-5b - sie sind
+       HTML, ihr `click()` lief also klaglos durch. Gemessen am Grundstand v8.724.0: 2. Derselbe
+       Ausstieg heilt sie mit. */
+    if (typeof el.onkeydown === 'function') return;
     e.preventDefault();
     /* SVG-Gruppen koennen kein `click()` (UI-5b, 12.09.2026). `click()` steht an HTMLElement, nicht
-       an SVGElement. GEMESSEN am Grundstand v8.724.0 auf dem Galaxie-Reiter: 34 Knoten tragen
-       role="button" + tabindex="0", davon sind 16 `<g>`-Gruppen der Sektorkarte (Regionen,
+       an SVGElement. GEMESSEN am Grundstand v8.724.0: In der Sektoransicht tragen 45 Knoten
+       role="button" + tabindex="0", davon sind 23 `<g>`-Gruppen der Sektorkarte (Regionen,
        Systeme, Ebenen-Knoepfe, Hinweis-Treffer), und bei KEINER davon ist `click` eine Funktion.
-       Ein Enter darauf lief bis hierher und warf dann "Uncaught TypeError: el.click is not a
-       function" - ausgeloest wurde nichts, gemeldet wurde dem Spieler nichts. Damit war das
-       Versprechen von role="button" fuer knapp die Haelfte aller so ausgezeichneten Knoten
-       ungedeckt, obwohl der Fokus dort laut Messung ankommt.
-       Die Kartenknoten haengen ihre Klick-Handler per `addEventListener` an sich selbst
-       (`[data-sektor-sys]`, `[data-kb-knopf]`, `[data-sektor-hinweise-treffer]`); ein
-       abgeschicktes Klick-Ereignis erreicht sie deshalb genauso wie ein echter Zeigerklick. */
+       WAS DABEI WIRKLICH PASSIERTE - und was ein frueherer Stand dieses Kommentars falsch
+       behauptet hat: Die Aktion lief trotzdem, und zwar GENAU EINMAL. Der eigene `onkeydown` des
+       Knotens hatte sie da laengst ausgefuehrt; erst danach kam das Ereignis hier an, und erst
+       hier flog "Uncaught TypeError: el.click is not a function". Der Fehler stand also in der
+       Konsole, die Bedienung war davon unberuehrt - gemessen am Grundstand mit Zaehlern an beiden
+       Handlern: 1 Aktion je Enter, 1 Konsolenfehler je Enter.
+       Der Rueckfall bleibt trotzdem stehen, aber fuer die Knoten OHNE eigenen Handler: Wer eine
+       SVG-Gruppe mit `role="button"` ohne eigenen `onkeydown` anlegt, bekommt von hier einen
+       echten Klick statt eines Konsolenfehlers. Die heutigen Kartenknoten haengen ihre Handler an
+       sich selbst und werden durch den Ausstieg oben gar nicht mehr erreicht. */
     if (typeof el.click === 'function') el.click();
     else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
   });
