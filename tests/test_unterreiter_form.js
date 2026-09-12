@@ -19,11 +19,18 @@
 //      Die beiden Warnungen des Vertrags sind eigene Prüfungen: JEDER Teilschein muss INNEN liegen
 //      (1c) und der Fokusring muss sichtbar sein (1d) - der Schnitt nimmt beides weg, wenn es
 //      außen liegt. Beide Prüfungen waren zunächst grün aus dem falschen Grund und sind nach
-//      Befunden nachgeschärft worden: 1c prüfte nur, ob IRGENDWO `inset` vorkommt (box-shadow ist
-//      eine Liste, ein zweiter äußerer Schein rutschte durch); 1d ließ `outline-offset: 0` als
-//      „nicht außen" durchgehen, obwohl ein Ring mit positiver Breite dort außerhalb der
-//      Rahmenkante gezeichnet und weggeschnitten wird. Die Werte, die 1d dafür braucht, sammelte
-//      sie damals schon ein und warf sie weg.
+//      Befunden nachgeschärft worden:
+//        1c prüfte nur, ob IRGENDWO `inset` vorkommt - box-shadow ist eine Liste, ein zweiter
+//        äußerer Schein rutschte durch.
+//        1d ließ `outline-offset: 0` als „nicht außen" durchgehen, obwohl ein Ring mit positiver
+//        Breite dort außerhalb der Rahmenkante gezeichnet und weggeschnitten wird. Die Werte
+//        dafür sammelte sie damals schon ein und warf sie weg.
+//      DIE ERSTE KORREKTUR VON 1d WAR SELBST GRÜN AUS DEM FALSCHEN GRUND, und das ist die
+//      eigentliche Lehre dieser Datei: Sie verlangte einen innenliegenden Schatten - aber der
+//      gemessene Knopf ist der AKTIVE und trägt ohnehin einen. Die Prüfung sah `inset` und war
+//      zufrieden, obwohl der Fokus nichts hinzufügte; die Sabotage „Ring nach außen" blieb grün.
+//      Aufgefallen ist das allein durch die Gegenprobe. Deshalb misst 1d heute die DIFFERENZ
+//      zwischen fokussiert und nicht fokussiert, nicht den Endzustand.
 //
 //   B  DIE SPALTENZAHL FOLGT DER ZAHL DER KNÖPFE. `.fleet-subtabs` stand auf
 //      grid-template-columns:repeat(3, 1fr); die vierspaltige Abgrund-Zeile musste das per
@@ -305,18 +312,33 @@ async function reiter(page, tab, ms){
 
     // 1d: Derselbe Grund für den Fokusring. Gemessen im Tastaturmodus - erst nach einem echten
     // Tastendruck setzt der Browser :focus-visible, und nur dann zeigt er den Ring überhaupt.
+    //
+    // GEMESSEN WIRD DIE DIFFERENZ, nicht der Endzustand - und zwar aus einem Grund, der beim
+    // ersten Anlauf zugeschlagen hat: Der erste Knopf der Zeile ist der AKTIVE, und der trägt
+    // ohnehin einen innenliegenden Schein als Aktiv-Markierung. Eine Prüfung, die nur fragt, ob im
+    // fokussierten Zustand irgendwo `inset` steht, ist deshalb auch dann grün, wenn der Fokus gar
+    // nichts hinzufügt. Genau so blieb die Sabotage „Ring nach außen" zunächst grün.
+    // Also: Schatten OHNE Fokus merken, Schatten MIT Fokus messen, und verlangen, dass der Fokus
+    // etwas Innenliegendes HINZUFÜGT (oder den Ring vollständig nach innen zieht).
     await reiter(page, 'flotte', 900);
+    const ohneFokus = await page.evaluate(() => {
+      const b = document.querySelector('#fleetSubtabs [data-fleet-subtab]');
+      if (!b) return null;
+      try { b.blur(); } catch(e){}
+      return getComputedStyle(b).boxShadow;
+    });
     await page.focus('#fleetSubtabs [data-fleet-subtab]');
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
-    const fokus = await page.evaluate(() => {
+    const fokus = await page.evaluate((vorher) => {
       const b = document.querySelector('#fleetSubtabs [data-fleet-subtab]');
       if (!b) return null;
       const c = getComputedStyle(b);
       let fv = false; try { fv = b.matches(':focus-visible'); } catch(e){}
       return { amKnopf:document.activeElement === b, fokusSichtbar:fv, versatz:c.outlineOffset,
-               stil:c.outlineStyle, breite:c.outlineWidth, schatten:c.boxShadow };
-    });
+               stil:c.outlineStyle, breite:c.outlineWidth, schatten:c.boxShadow,
+               schattenOhneFokus:vorher, aktiv:b.classList.contains('on') };
+    }, ohneFokus);
     // BEFUND DER EXTERNEN DURCHSICHT (12.09.2026): Die alte Bedingung lautete
     // `stil !== 'none' && parseFloat(versatz) <= 0`. Sie sammelte `breite` und `schatten` ein und
     // benutzte BEIDES NICHT. Ein Ring mit 1 px Breite und Versatz 0 wird außerhalb der Rahmenkante
@@ -326,16 +348,24 @@ async function reiter(page, tab, ms){
     //
     // Sichtbar ist der Ring auf einer geschnittenen Fläche nur auf zwei Arten, und die Prüfung
     // verlangt jetzt eine davon:
-    //   (a) ein INNENLIEGENDER Schatten trägt ihn (das Hausmuster), oder
-    //   (b) der Versatz ist mindestens so negativ wie die Ringbreite, zieht den Ring also
-    //       vollständig nach innen.
+    //   (a) der Fokus FÜGT einen innenliegenden Teilschatten HINZU (das Hausmuster), oder
+    //   (b) der gezeichnete Ring liegt vollständig innen, der Versatz ist also mindestens so
+    //       negativ wie die Ringbreite.
+    // Das „fügt hinzu" in (a) ist nicht Feinschliff, sondern der Kern: Der gemessene Knopf ist der
+    // aktive und trägt seinen Aktiv-Schein ohnehin innen. Wer nur den Endzustand ansieht, misst
+    // diesen Schein und nicht den Fokus - genau daran blieb die Sabotage im ersten Anlauf grün.
     const ringInnen = !!fokus && (() => {
-      const hatInsetRing = /inset/.test(fokus.schatten || '') && (fokus.schatten || '') !== 'none';
+      // (a) Der Fokus fügt einen innenliegenden Teilschatten HINZU, den es ohne ihn nicht gab.
+      const vorher = teileVon(fokus.schattenOhneFokus === 'none' ? '' : (fokus.schattenOhneFokus || ''));
+      const nachher = teileVon(fokus.schatten === 'none' ? '' : (fokus.schatten || ''));
+      const dazu = nachher.filter(t => !vorher.includes(t));
+      const fokusRingInnen = dazu.some(t => /\binset\b/.test(t));
+      // (b) Oder der gezeichnete Ring liegt vollständig innerhalb der Rahmenkante.
       const breite = parseFloat(fokus.breite) || 0;
       const versatz = parseFloat(fokus.versatz) || 0;
       const ringGezeichnet = fokus.stil !== 'none' && breite > 0;
-      const ringGanzInnen = !ringGezeichnet || versatz <= -breite;
-      return hatInsetRing || ringGanzInnen;
+      const ringGanzInnen = ringGezeichnet && versatz <= -breite;
+      return fokusRingInnen || ringGanzInnen;
     })();
     merke('1d: im Tastaturmodus ist der Fokusring sichtbar - innenliegender Schatten oder Versatz mindestens so negativ wie die Ringbreite',
       !!fokus && fokus.amKnopf && fokus.fokusSichtbar && ringInnen, fokus);
