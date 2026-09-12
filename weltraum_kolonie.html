@@ -1121,6 +1121,59 @@
     .hero-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 1 auto; }
     .hero-stats { position:absolute; right:0; left:0; top:14px; display:flex; gap:8px; flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; padding:0 16px; scrollbar-width:none; -ms-overflow-style:none; }
     .hero-stats::-webkit-scrollbar { display:none; }
+    /* ===== Die Chip-Reihe: zwei Gruppen und ein Hinweis auf die Fortsetzung (UI-6, 12.09.2026) ===
+       WARUM GRUPPEN. Vier Chips gelten kontoweit (Level, Punktestand, Forschung, Kampfpunkte),
+       vier haengen am aktiven Standort (Flotte, Angriffspunkte, Verteidigungspunkte, Expedition).
+       Der Unterschied stand bis v8.726.0 nur in den Tooltips - am Handy also nirgends. Der
+       Standort-Titel traegt jetzt den NAMEN des Standorts; damit ist die Angabe, die vorher als
+       Klammerzusatz im Flotten-Chip stand, an der Stelle, an der sie fuer alle vier Chips gilt.
+       FORM: derselbe Kasten wie .tab-gruppe in der Reiterleiste (Flaeche, feiner Rahmen, farbige
+       Leiste links aus --bw-rail, 9,5-px-Titel). Der Eckenschnitt kommt aus der Sammelregel am
+       Ende des Stylesheets, Stufe --cut-sm - dieselbe wie .hstat und .tab-gruppe.
+       HOEHE: Die Gruppen stehen NEBEN den Chips, nicht ueber ihnen. Ein Titel ueber der Reihe
+       waere die einzige Aenderung, die die Kopfzeile am Handy hoeher machen wuerde, und dort ist
+       sie mit 206 px schon hoeher als am PC mit 190 px (der kompakte Kopf spart Grafik, nicht
+       Hoehe). Gemessen vorher/nachher bei 360/390/700/1000/1400/1500 px. */
+    /* KEIN Rahmen oben/unten und KEIN senkrechtes Polster - das ist die ganze Hoehenrechnung.
+       Erster Anlauf trug den vollen Kasten von .tab-gruppe (1 px Rahmen + 1 px Polster oben wie
+       unten): gemessen wuchs die Reihe damit von 41 auf 45 px und der Kopf am Handy von 206 auf
+       210 px. Genau das darf nicht passieren. Es bleibt bei Flaeche und farbiger Leiste links -
+       dieselbe Entscheidung wie in der Reiterleiste (dort: der linke Rand markiert, WO eine
+       Gruppe anfaengt, und kostet keine Hoehe). */
+    .hstat-gruppe { display:flex; align-items:center; gap:6px; padding:0 8px 0 6px; flex:0 0 auto;
+      background:rgba(255,255,255,0.03); border:0;
+      border-left:var(--bw-rail) solid var(--hgrp-dom); min-width:0; }
+    .hstat-gruppe[data-hstat-gruppe="konto"]    { --hgrp-dom:#c3bef5; }
+    .hstat-gruppe[data-hstat-gruppe="standort"] { --hgrp-dom:#5ce1ff; }
+    /* Deckkraft 1 wie beim Reiter-Gruppentitel - bei 9,5 px ist alles darunter eine
+       Lesbarkeitsgrenze, keine Vorliebe (Begruendung und Messung bei .tab-gruppe-titel). */
+    .hstat-gruppe-titel { font-size:9.5px; letter-spacing:.09em; text-transform:uppercase;
+      color:var(--hgrp-dom); opacity:1; white-space:nowrap; padding:0 2px; font-weight:600;
+      max-width:130px; overflow:hidden; text-overflow:ellipsis; cursor:default; }
+    /* Der Knopf klebt am rechten Rand der Wischflaeche und laeuft deshalb NICHT mit dem Inhalt
+       weg. Er kostet keine Hoehe (align-self:stretch statt eigener Hoehe) und ist verborgen,
+       solange alles ins Bild passt - siehe pflegeHeroStats(). Der Farbverlauf zeigt, dass der
+       Inhalt darunter weitergeht; ohne ihn stuende der Pfeil auf einer harten Kante. */
+    /* min-height:0 schlaegt die Handy-Regel `button { min-height:36px }` (max-width:700px)
+       AUSDRUECKLICH aus: gemessen machte sie die Reihe 36 statt 33 px hoch und den Kopf am Handy
+       damit 209 statt 206 px - die Kopfzeile darf dort aber nicht wachsen. Die Trefferflaeche
+       bleibt mit 40 x 33 px bedienbar, und wischen geht ohnehin weiter. */
+    .hstat-mehr { position:sticky; right:0; flex:0 0 auto; align-self:stretch; min-width:40px; min-height:0;
+      display:flex; align-items:center; justify-content:flex-end; padding:0 6px 0 16px; border:0;
+      background:linear-gradient(to right, rgba(10,13,26,0) 0%, rgba(10,13,26,0.93) 55%);
+      color:#5ce1ff; font-size:16px; line-height:1; }
+    .hstat-mehr:hover:not(:disabled) { background:linear-gradient(to right, rgba(10,13,26,0) 0%, rgba(10,13,26,0.93) 55%); color:#e9ecf5; }
+    .hstat-mehr[hidden] { display:none; }
+    /* UMBRUCH NUR DORT, WO PLATZ IST. Ab 1001 px steht der ausfuehrliche Kopf mit fester
+       Bannerhoehe (190 px); die Reihe liegt dort absolut bei top:14px und endet gemessen bei
+       y=70, die Knopfzeile darunter beginnt bei y=122. Eine zweite Zeile (35 px + 8 px Luecke)
+       endet bei y=113 und passt damit OHNE die Kopfzeile zu vergroessern. Darunter - und in
+       jedem kompakten Kopf - bleibt es beim Wischen: dort stapeln sich Reihe und Knopfzeile
+       statisch, jede weitere Zeile waere echte Hoehe. Umbrochen wird zwischen den GRUPPEN, nie
+       mitten in einer. */
+    @media (min-width: 1001px) {
+      body:not(.compact-head) .hero-stats { flex-wrap:wrap; }
+    }
     /* Schlanker, themenfarbener Scrollbalken für alle horizontalen Wisch-Leisten (Rollen,
        Orbitalstation-Fokus, Expeditionstyp, Modul-Standort) statt des klobigen Browser-Standards. */
     /* Bug behoben (Spieler-Report 25.07.2026, "Slider Expeditionstyp geht nicht richtig am Handy"):
@@ -1499,6 +1552,7 @@
     body.compact-head .hero-title .sub { display:none; }
     body.compact-head .header-btn-label { display:none; }
     body.compact-head .hstat { padding:3px 7px; }
+    body.compact-head .hstat-gruppe { gap:5px; padding:0 6px 0 5px; }
     body.compact-head .hstat-label { font-size:8.5px; }
     body.compact-head .hstat-value { font-size:12px; }
     /* Ressourcen: eine dichte, waagerecht wischbare Zeile statt eines 2-3-zeiligen Kachelrasters.
@@ -2876,7 +2930,7 @@
        und der Eingabefeld-Fokus auf inset umgestellt.
        ============================================================================================ */
     .hud-cut,
-    button, select, .tab-btn, .tab-gruppe, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
+    button, select, .tab-btn, .tab-gruppe, .hstat-gruppe, .chip, .jumpnav, .jumpnav a, .hstat, .card-row, .mod-slot,
     .bicon, .bicon-def, .tab-icon-badge, .rescard, .icon-badge,
     .raid-banner, .event-banner, .summary-bar,
     .fp-colony-btn, .login-teaser-item, .help-category, .help-jump-btn,
@@ -2887,7 +2941,7 @@
       border-radius: 0;
     }
     /* Zuordnung der vier Stufen: je größer die Fläche, desto größer der Schnitt. */
-    button, select, .tab-btn, .tab-gruppe, .jumpnav, .hstat, .bicon, .tab-icon-badge, .rescard,
+    button, select, .tab-btn, .tab-gruppe, .hstat-gruppe, .jumpnav, .hstat, .bicon, .tab-icon-badge, .rescard,
     .login-tabs, .login-tab, .ll-fac-sig, .ach-summary, .ach-rank,
     input[type=text], input[type=email], input[type=password], input[type=number], textarea { --cut: var(--cut-sm); }
     .chip, .jumpnav a, .icon-badge, .help-jump-btn,
@@ -3779,21 +3833,43 @@
             <button id="headerLogoutBtn" style="display:none; font-size:10.5px; padding:5px 9px; background:rgba(10,13,26,0.55); align-items:center; justify-content:center;" title="Abmelden"><i class="ti ti-logout" aria-hidden="true"></i></button>
           </div>
         </div>
+        <!-- Zwei Gruppen statt einer verschränkten Reihe (UI-6, 12.09.2026). GEMESSEN am Grundstand:
+             vier Chips gelten kontoweit, vier hängen am aktiven Standort, und die Reihenfolge im
+             Markup war Konto, Konto, Standort, Standort, Standort, Konto, Standort, Konto. Wer den
+             Standort wechselte, sah vier von neun Zahlen springen und fünf stehen bleiben; erzählt
+             wurde der Unterschied nur in den Tooltips, und ein Tooltip ist am Handy nicht abrufbar.
+             Der Gruppenkasten ist derselbe wie in der Reiterleiste (.tab-gruppe): Fläche, feiner
+             Rahmen, farbige Leiste links, 9,5-px-Titel - eine Formensprache, keine zweite.
+             .hero-stats bleibt der äußere Behälter: tests/test_spielerzahl_kopfzeile.js sucht das
+             Spielerzahl-Abzeichen über closest('.hero-stats'). -->
         <div class="hero-stats">
+          <div class="hstat-gruppe" data-hstat-gruppe="konto"><span class="hstat-gruppe-titel" title="Diese Zahlen gelten für das ganze Konto - sie ändern sich beim Standortwechsel nicht.">Konto</span>
           <div class="hstat" title="Kommandanten-Level (mehr XP = höhere Produktion)"><i class="ti ti-award" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Level</span><span id="heroLevel" class="hstat-value">0</span></div></div>
           <div class="hstat" title="Aktueller Punktestand – Zusammensetzung und Verlauf im Punktestand-Tab"><i class="ti ti-star" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Punktestand</span><span id="heroScore" class="hstat-value">0</span></div></div>
-          <div class="hstat" title="Flotte des aktuell gewählten Planeten (umschaltbar im Basis-/Flotte-Tab)"><i class="ti ti-rocket" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Flotte</span><span id="heroFleet" class="hstat-value">1 Schiff</span></div></div>
-          <div class="hstat" title="Angriffspunkte der Flotte des aktuell gewählten Planeten: bestimmen Erfolgschance und Beute bei Angriffen"><i class="ti ti-sword" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Angriffspunkte</span><span id="heroAttack" class="hstat-value">0</span></div></div>
-          <div class="hstat" title="Verteidigungspunkte des aktuell gewählten Planeten: bestimmen die Chance, NPC-Überfälle dort abzuwehren. Jeder Planet verteidigt sich mit seinen eigenen Anlagen."><i class="ti ti-shield" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Verteidigungspunkte</span><span id="heroDefense" class="hstat-value">0</span></div></div>
           <div class="hstat" title="Erforschte Technologiestufen von allen verfügbaren"><i class="ti ti-flask" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Forschung</span><span id="heroResearch" class="hstat-value">0/17</span></div></div>
-          <div class="hstat" title="Aktive Expeditionen des aktuell gewählten Planeten (Forschungsschiffe im Einsatz)"><i class="ti ti-map-2" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Expedition</span><span id="heroExpedition" class="hstat-value">0/0</span></div></div>
           <div class="hstat" title="Kampfpunkte: Wertung aus gewonnenen Kämpfen und Duellen (nicht dasselbe wie Angriffs-/Verteidigungspunkte)"><i class="ti ti-trophy" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Kampfpunkte</span><span id="heroBP" class="hstat-value">0</span></div></div>
           <!-- Spielerzahl: NUR fuer das Betreiberkonto, deshalb von Haus aus verborgen. Sie steht
                absichtlich in derselben Reihe wie Level und Punktestand und nicht in einem eigenen
                Kasten: Es ist eine Kennzahl wie die anderen, nur eine, die sonst niemanden angeht.
                Sichtbar wird sie erst, wenn der Server geantwortet hat - ein Abzeichen mit einem
-               Platzhalter statt einer Zahl waere eine Behauptung ohne Deckung. -->
+               Platzhalter statt einer Zahl waere eine Behauptung ohne Deckung.
+               Sie zaehlt kontoweit/serverweit und steht deshalb in der Konto-Gruppe. -->
           <div class="hstat" id="heroOnlineChip" style="display:none;"><i class="ti ti-users" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Online</span><span id="heroOnline" class="hstat-value">0 / 0</span></div></div>
+          </div>
+          <div class="hstat-gruppe" data-hstat-gruppe="standort"><span class="hstat-gruppe-titel" id="heroStatsOrt" title="Diese Zahlen gelten nur für den gerade gewählten Standort. Beim Wechsel springen genau sie.">Standort</span>
+          <div class="hstat" title="Flotte des aktuell gewählten Planeten (umschaltbar im Basis-/Flotte-Tab)"><i class="ti ti-rocket" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Flotte</span><span id="heroFleet" class="hstat-value">1 Schiff</span></div></div>
+          <div class="hstat" title="Angriffspunkte der Flotte des aktuell gewählten Planeten: bestimmen Erfolgschance und Beute bei Angriffen"><i class="ti ti-sword" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Angriffspunkte</span><span id="heroAttack" class="hstat-value">0</span></div></div>
+          <div class="hstat" title="Verteidigungspunkte des aktuell gewählten Planeten: bestimmen die Chance, NPC-Überfälle dort abzuwehren. Jeder Planet verteidigt sich mit seinen eigenen Anlagen."><i class="ti ti-shield" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Verteidigungspunkte</span><span id="heroDefense" class="hstat-value">0</span></div></div>
+          <div class="hstat" title="Aktive Expeditionen des aktuell gewählten Planeten (Forschungsschiffe im Einsatz)"><i class="ti ti-map-2" aria-hidden="true"></i><div class="hstat-text"><span class="hstat-label">Expedition</span><span id="heroExpedition" class="hstat-value">0/0</span></div></div>
+          </div>
+          <!-- Der Hinweis, dass die Reihe weitergeht (UI-6). GEMESSEN am Grundstand: Der Inhalt ist
+               1023-1047 px breit, die Fläche 318/348/658/738/888/988 px bei 360/390/700/1000/1400/
+               1500 px Fenster - der letzte Chip war bei KEINER dieser Breiten ganz im Bild, und der
+               Scrollbalken ist per scrollbar-width:none unsichtbar. Es gab also keinen Hinweis
+               darauf, dass dort noch etwas steht. Der Knopf klebt am Rand der Wischfläche
+               (position:sticky), kostet keine Kopfhöhe und verschwindet, sobald alles ins Bild
+               passt - er behauptet nie eine Fortsetzung, die es nicht gibt. -->
+          <button type="button" id="heroStatsMehr" class="hstat-mehr" hidden aria-label="Weitere Kennzahlen anzeigen" title="Weitere Kennzahlen anzeigen"><i class="ti ti-chevron-right" id="heroStatsMehrIcon" aria-hidden="true"></i></button>
         </div>
       </div>
 
@@ -31346,7 +31422,7 @@
     if (remain <= lead*1000){
       state.incomingRaid.detected = true;
       const targetPlanet = state.incomingRaid.planet;
-      log('Scanner erfasst eine anfliegende Flotte ('+state.incomingRaid.faction+', geschätzte Stärke: '+state.incomingRaid.preview+', ≈'+state.incomingRaid.approxPoints+' Angriffspunkte) – Ziel: '+planetDisplayName(targetPlanet)+'. Verteidigungspunkte dort: '+defensePower(targetPlanet)+'.', 'ti-alert-triangle');
+      log('Scanner erfasst eine anfliegende Flotte ('+state.incomingRaid.faction+', geschätzte Stärke: '+state.incomingRaid.preview+', ≈'+state.incomingRaid.approxPoints+' Angriffspunkte) – Ziel: '+planetDisplayName(targetPlanet)+'. Verteidigungspunkte dort: '+fmt(defensePower(targetPlanet))+'.', 'ti-alert-triangle');
       playScanPing();
       maybeAutoReinforce();
       scheduleRaidAlertOnServer();
@@ -32886,6 +32962,11 @@ async function claimPendingRewards(){
       { label:'Flotte, alle Schiffstypen ('+shipCountAll+' Schiffe)', points:Math.floor(computeShipScoreTotal()), icon:'ti-rocket', detail:shipDetailLines },
       { label:'Forschungsstufen (gesamt '+researchLevelSum+')', points:Math.floor(researchLevelSum*8), icon:'ti-flask', detail:researchLevelSum+' Stufen × 8 Punkte = '+(researchLevelSum*8) },
       { label:'Kolonien & Monde ('+colonyCount+' Kolonien, '+moonCount+' Monde)', points:Math.floor(computeExpansionScoreTotal()), icon:'ti-planet', detail:colonyCount+' × 200 + '+moonCount+' × 150 = '+computeExpansionScoreTotal() },
+      /* BEWUSST EXAKT, nicht ueber fmt() (UI-6, 12.09.2026): Diese Zeile zeigt nicht den Standwert
+         der Kampfpunkte, sondern die RECHNUNG dahinter - wie alle sieben anderen Zeilen dieses
+         Aufrisses (Gebaeude-Level, Forschungsstufen, Kolonien, Prestige, Aufstieg, Abgrund). Mit
+         fmt() staende hier 1.23M x 3 Punkte = 3.70M, und das ergibt nachgerechnet 3.69M. Eine
+         Rechnung, die nicht aufgeht, ist schlimmer als zwei Schreibweisen. */
       { label:'Kampfpunkte ('+state.battlePoints+')', points:Math.floor(state.battlePoints*3), icon:'ti-sword', detail:state.battlePoints+' × 3 Punkte = '+(state.battlePoints*3) },
       { label:'Prestige ('+(state.prestige||0)+')', points:Math.floor((state.prestige||0)*500), icon:'ti-medal', detail:(state.prestige||0)+' × 500 Punkte = '+((state.prestige||0)*500) },
       { label:'Aufstieg ('+((state.ascension&&state.ascension.count)||0)+')', points:((state.ascension&&state.ascension.count)||0)*5000, icon:'ti-sparkles', detail:((state.ascension&&state.ascension.count)||0)+' × 5000 Punkte = '+(((state.ascension&&state.ascension.count)||0)*5000) },
@@ -71973,6 +72054,55 @@ function sekSternUse(key, x, y, k, unentdeckt){
     applyCompactHeadClass();
     save();
   }
+  /* ===== Chip-Reihe der Kopfzeile: leere Gruppe und Hinweis auf die Fortsetzung (UI-6) ==========
+     ZWEI AUFGABEN, eine Signatur.
+
+     1) LEERE GRUPPE. Der Spielerzahl-Chip ist das einzige Abzeichen der Reihe, das verschwinden
+        kann (nur das Betreiberkonto sieht ihn, und auch dort erst, wenn der Server geantwortet
+        hat). Bliebe seine Gruppe uebrig, stuende ein Gruppentitel ueber nichts. Gemessen wird
+        die SICHTBARKEIT der Chips, nicht ihre Anzahl - dann traegt die Regel auch fuer jeden
+        kuenftigen Chip, der sich ausblenden darf.
+     2) HINWEIS AUF DIE FORTSETZUNG. Am Grundstand ragte die Reihe bei JEDER gemessenen Breite
+        heraus (359 bis 705 px), und der Scrollbalken ist unsichtbar - es gab keinen Hinweis
+        darauf, dass rechts noch etwas steht. Der Knopf zeigt nach rechts, solange dort etwas
+        ist, und nach links, sobald man am Ende angekommen ist; passt alles ins Bild, ist er weg.
+        Ohne die Rueckrichtung waere er eine Sackgasse: Mit der Maus gibt es ohne sichtbaren
+        Balken keinen Weg zurueck.
+
+     WARUM EINE SIGNATUR. Die Funktion haengt am Sekundentakt (render ruft sie), am Wischen und
+     am Groessenwechsel. Ohne Vergleich schriebe sie jede Sekunde dieselben Attribute - genau die
+     Klasse von Dauerschreibern, die v8.538.0 abgestellt hat (tests/test_tickruhe.js). Gelesen
+     wird trotzdem jedes Mal; das sind drei Layout-Werte und neun getComputedStyle-Abfragen. */
+  let _heroStatsSig = null;
+  function pflegeHeroStats(){
+    const reihe = document.querySelector('.hero-stats');
+    const knopf = document.getElementById('heroStatsMehr');
+    if (!reihe || !knopf) return;
+    const gruppen = Array.from(reihe.querySelectorAll('.hstat-gruppe'));
+    const leer = gruppen.map(g => !Array.from(g.querySelectorAll('.hstat'))
+      .some(c => getComputedStyle(c).display !== 'none'));
+    const rest = reihe.scrollWidth - reihe.clientWidth - Math.round(reihe.scrollLeft);
+    const richtung = rest > 2 ? 'vor' : (reihe.scrollLeft > 2 ? 'zurueck' : 'aus');
+    const sig = leer.join(',') + '|' + richtung;
+    if (sig === _heroStatsSig) return;
+    _heroStatsSig = sig;
+    gruppen.forEach((g, i) => { g.style.display = leer[i] ? 'none' : ''; });
+    knopf.hidden = (richtung === 'aus');
+    if (richtung === 'aus') return;
+    const vor = richtung === 'vor';
+    const icon = document.getElementById('heroStatsMehrIcon');
+    if (icon) icon.className = 'ti ' + (vor ? 'ti-chevron-right' : 'ti-chevron-left');
+    const text = vor ? 'Weitere Kennzahlen anzeigen' : 'Zurück zu den ersten Kennzahlen';
+    knopf.title = text;
+    knopf.setAttribute('aria-label', text);
+  }
+  function heroStatsWeiter(){
+    const reihe = document.querySelector('.hero-stats');
+    if (!reihe) return;
+    const rest = reihe.scrollWidth - reihe.clientWidth - Math.round(reihe.scrollLeft);
+    const ziel = rest > 2 ? Math.min(reihe.scrollWidth, reihe.scrollLeft + Math.round(reihe.clientWidth * 0.8)) : 0;
+    reihe.scrollTo({ left: ziel, behavior: 'smooth' });
+  }
   // Der Zahlenwert und der „/ Lager"-Teil sind ZWEI Knoten, nicht ein innerHTML-String.
   //
   // GEMESSEN (05.08.2026, MutationObserver über 12 s je Reiter): Die Zähler-Animation lief mit
@@ -72664,7 +72794,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
               <div class="dash-colony-info">
                 <div class="dash-colony-name"><span class="dash-colony-name-text">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}</span>${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ''}</div>
                 <div class="dash-colony-level">${lvlSum} Lv.${role?` <span style="color:${role.color};">· ${role.name}</span>`:''}</div>
-                <div class="dash-colony-stats" title="Angriffskraft ${dAtk} · Verteidigungspunkte ${dDef} · ${shipCount} Schiffe stationiert"><i class="ti ti-sword" aria-hidden="true"></i>${fmt(dAtk)} <i class="ti ti-shield-lock" aria-hidden="true"></i>${fmt(dDef)} <i class="ti ti-rocket" aria-hidden="true"></i>${shipCount}</div>
+                <div class="dash-colony-stats" title="Angriffskraft ${fmt(dAtk)} · Verteidigungspunkte ${fmt(dDef)} · ${shipCount} Schiffe stationiert"><i class="ti ti-sword" aria-hidden="true"></i>${fmt(dAtk)} <i class="ti ti-shield-lock" aria-hidden="true"></i>${fmt(dDef)} <i class="ti ti-rocket" aria-hidden="true"></i>${shipCount}</div>
               </div>
             </div>
           `;
@@ -76167,10 +76297,25 @@ function sekSternUse(key, x, y, k, unentdeckt){
     }).join(''));
     } // Ende Galaxie-Tab-Guard
 
-    setBoxText(document.getElementById('heroAttack'), String(attackPower()));
-    setBoxText(document.getElementById('attackCentralValue'), String(attackPower()));
-    setBoxText(document.getElementById('heroDefense'), String(defensePower(state.activeBasePlanet)));
-    setBoxText(document.getElementById('defenseCentralValue'), String(defensePower(state.activeBasePlanet)));
+    /* EIN Format je Groesse (UI-6, 12.09.2026). GEMESSEN am Grundstand mit 1.234.567 Kampfpunkten:
+       Angriffskraft stand an vier Stellen (Kopf-Chip roh, 38-px-Zentralzahl roh, Klebeleiste ueber
+       fmt, Imperium-Uebersicht ueber fmt), Verteidigungskraft an fuenf (Chip roh, Zentralzahl roh,
+       Ueberfall-Meldung roh, Imperium-Uebersicht fmt, Standortliste fmt) und die Kampfpunkte an
+       sechs (Chip roh, Profilzeile roh, Kacheln fmt, Vergleichszeile fmt, drei Teilbilder fmt).
+       fmt() ist damit an der Mehrheit jeder der drei Groessen schon gesetzt; die uebrigen Stellen
+       ziehen nach, statt zwanzig Stellen zur Minderheit zu ziehen.
+       BREITE gemessen (dieselben Knoten, nur anderer Text, 360 und 1400 px): Bei Angriff und
+       Verteidigung bestimmt das Label die Chipbreite - 109 bzw. 136 px in JEDER Schreibweise, roh
+       wie gerundet wie voll. Die Formatwahl kostet dort keinen Pixel; der Chip Kampfpunkte waere
+       mit der vollen Schreibweise 6 px (1.234.567) bis 13 px (achtstellig) breiter.
+       AUSDRUECKLICH NICHT umgestellt: der Punktestand-Aufriss. Er zeigt nicht den Standwert,
+       sondern die Rechnung (Kampfpunkte x 3 = Punkte) - in derselben exakten Schreibweise wie
+       alle anderen sieben Zeilen dort. Gerundet ergaebe sie 1.23M x 3 = 3.70M und saehe falsch
+       aus. Die Begruendung steht auch an der Stelle selbst. */
+    setBoxText(document.getElementById('heroAttack'), String(fmt(attackPower())));
+    setBoxText(document.getElementById('attackCentralValue'), String(fmt(attackPower())));
+    setBoxText(document.getElementById('heroDefense'), String(fmt(defensePower(state.activeBasePlanet))));
+    setBoxText(document.getElementById('defenseCentralValue'), String(fmt(defensePower(state.activeBasePlanet))));
     renderDefenseFormationBox();
     renderTarnungBox();
     const dsb = document.getElementById('defenseSabotageBanner');
@@ -76861,8 +77006,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
       else { setBoxText(avatarEl, (state.player.name||'K').slice(0,2).toUpperCase()); avatarEl.style.background = 'rgba(126,119,221,0.25)'; }
     }
     setBoxText(document.getElementById('profileNameDisplay'), state.player.name || 'Kommandant');
-    setBoxText(document.getElementById('profileBP'), String(state.battlePoints));
-    setBoxText(document.getElementById('profileScore'), String(computeScore()));
+    /* Beide Zahlen dieser Zeile liefen roh, obwohl dieselben Groessen im Kopf-Chip (heroBP,
+       heroScore) und in scoreTotalValue ueber fmt() laufen. Der Punktestand steht hier nur mit,
+       weil er in DERSELBEN Zeile steht: Kampfpunkte gerundet neben einer rohen Punktzahl waere
+       die naechste Zeile mit zwei Formaten. */
+    setBoxText(document.getElementById('profileBP'), String(fmt(state.battlePoints||0)));
+    setBoxText(document.getElementById('profileScore'), String(fmt(computeScore())));
 
     renderShareCardBar();
     setBoxText(document.getElementById('scoreTotalValue'), fmt(computeScore()));
@@ -78036,12 +78185,18 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // state.research auch ra_*-Schluessel - ein Object.values() ueber alles haette hier "45/42"
     // ergeben, sobald jemand drei Allianzzweige angefangen hat.
     setBoxText(document.getElementById('heroResearch'), RESEARCH_DEFS.filter(r=>state.research[r.key]).length+'/'+RESEARCH_DEFS.length);
-    setBoxText(document.getElementById('heroFleet'), cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer ('+planetDisplayName(state.activeBasePlanet)+')');
+    /* Der Standortname stand hier als Klammerzusatz und war damit die einzige Stelle, an der die
+       Reihe ihren Bezug nannte - ausgerechnet im Flotten-Chip, obwohl er fuer vier Chips gilt.
+       Er steht jetzt im Titel der Standort-Gruppe (siehe unten). Gemessen: Der Chip war dadurch
+       mit 283 px der breiteste der Reihe und machte allein 28 % ihrer Breite aus. */
+    setBoxText(document.getElementById('heroFleet'), cf.ships+' Schiff'+(cf.ships===1?'':'e')+' · '+cf.cruisers+' Kreuzer');
+    setBoxText(document.getElementById('heroStatsOrt'), planetDisplayName(state.activeBasePlanet));
     setBoxText(document.getElementById('heroExpedition'), cf.missions.filter(m=>m.type==='expedition').length+'/'+(cf.forscher||0));
     setBoxText(document.getElementById('heroLevel'), commanderLevel(state.xp||0)+(state.prestige?' · P'+state.prestige:''));
-    setBoxText(document.getElementById('heroBP'), String(state.battlePoints));
+    setBoxText(document.getElementById('heroBP'), String(fmt(state.battlePoints||0)));
     setBoxText(document.getElementById('heroScore'), fmt(computeScore()));
     zeigeSpielerzahl();
+    pflegeHeroStats();
 
     document.querySelectorAll('[data-build]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-build');
@@ -78626,6 +78781,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // Beim Drehen/Größenändern greift die Automatik neu - aber nur, solange der Spieler NICHT
     // ausdrücklich gewählt hat (state.compactHead undefined). Eine bewusste Wahl bleibt bestehen.
     window.addEventListener('resize', () => { if (state.compactHead === undefined) applyCompactHeadClass(); });
+    // Der Hinweis auf die Fortsetzung der Chip-Reihe haengt an drei Ereignissen: Wischen,
+    // Groessenwechsel und dem Sekundentakt (dort ueber render -> pflegeHeroStats).
+    const heroStatsReihe = document.querySelector('.hero-stats');
+    if (heroStatsReihe) heroStatsReihe.addEventListener('scroll', pflegeHeroStats, { passive: true });
+    window.addEventListener('resize', pflegeHeroStats);
+    const heroStatsMehrBtn = document.getElementById('heroStatsMehr');
+    if (heroStatsMehrBtn) heroStatsMehrBtn.onclick = () => heroStatsWeiter();
     const headerProfileBtn = document.getElementById('headerProfileBtn');
     if (headerProfileBtn) headerProfileBtn.onclick = () => switchTab('einstellungen');
     const headerReportsBtn = document.getElementById('headerReportsBtn');
