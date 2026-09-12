@@ -1518,8 +1518,21 @@
        das Sprungziel wieder hinter ihr (gemessen: zielOben 128 bei leisteUnten 158). Eine neue
        feste Zahl wäre beim vierzehnten Reiter derselbe Fehler; der Wert folgt deshalb der
        GEMESSENEN Leiste (`sprungAbstandSetzen`, Hausregel 50). Die 128 bleiben als Rückfall für
-       den Moment vor dem ersten Takt stehen - nicht als Entscheidung, sondern als Startwert. */
-    body.compact-head [data-acc-key] { scroll-margin-top: var(--sprung-abstand, 128px); }
+       den Moment vor dem ersten Takt stehen - nicht als Entscheidung, sondern als Startwert.
+
+       DIE DREI HANDGEPFLEGTEN REITER BRAUCHEN DENSELBEN AUSGLEICH (UI-5b, 12.09.2026).
+       Punktestand, Fortschritt und Einstellungen springen nicht auf `[data-acc-key]`, sondern auf
+       `.prog-section[data-sec="…"]` - der Ausgleich oben hat sie nie erreicht. GEMESSEN am
+       Grundstand v8.724.0 bei 900x1000 mit kompaktem Kopf: In allen drei Reitern stand
+       `scroll-margin-top` auf 0, und jeder Sprung landete auf `zielOben 0` unter einer Leiste bis
+       158 - der Abschnittstitel lag also vollstaendig hinter ihr. Die Messung stand dabei
+       ausdruecklich NICHT am Anschlag (Fortschritt/Erfolge: scrollY 8935 von maxScroll 19393;
+       Punktestand/Zusammensetzung: 868 von 2329) - am Anschlag liegt das Ziel zufaellig frei und
+       die Messung meldet Glueck statt der Regel.
+       Es ist DIESELBE Zahl, nicht eine zweite: derselbe `--sprung-abstand` aus derselben Messung
+       in `sprungAbstandSetzen()`. */
+    body.compact-head [data-acc-key],
+    body.compact-head .prog-section[data-sec] { scroll-margin-top: var(--sprung-abstand, 128px); }
     body.compact-head .tabs { position:sticky; top:0; z-index:25; background:#0a0d1a; padding:6px 0 8px; margin-bottom:0.8rem; box-shadow:0 6px 14px -6px rgba(0,0,0,0.85); }
     /* Die zweite klebende Ebene klebt UNTER der Reiterleiste (UI-5a).
        GEMESSEN am 12.09.2026, 390x844, Flotte/Werft (Seite 15962 px scrollbar, Position 1400):
@@ -1761,6 +1774,16 @@
     .jumpnav { display:flex; gap:6px; flex-wrap:wrap; background:var(--elev-1); border:var(--bw-1) solid rgba(255,255,255,0.07); padding:8px; margin-bottom:14px; }
     .jumpnav a { font-size:10px; padding:4px 9px; background:var(--elev-2); color:#9fa3ba; white-space:nowrap; text-decoration:none; }
     .jumpnav a:hover { background:rgba(var(--primary-rgb),0.18); color:#fff; }
+    /* Fokusring der Sprungmarken NACH INNEN (UI-5b, 12.09.2026). Die Leiste ist im Fortschritt
+       20 Links lang und damit die Hauptnavigation dieses Panels - fuer Tastaturnutzer gab es
+       trotzdem keine erkennbare Marke. GEMESSEN im Tastaturmodus, nicht im Quelltext gelesen
+       (`matches(':focus-visible') === true`): `box-shadow: none`, nur der Ring des Browsers mit
+       `outline: 1px auto rgb(16,16,16)` - fast schwarz auf dunklem Grund -, und auf dem Chip liegt
+       `clip-path: polygon(5px 0px, …)` aus dem Eckenschnitt. Der schneidet jeden AEUSSEREN Ring
+       weg; ein `outline-offset` waere danach unsichtbar. Deshalb dieselbe Loesung, die das
+       Projekt fuer die Schalter-Zeilen schon hat: Ring als INNENLIEGENDER Schatten. */
+    .jumpnav a:focus { outline:none; }
+    .jumpnav a:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--c-info), inset 0 0 12px rgba(var(--info-rgb),0.35); }
     .prog-chevron { display:none; margin-left:auto; font-size:12px; transition:transform 0.15s ease; }
     .ui-accordion-on .prog-sec-header { cursor:pointer; }
     .ui-accordion-on .prog-chevron { display:inline-block; }
@@ -4258,7 +4281,7 @@
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-sparkles" aria-hidden="true"></i>Farbthema</div>
         <div id="themePicker" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
 <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-list-details" aria-hidden="true"></i>Übersichtlichkeit</div>
-        <div class="bmeta" style="margin-bottom:8px;">Optionale Layouts - alle standardmäßig aus, das bisherige Layout bleibt unverändert der Standard. Aufklappbare Abschnitte wirken in ALLEN Tabs; Sprungmarken und Zweispaltig in den dichtesten Tabs (Punktestand, Fortschritt, Einstellungen).</div>
+        <div class="bmeta" style="margin-bottom:8px;">Optionale Layouts - alle standardmäßig aus, das bisherige Layout bleibt unverändert der Standard. Aufklappbare Abschnitte wirken in ALLEN Tabs; Sprungmarken in Basis, Forschung, Punktestand, Fortschritt und Einstellungen; Zweispaltig im Fortschritt.</div>
         <div class="card-row" id="uiJumpNavToggleRow" role="button" tabindex="0" style="cursor:pointer;">
           <div class="left"><div class="bicon" style="background:rgba(126,119,221,0.18); color:#c3bef5;"><i class="ti ti-map-pin" aria-hidden="true"></i></div><div><div class="bname">Sprungmarken</div><div class="bmeta">Klick-Leiste oben, springt direkt zu einem Abschnitt</div></div></div>
           <div class="toggle-switch" id="uiJumpNavSwitch"><div class="toggle-knob"></div></div>
@@ -9207,8 +9230,13 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.724.0';
+  const VERSION = '8.725.0';
   const PATCHNOTES = [
+  { version:'8.725.0', date:'12.09.2026', changes:[
+    '<strong>Behoben: Die Sprungmarken sprangen hinter die Reiterleiste.</strong> Wer die optionalen <em>Sprungmarken</em> (Einstellungen &rsaquo; &Uuml;bersichtlichkeit) benutzt, landete in <strong>Punktestand, Fortschritt und Einstellungen</strong> genau unter der oben klebenden Reiterleiste &ndash; der angesprungene Abschnitt war verdeckt. Im Fortschritt traf das 11 von 12 Marken. Jetzt landet der Sprung in allen f&uuml;nf Reitern frei unter der Leiste, so wie es in Basis und Forschung schon immer war.',
+    '<strong>Acht versteckte Abschnitte im Fortschritt sind wieder erreichbar.</strong> Die Sprungleiste dort kannte nur 12 der 20 Abschnitte &ndash; <em>Kommandant-Profil</em>, <em>&Uuml;bersicht</em>, <em>Boni-Bilanz</em>, <em>Galaktisches Kompendium</em>, <em>Allianztitel</em>, <em>Allianzanstrich</em>, <em>Tages-Login</em> und <em>Aussehen</em> fehlten, weil die Liste von Hand gepflegt wurde und dem Spiel hinterherhinkte. Sie liest die Abschnitte jetzt selbst aus der Seite; neue Abschnitte stehen ab sofort automatisch drin.',
+    '<strong>Tastatur und Vorlesehilfen.</strong> Die Sprungmarken zeigen jetzt eine deutliche Markierung, wenn du sie mit der Tabulator-Taste ansteuerst, und nach einem Sprung springt auch der Tastatur-Fokus zum Ziel &ndash; vorher blieb er auf der Leiste stehen, und die Reise begann von vorn. Behoben nebenbei: Auf der Sektorkarte l&ouml;ste die Eingabetaste manche Kn&ouml;pfe doppelt aus, ein &bdquo;Weiter&ldquo; bl&auml;tterte zwei Sektoren statt einem.',
+  ] },
   { version:'8.724.0', date:'12.09.2026', changes:[
     '<strong>Behoben: Am Handy war die Flotten-Statusleiste nach dem Scrollen verschwunden.</strong> Sie klebte oben am Rand &ndash; genau dort, wo auch die Reiterleiste klebt &ndash; und lag damit vollst&auml;ndig hinter ihr: weder zu sehen noch antippbar. Jetzt klebt sie direkt <em>unter</em> der Reiterleiste, l&uuml;ckenlos und immer sichtbar. In der Querlage, wo zwei klebende Leisten &uuml;ber die H&auml;lfte des Bildes belegt h&auml;tten, klebt nur noch die Reiterleiste; die Statusleiste scrollt dort wieder mit.',
     '<strong>Die Unterreiter von Galaxie und Allianz passen am Handy in eine Zeile.</strong> Sechs Kn&ouml;pfe brachen vorher auf drei Zeilen um und fra&szlig;en 120&nbsp;px vom Bildschirm. Jetzt stehen sie wie die Ebenen-Leiste der Sektorkarte in einer wischbaren Zeile &ndash; und der gerade offene Unterreiter wird dabei von selbst ins Bild geholt, damit du siehst, wo du bist.',
@@ -9312,16 +9340,11 @@
     '<strong>Deine Flotten fliegen jetzt durch dein Sprungtor.</strong> Wer am Vorposten ein Sprungtor gebaut hat, sah bisher trotzdem jede ankommende Flotte am Sonnenrand ins Bild kommen – als g&auml;be es das Tor nicht. Kommt eine Mission von au&szlig;erhalb des ge&ouml;ffneten Systems, beginnt ihre Flugbahn jetzt <strong>am Tor</strong> statt am Systemrand. Das gilt f&uuml;r Erkundung, Kolonisierung, Vorposten-Bau und Abbau – also f&uuml;r genau die Fl&uuml;ge, denen das Tor die Strecke abnimmt.',
     'Gilt auch f&uuml;r das <strong>freigeschaltete Tor eines Allianzpartners</strong>: Steht in dem System ein verb&uuml;ndeter Vorposten mit ausgebautem Tor, nimmt deine Flotte es genauso – ohne dass du irgendwo zustimmen musst.',
   ]},
-  { version:'8.705.0', date:'08.09.2026', changes:[
-    '<strong>Deine Bergbauflotte hat jetzt auch eine Route auf der Karte.</strong> Bisher flogen Abbau- und Eskortenflüge unsichtbar – die Linie gab es für jede andere Mission, nur nicht für diese. Und sie sieht anders aus: Wo eine Kampfflotte im <em>Keil</em> hinter ihrem Flaggschiff fliegt, zieht eine reine Fracht- und Recyclerflotte als <strong>Konvoi in einer Reihe</strong>, in der Erzfarbe. Fliegt auch nur ein Kampfschiff mit, ist es wieder der Keil – dann ist das die ehrlichere Auskunft.',
-    '<strong>Während des Abbaus steht die Flotte am Vorkommen</strong> statt auf halbem Rückweg, und daneben steht „fördert". Die Karte kannte bisher nur Hinweg und Rückweg und halbierte stur die Gesamtzeit – bei einer Abbaumission liegt die Hälfte aber mitten in der Förderung.',
-    '<strong>Die fünf Dreiecke unter deiner Station sind weg.</strong> Sie zeigten den Füllstand der Garnison in Fünfteln – die genaue Schiffszahl steht ohnehin am Marker und im Kartenmenü.',
-  ]},
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1127;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1128;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -45648,7 +45671,7 @@ async function claimPendingRewards(){
     { key:'grundlagen', icon:'ti-home', title:'Grundlagen', entries:[
       { title:'Die vier Reiter-Gruppen', body:'Die Reiter über dem Spielfeld sind in <strong>vier Gruppen</strong> geordnet: <strong>Kolonie</strong> (Basis, Verteidigung, Forschung, Flotte) · <strong>Erkundung</strong> (Expedition, Sektorkarte, Galaxie) · <strong>Gemeinschaft</strong> (Allianz, Offiziere) · <strong>Spieler</strong> (Markt, Punktestand, Fortschritt, Sammlung).<br><br>Jede Gruppe hat eine eigene Farbe, und diese <strong>Farbe gehört zur Gruppe, nicht zum einzelnen Reiter</strong>: Der schmale Farbstreifen unter einem Reiter sagt dir also, in welchem Bereich du gerade bist – auch dann noch, wenn die Leiste in mehrere Zeilen umbricht. <strong>Ab 1561 px Fensterbreite</strong> steht der Gruppenname zusätzlich links neben den Reitern der Gruppe; darunter - und damit auf den verbreiteten Laptop-Auflösungen 1366, 1440 und 1536 px sowie am Handy - entfällt der Name und die Farbe allein trägt die Einteilung. Die <strong>Reihenfolge</strong> der Reiter ist in allen Fällen dieselbe.' },
       { title:'Wo ist gerade etwas offen? Die Punkte an den Reitern', body:'An jedem Reiter kann ein kleiner Punkt sitzen, und er hat <strong>zwei Bedeutungen</strong>, die sich an der Farbe unterscheiden.<br><br><strong>Bernstein</strong> heißt: hier ist etwas <em>offen</em>. Der Punkt bleibt, bis du es tatsächlich getan hast. Dieselbe Farbe wie eine vollgelaufene Ressource, und aus demselben Grund – in beiden Fällen verpufft gerade Fortschritt. Gemeldet werden: eine leere Bau-Wunschliste, keine laufende Forschung und keine Schiffe im Bau (jeweils nur, wenn du etwas davon gerade bezahlen könntest), eine offene Offizier-Talentwahl, nicht verteilte Fähigkeitspunkte, ein noch nicht begonnener Wochen-Tiefenlauf, ein ungenutztes Wochenangebot und ein Event-Schiff, das genug Teile hat.<br><br><strong>Rot</strong> heißt: hier ist etwas <em>passiert</em>. Der Punkt verschwindet, sobald du hingesehen hast – so wie bisher bei neuen Expeditionsmeldungen. Ein offener <strong>Leerenriss</strong> lässt zusätzlich den ganzen Reiter pulsieren; diese lautere Stufe bleibt ihm allein vorbehalten, weil er das einzige zeitlich harte Ereignis ist.<br><br>Dieselben Punkte findest du ausgeschrieben unter <strong>„Nächstes Ziel"</strong> auf der Basis und – nach einer Pause – im Fenster <strong>„Willkommen zurück"</strong> unter „Das wartet auf dich", dort direkt anklickbar. Ist nirgends ein Punkt zu sehen, läuft alles.' },
-      { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen für die dichtesten Tabs (Punktestand, Fortschritt) einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
+      { title:'Übersichtlichkeit (optional)', body:'In den <strong>Einstellungen</strong> lassen sich drei Layout-Optionen einzeln aktivieren, alle standardmäßig aus: <strong>Sprungmarken</strong> (Klick-Leiste oben springt direkt zu einem Abschnitt – in Basis, Forschung, Punktestand, Fortschritt und Einstellungen), <strong>Aufklappbare Abschnitte</strong> (jeder Abschnitt einzeln ein-/ausklappbar, gemerkt – in allen Tabs) und <strong>Zweispaltiges Layout</strong> (kurze Abschnitte nebeneinander im Fortschritt, nur auf breiteren Bildschirmen sichtbar). Das bisherige Layout bleibt unverändert der Standard.' },
       { title:'Konto & E-Mail-Bestätigung', body:'Für ein neues Konto ist eine <strong>E-Mail-Adresse Pflicht</strong>. Nach der Registrierung bekommst du eine Bestätigungs-E-Mail mit einem Link (24h gültig) – erst nach dem Klick darauf ist dein Konto freigeschaltet und du kannst dich anmelden. Keine Mail erhalten? Auch im Spam-Ordner nachsehen oder über den Login-Bildschirm eine neue anfordern. Bestehende Konten sind davon nicht betroffen.' },
       { title:'Nur ein Gerät gleichzeitig', body:'Pro Konto ist immer nur <strong>eine Sitzung</strong> aktiv. Meldest du dich auf einem zweiten Gerät an (Handy, Tablet, anderer Browser), wird das zuvor angemeldete Gerät automatisch abgemeldet und zeigt dort einen Hinweis – dein Fortschritt bis dahin ist gespeichert. Hintergrund: Zwei parallel laufende Geräte haben sich sonst gegenseitig den Spielstand überschrieben, sodass Bauaufträge, Forschung oder Ressourcen scheinbar zurücksprangen. <strong>Mehrere Tabs auf demselben Gerät</strong> sind ausdrücklich weiterhin erlaubt – sie teilen sich dieselbe Sitzung und stören sich nicht. Zum Gerätewechsel reicht ein normaler Login auf dem neuen Gerät, ein Abmelden auf dem alten ist nicht nötig.' },
       { title:'Zuletzt angemeldet & alle Sitzungen beenden', body:'Unter <strong>Einstellungen → Sitzung &amp; Sicherheit</strong> steht, wann die aktuell laufende Sitzung begonnen hat. Passt dieser Zeitpunkt nicht zu deiner eigenen letzten Anmeldung, hat sich jemand anderes an deinem Konto angemeldet. Dort findest du auch <strong>„Alle Sitzungen beenden"</strong> (Passwort-Bestätigung nötig): Das macht <strong>jede</strong> bisherige Anmeldung dieses Kontos ungültig – auch die auf dem Gerät, an dem du es auslöst, du wirst also sofort abgemeldet. Dein Spielstand wird vorher gespeichert. <strong>Wichtig:</strong> Das allein hilft nur kurzfristig, wenn jemand dein Passwort kennt – er kann sich damit direkt wieder anmelden. Ändere in dem Fall anschließend unbedingt dein Passwort. Nur mit eigenem Server verfügbar.' },
@@ -72251,6 +72274,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
       }
     }
   }
+  /* NACH DEM SPRUNG LIEGT DER FOKUS AUF DEM ABSCHNITTSKOPF (UI-5b, 12.09.2026).
+     Die Sprungleiste hat das Ziel bis hierher nur ins Bild gescrollt und dort aufgehoert.
+     GEMESSEN am Zwischenstand bei 900x1000: Nach dem Ausloesen lag `document.activeElement` noch
+     immer auf dem Link der Leiste (Fortschritt/eventkalender: Ziel auf Bildpunkt 168, scrollY 3172
+     von maxScroll 19443 - also NICHT am Anschlag), der Abschnittskopf trug weder `tabindex` noch
+     `id`, und die Adresszeile blieb leer. Der naechste Tabulator-Schritt ging deshalb bei der
+     LEISTE weiter, nicht beim Ziel: Wer mit Tastatur oder Vorlesehilfe springt, stand danach
+     genau da, wo er vorher stand.
+     `tabindex="-1"` haelt den Kopf aus der Tabulator-Reihe heraus und macht ihn trotzdem
+     programmatisch fokussierbar. `preventScroll` ist kein Beiwerk: Ohne es scrollt der Fokus das
+     Ziel ein zweites Mal an und ueberschreibt die weiche Bewegung, die gerade laeuft. */
+  function sprungFokusSetzen(kopf){
+    if (!kopf || typeof kopf.focus !== 'function') return;
+    if (kopf.getAttribute('tabindex') === null) kopf.setAttribute('tabindex', '-1');
+    try { kopf.focus({ preventScroll: true }); } catch(e){}
+  }
   function render(){
     applyPowerSaveClass(); // Energiesparmodus-Klasse (billig: ein classList.toggle) - greift auch nach Laden/Sync eines fremden Spielstands
     applyCompactHeadClass(); // dito für die kompakte Kopfzeile - ebenfalls nur ein classList.toggle
@@ -77781,53 +77820,72 @@ function sekSternUse(key, x, y, k, unentdeckt){
     } // Ende Fortschritt/Forschung/Galaxie-Perf-Guard
 
     // ===== Optionale Übersichtlichkeits-Layouts (Einstellungen) =====
-    // Body-Klassen spiegeln die drei Einstellungen wider; CSS greift nur, wenn die jeweilige Klasse
+    // Body-Klassen spiegeln die Einstellungen wider; CSS greift nur, wenn die jeweilige Klasse
     // gesetzt ist - Standard bleibt für niemanden ungefragt verändert.
-    document.body.classList.toggle('ui-jumpnav-on', !!state.uiJumpNav);
+    // `ui-jumpnav-on` stand hier bis UI-5b (12.09.2026) als dritte Klasse und wurde von NIEMANDEM
+    // gelesen - gemessen im Browser (0 CSS-Regeln mit diesem Selektor) und ueber das ganze Repo
+    // einschliesslich `tests/` (kein einziger Treffer ausser dieser Zeile selbst). Die Leiste
+    // schaltet sich ueber `jumpBox.style.display` ein und aus, nicht ueber eine Koerperklasse.
     document.body.classList.toggle('ui-accordion-on', !!state.uiCollapsibleSections);
     document.body.classList.toggle('ui-twocol-on', !!state.uiTwoColumn);
     if (activeTab === 'punkte' || activeTab === 'fortschritt' || activeTab === 'einstellungen'){
-      const PROG_SECTIONS = {
-        punkte: [
-          { key:'zusammensetzung', label:'Zusammensetzung', icon:'ti-star' },
-          { key:'verlauf', label:'Verlauf', icon:'ti-arrow-up' },
-          { key:'kampfbilanz', label:'Kampfbilanz', icon:'ti-sword' },
-          { key:'aufstieg', label:'Aufstieg', icon:'ti-sparkles' },
-          { key:'statistik', label:'Statistik', icon:'ti-atom' },
-          { key:'letzteaenderungen', label:'Änderungen', icon:'ti-clock' }
-        ],
-        fortschritt: [
-          { key:'eventkalender', label:'Event-Kalender', icon:'ti-clock' },
-          { key:'dominanz', label:'Dominanz', icon:'ti-medal' },
-          { key:'level', label:'Level', icon:'ti-award' },
-          { key:'inventar', label:'Inventar', icon:'ti-backpack' },
-          { key:'effekte', label:'Effekte', icon:'ti-bolt' },
-          { key:'items', label:'Items', icon:'ti-diamond' },
-          { key:'megaprojekte', label:'Mega-Projekte', icon:'ti-sun' },
-          { key:'artefakt', label:'Artefakt-Set', icon:'ti-sparkles' },
-          { key:'prestige', label:'Prestige', icon:'ti-infinity' },
-          { key:'faehigkeitsbaum', label:'Fähigkeitsbaum', icon:'ti-award' },
-          { key:'erfolge', label:'Erfolge', icon:'ti-medal' },
-          { key:'unterstuetzer', label:'Unterstützer', icon:'ti-sparkles' }
-        ],
-        einstellungen: [
-          { key:'konto', label:'Konto', icon:'ti-user-circle' },
-          { key:'anzeige', label:'Anzeige & Benachrichtigungen', icon:'ti-adjustments' },
-          { key:'support', label:'Support & Hilfe', icon:'ti-mail' }
-        ]
-      };
+      /* DIE LEISTE LIEST DAS MARKUP, NICHT MEHR EINE FESTE LISTE (UI-5b, 12.09.2026).
+         Hier stand bis heute `PROG_SECTIONS` - eine handgepflegte Aufzaehlung von Schluessel,
+         Beschriftung und Icon je Abschnitt. Sie war eine ZWEITE WAHRHEIT neben den
+         `.prog-section[data-sec]`-Abschnitten im Markup und hinkte ihnen hinterher. GEMESSEN am
+         Grundstand v8.724.0: Der Fortschritt hat 20 Abschnitte, die Leiste nannte 12 - ueber sie
+         nicht erreichbar waren `profil`, `uebersicht`, `bonibilanz`, `kompendium`,
+         `allianztitel`, `allianzanstrich`, `dailylogin` und `aussehen`. Punktestand (6 von 6) und
+         Einstellungen (3 von 3 sichtbaren) stimmten zufaellig noch.
+         Der generische Zweig weiter unten macht es seit v8.515.0 richtig und traegt es im
+         Kommentar: selbstwartend, keine zweite Liste. Ab jetzt gilt das auch hier.
+
+         WAS DABEI GEMESSEN WURDE, statt es zu erfinden:
+         - ICON: Jede `.prog-sec-header` beginnt im Markup mit genau einem Icon-Element; das wird
+           uebernommen. Es ist NICHT immer ein `<i class="ti …">`: 29 der 30 Koepfe tragen eines,
+           `unterstuetzer` dagegen ein `<span>`-Zeichen. Deshalb wird das erste Element-Kind
+           genommen (sofern es nicht schon das Chevron ist) und nicht nach `i.ti` gesucht.
+         - BESCHRIFTUNG: der Text des Kopfes ohne Icon, Chevron, Knoepfe und Links, abgeschnitten
+           am Doppelpunkt - dieselbe Regel wie im generischen Zweig. Aus "Artefakt-Set: Erbe der
+           Alten" wird damit wie bisher "Artefakt-Set".
+         - VERBORGENE ABSCHNITTE gehoeren nicht in die Leiste. Der Admin-Bereich in den
+           Einstellungen ist der einzige (1 von 30) und wird ueber die Inline-Anzeige versteckt -
+           im Markup (`style="display:none"`) wie zur Laufzeit (`adminSectionRow.style.display`).
+           `getComputedStyle` faende genau dieselbe eine Zeile, kostet aber je Takt 30 erzwungene
+           Stilberechnungen; die Inline-Anzeige ist die gemessene Wahrheit dieses Markups.
+         - SIGNATUR-RIEGEL wie im generischen Zweig: Der Hauptdurchlauf schreibt jede Sekunde neu,
+           und ein `innerHTML` an der Leiste wirft bei jedem Takt die Klick-Handler weg. Neu
+           geschrieben wird deshalb nur, wenn sich die Abschnittsliste wirklich aendert. */
       const jumpBox = document.getElementById('jumpnav-'+activeTab);
       if (jumpBox){
         jumpBox.style.display = state.uiJumpNav ? 'flex' : 'none';
         if (state.uiJumpNav){
-          jumpBox.innerHTML = PROG_SECTIONS[activeTab].map(s => `<a href="#" data-jump-to="${s.key}"><i class="ti ${s.icon}" aria-hidden="true"></i> ${s.label}</a>`).join('');
-          jumpBox.querySelectorAll('[data-jump-to]').forEach(a => a.onclick = (ev) => {
-            ev.preventDefault();
-            const key = a.getAttribute('data-jump-to');
-            if (state.uiCollapsibleSections) state.collapsedSections[key] = false;
-            const target = document.querySelector(`.prog-section[data-sec="${key}"]`);
-            if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); }
+          const eintraege = [];
+          document.querySelectorAll('#tab-'+activeTab+' .prog-section[data-sec]').forEach(sec => {
+            if (sec.style.display === 'none') return;
+            const kopf = sec.querySelector('.prog-sec-header');
+            const key = sec.getAttribute('data-sec');
+            if (!kopf || !key) return;
+            const erstes = kopf.firstElementChild;
+            const iconEl = (erstes && !(erstes.classList && erstes.classList.contains('prog-chevron'))) ? erstes : null;
+            const label = Array.from(kopf.childNodes)
+              .filter(n => n !== iconEl)
+              .filter(n => n.nodeType === 3 || (n.nodeType === 1 && n.tagName !== 'BUTTON' && n.tagName !== 'A' && !(n.classList && n.classList.contains('prog-chevron'))))
+              .map(n => n.textContent).join('').trim().split(':')[0].trim();
+            if (label) eintraege.push({ key, label, icon: iconEl ? iconEl.outerHTML : '' });
           });
+          const sig = eintraege.map(e => e.key+'='+e.label).join('|');
+          if (jumpBox.dataset.sig !== sig){
+            jumpBox.dataset.sig = sig;
+            jumpBox.innerHTML = eintraege.map(e => `<a href="#" data-jump-to="${escapeHtml(e.key)}">${e.icon} ${escapeHtml(e.label)}</a>`).join('');
+            jumpBox.querySelectorAll('[data-jump-to]').forEach(a => a.onclick = (ev) => {
+              ev.preventDefault();
+              const key = a.getAttribute('data-jump-to');
+              if (state.uiCollapsibleSections) state.collapsedSections[key] = false;
+              const target = document.querySelector(`.prog-section[data-sec="${key}"]`);
+              if (target){ target.classList.remove('collapsed'); target.scrollIntoView({ behavior:'smooth', block:'start' }); sprungFokusSetzen(target.querySelector('.prog-sec-header')); }
+            });
+          }
         }
       }
       document.querySelectorAll(`#tab-${activeTab} .prog-section`).forEach(sec => {
@@ -77900,7 +77958,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
                   render(); save();
                 }
                 const ziel = document.querySelector('[data-acc-key="'+CSS.escape(k)+'"]');
-                if (ziel) ziel.scrollIntoView({ behavior:'smooth', block:'start' });
+                if (ziel){ ziel.scrollIntoView({ behavior:'smooth', block:'start' }); sprungFokusSetzen(ziel); }
               });
             }
           }
@@ -79124,8 +79182,46 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (!el || el.getAttribute('role') !== 'button') return;
     // Native Knoepfe und Links bringen das von sich aus mit - nicht doppelt ausloesen.
     if (el.tagName === 'BUTTON' || el.tagName === 'A') return;
+    /* WER SEINE TASTATUR SELBST BEDIENT, WIRD HIER NICHT ANGEFASST (UI-5b, 12.09.2026).
+       Der Ausstieg steht bewusst VOR `preventDefault()`: Der eigene Handler des Knotens soll das
+       Ereignis unveraendert bekommen, so wie er es vor dieser Delegation bekommen hat.
+
+       GEMESSEN, statt aus dem Quelltext geschlossen. Inventur ueber das GANZE Dokument am
+       12.09.2026: `role="button"` steht 34-mal in der Datei, 23 davon sind echte Markup-Stellen
+       (die uebrigen 11 stehen in Kommentaren und CSS-Selektoren), und alle 23 tragen
+       `tabindex="0"`. Zur Laufzeit ueber ALLE Reiter gemessen - dreizehn Spiel-Reiter, die
+       Einstellungen und zusaetzlich die Sektoransicht der Karte: je Ansicht 36 bis 45 solcher
+       Knoten gleichzeitig, davon bis zu 25 mit EIGENEM `onkeydown` (23 SVG-Gruppen der
+       Sektoransicht plus die zwei Zeilen der Server-Ereignisse).
+
+       KEINER dieser eigenen Handler ruft `stopPropagation()`. Ohne diesen Ausstieg lief die Aktion
+       deshalb ZWEIMAL je Tastendruck - erst im eigenen Handler, dann noch einmal ueber den Klick
+       von hier unten. Gemessen mit Zaehlern an beiden Handlern: Weiter-Knopf der Sektoransicht 2,
+       Region der Sektoren-Uebersicht 2, Zeile der Server-Ereignisse 2, zum Vergleich eine Zeile
+       ohne eigenen Handler (`#uiJumpNavToggleRow`) 1. Ein Enter auf dem Weiter-Knopf blaetterte
+       damit zwei Sektoren statt einen. Nach diesem Ausstieg: ueberall 1.
+       Die Zeile der Server-Ereignisse (`[data-notif-go]`) und die Admin-Uebersicht
+       (`[data-uebersicht-konto]`) tragen dasselbe Muster und doppelten schon VOR UI-5b - sie sind
+       HTML, ihr `click()` lief also klaglos durch. Gemessen am Grundstand v8.724.0: 2. Derselbe
+       Ausstieg heilt sie mit. */
+    if (typeof el.onkeydown === 'function') return;
     e.preventDefault();
-    el.click();
+    /* SVG-Gruppen koennen kein `click()` (UI-5b, 12.09.2026). `click()` steht an HTMLElement, nicht
+       an SVGElement. GEMESSEN am Grundstand v8.724.0: In der Sektoransicht tragen 45 Knoten
+       role="button" + tabindex="0", davon sind 23 `<g>`-Gruppen der Sektorkarte (Regionen,
+       Systeme, Ebenen-Knoepfe, Hinweis-Treffer), und bei KEINER davon ist `click` eine Funktion.
+       WAS DABEI WIRKLICH PASSIERTE - und was ein frueherer Stand dieses Kommentars falsch
+       behauptet hat: Die Aktion lief trotzdem, und zwar GENAU EINMAL. Der eigene `onkeydown` des
+       Knotens hatte sie da laengst ausgefuehrt; erst danach kam das Ereignis hier an, und erst
+       hier flog "Uncaught TypeError: el.click is not a function". Der Fehler stand also in der
+       Konsole, die Bedienung war davon unberuehrt - gemessen am Grundstand mit Zaehlern an beiden
+       Handlern: 1 Aktion je Enter, 1 Konsolenfehler je Enter.
+       Der Rueckfall bleibt trotzdem stehen, aber fuer die Knoten OHNE eigenen Handler: Wer eine
+       SVG-Gruppe mit `role="button"` ohne eigenen `onkeydown` anlegt, bekommt von hier einen
+       echten Klick statt eines Konsolenfehlers. Die heutigen Kartenknoten haengen ihre Handler an
+       sich selbst und werden durch den Ausstieg oben gar nicht mehr erreicht. */
+    if (typeof el.click === 'function') el.click();
+    else el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
   });
   // aria-pressed an den Schalter-Zeilen mit dem sichtbaren Zustand gleichhalten. Bewusst zentral
   // beim Neuzeichnen statt an den rund fuenfzehn Stellen, die classList.toggle('on', ...) aufrufen -
