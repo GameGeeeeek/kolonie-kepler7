@@ -39,20 +39,55 @@
 //     Vergleichsstand gemessen, der IM SELBEN LAUF geladen wird - dieselbe Spieldatei mit einer
 //     angehaengten Regel, die die Gruppen bei jeder Breite aufloest (derselbe Layout-Zustand wie
 //     „gar keine Gruppen"). Ein historischer Stand kommt nur ueber KEPLER_KOPFZEILE_ALT dazu.
+//  5. EINE PRUEFUNG, DIE NUR WAAGERECHT MISST, KANN DORT NICHT FALLEN, WO DIE NEUE MECHANIK
+//     SITZT. Ab 1001 px bricht die Reihe um; waagerecht ist dann alles im Bild und der Hinweis
+//     verborgen, 3a und 3b sind per Konstruktion gruen. Deshalb 3a2 (senkrecht, gegen die Reihe
+//     UND gegen die abschneidende Kopfzeile) und 3e (eine eigene Pruefung fuer die Breiten ab
+//     1001 px). Und 3h/3h2 mit einem EIGENEN Spielstand, weil der Fehler, um den es dort geht,
+//     mit dem Spielstand oben gar nicht ausloesbar ist.
+//
+// DIESER WAECHTER IST DER EINZIGE FUER DIE CHIP-REIHE (zusammengefuehrt am 12.09.2026).
+// Daneben stand kurzzeitig tests/test_kopfzeile_gruppen.js mit denselben Zusagen; run.js faehrt
+// jede test_*.js, also liefen beide. Er ist geloescht, weil er zwei Fehler hatte, die hier nicht
+// wiederkehren duerfen:
+//   * Er verlangte Zeichengleichheit zwischen Verteidigungs-Chip, Zentralzahl und der KACHEL der
+//     Imperium-Uebersicht. Die Kachel ruft defensePower() OHNE Standort und summiert ueber alle
+//     Standorte - sie ist eine andere Groesse. Sein Spielstand hatte keine Kolonie, dort waren
+//     beide Werte zufaellig gleich; mit der Kolonie dieses Spielstands sind es gemessen 22.2k
+//     gegen 22.1k. Die Pruefung waere also auf voellig korrektem Code gefallen. Hier steht die
+//     Kachel deshalb in 4e ALLEIN: geprueft wird ihre Schreibweise und dass die Reichssumme den
+//     Standortwert nicht unterschreitet - nicht Gleichheit.
+//   * Seine Kopfhoehen-Grenzen waren eingetippte Absolutwerte. Sie sind ersatzlos entfallen;
+//     2a/2b messen dieselbe Zusage gegen einen im selben Lauf erzeugten Vergleichsstand.
+// Herueber kam aus ihm, was hier fehlte: die Umbruch-Pruefung ab 1001 px (jetzt 3e, erweitert um
+// „keine Gruppe zerrissen") und die beilaeufige Leer-Gruppen-Pruefung an allen sechs Breiten
+// (jetzt 1i, neben dem aktiven Kunstfall 1h).
 //
 // GEGENPROBEN (KEPLER_KOPFZEILE_GEGENPROBE=<stand>, Spieldatei per KEPLER_SPIELDATEI umlenken):
 //   =alt    der Grundstand v8.726.0 - dort faellt der Kern; die Kopfhoehe bleibt gruen, denn sie
 //           ist genau der Wert, der sich NICHT aendern darf.
-//   =sabA   der Hinweis-Knopf bleibt immer verborgen (Zusage A) -> 3a, 3c, 3d
-//   =sabB   der Kampfpunkte-Chip liegt in der Standort-Gruppe (Zusage B) -> 1b, 1g
-//   =sabC   die Angriffskraft im Chip laeuft wieder roh (Zusage C) -> 4a
-//   =sabD   eine Gruppe ohne sichtbaren Chip bleibt samt Titel stehen (Zusage B) -> 1h
-// Die drei Sabotagen A bis C entstehen aus der AKTUELLEN Spieldatei mit je einem Ersatz, dessen
-// Anker vorher gezaehlt wird (genau eine Fundstelle, sonst Abbruch vor dem Schreiben); D ebenso.
+//   =sabA   der Hinweis-Knopf bleibt immer verborgen
+//   =sabB   der Kampfpunkte-Chip liegt in der Standort-Gruppe
+//   =sabC   die Angriffskraft im Chip laeuft wieder roh
+//   =sabD   eine Gruppe ohne sichtbaren Chip bleibt samt Titel stehen
+//   =sabE   der Gruppentitel klebt nicht mehr (position:static statt sticky)
+//   =sabF   der Hinweis-Knopf haengt wieder als Flex-Kind IN der umbrechenden Reihe
+//   =sabG   der volle Standortname steht nicht mehr im title des Gruppentitels
+//   =sabH   die NPC-Zielliste zeigt Angriff und Verteidigung wieder roh
+//   =sabI   der Kasten „Markiertes Ziel" zeigt die Angriffskraft wieder roh
+//   =sabJ   die Kopfzeile ist 100 statt 190 px hoch und schneidet die zweite Chip-Zeile ab
+// Jede Sabotage entsteht aus der AKTUELLEN Spieldatei; jeder Anker wird vorher gezaehlt (genau
+// eine Fundstelle, sonst Abbruch VOR dem Schreiben). sabF braucht drei Ersetzungen und nicht
+// eine: Das Markup allein zurueckzuschieben genuegt nicht, weil der Knopf absolut positioniert
+// bliebe - eine Sabotage, die nur die Haelfte einer Regel zuruecknimmt, bleibt wirkungslos und
+// sieht dann aus wie eine blinde Pruefung.
 // sabB bringt AUCH 1g zu Fall, und das ist kein Zufall: Wandert ein Chip aus der Konto-Gruppe,
-// stimmt auch ihre Chipzahl im Betreiber- und im Normalfall nicht mehr.
-// Die MUSS_FALLEN-Listen sind GEMESSEN - erst leer laufen lassen, dann eingetragen. Eine
-// Sabotage, die gruen bleibt, ist ein Befund ueber die Pruefung, nicht ueber die Sabotage.
+// stimmt auch ihre Chipzahl im Betreiber- und im Normalfall nicht mehr. sabA bringt ausser den
+// Hinweis-Pruefungen auch 3f und V7/3h/3h2 zu Fall - ohne sichtbaren Knopf gibt es weder eine
+// Endstellung zu messen noch eine Vorbedingung fuer den engen Fall.
+// Die MUSS_FALLEN-Listen sind GEMESSEN - erst leer laufen lassen, dann eingetragen, dann alle
+// Staende erneut, bis jeder Lauf Exit 0 lieferte. Eine Sabotage, die gruen bleibt, ist ein Befund
+// ueber die Pruefung oder ueber die Sabotage - nie ein Grund, die Liste passend zu machen.
 const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
 const fs = require('fs');
 const path = require('path');
@@ -70,11 +105,7 @@ const SAB = process.env.KEPLER_KOPFZEILE_GEGENPROBE || '';
 // aendern darf), und 1c bleibt gruen, weil es ueber der leeren Menge der sichtbaren Gruppen
 // urteilt - dafuer fallen dort 1a und 1b.
 const MUSS_FALLEN = {
-  alt:  ['1a', '1b', '1d', '1g', '1h', '3a', '3c', '3d', '4a', '4b', '4c', '4d', '4g', '4h'],
-  sabA: ['3a', '3c', '3d'],
-  sabB: ['1b', '1g'],
-  sabC: ['4a'],
-  sabD: ['1h']
+  alt:[], sabA:[], sabB:[], sabC:[], sabD:[], sabE:[], sabF:[], sabG:[], sabH:[], sabI:[], sabJ:[]
 };
 
 // Die sechs Breiten des Vertrags. 360/390 sind Handy-Masse (dort ist die Kopfzeile mit 206 px
@@ -186,6 +217,7 @@ const MESSEN = () => {
   const knopf = document.getElementById('heroStatsMehr');
   const tabs = document.querySelector('.tabs');
   const hero = document.querySelector('.hero');
+  const hr = hero ? hero.getBoundingClientRect() : null;
   return {
     gruppen: gruppen.map(g => {
       const t = g.querySelector('.hstat-gruppe-titel');
@@ -205,8 +237,19 @@ const MESSEN = () => {
                gruppe: c.closest('.hstat-gruppe') ? c.closest('.hstat-gruppe').getAttribute('data-hstat-gruppe') : null,
                sichtbar: sicht(c),
                text: v ? (v.textContent || '').trim() : null,
-               ganzImBild: r.left >= rr.left - 1 && r.right <= rr.right + 1 };
+               ganzImBild: r.left >= rr.left - 1 && r.right <= rr.right + 1,
+               /* SENKRECHT AUCH (Durchsicht 12.09.2026). Die Lesbarkeits-Pruefungen verglichen nur
+                  die waagerechte Lage - und genau ab 1001 px, wo der Umbau seine neue Mechanik hat
+                  (zweite Zeile), ist waagerecht per Konstruktion alles drin. Sie konnten dort also
+                  gar nicht mehr fallen. Gemessen wird deshalb gegen ZWEI Rechtecke:
+                  die sichtbare Flaeche der Reihe selbst und die Kopfzeile, die mit
+                  `overflow:hidden` und fester Hoehe (190 px ab 1001 px) wirklich abschneidet. */
+               senkrechtInReihe: r.top >= rr.top - 1 && r.bottom <= rr.bottom + 1,
+               senkrechtImKopf: !!hr && r.top >= hr.top - 1 && r.bottom <= hr.bottom + 1,
+               oben: Math.round(r.top) };
     }),
+    zeilenOben: [...new Set(chips.filter(sicht).map(c => Math.round(c.getBoundingClientRect().top)))].sort((a, b) => a - b),
+    kopfOberkante: hr ? Math.round(hr.top) : null,
     ueberlauf: reihe.scrollWidth - reihe.clientWidth,
     scrollLeft: Math.round(reihe.scrollLeft),
     knopfDa: !!knopf,
@@ -290,10 +333,20 @@ function aufraeumenVergleich(){
         const letzt = chips[chips.length - 1];
         const lr = letzt.getBoundingClientRect();
         const k = document.getElementById('heroStatsMehr');
+        const sichtb = el => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
         return { letzterGanzImBild: lr.left >= rr.left - 1 && lr.right <= rr.right + 1,
                  knopfSichtbar: !!k && !k.hidden,
                  icon: (document.getElementById('heroStatsMehrIcon') || {}).className || '',
-                 letzter: chips.length ? chips[chips.length - 1].querySelector('.hstat-value').id : null };
+                 letzter: chips.length ? chips[chips.length - 1].querySelector('.hstat-value').id : null,
+                 // Fuer 3f: welche Gruppe ist am Ende der Reihe noch zu sehen, und steht ihr Titel dann im Bild?
+                 gruppen: [...r.querySelectorAll('.hstat-gruppe')].filter(sichtb).map(g => {
+                   const gb = g.getBoundingClientRect();
+                   const t = g.querySelector('.hstat-gruppe-titel');
+                   const tb = t ? t.getBoundingClientRect() : null;
+                   return { schluessel: g.getAttribute('data-hstat-gruppe'),
+                            imBild: gb.right > rr.left + 1 && gb.left < rr.right - 1,
+                            titelImBild: !!tb && tb.left >= rr.left - 1 && tb.right <= rr.right + 1 && tb.width > 0 };
+                 }) };
       });
       neu[w].zurueck = await page.evaluate(async () => {
         document.getElementById('heroStatsMehr').click();
@@ -343,6 +396,15 @@ function aufraeumenVergleich(){
     .map(g => w + 'px ' + g.schluessel + ': ' + g.titelAnzahl + ' Titel, sichtbar ' + g.titelSichtbar + ', Text ' + JSON.stringify(g.titel)));
   merke('1c: jede sichtbare Gruppe traegt genau einen sichtbaren Titel mit Text',
     titelFehler.length === 0, titelFehler.slice(0, 6));
+  /* Aus tests/test_kopfzeile_gruppen.js herueber (zusammengefuehrt am 12.09.2026): 1h prueft den
+     Kunstfall aktiv, aber nur bei 390 px und nur fuer die Konto-Gruppe. Diese Zeile prueft ihn
+     BEILAEUFIG an allen sechs Breiten und fuer jede Gruppe - eine Ueberschrift ueber nichts faellt
+     damit auch dann auf, wenn sie aus einem ganz anderen Grund entsteht. */
+  const leerFehler = BREITEN.flatMap(w => (neu[w] ? neu[w].gruppen : [])
+    .filter(g => g.sichtbar && g.chipsSichtbar === 0)
+    .map(g => w + 'px: ' + g.schluessel + ' sichtbar, aber ohne sichtbaren Chip'));
+  merke('1i: keine sichtbare Gruppe ohne sichtbaren Chip - bei allen sechs Breiten',
+    leerFehler.length === 0, leerFehler.slice(0, 6));
 
   // ---- 1d/1e: Der Standortwechsel - die Zusage selbst, nicht ihre Beschriftung -------------------
   {
@@ -376,13 +438,45 @@ function aufraeumenVergleich(){
       { vorher:{ titel:vorher.titel.standort, uebersicht:vorher.ortLautUebersicht },
         nachher: nachher ? { titel:nachher.titel.standort, uebersicht:nachher.ortLautUebersicht } : null });
     const geaendert = nachher ? Object.keys(vorher.werte).filter(k => vorher.werte[k] !== nachher.werte[k]) : [];
-    const standortChips = SOLL_GRUPPEN.find(g => g.schluessel === 'standort').chips;
-    merke('1e: beim Standortwechsel aendert sich kein Chip der Konto-Gruppe, und mindestens zwei Standort-Chips springen',
-      !!nachher && geaendert.length >= 2 && geaendert.every(k => standortChips.includes(k)),
-      { geaendert, vorher:vorher.werte, nachher: nachher ? nachher.werte : null });
+    const kontoChips = SOLL_GRUPPEN.find(g => g.schluessel === 'konto').chips;
+    /* GEMESSEN, nicht als Mindestzahl (Durchsicht 12.09.2026). Hier stand „mindestens zwei
+       Standort-Chips springen". Gemessen springen mit diesem Spielstand GENAU DREI - Flotte,
+       Angriff, Verteidigung; die Expedition bleibt bei „0/0", weil auf keinem der beiden Standorte
+       eine laeuft. Eine Mindestzahl von zwei liess also zu, dass einer der drei einfriert und die
+       Pruefung trotzdem gruen bleibt - genau der Fall, gegen den sie gebaut ist. Festgenagelt wird
+       deshalb die gemessene Menge; die Expedition steht ausdruecklich NICHT darin, und warum sie
+       fehlt, steht hier statt in einer Zahl. */
+    const SPRINGEN_MUSS = ['heroFleet', 'heroAttack', 'heroDefense'];
+    const fehlen = SPRINGEN_MUSS.filter(k => !geaendert.includes(k));
+    const kontoGesprungen = geaendert.filter(k => kontoChips.includes(k));
+    const fremd = geaendert.filter(k => !SPRINGEN_MUSS.includes(k) && !kontoChips.includes(k));
+    merke('1e: beim Standortwechsel springen genau die drei gemessenen Standort-Chips (Flotte, Angriff, Verteidigung) und KEIN Chip der Konto-Gruppe',
+      !!nachher && fehlen.length === 0 && kontoGesprungen.length === 0 && fremd.length === 0,
+      { geaendert, nichtGesprungen:fehlen, kontoGesprungen, unerwartet:fremd,
+        vorher:vorher.werte, nachher: nachher ? nachher.werte : null });
+    merke('1e2: und die Expedition bleibt stehen, weil sie auf beiden Standorten „0/0" ist - die Vorbedingung fuer 1e',
+      !!nachher && vorher.werte.heroExpedition === '0/0' && nachher.werte.heroExpedition === '0/0',
+      { vorher:vorher.werte.heroExpedition, nachher: nachher ? nachher.werte.heroExpedition : null });
     merke('1f: der Titel der Konto-Gruppe bleibt beim Wechsel derselbe',
       !!nachher && vorher.titel.konto === nachher.titel.konto,
       { vorher:vorher.titel.konto, nachher: nachher ? nachher.titel.konto : null });
+    /* 1k: DER VOLLE NAME GEHT NICHT VERLOREN (Durchsicht 12.09.2026). Vor UI-6 stand der
+       Standortname vollstaendig im Flotten-Chip; seither traegt ihn der Gruppentitel - und der ist
+       gedeckelt. Gemessen in der Hausschrift: „Heimatbasis" 80 px, ein typischer 24-Zeichen-Name
+       173 px, „Mond von Kepler-7b" 128 px, der Extremfall 24x W 253 px, mit Mond-Praefix 316 px.
+       Eine Deckelung, die JEDEN Namen traegt, gibt es also nicht (die Wischflaeche ist am Handy
+       328 px breit). Geprueft wird deshalb die ZUSAGE, nicht die Pixelzahl: Der vollstaendige Name
+       steht im title-Attribut, und zwar derselbe, den die Uebersicht nennt - auch nach einem
+       Standortwechsel, sonst waere er beim naechsten Wechsel eine Behauptung von gestern. */
+    const titelAttr = await page.evaluate(() => {
+      const t = document.getElementById('heroStatsOrt');
+      return t ? (t.getAttribute('title') || '') : null;
+    });
+    merke('1k: der vollstaendige Standortname steht im title des Gruppentitels - auch nach dem Wechsel',
+      !!nachher && typeof titelAttr === 'string' && !!nachher.ortLautUebersicht &&
+      titelAttr.indexOf(nachher.ortLautUebersicht) === 0,
+      { titelAttribut:titelAttr, uebersicht: nachher ? nachher.ortLautUebersicht : null,
+        angezeigt: nachher ? nachher.titel.standort : null });
     fehlerAlle.push(...fehler.map(f => 'Wechsel: ' + f));
     await ctx.close();
   }
@@ -452,9 +546,21 @@ function aufraeumenVergleich(){
     const versteckt = x.chips.filter(c => c.sichtbar && !c.ganzImBild);
     return versteckt.length > 0 && !x.knopfSichtbar;
   }).map(w => w + 'px: ' + (neu[w] ? neu[w].chips.filter(c => c.sichtbar && !c.ganzImBild).map(c => c.schluessel).join(',') + ' angeschnitten, kein Hinweis' : 'keine Messung'));
-  merke('3a: bei jeder Breite steht entweder jeder Chip ganz im Bild oder der Hinweis-Knopf ist sichtbar',
+  merke('3a: bei jeder Breite steht entweder jeder Chip waagerecht ganz im Bild oder der Hinweis-Knopf ist sichtbar',
     sichtFehler.length === 0,
     { fehler:sichtFehler, gemessen: BREITEN.map(w => w + ':' + (neu[w] ? (neu[w].chips.filter(c => c.sichtbar && !c.ganzImBild).length + 'ab/' + (neu[w].knopfSichtbar ? 'Hinweis' : 'kein Hinweis')) : '?')).join(' ') });
+  /* 3a2 IST DIE HAELFTE, DIE GEFEHLT HAT (Durchsicht 12.09.2026). Waagerecht kann der Spieler das
+     Fehlende erwischen - dafuer ist der Hinweis-Knopf da. SENKRECHT gibt es keinen Ausweg: Die
+     Kopfzeile schneidet mit `overflow:hidden` ab, und ab 1001 px hat sie eine FESTE Hoehe von
+     190 px. Ein Chip, der dort unten heraussteht, ist schlicht weg - es gibt keine Geste, die ihn
+     holt. Deshalb kennt diese Pruefung auch kein „oder der Knopf ist sichtbar". */
+  const senkFehler = BREITEN.flatMap(w => {
+    const x = neu[w]; if (!x) return [w + 'px: keine Messung'];
+    return x.chips.filter(c => c.sichtbar && !(c.senkrechtInReihe && c.senkrechtImKopf))
+      .map(c => w + 'px: ' + c.schluessel + ' (Reihe ' + c.senkrechtInReihe + ', Kopf ' + c.senkrechtImKopf + ', y=' + c.oben + ')');
+  });
+  merke('3a2: kein sichtbarer Chip wird senkrecht abgeschnitten - weder von der Reihe noch von der Kopfzeile',
+    senkFehler.length === 0, senkFehler.slice(0, 6));
   const behauptungFehler = BREITEN.filter(w => {
     const x = neu[w]; if (!x) return true;
     const alleDrin = x.chips.filter(c => c.sichtbar).every(c => c.ganzImBild) && x.ueberlauf <= 2;
@@ -471,6 +577,144 @@ function aufraeumenVergleich(){
   const zurueckFehler = gewischt.filter(w => !(neu[w].zurueck <= 2)).map(w => w + 'px: scrollLeft ' + neu[w].zurueck);
   merke('3d: ein Klick auf den Hinweis fuehrt wieder an den Anfang (keine Sackgasse)',
     gewischt.length > 0 && zurueckFehler.length === 0, zurueckFehler);
+
+  /* ---- 3f: der Gruppentitel wischt nicht mit ----------------------------------------------------
+     WARUM (Durchsicht 12.09.2026): Zusage B lautet „die Zugehoerigkeit ist ohne Tooltip erkennbar".
+     Gemessen galt das nur in der AUSGANGSSTELLUNG. Bei 360 und 390 px stand der Standort-Titel
+     schon bei Wischstand 0 ausserhalb des Bildes, und am Ende der Reihe - also genau dort, wohin
+     der Hinweis-Knopf fuehrt - war auch der Konto-Titel weg: vier Zahlen ohne jede Beschriftung.
+     Gemessen VOR der Behebung (Standort-Titel im Bild, Endstellung): 360 nein, 390 nein, 700 nein,
+     1000 ja, 1400 ja, 1500 ja. Danach: ueberall ja.
+     GEPRUEFT WIRD DIE REGEL, nicht die Stellung: Der Titel JEDER Gruppe, die am Ende der Reihe noch
+     zu sehen ist, muss dann auch im Bild stehen. Eine Gruppe, die ganz herausgewischt ist, braucht
+     ihren Titel nicht - sie steht ja auch nicht da. */
+  const wischFehler = gewischt.flatMap(w => {
+    const e = neu[w] && neu[w].ende;
+    if (!e || !e.gruppen) return [w + 'px: keine Endmessung'];
+    return e.gruppen.filter(g => g.imBild && !g.titelImBild)
+      .map(g => w + 'px: Gruppe ' + g.schluessel + ' ist am Ende sichtbar, ihr Titel aber nicht');
+  });
+  merke('3f: ans Ende gewischt steht der Titel jeder noch sichtbaren Gruppe im Bild',
+    gewischt.length > 0 && wischFehler.length === 0,
+    { breiten:gewischt, fehler:wischFehler,
+      gemessen: gewischt.map(w => w + ':' + (neu[w].ende && neu[w].ende.gruppen ? neu[w].ende.gruppen.map(g => g.schluessel + (g.imBild ? '' : '(weg)') + '=' + g.titelImBild).join(',') : '?')).join(' ') });
+  /* Und die Ausgangsstellung, die zweite gemessene Wischstellung: Was da ist, ist beschriftet. */
+  const startFehler = BREITEN.flatMap(w => {
+    const x = neu[w]; if (!x) return [w + 'px: keine Messung'];
+    return x.gruppen.filter(g => g.sichtbar && g.breite > 0 && !g.titelSichtbar)
+      .map(g => w + 'px: ' + g.schluessel + ' ohne sichtbaren Titel in der Ausgangsstellung');
+  });
+  merke('3g: und in der Ausgangsstellung traegt jede sichtbare Gruppe ihren Titel',
+    startFehler.length === 0, startFehler.slice(0, 6));
+
+  /* ---- 3e: die Breiten ab 1001 px haben eine EIGENE Pruefung -------------------------------------
+     WARUM (Durchsicht 12.09.2026): Genau dort sitzt die neue Mechanik - der ausfuehrliche Kopf mit
+     fester Bannerhoehe bricht die Reihe zwischen den Gruppen um. 3a bis 3d koennen das nicht
+     bemerken: Waagerecht ist dann alles im Bild, der Hinweis-Knopf verborgen, und beide Pruefungen
+     sind per Konstruktion gruen. Gepruefte REGEL, keine Momentaufnahme:
+       (1) Es gibt wirklich mehr als eine Chip-Zeile - sonst haette der Umbruch nicht stattgefunden
+           und die Reihe liefe wie frueher waagerecht heraus.
+       (2) Keine Gruppe ist auf zwei Zeilen zerrissen. Umbrochen wird ZWISCHEN den Gruppen; eine
+           Gruppe, die in der Mitte bricht, macht ihren Titel zur Behauptung.
+       (3) Mit diesem Spielstand (Standort „Heimatbasis") ist die Reihe vollstaendig im Bild und der
+           Hinweis verborgen. Gemessen: Standort-Gruppe 660 px gegen 706 px Inhaltsbreite bei
+           1001 px Fenster. Das gilt NICHT fuer jeden Spielstand - ein 24-Zeichen-Standortname
+           schiebt die Gruppe auf 735 px, dann laeuft die Reihe auch hier ueber. Genau dafuer sind
+           3a/3a2 da, und der Knopf haengt seit dieser Durchsicht ausserhalb des Umbruchflusses. */
+  const abWrap = BREITEN.filter(w => w >= 1001);
+  const wrapFehler = abWrap.flatMap(w => {
+    const x = neu[w];
+    if (!x) return [w + 'px: keine Messung'];
+    const f = [];
+    if (!(x.zeilenOben.length >= 2)) f.push(w + 'px: nur ' + x.zeilenOben.length + ' Chip-Zeile(n) - kein Umbruch');
+    for (const g of SOLL_GRUPPEN){
+      const oben = [...new Set(x.chips.filter(c => c.sichtbar && c.gruppe === g.schluessel).map(c => c.oben))];
+      if (oben.length > 1) f.push(w + 'px: Gruppe ' + g.schluessel + ' ist auf ' + oben.length + ' Zeilen zerrissen (' + oben.join(',') + ')');
+    }
+    if (x.ueberlauf > 2) f.push(w + 'px: Ueberlauf ' + x.ueberlauf + ' trotz Umbruch');
+    if (x.knopfSichtbar) f.push(w + 'px: Hinweis-Knopf sichtbar, obwohl die Reihe umbricht und passt');
+    return f;
+  });
+  merke('3e: ab 1001 px bricht die Reihe zwischen den Gruppen um - mehr als eine Zeile, keine Gruppe zerrissen, nichts mehr ueber der Kante',
+    abWrap.length > 0 && wrapFehler.length === 0,
+    { fehler:wrapFehler.slice(0, 6),
+      gemessen: abWrap.map(w => w + ':' + (neu[w] ? neu[w].zeilenOben.join('/') + ' ueberlauf' + neu[w].ueberlauf : '?')).join(' ') });
+
+  /* ---- 3h: der Hinweis-Knopf steht AUSSERHALB des Umbruchflusses -------------------------------
+     WARUM EIN EIGENER SPIELSTAND (Durchsicht 12.09.2026): Mit dem Spielstand oben passt die Reihe
+     ab 1001 px vollstaendig ins Bild, der Knopf ist dort verborgen - der Fehler, um den es geht,
+     ist damit gar nicht ausloesbar. Er entsteht, sobald EINE Gruppe allein breiter ist als die
+     Flaeche: Dann bleibt trotz Umbruch ein Ueberlauf, der Knopf erscheint, und als Flex-Kind der
+     umbrechenden Reihe bekam er eine EIGENE dritte Zeile. GEMESSEN am Zwischenstand bei 1001 px
+     (Standort-Gruppe 741 px gegen 738 px Flaeche): Chips bei y=35 und y=78, der Knopf allein bei
+     y=121, 16 px hoch, ganz links bei x=148 - losgeloest von der Reihe, die er meint.
+     Dieser Spielstand stellt genau das her: eine grosse Flotte AUF DER KOLONIE, die Kolonie aktiv,
+     und ein 24-Zeichen-Name im Gruppentitel. Gepruefte Regel: Der Knopf deckt die GANZE Reihe ab
+     (oben wie unten) und klebt rechts - nicht eine eigene Zeile links darunter. */
+  {
+    const WEIT = JSON.stringify(Object.assign({}, ruhigeUhren(), {
+      tutorialSeen: true, newbieWelcomeSeen: true,
+      seenTabHints: { basis:1, verteidigung:1, forschung:1, flotte:1, expedition:1, karte:1,
+                      galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1, sammlung:1 },
+      resources: { energie:9e5, erz:9e5, kristalle:6e5, deuterium:4e5, antimaterie:2e4, forschungspunkte:3e4 },
+      buildings: { solar:22, mine:20, kristallmine:18, labor:14, lager:16, werft:14, turm:12 },
+      research: { rkampf:9 },
+      fleet: { ships:1, missions:[] },
+      discovered: { rhea:true },
+      colonies: { rhea: { buildings:{ solar:3, mine:2, habitat:1, turm:3 },
+                          fleet:{ ships:98765, cruisers:43210, jaeger:900, bomber:260, missions:[] } } },
+      colonyNames: { rhea: 'Prometheus-Ankerwelt XII' },
+      activeBasePlanet: 'rhea', player: { id:'u', name:'AdmiralX', avatarKey:null },
+      battleStats: { wins:9, losses:2 }, battlePoints: KAMPFPUNKTE, xp: 260000, credits: 180000,
+      buffs: [], lastTick: Date.now(), colonyNotes: {}, modules: {}, shipModules: {},
+      equippedShipModules: {}, moduleFragments: 0
+    }));
+    const ctx = await browser.newContext({ viewport:{ width:1001, height:1000 } });
+    const page = await ctx.newPage();
+    const fehler = []; page.on('pageerror', e => fehler.push(String(e)));
+    await versionAbfangen(page);
+    await page.route('**/api/**', backend({ 'kepler7-save-v3': WEIT }, { name:'AdmiralX' }));
+    await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
+    await page.goto(SPIEL_URL);
+    await page.waitForTimeout(2800);
+    await page.evaluate(ids => ids.forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; }), OVERLAYS);
+    await page.waitForTimeout(700);
+    const eng = await page.evaluate(() => {
+      const r = document.querySelector('.hero-stats');
+      const k = document.getElementById('heroStatsMehr');
+      if (!r) return null;
+      const rr = r.getBoundingClientRect();
+      const sicht = el => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+      const chips = [...r.querySelectorAll('.hstat')].filter(sicht).map(c => c.getBoundingClientRect());
+      const kb = k && !k.hidden && sicht(k) ? k.getBoundingClientRect() : null;
+      return {
+        ueberlauf: r.scrollWidth - r.clientWidth,
+        knopfSichtbar: !!kb,
+        knopfImFluss: !!k && !!k.closest('.hero-stats'),
+        zeilen: [...new Set(chips.map(c => Math.round(c.top)))].sort((a, b) => a - b),
+        chipOben: chips.length ? Math.round(Math.min(...chips.map(c => c.top))) : null,
+        chipUnten: chips.length ? Math.round(Math.max(...chips.map(c => c.bottom))) : null,
+        knopfOben: kb ? Math.round(kb.top) : null,
+        knopfUnten: kb ? Math.round(kb.bottom) : null,
+        knopfLinks: kb ? Math.round(kb.left) : null,
+        reiheLinks: Math.round(rr.left), reiheRechts: Math.round(rr.right),
+        kopfhoehe: Math.round(document.querySelector('.hero').getBoundingClientRect().height)
+      };
+    });
+    merke('V7: Vorbedingung - dieser Spielstand erzeugt bei 1001 px wirklich einen Ueberlauf trotz Umbruch (sonst prueft 3h nichts)',
+      !!eng && eng.ueberlauf > 2 && eng.knopfSichtbar === true && eng.zeilen.length >= 2, eng);
+    /* `knopfSichtbar` gehoert IN die Bedingung, nicht nur in die Vorbedingung: Gaebe es den Knopf
+       gar nicht, waere „haengt nicht in der Reihe" trivial wahr - die Pruefung waere blind genau
+       in dem Fall, den sie am dringendsten melden muesste. */
+    merke('3h: der Hinweis-Knopf ist da und haengt nicht IN der umbrechenden Reihe - er kann dort keine Zeile mehr aufmachen',
+      !!eng && eng.knopfSichtbar === true && eng.knopfImFluss === false,
+      { knopfSichtbar: eng && eng.knopfSichtbar, knopfImFluss: eng && eng.knopfImFluss });
+    merke('3h2: er deckt die ganze Reihe ab (keine eigene Zeile darunter) und klebt rechts',
+      !!eng && eng.knopfOben <= eng.chipOben + 1 && eng.knopfUnten >= eng.chipUnten - 1 &&
+      eng.knopfLinks > (eng.reiheLinks + eng.reiheRechts) / 2, eng);
+    fehlerAlle.push(...fehler.map(f => 'eng@1001: ' + f));
+    await ctx.close();
+  }
 
   // ---- 4: Ein Format je Groesse, an ALLEN Anzeigestellen ------------------------------------------
   {
@@ -571,6 +815,38 @@ function aufraeumenVergleich(){
     }).map(k => k.zeile + ' <-> ' + k.titel);
     merke('4g: in der Standortliste stehen dieselben Zahlen in Zeile und Tooltip',
       s.kolonie.length > 0 && kolonieFehler.length === 0, { karten:s.kolonie.length, fehler:kolonieFehler.slice(0, 3) });
+
+    /* 4i: DIE NPC-ZIELLISTE IM GALAXIE-REITER (Durchsicht 12.09.2026). Sie war die groesste der
+       uebersehenen Anzeigestellen: dieselbe eigene Angriffskraft, die der Kopf-Chip gerundet
+       zeigt, stand hier roh - und gleich daneben die gegnerische Verteidigung ebenfalls roh,
+       obwohl die Flottenwahl-Vorschau (npcVorschauHtml) BEIDE Werte aus DERSELBEN Funktion
+       (npcKampfLage) laengst gerundet zeigt. Gemessen am Zwischenstand: 13.7k/5.0k dort gegen
+       13688/4960 hier.
+       Gepruefte Regel: JEDE Zahl dieser Zeile ist eine gueltige Haus-Kurzschreibweise. Eine
+       Rohzahl mit vier Ziffern kann diese Form nie annehmen. Die Vorbedingung dazu wird
+       mitgemessen - liegen alle Werte unter 1000, sind beide Schreibweisen gleich und die
+       Pruefung waere blind. */
+    const npc = await page.evaluate(() => {
+      const zeilen = [...document.querySelectorAll('.bmeta')]
+        .map(e => (e.textContent || '').replace(/\s+/g, ' ').trim())
+        .filter(t => /Gegner-Verteidigungspunkte:/.test(t) && /Deine Angriffskraft:/.test(t));
+      return zeilen.map(t => {
+        const d = t.match(/Gegner-Verteidigungspunkte: ([0-9][0-9.,]*[kM]?)/);
+        const a = t.match(/Deine Angriffskraft: ([0-9][0-9.,]*[kM]?)/);
+        return { zeile:t, def: d ? d[1] : null, atk: a ? a[1] : null };
+      });
+    });
+    const npcWerte = npc.flatMap(z => [z.def, z.atk]);
+    merke('V8: Vorbedingung - die NPC-Zielliste steht da, und je Seite liegt mindestens ein Wert ueber 1000',
+      npc.length > 0 && npc.every(z => z.def && z.atk) &&
+      npc.some(z => zahlWert(z.def) >= 1000) && npc.some(z => zahlWert(z.atk) >= 1000),
+      { zeilen:npc.length, beispiel: npc[0] ? npc[0].zeile : null,
+        groessteVerteidigung: npc.length ? Math.max(...npc.map(z => zahlWert(z.def) || 0)) : null,
+        groessteAngriffskraft: npc.length ? Math.max(...npc.map(z => zahlWert(z.atk) || 0)) : null });
+    const npcRoh = npc.filter(z => !KURZSCHREIBWEISE.test(String(z.def)) || !KURZSCHREIBWEISE.test(String(z.atk)))
+      .map(z => z.zeile);
+    merke('4i: in der NPC-Zielliste stehen eigene Angriffskraft UND gegnerische Verteidigung in der Kurzschreibweise des Hauses',
+      npc.length > 0 && npcRoh.length === 0, { zeilen:npc.length, roh:npcRoh.slice(0, 3) });
     await ctx.close();
   }
 
@@ -586,6 +862,37 @@ function aufraeumenVergleich(){
     merke('4h: die Ueberfall-Meldung nennt die Verteidigungspunkte in derselben Schreibweise',
       treffer === 1 && /fmt\(defensePower\(/.test(stelle),
       { anker:ANKER, treffer, stelle });
+  }
+
+  /* ---- 4j: die Anzeigestellen, die im Browser nicht ohne Weiteres erreichbar sind -------------
+     Der Kasten „Markiertes Ziel" braucht ein aus einem Spionagebericht markiertes Ziel, die sechs
+     Protokollzeilen einen wirklich losgeschickten Auftrag. Beide werden deshalb im QUELLTEXT
+     gemessen - und wie bei 4h wird JEDER Anker VOR der Benutzung gezaehlt: Steht er nicht genau
+     einmal da, faellt die Pruefung, statt eine umbenannte Stelle stillschweigend durchzulassen.
+     Alle sieben Stellen zeigen eine LIVE gerechnete eigene Angriffskraft - dieselbe Groesse wie
+     der Kopf-Chip, nur fuer die jeweils losgeschickte Flotte. Sie liefen roh, waehrend die
+     Ueberfall-Meldung daneben (4h) seit UI-6 ueber fmt() laeuft; zwei Schreibweisen in derselben
+     Protokollspalte sind genau die Fehlerklasse, um die es hier geht. */
+  {
+    const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+    const STELLEN = [
+      ['Kasten „Markiertes Ziel" im Galaxie-Reiter', 'angegriffen · Angriffskraft ${'],
+      ['Protokoll: Piratenflotte abfangen',          "' ab (Angriffskraft '+"],
+      ['Protokoll: Leerenriss',                      "' (Angriffskraft '+"],
+      ['Protokoll: Weltboss',                        "den '+worldBossName(b.level)+' an (Angriffskraft '+"],
+      ['Protokoll: NPC-Angriff',                     "gestartet (Angriffskraft '+"],
+      ['Protokoll: Piraten-Versteck',                "pirateLairName(stage)+' an (Angriffskraft '+"],
+      ['Protokoll: Expeditions-Eskorte',             "(Kampfkraft '+"]
+    ];
+    const fehlerStellen = [];
+    for (const [name, anker] of STELLEN){
+      const treffer = quelle.split(anker).length - 1;
+      if (treffer !== 1){ fehlerStellen.push(name + ': Anker ' + treffer + 'x gefunden (erwartet 1)'); continue; }
+      const stelle = quelle.substr(quelle.indexOf(anker), anker.length + 40);
+      if (!/fmt\(/.test(stelle)) fehlerStellen.push(name + ': laeuft roh - ' + stelle.slice(0, 70));
+    }
+    merke('4j: die sieben Anzeigestellen ausserhalb des Browsers nennen die Angriffskraft ueber fmt()',
+      fehlerStellen.length === 0, fehlerStellen);
   }
 
   merke('J1: keine Skriptfehler auf irgendeiner der gemessenen Seiten', fehlerAlle.length === 0, fehlerAlle.slice(0, 3));

@@ -148,6 +148,76 @@ async function spiel(browser, zustand, zaehler){
     await ctx.close();
   }
 
+  // ------------------------------------ 1b) Dasselbe mit einem FRISCHEN Konto
+  //
+  // WARUM ES DIESEN ZWEITEN DURCHGANG GIBT (Durchsicht 12.09.2026, Befund an der Kopfzeile):
+  // Abschnitt 1 kann eine ganze Fehlerklasse gar nicht sehen. `fmt()` liefert AB 1000 eine
+  // Zeichenkette (`(n/1000).toFixed(1)+'k'`), DARUNTER eine Zahl (`Math.floor(n*10)/10`).
+  // `setBoxText` vergleicht mit ===, und `'0' === 0` ist falsch - ein Label, dessen Wert unter
+  // 1000 liegt, wird also in JEDEM Takt neu geschrieben, auch wenn sich nichts geaendert hat.
+  // Der Spielstand oben traegt 180.000 Kredite und einen sechsstelligen Punktestand; dort geben
+  // alle drei betroffenen Schreiber Zeichenketten zurueck, und die Falle ist unsichtbar.
+  // Gemessen am Zwischenstand von UI-6 mit angehaltener Uhr: vier Aenderungen an #heroScore in
+  // 4,5 Sekunden, waehrend die Nachbarn ruhig blieben.
+  //
+  // Die VORBEDINGUNG wird mitgemessen (V-Zeile unten): Stuenden hier Werte ueber 1000, waere der
+  // ganze Durchgang trivial gruen - genau die Blindheit, die ihn noetig gemacht hat.
+  {
+    // Ein frisches Konto: keine Gebaeude, keine Forschung, kein Ruhm, keine Kredite. Alles, was
+    // die drei Schreiber anzeigen, liegt damit unter 1000.
+    const { page, ctx, errs } = await spiel(browser, {
+      resources:{energie:50,erz:40,kristalle:10,deuterium:0,antimaterie:0,forschungspunkte:0},
+      buildings:{}, research:{}, fleet:{ missions:[] },
+      battlePoints:0, xp:0, credits:0, battleStats:{wins:0,losses:0}
+    });
+    await page.evaluate(() => { const b=document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (b) b.click(); });
+    await page.waitForTimeout(1500);
+
+    // Die Schreiber, die ueber fmt() laufen und deshalb unter 1000 eine ZAHL liefern koennen.
+    const KLEIN = ['heroScore', 'scoreTotalValue', 'creditsDisplay', 'profileScore'];
+    // Nachbarn zur Gegenprobe IM SELBEN LAUF: Sie laufen ebenfalls ueber fmt(), waren aber schon
+    // vorher in String(...) gefasst. Bleiben sie ruhig, waehrend KLEIN schreibt, liegt es am
+    // String(...) und nicht an einer allgemeinen Unruhe dieses Spielstands.
+    const NACHBARN = ['heroAttack', 'heroDefense', 'heroBP', 'profileBP'];
+    const ALLE = KLEIN.concat(NACHBARN);
+
+    await page.evaluate(() => { const t0 = Date.now(); Date.now = () => t0; });
+    await page.waitForTimeout(1300);
+
+    const werte = await page.evaluate(ids => {
+      const o = {};
+      for (const id of ids){ const el = document.getElementById(id); o[id] = el ? (el.textContent||'') : null; }
+      return o;
+    }, ALLE);
+    const zahl = t => { const m = String(t==null?'':t).trim().match(/^(\d+(?:[.,]\d+)?)([kM])?$/);
+      if (!m) return null; const r = parseFloat(m[1].replace(',','.'));
+      return m[2]==='M' ? r*1e6 : m[2]==='k' ? r*1000 : r; };
+    const zuGross = ALLE.filter(id => !(zahl(werte[id]) !== null && zahl(werte[id]) < 1000)).map(id => id+'='+werte[id]);
+    check('1b-vorbedingung: alle gemessenen Werte liegen unter 1000 - nur dann kann fmt() eine Zahl statt einer Zeichenkette liefern',
+      zuGross.length === 0, { zuGross, werte });
+
+    await page.evaluate(ids => {
+      window.__mut2 = {};
+      for (const id of ids){
+        window.__mut2[id] = 0;
+        const el = document.getElementById(id);
+        if (el) new MutationObserver(m => { window.__mut2[id] += m.length; })
+          .observe(el, { childList:true, subtree:true, characterData:true });
+      }
+    }, ALLE);
+    await page.waitForTimeout(4200);
+    const mut2 = await page.evaluate(() => window.__mut2);
+    const unruhigKlein = KLEIN.filter(id => mut2[id] > 0).map(id => id + '=' + mut2[id]);
+    check('1b: bei einem frischen Konto schreibt kein fmt()-Label in jedem Takt neu',
+      unruhigKlein.length === 0, { unruhig:unruhigKlein, alle:mut2 });
+    const unruhigNachbarn = NACHBARN.filter(id => mut2[id] > 0).map(id => id + '=' + mut2[id]);
+    check('1b2: und die Nachbarn, die schon vorher in String(...) gefasst waren, bleiben ebenfalls ruhig',
+      unruhigNachbarn.length === 0, { unruhig:unruhigNachbarn, alle:mut2 });
+    const fb = errs.filter(e=>!/favicon/i.test(e));
+    check('1b: keine Konsolenfehler', fb.length === 0, fb.slice(0,3));
+    await ctx.close();
+  }
+
   // ------------------------------------ 2) Mit laufender Mission tickt der Countdown weiter
   {
     const jetzt = Date.now();
