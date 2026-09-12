@@ -16,8 +16,14 @@
 //      je einem Knopf jeder Zeile - und zwar gegen den clip-path eines `.tab-btn` aus derselben
 //      Seite. Eine Prüfung, die nur fragt, OB ein Schnitt da ist, wäre auch am Ausgangsstand grün
 //      gewesen; deshalb sagt 1b zusätzlich, WELCHE Stufe getragen wird (--cut-sm, nicht xs/md/lg).
-//      Die beiden Warnungen des Vertrags sind eigene Prüfungen: Ein Schein muss INNEN liegen (1c)
-//      und der Fokusring darf nicht nach außen versetzt sein (1d) - der Schnitt nimmt beides weg.
+//      Die beiden Warnungen des Vertrags sind eigene Prüfungen: JEDER Teilschein muss INNEN liegen
+//      (1c) und der Fokusring muss sichtbar sein (1d) - der Schnitt nimmt beides weg, wenn es
+//      außen liegt. Beide Prüfungen waren zunächst grün aus dem falschen Grund und sind nach
+//      Befunden nachgeschärft worden: 1c prüfte nur, ob IRGENDWO `inset` vorkommt (box-shadow ist
+//      eine Liste, ein zweiter äußerer Schein rutschte durch); 1d ließ `outline-offset: 0` als
+//      „nicht außen" durchgehen, obwohl ein Ring mit positiver Breite dort außerhalb der
+//      Rahmenkante gezeichnet und weggeschnitten wird. Die Werte, die 1d dafür braucht, sammelte
+//      sie damals schon ein und warf sie weg.
 //
 //   B  DIE SPALTENZAHL FOLGT DER ZAHL DER KNÖPFE. `.fleet-subtabs` stand auf
 //      grid-template-columns:repeat(3, 1fr); die vierspaltige Abgrund-Zeile musste das per
@@ -57,6 +63,11 @@
 //   =sabotageA   der harte 9-px-clip-path wieder in den .fleet-subtab-Regelblock geschrieben
 //   =sabotageB   .fleet-subtabs wieder auf grid-template-columns:repeat(3, 1fr)
 //   =sabotageC   das save() aus dem Standort-Modul-Umschalter entfernt
+//   =sabotageE   der Fokusring der Unterreiter nach AUSSEN gelegt (outline mit positivem
+//                Versatz statt innenliegendem Schatten) - die Sabotage zur Nachschaerfung von
+//                1d (Befund der externen Durchsicht, 12.09.2026: die alte Fassung liess
+//                Versatz 0 durchgehen und war damit blind fuer einen Ring, den der
+//                Eckenschnitt wegschneidet)
 //   =sabotageD   ein zusaetzlicher AEUSSERER Schein neben dem inneren am aktiven Knopf -
 //                die Sabotage zur Nachschaerfung von 1c (Befund der Durchsicht, 12.09.2026:
 //                die alte Fassung suchte 'inset' irgendwo in der Zeichenkette und war damit
@@ -79,6 +90,9 @@ const SAB = process.env.KEPLER_UNTERREITERFORM_GEGENPROBE || '';
 //             passend gemacht, nur eben an einer zweiten Stelle.
 //   sabotageB faellt bei 2a UND 2d: die Abgrund-Zeile bekommt drei Spalten fuer vier Knoepfe und
 //             bricht damit in zwei Knopfzeilen um (gemessen 80 statt 46 px Zeilenhoehe).
+//   sabotageE faellt allein bei 1d: der Ring liegt dann mit positivem Versatz aussen und wird
+//             vom Eckenschnitt weggeschnitten. Die alte Fassung von 1d waere hier gruen
+//             geblieben - gemessen, nicht vermutet.
 //   sabotageD faellt allein bei 1c, und zwar auf allen drei .fleet-subtab-Zeilen. Die alte,
 //             auf blosses Vorkommen von 'inset' pruefende Fassung waere hier gruen geblieben -
 //             gemessen, nicht vermutet.
@@ -87,7 +101,8 @@ const MUSS_FALLEN = {
   sabotageA: ['1a','1b'],
   sabotageB: ['2a','2d'],
   sabotageC: ['3f'],
-  sabotageD: ['1c']
+  sabotageD: ['1c'],
+  sabotageE: ['1d']
 };
 
 // Die sechs Zeilen der zweiten Ebene. `raster` heißt: gehört zur .fleet-subtabs-Familie und wird
@@ -302,9 +317,28 @@ async function reiter(page, tab, ms){
       return { amKnopf:document.activeElement === b, fokusSichtbar:fv, versatz:c.outlineOffset,
                stil:c.outlineStyle, breite:c.outlineWidth, schatten:c.boxShadow };
     });
-    merke('1d: im Tastaturmodus liegt der Fokusring nicht außerhalb der geschnittenen Fläche',
-      !!fokus && fokus.amKnopf && fokus.fokusSichtbar && fokus.stil !== 'none' &&
-      parseFloat(fokus.versatz) <= 0, fokus);
+    // BEFUND DER EXTERNEN DURCHSICHT (12.09.2026): Die alte Bedingung lautete
+    // `stil !== 'none' && parseFloat(versatz) <= 0`. Sie sammelte `breite` und `schatten` ein und
+    // benutzte BEIDES NICHT. Ein Ring mit 1 px Breite und Versatz 0 wird außerhalb der Rahmenkante
+    // gezeichnet und vom Eckenschnitt weggeschnitten - unsichtbar. Versatz 0 erfüllt aber `<= 0`,
+    // also war die Prüfung grün und verdeckte genau die Barriere, gegen die sie steht. Gemessen am
+    // Stand davor: outline-style `auto`, Breite 1px, Versatz 0px, box-shadow ohne Fokus-Anteil.
+    //
+    // Sichtbar ist der Ring auf einer geschnittenen Fläche nur auf zwei Arten, und die Prüfung
+    // verlangt jetzt eine davon:
+    //   (a) ein INNENLIEGENDER Schatten trägt ihn (das Hausmuster), oder
+    //   (b) der Versatz ist mindestens so negativ wie die Ringbreite, zieht den Ring also
+    //       vollständig nach innen.
+    const ringInnen = !!fokus && (() => {
+      const hatInsetRing = /inset/.test(fokus.schatten || '') && (fokus.schatten || '') !== 'none';
+      const breite = parseFloat(fokus.breite) || 0;
+      const versatz = parseFloat(fokus.versatz) || 0;
+      const ringGezeichnet = fokus.stil !== 'none' && breite > 0;
+      const ringGanzInnen = !ringGezeichnet || versatz <= -breite;
+      return hatInsetRing || ringGanzInnen;
+    })();
+    merke('1d: im Tastaturmodus ist der Fokusring sichtbar - innenliegender Schatten oder Versatz mindestens so negativ wie die Ringbreite',
+      !!fokus && fokus.amKnopf && fokus.fokusSichtbar && ringInnen, fokus);
 
     // ---- B: Die Spaltenzahl --------------------------------------------------------------------
     const raster = ZEILEN.filter(z => z.raster);
