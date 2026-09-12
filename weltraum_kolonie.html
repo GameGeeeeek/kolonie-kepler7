@@ -1521,6 +1521,30 @@
        den Moment vor dem ersten Takt stehen - nicht als Entscheidung, sondern als Startwert. */
     body.compact-head [data-acc-key] { scroll-margin-top: var(--sprung-abstand, 128px); }
     body.compact-head .tabs { position:sticky; top:0; z-index:25; background:#0a0d1a; padding:6px 0 8px; margin-bottom:0.8rem; box-shadow:0 6px 14px -6px rgba(0,0,0,0.85); }
+    /* Die zweite klebende Ebene klebt UNTER der Reiterleiste (UI-5a).
+       GEMESSEN am 12.09.2026, 390x844, Flotte/Werft (Seite 15962 px scrollbar, Position 1400):
+       `.tabs` klebte 0-159 px, `#fleetStickyBar` klebte 4-54 px - 50 von 50 px Ueberlappung, und
+       `document.elementFromPoint(195, 29)` lieferte `.tabs`. Die Statusleiste war nach dem
+       Scrollen also unsichtbar UND nicht antippbar, obwohl sie mit z-index 30 die hoehere
+       Stapelnummer traegt als die Leiste mit 25.
+       WARUM die hoehere Nummer nicht half - ebenfalls gemessen, nicht vermutet: `.tab-panel.active`
+       traegt `animation: tabIn ... forwards`. Eine Animation mit Fuellmodus `forwards` gilt auch
+       nach ihrem Ende weiter, und weil sie `transform` animiert, bleibt das Panel dauerhaft ein
+       eigener STAPELKONTEXT (gemessen an `#tab-flotte`: transform=matrix(1,0,0,1,0,0),
+       animation=tabIn/forwards). Die 30 gelten damit nur INNERHALB des Panels; gegen die Leiste
+       ausserhalb zaehlt der Platz des Panels selbst. Eine hoehere Zahl an der Statusleiste waere
+       deshalb wirkungslos gewesen.
+       DIE REPARATUR ist darum keine Stapelnummer, sondern der Klebepunkt: Zwei klebende Baender
+       duerfen sich gar nicht erst ueberlappen. Der Abstand ist die GEMESSENE Hoehe der
+       Reiterleiste - dieselbe Zahl, die `sprungAbstandSetzen()` ohnehin jede Sekunde nach
+       `--sprung-abstand` schreibt (Hoehe + 10 px Luft). Eine zweite Quelle fuer dieselbe Zahl
+       waere eine zweite Wahrheit; eine getippte Zahl waere falsch, weil die Leiste mit der
+       Fensterbreite und mit jedem Banner darueber waechst (gemessen 94/159 px).
+       Die Rueckfall-Zahl 128 ist bewusst dieselbe wie bei `scroll-margin-top` daneben: der
+       Startwert fuer den Moment vor dem ersten Takt, keine Entscheidung.
+       NUR unter `body.compact-head`: Am PC klebt `.tabs` nicht (gemessen bei 1400 px:
+       position=static), dort bliebe die Statusleiste an ihrem alten Platz. */
+    body.compact-head .fleet-sticky { top: var(--sprung-abstand, 128px); }
     .head-compact-toggle { font-size:10.5px; padding:4px 9px; margin-left:auto; }
     @media (prefers-reduced-motion: reduce) { body.compact-head .tabs { backdrop-filter:none; background:#0a0d1a; } }
     .resbar { display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:1.5rem; }
@@ -2403,11 +2427,26 @@
     /* Mobiler Feinschliff (v8.505.0, Etappe B-7): Die Ebenen-Leiste bricht auf schmalen
        Bildschirmen nicht mehr in zwei Zeilen, sondern wird einzeilig wischbar. Statisches HTML,
        nie per innerHTML neu geschrieben - die Wischposition überlebt deshalb von selbst. */
-    #karteEbenenLeiste { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:0.75rem; }
+    /* EINE Pillen-Leiste fuer alle drei Zeilen (UI-5a, 12.09.2026). Die Regel hing bis dahin an
+       der ID `#karteEbenenLeiste`; `#galaxySubtabBar` und `#allianceSubtabBar` hatten dieselbe
+       Aufgabe, aber gar keine CSS-Regel - nur wortgleiche Inline-Stile im Markup. GEMESSEN bei
+       390 px war die Galaxie-Zeile deshalb 120 px hoch (6 Pillen auf DREI Zeilen), die Allianz-
+       Zeile 78 px (4 Pillen auf zwei Zeilen), die Ebenen-Leiste dagegen 36 px.
+       WELCHES der beiden vorhandenen Muster traegt hier - gemessen, nicht geraten: `data-hscroll`
+       ist kein Layout-Muster, sondern ein MERKZETTEL fuer die Wischposition (der Attributwert ist
+       der Schluessel in `prev[...]`, mit dem sie nach einem innerHTML-Neuaufbau zurueckgesetzt
+       wird); die Wisch-Eigenschaften selbst stehen dort jedes Mal erneut inline. Diese drei Zeilen
+       sind statisches Markup und werden nie neu geschrieben (gemessen: kein innerHTML-Schreibort
+       auf eine der drei IDs) - ihre Wischposition ueberlebt von selbst, genau wie es der
+       urspruengliche Kommentar hier schon fuer die Ebenen-Leiste festhielt. Der Merkzettel waere
+       also totes Gewicht. Es traegt die Media-Regel, und sie steht jetzt EIN Mal. */
+    .pillen-leiste { display:flex; gap:6px; flex-wrap:wrap; }
+    #karteEbenenLeiste { margin-bottom:0.75rem; }
+    #galaxySubtabBar, #allianceSubtabBar { margin-bottom:1rem; }
     @media (max-width: 700px) {
-      #karteEbenenLeiste { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
-      #karteEbenenLeiste::-webkit-scrollbar { display:none; }
-      #karteEbenenLeiste .planet-pill { flex:0 0 auto; }
+      .pillen-leiste { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+      .pillen-leiste::-webkit-scrollbar { display:none; }
+      .pillen-leiste .planet-pill { flex:0 0 auto; }
     }
     .sun-disc { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fac775; margin-right:6px; vertical-align:-1px; }
     /* NUR das Karten-svg selbst (direktes Kind), nicht jedes svg IM Kasten: Das Fraktionswappen am
@@ -3927,7 +3966,7 @@
              Vorgabe alles an - der Standard sieht exakt aus wie vorher. Der aktive Zustand wird in
              buildGalaxyMap() aus state.karteEbenen gespiegelt (überlebt so auch den Spielstand-Load
              NACH dem Verdrahten). -->
-        <div id="karteEbenenLeiste">
+        <div id="karteEbenenLeiste" class="pillen-leiste">
           <button class="planet-pill" data-karte-ebene="routen" title="Eigene Missionslinien zwischen den Systemen ein-/ausblenden"><i class="ti ti-rocket" aria-hidden="true"></i>Routen</button>
           <button class="planet-pill" data-karte-ebene="fraktionen" title="NPC-Territorium (Ring und Wappen am System) ein-/ausblenden"><i class="ti ti-flag" aria-hidden="true"></i>Fraktionen</button>
           <button class="planet-pill" data-karte-ebene="ereignisse" title="Ereignis-Abzeichen (Piratenbasis, Aliens, Krieg) und Wurmloch ein-/ausblenden"><i class="ti ti-alert-triangle" aria-hidden="true"></i>Ereignisse</button>
@@ -3978,7 +4017,7 @@
       </div>
 
       <div class="tab-panel" id="tab-galaxie">
-        <div id="galaxySubtabBar" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1rem;">
+        <div id="galaxySubtabBar" class="pillen-leiste">
           <button class="planet-pill" data-galaxy-subtab="kampf"><i class="ti ti-sword" aria-hidden="true" style="margin-right:4px;"></i>Kampf &amp; Eroberung</button>
           <button class="planet-pill" data-galaxy-subtab="abgrund"><i class="ti ti-infinity" aria-hidden="true" style="margin-right:4px;"></i>Der Abgrund</button>
           <button class="planet-pill" data-galaxy-subtab="front"><i class="ti ti-flag" aria-hidden="true" style="margin-right:4px;"></i>Front</button>
@@ -4370,7 +4409,7 @@
           </div>
         </div>
 
-        <div id="allianceSubtabBar" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:1rem;">
+        <div id="allianceSubtabBar" class="pillen-leiste">
           <button class="planet-pill" data-alliance-subtab="uebersicht"><i class="ti ti-medal" aria-hidden="true" style="margin-right:4px;"></i>Übersicht</button>
           <button class="planet-pill" data-alliance-subtab="mitglieder"><i class="ti ti-users" aria-hidden="true" style="margin-right:4px;"></i>Mitglieder &amp; Kriege</button>
           <button class="planet-pill" data-alliance-subtab="ausbau"><i class="ti ti-flask" aria-hidden="true" style="margin-right:4px;"></i>Ausbau</button>
@@ -71707,6 +71746,32 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // (r.top faellt um d, scrollY steigt um d), bildAnkerLage bleibt also gueltig.
     if (r.top <= 0 && r.top - d <= 0) window.scrollBy(0, d);
   }
+  /* Ein Unterreiter-Schluessel, den es nicht (mehr) gibt, faellt auf den ERSTEN Reiter zurueck
+     (UI-5a, 12.09.2026). GEMESSEN am Ausgangsstand mit je einem Spielstand, der 'erfunden-xyz' im
+     Schluessel trug: In allen VIER Zeilen (Flotte, Offiziere, Galaxie, Allianz) waren danach
+     0 von 3 bzw. 0 von 6 bzw. 0 von 4 Panels sichtbar und 0 Knoepfe aktiv - der Reiter war leer.
+     Die alten Muster (`state.x || 'werft'` bzw. `if (state.x === undefined) state.x = 'kampf'`)
+     fangen nur `undefined` ab, nie einen FALSCHEN Wert. `tests/test_angriffsziel_reiter.js` haelt
+     genau das seit dem 05.08.2026 im Kommentar fest, weil es dort eine Gegenprobe gekostet hat.
+     Vorbild ist `abgrundReiter()`: pruefen, ob der Schluessel in der Liste steht, sonst der erste.
+     WOHER die gueltigen Schluessel kommen: aus dem MARKUP, ueber die ohnehin vorhandenen
+     `data-*-subtab`-Attribute der Knopfzeile. Eine zweite, eingetippte Liste im Skript waere
+     genau die zweite Wahrheit, die veraltet, sobald jemand einen Knopf hinzufuegt oder entfernt -
+     der Abgrund kann sich seine Tabelle leisten, weil sein Markup AUS dieser Tabelle entsteht;
+     diese vier Zeilen stehen dagegen fest im HTML.
+     DER SPIELSTAND WIRD NICHT BERICHTIGT - bewusst. Die Rueckfall-Frage ist eine ANZEIGE-Frage:
+     Ein unbekannter Schluessel kann aus einem neueren Stand stammen (ein Reiter, den dieser Build
+     noch nicht kennt), und ein stilles Ueberschreiben verloere die Wahl des Spielers endgueltig,
+     waehrend der Rueckfall sich von selbst repariert, sobald der Schluessel wieder bekannt ist.
+     Derselbe Weg wie bei `abgrundReiter()`, das ebenfalls nur liest. Sobald der Spieler einen
+     Knopf antippt, schreibt der Klick-Handler ohnehin einen gueltigen Wert. */
+  function unterreiterSchluessel(wert, knopfSelektor, attribut){
+    const knoepfe = document.querySelectorAll(knopfSelektor);
+    // Kein Markup gefunden (Test-Fixture, Teilseite): dann entscheidet diese Funktion nichts.
+    if (!knoepfe.length) return wert;
+    for (const b of knoepfe) if (b.getAttribute(attribut) === wert) return wert;
+    return knoepfe[0].getAttribute(attribut);
+  }
   // Der Abstand fuer Sprungziele haengt an der HOEHE der klebenden Reiterleiste - und die ist
   // keine Konstante: Sie wechselt mit dem Formfaktor (94 px am PC, 118 bzw. 159 px am Handy) und
   // waechst mit jedem Reiter. Gemessen statt nachgerechnet, aus demselben Grund wie bei
@@ -73569,7 +73634,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // über Reloads), Standard ist die Werft. Die Sticky-Leiste hält die Kernzahlen beim Scrollen
     // sichtbar - seit v8.538.0 hinter setBoxHtml (Begruendung am Schreibort unten).
     {
-      const fleetSub = state.fleetSubTab || 'werft';
+      const fleetSub = unterreiterSchluessel(state.fleetSubTab || 'werft', '#fleetSubtabs [data-fleet-subtab]', 'data-fleet-subtab');
       const subMap = { werft:'fleetSubWerft', flotte:'fleetSubFlotte', missionen:'fleetSubMissionen' };
       for (const [k, id] of Object.entries(subMap)){
         const el = document.getElementById(id);
@@ -75027,7 +75092,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // dasselbe Muster wie die fleet-subtabs - drei Sub-Container ein-/ausblenden je nach
       // state.officerSubTab (merkt sich die Auswahl über Reloads), Standard "offiziere".
       {
-        const offSub = state.officerSubTab || 'offiziere';
+        const offSub = unterreiterSchluessel(state.officerSubTab || 'offiziere', '#officerSubtabs [data-officer-subtab]', 'data-officer-subtab');
         const offMap = { offiziere:'offSubOffiziere', module:'offSubModule', schiffsmodule:'offSubShipModule' };
         for (const [k, id] of Object.entries(offMap)){
           const el = document.getElementById(id);
@@ -75698,12 +75763,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // echten Serverdaten eine Exception wirft, brach das komplette render() vorher genau dort ab,
     // BEVOR die Sichtbarkeits-Umschaltung überhaupt lief. So läuft sie garantiert als Erstes.
     try {
-      if (state.galaxySubTab === undefined) state.galaxySubTab = 'kampf';
+      // Hier stand `if (state.galaxySubTab === undefined) state.galaxySubTab = 'kampf';` - das
+      // fing den leeren Spielstand ab, aber keinen falschen Schluessel (Begruendung an
+      // `unterreiterSchluessel`). Der Rueckfall gilt jetzt fuer BEIDE Faelle und schreibt nichts.
+      const galSub = unterreiterSchluessel(state.galaxySubTab, '#galaxySubtabBar [data-galaxy-subtab]', 'data-galaxy-subtab');
       document.querySelectorAll('.galaxy-subpanel').forEach(panel => {
-        panel.style.display = panel.getAttribute('data-galaxy-sub') === state.galaxySubTab ? '' : 'none';
+        panel.style.display = panel.getAttribute('data-galaxy-sub') === galSub ? '' : 'none';
       });
       document.querySelectorAll('[data-galaxy-subtab]').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-galaxy-subtab') === state.galaxySubTab);
+        btn.classList.toggle('active', btn.getAttribute('data-galaxy-subtab') === galSub);
         btn.onclick = () => { state.galaxySubTab = btn.getAttribute('data-galaxy-subtab'); render(); save(); };
       });
     } catch(e){ console.error('Galaxie-Unterreiter-Umschaltung fehlgeschlagen:', e); }
@@ -77228,12 +77296,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // irgendeinem Grund eine Exception wirft, brach das komplette render() vorher an dieser Stelle
       // ab, BEVOR die Sichtbarkeits-Umschaltung überhaupt lief. So läuft sie garantiert als Erstes.
       try {
-        if (state.allianceSubTab === undefined) state.allianceSubTab = 'uebersicht';
+        // Wie bei der Galaxie-Zeile: der frueher hier stehende `=== undefined`-Riegel fing nur
+        // den leeren Spielstand ab, nicht den falschen Schluessel.
+        const allSub = unterreiterSchluessel(state.allianceSubTab, '#allianceSubtabBar [data-alliance-subtab]', 'data-alliance-subtab');
         document.querySelectorAll('.alliance-subpanel').forEach(panel => {
-          panel.style.display = panel.getAttribute('data-alliance-sub') === state.allianceSubTab ? '' : 'none';
+          panel.style.display = panel.getAttribute('data-alliance-sub') === allSub ? '' : 'none';
         });
         document.querySelectorAll('[data-alliance-subtab]').forEach(btn => {
-          btn.classList.toggle('active', btn.getAttribute('data-alliance-subtab') === state.allianceSubTab);
+          btn.classList.toggle('active', btn.getAttribute('data-alliance-subtab') === allSub);
           btn.onclick = () => { state.allianceSubTab = btn.getAttribute('data-alliance-subtab'); render(); save(); };
         });
       } catch(e){ console.error('Allianz-Unterreiter-Umschaltung fehlgeschlagen:', e); }
