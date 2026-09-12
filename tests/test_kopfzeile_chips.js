@@ -105,7 +105,17 @@ const SAB = process.env.KEPLER_KOPFZEILE_GEGENPROBE || '';
 // aendern darf), und 1c bleibt gruen, weil es ueber der leeren Menge der sichtbaren Gruppen
 // urteilt - dafuer fallen dort 1a und 1b.
 const MUSS_FALLEN = {
-  alt:[], sabA:[], sabB:[], sabC:[], sabD:[], sabE:[], sabF:[], sabG:[], sabH:[], sabI:[], sabJ:[]
+  alt:  ['1a', '1b', '1d', '1k', '1g', '1h', '3a', '3c', '3d', '3f', '3e', 'V7', '3h', '3h2', '4a', '4b', '4c', '4d', '4g', '4i', '4h', '4j'],
+  sabA: ['3a', '3c', '3d', '3f', 'V7', '3h', '3h2'],
+  sabB: ['1b', '1g'],
+  sabC: ['4a'],
+  sabD: ['1h'],
+  sabE: ['3f'],
+  sabF: ['3f', '3h', '3h2'],
+  sabG: ['1k'],
+  sabH: ['4i'],
+  sabI: ['4j'],
+  sabJ: ['3a2']
 };
 
 // Die sechs Breiten des Vertrags. 360/390 sind Handy-Masse (dort ist die Kopfzeile mit 206 px

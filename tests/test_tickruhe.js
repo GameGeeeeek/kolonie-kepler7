@@ -174,7 +174,12 @@ async function spiel(browser, zustand, zaehler){
     await page.waitForTimeout(1500);
 
     // Die Schreiber, die ueber fmt() laufen und deshalb unter 1000 eine ZAHL liefern koennen.
-    const KLEIN = ['heroScore', 'scoreTotalValue', 'creditsDisplay', 'profileScore'];
+    // AUSDRUECKLICH OHNE creditsDisplay, obwohl es dieselbe Falle traegt: Sein Schreiber sitzt in
+    // renderMarket() und laeuft nur auf dem Markt-Reiter. Hier - auf dem Fortschritt-Reiter -
+    // koennte er sich also weder melden noch verraten, und gemessen tat er es in BEIDEN
+    // Richtungen nicht (0 Aenderungen am gesunden wie am sabotierten Stand). Ein Eintrag, der
+    // nicht fallen kann, sieht wie Abdeckung aus und ist keine.
+    const KLEIN = ['heroScore', 'scoreTotalValue', 'profileScore'];
     // Nachbarn zur Gegenprobe IM SELBEN LAUF: Sie laufen ebenfalls ueber fmt(), waren aber schon
     // vorher in String(...) gefasst. Bleiben sie ruhig, waehrend KLEIN schreibt, liegt es am
     // String(...) und nicht an einer allgemeinen Unruhe dieses Spielstands.
