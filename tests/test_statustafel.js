@@ -48,6 +48,20 @@
 //     „den Lauscher ganz weglassen" eine erlaubte Antwort auf 3h. Sobald die Wiedergabe weg ist,
 //     liegt die Tafel wieder obenauf, und der naechste Tastendruck gehoert ihr.
 //
+// EINE PRUEFUNG AUS DER DURCHSICHT VOM 13.09.2026, DRITTER TEIL (2g)
+// ------------------------------------------------------------------
+// 2g  OBENAUF UEBER DER EIGENEN TAFEL HEISST NICHT OBENAUF UEBER ALLEM. UI-7 hob den Randknopf
+//     bei offener Tafel auf z-index 211 - gedacht als Sicherheitsmarge ueber die Verdunklung
+//     (205), gemessen aber eine Stufe UEBER der bildschirmfuellenden Kampf-Wiedergabe
+//     (.battle-modal-overlay, 210). GEMESSEN am 13.09.2026 auf 390x844, Tafel offen und
+//     Wiedergabe darueber: elementFromPoint auf der Knopfmitte (371,6 | 759,2) lieferte
+//     „fpToggleBtn", der Knopf war sichtbar, und ein echter Maustipp dorthin klappte die
+//     VERDECKTE Tafel zu, waehrend die Wiedergabe offen stehenblieb.
+//     DIE MARGE IST DESHALB WEG (206 statt 211), und ihre Rolle uebernimmt kein groesserer
+//     Abstand, sondern ein Waechter: 2f misst, dass Knopf und Tafel sich gar nicht ueberlappen,
+//     2g misst die Gegenrichtung. Eine Zahl, die sich Luft ueber fremden Ebenen nimmt, ist keine
+//     Sicherheit - sie ist der zweite Fehler.
+//
 // FUENF FALLEN, GEGEN DIE DIESER WAECHTER AUSDRUECKLICH GEBAUT IST
 // ----------------------------------------------------------------
 //  1. DIE SICHTBARKEIT HAENGT AN EINER MEDIA-REGEL (max-width: 1219px), NICHT AN EINER KLASSE.
@@ -95,6 +109,7 @@
 //   =sabNachzug der entprellte resize-Nachzug rendert nicht mehr
 //   =sabKnopf   der Randknopf haengt wieder an openFpPanel statt am Umschalter
 //   =sabZindex  die CSS-Zeile, die den Knopf ueber die offene Tafel hebt, fehlt
+//   =sabMarge   die Sicherheitsmarge aus UI-7 ist zurueck (Knopf wieder bei 211 statt 206)
 //   =sabAria    aria-expanded/aria-controls sind weg (Markup und beide setAttribute-Stellen)
 //   =sabEscape  der keydown-Lauscher der Tafel fehlt ganz
 //   =sabDurchfall der Lauscher haelt Escape nicht an (stopImmediatePropagation entfernt)
@@ -188,6 +203,7 @@ const MUSS_FALLEN = {
   sabNachzug:   ['1e'],
   sabKnopf:     ['2d'],
   sabZindex:    ['2c'],
+  sabMarge:     ['2g'],
   sabAria:      ['2a', '2b', '2d'],
   sabEscape:    ['3a', '3d', '3i'],
   sabDurchfall: ['3d'],
@@ -535,6 +551,65 @@ const knopfMitte = page => page.evaluate(() => {
       gemessen.every(g => g.offen === true && g.knopfDisplay !== 'none' && g.tafelBreite > 0), gemessen);
     merke('2f: der Randknopf verdeckt die aufgeklappte Tafel an keiner Breite (Ueberlappung 0)',
       gemessen.every(g => g.ueberlapp === 0), gemessen.map(g => g.breite + 'px:' + g.ueberlapp));
+    await ctx.close();
+  }
+
+  {
+    /* UND DIE GEGENRICHTUNG: OBENAUF UEBER DER TAFEL HEISST NICHT OBENAUF UEBER ALLEM. 2c misst,
+       dass der Knopf die Verdunklung seiner eigenen Tafel ueberragt. DIESE Pruefung misst, dass
+       er dafuer kein FREMDES Fenster ueberragt - ein Randknopf, der ueber einem
+       bildschirmfuellenden Fenster steht, bedient etwas, das der Spieler gar nicht sieht.
+       GEMESSEN am 13.09.2026 auf 390x844 mit z-index 211 (der Sicherheitsmarge aus UI-7), Tafel
+       offen und die Kampf-Wiedergabe darueber: elementFromPoint auf der Knopfmitte
+       (371,6 | 759,2) lieferte „fpToggleBtn", der Knopf war sichtbar (display block, opacity 1),
+       und ein echter Maustipp dorthin klappte die VERDECKTE Tafel zu (offen true -> false),
+       waehrend die Wiedergabe offen stehenblieb. Mit 206 lieferte dieselbe Messung ein Element
+       INNERHALB der Wiedergabe, und derselbe Tipp liess die Tafel offen.
+       ZWEI HAELFTEN, WEIL EINE NICHT REICHT: Nur „elementFromPoint trifft ihn nicht" liesse
+       Wege offen, auf denen der Knopf trotzdem bedient wird; nur „der Tipp tut nichts" liesse
+       einen sichtbaren Knopf ueber dem Fenster stehen. Gemessen wird die LAGE, nicht die Zahl -
+       in dieser Pruefung steht kein z-index. Die Lage wird ueber den Bestandsweg der Wiedergabe
+       hergestellt (der Knopf [data-watch-battle] in den Berichten, wie in tests/test_wiedergabe_*.js);
+       maybeAutoWatchBattle() stellt dieselbe Lage im Spiel per Zeitgeber her, ohne jeden Klick. */
+    const { ctx, page } = await seite(browser, 390, 844, [UEBERFALL]);
+    await page.evaluate(() => { const x = document.getElementById('headerReportsBtn'); if (x) x.click(); });
+    await page.waitForTimeout(1600);
+    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
+    await page.waitForTimeout(1500);
+    const amKnopf = await page.evaluate(() => {
+      const b = document.getElementById('fpToggleBtn');
+      const p = document.getElementById('fleetPositionPanel');
+      const ov = document.getElementById('battleModalOverlay');
+      const r = b.getBoundingClientRect(), o = ov.getBoundingClientRect();
+      const x = r.left + r.width/2, y = r.top + r.height/2;
+      const el = document.elementFromPoint(x, y);
+      const cs = getComputedStyle(b);
+      return { x:+x.toFixed(1), y:+y.toFixed(1),
+               tafelOffen: p.classList.contains('fp-mobile-open'),
+               tafelDisplay: getComputedStyle(p).display,
+               wiedergabeOffen: ov.classList.contains('open'),
+               knopfDisplay: cs.display,
+               knopfImBild: r.width > 0 && r.height > 0,
+               /* Deckt das Fenster die Knopfmitte ueberhaupt ab? Sonst waere die Pruefung
+                  trivial gruen, ohne etwas zu belegen. */
+               fensterDeckt: x >= o.left && x <= o.right && y >= o.top && y <= o.bottom,
+               getroffen: el ? (el.id || el.className || el.tagName) : null,
+               istKnopf: !!(el && (el === b || b.contains(el))),
+               inWiedergabe: !!(el && (el === ov || ov.contains(el))) };
+    });
+    merke('V14: Vorbedingung - Tafel offen, Wiedergabe offen, Knopf im Bild und vom Fenster ueberdeckt',
+      amKnopf.tafelOffen === true && amKnopf.tafelDisplay === 'block' && amKnopf.wiedergabeOffen === true
+      && amKnopf.knopfDisplay !== 'none' && amKnopf.knopfImBild === true && amKnopf.fensterDeckt === true, amKnopf);
+    await page.mouse.click(amKnopf.x, amKnopf.y);
+    await page.waitForTimeout(600);
+    const nachTipp = await page.evaluate(() => ({
+      tafelOffen: document.getElementById('fleetPositionPanel').classList.contains('fp-mobile-open'),
+      wiedergabeOffen: document.getElementById('battleModalOverlay').classList.contains('open') }));
+    merke('2g: ueber einem bildschirmfuellenden Fenster liegt der Randknopf NICHT obenauf - und ein Tipp auf seine Mitte klappt die verdeckte Tafel nicht zu',
+      amKnopf.istKnopf === false && amKnopf.inWiedergabe === true && nachTipp.tafelOffen === true,
+      { amKnopf, nachTipp });
     await ctx.close();
   }
 

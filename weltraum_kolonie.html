@@ -2070,12 +2070,31 @@
          gar nicht einloesen kann: Der zweite Tipp erreicht den Knopf nicht.
          ZU HEBEN IST ER SEIT DER DURCHSICHT NUR NOCH UEBER DIE VERDUNKLUNG (205): Die Tafel haelt
          sich aus seinem Streifen heraus und liegt gar nicht mehr unter ihm (gemessen: keine
-         Ueberlappung an 360, 390, 430, 700, 1000 und 1219 px). 211 statt 206 bleibt es trotzdem,
-         damit eine kuenftige Aenderung am Streifen den Knopf nicht still begraebt.
+         Ueberlappung an 360, 390, 430, 700, 1000 und 1219 px).
+         DESHALB 206 UND NICHT 211. Hier stand bis zum 13.09.2026 eine Sicherheitsmarge auf 211,
+         damit eine kuenftige Aenderung am Streifen den Knopf nicht still begraebt. Sie hat dabei
+         eine FREMDE Ebene uebersprungen: `.battle-modal-overlay`, das bildschirmfuellende Fenster
+         der Kampf-Wiedergabe, liegt bei 210. GEMESSEN am 13.09.2026 auf 390x844, Tafel offen und
+         die Wiedergabe ueber den Bestandsweg darueber geoeffnet: document.elementFromPoint auf der
+         Knopfmitte (371,6 | 759,2) lieferte „fpToggleBtn" - der Knopf stand sichtbar UEBER dem
+         Fenster, und ein echter Tipp dorthin klappte die VERDECKTE Tafel zu (offen true -> false),
+         waehrend die Wiedergabe offen stehenblieb. maybeAutoWatchBattle() stellt genau diese Lage
+         per Zeitgeber her, ohne jeden Klick. Eine Marge, die eine fremde Ebene ueberspringt, ist
+         keine Sicherheit, sondern ein zweiter Fehler.
+         DIE ROLLE DER MARGE UEBERNIMMT EIN WAECHTER STATT EINER ZAHL: Pruefung 2f in
+         tests/test_statustafel.js misst an sechs Breiten, dass Knopf und Tafel sich GAR NICHT
+         ueberlappen - eine kuenftige Aenderung am Streifen faellt dort auf, statt den Knopf still
+         zu begraben. Pruefung 2g misst die Gegenrichtung: Ueber einem bildschirmfuellenden Fenster
+         darf der Knopf nicht obenauf liegen.
+         206 ist die gemessen naechste freie Stufe ueber der Verdunklung: Zwischen 205 und 210
+         belegt diese Datei keinen einzigen Wert (gemessen ueber alle z-index-Deklarationen, und
+         zur Laufzeit wird keiner gesetzt), waehrend 210 gemessen zwei Dinge tragen - die Tafel
+         selbst und jedes bildschirmfuellende Fenster. Was vorher unter dem Knopf lag, liegt
+         weiter darunter: die Verdunklung (205) und das Anmelde-Fenster (200).
          Der Geschwister-Selektor braucht kein zweites Zustandsflag in JS - der Knopf steht im
          Markup unmittelbar hinter der Tafel, und die Klasse .fp-mobile-open ist bereits die eine
          Wahrheit ueber den offenen Zustand. */
-      .fleet-position-panel.fp-mobile-open ~ .fp-edge-tab { z-index:211; }
+      .fleet-position-panel.fp-mobile-open ~ .fp-edge-tab { z-index:206; }
     }
     .fp-close-btn { display:none; position:absolute; top:8px; right:8px; width:28px; height:28px; align-items:center; justify-content:center; padding:0; font-size:12px; }
     .fp-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:205; }
