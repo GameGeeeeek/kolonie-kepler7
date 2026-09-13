@@ -15069,6 +15069,17 @@
     box.querySelectorAll('[data-vp-projekt-zu]').forEach(b => b.onclick = () => { box.classList.remove('open'); });
     box.querySelectorAll('[data-vp-projekt-start]').forEach(b => b.onclick = () => vorpostenProjektStarten(sysId, b.getAttribute('data-vp-projekt-start')));
   }
+  /* TASTENAUSGANG (UI-8, 13.09.2026). Dieses Fenster hatte bis heute keinen - und das war nicht
+     nur eine fehlende Bequemlichkeit: GEMESSEN am 13.09.2026 auf 390x844 UND 1280x900 schloss
+     Escape bei offenem Projektfenster das aufgeklappte SYSTEM darunter (Fenster blieb offen,
+     System true -> false). Die Taste wirkte also auf etwas, das der Spieler hinter einem
+     bildschirmfuellenden Overlay gar nicht sehen konnte.
+     Der Aufruf steht hier oben und nicht im Erzeugungszweig des Overlays: Das Fenster entsteht
+     erst beim ersten Oeffnen, ein Lauscher von dort waere also HINTER allen anderen registriert -
+     und der Boden-Lauscher des aufgeklappten Systems kaeme vor ihm dran. */
+  escapeAusgang(() => { const b = document.getElementById('vorpostenProjektOverlay'); return !!b && b.classList.contains('open'); },
+    () => document.getElementById('vorpostenProjektOverlay').classList.remove('open'),
+    () => document.getElementById('vorpostenProjektOverlay'));
   async function vorpostenProjektStarten(sysId, key){
     const d = vpProjektDef(key);
     if (!d) return;
@@ -15240,6 +15251,12 @@
     box.querySelectorAll('[data-vp-modul-raus]').forEach(b => b.onclick = () => vorpostenModulAusbauen(sysId, Number(b.getAttribute('data-vp-modul-raus'))));
     box.querySelectorAll('[data-vp-modul-bau]').forEach(b => b.onclick = () => vorpostenModulBauen(b.getAttribute('data-vp-modul-bau')));
   }
+  /* TASTENAUSGANG (UI-8, 13.09.2026) - dieselbe Messung wie beim Projektfenster eine Etage
+     hoeher: Escape schloss bei offenem Steckplatzfenster das aufgeklappte System darunter, das
+     Fenster selbst blieb stehen. Begruendung fuer die Stelle des Aufrufs steht dort. */
+  escapeAusgang(() => { const b = document.getElementById('vorpostenModulOverlay'); return !!b && b.classList.contains('open'); },
+    () => document.getElementById('vorpostenModulOverlay').classList.remove('open'),
+    () => document.getElementById('vorpostenModulOverlay'));
   async function vorpostenModulEinbauen(sysId, instKey){
     const res = await backendFetch('/vorposten/modul/einbauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId, modul: instKey }) }).catch(() => null);
     const daten = res ? await res.json().catch(() => null) : null;
@@ -25167,6 +25184,16 @@
     const ov = document.getElementById('fwahlOverlay');
     if (ov) ov.classList.remove('open');
   }
+  /* TASTENAUSGANG (UI-8, 13.09.2026). Bis dahin kam man aus der Flottenwahl nur ueber das x oder
+     den Klick auf den dunklen Rand. Der Rand ist hier gemessen erreichbar - anders als bei der
+     Kampf-Wiedergabe, wo der Inhalt das Overlay restlos ausfuellt: 390x844 Overlay 390x844 gegen
+     Karte 362x745, alle vier Randpunkte lieferten `fwahlOverlay`, und ein echter Tipp auf
+     (4|422) schloss das Fenster. Ein einziger Tastenausgang fehlte trotzdem, und Escape tat
+     stattdessen etwas Unsichtbares (siehe Projektfenster).
+     GESCHLOSSEN WIRD UEBER schliesseFlottenwahl, nicht ueber classList.remove: Nur das raeumt
+     `fwahlAuftrag` und den Sekundenzaehler des Countdowns mit ab. */
+  escapeAusgang(() => { const o = document.getElementById('fwahlOverlay'); return !!o && o.classList.contains('open'); },
+    schliesseFlottenwahl, () => document.getElementById('fwahlOverlay'));
   function zeichneFlottenwahl(){
     const ov = document.getElementById('fwahlOverlay');
     if (!ov || !fwahlAuftrag) return;
@@ -50810,13 +50837,12 @@ async function claimPendingRewards(){
   /* ESCAPE GEHOERT DEM OBERSTEN FENSTER (Durchsicht 04.09.2026). Ohne diesen Lauscher fiel Escape
      durch bis zu dem Handler, der das aufgeklappte System zuklappt: Man kam aus dem Overlay nur
      heraus, indem man nebenbei das System verlor. Genau dieselbe Begruendung, die beim Kartenmenue
-     schon steht - und `stopImmediatePropagation` aus demselben Grund. Der Lauscher wird VOR jenem
-     registriert und tut nichts, solange das Overlay zu ist. */
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !vrufOffen()) return;
-    schliesseVerbandsRuf();
-    e.stopImmediatePropagation();
-  });
+     schon steht.
+     SEIT UI-8 UEBER DIE GEMEINSAME HAUSFORM (siehe escapeAusgang weiter unten): Das Overlay haelt
+     die Taste nur an, solange es an seiner eigenen Stelle wirklich obenauf liegt. Es teilt sich
+     die Klasse `fwahl-overlay` samt z-index 9200 mit drei weiteren Fenstern - wer von denen oben
+     liegt, bekommt die Taste, gleich in welcher Reihenfolge die Lauscher registriert sind. */
+  escapeAusgang(vrufOffen, schliesseVerbandsRuf, () => document.getElementById('vrufOverlay'));
   /* Was der Spieler eingetippt hat, ueberlebt eine Ablehnung (Durchsicht 04.09.2026). Vorher
      schloss das Overlay vor dem Absenden, und bei einem 409 ("es laeuft schon ein Verband") oder
      einem Verbindungsfehler waren Sammelphase, Zielwahl UND die getippte Nachricht weg - man
@@ -66363,16 +66389,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
   document.addEventListener('click', (e) => {
     if (karteMenuEl && !karteMenuEl.contains(e.target) && !e.target.closest('[data-planet],[data-map-player],[data-map-npc],[data-map-moon],[data-map-asteroid]')) closeKarteMenu();
   });
-  // Esc gehört dem Menü, solange eines offen ist. stopImmediatePropagation, weil weiter unten ein
-  // zweiter Esc-Handler auf document das aufgeklappte System zuklappt: Ohne das Anhalten würde ein
-  // Tastendruck beides auf einmal schließen, und man käme aus einem versehentlich geöffneten Menü
-  // nur heraus, indem man nebenbei das System verliert. Dieser Block wird VOR jenem registriert,
-  // deshalb greift es. Ist kein Menü offen, passiert hier gar nichts.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !karteMenuEl) return;
-    closeKarteMenu();
-    e.stopImmediatePropagation();
-  });
+  // Esc gehört dem Menü, solange eines offen ist. Das Anhalten der Taste ist der Kern: Ohne es
+  // würde ein Tastendruck das Menü UND das aufgeklappte System darunter auf einmal schließen, und
+  // man käme aus einem versehentlich geöffneten Menü nur heraus, indem man nebenbei das System
+  // verliert. Seit UI-8 läuft das über die gemeinsame Hausform (escapeAusgang): Das Menü nimmt
+  // die Taste nur, wenn es an seiner eigenen Stelle obenauf liegt - es wird zwar von Hand ins
+  // Fenster gerückt, kann aber unter einem bildschirmfüllenden Fenster liegen. Ist kein Menü
+  // offen, passiert hier gar nichts.
+  escapeAusgang(() => !!karteMenuEl, closeKarteMenu, () => karteMenuEl);
   /* Scrollt die SEITE, verliert das Menue seinen Marker (es ist position:fixed) - deshalb wird
      es dann geschlossen. Der Lauscher hing aber mit capture:true am window und bekam damit AUCH
      das Scrollen IM Menue: Seit dem Hoehendeckel (max-height/overflow-y) ist das Kartenmenue eines
@@ -79410,6 +79434,62 @@ function sekSternUse(key, x, y, k, unentdeckt){
   ['gesturestart', 'gesturechange'].forEach(function(ev){
     document.addEventListener(ev, function(e){ e.preventDefault(); });
   });
+  /* ===== DIE HAUSFORM FUER TASTENAUSGAENGE - EINMAL, NICHT SIEBENMAL (UI-8, 13.09.2026) =====
+
+     Die Regel stand bis heute WOERTLICH an drei Stellen und galt an dreien nicht. Sie lautet:
+     Escape gehoert dem obersten Fenster. Wer sie befolgt, tut dreierlei - nichts, solange sein
+     Fenster zu ist; schliessen, wenn es obenauf liegt; und die Taste mit
+     stopImmediatePropagation bei sich behalten, damit sie nicht durchfaellt und nebenbei etwas
+     anderes zuklappt.
+
+     WARUM GEMESSEN STATT AUFGEZAEHLT: Eine Liste der staerkeren Fenster ist genau so
+     vollstaendig wie die Fantasie dessen, der sie schreibt. In diesem Bereich ist das in einer
+     Woche zweimal schiefgegangen - eine Suche nach erreichbaren Fensterlagen kannte nur Wege,
+     die ein KLICK herstellt, und uebersah die Kampf-Wiedergabe, die sich per Zeitgeber selbst
+     oeffnet (maybeAutoWatchBattle, 400 ms nach einem eintreffenden Bericht); und eine
+     Sicherheitsmarge am z-index ueberschritt dabei die Ebene eines echten Fensters. Der Browser
+     weiss die Antwort ohnehin schon: Was liegt an MEINER Stelle obenauf? Gefragt wird in der
+     Mitte des Teils des Fensters, der wirklich im Bild steht. Damit ist die
+     Registrierungsreihenfolge unten nur noch ein Gleichstands-Entscheid und nicht mehr die
+     Wahrheit - ein neues Fenster braucht keine Zeile in einer Liste, nur seinen eigenen
+     Tastenausgang.
+
+     KOSTEN: getBoundingClientRect und elementFromPoint erzwingen einen Layout-Durchlauf. Er
+     laeuft ausschliesslich bei gedruecktem Escape UND offenem Fenster, also hoechstens einmal je
+     Tastendruck - nie im Takt und nie beim Zeichnen. Gemessen am 13.09.2026 auf 390x844:
+     0,004 ms je Aufruf.
+
+     WO DIE HAUSFORM NICHT GILT UND WARUM: Das aufgeklappte System ist kein Fenster im
+     Bildschirmsinn, sondern ein Kasten IN der Seite. GEMESSEN am 13.09.2026 auf 900x1000 bei
+     scrollY 1847: seine Kartenflaeche stand bei top -954 bis -129, also vollstaendig ausserhalb
+     des Bildes - und Escape schliesst es dort seit jeher, zu Recht. Eine Obenauf-Messung wuerde
+     ihm genau dort den Ausgang nehmen. Es bleibt deshalb der LETZTE Lauscher: der Boden, der
+     die Taste nimmt, wenn kein Fenster darueber sie beansprucht hat.
+     Die Statustafel bringt ihre eigene, gleich gebaute Messung mit (statustafelObenauf) - sie
+     prueft zusaetzlich den GERECHNETEN display-Wert gegen ihre Media-Regel und bleibt mit
+     UI-7/C unveraendert. */
+  function fensterObenauf(el){
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    const l = Math.max(r.left, 0), o = Math.max(r.top, 0);
+    const re = Math.min(r.right, window.innerWidth), u = Math.min(r.bottom, window.innerHeight);
+    // Nichts von dem Fenster im Bild: dann ist es auch keines, das die Taste verdient.
+    if (re <= l || u <= o) return false;
+    const oben = document.elementFromPoint((l + re) / 2, (o + u) / 2);
+    return !!oben && (oben === el || el.contains(oben));
+  }
+  /* Ein Fenster meldet hier seinen Tastenausgang an: WANN es offen ist, WIE es zugeht und WELCHES
+     Element es im Bild ist. Der Rest - Taste pruefen, Obenauf messen, Taste anhalten - steht
+     einmal hier statt siebenmal im Spiel. Die Stelle des Aufrufs bleibt der Gleichstands-
+     Entscheid, deshalb steht jeder Aufruf bei SEINEM Fenster und nicht in einer Liste. */
+  function escapeAusgang(istOffen, schliessen, element){
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !istOffen()) return;
+      if (!fensterObenauf(typeof element === 'function' ? element() : element)) return;
+      schliessen();
+      e.stopImmediatePropagation();
+    });
+  }
   /* ESCAPE GEHOERT DEM OBERSTEN FENSTER (UI-7/C) - und die aufgeklappte Statustafel ist ein
      echtes Fenster mit Verdunklung. Die REIHENFOLGE gehoert deshalb zur Sache: Dieser Lauscher
      steht VOR dem, der ein paar Zeilen weiter unten das aufgeklappte System zuklappt, und haelt
@@ -79447,14 +79527,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
     closeFpPanel();
     e.stopImmediatePropagation();
   });
-  // Esc schließt das offene System - dieselbe Taste, die überall sonst im Spiel einen Kasten
-  // zumacht. Nur wenn gerade nichts getippt wird, sonst nähme sie dem Suchfeld das Abbrechen weg.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !galaxyOpenSystem) return;
-    const a = document.activeElement;
-    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
-    galaxySchliesse();
-  });
+  /* Der Esc-Lauscher des aufgeklappten Systems stand bis UI-8 HIER, also vor dem der
+     Kampf-Wiedergabe. Er ist ans Ende der Escape-Kette gewandert (hinter initBattleModal) - die
+     Begruendung steht dort. */
 
   // Tastatur-Bedienung der Karte (KB-14, Auftrag Sascha "bedienung über pfeiltasten wenn man am
   // pc ist"). Sie hängt bewusst NICHT an einer Bildschirmbreite: Wer eine Tastatur hat, soll sie
@@ -79536,12 +79611,35 @@ function sekSternUse(key, x, y, k, unentdeckt){
     // gefangen (Spieler-Report Sascha: "man kann nicht aus dieser Simulation raus tappen").
     // Ein einziger Ausgang ist bei einem bildschirmfüllenden Fenster zu wenig, unabhängig
     // davon, ob die damalige Ursache behoben ist.
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      if (!overlay.classList.contains('open')) return;
-      closeBattleReplay();
-    });
+    // Seit UI-8 ueber die gemeinsame Hausform: Die Taste wird ANGEHALTEN, sobald dieses Fenster
+    // sie nimmt. GEMESSEN am 13.09.2026 (390x844 und 900x1000, Wiedergabe ueber einem
+    // aufgeklappten System): Vorher fiel derselbe Tastendruck weiter bis zum System-Lauscher und
+    // schloss beides auf einmal - der Spieler drueckte einmal und verlor zwei Fenster.
+    escapeAusgang(() => overlay.classList.contains('open'), closeBattleReplay, overlay);
   })();
+  /* DER BODEN DER ESCAPE-KETTE: das aufgeklappte System (UI-8, 13.09.2026).
+     Esc schliesst es - dieselbe Taste, die ueberall sonst im Spiel einen Kasten zumacht. Nur wenn
+     gerade nichts getippt wird, sonst naehme sie dem Suchfeld das Abbrechen weg.
+     WARUM DIESER LAUSCHER ALS EINZIGER NICHT MISST, OB ER OBENAUF LIEGT: Das aufgeklappte System
+     ist kein Fenster ueber dem Bildschirm, sondern ein Kasten IN der Seite - es kann vollstaendig
+     aus dem Bild scrollen. GEMESSEN am 13.09.2026 auf 900x1000 bei scrollY 1847: Kartenflaeche
+     top -954 bis -129, kein Pixel im Bild, und Escape schliesst das System dort seit jeher. Eine
+     Obenauf-Messung wuerde ihm genau in dieser Lage den Ausgang nehmen.
+     WARUM ER STATTDESSEN GANZ NACH UNTEN GEHOERT: Jedes Fenster ueber ihm misst selbst, ob es
+     obenauf liegt, und haelt die Taste dann an. Kommt sie trotzdem bis hierher, hat sie niemand
+     beansprucht - dann gehoert sie dem System. Bis v8.728.0 stand dieser Lauscher rund 90 Zeilen
+     WEITER OBEN, vor dem der Kampf-Wiedergabe, und genau daraus entstand der Doppelschluss:
+     GEMESSEN an v8.728.0 in der Lage `Tafel offen, System aufgeklappt, Wiedergabe darueber'
+     ergab der erste Tastendruck auf 390x844 wie auf 900x1000 {system:false, wiedergabe:false}.
+     Das Anhalten ist trotzdem kein Selbstzweck: Nach ihm hoert nur noch das Anmeldefenster auf
+     Escape, und das steht nie gleichzeitig offen. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !galaxyOpenSystem) return;
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    galaxySchliesse();
+    e.stopImmediatePropagation();
+  });
 
   // Event-Delegation statt einzelner onclick-Bindungen: funktioniert unabhängig davon, ob die
   // "?"-Buttons Teil des statischen HTML sind oder später neu gerendert werden.
