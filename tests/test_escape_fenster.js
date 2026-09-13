@@ -14,6 +14,37 @@
 //    1280x900 schloss Escape dort das aufgeklappte SYSTEM hinter dem Overlay - das Fenster blieb
 //    stehen, die Taste wirkte auf etwas, das der Spieler gar nicht sehen konnte.
 //
+// DIE BESTANDSAUFNAHME, AUF DER DIESER WAECHTER STEHT (gemessen 13.09.2026)
+// --------------------------------------------------------------------------
+// Fenster im Bildschirmsinn, nach z-index, mit ihren Ausgaengen:
+//   .fwahl-overlay (9200, inset:0) - VIER Fenster, alle dynamisch gebaut: vorpostenProjektOverlay,
+//     vorpostenModulOverlay, fwahlOverlay, vrufOverlay. Jedes hat ein x und einen Randklick, und
+//     der Rand ist hier am Handy WIRKLICH ein Ausgang: padding 14 px, Karte width min(560px,96vw)
+//     schrumpft auf die verbleibenden 362 von 390 px - es bleiben 14 px links und rechts.
+//     Tastenausgang: seit UI-8 alle vier, vorher nur der Verbandsruf. 0c bewacht das Muster.
+//   .kmenu (9000, fixed) - Eintrag anklicken, Klick daneben, Scrollen, Tabwechsel, Escape (3b).
+//     Es kann nicht halb aus dem Bild stehen: openKarteMenu rueckt es nach dem Einhaengen mit
+//     Math.max/Math.min vollstaendig ins Fenster, und max-height min(60vh,420px) haelt es
+//     kleiner als der Bildschirm.
+//   .battle-modal-overlay (210, inset:0) - x in der Titelzeile und Escape. Der Randklick ist am
+//     Handy GEMESSEN keiner: `@media (max-width:879px)` setzt das padding der Wiedergabe auf 0,
+//     `align-items:stretch` streckt #osWrap ueber das ganze Overlay, e.target === overlay tritt
+//     nie ein. Genau diese Falle steht seit dem 03.08.2026 als Kommentar daneben.
+//   #fleetPositionPanel.fp-mobile-open (210) mit #fpBackdrop (205) - x, Randknopf, Klick auf die
+//     Verdunklung, Escape. Bewacht in tests/test_statustafel.js, nicht hier.
+//   .login-overlay (200, inset:0) - DREIZEHN Fenster (Anmeldung, Willkommen neu und zurueck,
+//     Update-Hinweis, Tutorial, Spielerprofil, Adminbereich, Aufstiegspfad, Prestige-Bonus,
+//     Sitzungskonflikt, Ko-fi-Nachfrage, Stimmen-Hinweis, Spenden-Rangliste). Keines hoert auf
+//     Escape, und sie bleiben ausdruecklich in Ruhe: Jedes hat einen eigenen sichtbaren Knopf im
+//     Inhalt, und drei davon (Prestige-Bonus, Aufstiegspfad, Sitzungskonflikt) sind Pflichtwahlen
+//     nach einem unumkehrbaren Schritt - dort waere ein Tastenausgang ein Fehler, kein Gewinn.
+//     Sie sind nicht Gegenstand der beiden Zusagen dieser Etappe.
+//   .chat-panel (61) mit .chat-panel-overlay (60) - eine Schublade ueber 88vw, kein
+//     bildschirmfuellendes Fenster: x-Knopf UND Klick auf die verbleibenden 12vw Verdunklung,
+//     beides gemessen erreichbar. Kein Tastenausgang, aber auch keine Falle.
+//   Das aufgeklappte System ist KEIN Fenster im Bildschirmsinn, sondern ein Kasten IN der Seite
+//     (Knopf „‹ Galaxie", Klick ins Leere, Escape) - siehe den Absatz zum Boden.
+//
 // WIE ES GELOEST IST - UND WAS DARAN GEMESSEN IST
 // -----------------------------------------------
 // Die Hausform steht seit UI-8 einmal im Spiel (escapeAusgang/fensterObenauf) statt wortgleich an
@@ -48,6 +79,7 @@
 //   =sabFlotte     der Tastenausgang der Flottenwahl fehlt wieder
 //   =sabRoh        die Flottenwahl schliesst per classList.remove statt ueber schliesseFlottenwahl
 //   =sabMisstBoden der Boden misst DOCH, ob er obenauf liegt - die naheliegende, falsche Loesung
+//   =sabMuster     ein FUENFTES .fwahl-overlay entsteht, ohne einen Tastenausgang anzumelden
 //   =sabBlind      escapeAusgang fragt fensterObenauf nicht mehr (greift wieder blind)
 // Jede Sabotage entsteht aus der AKTUELLEN Spieldatei, jeder Anker wird vorher gezaehlt (genau
 // eine Fundstelle, sonst Abbruch VOR dem Schreiben). Die MUSS_FALLEN-Listen sind GEMESSEN: erst
@@ -69,8 +101,16 @@
 // * sabDurchfall LAESST 2c GRUEN, und das ist keine Luecke: Die Flottenwahl wird ohne offenes
 //   System gemessen (Galaxie-Reiter, Angriffsknopf). Ohne etwas darunter kann das Durchfallen der
 //   Taste dort nichts anrichten - 2c misst den AUSGANG, 2a/2b messen das Anhalten.
-// * sabFlotte BRINGT 2d MIT: Die Sabotage nimmt den ganzen Aufruf weg, damit auch den Anker, an
-//   dem 2d den Schliessweg liest.
+// * sabFlotte BRINGT 2d UND 0c MIT: Die Sabotage nimmt den ganzen Aufruf weg - damit auch den
+//   Anker, an dem 2d den Schliessweg liest, und damit meldet `fwahlOverlay` keinen Tastenausgang
+//   mehr an, was 0c zaehlt.
+// * 0c MISST DAS MUSTER, NICHT DIE VIER NAMEN, und hat dafuer einen eigenen Falsifikator:
+//   sabMuster baut ein FUENFTES .fwahl-overlay (`vorpostenLagerOverlay`), ohne ihm einen
+//   Tastenausgang zu geben. GEMESSEN am 13.09.2026: gebaut 5, erkannt 5, ohne Ausgang eines -
+//   0c faellt, und keine andere Pruefung merkt etwas davon. Genau so entstand Zusage B: Das
+//   aeltere Blatt nannte „die Flottenwahl", und die Messung fand drei weitere Fenster derselben
+//   Familie. Am Grundstand faellt 0c mit allen vier Namen, weil es dort gar keinen escapeAusgang
+//   gibt.
 // * sabBLIND BLEIBT VOLLSTAENDIG GRUEN - und das ist ein Befund, kein Versaeumnis. Gemessen faellt
 //   die Registrierungsreihenfolge der Fenster-Lauscher Zeile fuer Zeile mit ihrem z-index
 //   zusammen (9200, 9200, 9200, 9200, 9000, 210, 210), es gibt also heute kein erreichbares
@@ -93,12 +133,13 @@ const merke = (name, bed, zusatz) => {
 const SAB = process.env.KEPLER_ESCAPE_GEGENPROBE || '';
 // GEMESSEN am 13.09.2026 - erst leer gefahren, dann eingetragen, dann jeder Stand erneut.
 const MUSS_FALLEN = {
-  alt:           ['0a', '0b', '1a', '1a-900', '1b', '1b-900', '2a', '2b', '2c', '2d'],
+  alt:           ['0a', '0b', '0c', '1a', '1a-900', '1b', '1b-900', '2a', '2b', '2c', '2d'],
   sabBoden:      ['0b', '1a', '1a-900', '1b', '1b-900'],
   sabDurchfall:  ['1a', '1a-900', '1b', '1b-900', '2a', '2b', '3b', '3c'],
-  sabFlotte:     ['2c', '2d'],
+  sabFlotte:     ['0c', '2c', '2d'],
   sabRoh:        ['2d'],
   sabMisstBoden: ['1c', '1c-900', '3a'],
+  sabMuster:     ['0c'],
   sabBlind:      []
 };
 
@@ -117,6 +158,26 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8');
   const iSystem = JS.indexOf('if (e.key !== \'Escape\' || !galaxyOpenSystem) return;');
   merke('0b: der Lauscher des aufgeklappten Systems ist der Boden - er steht HINTER dem der Kampf-Wiedergabe',
     iWiedergabe > 0 && iSystem > 0 && iSystem > iWiedergabe, { wiedergabe: iWiedergabe, system: iSystem });
+
+  /* 0c: DAS MUSTER, NICHT DIE VIER NAMEN (Durchsicht 13.09.2026). Zusage B galt einer FAMILIE:
+     `.fwahl-overlay` ist eine Klasse, mit der heute vier Fenster dynamisch gebaut werden, und an
+     dreien davon fehlte der Tastenausgang. Ein Waechter, der diese vier Namen aufzaehlt, laesst
+     das fuenfte durch - genau die Aufzaehlungs-Falle, gegen die die Hausform gebaut ist.
+     Gelesen wird deshalb aus dem Quelltext, WELCHE Ids die Klasse bekommen, und fuer jede, ob sie
+     in einem escapeAusgang-Aufruf vorkommt. Der Vergleich `erkannt === gebaut` haelt die Pruefung
+     davor, still gegenstandslos zu werden: Baut jemand ein solches Overlay kuenftig anders auf
+     (etwa ueber setAttribute oder eine Hilfsfunktion), faellt diese Zeile, statt das neue Fenster
+     zu uebersehen. Falsifikatoren gemessen: sabMuster (fuenftes Overlay ohne Ausgang), sabFlotte
+     (Ausgang eines vorhandenen weggenommen) und der Grundstand. */
+  const bauStellen = JS.match(/\.className = 'fwahl-overlay'/g) || [];
+  const erkannt = [...JS.matchAll(/(\w+)\.id = '([A-Za-z0-9_]+)';\s*\n\s*\1\.className = 'fwahl-overlay';/g)].map(m => m[2]);
+  const aufrufe = [];
+  { let p = JS.indexOf('escapeAusgang(');
+    while (p >= 0){ aufrufe.push(JS.slice(p, p + 400)); p = JS.indexOf('escapeAusgang(', p + 1); } }
+  const ohneAusgang = erkannt.filter(id => !aufrufe.some(a => a.indexOf("'" + id + "'") >= 0));
+  merke('0c: das Muster ist vollstaendig - jedes dynamisch gebaute .fwahl-overlay meldet einen Tastenausgang an',
+    bauStellen.length >= 4 && erkannt.length === bauStellen.length && ohneAusgang.length === 0,
+    { gebaut: bauStellen.length, erkannt, ohneAusgang });
 
   /* 2d als Quelltext-Pruefung, und zwar mit Grund: Der Unterschied zwischen den beiden Schliess-
      wegen ist im DOM nicht sichtbar. schliesseFlottenwahl raeumt zusaetzlich `fwahlAuftrag` und
