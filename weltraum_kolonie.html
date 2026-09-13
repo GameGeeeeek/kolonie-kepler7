@@ -79414,10 +79414,17 @@ function sekSternUse(key, x, y, k, unentdeckt){
        Verbandsruf auf, dann den Randknopf antippen: Sein Overlay liegt mit inset:0 bei z-index
          9200 ueber dem Knopf (50); elementFromPoint auf der Knopfmitte lieferte „vrufOverlay".
          Geoeffnet wird der Verbandsruf ohnehin nur aus einem Kartenmenue-Eintrag heraus.
-     Fuehrt eines Tages doch ein Weg dorthin, gehoert die Zusicherung zurueck - zusammen mit der
-     Pruefung, die sie belegt. */
+     Fuehrt eines Tages doch ein Weg dorthin, braucht es dafuer keine neue Zeile mehr: Seit dem
+     13.09.2026 fragt statustafelObenauf() den Browser, WAS an der Stelle der Tafel wirklich
+     obenauf liegt, und der Lauscher laesst die Taste dann durch. Das gilt fuer jedes Fenster,
+     auch fuer eines, das es heute noch nicht gibt. */
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !statustafelOffen()) return;
+    /* NUR WENN DIE TAFEL DAS OBERSTE FENSTER IST - und das wird GEMESSEN, nicht gewusst
+       (Durchsicht 13.09.2026). Liegt etwas darueber, gehoert die Taste dem, was der Spieler
+       wirklich sieht; die Tafel wartet mit ihren eigenen Ausgaengen (x, Verdunklung, Randknopf)
+       darunter weiter. Begruendung der Messung steht an statustafelObenauf(). */
+    if (!statustafelObenauf()) return;
     closeFpPanel();
     e.stopImmediatePropagation();
   });
@@ -81430,6 +81437,38 @@ function sekSternUse(key, x, y, k, unentdeckt){
   function statustafelSichtbar(){
     if (!fpPanelEl) return false;
     return getComputedStyle(fpPanelEl).display !== 'none';
+  }
+  /* IST DIE TAFEL DAS OBERSTE FENSTER? GEMESSEN STATT AUFGEZAEHLT (Durchsicht 13.09.2026).
+     Der Anlass: maybeAutoWatchBattle() oeffnet die bildschirmfuellende Kampf-Wiedergabe von
+     SELBST (setTimeout 400 ms nach einem eintreffenden Kampfbericht, state.autoWatchLiveRaid
+     steht auf an) - ohne jeden Klick. Beide tragen z-index 210; die Wiedergabe steht im Markup
+     spaeter und malt deshalb oben. GEMESSEN am 13.09.2026 auf 390x844 mit offener Tafel:
+     document.elementFromPoint in der Bildmitte lieferte „osCv" (die Leinwand der Wiedergabe),
+     der erste Escape schloss trotzdem die VERDECKTE Tafel, und die sichtbare Wiedergabe
+     brauchte einen zweiten. Genau davor warnt ihr Kommentar seit dem 03.08.2026.
+
+     WARUM KEINE LISTE DER STAERKEREN FENSTER: Die Korrekturrunde zu UI-7 hat nach einer
+     erreichbaren Lage „Tafel auf und staerkeres Fenster darueber" gesucht und keine gefunden -
+     die Suche kannte aber nur Wege, die ein KLICK herstellt (Kartenmenue, Verbandsruf). Ein
+     Fenster, das sich selbst oeffnet, kam darin nicht vor. Eine Aufzaehlung waere genau so
+     vollstaendig wie die Fantasie dessen, der sie schreibt, und beim naechsten neuen Fenster
+     still falsch. Der Browser weiss die Antwort ohnehin schon: Was liegt an dieser Stelle
+     obenauf? Gefragt wird in der Mitte des Teils der Tafel, der WIRKLICH im Bild steht - nicht
+     in der Bildmitte, denn die Tafel ist ein Streifen und deckt sie gar nicht ab.
+
+     KOSTEN: Der Aufruf erzwingt einen Layout-Durchlauf (getBoundingClientRect und
+     elementFromPoint). Er laeuft ausschliesslich bei gedruecktem Escape UND aufgeklappter
+     Tafel, also hoechstens einmal je Tastendruck - nie im Takt und nie beim Zeichnen.
+     GEMESSEN am 13.09.2026: 0,004 ms je Aufruf (Mittel aus 200, 390x844, aufgeklappte Tafel). */
+  function statustafelObenauf(){
+    if (!fpPanelEl || !statustafelSichtbar()) return false;
+    const r = fpPanelEl.getBoundingClientRect();
+    const l = Math.max(r.left, 0), o = Math.max(r.top, 0);
+    const re = Math.min(r.right, window.innerWidth), u = Math.min(r.bottom, window.innerHeight);
+    // Nichts von der Tafel im Bild: dann ist sie auch kein Fenster, das die Taste verdient.
+    if (re <= l || u <= o) return false;
+    const oben = document.elementFromPoint((l + re) / 2, (o + u) / 2);
+    return !!oben && (oben === fpPanelEl || fpPanelEl.contains(oben));
   }
   function openFpPanel(){
     if (fpPanelEl) fpPanelEl.classList.add('fp-mobile-open');

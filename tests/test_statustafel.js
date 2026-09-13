@@ -31,6 +31,23 @@
 //     Tastendruck schloss die unsichtbare Klasse, das aufgeklappte System darunter brauchte
 //     einen zweiten.
 //
+// ZWEI PRUEFUNGEN AUS DER DURCHSICHT VOM 13.09.2026, ZWEITER TEIL (3h, 3i)
+// ------------------------------------------------------------------------
+// 3h  EIN FENSTER, DAS SICH OHNE KLICK OEFFNET, NIMMT DIE TAFEL NICHT MIT IN DEN HINTERGRUND.
+//     maybeAutoWatchBattle() schiebt die bildschirmfuellende Kampf-Wiedergabe per setTimeout
+//     400 ms hinter einen eintreffenden Kampfbericht; der Schalter state.autoWatchLiveRaid steht
+//     per Voreinstellung auf an. GEMESSEN am 13.09.2026 auf 390x844, Tafel offen: beide z-index
+//     210, die Wiedergabe steht im Markup spaeter und malt oben (elementFromPoint ueber der
+//     Tafel lieferte „osCv"). Der erste Escape schloss die VERDECKTE Tafel, die sichtbare
+//     Wiedergabe blieb stehen und brauchte einen zweiten.
+//     DIE LOESUNG ZAEHLT NICHT AUF: statustafelObenauf() fragt den Browser, was an der Stelle
+//     der Tafel obenauf liegt. Eine Liste der staerkeren Fenster waere derselbe Fehler noch
+//     einmal - die Korrekturrunde zu UI-7 hatte genau deshalb nichts gefunden, weil sie nur
+//     Wege kannte, die ein KLICK herstellt.
+// 3i  UND DIE TAFEL VERLIERT IHREN EIGENEN AUSGANG DABEI NICHT. Ohne diese zweite Haelfte waere
+//     „den Lauscher ganz weglassen" eine erlaubte Antwort auf 3h. Sobald die Wiedergabe weg ist,
+//     liegt die Tafel wieder obenauf, und der naechste Tastendruck gehoert ihr.
+//
 // FUENF FALLEN, GEGEN DIE DIESER WAECHTER AUSDRUECKLICH GEBAUT IST
 // ----------------------------------------------------------------
 //  1. DIE SICHTBARKEIT HAENGT AN EINER MEDIA-REGEL (max-width: 1219px), NICHT AN EINER KLASSE.
@@ -86,6 +103,7 @@
 //   =sabStreifen die Tafel steht wieder mittig ueber die volle Breite und reicht unter den Knopf
 //   =sabZustand der Nachzug raeumt den Offen-Zustand ueber der Schwelle nicht mehr ab
 //   =sabSpaet   derselbe Escape-Lauscher, aber HINTER dem des aufgeklappten Systems registriert
+//   =sabBlind   der Riegel statustafelObenauf() faellt weg - der Lauscher greift wieder blind
 // Jede Sabotage entsteht aus der AKTUELLEN Spieldatei, jeder Anker wird vorher gezaehlt (genau
 // eine Fundstelle, sonst Abbruch VOR dem Schreiben). Die MUSS_FALLEN-Listen sind GEMESSEN: erst
 // leer gefahren, dann eingetragen, dann jeder Stand erneut, bis jeder Lauf Exit 0 lieferte.
@@ -126,6 +144,26 @@
 //   Riegel aus Zusage A beinahe kassiert haette - belegt durch sabVerdrahtung, wo genau sie
 //   faellt. 3g bleibt am alten Stand ebenfalls gruen: Ohne Escape-Lauscher an der Tafel ging
 //   Escape dort ohnehin ans System; was fehlte, war der Ausgang (3f).
+// * 3h UND 3i AENDERN DREI BESTEHENDE LISTEN, und jede Aenderung ist ein Befund, kein Anpassen:
+//   - alt und sabEscape bekommen 3i dazu. Beide Staende haben keinen Escape-Lauscher an der
+//     Tafel (alt kannte ihn noch nicht, sabEscape nimmt ihn weg). 3h bleibt dort GRUEN - ohne
+//     Lauscher nimmt die Tafel der Wiedergabe nichts weg -, aber die Tafel hat dann ueberhaupt
+//     keinen Tastenausgang mehr, und genau das misst 3i. Das ist der Zugewinn aus UI-7/C,
+//     jetzt zum ersten Mal belegt.
+//   - sabVorrang bekommt 3h dazu: Ein Lauscher in der capture-Phase, der Escape immer anhaelt,
+//     verschluckt ihn auch vor der Wiedergabe.
+//   - sabZustand VERLIERT 3g, und das ist die interessanteste Messung. Die Sabotage laesst den
+//     Offen-Zustand ueber der Schwelle stehen; frueher fiel damit beides - das Fenster ohne
+//     Ausgang (3f) UND die dafuer verbrauchte Taste (3g). Die zweite Haelfte heilt jetzt die
+//     allgemeine Messung: GEMESSEN am 13.09.2026 auf 1400x900 liegt ueber der Tafel dort ihre
+//     eigene Verdunklung (elementFromPoint in der Bildmitte lieferte „fpBackdrop"; die Tafel
+//     traegt ihre 210 nur unterhalb der Schwelle, darueber steht sie bei 50). Die Tafel ist also
+//     gemessen NICHT obenauf, der Lauscher laesst die Taste durch, und das System bekommt sie.
+//     3f faellt weiter - das Fenster ohne Ausgang ist der eigentliche Schaden und bleibt
+//     bewacht. 3g bleibt trotzdem falsifizierbar: sabVorrang bringt es weiterhin zu Fall.
+// * sabBlind ist die Sabotage ZU 3h: genau die eine Zeile `if (!statustafelObenauf()) return;`
+//   faellt weg, der Lauscher greift wieder blind. Gemessen faellt dort 3h und sonst nichts -
+//   3i bleibt gruen, weil die Tafel beim ersten Tastendruck ja zugeht (nur eben die falsche).
 // * sabSpaet aendert NUR die Reihenfolge - derselbe Lauscher, hinter dem des aufgeklappten
 //   Systems registriert. Es faellt genau 3d: Escape schliesst dann die Tafel UND das System auf
 //   einmal. Das ist die Pruefung, mit der die Reihenfolge-Zusage im Kommentar der Spieldatei
@@ -144,20 +182,21 @@ const SAB = process.env.KEPLER_STATUSTAFEL_GEGENPROBE || '';
 // GEMESSEN am 13.09.2026 - siehe Kopf. Was NICHT faellt, ist so wichtig wie was faellt: 1d und 2e
 // halten fest, was sich NICHT aendern darf, und bleiben an jedem Stand gruen.
 const MUSS_FALLEN = {
-  alt:          ['1a', '1b', '1e', '2a', '2b', '2c', '2d', '2f', '3a', '3d', '3f'],
+  alt:          ['1a', '1b', '1e', '2a', '2b', '2c', '2d', '2f', '3a', '3d', '3f', '3i'],
   sabRiegel:    ['1a', '1b'],
   sabSofort:    ['1c'],
   sabNachzug:   ['1e'],
   sabKnopf:     ['2d'],
   sabZindex:    ['2c'],
   sabAria:      ['2a', '2b', '2d'],
-  sabEscape:    ['3a', '3d'],
+  sabEscape:    ['3a', '3d', '3i'],
   sabDurchfall: ['3d'],
-  sabVorrang:   ['3b', '3c', '3e', '3g'],
+  sabVorrang:   ['3b', '3c', '3e', '3g', '3h'],
   sabVerdrahtung: ['1f'],
   sabStreifen:  ['2f'],
-  sabZustand:   ['3f', '3g'],
-  sabSpaet:     ['3d']
+  sabZustand:   ['3f'],
+  sabSpaet:     ['3d'],
+  sabBlind:     ['3h']
 };
 
 // 12 Kolonien mit je 6 Missionen + 24 eigene = 96 Missionszeilen, dazu der angeschlossene
@@ -209,11 +248,15 @@ function schwererStand(){
   });
 }
 
-function backend(store){
+function backend(store, berichte){
   return async r => {
     const req = r.request(); const p = req.url().split('/api/')[1].split('?')[0];
     const j = (o, s = 200) => r.fulfill({ status:s, contentType:'application/json', body:JSON.stringify(o) });
     if (p === 'health') return j({ ok:true });
+    /* Berichte NUR, wenn der Aufrufer welche mitgibt: Ohne diesen Zweig antwortet der Sammel-
+       Zweig weiter unten mit [] - genau wie bisher. Jede Seite, die keine Berichte anfordert,
+       sieht damit unveraendert dieselbe Antwort wie vor dem 13.09.2026. */
+    if (p === 'reports' && berichte) return j({ reports: berichte });
     if (p === 'me') return j({ userId:'u', username:'A', homeSystem:'kepler', homeSlot:0, attackShieldMs:0, hasEmail:true, wantsPatchnotes:true });
     if (p === 'leaderboard') return j(Array.from({ length:20 }, (_, i) => ({ id:'p'+i, name:'Spieler'+i, score:100000-i*137, lastSeen:Date.now() })));
     if (p.startsWith('storage/')){
@@ -228,16 +271,26 @@ function backend(store){
   };
 }
 
+/* EIN Kampfbericht, aus dem die Wiedergabe wirklich ein Gefecht bauen kann. openBattleReplay()
+   macht das Fenster sonst sofort wieder zu und meldet „Zu diesem Bericht gibt es kein Gefecht zum
+   Zuschauen." - die Lage aus 3h waere dann gar nicht hergestellt, und die Pruefung waere gruen,
+   ohne etwas zu belegen. Deshalb misst V13 ausdruecklich nach, dass beide Fenster offen sind. */
+const UEBERFALL = { id:'r1', time:Date.now(), ts:Date.now(), type:'raid', result:'win',
+  faction:'Söldnerkonvoi', attackPower:41200, defensePower:23400, targetPlanet:'home',
+  fleet:{ destroyers:179 }, destroyedShips:{ destroyers:31 },
+  stationedFleet:{ jaeger:152, destroyers:2418, schlachtschiff:7234 }, ownLostShips:{},
+  defenseBefore:{ flak:55, turm:50, laser:45 } };
+
 const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay',
                   'kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'];
 const fehlerAlle = [];
 
-async function seite(browser, breite, hoehe){
+async function seite(browser, breite, hoehe, berichte){
   const ctx = await browser.newContext({ viewport:{ width:breite, height:hoehe } });
   const page = await ctx.newPage();
   page.on('pageerror', e => fehlerAlle.push(breite + 'px: ' + String(e)));
   await versionAbfangen(page);
-  await page.route('**/api/**', backend({ 'kepler7-save-v3': schwererStand() }));
+  await page.route('**/api/**', backend({ 'kepler7-save-v3': schwererStand() }, berichte));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(3000);
@@ -270,6 +323,25 @@ const tafel = page => page.evaluate(TAFEL);
 const systemOffen = page => page.evaluate(() => {
   const b = document.getElementById('galaxyBackBtn');
   return !!b && b.style.display !== 'none';
+});
+/* WER LIEGT AUF DER FLAECHE DER TAFEL OBENAUF? Gefragt wird in der Mitte des Teils der Tafel,
+   der wirklich im Bild steht - nicht in der Bildmitte: Die Tafel ist ein Streifen und deckt die
+   Bildmitte gar nicht ab. Keine Zahl aus dem CSS steht hier, kein z-index und keine Breite;
+   gefragt wird der Browser. */
+const lage = page => page.evaluate(() => {
+  const p = document.getElementById('fleetPositionPanel');
+  const ov = document.getElementById('battleModalOverlay');
+  const r = p.getBoundingClientRect();
+  const l = Math.max(r.left, 0), o = Math.max(r.top, 0);
+  const re = Math.min(r.right, window.innerWidth), u = Math.min(r.bottom, window.innerHeight);
+  const ob = (re > l && u > o) ? document.elementFromPoint((l + re) / 2, (o + u) / 2) : null;
+  return {
+    tafelOffen: p.classList.contains('fp-mobile-open'),
+    tafelDisplay: getComputedStyle(p).display,
+    wiedergabeOffen: ov.classList.contains('open'),
+    obenauf: ob ? (ov.contains(ob) || ob === ov ? 'wiedergabe'
+                 : (p.contains(ob) || ob === p ? 'tafel' : (ob.id || ob.tagName))) : null
+  };
 });
 const knopfMitte = page => page.evaluate(() => {
   const b = document.getElementById('fpToggleBtn'); const r = b.getBoundingClientRect();
@@ -589,6 +661,46 @@ const knopfMitte = page => page.evaluate(() => {
     const sysNach = await systemOffen(page);
     merke('3g: der erste Tastendruck danach erreicht das Fenster, das wirklich im Bild steht (das System)',
       sysNach === false, { sysVor, sysNach });
+    await ctx.close();
+  }
+
+  {
+    /* EIN FENSTER, DAS SICH OHNE KLICK OEFFNET (Durchsicht 13.09.2026). maybeAutoWatchBattle()
+       schiebt die bildschirmfuellende Kampf-Wiedergabe per setTimeout 400 ms hinter einen
+       eintreffenden Kampfbericht; state.autoWatchLiveRaid steht per Voreinstellung auf an. Der
+       Zeitgeber ist dabei nur der ANLASS - die Bedingung ist die Lage „Tafel offen, Wiedergabe
+       darueber". Sie wird hier ueber den Bestandsweg der Wiedergabe hergestellt (der Knopf
+       [data-watch-battle] in den Berichten, wie in tests/test_wiedergabe_*.js), weil das
+       dieselbe Funktion aufruft und ohne Wartezeit auskommt.
+       GEMESSEN am 13.09.2026 auf 390x844 vor der Aenderung: beide z-index 210, elementFromPoint
+       ueber der Tafel lieferte „osCv" (die Leinwand der Wiedergabe) - und der erste Escape
+       schloss trotzdem die VERDECKTE Tafel; die sichtbare Wiedergabe brauchte einen zweiten. */
+    const { ctx, page } = await seite(browser, 390, 844, [UEBERFALL]);
+    await page.evaluate(() => { const x = document.getElementById('headerReportsBtn'); if (x) x.click(); });
+    await page.waitForTimeout(1600);
+    const knoepfe = await page.evaluate(() => document.querySelectorAll('[data-watch-battle]').length);
+    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
+    await page.waitForTimeout(1500);
+    const vor = await lage(page);
+    merke('V13: Vorbedingung - die Tafel steht offen UND die Wiedergabe liegt gemessen ueber ihr',
+      knoepfe === 1 && vor.tafelOffen === true && vor.tafelDisplay === 'block'
+      && vor.wiedergabeOffen === true && vor.obenauf === 'wiedergabe', { knoepfe, vor });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const e1 = await lage(page);
+    merke('3h: der erste Tastendruck trifft das Fenster, das der Spieler SIEHT - die Wiedergabe geht zu, die Tafel bleibt offen',
+      e1.wiedergabeOffen === false && e1.tafelOffen === true, { vor, e1 });
+    /* Und die Tafel verliert ihren eigenen Ausgang dabei nicht: Sobald sie wieder obenauf liegt,
+       gehoert die Taste ihr. Ohne diese zweite Haelfte waere „nicht anfassen" eine erlaubte
+       Antwort auf 3h - und die Tafel haette Escape fuer immer verloren (belegt durch sabEscape,
+       wo genau 3i faellt und 3h gruen bleibt). */
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const e2 = await lage(page);
+    merke('3i: danach liegt die Tafel wieder obenauf - der zweite Tastendruck schliesst sie',
+      e2.tafelOffen === false, { e1, e2 });
     await ctx.close();
   }
 
