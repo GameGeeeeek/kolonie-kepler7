@@ -123,10 +123,11 @@
 // leer gefahren, dann eingetragen, dann jeder Stand erneut, bis jeder Lauf Exit 0 lieferte.
 // KEINE Liste ist leer, und keine Pruefung ohne Falsifikator: 0a faellt an alt; 0b an alt und
 // sabBoden; 0c und 0d an alt, sabFlotte, sabMuster und sabMusterKlasse; 1a/1b (beide Breiten) an
-// alt, sabBoden und sabDurchfall; 1c an sabMisstBoden; 1d an alt, sabMisstBoden und sabBlind;
-// 2a/2b an alt und sabDurchfall; 2c an alt und sabFlotte; 2d an alt, sabFlotte und sabRoh; 2e an
-// alt, sabDurchfall und sabFlotte; 3a an sabMisstBoden; 3b und 3c an sabDurchfall; 3d an alt und
-// sabBlinderBoden.
+// alt, sabBoden und sabDurchfall; 1c an sabMisstBoden und sabMisstVerkehrt; 1d an alt,
+// sabMisstBoden, sabMisstVerkehrt und sabBlind; 2a/2b an alt und sabDurchfall; 2c an alt und
+// sabFlotte; 2d an alt, sabFlotte und sabRoh; 2e an alt, sabDurchfall und sabFlotte; 3a an
+// sabMisstBoden und sabMisstVerkehrt; 3b und 3c an sabDurchfall; 3d an alt, sabBlinderBoden und
+// sabMisstVerkehrt; 3e an sabMisstVerkehrt.
 //
 // WAS BEIM MESSEN DER LISTEN HERAUSKAM UND ERKLAERT GEHOERT
 // ---------------------------------------------------------
@@ -201,8 +202,23 @@
 //   ganz - der Stand vor dem 13.09.2026. Gemessen faellt genau eine Pruefung, und das ist richtig
 //   so: Die neue Zeile aendert das Verhalten NUR in der Lage `im Bild, aber verdeckt`. In jeder
 //   anderen Lage (nichts darueber, aus dem Bild gescrollt, ein Fenster mit eigenem Tastenausgang
-//   darueber) verhaelt sich der Boden unveraendert - belegt dadurch, dass 1c, 1c-900, 3a, 3b und
-//   1d an diesem Stand gruen bleiben.
+//   darueber) verhaelt sich der Boden unveraendert - belegt dadurch, dass 1c, 1c-900, 3a, 3b, 3e
+//   und 1d an diesem Stand gruen bleiben.
+// * 3e UND sabMISSTVERKEHRT SIND BEIM MESSEN DAZUGEKOMMEN, und zwar aus einer Luecke, die die
+//   Aenderung am Boden selbst aufgemacht hat. 3d allein laesst sich naemlich auch dadurch gruen
+//   halten, dass der Boden NIE mehr zugreift - und die Lage `im Bild UND obenauf` kam in keiner
+//   Pruefung dieser Datei vor: 1c und 3a messen `weg`, bei 3b haelt das Kartenmenue die Taste
+//   schon vorher an. Dass es keine Regression gab, haetten hier also nur Nachbartests belegt
+//   (test_galaxiekarte, test_kartenmenue) - fuer die Zeile, die dieser Waechter bewacht, ist das
+//   zu weit weg. 3e stellt die Lage deshalb selbst her (Schublade wieder zu, Kartenflaeche wieder
+//   ins Bild) und misst, dass die Taste dem System gehoert wie eh und je. Sein Falsifikator ist
+//   sabMisstVerkehrt: die beiden Haelften des Bodens vertauscht (`!== verdeckt`), also ein Boden,
+//   der nur noch zugreift, wenn man ihn NICHT sieht. GEMESSEN am 13.09.2026 faellt dort genau die
+//   Haelfte, die diese Zeile betrifft: 1c, 1c-900, 1d, 3a (die `weg`-Faelle), 3d (der
+//   `verdeckt`-Fall, jetzt verkehrt herum) und 3e (der `obenauf`-Fall).
+//   3e BAUT DIE LAGE NOTFALLS NEU AUF: An einem Stand, an dem 3d faellt, ist das System schon zu.
+//   Ohne den Neuaufbau waere 3e dort trivial wahr UND seine Vorbedingung V10 fiele als
+//   Folgeschaden mit - gemessen am Grundstand, bevor der Neuaufbau eingebaut war.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
@@ -224,7 +240,7 @@ const MUSS_FALLEN = {
   sabRoh:          ['2d'],
   sabMisstBoden:   ['1c', '1c-900', '1d', '3a'],
   sabBlinderBoden: ['3d'],
-  sabMisstVerkehrt: ['PLATZHALTER'],
+  sabMisstVerkehrt:['1c', '1c-900', '1d', '3a', '3d', '3e'],
   sabMuster:       ['0c', '0d'],
   sabMusterKlasse: ['0c', '0d'],
   sabBlind:        ['1d']
