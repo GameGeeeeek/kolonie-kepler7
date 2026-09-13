@@ -21,7 +21,8 @@
 //     vorpostenModulOverlay, fwahlOverlay, vrufOverlay. Jedes hat ein x und einen Randklick, und
 //     der Rand ist hier am Handy WIRKLICH ein Ausgang: padding 14 px, Karte width min(560px,96vw)
 //     schrumpft auf die verbleibenden 362 von 390 px - es bleiben 14 px links und rechts.
-//     Tastenausgang: seit UI-8 alle vier, vorher nur der Verbandsruf. 0c bewacht das Muster.
+//     Tastenausgang: seit UI-8 alle vier, vorher nur der Verbandsruf. 0c und 0d bewachen das
+//     Muster - das eine aus dem gerenderten DOM, das andere aus dem Quelltext.
 //   .kmenu (9000, fixed) - Eintrag anklicken, Klick daneben, Scrollen, Tabwechsel, Escape (3b).
 //     Es kann nicht halb aus dem Bild stehen: openKarteMenu rueckt es nach dem Einhaengen mit
 //     Math.max/Math.min vollstaendig ins Fenster, und max-height min(60vh,420px) haelt es
@@ -50,7 +51,7 @@
 //     dahinter. Genau der Satz, mit dem diese Etappe die vier neuen Tastenausgaenge begruendet,
 //     galt also auch hier. Es war KEINE Verschlechterung gegenueber v8.728.0, aber eine
 //     Zusicherung, die die Messung nicht trug. Behoben nicht an der Schublade, sondern am BODEN
-//     (siehe den Absatz darueber und Pruefung 3d).
+//     (siehe den Absatz „WARUM DER BODEN NUR DIE HALBE FRAGE STELLT" weiter unten und Pruefung 3d).
 //   Das aufgeklappte System ist KEIN Fenster im Bildschirmsinn, sondern ein Kasten IN der Seite
 //     (Knopf „‹ Galaxie", Klick ins Leere, Escape) - siehe den Absatz zum Boden.
 //
@@ -112,6 +113,8 @@
 //   =sabMisstBoden der Boden verlangt DOCH `obenauf` statt nur `nicht verdeckt` - die
 //                  naheliegende, falsche Loesung
 //   =sabBlinderBoden der Boden misst GAR NICHT (der Stand vor dem 13.09.2026)
+//   =sabMisstVerkehrt die beiden Haelften des Bodens sind vertauscht (`!== verdeckt` statt
+//                  `=== verdeckt`) - er greift nur noch zu, wenn er NICHT zu sehen ist
 //   =sabMuster     ein FUENFTES .fwahl-overlay entsteht, ohne einen Tastenausgang anzumelden
 //   =sabMusterKlasse dasselbe fuenfte Fenster, aber ueber classList.add gebaut
 //   =sabBlind      escapeAusgang fragt fensterObenauf nicht mehr (greift wieder blind)
@@ -221,6 +224,7 @@ const MUSS_FALLEN = {
   sabRoh:          ['2d'],
   sabMisstBoden:   ['1c', '1c-900', '1d', '3a'],
   sabBlinderBoden: ['3d'],
+  sabMisstVerkehrt: ['PLATZHALTER'],
   sabMuster:       ['0c', '0d'],
   sabMusterKlasse: ['0c', '0d'],
   sabBlind:        ['1d']
@@ -565,6 +569,33 @@ const zahlOffen = l => (l.tafel ? 1 : 0) + (l.system ? 1 : 0) + (l.wiedergabe ? 
     const nachC = await page.evaluate(LAGE);
     merke('3d: unter der offenen Chat-Schublade laesst der Boden die Taste liegen - das System dahinter bleibt offen',
       nachC.system === true && nachC.chat === true, { vorC, nachC });
+
+    /* UND DIESELBE ZEILE VON DER ANDEREN SEITE. 3d allein laesst sich naemlich auch dadurch gruen
+       halten, dass der Boden NIE mehr zugreift - und das faellt in diesem Waechter sonst nirgends
+       auf: 1c und 3a messen den Fall `weg` (Kartenflaeche gar nicht im Bild), 3b den Fall, in dem
+       das Kartenmenue die Taste schon vorher anhaelt. Die Lage `im Bild UND obenauf` kam bis zum
+       13.09.2026 in keiner Pruefung dieser Datei vor. Hier wird sie hergestellt, indem die
+       Schublade wieder zugeht - derselbe Weg zurueck, denselben Bildausschnitt. */
+    await page.evaluate(() => {
+      const x = document.getElementById('chatPanelCloseBtn');
+      if (x) x.click(); else { const o = document.getElementById('chatPanelOverlay'); if (o) o.click(); }
+    });
+    await page.waitForTimeout(800);
+    /* AN EINEM STAND, AN DEM 3d FAELLT, hat die Taste das System schon genommen. Dann wird es fuer
+       diese Messung neu aufgeklappt: 3e soll die eigene Aussage messen und nicht das Ergebnis von
+       3d weiterreichen - sonst waere es dort trivial wahr und V10 fiele als Folgeschaden mit. */
+    if (!await page.evaluate(() => { const b = document.getElementById('galaxyBackBtn'); return !!b && b.style.display !== 'none'; }))
+      await oeffneSystemUeberSektoren(page, 'vega');
+    await page.evaluate(() => { const svg = document.getElementById('galaxyMapSvg'); if (svg) svg.scrollIntoView({ block:'center' }); });
+    await page.waitForTimeout(400);
+    const woZu = await page.evaluate(WO, 'galaxyMapSvg');
+    const vorE = await page.evaluate(LAGE);
+    merke('V10: Vorbedingung - die Schublade ist wieder zu, das System offen und die Kartenflaeche obenauf',
+      vorE.chat === false && vorE.system === true && woZu.lage === 'obenauf', { woZu, vorE });
+    await page.keyboard.press('Escape'); await page.waitForTimeout(600);
+    const nachE = await page.evaluate(LAGE);
+    merke('3e: liegt die Kartenflaeche im Bild UND obenauf, nimmt der Boden die Taste wie eh und je',
+      nachE.system === false, { vorE, nachE });
     await familieEinsammeln(page);
     await ctx.close();
   }
