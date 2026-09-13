@@ -79459,12 +79459,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
      Tastendruck - nie im Takt und nie beim Zeichnen. Gemessen am 13.09.2026 auf 390x844:
      0,004 ms je Aufruf.
 
-     WO DIE HAUSFORM NICHT GILT UND WARUM: Das aufgeklappte System ist kein Fenster im
+     WO DIE HAUSFORM NUR ZUR HAELFTE GILT UND WARUM: Das aufgeklappte System ist kein Fenster im
      Bildschirmsinn, sondern ein Kasten IN der Seite. GEMESSEN am 13.09.2026 auf 900x1000 bei
      scrollY 1847: seine Kartenflaeche stand bei top -954 bis -129, also vollstaendig ausserhalb
-     des Bildes - und Escape schliesst es dort seit jeher, zu Recht. Eine Obenauf-Messung wuerde
-     ihm genau dort den Ausgang nehmen. Es bleibt deshalb der LETZTE Lauscher: der Boden, der
-     die Taste nimmt, wenn kein Fenster darueber sie beansprucht hat.
+     des Bildes - und Escape schliesst es dort seit jeher, zu Recht. Eine volle Obenauf-Messung
+     wuerde ihm genau dort den Ausgang nehmen. Es bleibt deshalb der LETZTE Lauscher: der Boden,
+     der die Taste nimmt, wenn kein Fenster darueber sie beansprucht hat. Er fragt seit dem
+     13.09.2026 trotzdem, aber nur nach `verdeckt' - siehe fensterLage() und den Boden selbst.
 
      WAS HIER NOCH EIN ZWEITES MAL STEHT, UND WARUM ES STEHENBLEIBT: Die Statustafel bringt mit
      statustafelObenauf() eine zeichengleiche Kopie dieser Messung mit. Ihr einziger Unterschied
@@ -79474,22 +79475,42 @@ function sekSternUse(key, x, y, k, unentdeckt){
      antworten in jeder gemessenen Lage gleich; die Tafel koennte also `escapeAusgang(
      statustafelOffen, closeFpPanel, () => fpPanelEl)' benutzen. Sie tut es nicht, weil UI-8 ihren
      Lauscher und ihre Messung ausdruecklich unangetastet laesst (Vertrag UI-8, Abschnitt D) -
-     nicht, weil der Unterschied gebraucht wuerde. Das kostet mehr als Doppelung: Die EINE Lage,
-     in der die Obenauf-Messung heute wirklich entscheidet, ist Tafel gegen Kampf-Wiedergabe
-     (beide z-index 210, die Wiedergabe malt spaeter) - und genau die laeuft an dieser Hausform
-     vorbei. Solange das so bleibt, bewacht tests/test_escape_fenster.js mit seiner Gegenprobe
-     `sabBlind' eine Zeile, die dort nichts entscheidet, und der Beleg dafuer steht in
-     tests/test_statustafel.js (3h/3i). */
-  function fensterObenauf(el){
-    if (!el) return false;
+     nicht, weil der Unterschied gebraucht wuerde. Das kostet mehr als Doppelung: Unter den heute
+     ohne Kunstgriff erreichbaren Fensterpaaren ist Tafel gegen Kampf-Wiedergabe das einzige, bei
+     dem die Obenauf-Messung anders entscheidet als die Registrierungsreihenfolge (beide z-index
+     210, die Wiedergabe malt spaeter) - und genau das laeuft an dieser Hausform vorbei, weil die
+     Tafel ihre eigene Kopie benutzt. Die Zeile hier ist deshalb NICHT unbewacht: Legt man eine
+     kuenstliche Ebene ueber ein offenes Fenster, entscheidet sie sichtbar. GEMESSEN am 13.09.2026
+     auf 390x844, Fangschirm (position:fixed; inset:0; z-index:9999; opacity:0) ueber der offenen
+     Kampf-Wiedergabe: Mit Messung blieb die Wiedergabe stehen und die Taste ging weiter, ohne
+     Messung nahm die Wiedergabe sie. Bewacht in tests/test_escape_fenster.js (1d, Gegenprobe
+     `sabBlind'); der Beleg fuer die Tafel-Lage steht in tests/test_statustafel.js (3h/3i). */
+  /* ZWEI AUSKUENFTE STATT EINER (Durchsicht 13.09.2026). Die Messung unterscheidet seither, WARUM
+     eine Stelle nicht dem Element gehoert:
+       `weg'      kein Pixel im Bild - das Element ist gar nicht auf dem Schirm.
+       `verdeckt' im Bild, aber an seiner eigenen Stelle liegt etwas anderes obenauf.
+       `obenauf'  die Stelle gehoert ihm selbst.
+     Ein FENSTER braucht den Unterschied nicht: Fuer es sind `weg' und `verdeckt' dasselbe
+     Nein - das ist fensterObenauf() gleich darunter, und escapeAusgang fragt nur das.
+     DER BODEN BRAUCHT IHN. Er ist kein Fenster ueber dem Schirm, sondern ein Kasten IN der Seite
+     und darf bei `weg' zugreifen - die Begruendung und die Messung stehen bei ihm. Bis zum
+     13.09.2026 mass er gar nicht, und das hatte einen gemessenen Preis: Bei offener
+     Chat-Schublade (390x844 UND 900x1000, Karte-Reiter, System aufgeklappt, Kartenflaeche
+     sichtbar) lieferte elementFromPoint in ihrer Mitte den Chat, und ein Escape schloss trotzdem
+     das System dahinter - die Taste wirkte auf etwas, das der Spieler nicht sehen konnte. Genau
+     der Satz, mit dem die vier neuen Tastenausgaenge dieser Etappe begruendet sind. */
+  function fensterLage(el){
+    if (!el) return 'weg';
     const r = el.getBoundingClientRect();
     const l = Math.max(r.left, 0), o = Math.max(r.top, 0);
     const re = Math.min(r.right, window.innerWidth), u = Math.min(r.bottom, window.innerHeight);
-    // Nichts von dem Fenster im Bild: dann ist es auch keines, das die Taste verdient.
-    if (re <= l || u <= o) return false;
+    // Nichts von dem Element im Bild.
+    if (re <= l || u <= o) return 'weg';
     const oben = document.elementFromPoint((l + re) / 2, (o + u) / 2);
-    return !!oben && (oben === el || el.contains(oben));
+    return (!!oben && (oben === el || el.contains(oben))) ? 'obenauf' : 'verdeckt';
   }
+  // Fuer ein Fenster: nichts im Bild und verdeckt sind dasselbe Nein.
+  function fensterObenauf(el){ return fensterLage(el) === 'obenauf'; }
   /* Ein Fenster meldet hier seinen Tastenausgang an: WANN es offen ist, WIE es zugeht und WELCHES
      Element es im Bild ist. Der Rest - Taste pruefen, Obenauf messen, Taste anhalten - steht
      einmal hier statt siebenmal im Spiel. Die Stelle des Aufrufs bleibt der Gleichstands-
@@ -79565,6 +79586,20 @@ function sekSternUse(key, x, y, k, unentdeckt){
   // Bezugspunkt, und das war schon immer die eigentliche Begründung dieser Zeile.
   // preventDefault erst NACH den Prüfungen - sonst schluckte die Karte Tastendrücke, die ihr gar
   // nicht gelten.
+  //
+  // OFFENER BEFUND, NICHT IN UI-8 BEHOBEN (Durchsicht 13.09.2026): Diese Zeilen fragen NICHT, ob
+  // die Karte überhaupt zu sehen ist - dieselbe Fehlerklasse, gegen die UI-8 die Escape-Taste
+  // umgebaut hat. GEMESSEN auf 900x1000, Kampf-Wiedergabe offen über dem aufgeklappten System:
+  // ArrowRight schob den viewBox von `327.9 150.2 201.5 225.2' auf `176.0 255.8 336.8 177.2', ein
+  // anschließendes `+' weiter auf `224.1 281.2 240.5 126.6' - die Wiedergabe stand die ganze Zeit
+  // unverändert offen. Der Spieler blättert also blind ein anderes System auf.
+  // fensterObenauf()/fensterLage() (weiter unten, bei der Hausform) wären genau dafür da. UI-8
+  // nimmt die Lauscher für andere Tasten ausdrücklich aus (Vertrag UI-8, Abschnitt D), deshalb
+  // steht hier nur der Befund. OFFEN und vor einer Umsetzung zu messen: ob die Obenauf-Frage für
+  // eine TEILWEISE gescrollte Karte taugt. Sie fragt einen Punkt - die Mitte des sichtbaren
+  // Teils -, und ein halb sichtbarer Kartenkasten mit einem Fenster über seiner unteren Hälfte
+  // antwortet damit anders als einer mit einem Fenster über der oberen. Beim Boden der
+  // Escape-Kette ist genau das der Grund, warum er `weg' und `verdeckt' unterscheidet.
   document.addEventListener('keydown', (e) => {
     if (!galaxyOpenSystem && !karteSektorOffen) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;   // Browser-Kürzel (Strg +/-, Zurück) bleiben
@@ -79644,11 +79679,29 @@ function sekSternUse(key, x, y, k, unentdeckt){
      GEMESSEN an v8.728.0 in der Lage `Tafel offen, System aufgeklappt, Wiedergabe darueber'
      ergab der erste Tastendruck auf 390x844 wie auf 900x1000 {system:false, wiedergabe:false}.
      Das Anhalten ist trotzdem kein Selbstzweck: Nach ihm hoert nur noch das Anmeldefenster auf
-     Escape, und das steht nie gleichzeitig offen. */
+     Escape, und das steht nie gleichzeitig offen.
+     ER MISST SEIT DEM 13.09.2026 TROTZDEM - ABER NUR DIE EINE HAELFTE (Durchsicht): `weg' und
+     `verdeckt' sind fuer ihn eben NICHT dasselbe. Solange er gar nicht mass, nahm er die Taste
+     auch dann, wenn ein Fenster OHNE Tastenausgang bildschirmnah darueber lag. GEMESSEN am
+     13.09.2026 an der Chat-Schublade, auf 390x844 und auf 900x1000: Karte-Reiter, System
+     aufgeklappt, Kartenflaeche sichtbar und obenauf - dann die Schublade auf, und
+     elementFromPoint lieferte in der Mitte der Kartenflaeche `chatPanelAllianceBox' (390) bzw.
+     `chatPanelOverlay' (900). Ein Escape liess die Schublade stehen und schloss das System
+     dahinter: Wirkung auf etwas, das der Spieler nicht sehen konnte.
+     WAS DIE ZEILE DESHALB TUT UND WAS NICHT: Sie laesst die Taste liegen, wenn die Kartenflaeche
+     IM BILD, aber verdeckt ist. Sie greift NICHT, wenn die Flaeche gar nicht im Bild steht - dort
+     braucht der bis ganz nach unten gescrollte Spieler den Ausgang, und genau dort haette eine
+     volle Obenauf-Pruefung ihn genommen (gemessen 900x1000, scrollY 1847: Flaeche top -954 bis
+     -129). Die Chat-Schublade ist damit keine Falle mehr; SICHT- und SCROLLAGE bleiben aber zwei
+     verschiedene Fragen, und wer die Flaeche aus dem Bild scrollt UND die Schublade oeffnet,
+     schliesst mit Escape weiterhin das System. Das ist kein Versehen, sondern der Preis dafuer,
+     dass 3a heil bleibt - bewacht in tests/test_escape_fenster.js (3a und 3d, Gegenproben
+     sabMisstBoden und sabBlinderBoden). */
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !galaxyOpenSystem) return;
     const a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    if (fensterLage(document.getElementById('galaxyMapSvg')) === 'verdeckt') return;
     galaxySchliesse();
     e.stopImmediatePropagation();
   });
