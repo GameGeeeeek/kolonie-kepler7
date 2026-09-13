@@ -43,12 +43,20 @@ check('das Menue bleibt im Fenster (Position wird geklemmt)',
 
 // ---------------------------------------------------------------- 2. Schliessen
 check('schliesst bei Klick daneben', /if \(karteMenuEl && !karteMenuEl\.contains\(e\.target\)/.test(src));
-check('schliesst mit Escape', /if \(e\.key !== 'Escape' \|\| !karteMenuEl\) return;\s*closeKarteMenu\(\);/.test(src));
-// Weiter unten haengt ein zweiter Esc-Handler an document, der das aufgeklappte System zuklappt.
-// Ohne das Anhalten schloesse ein Tastendruck beides - man kaeme aus einem versehentlich
-// geoeffneten Menue nur heraus, indem man nebenbei das System verliert.
+/* SEIT UI-8 UEBER DIE GEMEINSAME HAUSFORM (nachgezogen 13.09.2026). Bis v8.728.0 stand der
+   Lauscher woertlich im Kartenmenue-Block, und diese beiden Zeilen lasen ihn dort. UI-8 hat ihn
+   durch escapeAusgang() ersetzt - die Pruefungen suchten danach eine Formulierung, die es nicht
+   mehr gibt, und fielen auf korrektem Code durch (gemessen: gruen an 7fef031, rot an b17c05a).
+   Verloren gehen darf dabei nichts, deshalb pruefen sie weiter DIESELBEN zwei Sachen, nur an
+   ihrer neuen Stelle: dass das Menue seinen Tastenausgang ueberhaupt anmeldet, und dass die
+   Hausform die Taste anhaelt. Das Anhalten wird ausdruecklich IN escapeAusgang gelesen und nicht
+   irgendwo in der Datei - sonst genuegte ein beliebiges stopImmediatePropagation an einem ganz
+   anderen Lauscher. Den EFFEKT (Menue zu, aufgeklapptes System darunter bleibt offen) misst
+   tests/test_escape_fenster.js, Pruefung 3b, mit der Gegenprobe sabDurchfall. */
+check('schliesst mit Escape - das Menue meldet seinen Tastenausgang bei der Hausform an',
+  /escapeAusgang\(\(\) => !!karteMenuEl, closeKarteMenu, \(\) => karteMenuEl\);/.test(src));
 check('Escape gehoert dem Menue und klappt nicht zusaetzlich das System zu',
-  /closeKarteMenu\(\);\s*e\.stopImmediatePropagation\(\);/.test(src));
+  /function escapeAusgang\(istOffen, schliessen, element\)\{[\s\S]{0,400}?schliessen\(\);\s*e\.stopImmediatePropagation\(\);/.test(src));
 // Gemeint ist das Scrollen DER SEITE - das Menue ist fixed und stuende danach neben seinem
 // Marker. Bis zum 03.09.2026 stand hier die feste Zeile "closeKarteMenu, true", und genau die
 // schloss auch das Scrollen IM Menue mit (capture:true am window sieht jedes Scroll-Ereignis der

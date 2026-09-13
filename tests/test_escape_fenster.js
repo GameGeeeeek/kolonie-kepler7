@@ -119,6 +119,16 @@
 //   sich per Zeitgeber ueber den frueher registrierten Lauscher schiebt, entscheidet sie seit
 //   UI-7 sehr wohl (bewacht in tests/test_statustafel.js, 3h/3i). Die Liste wird deshalb NICHT
 //   passend gemacht: Eine leere Liste sagt ehrlich, dass diese Zeile heute nichts beweist.
+//   NACHGEMESSEN am 13.09.2026, und der Grund ist schaerfer als die Reihenfolge-Erklaerung: Die
+//   EINE Lage, in der die Obenauf-Messung heute wirklich entscheidet, ist Tafel gegen
+//   Kampf-Wiedergabe - beide z-index 210, die Tafel frueher registriert, die Wiedergabe malt
+//   spaeter. Genau diese Lage misst 1a. Dass 1a unter sabBlind trotzdem gruen bleibt, liegt
+//   daran, dass die TAFEL ihre Messung gar nicht aus der Hausform bezieht, sondern aus ihrer
+//   eigenen Kopie statustafelObenauf(), die sabBlind nicht anfasst. Wuerde die Tafel auf
+//   escapeAusgang umgestellt - und gemessen antwortet fensterObenauf(fpPanelEl) in jeder
+//   gemessenen Lage genauso wie statustafelObenauf() -, dann faellt 1a unter sabBlind, und diese
+//   Liste waere nicht mehr leer. Der Vertrag UI-8 laesst den Lauscher der Tafel ausdruecklich in
+//   Ruhe (Abschnitt D); die Umstellung gehoert deshalb in die naechste Etappe, nicht hierher.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');

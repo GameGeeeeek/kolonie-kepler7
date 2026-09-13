@@ -79465,9 +79465,21 @@ function sekSternUse(key, x, y, k, unentdeckt){
      des Bildes - und Escape schliesst es dort seit jeher, zu Recht. Eine Obenauf-Messung wuerde
      ihm genau dort den Ausgang nehmen. Es bleibt deshalb der LETZTE Lauscher: der Boden, der
      die Taste nimmt, wenn kein Fenster darueber sie beansprucht hat.
-     Die Statustafel bringt ihre eigene, gleich gebaute Messung mit (statustafelObenauf) - sie
-     prueft zusaetzlich den GERECHNETEN display-Wert gegen ihre Media-Regel und bleibt mit
-     UI-7/C unveraendert. */
+
+     WAS HIER NOCH EIN ZWEITES MAL STEHT, UND WARUM ES STEHENBLEIBT: Die Statustafel bringt mit
+     statustafelObenauf() eine zeichengleiche Kopie dieser Messung mit. Ihr einziger Unterschied
+     ist ein vorgeschaltetes statustafelSichtbar() - und das aendert GEMESSEN nichts: Bei 390 px
+     mit zugeklappter Tafel steht der gerechnete display-Wert auf `none', das Rechteck ist
+     [0,0,0,0], und damit greift schon `re <= l' hier eine Zeile weiter unten. Beide Fassungen
+     antworten in jeder gemessenen Lage gleich; die Tafel koennte also `escapeAusgang(
+     statustafelOffen, closeFpPanel, () => fpPanelEl)' benutzen. Sie tut es nicht, weil UI-8 ihren
+     Lauscher und ihre Messung ausdruecklich unangetastet laesst (Vertrag UI-8, Abschnitt D) -
+     nicht, weil der Unterschied gebraucht wuerde. Das kostet mehr als Doppelung: Die EINE Lage,
+     in der die Obenauf-Messung heute wirklich entscheidet, ist Tafel gegen Kampf-Wiedergabe
+     (beide z-index 210, die Wiedergabe malt spaeter) - und genau die laeuft an dieser Hausform
+     vorbei. Solange das so bleibt, bewacht tests/test_escape_fenster.js mit seiner Gegenprobe
+     `sabBlind' eine Zeile, die dort nichts entscheidet, und der Beleg dafuer steht in
+     tests/test_statustafel.js (3h/3i). */
   function fensterObenauf(el){
     if (!el) return false;
     const r = el.getBoundingClientRect();
