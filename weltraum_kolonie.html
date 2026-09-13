@@ -2043,6 +2043,16 @@
         width:min(340px, 92vw); max-height:82vh; z-index:210; box-shadow:0 20px 60px rgba(0,0,0,0.55);
       }
       .fp-close-btn { display:flex !important; }
+      /* UI-7/B: Der Randknopf ist seit UI-7 ein UMSCHALTER - er muss also auch dann noch
+         getroffen werden, wenn die Tafel offen ist. GEMESSEN am 13.09.2026 auf 390x844:
+         document.elementFromPoint auf der Knopfmitte (371,6 | 773,2) lieferte bei offener Tafel
+         „fleetPositionPanel" - der Knopf (z-index 50) lag unter der Tafel (210) UND unter der
+         Verdunklung (205). Ein Umschalter allein waere damit eine Zusage gewesen, die der Spieler
+         gar nicht einloesen kann: Der zweite Tipp erreicht den Knopf nicht.
+         Der Geschwister-Selektor braucht kein zweites Zustandsflag in JS - der Knopf steht im
+         Markup unmittelbar hinter der Tafel, und die Klasse .fp-mobile-open ist bereits die eine
+         Wahrheit ueber den offenen Zustand. */
+      .fleet-position-panel.fp-mobile-open ~ .fp-edge-tab { z-index:211; }
     }
     .fp-close-btn { display:none; position:absolute; top:8px; right:8px; width:28px; height:28px; align-items:center; justify-content:center; padding:0; font-size:12px; }
     .fp-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:205; }
@@ -3068,7 +3078,7 @@
     </div>
   </div>
 
-  <button class="edge-tab fp-edge-tab" id="fpToggleBtn" aria-label="Flottenposition, Kolonien und Bestenliste anzeigen"><i class="ti ti-list-details" aria-hidden="true"></i> Status</button>
+  <button class="edge-tab fp-edge-tab" id="fpToggleBtn" aria-expanded="false" aria-controls="fleetPositionPanel" aria-label="Flottenposition, Kolonien und Bestenliste ein- und ausblenden"><i class="ti ti-list-details" aria-hidden="true"></i> Status</button>
 
   <div class="toast-container" id="toastContainer"></div>
 
@@ -76424,10 +76434,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
       }
     }
 
-    renderFpLeaderboard();
-    renderFpAllianceDonation();
-    const fpList = document.getElementById('fleetPositionList');
+    /* UI-7/A: DER AUFBAU DER STATUSTAFEL LAEUFT NUR NOCH, WENN SIE AUCH IM BILD IST.
+       Das SCHREIBEN war schon gedeckelt (setBoxHtml, v8.538.0, siehe Kommentar weiter unten);
+       gedeckelt ist jetzt die Rechnung davor - die Schleife ueber allFleetsWithPlanet() samt
+       aller Missionen, allianzVerbandEintraege(), renderFpLeaderboard() und
+       renderFpAllianceDonation(). Die beiden Zeichner schreiben ausschliesslich in Kaesten
+       INNERHALB der Tafel (#fpLeaderboard, #fpAllianceDonationBox); sie duerfen deshalb mit
+       hinter den Riegel.
+       GEMESSEN am 13.09.2026: schwerer Spielstand (12 Kolonien, 96 Missionen), Uhr angehalten,
+       je drei Laeufe a 12 gezaehlten Takten, Median der Takt-Laufzeit:
+         390x844, Tafel zu  : 17,02 ms -> 15,34 ms je Takt (-9,9 %)
+         dieselbe Lage mit 4-fach gedrosselter CPU: 71,99 ms -> 62,47 ms (-13,2 %)
+         1400x900, Tafel sichtbar: 16,00 ms gegen 16,34 ms - unveraendert im Rauschen
+       Der Block allein kostete 0,758 ms je Takt, die Sichtbarkeitsfrage kostet 0,025 ms.
+       MIT LEEREM SPIELSTAND kostet der Block 0,008 ms je Takt - wer so misst, misst
+       „gegenstandslos" und laesst die Bremse zu Recht weg.
+       Aufgeklappt wird die Tafel SOFORT gefuellt: openFpPanel() ruft render(). */
+    const fpList = statustafelSichtbar() ? document.getElementById('fleetPositionList') : null;
     if (fpList){
+      renderFpLeaderboard();
+      renderFpAllianceDonation();
       const allMissionsRaw = [];
       for (const { planet: originKey, fleet } of allFleetsWithPlanet()) for (const m of fleet.missions) allMissionsRaw.push({ m, originKey });
       // Verband-Gruppierung (Bugfix, Spieler-Feedback 17.07.2026): siehe identischer Kommentar bei der
@@ -79333,6 +79359,23 @@ function sekSternUse(key, x, y, k, unentdeckt){
   ['gesturestart', 'gesturechange'].forEach(function(ev){
     document.addEventListener(ev, function(e){ e.preventDefault(); });
   });
+  /* ESCAPE GEHOERT DEM OBERSTEN FENSTER (UI-7/C) - und die aufgeklappte Statustafel ist ein
+     echtes Fenster mit Verdunklung. DIE REIHENFOLGE IST HIER DIE GANZE ARBEIT, deshalb steht
+     dieser Lauscher genau an dieser Stelle und nicht bei der uebrigen Tafel-Bedienung:
+       VOR ihm registriert und damit staerker: der Verbandsruf (z-index 9200) und das
+       Kartenmenue (9000) - beide liegen ueber der Tafel (210) und halten Escape mit
+       stopImmediatePropagation bei sich.
+       NACH ihm registriert und damit schwaecher: das aufgeklappte System direkt darunter, die
+       Kampf-Wiedergabe und das Anmeldefenster.
+     stopImmediatePropagation aus demselben Grund wie beim Kartenmenue darueber: Ohne das
+     Anhalten schloesse ein Tastendruck die Tafel UND nebenbei das aufgeklappte System -
+     gemessen am Ausgangsstand schliesst Escape dort das System, und genau das soll es
+     weiterhin tun, solange die Tafel ZU ist. Ist sie zu, passiert hier gar nichts. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !statustafelOffen()) return;
+    closeFpPanel();
+    e.stopImmediatePropagation();
+  });
   // Esc schließt das offene System - dieselbe Taste, die überall sonst im Spiel einen Kasten
   // zumacht. Nur wenn gerade nichts getippt wird, sonst nähme sie dem Suchfeld das Abbrechen weg.
   document.addEventListener('keydown', (e) => {
@@ -81327,11 +81370,52 @@ function sekSternUse(key, x, y, k, unentdeckt){
 
   const fpPanelEl = document.getElementById('fleetPositionPanel');
   const fpBackdropEl = document.getElementById('fpBackdrop');
-  const openFpPanel = () => { if (fpPanelEl) fpPanelEl.classList.add('fp-mobile-open'); if (fpBackdropEl) fpBackdropEl.classList.add('show'); };
-  const closeFpPanel = () => { if (fpPanelEl) fpPanelEl.classList.remove('fp-mobile-open'); if (fpBackdropEl) fpBackdropEl.classList.remove('show'); };
   const fpToggleBtn = document.getElementById('fpToggleBtn');
-  if (fpToggleBtn) fpToggleBtn.addEventListener('click', openFpPanel);
-  
+  /* FUNKTIONS-DEKLARATIONEN STATT const-PFEILEN (UI-7): render() steht rund 5000 Zeilen WEITER
+     OBEN in derselben Ebene und fragt statustafelSichtbar(); der Escape-Lauscher der Tafel steht
+     ebenfalls weiter oben. Eine Funktionsdeklaration wird in den ganzen Gueltigkeitsbereich
+     hochgezogen und ist dort verfuegbar - ein `const` haette an beiden Stellen in der temporalen
+     Todeszone gelegen. */
+  function statustafelOffen(){ return !!(fpPanelEl && fpPanelEl.classList.contains('fp-mobile-open')); }
+  /* DIE SICHTBARKEIT HAENGT AN EINER MEDIA-REGEL, NICHT AN EINER KLASSE: ab 1220 px steht die
+     Tafel fest am rechten Rand, darunter ist sie display:none und wird erst durch .fp-mobile-open
+     sichtbar. Gelesen wird deshalb der BERECHNETE display-Wert und nicht window.innerWidth: Eine
+     zweite Schwelle 1219 in JS waere eine zweite Wahrheit, die beim naechsten Anfassen der
+     Media-Regel still falsch wird. */
+  function statustafelSichtbar(){
+    if (!fpPanelEl) return false;
+    return getComputedStyle(fpPanelEl).display !== 'none';
+  }
+  function openFpPanel(){
+    if (fpPanelEl) fpPanelEl.classList.add('fp-mobile-open');
+    if (fpBackdropEl) fpBackdropEl.classList.add('show');
+    if (fpToggleBtn) fpToggleBtn.setAttribute('aria-expanded', 'true');
+    /* SOFORT FUELLEN, nicht erst beim naechsten Takt: Seit UI-7/A ueberspringt render() den
+       Aufbau der Tafel, solange sie unsichtbar ist. Ohne diesen Aufruf stuende sie nach dem
+       Aufklappen bis zu eine Sekunde leer oder mit dem Stand von vorhin da. Die Klasse ist eine
+       Zeile vorher gesetzt, statustafelSichtbar() sieht also bereits display:block. */
+    render();
+  }
+  function closeFpPanel(){
+    if (fpPanelEl) fpPanelEl.classList.remove('fp-mobile-open');
+    if (fpBackdropEl) fpBackdropEl.classList.remove('show');
+    if (fpToggleBtn) fpToggleBtn.setAttribute('aria-expanded', 'false');
+  }
+  /* UI-7/B: EIN Knopf, beide Richtungen. Bis v8.727.0 hing hier `openFpPanel` - der Knopf heisst
+     „Status", sieht aus wie ein Umschalter und war keiner: Zu ging es nur ueber das x oder die
+     Verdunklung. GEMESSEN am Ausgangsstand: zweiter Klick bei offener Tafel -> offen blieb true. */
+  if (fpToggleBtn) fpToggleBtn.addEventListener('click', () => { if (statustafelOffen()) closeFpPanel(); else openFpPanel(); });
+  /* Wird die Schwelle 1219 px im Betrieb ueberschritten (Fenster aufgezogen, Geraet gedreht),
+     steht die Tafel ploetzlich fest am Rand - und zeigte dann bis zum naechsten Takt den Stand
+     von vor dem Ueberspringen, im Extremfall gar keinen. Der Sekunden-Takt holt das von selbst
+     nach; dieser Nachzug schliesst nur die eine Sekunde dazwischen. Entprellt, weil resize
+     waehrend des Ziehens dutzendfach feuert und render() nicht in jeden Zwischenschritt gehoert. */
+  let fpGroessenNachzug = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(fpGroessenNachzug);
+    fpGroessenNachzug = setTimeout(() => { if (statustafelSichtbar()) render(); }, 150);
+  });
+
   const fpCloseBtn = document.getElementById('fpCloseBtn');
   if (fpCloseBtn) fpCloseBtn.addEventListener('click', closeFpPanel);
   if (fpBackdropEl) fpBackdropEl.addEventListener('click', closeFpPanel);

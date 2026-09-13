@@ -83,7 +83,12 @@ const seiten = page => page.evaluate(() => {
 });
 
 async function starteSpiel(browser, spielstand, berichte){
-  const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{ width:1100, height:1400 } }));
+  /* 1240 statt 1100 px BREIT (UI-7, 13.09.2026): Ab 1220 px steht die Statustafel fest am
+     rechten Rand, darunter ist sie display:none - und seit UI-7 wird sie dort auch nicht mehr
+     aufgebaut. Die Pruefungen 2 und 4 lesen #fleetPositionList; bei 1100 px lasen sie damit
+     eine Tafel, die gar nicht im Bild war (gemessen: leerer Text). Breiter gemessen steht
+     dieselbe Aussage wieder da, wo der Spieler sie auch sieht. */
+  const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{ width:1240, height:1400 } }));
   const page = await ctx.newPage(); const errs = [];
   page.on('pageerror', e => errs.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });

@@ -75,7 +75,14 @@ const markeDa = (page, id) => page.evaluate(x => {
 
 async function spiel(browser, zustand, zaehler){
   const store={'kepler7-save-v3':save(zustand)};
-  const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:900,height:1200} }));
+  /* 1240 statt 900 px BREIT (UI-7, 13.09.2026): Ab 1220 px steht die Statustafel fest am
+     rechten Rand, darunter ist sie display:none - und seit UI-7 wird sie dort auch nicht mehr
+     aufgebaut. Bei 900 px mass dieser Test #fleetPositionList also an einer Tafel, die gar
+     nicht im Bild war; die Abschnitte 1 und 2 kamen nach dem Riegel mit 0 Zeilen zurueck.
+     Die breitere Bildflaeche stellt genau den Fall wieder her, den die beiden Abschnitte
+     meinen (dauerhaft sichtbare Tafel, reiterunabhaengig geschrieben) - es geht keine
+     Pruefung verloren, sie misst nur wieder das, was sie beschreibt. */
+  const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:1240,height:1200} }));
   const page = await ctx.newPage(); const errs=[];
   page.on('pageerror', e=>errs.push(String(e)));
   page.on('console', m=>{ if(m.type()==='error' && !/Failed to load resource|CORS|ERR_/.test(m.text())) errs.push(m.text()); });
