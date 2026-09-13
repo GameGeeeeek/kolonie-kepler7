@@ -22,10 +22,26 @@
 //     #relocateAllQuickBox 1.1 kB
 //     #qtySelect(Def/Fleet) 3x 0.2 kB
 //
-// Nicht umgestellt, weil ihr Markup sich WIRKLICH jede Sekunde ändert: #orbitalStationBox (zeigt
-// die Restzeit eines laufenden Ausbaus), #buildQueueBox/#researchQueueBox (Countdown),
+// Damals NICHT umgestellt, weil ihr Markup sich wirklich jede Sekunde ändert: #orbitalStationBox
+// (Restzeit eines laufenden Ausbaus), #buildQueueBox/#researchQueueBox (Countdown),
 // #happyHourBox (Restzeit), #resbar (Rohstoffzähler). Nachgemessen, nicht angenommen: ein
-// Vergleich des Markups über zwei Sekunden zeigt bei #orbitalStationBox "11m 58s" -> "11m 56s".
+// Vergleich des Markups über zwei Sekunden zeigte bei #orbitalStationBox "11m 58s" -> "11m 56s".
+//
+// STAND HEUTE (nachgemessen am 13.09.2026) - und das ist genau die Unterscheidung, die der
+// KERNPUNKT weiter unten trägt: Ein laufender Countdown ist KEIN Hinderungsgrund mehr, sobald
+// die Signatur das fertige Markup ist. Vier der fünf sind deshalb inzwischen umgestellt:
+//
+//     #orbitalStationBox    setBoxHtml, 2 Stellen   seit v8.451.0 (80a4b52)
+//     #buildQueueBox        setBoxHtml, 1 Stelle    seit v8.467.0 (59d4225)
+//     #researchQueueBox     setBoxHtml, 1 Stelle    seit v8.467.0 (59d4225)
+//     #happyHourBox         setBoxHtml, 3 Stellen   seit v8.467.0 (59d4225)
+//
+// Der GRUND von damals bleibt richtig - er trägt nur nicht mehr gegen setBoxHtml, sondern nur
+// noch gegen eine Signatur aus einer LISTE VON WERTEN, in der man den Countdown vergessen kann.
+// Übrig bleibt „nicht umgestellt" allein #resbar - und aus einem anderen Grund: Der Balken wird
+// nicht per innerHTML neu geschrieben, sondern EINMAL aufgebaut, danach werden nur noch Werte in
+// den bestehenden Knoten nachgezogen (gemessen: 0 Treffer für setBoxHtml mit Schlüssel 'resbar').
+// Wer diese Liste kürzt statt sie zu datieren, verliert genau diese Unterscheidung.
 //
 // KERNPUNKT DIESES TESTS - die Signatur ist das FERTIGE MARKUP, nicht eine Liste von Werten.
 // CLAUDE.md sagt, das Muster dürfe nur auf Boxen OHNE Live-Countdown angewandt werden. Das gilt für
