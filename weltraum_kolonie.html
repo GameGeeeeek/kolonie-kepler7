@@ -563,6 +563,12 @@
        HUD-Eckenschnitt der Karten/Dialoge - hier nur an der äußeren (dem Bildschirmrand abgewandten)
        Kante, da die beiden anderen Ecken am Viewport-Rand ohnehin unsichtbar wären. */
     .chat-edge-tab { left:0; clip-path:polygon(0 0, 100% 8px, 100% calc(100% - 8px), 0 100%); display:block; }
+    /* Der Streifen am rechten Bildschirmrand, den der Randknopf belegt - EINE Zahl fuer beide
+       Seiten. Der Knopf haengt darin (right:0), und die aufgeklappte Statustafel haelt sich daraus
+       frei, statt ihn zu ueberdecken. GEMESSEN am 13.09.2026: Der Knopf ist 36,8 px breit
+       (padding 2x8 px, senkrechte Schrift, Rand) - 40 px lassen ihm Luft, ohne dass die Zahl an
+       einer Schriftgroesse haengt. */
+    :root { --fp-knopf-streifen: 40px; }
     .fp-edge-tab {
       right:0; clip-path:polygon(0 8px, 100% 0, 100% 100%, 0 calc(100% - 8px));
       background:rgba(13,18,36,0.96); color:var(--c-danger); border:var(--bw-1) solid rgba(var(--danger-rgb),0.4); border-right:none;
@@ -2038,9 +2044,22 @@
        opt-in drawer opened via a floating toggle button, so it never overlaps game content. */
     @media (max-width: 1219px) {
       .fleet-position-panel { display:none; }
+      /* DIE AUFGEKLAPPTE TAFEL BLEIBT AUS DEM STREIFEN DES RANDKNOPFS HERAUS (UI-7, Durchsicht
+         13.09.2026). Vorher stand sie mittig ueber die volle Breite und reichte am Handyformat
+         unter den hochgezogenen Knopf. GEMESSEN mit offener Tafel, Ueberlappung Knopf/Tafel:
+           360x844: 33,4 x 37,7 px    390x844: 22,8 x 51,7 px    430x844: 2,8 x 64,7 px
+           700, 1000, 1219 px: keine  ab 1220 px: der Knopf ist display:none
+         Unter der Flaeche lag bei 360 und 390 px je eine Missionszeile mit eigenem Klickziel
+         (data-fp-mziel): Ein Tipp dorthin klappte die Tafel ZU, statt zum Ziel zu springen - am
+         Ausgangsstand sprang derselbe Tipp zur Sektorkarte.
+         left/right spannen den Platz NEBEN dem Streifen auf, margin-inline:auto zentriert die
+         Tafel darin. Die Breite bleibt min(340px, ...); abgezogen wird der Streifen nur vom
+         Fenster-Anteil, ab etwa 455 px Fensterbreite kostet er deshalb gar nichts mehr. */
       .fleet-position-panel.fp-mobile-open {
-        display:block; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-        width:min(340px, 92vw); max-height:82vh; z-index:210; box-shadow:0 20px 60px rgba(0,0,0,0.55);
+        display:block; position:fixed; left:0; right:var(--fp-knopf-streifen); top:50%;
+        transform:translateY(-50%); margin-inline:auto;
+        width:min(340px, calc(92vw - var(--fp-knopf-streifen)));
+        max-height:82vh; z-index:210; box-shadow:0 20px 60px rgba(0,0,0,0.55);
       }
       .fp-close-btn { display:flex !important; }
       /* UI-7/B: Der Randknopf ist seit UI-7 ein UMSCHALTER - er muss also auch dann noch
@@ -2049,6 +2068,10 @@
          „fleetPositionPanel" - der Knopf (z-index 50) lag unter der Tafel (210) UND unter der
          Verdunklung (205). Ein Umschalter allein waere damit eine Zusage gewesen, die der Spieler
          gar nicht einloesen kann: Der zweite Tipp erreicht den Knopf nicht.
+         ZU HEBEN IST ER SEIT DER DURCHSICHT NUR NOCH UEBER DIE VERDUNKLUNG (205): Die Tafel haelt
+         sich aus seinem Streifen heraus und liegt gar nicht mehr unter ihm (gemessen: keine
+         Ueberlappung an 360, 390, 430, 700, 1000 und 1219 px). 211 statt 206 bleibt es trotzdem,
+         damit eine kuenftige Aenderung am Streifen den Knopf nicht still begraebt.
          Der Geschwister-Selektor braucht kein zweites Zustandsflag in JS - der Knopf steht im
          Markup unmittelbar hinter der Tafel, und die Klasse .fp-mobile-open ist bereits die eine
          Wahrheit ueber den offenen Zustand. */
@@ -76724,23 +76747,6 @@ function sekSternUse(key, x, y, k, unentdeckt){
         });
         /* FL-1: dieselbe Verdrahtungsstelle, damit beide Wege nach jedem Neuschreiben der Box
            wieder haengen (setBoxHtml-Muster, siehe Kommentar darueber). */
-        /* KB-29: Der angeschlossene Verband fuehrt zum Ziel. BEWUSST dokumentweit statt auf
-           fpList gescopt - dieselbe Zeile steht in der Missionsliste im Flotte-Tab UND hier im
-           Seitenmenue. Ein erster Entwurf haengte sie an die Verdrahtung im Flotte-Zweig; dort
-           bekam die Zeile im Seitenmenue auf JEDEM anderen Reiter keinen Handler (gemessen: der
-           Klick tat nichts, solange der Basis-Tab offen war). Das Seitenmenue steht ausserhalb der
-           Tab-Riegel und ist damit die einzige Stelle, die beide Listen sicher erreicht. */
-        document.querySelectorAll('[data-fp-vziel]').forEach(el => {
-          el.onclick = () => {
-            const roh = el.getAttribute('data-fp-vziel') || '';
-            const trenner = roh.indexOf('|');
-            if (trenner < 0) return;
-            zeigeVerbandsziel(roh.slice(0, trenner), roh.slice(trenner + 1),
-                              el.getAttribute('data-fp-vwas') || 'Ziel',
-                              Number(el.getAttribute('data-fp-vzeit')) || 0,
-                              el.getAttribute('data-fp-vebene') || null);
-          };
-        });
         fpList.querySelectorAll('[data-fp-mziel]').forEach(el => {
           el.onclick = () => {
             const roh = el.getAttribute('data-fp-mziel') || '';
@@ -76755,6 +76761,32 @@ function sekSternUse(key, x, y, k, unentdeckt){
         });
       }
     }
+    /* KB-29: Der angeschlossene Verband fuehrt zum Ziel. BEWUSST dokumentweit statt auf fpList
+       gescopt - dieselbe Zeile steht in der Missionsliste im Flotte-Tab UND in der Statustafel.
+       Ein erster Entwurf haengte sie an die Verdrahtung im Flotte-Zweig; dort bekam die Zeile in
+       der Statustafel auf JEDEM anderen Reiter keinen Handler (gemessen: der Klick tat nichts,
+       solange der Basis-Tab offen war). Die Statustafel steht ausserhalb der Tab-Riegel und ist
+       damit die einzige Stelle, die beide Listen sicher erreicht.
+       UI-7: GENAU DESHALB STEHT SIE AUSSERHALB DES SICHTBARKEITS-RIEGELS und nicht mehr in dem
+       Block darueber. Der Riegel von UI-7/A nahm dieser Verdrahtung die Voraussetzung, auf der ihr
+       eigener Kommentar beruht. GEMESSEN am 13.09.2026 auf 390x844 mit zugeklappter Tafel: Die
+       Zeile des angeschlossenen Verbands im Flotte-Reiter trug weiterhin data-fp-vziel und den
+       Titel „antippen zeigt das Ziel auf der Karte", bekam aber keinen onclick mehr - der Tipp tat
+       nichts (mit Riegel 0 von 1 Zeile verdrahtet, ohne Riegel 1 von 1).
+       Bedingungslos und NACH dem Schreiben, aus demselben Grund wie die beiden Verdrahtungen im
+       Block darueber (setBoxHtml-Muster). Sie haengt an keiner der beiden Listen und laeuft
+       deshalb auch dann, wenn die Statustafel gerade gar keine Missionszeile hat. */
+    document.querySelectorAll('[data-fp-vziel]').forEach(el => {
+      el.onclick = () => {
+        const roh = el.getAttribute('data-fp-vziel') || '';
+        const trenner = roh.indexOf('|');
+        if (trenner < 0) return;
+        zeigeVerbandsziel(roh.slice(0, trenner), roh.slice(trenner + 1),
+                          el.getAttribute('data-fp-vwas') || 'Ziel',
+                          Number(el.getAttribute('data-fp-vzeit')) || 0,
+                          el.getAttribute('data-fp-vebene') || null);
+      };
+    });
     const raidBadge = document.getElementById('heroRaidTimer');
     // Grafik-Runde "High-End", Vorschlag 31 "Bedrohungs-Vignette": dieselbe bereits etablierte
     // Bedingung wie das Raid-Timer-Badge direkt darunter (nur bei ERKANNTEM Überfall, siehe
@@ -79360,17 +79392,30 @@ function sekSternUse(key, x, y, k, unentdeckt){
     document.addEventListener(ev, function(e){ e.preventDefault(); });
   });
   /* ESCAPE GEHOERT DEM OBERSTEN FENSTER (UI-7/C) - und die aufgeklappte Statustafel ist ein
-     echtes Fenster mit Verdunklung. DIE REIHENFOLGE IST HIER DIE GANZE ARBEIT, deshalb steht
-     dieser Lauscher genau an dieser Stelle und nicht bei der uebrigen Tafel-Bedienung:
-       VOR ihm registriert und damit staerker: der Verbandsruf (z-index 9200) und das
-       Kartenmenue (9000) - beide liegen ueber der Tafel (210) und halten Escape mit
-       stopImmediatePropagation bei sich.
-       NACH ihm registriert und damit schwaecher: das aufgeklappte System direkt darunter, die
-       Kampf-Wiedergabe und das Anmeldefenster.
-     stopImmediatePropagation aus demselben Grund wie beim Kartenmenue darueber: Ohne das
-     Anhalten schloesse ein Tastendruck die Tafel UND nebenbei das aufgeklappte System -
-     gemessen am Ausgangsstand schliesst Escape dort das System, und genau das soll es
-     weiterhin tun, solange die Tafel ZU ist. Ist sie zu, passiert hier gar nichts. */
+     echtes Fenster mit Verdunklung. Die REIHENFOLGE gehoert deshalb zur Sache: Dieser Lauscher
+     steht VOR dem, der ein paar Zeilen weiter unten das aufgeklappte System zuklappt, und haelt
+     Escape mit stopImmediatePropagation bei sich - aus demselben Grund wie das Kartenmenue weiter
+     oben. Ohne das Anhalten schloesse ein Tastendruck die Tafel UND nebenbei das System; gemessen
+     am Ausgangsstand schliesst Escape dort das System, und genau das soll es weiterhin tun,
+     solange die Tafel ZU ist. Ist sie zu, passiert hier gar nichts. Diese eine Reihenfolge ist
+     gemessen und bewacht (tests/test_statustafel.js, Pruefungen 3d und 3e).
+     WAS HIER BEWUSST NICHT MEHR BEHAUPTET WIRD (Durchsicht 13.09.2026): dass der Verbandsruf
+     (z-index 9200) und das Kartenmenue (9000) diesem Lauscher vorgehen. Frueher registriert sind
+     sie - nur ist die Lage „Tafel auf UND eines von beiden offen" GEMESSEN nicht erreichbar, und
+     eine Zusicherung, die keine Pruefung belegen kann, ist keine. Gemessen am 13.09.2026 auf
+     390x844:
+       Kartenmenue auf, dann den Randknopf antippen: Das Menue geht dabei ZU (der Klick faellt auf
+         den document-Lauscher, der jeden Klick ausserhalb des Menues schliesst) - .kmenu weg,
+         Tafel auf. Beides zusammen gab es nie.
+       Tafel auf, dann einen Kartenknoten antippen: Ueber dem Knoten lag laut
+         document.elementFromPoint „fleetPositionPanel"; ausserhalb der Tafel liegt die Verdunklung
+         (205) ueber der Karte. Ohne Kartenklick kein Kartenmenue - und openKarteMenu hat
+         ausschliesslich Kartenklicks als Aufrufer (gezaehlt: zehn, jeder ein *MapMenu(ev, ...)).
+       Verbandsruf auf, dann den Randknopf antippen: Sein Overlay liegt mit inset:0 bei z-index
+         9200 ueber dem Knopf (50); elementFromPoint auf der Knopfmitte lieferte „vrufOverlay".
+         Geoeffnet wird der Verbandsruf ohnehin nur aus einem Kartenmenue-Eintrag heraus.
+     Fuehrt eines Tages doch ein Weg dorthin, gehoert die Zusicherung zurueck - zusammen mit der
+     Pruefung, die sie belegt. */
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !statustafelOffen()) return;
     closeFpPanel();
@@ -81405,15 +81450,34 @@ function sekSternUse(key, x, y, k, unentdeckt){
      „Status", sieht aus wie ein Umschalter und war keiner: Zu ging es nur ueber das x oder die
      Verdunklung. GEMESSEN am Ausgangsstand: zweiter Klick bei offener Tafel -> offen blieb true. */
   if (fpToggleBtn) fpToggleBtn.addEventListener('click', () => { if (statustafelOffen()) closeFpPanel(); else openFpPanel(); });
+  /* DIE SCHUBLADE GIBT ES NUR, SOLANGE ES IHREN KNOPF GIBT. `.fp-edge-tab` ist ab 1220 px
+     display:none - dieselbe Media-Regel, die die Tafel an den rechten Rand stellt. Gelesen wird
+     deshalb sein gerechneter display-Wert und nicht window.innerWidth; eine zweite Schwelle in JS
+     waere eine zweite Wahrheit (gleiche Begruendung wie bei statustafelSichtbar oben). */
+  function statustafelSchubladeMoeglich(){
+    return !!fpToggleBtn && getComputedStyle(fpToggleBtn).display !== 'none';
+  }
   /* Wird die Schwelle 1219 px im Betrieb ueberschritten (Fenster aufgezogen, Geraet gedreht),
      steht die Tafel ploetzlich fest am Rand - und zeigte dann bis zum naechsten Takt den Stand
      von vor dem Ueberspringen, im Extremfall gar keinen. Der Sekunden-Takt holt das von selbst
      nach; dieser Nachzug schliesst nur die eine Sekunde dazwischen. Entprellt, weil resize
-     waehrend des Ziehens dutzendfach feuert und render() nicht in jeden Zwischenschritt gehoert. */
+     waehrend des Ziehens dutzendfach feuert und render() nicht in jeden Zwischenschritt gehoert.
+     ZUERST DEN ZUSTAND, DANN DEN INHALT (Durchsicht 13.09.2026): Der Nachzug reparierte nur, was
+     IN der Tafel steht, nicht den Umstand, dass sie ueberhaupt noch aufgeklappt war. GEMESSEN:
+     bei 390 px aufklappen, auf 1400 px wechseln - .fp-mobile-open und die Verdunklung blieben
+     stehen, document.elementFromPoint in der Bildmitte lieferte „fpBackdrop", und Randknopf wie x
+     sind dort display:none. Die Verdunklung deckte also das ganze Bild ab, ohne einen Ausgang.
+     Der einzige, der blieb, war Escape - und der ging fuer eine Tafel drauf, die gar nicht mehr
+     als Fenster im Bild stand: Der erste Tastendruck schloss die unsichtbare Klasse, das darunter
+     aufgeklappte System blieb offen und brauchte einen zweiten. Ab 1220 px ist die Tafel eine
+     feste Seitenspalte und braucht gar keinen Offen-Zustand; der wird hier abgeraeumt. */
   let fpGroessenNachzug = 0;
   window.addEventListener('resize', () => {
     clearTimeout(fpGroessenNachzug);
-    fpGroessenNachzug = setTimeout(() => { if (statustafelSichtbar()) render(); }, 150);
+    fpGroessenNachzug = setTimeout(() => {
+      if (statustafelOffen() && !statustafelSchubladeMoeglich()) closeFpPanel();
+      if (statustafelSichtbar()) render();
+    }, 150);
   });
 
   const fpCloseBtn = document.getElementById('fpCloseBtn');
