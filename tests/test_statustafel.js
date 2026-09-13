@@ -116,6 +116,17 @@
 //   =sabVorrang der Lauscher greift zu frueh und auch bei zugeklappter Tafel (capture-Phase)
 //   =sabVerdrahtung die dokumentweite Verdrahtung faellt wieder hinter den Sichtbarkeits-Riegel
 //   =sabStreifen die Tafel steht wieder mittig ueber die volle Breite und reicht unter den Knopf
+//               GEMESSEN 13.09.2026: Diese Sabotage laesst DREI Pruefungen fallen (2c 2d 2f),
+//               nicht nur die Ueberlappung. Der Grund ist die Ebene des Knopfs: Solange er auf
+//               211 stand, ueberragte er die Tafel (210) auch dann noch, wenn sie unter ihn
+//               reichte - nur 2f schlug an. Seit er auf 206 steht (ueber der Verdunklung 205,
+//               UNTER jedem bildschirmfuellenden Fenster), begraebt ihn die Tafel in dieser
+//               Lage, und 2c (treffbar) und 2d (klappt wieder zu) fallen mit.
+//               DAS IST DER BELEG FUER DIE 206. Der frueher hier stehende Kommentar begruendete
+//               die 211 als Marge, 'damit eine kuenftige Aenderung am Streifen den Knopf nicht
+//               still begraebt'. Die Sorge war richtig, die Marge falsch: Sie uebersprang die
+//               Ebene eines echten Fensters. Und STILL ist der Fall gar nicht - genau diese drei
+//               Pruefungen schlagen an. Die Liste ist deshalb gewachsen, nicht passend gemacht.
 //   =sabZustand der Nachzug raeumt den Offen-Zustand ueber der Schwelle nicht mehr ab
 //   =sabSpaet   derselbe Escape-Lauscher, aber HINTER dem des aufgeklappten Systems registriert
 //   =sabBlind   der Riegel statustafelObenauf() faellt weg - der Lauscher greift wieder blind
@@ -209,7 +220,7 @@ const MUSS_FALLEN = {
   sabDurchfall: ['3d'],
   sabVorrang:   ['3b', '3c', '3e', '3g', '3h'],
   sabVerdrahtung: ['1f'],
-  sabStreifen:  ['2f'],
+  sabStreifen:  ['2c', '2d', '2f'],
   sabZustand:   ['3f'],
   sabSpaet:     ['3d'],
   sabBlind:     ['3h']
