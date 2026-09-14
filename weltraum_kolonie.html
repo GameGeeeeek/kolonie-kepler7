@@ -1767,6 +1767,37 @@
     .rescard .label { font-size:11px; color:#aeb1c4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .value { font-size:17px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .rate { font-size:10px; color:#7d8199; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* VERDICHTUNG (14.09.2026): die Rohstoffleiste einzeilig, sechs Spalten.
+       GEMESSEN mit 14 Kolonien bei 1310x1000: Die Leiste steht nicht in der Fensterbreite, sondern
+       in einer 738 px breiten Spalte. Darin standen die sechs Karten in ZWEI Reihen zu je 73 px =
+       154 px, obwohl die Zahl darin nur eine Zeile hoch ist.
+       Die naheliegende Abhilfe - nur die 1400-px-Schwelle senken - ist GEMESSEN untauglich: sechs
+       dreizeilige Karten in 738 px sind je 116 px breit, und dort wird ALLES abgeschnitten (Name,
+       Wert und Rate an allen sechs Karten). Erst die einzeilige Karte passt: Symbol und Wert
+       brauchen zusammen 91 von 116 px; gemessen null Abschneidungen bei 1310 wie bei 1600.
+       Ergebnis 154 -> 42 px.
+       Bei 1600 px behebt dieselbe Regel nebenbei einen BESTEHENDEN Fehler: dort standen die sechs
+       Karten dank der 1400er-Schwelle zwar schon nebeneinander, der Wert war aber trotzdem
+       abgeschnitten - gemessen 121 px Inhalt in einem 98 px breiten Feld an fuenf von sechs Karten.
+       WAS WEGFAELLT UND WO ES BLEIBT: Name und Rate stehen jetzt im Titel der Karte
+       (resCardState.titel - dieselbe Quelle wie der sichtbare Ratentext, damit beide nicht
+       auseinanderlaufen koennen); der Fuellstand bleibt als Balken sichtbar; der Lagerdeckel ist an
+       allen sechs Karten dieselbe Zahl und stand damit sechsmal da.
+       NUR ohne body.compact-head: Das Handy hat weiter oben seine eigene, ebenfalls gemessene
+       Fassung (3 Spalten, 41 px je Karte) - und ohne Zeigegeraet gaebe es dort keinen Titel zu
+       lesen. Der ID-Selektor ist Absicht: .resbar traegt auch die Werkstoff-Zeile
+       (#tier2ResBadges), die ihre eigene Kompaktfassung hat. */
+    body:not(.compact-head) #resbar { grid-template-columns: repeat(6, 1fr); }
+    body:not(.compact-head) #resbar .rescard { padding:0.45rem 0.6rem; gap:8px; }
+    body:not(.compact-head) #resbar .rescard .icon-badge { width:26px; height:26px; font-size:13px; }
+    /* Die RES_ICONS-Bilder sind fest 20 px; im 26-px-Abzeichen mit Schnittecke schnitte die Ecke ins
+       Bild - dasselbe Verhaeltnis wie in der Werkstoff-Zeile (14 px in 22 px). */
+    body:not(.compact-head) #resbar .rescard .icon-badge svg { width:16px; height:16px; }
+    body:not(.compact-head) #resbar .rescard-info { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
+    body:not(.compact-head) #resbar .rescard .label,
+    body:not(.compact-head) #resbar .rescard .rate,
+    body:not(.compact-head) #resbar .rescard .value span { display:none; }
+    body:not(.compact-head) #resbar .rescard .value { font-size:15px; flex:0 0 auto; }
     /* Werkstoff-Zeile (Gleichmaß Etappe 1, 11.09.2026): Protomaterie und die Fabrik-Ketten stehen
        eingeklappt als schmale Chips (Symbol + Zahl) in EINER umbrechenden Zeile statt als zweite
        Karten-Leiste in Kartengroesse - die Zeile war so hoch wie die Hauptleiste, obwohl sie
@@ -1841,6 +1872,25 @@
     .dash-colony-level { font-size:12.5px; font-weight:500; color:#fff; white-space:nowrap; }
     .dash-colony-stats { font-size:10px; color:var(--ink-dim); white-space:normal; display:flex; flex-wrap:wrap; align-items:center; gap:2px 5px; margin-top:1px; }
     .dash-colony-stats i { font-size:10px; margin-right:1px; }
+    /* VERDICHTUNG (14.09.2026): die Kolonienzeile einzeilig.
+       GEMESSEN mit 14 Kolonien: 253 -> 192 px bei 1310, 191 -> 112 px bei 1600.
+       Zwei naheliegende Fassungen sind vorher gemessen DURCHGEFALLEN; sie stehen hier, damit sie
+       nicht noch einmal probiert werden:
+       - einzeilig, Breite aber weiter auf 172 px gedeckelt: der Name wird dann auf null Pixel
+         zusammengedrueckt (gemessen clientWidth 0 an allen 14 Karten).
+       - einzeilig MIT sichtbaren Kampfwerten: die Karte will dann 281-342 px, es passen nur noch
+         zwei je Zeile, sieben Zeilen statt vier - 272 px, also schlechter als der Ausgangsstand.
+       Deshalb: Name und Stufe bleiben sichtbar und ungekuerzt (die Karte waechst mit ihrem Inhalt),
+       die drei Kampfwerte wandern in den Titel der Karte, der sie ohnehin schon nannte.
+       NUR ohne body.compact-head, aus demselben Grund wie bei der Rohstoffleiste: ohne Zeigegeraet
+       gibt es keinen Titel zu lesen, dort bleiben die Werte auf der Karte stehen. */
+    body:not(.compact-head) .dash-colony-card { max-width:none; padding:4px 9px 4px 5px; gap:7px; }
+    body:not(.compact-head) .dash-colony-icon { width:22px; height:22px; font-size:11px; }
+    body:not(.compact-head) .dash-colony-info { display:flex; align-items:baseline; gap:7px; }
+    body:not(.compact-head) .dash-colony-name { font-size:11.5px; flex:0 0 auto; }
+    body:not(.compact-head) .dash-colony-name-text { white-space:nowrap; }
+    body:not(.compact-head) .dash-colony-level { font-size:11px; flex:0 0 auto; }
+    body:not(.compact-head) .dash-colony-stats { display:none; }
     .dash-attack-badge { position:absolute; top:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-danger); display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     .dash-sabotage-badge { position:absolute; top:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-warning); display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-debris-badge { position:absolute; bottom:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:#8a8880; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
@@ -71921,7 +71971,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
     else if (isFull && r > 0) rateHtml = '<span style="color:#e0a548;">+0/s (Lager voll)</span>';
     else if (isNear) rateHtml = '+'+fmt(r)+'/s <span class="pct">· '+Math.round(pct)+'% – fast voll</span>';
     else rateHtml = '+'+fmt(r)+'/s'+(cap>0 ? ' <span class="pct">· '+Math.round(pct)+'%</span>' : '');
-    return { pct, isFull, isNear, rateHtml,
+    /* Derselbe Satz noch einmal OHNE Auszeichnung, fuer den Tooltip der Karte (Verdichtung
+       14.09.2026). Die einzeilige Leiste zeigt nur noch Symbol und Wert; Name, Lagerdeckel und
+       Rate stehen dann im Titel. Der Text wird HIER gebildet und nicht an der Anzeigestelle, weil
+       diese Funktion per Kommentar oben die einzige Quelle des Ratentexts ist - eine zweite
+       Formulierung waere genau die zweite Anzeigestelle, vor der derselbe Kommentar warnt.
+       tags-los aus rateHtml abgeleitet statt neu formuliert: so kann der Titel gar nicht etwas
+       anderes behaupten als die sichtbare Rate. */
+    const rateText = rateHtml.replace(/<[^>]*>/g, '');
+    const titel = d.label + ' · ' + fmt(stock) + (cap>0 ? ' / ' + fmt(cap) : '') + ' · ' + rateText;
+    return { pct, isFull, isNear, rateHtml, titel,
       cls: isFull ? ' t2-full' : (isNear ? ' t2-near' : ''),
       fillPct: pct.toFixed(1),
       // 11.09.2026: RES_DEFS kennt nur bg/fg, kein color - der Balken war unter 100 % unsichtbar.
@@ -72602,7 +72661,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const stock = state.resources[d.key]||0;
         const st = resCardState(d, stock, cap, rates[d.key]);
         return `
-        <div class="rescard${st.cls}" data-res="${d.key}">
+        <div class="rescard${st.cls}" data-res="${d.key}" title="${escapeHtml(st.titel)}">
           <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
           <div class="rescard-info">
             <div class="label">${d.label}</div>
@@ -72624,6 +72683,10 @@ function sekSternUse(key, x, y, k, unentdeckt){
         // Auch die Rate wurde jeden Tick neu geparst (gemessen 6 Schreibvorgänge/s), obwohl sie
         // sich nur ändert, wenn sich die Produktion ändert.
         if (rateEl.innerHTML !== st.rateHtml) rateEl.innerHTML = st.rateHtml;
+        // Der Titel traegt in der einzeiligen Leiste die Auskunft, die nicht mehr auf der Karte
+        // steht - er muss deshalb denselben Weg mitgehen wie die Rate, sonst zeigt der Tooltip
+        // nach dem ersten Tick fuer immer den Stand des Aufbaus.
+        if (card.title !== st.titel) card.title = st.titel;
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
         if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else resWertSchreiben(valEl, newVal, cap);
         lastResRenderVal[d.key] = newVal;
@@ -72910,7 +72973,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           const debrisTitle = debrisInfoText(d.id) || '';
           const hasDebris = !!debrisTitle;
           return `
-            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${colonyNoteOf(d.id)?' – Notiz: '+colonyNoteOf(d.id):''}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – anklicken zum Wechseln">
+            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${colonyNoteOf(d.id)?' – Notiz: '+colonyNoteOf(d.id):''}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – ${lvlSum} Lv. · Angriffskraft ${fmt(dAtk)} · Verteidigungspunkte ${fmt(dDef)} · ${shipCount} Schiffe stationiert – anklicken zum Wechseln">
               ${targeted ? `<span class="dash-attack-badge" title="Wird angegriffen!"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : ''}
               ${sabotaged ? `<span class="dash-sabotage-badge" title="Sabotiert${sabotageTitle}"><i class="ti ti-bolt" aria-hidden="true"></i></span>` : ''}
               ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
