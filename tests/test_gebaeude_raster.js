@@ -64,6 +64,11 @@ const SAB = process.env.KEPLER_GEBAEUDERASTER_GEGENPROBE || '';
 //   sabotageL  Vorbelegung aus laufenden Bauaufträgen entfernt                      -> 8h
 const MUSS_FALLEN = {
   alt:       ['1a','1b','1c','1d','2a','3a','4a','4d','5c','3f','4f','6a','6b','6c','3b','4b','3c','4c','3d','3e','9a','8b','8c','8d','8e','8g','8h'],
+  // 14.09.2026: align-items:start statt stretch am Raster - genau der Stand vor der Reparatur.
+  sabotageM: ['5f','5g','5h'],
+  // Nur die Verteilung zurueckgenommen: die Kacheln fuellen ihre Reihe, aber die Knopfreihen
+  // stehen wieder versetzt. Belegt, dass 5g nicht bloss an 5f haengt.
+  sabotageN: ['5g'],
   sabotageA: ['1a'],
   sabotageB: ['1d','6b'],
   sabotageC: ['1c','3a','4a','4d','3f','4f','6c','3b','4b','3c','4c'],
@@ -222,7 +227,35 @@ const LESEN_BASIS = () => {
   const mitBauKnopf = alleKarten.filter(k => k.querySelector('[data-build]'));
   const fertigKarten = alleKarten.filter(k => k.querySelector('.badge-done'));
   const jump = document.getElementById('jumpnav-basis');
+  /* ZERFRANSTE REIHEN (14.09.2026). Steht eine fertige „Max"-Karte neben einer ausbaubaren mit
+     Kostenzeilen und Knopfreihe, war die kuerzere frueher nur so hoch wie ihr Inhalt - der Rest der
+     Rasterreihe blieb als Loch stehen. Gemessen wird die VERSCHENKTE FLAECHE: je Rasterreihe die
+     Hoehe der hoechsten Kachel minus die Hoehe jeder anderen. Null heisst: jede Kachel fuellt ihre
+     Reihe. Dazu die zweite Haelfte der Zusage: die Knopfreihen einer Reihe liegen auf EINER Linie.
+     Beides aus dem gemessenen Layout abgeleitet, keine eingetippte Hoehe - wer die Kacheln spaeter
+     anders baut und dieselbe Zusage haelt, soll nicht rot werden. */
+  let verschenkt = 0, groessteLuecke = 0, reihenMitKnopf = 0, reihenVersetzt = 0;
+  const versatz = [];
+  Array.from(box.querySelectorAll('.gebaeude-raster')).forEach(r => {
+    const kacheln = Array.from(r.children).filter(k => k.getBoundingClientRect().height > 0);
+    const nachOben = {};
+    kacheln.forEach(k => { const t = Math.round(k.getBoundingClientRect().top); (nachOben[t] = nachOben[t] || []).push(k); });
+    Object.keys(nachOben).forEach(t => {
+      const gruppe = nachOben[t];
+      const hoehen = gruppe.map(k => Math.round(k.getBoundingClientRect().height));
+      const max = Math.max.apply(null, hoehen);
+      hoehen.forEach(h => { verschenkt += max - h; if (max - h > groessteLuecke) groessteLuecke = max - h; });
+      const knopfOben = gruppe.map(k => { const l = k.lastElementChild;
+        return (l && l.tagName === 'DIV' && !l.classList.contains('left') && l.querySelector('button'))
+          ? Math.round(l.getBoundingClientRect().top) : null; }).filter(x => x !== null);
+      if (knopfOben.length < 2) return;
+      reihenMitKnopf++;
+      const spanne = Math.max.apply(null, knopfOben) - Math.min.apply(null, knopfOben);
+      if (spanne > 1) { reihenVersetzt++; if (versatz.length < 5) versatz.push(spanne); }
+    });
+  });
   return {
+    verschenkt, groessteLuecke, reihenMitKnopf, reihenVersetzt, versatz,
     gruppen,
     kartenMitBname: alleKarten.filter(k => k.querySelector('.bname')).length,
     kartenMitDetails: alleKarten.filter(k => k.querySelector('details.karten-info')).length,
@@ -397,6 +430,13 @@ const LESEN_SCHLANGE = () => {
     // ---- 3b/4b) 1000x900
     await page.setViewportSize({ width: 1000, height: 900 }); await page.waitForTimeout(600);
     const z1 = (await page.evaluate(LESEN_BASIS)) || { gruppen: [], knoepfeAusserhalb: [] };
+    merke('5f: bei 1400 px fuellt jede Kachel ihre Rasterreihe - keine verschenkte Flaeche',
+      z0.verschenkt === 0, { verschenkt: z0.verschenkt, groessteLuecke: z0.groessteLuecke });
+    merke('5g: bei 1400 px liegen die Knopfreihen einer Rasterreihe auf einer Linie',
+      z0.reihenMitKnopf > 0 && z0.reihenVersetzt === 0,
+      { reihenMitKnopf: z0.reihenMitKnopf, versetzt: z0.reihenVersetzt, spannen: z0.versatz });
+    merke('5h: bei 1000 px fuellt jede Kachel ihre Rasterreihe',
+      z1.verschenkt === 0, { verschenkt: z1.verschenkt, groessteLuecke: z1.groessteLuecke });
     merke('3b: bei 1000 px hat jedes Basis-Raster 2 Spalten',
       z1.gruppen.length === 3 && z1.gruppen.every(x => x.rasterDisplay === 'grid' && x.spalten === 2), z1.gruppen.map(x => x.spalten));
     merke('5d: bei 1000 px (2 Spalten) liegt die Median-Höhe der unfertigen Basis-Karten unter 170 px',
