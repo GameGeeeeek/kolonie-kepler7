@@ -631,7 +631,20 @@ check('11: Waechter haben Namen UND einen eigenen Text',
   const erwartetOhne = Math.sqrt(davor.defense * danach.defense);
   check('11: eine Waechtertiefe ist spuerbar staerker als ihre Nachbarn',
     w.defense > erwartetOhne * 1.2, { tiefe20:w.defense, nachbarmittel:Math.round(erwartetOhne) });
-  check('11: und sie gibt mehr Splitter', w.splitter > davor.splitter * 2, { t19:davor.splitter, t20:w.splitter });
+  /* GEGEN DIE INTERPOLATION, nicht gegen den Nachbarn allein (berichtigt 14.09.2026).
+     Die alte Fassung verglich Tiefe 20 gegen Tiefe 19 mit Faktor 2 - und fiel damit an jedem
+     achten Tag, ohne dass sich am Spiel etwas geaendert haette. Grund: Der Splitterwert traegt
+     `mods.shards` aus den Mutatoren, und die werden je Tiefe UND je Stroemung neu gezogen. Eine
+     zufaellig splitterreiche Tiefe 19 drueckt das Verhaeltnis unter 2, obwohl der Waechter
+     seinen vollen Zuschlag gibt. GEMESSEN ueber 400 Stroemungen: 49 davon (12,3 %) fielen, das
+     Verhaeltnis lief von 1,24 bis 7,94 - eine Momentaufnahme, keine Regel.
+     Dieselbe Form wie die Staerke-Pruefung direkt darueber rechnet den Laerm heraus, weil er in
+     beiden Nachbarn steckt. GEMESSEN ueber dieselben 400 Stroemungen: kleinstes Verhaeltnis
+     1,296, Median 2,96 - der Faktor 1,2 (derselbe wie oben) haelt an jeder einzelnen. */
+  const erwartetSplitterOhne = Math.sqrt(davor.splitter * danach.splitter);
+  check('11: und sie gibt mehr Splitter als die Nachbartiefen hergeben',
+    w.splitter > erwartetSplitterOhne * 1.2,
+    { t19:davor.splitter, t20:w.splitter, t21:danach.splitter, nachbarmittel:+erwartetSplitterOhne.toFixed(1) });
 }
 // Seit v8.330.0 ist der Erstsieg anders belohnt als die Wiederholung: beim ERSTEN Sieg ueber einen
 // Waechter faellt seine Reliquie, ab dem zweiten wie bisher ein Modul. Die Zusage "ein Waechter
@@ -680,9 +693,25 @@ check('11: Waechter haben Namen UND einen eigenen Text',
   // Der Waechterzuschlag muss den Bann ueberleben - er haengt an der Tiefe, nicht am Mutator.
   const wRoh = G.abgrundSektor(20);
   const wGebannt = G.abgrundSektorMitBann(wRoh, wRoh.mutatoren[0].key);
+  /* GEGEN DEN EIGENEN SEKTOR, nicht gegen die Nachbartiefe (berichtigt 14.09.2026).
+     Dieselbe Falle wie eine Pruefung weiter oben: Der Vergleich lief gegen Tiefe 19 mit Faktor 2,
+     und Tiefe 19 zieht ihre eigenen Mutatoren - an jedem achten Tag fiel die Pruefung, ohne dass
+     sich am Spiel etwas geaendert haette.
+     Gemessen wird stattdessen, was die Pruefung WIRKLICH behauptet: Ein Bann darf am Sektor nur
+     die Mutatoren aendern, nicht den Waechterzuschlag. Teilt man den Splitterwert durch
+     `mods.shards`, bleibt genau der Teil uebrig, der NICHT von den Mutatoren kommt - und der muss
+     vor und nach dem Bann derselbe sein. Keine zweite Rechnung, keine eingetippte Zahl: beide
+     Groessen liest die Pruefung aus dem Sektor selbst. Faellt der Zuschlag beim Bann weg, sinkt
+     dieser Wert um den Faktor ABGRUND_WAECHTER_SPLITTER und die Pruefung schlaegt an.
+     Die Toleranz von 5 % faengt nur die Rundung ab: GEMESSEN ueber 400 Stroemungen betrug die
+     groesste Abweichung 1,16 %. Der Fehlerfall, gegen den die Pruefung steht, ist keine knappe
+     Sache - dort faellt der Wert auf ein Drittel (gemessen 57 auf 19). */
+  const grundRoh = wRoh.splitter / wRoh.mods.shards;
+  const grundGebannt = wGebannt.splitter / wGebannt.mods.shards;
   check('11: ein Bann hebt den Waechterstatus nicht auf',
-    !!wGebannt.waechter && wGebannt.splitter > G.abgrundSektor(19).splitter * 2,
-    { splitter:wGebannt.splitter });
+    !!wGebannt.waechter && Math.abs(grundRoh - grundGebannt) <= Math.max(1, grundRoh * 0.05),
+    { splitterRoh:wRoh.splitter, splitterGebannt:wGebannt.splitter,
+      grundRoh:+grundRoh.toFixed(1), grundGebannt:+grundGebannt.toFixed(1) });
 }
 // Seit v8.336.0 reisen neben dem Bann drei weitere Vormerkungen mit (Bannspule, Waechterruf,
 // Grundberuehrung). Die Aussage bleibt dieselbe - beim START verbraucht, in der Mission mitgereist -,

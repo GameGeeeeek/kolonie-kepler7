@@ -1767,6 +1767,79 @@
     .rescard .label { font-size:11px; color:#aeb1c4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .value { font-size:17px; font-weight:500; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .rescard .rate { font-size:10px; color:#7d8199; font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* VERDICHTUNG (14.09.2026): die Rohstoffleiste einzeilig, sechs Spalten.
+       GEMESSEN mit 14 Kolonien bei 1310x1000: Die Leiste steht nicht in der Fensterbreite, sondern
+       in einer 738 px breiten Spalte. Darin standen die sechs Karten in ZWEI Reihen zu je 73 px =
+       154 px, obwohl die Zahl darin nur eine Zeile hoch ist.
+       Die naheliegende Abhilfe - nur die 1400-px-Schwelle senken - ist GEMESSEN untauglich: sechs
+       dreizeilige Karten in 738 px sind je 116 px breit, und dort wird ALLES abgeschnitten (Name,
+       Wert und Rate an allen sechs Karten). Erst die einzeilige Karte passt: Symbol und Wert
+       brauchen zusammen 91 von 116 px; gemessen null Abschneidungen bei 1310 wie bei 1600.
+       Ergebnis 154 -> 42 px.
+       Bei 1600 px behebt dieselbe Regel nebenbei einen BESTEHENDEN Fehler: dort standen die sechs
+       Karten dank der 1400er-Schwelle zwar schon nebeneinander, der Wert war aber trotzdem
+       abgeschnitten - gemessen 121 px Inhalt in einem 98 px breiten Feld an fuenf von sechs Karten.
+       WAS WEGFAELLT UND WO ES BLEIBT: Name und Rate stehen jetzt im Titel der Karte
+       (resCardState.titel - dieselbe Quelle wie der sichtbare Ratentext, damit beide nicht
+       auseinanderlaufen koennen); der Fuellstand bleibt als Balken sichtbar; der Lagerdeckel ist an
+       allen sechs Karten dieselbe Zahl und stand damit sechsmal da.
+       NUR ohne body.compact-head: Das Handy hat weiter oben seine eigene, ebenfalls gemessene
+       Fassung (3 Spalten, 41 px je Karte) - und ohne Zeigegeraet gaebe es dort keinen Titel zu
+       lesen. Der ID-Selektor ist Absicht: .resbar traegt auch die Werkstoff-Zeile
+       (#tier2ResBadges), die ihre eigene Kompaktfassung hat. */
+    /* DIE BREITE IST TEIL DES RIEGELS, nicht nur die Klasse (Nachtrag 14.09.2026). compact-head ist
+       ein DREIzustand: `state.compactHead` schlaegt die Automatik dauerhaft (compactHeadActive,
+       Zeile ~72015), und der Knopf dafuer steht auf JEDEM Geraet in der Kopfzeile. Wer am Handy
+       einmal auf "Kopfzeile ausfuehrlich" tippt, haette sonst sechs Spalten in 358 px - gerechnet
+       53 px je Karte, in denen nach Abzug von Polster und Symbol nichts uebrig bleibt. Die
+       Klassenregel allein haette ausserdem @media(max-width:480px) ausgestochen: (0,1,1,1) gegen
+       (0,0,1,0), und eine Media-Query erhoeht die Spezifitaet nicht. 1001 ist
+       COMPACT_HEAD_MAX_WIDTH + 1 - genau die Grenze, an der die Automatik loslaesst. */
+    @media (min-width: 1001px) {
+      body:not(.compact-head) #resbar { grid-template-columns: repeat(6, 1fr); }
+      /* DIE DEKORATION SCHRUMPFT, NICHT DIE ZAHL (gemessen 14.09.2026). Bei 738 px Spalte ist eine
+         Karte 116 px breit; mit 26er-Symbol, 8 px Abstand und 0,6rem Polster blieben dem Wert
+         61 px - und ab 1e9 braucht er 75 px ("3212.90M", weil fmt() kein B/T kennt). Die
+         naheliegende Abhilfe, die Schrift zu verkleinern, ist gemessen die schlechtere: Selbst
+         12,5 px reichten nur knapp (62 gegen 61 px), und bei 1e12 hilft keine Groesse mehr. Mit
+         20er-Symbol, 6 px Abstand und 6 px Polster stehen dem Wert 75 px zur Verfuegung - bei
+         voller Schriftgroesse passt er, und die Karte wird nebenbei von 42 auf 36 px flacher.
+         Bei noch groesseren Betraegen greift die Ellipse (siehe .value unten); der volle Betrag
+         steht dann im Titel. Das Verhaeltnis Bild zu Abzeichen ist dasselbe wie in der
+         Werkstoff-Zeile (14 in 22), sonst schnitte die HUD-Ecke ins Bild. */
+      body:not(.compact-head) #resbar .rescard { padding:7px 6px; gap:6px; }
+      body:not(.compact-head) #resbar .rescard .icon-badge { width:20px; height:20px; font-size:11px; }
+      body:not(.compact-head) #resbar .rescard .icon-badge svg { width:13px; height:13px; }
+      body:not(.compact-head) #resbar .rescard-info { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
+      /* flex:0 1 auto UND min-width:0 sind Pflicht, nicht Geschmack (gemessen 14.09.2026): Mit
+         flex:0 0 auto ist das Feld immer genau so breit wie sein Inhalt, `text-overflow:ellipsis`
+         laeuft dann ins Leere - und weil daneben justify-content:flex-end steht, waere der
+         Ueberlauf nach LINKS gewandert, also UNTER das farbige Symbol. Der Spieler haette eine
+         plausible, aber falsche kleinere Zahl gelesen, ohne Auslassungspunkte als Warnung. Der
+         Fall ist kein Randfall: fmt() kennt kein B/T, ab 1e9 steht dort "1000.00M" (acht Zeichen
+         statt sieben), und der Lagerdeckel ist nach oben offen. */
+      body:not(.compact-head) #resbar .rescard .value { font-size:15px; flex:0 1 auto; min-width:0; }
+      /* Name, Rate und Lagerdeckel verschwinden aus dem BILD, nicht aus der Auskunft: dieselbe
+         Technik wie .sr-only weiter oben. Mit display:none waeren sie auch aus dem
+         Vorlese-Baum gefallen - und am PC gibt es dieselbe Gruppe wie am Handy: eine .rescard ist
+         ein div ohne tabindex und ohne role, ein title daran ist fuer Vorleseprogramme die
+         schwaechste aller Quellen und mit der Tastatur gar nicht erreichbar. Uebrig blieben sechs
+         nackte Zahlen ohne Bezeichnung. */
+      body:not(.compact-head) #resbar .rescard .label,
+      body:not(.compact-head) #resbar .rescard .rate,
+      body:not(.compact-head) #resbar .rescard .value span {
+        position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+        overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+      }
+      /* "Lager voll" stand bisher als Text in der Rate. Damit die Karte es weiterhin SIEHT-bar
+         meldet (und der Hilfetext wahr bleibt), faerbt sich der Wert bernsteinfarben - derselbe
+         Gegenzug, den die Werkstoff-Zeile beim Einklappen schon faehrt. */
+      body:not(.compact-head) #resbar .rescard.t2-full .value { color:#e0a548; }
+      /* Die "+N"-Einflugzahl sass rechts oben und traf dort auf den jetzt RECHTSbuendigen Wert -
+         gemessen ueberlappten beide Rechtecke, und flashGains laeuft jede Sekunde. Sie zieht
+         deshalb links neben dem Symbol hoch, wo der rechtsbuendige Wert nicht hinkommt. */
+      body:not(.compact-head) #resbar .float-gain { right:auto; left:8px; top:auto; bottom:0; font-size:9.5px; }
+    }
     /* Werkstoff-Zeile (Gleichmaß Etappe 1, 11.09.2026): Protomaterie und die Fabrik-Ketten stehen
        eingeklappt als schmale Chips (Symbol + Zahl) in EINER umbrechenden Zeile statt als zweite
        Karten-Leiste in Kartengroesse - die Zeile war so hoch wie die Hauptleiste, obwohl sie
@@ -1841,6 +1914,53 @@
     .dash-colony-level { font-size:12.5px; font-weight:500; color:#fff; white-space:nowrap; }
     .dash-colony-stats { font-size:10px; color:var(--ink-dim); white-space:normal; display:flex; flex-wrap:wrap; align-items:center; gap:2px 5px; margin-top:1px; }
     .dash-colony-stats i { font-size:10px; margin-right:1px; }
+    /* VERDICHTUNG (14.09.2026): die Kolonienzeile einzeilig.
+       GEMESSEN mit 14 Kolonien: 253 -> 192 px bei 1310, 191 -> 112 px bei 1600.
+       Zwei naheliegende Fassungen sind vorher gemessen DURCHGEFALLEN; sie stehen hier, damit sie
+       nicht noch einmal probiert werden:
+       - einzeilig, Breite aber weiter auf 172 px gedeckelt: der Name wird dann auf null Pixel
+         zusammengedrueckt (gemessen clientWidth 0 an allen 14 Karten).
+       - einzeilig MIT sichtbaren Kampfwerten: die Karte will dann 281-342 px, es passen nur noch
+         zwei je Zeile, sieben Zeilen statt vier - 272 px, also schlechter als der Ausgangsstand.
+       Deshalb: Name und Stufe bleiben sichtbar und ungekuerzt (die Karte waechst mit ihrem Inhalt),
+       die drei Kampfwerte wandern in den Titel der Karte, der sie ohnehin schon nannte.
+       NUR ohne body.compact-head, aus demselben Grund wie bei der Rohstoffleiste: ohne Zeigegeraet
+       gibt es keinen Titel zu lesen, dort bleiben die Werte auf der Karte stehen. */
+    @media (min-width: 1001px) {
+      /* KEIN Deckel - und das ist gemessen, nicht bequem (14.09.2026). Der Deckel war die erste
+         Antwort auf einen echten Befund: Ohne ihn waechst die Karte mit ihrem Inhalt, und sobald
+         eine Kolonie eine ROLLE traegt, stuende in der Stufenzeile nicht "540 Lv." sondern
+         "540 Lv. · Forschungs-Welt" - die Zeile kippte von vier auf sieben Reihen und wurde HOEHER
+         als vorher. Den Befund loest aber schon die Regel weiter unten, die den Rollennamen aus
+         dem Bild nimmt. Danach ist die breiteste Karte gemessen 246 px, und ein Deckel von 260 px
+         griff an keiner einzigen: totes CSS, das eine Absicht vortaeuscht.
+         Was die Breite wirklich begrenzt, sind die Namen: die laengsten in PLANETS haben
+         25 Zeichen, eigene Namen schneidet renameColony bei 24 ab. Waechst eine dieser Grenzen,
+         faellt Pruefung 3e in tests/test_verdichtung.js - sie vergleicht die Zeilenhoehe im selben
+         Lauf gegen dieselbe Zeile in der alten Fassung. */
+      body:not(.compact-head) .dash-colony-card { max-width:none; padding:4px 9px 4px 5px; gap:7px; }
+      /* Der Inhalt ist ein Canvas mit den FESTEN Attributen width=26 height=26, und
+         .dash-colony-icon schneidet per overflow:hidden und border-radius:50% ab - ein 22-px-Kreis
+         haette dem Planeten je Seite 2 px abgeschnitten. Den Kreis stattdessen auf 26 px zu
+         vergroessern kostet gemessen 4 px je Karte und bei sechs Reihen 24 px Hoehe, also einen
+         guten Teil des Gewinns. Deshalb schrumpft das Bild statt des Kreises.
+         Das !important ist hier kein Holzhammer, sondern die einzige Moeglichkeit: ensureCanvasDpr
+         setzt bei devicePixelRatio > 1 eine INLINE-Breite von 26 px, und die schlaegt jede normale
+         Regel. Prozentwerte, damit die Zahl nicht an zwei Stellen steht. */
+      body:not(.compact-head) .dash-colony-icon { width:22px; height:22px; font-size:11px; }
+      body:not(.compact-head) .dash-colony-icon canvas { width:100% !important; height:100% !important; }
+      body:not(.compact-head) .dash-colony-info { display:flex; align-items:baseline; gap:7px; min-width:0; }
+      body:not(.compact-head) .dash-colony-name { font-size:11.5px; flex:0 1 auto; min-width:0; }
+      body:not(.compact-head) .dash-colony-level { font-size:11px; flex:0 0 auto; }
+      /* Kampfwerte und Rollenname verlassen das Bild, nicht die Auskunft - dieselbe Technik wie in
+         der Rohstoffleiste. Die Rolle bleibt ausserdem SICHTBAR am Abzeichen des Symbols
+         (.dash-role-badge, mit eigenem Titel) - sie steht also nicht ersatzlos da. */
+      body:not(.compact-head) .dash-colony-stats,
+      body:not(.compact-head) .dash-colony-role-text {
+        position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+        overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+      }
+    }
     .dash-attack-badge { position:absolute; top:-5px; right:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-danger); display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; box-shadow:0 0 0 2px #0d1224; animation: dashAttackPulse 1.3s ease-in-out infinite; }
     .dash-sabotage-badge { position:absolute; top:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:var(--c-warning); display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
     .dash-debris-badge { position:absolute; bottom:-5px; left:-5px; width:17px; height:17px; border-radius:50%; background:#8a8880; display:flex; align-items:center; justify-content:center; font-size:10px; color:#0d1224; box-shadow:0 0 0 2px #0d1224; }
@@ -9444,8 +9564,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.729.0';
+  const VERSION = '8.730.0';
   const PATCHNOTES = [
+  { version:'8.730.0', date:'14.09.2026', changes:[
+    '<strong>Die Kopfzeile ist deutlich flacher geworden.</strong> Die sechs Rohstoffe stehen am PC jetzt einzeilig nebeneinander &ndash; Symbol und Zahl &ndash; statt in zwei Reihen gestapelter Karten. Gemessen in einem typischen Fenster: <strong>149 statt 36 Pixel</strong> Hoehe. Name, Lagerdeckel und Produktionsrate nennt der Tooltip der Karte, der Fuellstandsbalken bleibt, und ein volles Lager faerbt die Zahl weiterhin bernsteinfarben.',
+    '<strong>Der Lagerdeckel stand sechsmal da.</strong> Er ist an allen sechs Rohstoffen dieselbe Zahl &ndash; einmal im Tooltip reicht.',
+    '<strong>Auch die Kolonienzeile ist einzeilig.</strong> Symbol, Name und Stufe stehen nebeneinander, und die Karte waechst mit ihrem Namen, statt ihn abzuschneiden. Die drei Kampfwerte wandern in den Tooltip, den die Karte ohnehin schon trug; die Rolle bleibt als farbiges Abzeichen am Symbol sichtbar. Gemessen bei 14 Kolonien: <strong>342 statt 192 Pixel</strong>.',
+    '<strong>Behoben: Bei grossen Zahlen war der Rohstoffwert abgeschnitten.</strong> In breiten Fenstern passte der Betrag schon bisher nicht in seine Karte &ndash; fuenf von sechs Karten zeigten einen gekuerzten Wert. Jetzt passt er, weil Symbol und Polster kleiner sind statt der Zahl.',
+    '<strong>Am Handy aendert sich nichts.</strong> Die kompakte Kopfzeile hat ihre eigene, fruehere Fassung behalten &ndash; auch dann, wenn du dort ausdruecklich <em>Kopfzeile ausfuehrlich</em> gewaehlt hast.',
+  ] },
   { version:'8.729.0', date:'13.09.2026', changes:[
     '<strong>Behoben: <em>Escape</em> schliesst jetzt das Fenster, das du wirklich siehst.</strong> Bisher entschied die Reihenfolge im Programm, wer die Taste bekommt &ndash; nicht, was oben liegt. Stand die <em>Live-Kampf-Wiedergabe</em> ueber einem aufgeklappten System, schloss ein Tastendruck <strong>beide</strong> auf einmal. Jetzt misst das Spiel an Ort und Stelle nach, welches Fenster obenauf liegt: Ein Druck schliesst ein Fenster.',
     '<strong>Vier Fenster hatten gar keinen Tastenausgang.</strong> Die <em>Flottenwahl</em>, der <em>Verbandsruf</em> und die beiden Vorposten-Fenster (Projekte und Steckplaetze) fuellen den Bildschirm, reagierten aber nicht auf <em>Escape</em> &ndash; schlimmer noch, die Taste schloss das aufgeklappte System dahinter, waehrend das Fenster stehenblieb. Alle vier haben jetzt einen Ausgang.',
@@ -9541,16 +9668,11 @@
     '<strong>Die gr&uuml;nen Online-Punkte stimmen jetzt mit der Rechnung des Servers &uuml;berein.</strong> In Bestenliste und Freundesliste galt bisher als online, wer in den letzten 90 Sekunden gespeichert hatte &ndash; der Server rechnet aber mit zwei Minuten. Wer dazwischen lag, war f&uuml;r die eine Stelle online und f&uuml;r die andere nicht. Ab jetzt gilt &uuml;berall dieselbe Zeitspanne.',
     '<strong>Sonst eine Wartungsversion.</strong> Die Kopfzeile bekommt ein Anzeigefeld, das ausschlie&szlig;lich das Betreiberkonto sieht, und im Abgrund-Code wurden zwei Stellen aufger&auml;umt, die im Spiel keine Wirkung hatten. Keine Balance-&Auml;nderung, keine neuen Inhalte.'
   ] },
-  { version:'8.710.0', date:'09.09.2026', changes:[
-    '<strong>Der Abgrund steht nicht mehr still: Die Str&ouml;mung dreht sich einmal am Tag.</strong> Bisher hing jeder Sektor allein an seiner Tiefe &ndash; Tiefe 47 sah heute aus wie vor einem halben Jahr und wie in einem Jahr. Ab jetzt tr&auml;gt dieselbe Tiefe nach Mitternacht einen anderen Namen, andere Mutatoren, eine andere Konstellation, eine andere Gegnerst&auml;rke und eine andere Beute. Die 24 Mutatoren und 9 Konstellationen sind damit jeden Tag neu gemischt, und eine Tiefe, an der du gestern gescheitert bist, kann heute deine sein.',
-    '<strong>Was die Str&ouml;mung <em>nicht</em> anfasst:</strong> die W&auml;chter. Sie sitzen fest auf ihren Zehnertiefen, in ihrer Reihenfolge, mit ihren Reliquien &ndash; dein Kabinett und der Kartenraum bleiben unver&auml;ndert, ebenso Rekordtiefe und Bergungsgut.',
-    '<strong>Ein gestarteter Tauchgang beh&auml;lt seinen Sektor.</strong> Was die Vorschau beim Abflug zeigt, k&auml;mpfst du bei der Ankunft &ndash; auch wenn die Str&ouml;mung dazwischen dreht. Wie lange die aktuelle noch steht, sagt der Tauchreiter unter dem Sektornamen.'
-  ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1132;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1133;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -45923,7 +46045,7 @@ async function claimPendingRewards(){
       { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. '+KOMFORT_GRENZEN.freunde.standard+', mit Unterstützer-Rang '+KOMFORT_GRENZEN.freunde.unterstuetzer+'), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:'Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>Silber</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.' },
       { title:'Die Basis liefert die Grundlast – der Weg nach oben führt über die Asteroiden', body:'Seit dem Umbau der Basiswirtschaft haben die vier Rohstoff-Gebäude (<strong>Erzmine, Kristallraffinerie, Deuteriumsynthetisierer, Fusionsreaktor</strong>) einen Deckel: <strong>Ab Stufe 16 zählt jede weitere Stufe nur noch halb</strong>, und <strong>ab Stufe 25 lassen sie sich nicht mehr ausbauen</strong>. Ein harter Schnitt hätte Stufe 26 zu einem Knopf gemacht, der nichts tut; die Abflachung sagt dir stattdessen über zehn Stufen hinweg, dass hier die Luft raus ist.<br><br><strong>Stufen über dem Deckel entfallen.</strong> Wer beim Umbau Minen jenseits von 25 hatte, hat dafür einmalig <strong>60% der Baukosten dieser Stufen zurückbekommen</strong> und dazu sechs Minenschiffe als Starthilfe; seit v8.493.0 stehen sie auf Stufe 25. Ein zweiter Ausgleich kommt nicht – die Erstattung war der Ausgleich.<br><br>Der erste Durchgang erfasste allerdings <em>nur</em> diese vier Minen. Gebäude mit Deckel, aber ohne Abflachung – Solarkraftwerk (40), Habitat (20), Aufbereitungsanlage (20) und weitere – blieben auf ihren Altstufen stehen, der Deckel bedeutete für sie nichts. <strong>Seit v8.506.0 werden auch sie beim Laden auf ihre Maximalstufe gekappt.</strong> Für diese Stufen gab es <strong>keine Erstattung</strong>: Der Ausgleich vom Sommer-Umbau hatte denselben zu engen Zuschnitt, und eine nachträgliche Rückzahlung wäre bei den Größenordnungen (bei einem Solarkraftwerk auf Stufe 100 rechnerisch einige hundert Millionen Erz) am Lagerdeckel fast vollständig verpufft. Der Bericht kennzeichnet jedes betroffene Gebäude einzeln und sagt dazu, ob eine Erstattung gelaufen ist.<br><br><strong>Das Solarkraftwerk ist bewusst ausgenommen</strong> (Ausbau bis Stufe 40, volle Rate durchgehend): Energie ist der Betriebsstoff der Aufbereitungsanlage. Die Basis verliert also keine Aufgabe, sie tauscht eine gegen eine andere – <strong>Bergwerk war gestern, jetzt ist sie Kraftwerk und Hütte</strong>. Was darüber hinaus wachsen soll, kommt aus den Asteroidengürteln (siehe „Asteroiden und Abbaumissionen").<br><br>Zwei Dinge, die dabei gleich bleiben: Der Deckel wirkt <strong>je Standort</strong>, nicht imperiumsweit – neue Kolonien bringen weiterhin voll. Und alle Produktions-Multiplikatoren (Habitat, Rollen, Module, Planetentyp) wirken unverändert auf das, was übrig bleibt.' },
-      { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Alle sechs füllen sich über die Zeit und werden bis zum Lagerdeckel gespeichert - auch Energie, die Karte zeigt dann „Lager voll". Unter den sechs Kernressourcen steht die Zeile <strong>Werkstoffe</strong>: Protomaterie und die neun Fabrik-Ketten (ab dem Lategame, beginnend mit Nanolegierungen - siehe eigener Eintrag unten) als schmale Chips, jede mit eigenem, kleinerem Lager, getrennt von den sechs Basis-Ressourcen. Die Kopfzeile zählt, wie viele dieser Lager voll und wie viele Ketten gedrosselt sind; „Aufklappen" zeigt die vollen Karten mit Rate und Status, die Wahl wird gespeichert.' },
+      { title:'Ressourcen', body:'Sechs Ressourcen: Energie, Erz, Kristalle, Deuterium, Antimaterie und Forschungspunkte. Alle sechs füllen sich über die Zeit und werden bis zum Lagerdeckel gespeichert - auch Energie. Am PC steht die Leiste einzeilig - Symbol und Wert -, und ein volles Lager faerbt den Wert bernsteinfarben; Name, Lagerdeckel und Rate nennt der Tooltip der Karte. Am Handy steht weiterhin „Lager voll" auf der Karte. Unter den sechs Kernressourcen steht die Zeile <strong>Werkstoffe</strong>: Protomaterie und die neun Fabrik-Ketten (ab dem Lategame, beginnend mit Nanolegierungen - siehe eigener Eintrag unten) als schmale Chips, jede mit eigenem, kleinerem Lager, getrennt von den sechs Basis-Ressourcen. Die Kopfzeile zählt, wie viele dieser Lager voll und wie viele Ketten gedrosselt sind; „Aufklappen" zeigt die vollen Karten mit Rate und Status, die Wahl wird gespeichert.' },
       { title:'Tier-2-Ressourcen: Nanolegierungen & Quantenchips', body:'Tier-2-Ressourcen werden nicht kostenlos produziert, sondern in speziellen Fabriken laufend <strong>aus Basis-Ressourcen hergestellt</strong> - reicht der Bestand nicht, läuft die Fabrik langsamer oder pausiert, nie ins Minus. Der Durchsatz ist bewusst winzig und gilt <strong>je Standort</strong> (Fabriken auf mehreren Kolonien erhöhen Durchsatz UND Rohstoffverbrauch entsprechend), Tier-2-Ressourcen bleiben dauerhaft knapp und haben eigene, kleine Lager. <strong>Nanolegierungen</strong> (ab Forschung „Nanotechnologie", über „Effiziente Baupläne" Stufe 10): Nanolegierungsfabrik, max. Stufe 15, verbraucht 8 Erz + 5 Kristalle + 4 Energie je Einheit, max. ca. 0,09/s. Erste Verwendung: die <strong>Nano-Verteidigungsplattform</strong> (Verteidigung-Tab) - der Einstieg in die Tier-2-Verteidigung (150 Verteidigung je Stufe), inzwischen von fünf stärkeren Bauten überholt; eingereihte Plattformen starten automatisch, sobald genug Nanolegierungen angesammelt sind. <strong>Quantenchips</strong> (ab Forschung „Quantenphysik", benötigt Nanotechnologie UND „Nanoschliff-Kristalle" Stufe 10): Quantenchipfabrik, max. Stufe 15, verbraucht 12 Kristalle + 5 Deuterium + 6 Energie je Chip und ist bewusst 3x langsamer (max. ca. 0,03/s) - die höherwertige, knappere zweite Stufe. Erste Verwendung: die <strong>Quanten-Sensorphalanx</strong> (Verteidigung-Tab) - jede Stufe gibt +120 Sekunden Überfall-Vorwarnzeit (imperiumsweit gedeckelt bei +20 Minuten, zusätzlich zu Langstrecken-Scanner/Allianz/Pakten/Fähigkeitsbaum) plus etwas Verteidigung; eingereihte Phalanxen starten automatisch, sobald genug Quantenchips angesammelt sind. <strong>Hochenergiekristalle</strong> (ab Forschung „Hochenergiephysik", benötigt Quantenphysik UND „Vakuumfluktuationskompression" Stufe 5): Kristalllabor, max. Stufe 15, verbraucht 18 Kristalle + 12 Energie + 1 Antimaterie je Einheit - die erste Kette mit Antimaterie als Zutat und mit 0,0015/s je Stufe die langsamste. Verwendung: die <strong>Hochenergie-Schildkuppel</strong> (Verteidigung-Tab) - der stärkste reine Schild des Spiels (220 Verteidigung je Stufe, kein Angriff), Baukosten enthalten Hochenergiekristalle. <strong>Fusionskerne</strong> (ab Forschung „Fusionskern-Synthese", benötigt Hochenergiephysik UND „Isotopen-Anreicherung" Stufe 5): die Fusionsschmiede ist die erste <strong>mehrstufige</strong> Kette - sie verbraucht 20 Deuterium + 2 Antimaterie + <strong>3 Nanolegierungen</strong> je Kern, eine Tier-2-Ressource wird also selbst zur Zutat. Mit 0,0008/s je Stufe die langsamste Kette. Verwendung: die <strong>Fusionsbastion</strong> (Verteidigung-Tab) - starkes Kombigebäude (250 Verteidigung + 120 Angriff je Stufe), Baukosten enthalten Fusionskerne. <strong>KI-Kerne</strong> (ab Forschung „KI-Technologie", benötigt Fusionskern-Synthese): das KI-Labor ist die Spitze der Kette - die einzige Fabrik mit <strong>zwei Tier-2-Zutaten</strong> (2 Quantenchips + 2 Nanolegierungen + 3 Antimaterie je Kern) und mit 0,0005/s je Stufe die langsamste. Verwendung: der <strong>KI-Verteidigungskern</strong> (Verteidigung-Tab) - lange die Spitze der Verteidigungsleiter (300 Verteidigung + 150 Angriff je Stufe); inzwischen stehen Resonanzschild-Emitter (420), Kristallfestung (350), Metamaterial-Panzerwall (340) und Singularitäts-Geschützturm (330) darüber. Hinweis für alle Tier-2-Fabriken: Ist das jeweilige Tier-2-Lager voll, <strong>pausiert</strong> die Fabrik (verbraucht dann auch keine Rohstoffe mehr), bis wieder Platz ist. Die <strong>Werkstoff-Zeile</strong> unter den sechs Kernressourcen zeigt je Kette den Bestand; aufgeklappt steht in der Rate-Zeile die aktuelle <strong>effektive Produktionsrate pro Sekunde</strong> samt Status - gedrosselt wegen Rohstoffmangel (mit Auslastung und knappstem Eingangsstoff) oder pausiert wegen vollem Lager („Lager voll"). Eingeklappt färbt sich der Chip in beiden Fällen bernsteinfarben; am PC nennt der Tooltip den Grund, am Handy steht er nach „Aufklappen" in der Rate-Zeile. Neben den Verteidigungsgebäuden gibt es drei <strong>Nutzgebäude</strong> als weitere Verbraucher (Basis-Tab): das <strong>Hochsicherheitslager</strong> (+80 Tier-2-Lagerkapazität je Stufe auf jede Kette, Kosten enthalten Nanolegierungen), das <strong>Kryolager</strong> (+2.000 Basis-Lagerkapazität je Stufe, Kosten enthalten Hochenergiekristalle) den <strong>Fusions-Werftkern</strong> (-1,5% Schiffsbauzeit je Stufe, Kosten enthalten Fusionskerne) und die <strong>Quanten-Assemblierwerft</strong> (ebenfalls -1,5% Schiffsbauzeit je Stufe, Kosten enthalten Quantenchips) - beide Werft-Gebäude teilen sich einen gemeinsamen, imperiumsweiten Schiffsbauzeit-Deckel von -20%. Dazu drei <strong>Tier-2-Schiffe</strong> (Flotte-Tab, Baukosten bestehen KOMPLETT aus raffinierten Ressourcen): die <strong>Nanoklinge</strong> (55 Angriff, schnell - 130 Nanolegierungen), der <strong>Quantenkreuzer</strong> (80 Angriff + Schildwert - 60 Quantenchips + 60 Nanolegierungen) und der <strong>Fusionsdreadnought</strong> (180 Angriff, zwischen Leerenjäger und Superschlachtschiff - 45 Fusionskerne + 60 Hochenergiekristalle). Alle drei sind in Angriffen, Allianz-Raids und Musterangriffen voll einsetzbar. Erster <strong>Verbrauchsgegenstand</strong>: „Quantensensoren kalibrieren" im Expeditions-Bereich (ab Forschung Quantenphysik) verbraucht 10 Quantenchips und gibt 30 Minuten lang allen in diesem Fenster GESTARTETEN Expeditionen einen spürbaren Glücksbonus auf die Fundqualität - laufende Expeditionen profitieren nicht rückwirkend. Die <strong>Auto-Kalibrierung</strong> (Schalter direkt darunter) investiert die 10 Chips beim Expeditions-Start automatisch, falls gerade kein Fenster läuft - reichen die Chips nicht, startet die Expedition normal ohne Bonus. Ebenfalls Quantenchip-basiert: der <strong>Werft-Overdrive</strong> (Flotte-Tab, direkt unter der Schiffswerft, ab Quantenphysik) verbraucht 12 Quantenchips und senkt 30 Minuten lang die Schiffsbauzeit imperiumsweit um 25%. Zweiter laufender Verbraucher: die <strong>KI-Abfangautomatik</strong> (Verteidigung-Tab, ab KI-Technologie, <strong>nur mit Unterstützer-Rang</strong>) vertreibt Piraten-Trümmerräuber automatisch für 3 KI-Kerne je Einsatz - Details im Abschnitt „Piraten-Trümmerräuber". Dritter: der <strong>Terraforming-Energieschub</strong> (ab Hochenergiephysik) verkürzt eine laufende Terraforming-Stufe um je 10% für 6 Hochenergiekristalle x Zielstufe (max. 3 Schübe je Stufe) - Details im Abschnitt „Terraforming". Außerdem lassen sich Tier-2-Ressourcen als hart gedeckeltes <strong>Pakt-Geschenk</strong> an Paktpartner senden (ab Handelsabkommen, Details unter „Diplomatie") und es gibt eine eigene <strong>Tagesaufgabe</strong> „5 Tier-2-Ressourcen produzieren", sobald mindestens eine Fabrik existiert. Für Allianzen: Das Weltprojekt <strong>Galaktische Verbundraffinerie</strong> verlangt 600 Fusionskerne als Materialschwelle und belohnt mit dauerhaft +10% Durchsatz aller Tier-2-Fabriken (Details unter „Allianzen"). Am galaktischen Markt sind Tier-2-Ressourcen bewusst <strong>nicht</strong> handelbar - sie kommen ausschließlich aus den eigenen Fabriken. Fürs Prestige: das <strong>Kryo-Archiv</strong> (viertes Nutzgebäude, ab Hochenergiephysik) bewahrt je Stufe feste Tier-2-Mengen durch den Reset - ohne Archiv geht der Bestand verloren (Details unter „Fortschritt & Prestige"). Und für die Tier-2-Schiffe gibt es eine eigene Schiffsklassen-Modul-Kategorie mit <strong>gefertigten</strong> Modulen aus Tier-2-Ressourcen (Details unter „Offiziere").' },
       { title:'Synthese-Kette: Metamaterial & Singularitätskerne (Tier-2-Erweiterung)', body:'Die Kette setzt sich über die KI-Kerne hinaus fort - zwei <strong>Apex-Ressourcen</strong>, die je ZWEI bestehende Tier-2-Ressourcen bündeln und noch langsamer produzieren (reines Endgame). <strong>Metamaterial-Gewebe</strong> (ab Forschung „Metamaterial-Synthese", benötigt KI-Technologie): Metamaterialweberei, max. Stufe 15, verbraucht 2 Hochenergiekristalle + 1 Fusionskern + 30 Kristalle je Einheit (0,0004/s je Stufe). Verwendung: der <strong>Metamaterial-Panzerwall</strong> (Verteidigung-Tab) - schwerer reiner Schutz (340 Verteidigung, kein Angriff) – nur der Resonanzschild-Emitter mit 420 steht darüber, der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, s. u.) und der <strong>Metamaterial-Titan</strong> (Flotte-Tab, 150 Angriff + höchster Schildwert). <strong>Singularitätskerne</strong> (ab Forschung „Singularitätsphysik", benötigt Metamaterial-Synthese): Singularitätsreaktor, max. Stufe 15, verbraucht 2 KI-Kerne + 2 Fusionskerne + 5 Antimaterie je Kern (0,0003/s je Stufe) - die rarste Ressource des Spiels. Verwendung: der <strong>Singularitäts-Geschützturm</strong> (Verteidigung-Tab, 330 Verteidigung + 180 Angriff - der beste BAUBARE Kombiwert, knapp unter der seltenen Kristallfestung) und der <strong>Singularitäts-Vernichter</strong> (Flotte-Tab, 280 Angriff - stärkster regulärer Angriffswert). Neue <strong>Effizienz-Achse:</strong> Die Forschung <strong>Raffinerie-Optimierung</strong> (ab Quantenphysik, bis Stufe 10) erhöht den Durchsatz ALLER Tier-2-Fabriken um +3% je Stufe (max. +30%); der <strong>Gravitations-Stabilisator</strong> (Nutzgebäude, ab Metamaterial-Synthese, bis Stufe 10) senkt den Rohstoffverbrauch aller Fabriken um -2% je Stufe (imperiumsweit max. -20%). Das Kryo-Archiv bewahrt beide neuen Ressourcen ebenfalls durchs Prestige (3 Metamaterial / 2 Singularitätskerne je Stufe). Zwei neue <strong>Verbrauchsgegenstände</strong> (Flotte-Tab, unter „Aktive Missionen", sobald du die jeweilige Ressource besitzt): der <strong>Metamaterial-Reparaturschwarm</strong> behebt eine aktive Sabotage (Produktions-Debuff nach verlorenem Überfall) sofort für 6 Metamaterial-Gewebe, und die <strong>Singularitäts-Sprungladung</strong> verkürzt die Restflugzeit deiner längsten laufenden Flottenmission um 25% für 3 Singularitätskerne. Und zwei neue <strong>gefertigte Module</strong> (Tier-2-Modulfertigung): Metamaterial-Panzerplatte (+14% Verteidigungsbeitrag) und Singularitäts-Fokusarray (+14% Angriffskraft).' },
       { title:'Tägliche Belohnungen', body:'Beim ersten Login eines neuen Kalendertages gibt es automatisch eine kleine Belohnung - keine extra Schaltfläche nötig, sie wird direkt gutgeschrieben und im "Willkommen zurück"-Fenster angezeigt. Die Belohnungen folgen einem <strong>7-Tage-Zyklus</strong> mit unterschiedlichen Inhalten (Ressourcen, ein Verbrauchsgegenstand, ein einfaches Schiff, Forschungspunkte, kleine Kredite) - bewusst nur günstige, frühe Inhalte, keine seltenen Items oder starken Schiffe. Nach Tag 7 beginnt der Zyklus erneut. <strong>Streak-Schutzschilde:</strong> verpasst du GENAU einen Tag, rettet ein vorhandener Schutzschild deine Serie (statt Reset auf Tag 1) - für jeden vollständig durchgehaltenen 7-Tage-Zyklus bekommst du automatisch +1 Schild (max. 3 auf Vorrat). Ohne Schild oder bei mehr als einem verpassten Tag beginnt die Serie neu. <strong>Treue-Meilensteine:</strong> erreicht deine Serie 14/30/60/100 Tage am Stück, gibt es je einmal pro Lauf eine große Zusatzbelohnung (Ressourcen, Kredite, ab Tag 60 auch Schiffe). Schild-Vorrat, nächster Meilenstein samt Countdown und die komplette 7-Tage-Vorschau stehen im <strong>Fortschritt-Tab</strong> unter "Tägliche Belohnungen".' },
@@ -71921,7 +72043,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
     else if (isFull && r > 0) rateHtml = '<span style="color:#e0a548;">+0/s (Lager voll)</span>';
     else if (isNear) rateHtml = '+'+fmt(r)+'/s <span class="pct">· '+Math.round(pct)+'% – fast voll</span>';
     else rateHtml = '+'+fmt(r)+'/s'+(cap>0 ? ' <span class="pct">· '+Math.round(pct)+'%</span>' : '');
-    return { pct, isFull, isNear, rateHtml,
+    /* Derselbe Satz noch einmal OHNE Auszeichnung, fuer den Tooltip der Karte (Verdichtung
+       14.09.2026). Die einzeilige Leiste zeigt nur noch Symbol und Wert; Name, Lagerdeckel und
+       Rate stehen dann im Titel. Der Text wird HIER gebildet und nicht an der Anzeigestelle, weil
+       diese Funktion per Kommentar oben die einzige Quelle des Ratentexts ist - eine zweite
+       Formulierung waere genau die zweite Anzeigestelle, vor der derselbe Kommentar warnt.
+       tags-los aus rateHtml abgeleitet statt neu formuliert: so kann der Titel gar nicht etwas
+       anderes behaupten als die sichtbare Rate. */
+    const rateText = rateHtml.replace(/<[^>]*>/g, '');
+    const titel = d.label + ' · ' + fmt(stock) + (cap>0 ? ' / ' + fmt(cap) : '') + ' · ' + rateText;
+    return { pct, isFull, isNear, rateHtml, titel,
       cls: isFull ? ' t2-full' : (isNear ? ' t2-near' : ''),
       fillPct: pct.toFixed(1),
       // 11.09.2026: RES_DEFS kennt nur bg/fg, kein color - der Balken war unter 100 % unsichtbar.
@@ -72602,7 +72733,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const stock = state.resources[d.key]||0;
         const st = resCardState(d, stock, cap, rates[d.key]);
         return `
-        <div class="rescard${st.cls}" data-res="${d.key}">
+        <div class="rescard${st.cls}" data-res="${d.key}" title="${escapeHtml(st.titel)}">
           <div class="icon-badge" style="background:${d.bg};">${RES_ICONS[d.key]}</div>
           <div class="rescard-info">
             <div class="label">${d.label}</div>
@@ -72624,6 +72755,10 @@ function sekSternUse(key, x, y, k, unentdeckt){
         // Auch die Rate wurde jeden Tick neu geparst (gemessen 6 Schreibvorgänge/s), obwohl sie
         // sich nur ändert, wenn sich die Produktion ändert.
         if (rateEl.innerHTML !== st.rateHtml) rateEl.innerHTML = st.rateHtml;
+        // Der Titel traegt in der einzeiligen Leiste die Auskunft, die nicht mehr auf der Karte
+        // steht - er muss deshalb denselben Weg mitgehen wie die Rate, sonst zeigt der Tooltip
+        // nach dem ersten Tick fuer immer den Stand des Aufbaus.
+        if (card.title !== st.titel) card.title = st.titel;
         const oldVal = lastResRenderVal[d.key]!==undefined ? lastResRenderVal[d.key] : newVal;
         if (Math.abs(newVal-oldVal) > 0.001) animateResValue(valEl, oldVal, newVal, cap); else resWertSchreiben(valEl, newVal, cap);
         lastResRenderVal[d.key] = newVal;
@@ -72910,7 +73045,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           const debrisTitle = debrisInfoText(d.id) || '';
           const hasDebris = !!debrisTitle;
           return `
-            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${d.name}${colonyNoteOf(d.id)?' – Notiz: '+colonyNoteOf(d.id):''}${role?' – Rolle: '+role.name+' ('+role.detail+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – anklicken zum Wechseln">
+            <div class="dash-colony-card ${targeted?'targeted':(sabotaged?'event-sabotage':(hasVoidRift?'event-voidrift':''))} ${state.activeBasePlanet===d.id?'active-base':''}" data-planet-switch="${d.id}" style="cursor:pointer;" title="${escapeHtml(d.name)}${colonyNoteOf(d.id)?' – Notiz: '+escapeHtml(colonyNoteOf(d.id)):''}${role?' – Rolle: '+escapeHtml(role.name)+' ('+escapeHtml(role.detail)+')':''}${targeted?' – wird angegriffen!':''}${sabotageTitle}${voidRiftTitle} – ${lvlSum} Lv. · Angriffskraft ${fmt(dAtk)} · Verteidigungspunkte ${fmt(dDef)} · ${shipCount} Schiffe stationiert – anklicken zum Wechseln">
               ${targeted ? `<span class="dash-attack-badge" title="Wird angegriffen!"><i class="ti ti-alert-triangle" aria-hidden="true"></i></span>` : ''}
               ${sabotaged ? `<span class="dash-sabotage-badge" title="Sabotiert${sabotageTitle}"><i class="ti ti-bolt" aria-hidden="true"></i></span>` : ''}
               ${hasVoidRift ? `<span class="dash-voidrift-badge" title="Leerenriss offen${voidRiftTitle}"><i class="ti ti-atom-2" aria-hidden="true"></i></span>` : ''}
@@ -72921,7 +73056,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
               </div>
               <div class="dash-colony-info">
                 <div class="dash-colony-name"><span class="dash-colony-name-text">${targeted?'<i class="ti ti-sword" aria-hidden="true" style="color:#e24b4a;"></i> ':''}${sabotaged&&!targeted?'<i class="ti ti-bolt" aria-hidden="true" style="color:#e0a548;"></i> ':''}${d.name}</span>${(!isMoonKey(d.id) && state.colonies && state.colonies['moon_'+d.id]) ? `<span class="pill-moon-btn ${state.activeBasePlanet==='moon_'+d.id?'active':''}" data-moon-switch="moon_${d.id}" title="${planetDisplayName('moon_'+d.id)} – zum Mond wechseln" style="vertical-align:middle;">☾</span>` : ''}</div>
-                <div class="dash-colony-level">${lvlSum} Lv.${role?` <span style="color:${role.color};">· ${role.name}</span>`:''}</div>
+                <div class="dash-colony-level">${lvlSum} Lv.${role?` <span class="dash-colony-role-text" style="color:${role.color};">· ${role.name}</span>`:''}</div>
                 <div class="dash-colony-stats" title="Angriffskraft ${fmt(dAtk)} · Verteidigungspunkte ${fmt(dDef)} · ${shipCount} Schiffe stationiert"><i class="ti ti-sword" aria-hidden="true"></i>${fmt(dAtk)} <i class="ti ti-shield-lock" aria-hidden="true"></i>${fmt(dDef)} <i class="ti ti-rocket" aria-hidden="true"></i>${shipCount}</div>
               </div>
             </div>
