@@ -5995,14 +5995,40 @@
     }
     return res;
   }
-  async function storageGet(key, shared){
+  /* strikt (Spieler-Report 14.09.2026: "wenn Updates kommen, wird die Bauschlange gelöscht und
+     auch die Forschungsschlange") - GEMESSEN, nicht vermutet:
+
+     Der Rückfall auf den lokalen Speicher direkt darunter ist für Rundfunk-Schlüssel richtig
+     (lieber ein alter Wert als gar keiner), für den EIGENEN SPIELSTAND aber gefährlich. Antwortet
+     die Spielstand-Route kurz nicht - und genau das ist das Deploy-Fenster, in dem sich das
+     Backend neu startet -, dann lieferte storageGet still die lokale Notkopie zurück. load() kann
+     sie von einer echten Serverantwort nicht unterscheiden: Es meldete "Spielstand automatisch
+     geladen", setzte bootDataReady und schrieb diesen alten Stand beim nächsten Takt über den
+     unversehrten Serverstand. Die Versionsprüfung half nicht, sondern half MIT - die Notkopie hat
+     keine Version, gameSaveVersion fiel auf 0, der 409 löste ein Nachladen aus, und der zweite
+     Versuch schrieb mit der frisch geholten Version erfolgreich über.
+     Gemessener Ablauf (tests/test_spielstand_ersatz.js): Server v7 mit gefüllten Warteschlangen,
+     502 nur auf die Spielstand-Route, alte Notkopie mit leeren Warteschlangen -> nach der Störung
+     stand v8 mit leeren Warteschlangen auf dem Server.
+     Noch schlimmer der Fall ohne Notkopie (neues Gerät): storageGet lieferte null, load() nahm den
+     "Neue Kolonie gestartet"-Zweig und speicherte einen leeren Anfangsstand über alles.
+
+     Mit strikt=true fällt der eigene Spielstand nicht mehr zurück, sondern wirft. load() behandelt
+     das wie jeden anderen Ladefehler: bootDataReady bleibt aus, es wird NICHTS gespeichert, die
+     Daten bleiben serverseitig unversehrt. Fail-closed, wie es für eine Sicherung sein muss.
+     Ohne Serververbindung (useBackend() false) ist der lokale Speicher der reguläre Ablageort -
+     dort ändert strikt nichts. */
+  async function storageGet(key, shared, strikt){
     if (useBackend()){
       try {
         const res = await backendFetch('/storage/'+encodeURIComponent(key)+'?shared='+(shared?'true':'false'));
         if (res.status === 404) return null;
         if (!res.ok) throw new Error('backend get failed');
         return await res.json();
-      } catch(e){ /* fällt unten durch auf lokalen Speicher */ }
+      } catch(e){
+        if (strikt) throw new Error('SERVERSTAND_UNERREICHBAR');
+        /* sonst: fällt unten durch auf lokalen Speicher */
+      }
     }
     if (hasCloudStorage()){
       try { return await window.storage.get(key, shared); } catch(e){}
@@ -53810,6 +53836,11 @@ async function claimPendingRewards(){
     return saveResult;
   }
 
+  /* Wie oft ein unerreichbarer Server erneut versucht wird, bevor der Spieler es selbst in die
+     Hand nehmen muss. 8 x 5 s deckt das gemessene Deploy-Fenster (rund 7 s 502) mit reichlich
+     Reserve ab, ohne bei einem echten Ausfall ewig weiterzulaufen. */
+  const LADE_VERSUCHE_MAX = 8, LADE_WARTE_MS = 5000;
+  let ladeVersuche = 0;
   async function load(){
     // Warnung nur zeigen, wenn WEDER die Claude.ai-Speicherschnittstelle NOCH ein echter eigener
     // Server (useBackend) verfügbar ist – vorher wurde ein eigener Server hier fälschlich ignoriert,
@@ -53819,7 +53850,9 @@ async function claimPendingRewards(){
       if (lbNote) lbNote.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i>Dieses Spiel läuft gerade ohne geteilten Cloud-Speicher (z.B. weil die Datei lokal geöffnet wurde statt in Claude.ai) – dein eigener Fortschritt wird trotzdem gespeichert (lokal in diesem Browser), aber Bestenliste, Duelle und Allianzen können nicht mit anderen synchronisieren.`;
     }
     try {
-      const res = await storageGet(STORE_KEY, false);
+      // strikt: siehe storageGet(). Ein Stand, den der Server nicht geliefert hat, ist kein
+      // Spielstand - er darf weder angezeigt noch zurückgeschrieben werden.
+      const res = await storageGet(STORE_KEY, false, true);
       if (res && res.value){
         gameSaveVersion = res.version || 0;
         const parsedSave = JSON.parse(res.value);
@@ -54039,6 +54072,20 @@ async function claimPendingRewards(){
         if (lastOfflineSummary || loginBonus) setTimeout(() => showWelcomeBackModal(lastOfflineSummary, loginBonus), 400);
       } else { state.lastSeenVersion = VERSION; checkDailyLogin(); initDailyQuests(); bootDataReady = true; await save(); document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
     } catch(e){
+      /* Der Server war nicht erreichbar (strikte Lesung, siehe storageGet). Das ist der Normalfall
+         für die paar Sekunden eines Deploys und heilt sich von selbst - deshalb wird hier NICHT der
+         allgemeine Fehlertext gezeigt, der zum Neuladen auffordert, sondern von allein erneut
+         geladen. Entscheidend ist, was NICHT passiert: bootDataReady bleibt aus, also speichert
+         nichts, und der unversehrte Serverstand bleibt stehen. */
+      if (e && e.message === 'SERVERSTAND_UNERREICHBAR'){
+        ladeVersuche++;
+        const wieder = ladeVersuche < LADE_VERSUCHE_MAX;
+        document.getElementById('loadstate').textContent = wieder
+          ? 'Server gerade nicht erreichbar (läuft evtl. ein Update?) - dein Spielstand liegt sicher dort und wird gleich erneut geholt…'
+          : 'Server nicht erreichbar - dein Spielstand liegt unverändert dort. Bitte die Seite neu laden. Es wurde nichts überschrieben.';
+        if (wieder) setTimeout(() => { load().then(() => { if (bootDataReady) render(); }).catch(()=>{}); }, LADE_WARTE_MS);
+        return;
+      }
       // Diesen Fehler NIE stillschweigend verschlucken: ein Ladefehler bei einem BESTEHENDEN
       // Spielstand sah für Spieler zuvor exakt wie "Fortschritt komplett weg" aus, obwohl die
       // Daten die ganze Zeit unversehrt auf dem Server lagen (siehe v8.18.3-Hotfix). Immer in die

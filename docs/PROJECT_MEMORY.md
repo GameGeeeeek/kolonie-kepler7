@@ -551,3 +551,38 @@ nichts belegte).
    Fehlversuch.** `MUSS_FALLEN` trägt hier zwei Richtungen: `alt` (der Stand vor der Etappe) und
    `entwurf` (der eigene erste Entwurf, aus der Git-Historie geholt). Nur die zweite belegt, dass
    die Prüfung gegen den Fehler schützt, der wirklich passiert ist.
+
+## Ein Rückfall auf eine lokale Kopie darf nie als geladener Serverstand durchgehen (14.09.2026)
+
+Spieler-Report: „Wenn Updates kommen, wird die Bauschlange gelöscht und auch die
+Forschungsschlange." Gemessen wurde eine Fehlerklasse, die weit über diesen einen Fall hinausgeht.
+
+`storageGet()` fiel bei **jedem** Serverfehler still auf den lokalen Speicher zurück. Für
+Rundfunk-Schlüssel ist das richtig – ein alter Wert schlägt gar keinen. Für den eigenen Spielstand
+war es zerstörerisch, weil `load()` die Notkopie nicht von einer echten Serverantwort unterscheiden
+konnte: Es meldete „Spielstand automatisch geladen", setzte `bootDataReady` und schrieb den alten
+Stand beim nächsten Takt über den unversehrten Serverstand. Das Zeitfenster ist genau der Deploy
+(Backend startet sich neu, rund 7 s 502) – deshalb fiel es als „beim Update" auf.
+
+| gemessen (tests/test_spielstand_ersatz.js) | Ergebnis am alten Stand |
+|---|---|
+| Server v7 mit gefüllten Warteschlangen, 502 nur auf die Spielstand-Route, alte Notkopie mit leeren Warteschlangen | v8 mit **leeren** Warteschlangen auf dem Server |
+| dasselbe, aber **ohne** Notkopie (neues Gerät) | „Neue Kolonie gestartet" – ein leerer Anfangsstand über alles |
+
+Die Versionsprüfung half nicht, sie half **mit**: Die Notkopie hat keine Version, `gameSaveVersion`
+fiel auf 0, der 409 löste ein Nachladen aus, und der zweite Versuch schrieb mit der frisch geholten
+Version erfolgreich über.
+
+**Übertragbar, drei Punkte:**
+
+1. **Ein Ersatzwert muss sich als Ersatzwert zu erkennen geben.** Eine Funktion, die im Erfolgs-
+   und im Ausfall-Fall dieselbe Form zurückgibt, nimmt jedem Aufrufer die Möglichkeit, richtig zu
+   entscheiden. Wer den Unterschied braucht, bekommt ihn hier über `storageGet(key, shared, strikt)`.
+2. **Lesen und Zurückschreiben sind eine Kette.** Ein toleranter Leser ist harmlos, solange
+   niemand das Gelesene zurückschreibt. Sobald doch, wird aus „lieber ein alter Wert als keiner"
+   ein „ein alter Wert überschreibt den neuen". Bei jedem Rückfall prüfen, wer das Ergebnis
+   speichert.
+3. **Fail-closed gilt auch fürs Laden.** `bootDataReady` bleibt jetzt aus, wenn der Stand nicht
+   vom Server kam – das Spiel bleibt lieber ein paar Sekunden gesperrt (und holt selbsttätig nach),
+   als mit einem falschen Stand weiterzulaufen. Eine Sicherung, deren Ausfall wie Normalbetrieb
+   aussieht, ist keine.
