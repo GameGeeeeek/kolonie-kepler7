@@ -1796,7 +1796,16 @@
        (0,0,1,0), und eine Media-Query erhoeht die Spezifitaet nicht. 1001 ist
        COMPACT_HEAD_MAX_WIDTH + 1 - genau die Grenze, an der die Automatik loslaesst. */
     @media (min-width: 1001px) {
-      body:not(.compact-head) #resbar { grid-template-columns: repeat(6, 1fr); }
+      /* DIESELBE FORM WIE DIE WERKSTOFF-ZEILE (Wunsch Sascha, 14.09.2026). Die Rohstoffleiste stand
+         als Raster ueber einer Chip-Zeile, die genau dasselbe zeigt - Symbol und Zahl - und sah
+         trotzdem anders aus: andere Hoehe, andere Polster, feste Spalten statt mitwachsender
+         Chips. Zwei Zeilen uebereinander, die dasselbe tun und sich verschieden geben.
+         Jetzt traegt sie die Masse der Werkstoff-Chips (`#tier2ResBadges.werkstoffe-kompakt`
+         weiter unten): flex-wrap statt Raster, dieselben Polster, dasselbe Abzeichen, dieselbe
+         Schriftgroesse. Die Chips wachsen mit ihrer Zahl, statt sechs gleich breite Spalten zu
+         erzwingen - dadurch passt auch ein Milliardenbetrag hinein, ohne dass die Nachbarn
+         schrumpfen. */
+      body:not(.compact-head) #resbar { display:flex; flex-wrap:wrap; gap:6px; align-items:stretch; }
       /* DIE DEKORATION SCHRUMPFT, NICHT DIE ZAHL (gemessen 14.09.2026). Bei 738 px Spalte ist eine
          Karte 116 px breit; mit 26er-Symbol, 8 px Abstand und 0,6rem Polster blieben dem Wert
          61 px - und ab 1e9 braucht er 75 px ("3212.90M", weil fmt() kein B/T kennt). Die
@@ -1807,18 +1816,23 @@
          Bei noch groesseren Betraegen greift die Ellipse (siehe .value unten); der volle Betrag
          steht dann im Titel. Das Verhaeltnis Bild zu Abzeichen ist dasselbe wie in der
          Werkstoff-Zeile (14 in 22), sonst schnitte die HUD-Ecke ins Bild. */
-      body:not(.compact-head) #resbar .rescard { padding:7px 6px; gap:6px; }
-      body:not(.compact-head) #resbar .rescard .icon-badge { width:20px; height:20px; font-size:11px; }
-      body:not(.compact-head) #resbar .rescard .icon-badge svg { width:13px; height:13px; }
+      body:not(.compact-head) #resbar .rescard { padding:3px 8px; gap:6px; min-width:0; flex:0 1 auto; }
+      body:not(.compact-head) #resbar .rescard .icon-badge { width:22px; height:22px; font-size:11px; }
+      /* Die RES_ICONS-Bilder sind fest 20 px; im 22-px-Abzeichen mit Schnittecke saessen sie
+         randlos und die Ecke schnitte ins Bild - dieselbe Zahl wie in der Werkstoff-Zeile. */
+      body:not(.compact-head) #resbar .rescard .icon-badge svg { width:14px; height:14px; }
       body:not(.compact-head) #resbar .rescard-info { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
-      /* flex:0 1 auto UND min-width:0 sind Pflicht, nicht Geschmack (gemessen 14.09.2026): Mit
-         flex:0 0 auto ist das Feld immer genau so breit wie sein Inhalt, `text-overflow:ellipsis`
-         laeuft dann ins Leere - und weil daneben justify-content:flex-end steht, waere der
-         Ueberlauf nach LINKS gewandert, also UNTER das farbige Symbol. Der Spieler haette eine
-         plausible, aber falsche kleinere Zahl gelesen, ohne Auslassungspunkte als Warnung. Der
-         Fall ist kein Randfall: fmt() kennt kein B/T, ab 1e9 steht dort "1000.00M" (acht Zeichen
-         statt sieben), und der Lagerdeckel ist nach oben offen. */
-      body:not(.compact-head) #resbar .rescard .value { font-size:15px; flex:0 1 auto; min-width:0; }
+      /* HIER STAND `flex:0 1 auto; min-width:0` - und es ist gemessen ueberfluessig geworden
+         (14.09.2026). Solange die Leiste ein Raster aus sechs gleich breiten Spalten war, brauchte
+         es das: Ohne Schrumpf-Erlaubnis lief `text-overflow:ellipsis` ins Leere, und weil daneben
+         justify-content:flex-end steht, waere der Ueberlauf nach LINKS unter das farbige Symbol
+         gewandert - der Spieler haette eine plausible, aber FALSCHE kleinere Zahl gelesen, ohne
+         Auslassungspunkte als Warnung.
+         Seit die Chips mit ihrer Zahl wachsen, entsteht der Fall nicht mehr: Gemessen ohne die
+         beiden Angaben, bei 1e9 wie bei 1e12, faellt keine einzige Pruefung. Eine Angabe, die
+         nichts mehr tut, taeuscht eine Absicht vor - deshalb weg. Kehrt jemand zum festen Raster
+         zurueck, faellt Pruefung 6b (gemessen am Stand sabRaster). */
+      body:not(.compact-head) #resbar .rescard .value { font-size:12px; }
       /* Name, Rate und Lagerdeckel verschwinden aus dem BILD, nicht aus der Auskunft: dieselbe
          Technik wie .sr-only weiter oben. Mit display:none waeren sie auch aus dem
          Vorlese-Baum gefallen - und am PC gibt es dieselbe Gruppe wie am Handy: eine .rescard ist
@@ -1838,7 +1852,7 @@
       /* Die "+N"-Einflugzahl sass rechts oben und traf dort auf den jetzt RECHTSbuendigen Wert -
          gemessen ueberlappten beide Rechtecke, und flashGains laeuft jede Sekunde. Sie zieht
          deshalb links neben dem Symbol hoch, wo der rechtsbuendige Wert nicht hinkommt. */
-      body:not(.compact-head) #resbar .float-gain { right:auto; left:8px; top:auto; bottom:0; font-size:9.5px; }
+      body:not(.compact-head) #resbar .float-gain { right:auto; left:6px; top:auto; bottom:-1px; font-size:9px; }
     }
     /* Werkstoff-Zeile (Gleichmaß Etappe 1, 11.09.2026): Protomaterie und die Fabrik-Ketten stehen
        eingeklappt als schmale Chips (Symbol + Zahl) in EINER umbrechenden Zeile statt als zweite
@@ -4203,11 +4217,6 @@
         <div id="planetRoleBox"></div>
         <div id="orbitalStationBox"></div>
         <div id="terraformBox"></div>
-        <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 0.5rem;">
-          <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
-          <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
-          <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
-        </div>
         <div id="colonyNoteBox" style="display:flex; gap:8px; margin:0 0 1rem;">
           <input type="text" id="colonyNoteInput" placeholder="Kurze Notiz zu diesem Standort (optional)…" maxlength="48" style="flex:1;"/>
           <button id="colonyNoteSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Notiz</button>
@@ -4218,6 +4227,15 @@
              weit von den eigentlichen Gebäuden entfernt). -->
         <div class="qty-select" id="qtySelect"></div>
         <div class="buildings" id="buildings"></div>
+        <!-- ANS ENDE, nicht in die Mitte (Wunsch Sascha, 14.09.2026): Das Namensfeld stand zwischen
+             den Standort-Kaesten und der Gebaeudeliste und schob damit das, was man im Basis-Reiter
+             wirklich sucht, nach unten. Es ist ein Feld, das man einmal ausfuellt - die Gebaeude
+             sind das, weswegen man den Reiter oeffnet. -->
+        <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 0.5rem;">
+          <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
+          <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
+          <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-verteidigung">
@@ -15288,12 +15306,23 @@
     if (!v || !v.eigener){ log('Dort steht kein eigener Vorposten.', 'ti-alert-triangle', 'warn'); return; }
     const res = await backendFetch('/vorposten/reparieren', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) }).catch(() => null);
     const daten = res ? await res.json().catch(() => null) : null;
-    if (!res || !res.ok){ log((daten && daten.error) || 'Der Server hat die Reparatur abgelehnt.', 'ti-alert-triangle', 'warn'); return; }
+    if (!res || !res.ok){
+      log((daten && daten.error) || 'Der Server hat die Reparatur abgelehnt.', 'ti-alert-triangle', 'warn');
+      /* NACH EINER ABLEHNUNG NEU LADEN (Durchsicht 14.09.2026). Drei der acht Ablehnungen heissen
+         der Sache nach „dein Zwischenspeicher ist alt": Kern unversehrt, Station gesperrt, Lager
+         leer. Wer nur zurueckkehrt, laesst den Spieler auf genau die veralteten Zahlen schauen,
+         die ihn zum Klick verleitet haben - und der naechste Klick faende dieselbe Ablehnung. */
+      await ladeVorposten(); render();
+      return;
+    }
     /* Beide Zahlen kommen aus der ANTWORT und werden nicht auseinander abgeleitet: Der Server
        rundet die drei Rohstoffe einzeln, deshalb kann der Verbrauch die Heilung um wenige
        Einheiten uebersteigen - nie zugunsten des Besitzers. Wer eine aus der anderen rechnete,
        zeigte eine Zahl, die der Server nie geschickt hat. */
-    log('Kern um ' + fmt(daten.geheilt || 0) + ' wiederhergestellt – verbraucht: ' + vorpostenLagerText(daten.verbraucht) + '.', 'ti-refresh', 'good');
+    /* `daten` kann trotz res.ok null sein - wenn die Antwort kein gueltiges JSON traegt, faengt
+       das .catch oben sie ab. Ohne die Absicherung flaege hier ein TypeError, und das Neuladen
+       darunter bliebe aus: Der Kern waere geheilt, das Spiel wuesste es nicht. */
+    log('Kern um ' + fmt((daten && daten.geheilt) || 0) + ' wiederhergestellt – verbraucht: ' + vorpostenLagerText(daten && daten.verbraucht) + '.', 'ti-refresh', 'good');
     await ladeVorposten(); render(); save();
   }
   /* Die Steckplatz-Verwaltung. Bewusst ein eigenes Fenster statt eines weiteren Kartenmenue-
@@ -70389,13 +70418,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
          zweite Entscheidung. */
       if (vorpostenCache.reparaturAktiv){
         const rep = v.reparatur || {};
+        /* DIE SPERRE KOMMT AUS DEM ZEITSTEMPEL, nicht aus dem Schnappschuss (Durchsicht
+           14.09.2026). `rep.gesperrt` und `rep.moeglich` sind der Stand zum Zeitpunkt des
+           Katalog-Abrufs, und der liegt bis zu zwei Minuten zurueck; die Sperre selbst dauert
+           vier Stunden. Laeuft sie zwischen zwei Abrufen ab, blieben beide auf dem alten Wert
+           stehen - der Knopf waere grau und daneben stuende „reparieren geht in 0s", weil
+           fmtDuration die negative Differenz auf null kappt. Dieselbe Anzeige entstuende
+           dauerhaft, wenn die Uhr des Geraets vorgeht.
+           Genau darum leiten ALLE Nachbarn hier aus Zeitstempeln ab (Bauschutz, Angriff,
+           Umruestung, Abbau, Umbenennungsfrist). Das ist keine zweite Entscheidung: `moeglich`
+           ist serverseitig `aktiv && !gesperrt && heilung > 0` - hier stehen dieselben drei
+           Teile, nur mit der frischeren Uhr. Autoritaet bleibt der Server, er prueft beim
+           Request erneut. */
+        const repGesperrt = rep.gesperrtBis ? (rep.gesperrtBis > jetzt) : !!rep.gesperrt;
         let repGrund, repSperre = true;
         if (!(rep.fehlend > 0)) repGrund = 'Der Kern ist unversehrt.';
-        else if (rep.gesperrt) repGrund = 'Steht noch unter Beschuss – reparieren geht in ' + fmtDuration(((rep.gesperrtBis || 0) - jetzt)/1000) + '.';
+        else if (repGesperrt) repGrund = 'Steht noch unter Beschuss – reparieren geht in ' + fmtDuration(((rep.gesperrtBis || 0) - jetzt)/1000) + '.';
         else if (!(rep.heilung > 0)) repGrund = 'Im Lager dieser Station liegt nichts, woraus sich reparieren ließe.';
         else { repGrund = 'Stellt ' + fmt(rep.heilung) + ' Kernpunkte her und verbraucht dafür ' + vorpostenLagerText(rep.kosten) + ' aus dem Stationslager. Wirkt sofort, ohne Flottenslot.'; repSperre = false; }
         eintraege.push({ icon:'ti-refresh', label:'Kern reparieren', grund: repGrund,
-          disabled: repSperre || !rep.moeglich, fn: () => vorpostenReparieren(sysId) });
+          disabled: repSperre || !rep.aktiv, fn: () => vorpostenReparieren(sysId) });
       }
       eintraege.push({ icon:'ti-adjustments', label: slots ? 'Steckplätze (' + drin + '/' + slots + ')' : 'Steckplätze',
         grund: slots ? 'Module einbauen, ausbauen oder in der Schmiede bauen.' : 'Gibt es ab Stufe ' + (vorpostenCache.zweigAb || 4) + '.',
@@ -70543,7 +70585,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
          Menue, deshalb `escapeHtml` um den eingesetzten Text. */
       + ((vorpostenCache.reparaturAktiv && v.eigener && ((v.reparatur||{}).fehlend > 0))
           ? `<div class="bmeta" data-vp-reparatur="${(v.reparatur||{}).heilung||0}"><i class="ti ti-refresh" aria-hidden="true" style="color:#5dcaa5;"></i> Reparatur: ${
-              (v.reparatur||{}).gesperrt
+              ((v.reparatur||{}).gesperrtBis ? ((v.reparatur||{}).gesperrtBis > jetzt) : !!(v.reparatur||{}).gesperrt)
                 ? `gesperrt – noch <strong>${fmtDuration(((((v.reparatur||{}).gesperrtBis)||0) - jetzt)/1000)}</strong> unter Beschuss`
                 : (((v.reparatur||{}).heilung||0) > 0
                     ? `<strong>${fmt((v.reparatur||{}).heilung)}</strong> Kernpunkte aus dem Stationslager – kostet ${escapeHtml(vorpostenLagerText((v.reparatur||{}).kosten))}`

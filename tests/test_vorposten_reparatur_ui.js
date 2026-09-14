@@ -100,6 +100,14 @@ check('0a: es gibt GENAU EINE Stelle, die den Reparatur-Endpunkt ruft',
 /* 1a ist der Waechter, den es fuer die Abholung nicht gab: Beide Felder sind die Schnittstelle
    zum Server. Verschwindet eines - etwa durch einen Tippfehler beim naechsten Umbau -, faellt der
    Knopf still aus, ohne dass eine Browser-Pruefung das zwingend bemerkt. */
+/* 1b/1c: Die beiden Textstellen, die diese Aenderung mitgezogen hat. „Ein Ausbau heilt nicht"
+   steht an ZWEI Orten; wer spaeter einen davon umformuliert, ohne den anderen, erzeugt genau den
+   Widerspruch, den die Hausregel verbietet. Und der Hilfe-Absatz ist die einzige Stelle, die
+   erklaert, WER reparieren darf. */
+check('1b: die Ausbau-Rueckfrage nennt die Reparatur aus dem Stationslager',
+  /Ein Ausbau heilt nicht[^']*Reparatur aus dem Stationslager/.test(JS), {});
+check('1c: der Vorposten-Hilfetext nennt das Reparieren UND wer es darf',
+  /reparieren<\/strong> l[^<]*sst sich der Kern/.test(JS) && /nur der <strong>Besitzer<\/strong>/.test(JS), {});
 check('1a: das Spiel liest `reparaturAktiv` (Katalog) UND `.reparatur` (je Station)',
   /\breparaturAktiv\b/.test(JS) && /\.reparatur\b/.test(JS),
   { aktiv: /\breparaturAktiv\b/.test(JS), jeStation: /\.reparatur\b/.test(JS) });
@@ -114,6 +122,7 @@ const STUFEN = [1,2,3,4,5,6,7,8].map(s => ({ stufe:s, name:'Stufe '+s, kernLp:20
    "nachgerechnet" unterscheiden. */
 // Unter 1000, weil fmt() erst darueber kuerzt ("2.7k"): Nur ungekuerzte Zahlen lassen 5b
 // zwischen "aus der Antwort gelesen" und "nachgerechnet" unterscheiden.
+const ABLEHNUNG = 'Im Lager dieser Station liegt nichts, woraus sich reparieren ließe.';
 const HEILUNG = 437;
 const KOSTEN = { erz: 281, kristalle: 94, deuterium: 75 };   // Summe 450, absichtlich nicht 437
 function rep(over){
@@ -164,6 +173,7 @@ function spielstand(){
       if (p === 'vorposten/reparieren'){
         reparaturRufe++;
         try { reparaturBody = JSON.parse(req.postData() || '{}'); } catch(e){ reparaturBody = null; }
+        if (opt.ablehnen) return j({ error: ABLEHNUNG, leer: true }, 400);
         return j({ ok:true, geheilt: HEILUNG, verbraucht: KOSTEN, vorposten: vpDoc });
       }
       if (p === 'vorposten'){
@@ -193,7 +203,19 @@ function spielstand(){
         return st[k] === undefined ? j({ error:'nix' }, 404) : j({ value: st[k] }); }
       return j({ ok:true });
     });
-    await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); window.confirm = () => true; });
+    /* DIE MELDUNG WIRD MITGESCHNITTEN, nicht am Ende abgelesen: `log()` schreibt per innerHTML und
+       ueberschreibt sich selbst, und in einem Idle-Spiel rollt jede Meldung weiter. Wer den
+       Endzustand liest, misst „stand am Ende noch da", nicht „ist erschienen". */
+    await page.addInitScript(() => {
+      localStorage.setItem('kepler7_token', 'tok'); window.confirm = () => true;
+      window.__logMit = [];
+      document.addEventListener('DOMContentLoaded', () => {
+        const l = document.getElementById('log');
+        if (!l) return;
+        new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes)
+          window.__logMit.push((n.textContent || '').replace(/\s+/g, ' ').trim()); }).observe(l, { childList:true, subtree:true });
+      });
+    });
     await page.goto(SPIEL_URL); await page.waitForTimeout(6000);
     await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
       .forEach(id => { const n = document.getElementById(id); if (n) n.style.display = 'none'; }));
@@ -240,8 +262,9 @@ function spielstand(){
       });
       await page.waitForTimeout(2500);
     }
+    const meldungen = await page.evaluate(() => window.__logMit || []);
     await ctx.close();
-    return Object.assign(g, { errs, reparaturBody, reparaturRufe, vorpostenAbrufe, abrufeVorKlick });
+    return Object.assign(g, { errs, reparaturBody, reparaturRufe, vorpostenAbrufe, abrufeVorKlick, meldungen });
   }
 
   // ---- 2: der Eintrag selbst
@@ -271,8 +294,21 @@ function spielstand(){
     e.knopfDa === true && e.gesperrt === true && /1h 1[0-9]m/.test(e.grund || ''), { grund:e.grund });
 
   const f = await messe(vp({ reparatur: rep({ heilung:0, kosten:{}, vorrat:0, moeglich:false }) }));
-  check('3c: leeres Stationslager - gesperrt, und der Grund nennt das Lager',
-    f.knopfDa === true && f.gesperrt === true && /Lager/i.test(f.grund || ''), { grund:f.grund });
+  /* DEN EIGENEN SATZ, NICHT DIE SILBE (Durchsicht 14.09.2026, Schwere hoch). Die erste Fassung
+     suchte /Lager/i - und das Wort steht auch im Erfolgsgrund („aus dem Stationslager"). Faellt
+     der dritte Zweig ersatzlos weg, greift dort der Erfolgszweig, der Grund enthaelt weiter
+     „Lager", und die Pruefung waere gruen geblieben. Jetzt steht der eigene Satz drin. */
+  check('3c: leeres Stationslager - gesperrt, und der Grund nennt SEINEN eigenen Satz',
+    f.knopfDa === true && f.gesperrt === true && /liegt nichts, woraus/.test(f.grund || ''), { grund:f.grund });
+
+  /* 3d: DIE SPERRE LAEUFT AB, WAEHREND DER ZWISCHENSPEICHER STEHT. Der Server hat `gesperrt:true`
+     und `moeglich:false` geschickt, aber `gesperrtBis` liegt inzwischen in der Vergangenheit -
+     genau die Lage nach jeder Belagerung, weil der Katalog nur alle zwei Minuten frisch wird und
+     die Sperre vier Stunden dauert. Wer die Booleans abschreibt, zeigt einen grauen Knopf mit
+     „reparieren geht in 0s". */
+  const h = await messe(vp({ reparatur: rep({ gesperrt:true, gesperrtBis: now - 60000, moeglich:false }) }));
+  check('3d: abgelaufene Sperre - der Knopf ist wieder benutzbar, obwohl der Server noch gesperrt meldete',
+    h.knopfDa === true && h.gesperrt === false && !/0s/.test(h.grund || ''), { grund:h.grund, gesperrt:h.gesperrt });
 
   // ---- 4: die Info-Zeile
   check('4a: die Info-Zeile nennt die Heilung UND die Kosten',
@@ -280,6 +316,10 @@ function spielstand(){
     { zeile:a.zeile, heilung:a.zeileHeilung });
   check('4b: am fremden Vorposten steht die Info-Zeile nicht',
     c.zeileDa === false, { zeile:c.zeile });
+  /* Die Zeile haengt an DREI Bedingungen (Schalter, eigener Vorposten, beschaedigter Kern). 4a/4b
+     bewachten nur zwei davon - die dritte war ungeprueft (Durchsicht 14.09.2026). */
+  check('4c: bei ausgeschaltetem Schalter fehlt auch die Info-Zeile', b.zeileDa === false, { zeile:b.zeile });
+  check('4d: am unversehrten Kern fehlt die Info-Zeile', d.zeileDa === false, { zeile:d.zeile });
 
   // ---- 5: was ueber die Leitung geht
   const k = await messe(vp(), { klicken:true });
@@ -291,14 +331,30 @@ function spielstand(){
   check('5a: der Request traegt GENAU {system} - kein Betrag, keine Menge',
     !!k.reparaturBody && Object.keys(k.reparaturBody).length === 1 && k.reparaturBody.system === SYS,
     { body:k.reparaturBody });
-  /* 5b: HEILUNG und die Summe von KOSTEN sind absichtlich ungleich (4321 gegen 4347). Ein
-     Frontend, das die Kosten aus der Heilung ableitet, zeigte hier 4321 Erz - eine Zahl, die der
-     Server nie geschickt hat. */
+  /* 5b: HEILUNG und die Summe von KOSTEN sind absichtlich ungleich - gemessen 437 gegen 450. Ein
+     Frontend, das die Kosten aus der Heilung ableitet, zeigte hier „437 Erz" statt „281 Erz" -
+     eine Zahl, die der Server nie geschickt hat. */
   check('5b: die Kostenzahl ist NICHT aus der Heilung abgeleitet',
     !!a.grund && a.grund.indexOf('281 Erz') >= 0 && a.grund.indexOf('437 Erz') < 0,
     { grund:a.grund });
   check('6a: nach dem Klick werden die Vorposten NEU geladen',
     k.vorpostenAbrufe > k.abrufeVorKlick, { vorher:k.abrufeVorKlick, nachher:k.vorpostenAbrufe });
+  /* 6b: Der Klickpfad prueft sonst nur das OB, nicht das WAS (Durchsicht 14.09.2026). Die
+     Erfolgsmeldung muss BEIDE Zahlen der ANTWORT tragen - und zwar die aus der Antwort, nicht die
+     aus der Vorschau. Beide sind hier zufaellig gleich; entscheidend ist, dass sie ueberhaupt
+     erscheinen und nicht auseinander abgeleitet sind. */
+  const erfolg = (k.meldungen || []).filter(m => /wiederhergestellt/.test(m)).pop() || '';
+  check('6b: die Erfolgsmeldung nennt die geheilten Punkte UND den Verbrauch aus der Antwort',
+    erfolg.indexOf(String(HEILUNG)) >= 0 && erfolg.indexOf('281 Erz') >= 0, { meldung:erfolg });
+  /* 6c: Der Ablehnungsweg. Der Servertext gewinnt - das Spiel bildet keinen der acht Fehlerfaelle
+     nach -, und danach wird NEU GELADEN, weil drei der acht Ablehnungen heissen „dein
+     Zwischenspeicher ist alt". */
+  const ab = await messe(vp(), { klicken:true, ablehnen:true });
+  const abMeldung = (ab.meldungen || []).filter(m => /reparieren/i.test(m)).pop() || '';
+  check('6c: bei Ablehnung steht der SERVERTEXT im Spiel, nicht eine eigene Nachbildung',
+    abMeldung.indexOf('liegt nichts, woraus') >= 0, { meldung:abMeldung });
+  check('6d: auch nach einer Ablehnung werden die Vorposten neu geladen',
+    ab.vorpostenAbrufe > ab.abrufeVorKlick, { vorher:ab.abrufeVorKlick, nachher:ab.vorpostenAbrufe });
 
   check('J1: keine JS-Fehler', a.errs.length === 0 && k.errs.length === 0, a.errs.slice(0,3).concat(k.errs.slice(0,3)));
   await browser.close();

@@ -376,11 +376,13 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     await ctx.close();
   }
 
-  // ---- 6: Der Extremfall - gekuerzt ist erlaubt, FALSCH nicht.
-  // Ab 1e12 steht dort "3212900.00M" (fmt kennt kein B/T), und keine Schriftgroesse und kein
-  // Polster der Welt bringen das in eine 116-px-Karte. Die Zusage ist deshalb nicht "passt immer",
-  // sondern: Der Wert wird sichtbar GEKUERZT (Ellipse) statt nach links unter das Symbol zu
-  // wandern, wo er sich als plausible kleinere Zahl laese - und der volle Betrag steht im Titel.
+  // ---- 6: Der Extremfall - und seit der Chip-Fassung eine STAERKERE Zusage.
+  // Ab 1e12 steht dort "3212900.00M" (fmt kennt kein B/T). Solange die Leiste ein Raster aus sechs
+  // gleich breiten Spalten war, passte das in keine Karte, und die Zusage lautete nur: sichtbar
+  // gekuerzt statt nach links unter das Symbol gewandert. Seit die Chips mit ihrer Zahl WACHSEN,
+  // gilt mehr - gemessen am 14.09.2026 bei 1310 px: Der Chip wird 129 statt 106 px breit, die
+  // Leiste bleibt 30 px hoch und einreihig, und NICHTS wird gekuerzt. Die Pruefung haelt deshalb
+  // jetzt das Staerkere fest; faellt sie zurueck auf feste Spalten, faellt 6b.
   {
     const riesig = JSON.parse(SPIELSTAND);
     Object.keys(riesig.resources).forEach(k => { if (k !== 'kristalle') riesig.resources[k] *= 1000; });
@@ -389,9 +391,9 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     const e = m.resbar.alle.find(k => k.res === 'energie');
     P.check('6a@1310 der riesige Betrag ist wirklich riesig (sonst prueft 6b/6c nichts)',
       /^\d{5,}/.test(e.wert.replace(/[.,]/g,'')), e.wert);
-    P.check('6b@1310 er wird sichtbar GEKUERZT statt nach links aus der Karte zu wandern',
-      m.resbar.randRaus.length === 0 && m.resbar.schnitt.length > 0,
-      { randRaus:m.resbar.randRaus, gekuerzt:m.resbar.schnitt });
+    P.check('6b@1310 er steht VOLLSTAENDIG da - der Chip waechst mit, statt die Zahl zu kuerzen',
+      m.resbar.randRaus.length === 0 && m.resbar.schnitt.length === 0 && m.resbar.rasterRaus === 0,
+      { randRaus:m.resbar.randRaus, gekuerzt:m.resbar.schnitt, rasterRaus:m.resbar.rasterRaus });
     P.check('6c@1310 der volle Betrag steht trotzdem im Titel',
       zahlen(e.wert).every(z => zahlen(e.titel).includes(z)), { titel:e.titel, wert:e.wert });
     await ctx.close();
@@ -411,13 +413,18 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     await ctx.close();
   }
   // Die Grenze selbst: 1000 gehoert noch dem alten Stand, 1001 der Verdichtung
-  // (COMPACT_HEAD_MAX_WIDTH + 1). Eine eingetippte Zahl waere hier wertlos, wenn die Konstante
-  // wandert - deshalb liest die Pruefung sie aus der Spieldatei.
+  // (COMPACT_HEAD_MAX_WIDTH + 1).
+  // GEMESSEN WIRD DIE KARTENHOEHE, NICHT DIE SPALTENZAHL (Nachtrag 14.09.2026): Seit die Leiste
+  // die Form der Werkstoff-Chips traegt, ist sie kein Raster mehr, und `gridTemplateColumns`
+  // meldet dort gar keine Spalten. Eine Pruefung auf "sechs Spalten" haette also die FORM
+  // festgeschrieben statt die Zusage - und waere an einer richtigen Aenderung gefallen. Die
+  // Zusage ist: unterhalb der Grenze die alte, hohe Karte (gemessen 73 px), oberhalb die flache
+  // (gemessen 30 px). Die Schwelle 50 liegt zwischen beiden, nicht auf einer von ihnen.
   for (const [breite, verdichtet] of [[1000,false],[1001,true]]) {
     const { ctx, page } = await laden(breite, 900, { compactHead:false });
     const m = await page.evaluate(MESSEN);
-    P.check('5d@'+breite+' '+(verdichtet?'verdichtet':'alter Stand')+' - sechs Spalten: '+verdichtet,
-      (m.resbar.spalten === 6) === verdichtet, { spalten:m.resbar.spalten, kartenH:m.resbar.kartenH });
+    P.check('5d@'+breite+' '+(verdichtet?'verdichtet':'alter Stand')+' - flache Karte: '+verdichtet,
+      (m.resbar.kartenH <= 50) === verdichtet, { kartenH:m.resbar.kartenH, zeilen:m.resbar.zeilen });
     await ctx.close();
   }
 
