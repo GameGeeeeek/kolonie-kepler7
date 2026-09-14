@@ -79880,24 +79880,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
      der die Taste nimmt, wenn kein Fenster darueber sie beansprucht hat. Er fragt seit dem
      13.09.2026 trotzdem, aber nur nach `verdeckt' - siehe fensterLage() und den Boden selbst.
 
-     WAS HIER NOCH EIN ZWEITES MAL STEHT, UND WARUM ES STEHENBLEIBT: Die Statustafel bringt mit
-     statustafelObenauf() eine zeichengleiche Kopie dieser Messung mit. Ihr einziger Unterschied
-     ist ein vorgeschaltetes statustafelSichtbar() - und das aendert GEMESSEN nichts: Bei 390 px
-     mit zugeklappter Tafel steht der gerechnete display-Wert auf `none', das Rechteck ist
-     [0,0,0,0], und damit greift schon `re <= l' hier eine Zeile weiter unten. Beide Fassungen
-     antworten in jeder gemessenen Lage gleich; die Tafel koennte also `escapeAusgang(
-     statustafelOffen, closeFpPanel, () => fpPanelEl)' benutzen. Sie tut es nicht, weil UI-8 ihren
-     Lauscher und ihre Messung ausdruecklich unangetastet laesst (Vertrag UI-8, Abschnitt D) -
-     nicht, weil der Unterschied gebraucht wuerde. Das kostet mehr als Doppelung: Unter den heute
-     ohne Kunstgriff erreichbaren Fensterpaaren ist Tafel gegen Kampf-Wiedergabe das einzige, bei
-     dem die Obenauf-Messung anders entscheidet als die Registrierungsreihenfolge (beide z-index
-     210, die Wiedergabe malt spaeter) - und genau das laeuft an dieser Hausform vorbei, weil die
-     Tafel ihre eigene Kopie benutzt. Die Zeile hier ist deshalb NICHT unbewacht: Legt man eine
-     kuenstliche Ebene ueber ein offenes Fenster, entscheidet sie sichtbar. GEMESSEN am 13.09.2026
-     auf 390x844, Fangschirm (position:fixed; inset:0; z-index:9999; opacity:0) ueber der offenen
-     Kampf-Wiedergabe: Mit Messung blieb die Wiedergabe stehen und die Taste ging weiter, ohne
-     Messung nahm die Wiedergabe sie. Bewacht in tests/test_escape_fenster.js (1d, Gegenprobe
-     `sabBlind'); der Beleg fuer die Tafel-Lage steht in tests/test_statustafel.js (3h/3i). */
+     WAS HIER FRUEHER EIN ZWEITES MAL STAND (aufgeraeumt 14.09.2026): Die Statustafel brachte mit
+     statustafelObenauf() eine zeichengleiche Kopie dieser Messung mit - derselbe Zuschnitt aufs
+     Bild, dieselbe `nichts im Bild'-Abkuerzung, dieselbe Frage an elementFromPoint. Ihr einziger
+     Unterschied war ein vorgeschaltetes statustafelSichtbar(), und das aendert GEMESSEN nichts:
+     Bei zugeklappter Tafel steht der gerechnete display-Wert auf `none', das Rechteck ist
+     [0,0,0,0], und damit greift schon `re <= l' hier eine Zeile weiter unten. Die Kopie ist weg;
+     statustafelObenauf() ruft jetzt fensterObenauf(fpPanelEl) und behaelt nur seinen
+     Sichtbarkeits-Riegel, der den Layout-Durchlauf spart. Ihr LAUSCHER bleibt unangetastet, wo er
+     ist - die Reihenfolge der Kette ist der Gleichstands-Entscheid.
+     WARUM DAS MEHR WAR ALS DOPPELUNG: Unter den heute ohne Kunstgriff erreichbaren Fensterpaaren
+     ist Tafel gegen Kampf-Wiedergabe das einzige, bei dem die Obenauf-Messung anders entscheidet
+     als die Registrierungsreihenfolge (beide z-index 210, die Wiedergabe malt spaeter) - und
+     genau dieser Fall lief an der gemeinsamen Messung vorbei, solange die Tafel ihre eigene Kopie
+     benutzte. Jetzt nicht mehr.
+     Die Zeile hier ist NICHT unbewacht: Legt man eine kuenstliche Ebene ueber ein offenes Fenster,
+     entscheidet sie sichtbar. GEMESSEN am 13.09.2026 auf 390x844, Fangschirm (position:fixed;
+     inset:0; z-index:9999; opacity:0) ueber der offenen Kampf-Wiedergabe: Mit Messung blieb die
+     Wiedergabe stehen und die Taste ging weiter, ohne Messung nahm die Wiedergabe sie. Bewacht in
+     tests/test_escape_fenster.js (1d, Gegenprobe `sabBlind'); der Beleg fuer die Tafel-Lage steht
+     in tests/test_statustafel.js (3h/3i). */
   /* ZWEI AUSKUENFTE STATT EINER (Durchsicht 13.09.2026). Die Messung unterscheidet seither, WARUM
      eine Stelle nicht dem Element gehoert:
        `weg'      kein Pixel im Bild - das Element ist gar nicht auf dem Schirm.
@@ -82070,15 +82072,19 @@ function sekSternUse(key, x, y, k, unentdeckt){
      elementFromPoint). Er laeuft ausschliesslich bei gedruecktem Escape UND aufgeklappter
      Tafel, also hoechstens einmal je Tastendruck - nie im Takt und nie beim Zeichnen.
      GEMESSEN am 13.09.2026: 0,004 ms je Aufruf (Mittel aus 200, 390x844, aufgeklappte Tafel). */
+  /* EINE Messung, nicht zwei (Hausputz 14.09.2026). Hier stand bis dahin der Rumpf von
+     fensterLage() ein zweites Mal - Zeichen fuer Zeichen dieselbe Rechnung: derselbe Zuschnitt
+     aufs Bild, dieselbe `nichts im Bild'-Abkuerzung, dieselbe Frage an elementFromPoint, dieselbe
+     contains-Pruefung. Zwei Kopien einer Messung sind genau die Fehlerklasse, die dieses Projekt
+     wiederholt getroffen hat: Wer die eine repariert, verfehlt die andere still.
+     Der Lauscher der Tafel bleibt, wo er ist. Nur der Rumpf delegiert - die Reihenfolge der
+     Escape-Kette ist der Gleichstands-Entscheid und wird hier ausdruecklich NICHT angefasst.
+     statustafelSichtbar() bleibt vorgeschaltet: Es aendert das Ergebnis gemessen nicht (bei
+     zugeklappter Tafel ist das Rechteck [0,0,0,0], damit greift schon `re <= l' in fensterLage),
+     spart aber den Layout-Durchlauf, wenn die Tafel gar nicht offen ist. */
   function statustafelObenauf(){
-    if (!fpPanelEl || !statustafelSichtbar()) return false;
-    const r = fpPanelEl.getBoundingClientRect();
-    const l = Math.max(r.left, 0), o = Math.max(r.top, 0);
-    const re = Math.min(r.right, window.innerWidth), u = Math.min(r.bottom, window.innerHeight);
-    // Nichts von der Tafel im Bild: dann ist sie auch kein Fenster, das die Taste verdient.
-    if (re <= l || u <= o) return false;
-    const oben = document.elementFromPoint((l + re) / 2, (o + u) / 2);
-    return !!oben && (oben === fpPanelEl || fpPanelEl.contains(oben));
+    if (!statustafelSichtbar()) return false;
+    return fensterObenauf(fpPanelEl);
   }
   function openFpPanel(){
     if (fpPanelEl) fpPanelEl.classList.add('fp-mobile-open');
