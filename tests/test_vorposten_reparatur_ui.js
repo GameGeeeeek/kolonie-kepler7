@@ -32,36 +32,46 @@
 //   5b      Die Kostenzahl ist NICHT aus der Heilung abgeleitet.
 //   6a      Nach dem Klick wird GET /api/vorposten erneut gerufen.
 //
-// GEGENPROBEN (Spieldatei per KEPLER_SPIELDATEI auf eine sabotierte Kopie umlenken). Die Liste
-// ist GEMESSEN am 14.09.2026, nicht geschaetzt: Exit 1 allein genuegt nicht, es muessen GENAU
-// diese Pruefungen fallen. Alle vierzehn Staende tragen dieselben Pruefnamen wie der gruene Lauf
-// (per diff verglichen, nicht gezaehlt).
+// GEGENPROBEN (Spieldatei per KEPLER_SPIELDATEI auf eine sabotierte Kopie umlenken). Die Liste ist
+// GEMESSEN am 14.09.2026 gegen DIESE Fassung des Tests - Exit 1 allein genuegt nicht, es muessen
+// GENAU diese Pruefungen fallen. Alle siebzehn Staende tragen dieselben 30 Pruefnamen wie der
+// gruene Lauf (per diff verglichen, nicht gezaehlt).
 //
-//   Stand           sabotiert                                 es fallen
-//   sabZweiterRuf   eine zweite Kopie des Aufrufs             0a
-//   sabName         Funktion umbenannt                        0-anker, 0c, 0d
-//   sabBucht        pay(daten.verbraucht) eingesetzt          0b
-//   sabOhneCatch    .catch(() => null) entfernt               0c
-//   sabOhneLaden    ladeVorposten() entfernt                  0d, 6a
-//   sabClaim        claimPendingRewards() eingesetzt          0e
-//   sabOhneSchalter der reparaturAktiv-Riegel entfernt        2b
-//   sabFremd        derselbe Eintrag auch im fremden Zweig    2c
-//   sabGrundTausch  Grund-Kette umsortiert                    3a
-//   sabFesteZeit    feste Zahl statt gesperrtBis              3b
-//   sabOhneKosten   kosten aus der Info-Zeile entfernt        4a
-//   sabZeileFremd   v.eigener aus der Zeilenbedingung raus    4b
-//   sabZweitesFeld  zweites Feld im Body                      5a
-//   sabAusHeilung   Kosten aus heilung abgeleitet             2a2, 5b
+//   Stand             sabotiert                                      es fallen
+//   sabZweiterRuf     eine zweite Kopie des Aufrufs                  0a
+//   sabName           Funktion umbenannt                             0-anker, 0c, 0d
+//   sabBucht          pay(daten.verbraucht) eingesetzt               0b
+//   sabOhneCatch      .catch(() => null) entfernt                    0c
+//   sabOhneLaden      Neuladen im ERFOLGSpfad entfernt               0d, 6a
+//   sabOhneNachladen  Neuladen im ABLEHNUNGSpfad entfernt            0d, 6d
+//   sabClaim          claimPendingRewards() eingesetzt               0e
+//   sabOhneSchalter   der reparaturAktiv-Riegel entfernt             2b
+//   sabFremd          derselbe Eintrag auch im fremden Zweig         2c
+//   sabGrundTausch    Grund-Kette umsortiert                         3a
+//   sabDritterZweig   der dritte Grund-Zweig geloescht               3c
+//   sabFesteZeit      Sperre wieder aus dem Schnappschuss            3d
+//   sabOhneKosten     kosten aus der Info-Zeile entfernt             4a
+//   sabZeileFremd     v.eigener aus der Zeilenbedingung raus         4b
+//   sabZweitesFeld    zweites Feld im Body                           5a
+//   sabAusHeilung     Kosten aus heilung abgeleitet                  2a2, 5b
+//   sabTextAusbau     der Zusatz in der Ausbau-Rueckfrage entfernt   1b
+//
+// DREI STAENDE GAB ES IN DER ERSTEN FASSUNG NICHT - sie sind das Ergebnis der adversarischen
+// Durchsicht, und jeder deckt eine Pruefung auf, die vorher aus dem falschen Grund gruen war:
+//   * sabDritterZweig: 3c suchte die Silbe „Lager" - die steht auch im Erfolgsgrund. Faellt der
+//     dritte Zweig ersatzlos weg, greift der Erfolgszweig, und die Pruefung waere gruen geblieben.
+//   * sabFesteZeit: 3d gab es gar nicht. Die Sperre kam aus dem Server-Schnappschuss, und der ist
+//     bis zu zwei Minuten alt, waehrend die Sperre vier Stunden dauert.
+//   * sabOhneLaden: 0d verlangte EIN Vorkommen von ladeVorposten() - und seit auch der
+//     Ablehnungspfad neu laedt, war das schon durch ihn erfuellt. Jetzt sind es zwei.
 //
 // ZWEI EHRLICHE EINSCHRAENKUNGEN, beide gemessen:
 //   * sabName laesst 0b und 0e NICHT fallen. Beide sind VERNEINUNGEN ("bucht nichts", "ruft
 //     keinen Claim"), und an einem leeren Rumpf sind Verneinungen wahr. Genau dafuer gibt es
-//     0-anker: Er faellt zuerst und sagt, dass die beiden nichts mehr messen. Wer 0-anker
-//     entfernt, macht 0b/0e still wertlos.
+//     0-anker: Er faellt zuerst und sagt, dass die beiden nichts mehr messen.
 //   * sabGrundTausch laesst nur 3a fallen, nicht auch 3c. Die vertauschte Kette liefert fuer den
-//     Fall "leeres Lager" zufaellig denselben Text - die Reihenfolge ist damit an ihrem ERSTEN
-//     Glied bewacht, nicht an jedem. Ein eigener Stand fuer 3c waere eine zweite Sabotage
-//     derselben Zeile und haette nichts Neues gezeigt.
+//     Fall „leeres Lager" zufaellig denselben Text - die Reihenfolge ist an ihrem ERSTEN Glied
+//     bewacht, den dritten Zweig bewacht stattdessen sabDritterZweig.
 const fs = require('fs');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
