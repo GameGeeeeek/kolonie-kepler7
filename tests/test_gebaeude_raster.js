@@ -245,12 +245,20 @@ const LESEN_BASIS = () => {
       const hoehen = gruppe.map(k => Math.round(k.getBoundingClientRect().height));
       const max = Math.max.apply(null, hoehen);
       hoehen.forEach(h => { verschenkt += max - h; if (max - h > groessteLuecke) groessteLuecke = max - h; });
-      const knopfOben = gruppe.map(k => { const l = k.lastElementChild;
+      /* DIE UNTERKANTE, NICHT DIE OBERKANTE (berichtigt 14.09.2026). Die erste Fassung mass die
+         Oberkante der Knopfbloecke - und war damit im Basis-Raster nur deshalb gruen, weil dort
+         alle Knopfbloecke gleich hoch sind. Im Verteidigungs-Raster bei 1000 px stehen in einer
+         Reihe ein Block mit zwei Knopfzeilen (60 px) und einer mit einer (32 px): gemessen
+         {oben:28, unten:0}. Die Oberkanten unterscheiden sich um genau die Hoehendifferenz,
+         die Unterkanten liegen exakt aufeinander - und die Unterkante ist das, was
+         align-content:space-between zusagt. Die alte Pruefung haette hier auf richtigem Code
+         geschlagen. */
+      const knopfUnten = gruppe.map(k => { const l = k.lastElementChild;
         return (l && l.tagName === 'DIV' && !l.classList.contains('left') && l.querySelector('button'))
-          ? Math.round(l.getBoundingClientRect().top) : null; }).filter(x => x !== null);
-      if (knopfOben.length < 2) return;
+          ? Math.round(l.getBoundingClientRect().bottom) : null; }).filter(x => x !== null);
+      if (knopfUnten.length < 2) return;
       reihenMitKnopf++;
-      const spanne = Math.max.apply(null, knopfOben) - Math.min.apply(null, knopfOben);
+      const spanne = Math.max.apply(null, knopfUnten) - Math.min.apply(null, knopfUnten);
       if (spanne > 1) { reihenVersetzt++; if (versatz.length < 5) versatz.push(spanne); }
     });
   });
@@ -432,7 +440,7 @@ const LESEN_SCHLANGE = () => {
     const z1 = (await page.evaluate(LESEN_BASIS)) || { gruppen: [], knoepfeAusserhalb: [] };
     merke('5f: bei 1400 px fuellt jede Kachel ihre Rasterreihe - keine verschenkte Flaeche',
       z0.verschenkt === 0, { verschenkt: z0.verschenkt, groessteLuecke: z0.groessteLuecke });
-    merke('5g: bei 1400 px liegen die Knopfreihen einer Rasterreihe auf einer Linie',
+    merke('5g: bei 1400 px enden die Knopfreihen einer Rasterreihe auf einer Linie',
       z0.reihenMitKnopf > 0 && z0.reihenVersetzt === 0,
       { reihenMitKnopf: z0.reihenMitKnopf, versetzt: z0.reihenVersetzt, spannen: z0.versatz });
     merke('5h: bei 1000 px fuellt jede Kachel ihre Rasterreihe',
