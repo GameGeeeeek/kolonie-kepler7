@@ -34193,8 +34193,34 @@ async function claimPendingRewards(){
   }
   // Verschiebt einen Warteschlangen-Eintrag um eine Position (direction: -1 hoch, +1 runter). Bricht
   // ab und erklärt warum, wenn die neue Reihenfolge eine Voraussetzung verletzen würde.
-  function moveResearchQueueItem(index, direction){
+  /* Die ✕- und Pfeil-Knöpfe beider Warteschlangen trugen bis zum 14.09.2026 nur die POSITION aus
+     der letzten Zeichnung. Verschiebt sich die Liste zwischen Zeichnung und Klick, traf der
+     gemerkte Index einen ANDEREN Eintrag - für den Spieler sah das aus wie „mein Eintrag ist
+     einfach verschwunden", also genau wie der Report, der zu v8.732.0 geführt hat, nur mit anderer
+     Ursache. Das Zeitfenster ist nicht theoretisch: Der Takt arbeitet die Listen nebenher ab, und
+     beim Forschungs-✕ steht sogar eine Rückfrage dazwischen, während der Takt weiterläuft.
+     Jeder Knopf trägt jetzt zusätzlich, WAS an seiner Stelle stand. Stimmt das nicht mehr, wird
+     der erste passende Eintrag genommen; gibt es gar keinen, passiert NICHTS und das Spiel sagt
+     es. Ein Knopf, der im Zweifel nichts tut, ist besser als einer, der im Zweifel das Falsche
+     löscht. Nach JEDER Rückfrage wird erneut aufgelöst - der Dialog ist das Zeitfenster. */
+  function schlangenPosition(liste, i, passt){
+    if (Number.isInteger(i) && i >= 0 && i < liste.length && passt(liste[i])) return i;
+    return liste.findIndex(passt);
+  }
+  function schlangeGeaendert(was){
+    log('Dieser Eintrag steht nicht mehr in der '+was+' - die Liste hat sich inzwischen geändert. Es wurde nichts entfernt.', 'ti-alert-triangle', 'warn');
+    render();
+  }
+  function moveResearchQueueItem(index, direction, key){
     const q = state.researchQueue||[];
+    // Auch das Umsortieren ging nach Position: Rutschte die Schlange zwischen Zeichnung und Klick,
+    // vertauschte der Pfeil zwei fremde Einträge. key ist optional, damit alte Aufrufer (Tests,
+    // künftige Stellen) weiter funktionieren - mit Schlüssel ist es genau.
+    if (key !== undefined){
+      const i = schlangenPosition(q, index, e => e === key);
+      if (i < 0){ schlangeGeaendert('Forschungs-Warteschlange'); return; }
+      index = i;
+    }
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= q.length) return;
     const proposed = q.slice();
@@ -73365,7 +73391,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             // planetDisplayName statt PLANETS.find: kennt eigene Kolonienamen und Monde (vorher
             // stand bei einem Mond-Schlüssel „(undefined)").
             const ortText = q.planet!=='home' ? ' ('+escapeHtml(planetDisplayName(q.planet))+')' : '';
-            return `<span class="bauschlange-chip"><span class="lvl-pill">${i+1}</span><span class="bauschlange-name">${def.name||q.key}${ortText}</span>${zielStufen[i]!==null?`<span class="bauschlange-ziel">→ Lv. ${zielStufen[i]}</span>`:''}<button type="button" aria-label="Aus Bauwarteschlange entfernen" data-buildqueue-remove="${i}"><i class="ti ti-x" aria-hidden="true"></i></button></span>`;
+            return `<span class="bauschlange-chip"><span class="lvl-pill">${i+1}</span><span class="bauschlange-name">${def.name||q.key}${ortText}</span>${zielStufen[i]!==null?`<span class="bauschlange-ziel">→ Lv. ${zielStufen[i]}</span>`:''}<button type="button" aria-label="Aus Bauwarteschlange entfernen" data-buildqueue-remove="${i}" data-bq-key="${escapeHtml(q.key)}" data-bq-planet="${escapeHtml(q.planet)}"><i class="ti ti-x" aria-hidden="true"></i></button></span>`;
           }).join('')}
         </div>
       `);
@@ -73440,9 +73466,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
             return `<div class="card-row" style="padding:0.5rem 0.85rem;${wand?' border-color:rgba(250,199,117,0.45);':''}">
               <div class="left" style="min-width:0;"><span class="lvl-pill">${i+1}</span><div style="min-width:0;"><span class="bname" style="font-size:12.5px;">${r.name||key} → Stufe ${nextLvl}</span>${wandText}${ktoText}</div></div>
               <div style="display:flex; gap:4px;">
-                <button data-researchqueue-up="${i}" ${i===0?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach oben"><i class="ti ti-arrow-up" aria-hidden="true"></i></button>
-                <button data-researchqueue-down="${i}" ${i===rq.length-1?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach unten"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>
-                <button aria-label="Aus Forschungswarteschlange entfernen" data-researchqueue-remove="${i}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
+                <button data-researchqueue-up="${i}" data-rq-key="${escapeHtml(key)}" ${i===0?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach oben"><i class="ti ti-arrow-up" aria-hidden="true"></i></button>
+                <button data-researchqueue-down="${i}" data-rq-key="${escapeHtml(key)}" ${i===rq.length-1?'disabled':''} style="font-size:10px; padding:4px 7px;" aria-label="Nach unten"><i class="ti ti-arrow-up" aria-hidden="true" style="transform:rotate(180deg); display:inline-block;"></i></button>
+                <button aria-label="Aus Forschungswarteschlange entfernen" data-researchqueue-remove="${i}" data-rq-key="${escapeHtml(key)}" style="font-size:10px; padding:4px 8px;"><i class="ti ti-x" aria-hidden="true"></i></button>
               </div>
             </div>`;
           }).join('')}
@@ -78918,11 +78944,19 @@ function sekSternUse(key, x, y, k, unentdeckt){
     });
     document.querySelectorAll('[data-research-queue]').forEach(btn => btn.onclick = () => addToResearchQueue(btn.getAttribute('data-research-queue')));
     document.querySelectorAll('[data-buildqueue-remove]').forEach(btn => btn.onclick = () => {
-      state.buildQueue.splice(parseInt(btn.getAttribute('data-buildqueue-remove'),10), 1);
+      const liste = state.buildQueue || [];
+      const key = btn.getAttribute('data-bq-key'), planet = btn.getAttribute('data-bq-planet');
+      const i = schlangenPosition(liste, parseInt(btn.getAttribute('data-buildqueue-remove'),10),
+        e => !!e && e.key === key && e.planet === planet);
+      if (i < 0){ schlangeGeaendert('Bau-Wunschliste'); return; }
+      liste.splice(i, 1);
       render(); save();
     });
     document.querySelectorAll('[data-researchqueue-remove]').forEach(btn => btn.onclick = () => {
-      const i = parseInt(btn.getAttribute('data-researchqueue-remove'),10);
+      const rqKey = btn.getAttribute('data-rq-key');
+      const i = schlangenPosition(state.researchQueue || [],
+        parseInt(btn.getAttribute('data-researchqueue-remove'),10), e => e === rqKey);
+      if (i < 0){ schlangeGeaendert('Forschungs-Warteschlange'); return; }
       /* Rueckfrage, wenn auf diesem Posten ein Baustellen-Konto liegt, das beim Aufloesen NICHT
          mehr vollstaendig ins Lager passt (B4, 19.08.2026). Das ist kein Sonderfall, sondern der
          Normalfall: Ein Konto sammelt genau fuer einen Posten, dessen Kosten ueber dem Lager
@@ -78932,7 +78966,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
          beim Forschungsabbruch daneben, der seine 50%-Erstattung ebenfalls vorher ansagt. */
       const kd = baustelleKontoVerlust(i);
       if (kd && !confirm('Auf diesem Posten liegt ein Baustellen-Konto. Beim Entfernen kommt es zurück ins Lager – dort passen aber nur ' + kd.passt + '. Verloren gehen: ' + kd.verlust + '. Trotzdem entfernen?')) return;
-      state.researchQueue.splice(i, 1);
+      /* NACH der Rückfrage erneut auflösen: Der offene Dialog ist genau das Zeitfenster, in dem
+         der Takt die Schlange weiterbewegt. Ohne diese zweite Messung hätte die Rückfrage den
+         Fehler nicht nur nicht verhindert, sondern wahrscheinlicher gemacht. */
+      const j = schlangenPosition(state.researchQueue || [], i, e => e === rqKey);
+      if (j < 0){ schlangeGeaendert('Forschungs-Warteschlange'); return; }
+      state.researchQueue.splice(j, 1);
       render(); save();
     });
     /* Der Anteil wird SOFORT wirksam - und der Zwischenspeicher des Zielpostens gehoert
@@ -78946,8 +78985,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
       _bstZiel = null;
       render(); save();
     });
-    document.querySelectorAll('[data-researchqueue-up]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-up'),10), -1));
-    document.querySelectorAll('[data-researchqueue-down]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-down'),10), 1));
+    document.querySelectorAll('[data-researchqueue-up]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-up'),10), -1, btn.getAttribute('data-rq-key')));
+    document.querySelectorAll('[data-researchqueue-down]').forEach(btn => btn.onclick = () => moveResearchQueueItem(parseInt(btn.getAttribute('data-researchqueue-down'),10), 1, btn.getAttribute('data-rq-key')));
     document.querySelectorAll('[data-unlock]').forEach(btn => btn.onclick = () => {
       const key = btn.getAttribute('data-unlock');
       const def = BUILDING_DEFS.find(d=>d.key===key) || SHIP_DEFS.find(d=>d.key===key) || { unlockItem: key==='superschlachtschiff' ? 'antimateriekern' : null };
@@ -80602,8 +80641,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
   // Tagesquests und ein gerade aufgelöster Überfall (nextRaidTime/incomingRaid genullt) landeten nie
   // auf dem Server, sodass sie beim nächsten Laden erneut auslösten (immer derselbe gespeicherte Raid).
   // Der Safety-Timeout stellt sicher, dass ein hängender Server das Neuladen trotzdem nie blockiert.
-  async function saveThenReload(){
+  /* EINE Stelle fuer "sicher speichern, aber nicht ewig warten" - saveThenReload() und der
+     Abmeldeknopf teilen sie sich seit dem 14.09.2026. Vorher hatte nur saveThenReload() sie, und
+     der Abmeldeknopf lud ungespeichert neu (siehe doLogout). */
+  async function sicherSpeichern(){
     try { await Promise.race([ Promise.resolve(save()), new Promise(r => setTimeout(r, 5000)) ]); } catch(e){}
+  }
+  async function saveThenReload(){
+    await sicherSpeichern();
     location.reload();
   }
   function scheduleAutoReload(newVersion){
@@ -81500,6 +81545,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
   function showLogoutBtn(){
     const doLogout = async () => {
       if (!confirm('Abmelden? Dein Fortschritt ist auf dem Server gespeichert und bleibt beim nächsten Anmelden erhalten.')) return;
+      /* ZUERST speichern, und zwar VOR sitzungBeenden() - das ist die ganze Pointe (14.09.2026).
+         Bis dahin lud der Abmeldeknopf ungespeichert neu: Bis zu zehn Sekunden Fortschritt waren
+         weg (der Takt speichert alle 10 s), und der Bestätigungsdialog eine Zeile darüber
+         verspricht wörtlich das Gegenteil. Dieselbe Fehlerklasse, für die am 21.07.2026
+         saveThenReload() gebaut wurde - der Abmeldeknopf hatte sie nur nie bekommen.
+         Die Reihenfolge ist nicht beliebig: sitzungBeenden() ruft sitzungLokalAbraeumen() und
+         setzt sitzungAktiv = false. Danach ist useBackend() false, und save() schriebe in den
+         LOKALEN Speicher statt auf den Server - ein Speichern, das dem Spieler nichts nützt. */
+      await sicherSpeichern();
       // Das await ist hier keine Höflichkeit, sondern die Sache selbst: Lädt die Seite neu, bevor
       // die Antwort da ist, kommt die Lösch-Kopfzeile nie an - und der Spieler ist nach dem
       // "Abmelden" wieder angemeldet.
