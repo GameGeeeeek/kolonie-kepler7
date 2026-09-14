@@ -1990,7 +1990,20 @@
     .gebaeude-gruppe-titel { color:#e2e0da; font-weight:600; }
     .gebaeude-gruppe-zaehler { text-transform:none; letter-spacing:0; color:#7d8199; font-variant-numeric:tabular-nums; }
     .gebaeude-gruppe-leer { font-size:11px; color:#7d8199; padding:2px 2px 6px; }
-    .gebaeude-raster { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:9px; align-items:start; }
+    /* align-items:STRETCH, nicht start (Abstandsfehler, gemessen 14.09.2026). Mit `start` ist jede
+       Kachel nur so hoch wie ihr Inhalt - eine fertige „Max"-Karte (97 px) steht dann neben einer
+       ausbaubaren mit Kostenzeilen und Knopfreihe (194 px), und die 97 px Unterschied bleiben als
+       Loch in der Reihe stehen. GEMESSEN ueber die drei Basis-Raster: 626 px verschenkte Flaeche
+       bei 1600 px Fensterbreite, 404 px bei 1400 px; groesste Einzelluecke 97 px.
+       Das Dehnen kostet NICHTS: Die Rasterhoehe ist vorher wie nachher dieselbe (419/461/708 px
+       bei 1600) - die Reihe war ohnehin so hoch wie ihre hoechste Kachel, nur sahen die anderen
+       Kacheln kuerzer aus als ihre Reihe.
+       align-content:space-between an der Kachel schiebt die Knopfreihe dabei an den unteren Rand.
+       Ohne sie stehen die Knopfreihen einer Reihe gemessen bis zu 9 px versetzt; mit ihr liegen
+       sie auf einer Linie. Bei Kacheln ohne Knopfreihe (eine einzige Flex-Zeile) wirkt sie nicht -
+       dort bleibt der Inhalt oben, wie bisher. */
+    .gebaeude-raster { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:9px; align-items:stretch; }
+    .gebaeude-raster .card-row { align-content:space-between; }
     @media (min-width:1600px) { #buildings .gebaeude-raster { grid-template-columns:repeat(3, minmax(0,1fr)); } }
     @media (max-width:700px) { .gebaeude-raster { grid-template-columns:minmax(0,1fr); } }
     /* Verteidigung: die Kennwert-Balken (.ship-stats, selbst zweispaltig) brauchen Breite - höchstens
