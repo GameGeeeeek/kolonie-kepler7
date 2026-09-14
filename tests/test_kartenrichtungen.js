@@ -14,6 +14,18 @@
 //       und war seit KB-4 ueberholt: Die Sektoransicht HAT einen Nachbarsektor, mit Knopf und
 //       Wischgeste. Am PC war das die einzige der drei Ebenen ohne Tastenweg.
 //
+// NACHTRAG 14.09.2026: DIESER TEST MASS EINEN ZUSTAND, DEN EIN SPIELER NICHT ERREICHT.
+// Er lief als EINZIGER der Karten-Tests abgemeldet - sein Schwestertest test_kartenbedienung, der
+// dieselben Pfeiltasten misst, setzt seit jeher Token und Backend-Attrappe. Aufgefallen ist das
+// erst durch die Schirmfrage aus UI-9 (Tasten wirken nicht mehr durch Fenster hindurch): Sie
+// liess die Pfeiltasten hier zu Recht liegen, denn GEMESSEN stand die Bildmitte auf
+// `#loginUsername` in `#loginCardNormal` - ueber der Karte lag das Anmeldefenster. Die Karte war
+// nur erreichbar, weil dieser Test bewusst mit SYNTHETISCHEN Ereignissen direkt am Knoten
+// arbeitet; die gehen an jeder Ueberdeckung vorbei.
+// Geaendert wurde deshalb die LAGE, nicht die Pruefungen. Gegenprobe gemessen: An einem Stand,
+// dem der Sektorwechsel per Pfeiltaste gezielt entfernt wurde (`sabSektor`), faellt der Test
+// weiterhin mit genau 3 und 3c - er prueft also unveraendert das, wofuer er gebaut wurde.
+//
 // BEIDE HAELFTEN werden geprueft, und das ist hier die halbe Miete: Ein Wisch-Schutz laesst sich
 // trivial erfuellen, indem der Klick GAR NICHTS mehr tut. Jede Sperr-Pruefung hat deshalb ihre
 // Gegenrichtung - derselbe Knoten, nur ohne Bewegung, MUSS oeffnen (Hausregel 33).
@@ -113,6 +125,25 @@ const systemListe   = page => page.evaluate(() => [...document.querySelectorAll(
   const page = await ctx.newPage();
   const fehler = [];
   page.on('pageerror', e => fehler.push(String(e)));
+  /* ANGEMELDET messen (14.09.2026, UI-9). Dieser Test lief bis dahin als EINZIGER der
+     Karten-Tests ABGEMELDET - sein Schwestertest test_kartenbedienung, der dieselben Pfeiltasten
+     misst, setzt seit jeher Token und Backend-Attrappe. Das war ein Versaeumnis, keine Absicht,
+     und es fiel erst auf, als die Schirmfrage kam: GEMESSEN stand die Bildmitte auf
+     `#loginUsername` in `#loginCardNormal` - ueber der Karte lag das Anmeldefenster
+     (`loginOverlay`, display:block). Die Pfeiltasten wurden also in einem Zustand geprueft, den
+     ein Spieler gar nicht erreichen kann: Er saehe dort eine Anmeldekarte, keine Karte. Erreichbar
+     war sie nur, weil dieser Test bewusst mit SYNTHETISCHEN Ereignissen direkt am Knoten arbeitet
+     (siehe Messvorrichtung oben) - die gehen an jeder Ueberdeckung vorbei.
+     Die Pruefungen selbst sind unveraendert. Nur die Lage ist jetzt die des Spielers. */
+  await page.route('**/api/**', async r => {
+    const req = r.request(); const pfad = req.url().split('/api/')[1].split('?')[0];
+    const j = (o, st = 200) => r.fulfill({ status: st, contentType: 'application/json', body: JSON.stringify(o) });
+    if (pfad === 'health') return j({ ok: true });
+    if (pfad === 'me') return j({ userId: 'u', username: 'Richtungstest', homeSystem: 'kepler', homeSlot: 0, attackShieldMs: 0, hasEmail: true, wantsPatchnotes: true });
+    if (pfad.startsWith('storage/')) return j({ e: 1 }, 404);
+    return j([]);
+  });
+  await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
   await page.goto(SPIEL_URL);
   await page.waitForTimeout(2500);
   await karteOeffnen(page);

@@ -130,6 +130,15 @@
 //   =sabZustand der Nachzug raeumt den Offen-Zustand ueber der Schwelle nicht mehr ab
 //   =sabSpaet   derselbe Escape-Lauscher, aber HINTER dem des aufgeklappten Systems registriert
 //   =sabBlind   der Riegel statustafelObenauf() faellt weg - der Lauscher greift wieder blind
+//
+// 3j (14.09.2026, Hausputz): DIE OBENAUF-MESSUNG STEHT NUR NOCH EINMAL DA. statustafelObenauf()
+//     trug bis dahin den Rumpf von fensterLage() ein zweites Mal - Zeichen fuer Zeichen dieselbe
+//     Rechnung. Jetzt delegiert es an fensterObenauf(); nur der Sichtbarkeits-Riegel bleibt davor
+//     stehen, weil er den Layout-Durchlauf spart. Der LAUSCHER wurde ausdruecklich NICHT bewegt -
+//     die Reihenfolge der Escape-Kette ist der Gleichstands-Entscheid.
+//     Dass es ein reiner Umbau war, belegt die Gegenprobe: Am Stand von v8.733.0 faellt 3j als
+//     EINZIGE Pruefung; jede Verhaltenspruefung (3h, 3i und der Rest) bleibt an beiden Staenden
+//     gruen. Waere das Verhalten mitgewandert, stuenden dort mehr Namen.
 // Jede Sabotage entsteht aus der AKTUELLEN Spieldatei, jeder Anker wird vorher gezaehlt (genau
 // eine Fundstelle, sonst Abbruch VOR dem Schreiben). Die MUSS_FALLEN-Listen sind GEMESSEN: erst
 // leer gefahren, dann eingetragen, dann jeder Stand erneut, bis jeder Lauf Exit 0 lieferte.
@@ -196,8 +205,9 @@
 //   belegt ist; die frueher dort behauptete Reihenfolge gegenueber Verbandsruf und Kartenmenue
 //   steht nicht mehr drin, weil jene Lage gemessen nicht erreichbar ist (Begruendung samt
 //   Messung am Lauscher in weltraum_kolonie.html).
-const { starteBrowser, SPIEL_URL, ruhigeUhren, versionAbfangen, warteBis } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, ruhigeUhren, versionAbfangen, warteBis } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
+const fs = require('fs');
 
 const ergebnis = {};
 let fail = false;
@@ -205,10 +215,31 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 const merke = (name, bed, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bed; check(name, bed, zusatz); };
 
 const SAB = process.env.KEPLER_STATUSTAFEL_GEGENPROBE || '';
+
+/* 3j (Hausputz 14.09.2026): DIE OBENAUF-MESSUNG DARF NICHT WIEDER ZWEIMAL DASTEHEN.
+   Bis dahin trug statustafelObenauf() den Rumpf von fensterLage() ein zweites Mal - Zeichen fuer
+   Zeichen dieselbe Rechnung. Zwei Kopien einer Messung sind die Fehlerklasse, bei der eine
+   Reparatur die andere Stelle still verfehlt; genau das steht in der Hausregel „Bei Refactorings
+   Tests staerker machen: gemeinsame Implementierung + alle Einstiegspunkte pruefen".
+   Geprueft wird die REGEL (die Tafel benutzt die gemeinsame Messung), nicht der Wortlaut: Ein
+   eigenes elementFromPoint im Rumpf ist der Befund, egal wie es formuliert ist. Der
+   Sichtbarkeits-Riegel davor darf bleiben - er spart nur den Layout-Durchlauf. */
+{
+  const html = fs.readFileSync(SPIELDATEI, 'utf8');
+  const m = html.match(/function statustafelObenauf\(\)\{[\s\S]*?\n  \}/);
+  merke('3j-anker: statustafelObenauf ist auffindbar (sonst misst 3j nichts)', !!m);
+  const rumpf = m ? m[0] : '';
+  merke('3j: die Tafel benutzt die gemeinsame Obenauf-Messung',
+    !!m && /fensterObenauf\(/.test(rumpf) && !/elementFromPoint/.test(rumpf) && !/getBoundingClientRect/.test(rumpf),
+    rumpf.replace(/\s+/g, ' ').slice(0, 150));
+}
+
 // GEMESSEN am 13.09.2026 - siehe Kopf. Was NICHT faellt, ist so wichtig wie was faellt: 1d und 2e
 // halten fest, was sich NICHT aendern darf, und bleiben an jedem Stand gruen.
 const MUSS_FALLEN = {
-  alt:          ['1a', '1b', '1e', '2a', '2b', '2c', '2d', '2f', '3a', '3d', '3f', '3i'],
+  // 3j-anker/3j dazu (14.09.2026): GEMESSEN - v8.727.0 kennt statustafelObenauf() gar nicht
+  // (grep -c = 0), also faellt schon der Anker. Die Liste ist gewachsen, nicht passend gemacht.
+  alt:          ['1a', '1b', '1e', '2a', '2b', '2c', '2d', '2f', '3a', '3d', '3f', '3i', '3j-anker', '3j'],
   sabRiegel:    ['1a', '1b'],
   sabSofort:    ['1c'],
   sabNachzug:   ['1e'],
