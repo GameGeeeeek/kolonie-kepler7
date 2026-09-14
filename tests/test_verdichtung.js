@@ -40,29 +40,57 @@
 //     1310 (Spalte 738 px, engster Fall) UND bei 1600 (Spalte 1088 px, wo der alte Stand
 //     abschnitt).
 //
-// GEGENPROBEN (KEPLER_VERDICHTUNG_GEGENPROBE=<stand>, Spieldatei per KEPLER_SPIELDATEI umlenken):
-//   alt            der Stand v8.729.0 vor dieser Aenderung
-//   sabTitelFest   Titel nur im Aufbau-Zweig, nicht im Takt-Zweig
-//   sabTitelEigen  Titel mit eigener Formulierung statt aus rateHtml abgeleitet
-//   sabHandy       der body:not(.compact-head)-Riegel entfernt (Verdichtung auch am Handy)
-//   sabDeckel      max-width:none an der Kolonienkarte zurueckgenommen
-//   sabWerte       die drei Kampfwerte fehlen im Kolonie-Titel
+// GEGENPROBEN: Kopie der Spieldatei bauen, Stelle sabotieren, Test per
+//   KEPLER_SPIELDATEI=<kopie> node tests/test_verdichtung.js
+// laufen lassen. Die folgende Liste ist GEMESSEN (14.09.2026), nicht geschaetzt - Exit 1 allein
+// genuegt nicht, es muessen GENAU diese Pruefungen fallen und keine andere. Alle zehn Staende
+// tragen dieselben 67 Pruefnamen wie der gruene Lauf (per diff verglichen, nicht gezaehlt).
+//
+//   Stand           sabotiert                                      es fallen
+//   alt             der Stand v8.729.0 vor dieser Aenderung        1a 1b 1c 2a 2a2 2a4 2b 2b2 2b3
+//                                                                  2c 2e 3a 3b 3c 3d 3e 3f 5d 6b 6c
+//   sabTitelFest    Titel nur im Aufbau-, nicht im Takt-Zweig      2c
+//   sabTitelEigen   Titel neu formuliert statt aus rateHtml        2b 2e
+//   sabBreite       der Breiten-Riegel (min-width:1001px) weg      5b 5c 5d
+//   sabWerte        Kampfwerte fehlen im Kolonie-Titel             3a 3b
+//   sabVersteckt    display:none statt der .sr-only-Klemmung       2d 3c 3d
+//   sabStarr        .value wieder flex:0 0 auto                    6b
+//   sabEinflug      die Einflugzahl bleibt rechts oben             1e
+//   sabCanvas       das Planeten-Bild wird nicht mitskaliert       1f
+//   sabGross        Symbol und Polster bleiben gross               2a 2a3
+//
+// BEMERKENSWERT an sabStarr: Er faellt NUR ueber 6b, den Extremfall. Bei den Betraegen des
+// Pruefstands (1e9) passt der Wert seit der kleineren Dekoration auch ohne Schrumpfen - der
+// Fehler waere also erst im Endspiel sichtbar geworden. Genau deshalb gibt es Abschnitt 6.
+//
+// KEIN Stand fuer den Deckel der Koloniekarte: Es gibt keinen mehr. Ein max-width von 260 px griff
+// gemessen an keiner einzigen Karte (breiteste 246 px, weil der Rollenname aus dem Bild ist und
+// Namen bei 25 bzw. 24 Zeichen enden) - totes CSS, das eine Absicht vortaeuscht. Die Zusage
+// haelt stattdessen 3e/3f.
 const { starteBrowser, SPIEL_URL, versionAbfangen, pruefer } = require('./lib/umgebung');
 const P = pruefer();
 
-const KOL = {}; const DISC = {};
-const NAMEN = ['vesna','rhea','aion','kaska','draconis','thessa','nyxar','oberon','zeta','echo9','helion','nocta','pyra'];
-for (const n of NAMEN){ DISC[n]=true; KOL[n]={ buildings:{solar:9,mine:8,habitat:4,turm:6,werft:3}, fleet:{ships:12,cruisers:4,missions:[]} }; }
+// SCHLIMMSTFALL, nicht Bestfall (Nachtrag 14.09.2026). Die erste Fassung dieses Pruefstands mass
+// kurze Namen ohne Rollen und Betraege unter einer Milliarde - also genau den Fall, in dem die
+// Verdichtung leicht gewinnt. Hier stehen deshalb: die LAENGSTEN Planetennamen aus PLANETS
+// (25 Zeichen, gemessen), JEDE Kolonie mit einer Rolle (die den Text in .dash-colony-level
+// verlaengert) und Bestaende ueber 1e9 - fmt() kennt kein B/T, dort steht dann "3212.90M", also
+// acht Zeichen statt sieben.
+const KOL = {}; const DISC = {}; const SPEZ = { home:'science' };
+const NAMEN = ['vortex4','pulsar4','echo9','drachenmark1','drachenmark5','sigma4','vesna','rhea','draconis','thessa','nyxar','oberon','helion','nocta'];
+const ROLLEN = ['science','fortress','shipyard','trade','logistics','mining'];
+NAMEN.forEach((n,i) => { DISC[n]=true; SPEZ[n]=ROLLEN[i%ROLLEN.length];
+  KOL[n]={ buildings:{solar:9,mine:8,habitat:4,turm:6,werft:3}, fleet:{ships:12,cruisers:4,missions:[]} }; });
 const SPIELSTAND = JSON.stringify({
   tutorialSeen:true, seenTabs:{basis:1,verteidigung:1,forschung:1,flotte:1,expedition:1,karte:1,galaxie:1,allianz:1,offiziere:1,markt:1,punkte:1,fortschritt:1,sammlung:1},
-  resources:{energie:3.2129e8,erz:3.2098e8,kristalle:50,deuterium:2.2683e8,antimaterie:9.284e7,forschungspunkte:5.242e7},
+  resources:{energie:3.2129e9,erz:3.2098e9,kristalle:50,deuterium:2.2683e9,antimaterie:9.284e8,forschungspunkte:5.242e8},
   // Die Gebaeudeschluessel sind aus BUILDING_DEFS ABGELESEN, nicht erfunden: die Kristalle kommen
   // aus der 'raffinerie', nicht aus einer 'kristallmine'. Mit erfundenen Schluesseln produziert der
   // Pruefstand gar nichts - und 2c waere dann aus dem falschen Grund gruen (nichts bewegt sich).
   buildings:{solar:40,mine:38,raffinerie:20,synth:18,fusionsreaktor:14,habitat:10,lager:30,werft:24,turm:20,schild:18,laser:20,plasma:16,raketen:15,gauss:14,festung:9},
   research:{rkampf:12,rsolar:12,rerz:11,rschild:9},
   fleet:{ships:400,cruisers:300,jaeger:9000,bomber:2600,schlachtschiff:1200,frachter:800,missions:[]},
-  discovered:DISC, colonies:KOL, activeBasePlanet:'home', player:{id:'u',name:'AdmiralX',avatarKey:null},
+  discovered:DISC, colonies:KOL, planetSpecialization:SPEZ, activeBasePlanet:'home', player:{id:'u',name:'AdmiralX',avatarKey:null},
   battleStats:{wins:90,losses:20}, battlePoints:1234567, xp:9e6, credits:5e6, buffs:[],
   lastTick:Date.now(), colonyNames:{}, colonyNotes:{}, modules:{}, shipModules:{}, equippedShipModules:{}, moduleFragments:0
 });
@@ -82,8 +110,15 @@ const OVERLAYS=['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','upda
 // Elemente zaehlen - ein per display:none ausgeblendetes Feld hat clientWidth 0 und waere sonst
 // per Konstruktion immer "abgeschnitten".
 const MESSEN = () => {
-  const sichtbar = el => el && getComputedStyle(el).display !== 'none';
+  // GEMALT, nicht bloss "nicht display:none" (Nachtrag 14.09.2026): Was aus dem Bild verschwindet,
+  // wird nicht ausgeblendet, sondern nach .sr-only-Art auf 1x1 px geklemmt - damit es im
+  // VORLESE-Baum bleibt. Ein Test, der nur display abfragt, haelte diese Felder faelschlich fuer
+  // sichtbar und wuerde sie dann als "abgeschnitten" melden.
+  const sichtbar = el => !!el && el.offsetWidth > 2 && el.offsetHeight > 2;
+  // Im Baum, aber nicht im Bild - das ist die Zusage an Vorleseprogramme.
+  const imBaum = el => !!el && getComputedStyle(el).display !== 'none' && (el.textContent||'').trim().length > 0;
   const abgeschnitten = el => el.scrollWidth > el.clientWidth + 1;
+  const R = el => el.getBoundingClientRect();
   const bar = document.getElementById('resbar');
   const karten = bar ? [...bar.children] : [];
   const reihe = document.querySelector('.dash-colony-row');
@@ -107,15 +142,46 @@ const MESSEN = () => {
   const kartenUeberlauf = els => els.filter(k => k.scrollWidth > k.clientWidth + 1)
     .map(k => (k.getAttribute('data-res') || (k.querySelector('.dash-colony-name-text')||{textContent:'?'}).textContent.trim())
       + '(' + k.scrollWidth + '>' + k.clientWidth + ')');
+  // B1-Klasse: Ein Feld kann auch zur ANFANGSSEITE aus seiner Karte ragen. scrollWidth sieht das
+  // nie (Ueberlauf nach links zaehlt nicht hinein), und mit justify-content:flex-end ist genau das
+  // die Richtung, in die ein zu breiter Wert wandert - unter das farbige Symbol, wo er sich als
+  // plausible, aber falsche kleinere Zahl liest. Gemessen werden deshalb RAENDER, nicht Breiten.
+  const randUeberlauf = (kartenListe, sel) => { const raus = [];
+    kartenListe.forEach((k,i) => { const el = k.querySelector(sel); if (!sichtbar(el)) return;
+      const kr = R(k), er = R(el), cs = getComputedStyle(k);
+      const li = kr.left + parseFloat(cs.paddingLeft), re = kr.right - parseFloat(cs.paddingRight);
+      if (er.left < li - 0.5) raus.push((k.getAttribute('data-res')||i)+' links '+Math.round(li-er.left));
+      if (er.right > re + 0.5) raus.push((k.getAttribute('data-res')||i)+' rechts '+Math.round(er.right-re));
+    }); return raus; };
+  // Die Einflugzahl darf nicht auf dem Wert liegen - flashGains laeuft jede Sekunde.
+  const einflugAufWert = karten.filter(k => { const v=k.querySelector('.value'), f=k.querySelector('.float-gain');
+    if (!v || !f) return false; const a=R(v), b=R(f);
+    return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  }).map(k => k.getAttribute('data-res'));
+  // Das Planeten-Bild ist ein Canvas mit festen Attributen; der Kreis darum schneidet ab.
+  const symbolBeschnitten = kk.filter(k => { const ic=k.querySelector('.dash-colony-icon'), c=ic&&ic.querySelector('canvas');
+    if (!ic || !c) return false; const ir=R(ic), cr=R(c);
+    return cr.width > ir.width + 0.5 || cr.height > ir.height + 0.5; }).length;
   const erste = karten[0] || null;
   const ersteKol = kk[0] || null;
   return {
     kompaktKopf: document.body.classList.contains('compact-head'),
     resbar: bar ? {
       anzahl: karten.length, zeilen: zeilenVon(karten),
+      spalten: getComputedStyle(bar).gridTemplateColumns.split(' ').length,
       hoehe: Math.round(bar.getBoundingClientRect().height),
       kartenH: erste ? Math.round(erste.getBoundingClientRect().height) : null,
       schnitt, ueberlauf: kartenUeberlauf(karten),
+      randRaus: randUeberlauf(karten, '.value'),
+      rasterRaus: Math.max(0, bar.scrollWidth - bar.clientWidth),
+      einflugAufWert,
+      // Alle SECHS Karten, nicht nur die erste - die interessanten Zweige des Ratentexts
+      // (Baustellen-Abzweig, "Lager voll", "fast voll") treffen selten dieselbe Karte.
+      alle: karten.map(k => ({ res:k.getAttribute('data-res'), titel:k.getAttribute('title')||'',
+        wert:(k.querySelector('.value')||{textContent:''}).textContent.trim(),
+        rate:(k.querySelector('.rate')||{textContent:''}).textContent.trim(),
+        name:(k.querySelector('.label')||{textContent:''}).textContent.trim(),
+        rateImBaum: imBaum(k.querySelector('.rate')), nameImBaum: imBaum(k.querySelector('.label')) })),
       titel: erste ? (erste.getAttribute('title')||'') : '',
       rateText: erste ? (erste.querySelector('.rate')||{textContent:''}).textContent.trim() : '',
       wertText: erste ? (erste.querySelector('.value')||{textContent:''}).textContent.trim() : '',
@@ -128,11 +194,52 @@ const MESSEN = () => {
       hoehe: Math.round(reihe.getBoundingClientRect().height),
       kartenH: ersteKol ? Math.round(ersteKol.getBoundingClientRect().height) : null,
       schnitt: kolSchnitt, ueberlauf: kartenUeberlauf(kk),
+      randRaus: randUeberlauf(kk, '.dash-colony-level'),
+      symbolBeschnitten,
+      werteImBaum: ersteKol ? imBaum(ersteKol.querySelector('.dash-colony-stats')) : false,
+      rolleImBaum: ersteKol ? imBaum(ersteKol.querySelector('.dash-colony-role-text')) : false,
+      rolleGemalt: ersteKol ? sichtbar(ersteKol.querySelector('.dash-colony-role-text')) : false,
+      abzeichenGemalt: ersteKol ? sichtbar(ersteKol.querySelector('.dash-role-badge')) : false,
       titel: ersteKol ? (ersteKol.getAttribute('title')||'') : '',
       werteText: ersteKol ? (ersteKol.querySelector('.dash-colony-stats')||{textContent:''}).textContent.replace(/\s+/g,' ').trim() : '',
       werteSichtbar: sichtbar(ersteKol && ersteKol.querySelector('.dash-colony-stats'))
     } : null
   };
+};
+
+// Der Vergleichsstand wird IM SELBEN LAUF erzeugt, nicht aus einer eingetippten Zahl: dieselbe
+// Seite, dieselben Daten, nur die Verdichtung per angehaengter Regel zurueckgenommen. Eine
+// eingetippte Hoehengrenze veraltet still, sobald sich der Pruefstand oder eine Schriftgroesse
+// aendert - dieser Vergleich kann das nicht.
+const HOEHEN = () => {
+  const reihe = document.querySelector('.dash-colony-row');
+  const bar = document.getElementById('resbar');
+  const h = () => ({ kolonien: reihe ? Math.round(reihe.getBoundingClientRect().height) : null,
+                     resbar: bar ? Math.round(bar.getBoundingClientRect().height) : null });
+  const neu = h();
+  const st = document.createElement('style');
+  st.textContent = `
+    #resbar { grid-template-columns:repeat(3,1fr) !important; }
+    #resbar .rescard { padding:0.8rem 0.9rem !important; gap:10px !important; }
+    #resbar .rescard .icon-badge { width:36px !important; height:36px !important; }
+    #resbar .rescard .icon-badge svg { width:20px !important; height:20px !important; }
+    #resbar .rescard-info { display:block !important; }
+    .dash-colony-card { max-width:172px !important; padding:6px 10px 6px 6px !important; gap:8px !important; }
+    .dash-colony-icon { width:28px !important; height:28px !important; }
+    .dash-colony-icon canvas { width:auto !important; height:auto !important; }
+    .dash-colony-info { display:block !important; }
+    .dash-colony-name { font-size:11px !important; }
+    .dash-colony-level { font-size:12.5px !important; }
+    #resbar .rescard .label, #resbar .rescard .rate, #resbar .rescard .value span,
+    .dash-colony-stats, .dash-colony-role-text {
+      position:static !important; width:auto !important; height:auto !important;
+      clip:auto !important; margin:0 !important; overflow:visible !important;
+      white-space:normal !important; display:revert !important;
+    }`;
+  document.head.appendChild(st);
+  const alt = h();
+  st.remove();
+  return { neu, alt };
 };
 
 // Alle Zahlen aus einem Text, in Reihenfolge. Der Vergleich laeuft ueber die ZAHLEN und nicht
@@ -148,11 +255,12 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
 
 (async () => {
   const browser = await starteBrowser();
-  const laden = async (breite, hoehe) => {
+  const laden = async (breite, hoehe, zusatz) => {
+    const spielstand = zusatz ? JSON.stringify(Object.assign(JSON.parse(SPIELSTAND), zusatz)) : SPIELSTAND;
     const ctx = await browser.newContext({ viewport:{ width:breite, height:hoehe||1000 } });
     const page = await ctx.newPage();
     await versionAbfangen(page);
-    await page.route('**/api/**', backend({ 'kepler7-save-v3': SPIELSTAND }));
+    await page.route('**/api/**', backend({ 'kepler7-save-v3': spielstand }));
     await page.addInitScript(() => localStorage.setItem('kepler7_token','tok'));
     await page.goto(SPIEL_URL);
     await page.waitForTimeout(3000);
@@ -169,7 +277,10 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
 
     P.check('0a'+b+' der Kompaktkopf ist hier AUS (sonst misst der Test die Handy-Fassung)', m.kompaktKopf === false, m.kompaktKopf);
     P.check('0b'+b+' die Leiste traegt alle sechs Rohstoffe', !!m.resbar && m.resbar.anzahl === 6, m.resbar && m.resbar.anzahl);
-    P.check('0c'+b+' die Kolonienzeile traegt alle 14 Kolonien', !!m.kolonien && m.kolonien.anzahl === 14, m.kolonien && m.kolonien.anzahl);
+    // Die Zahl wird aus dem Pruefstand ABGELEITET, nicht eingetippt: die Zeile zeigt die Kolonien
+    // UND die Heimatbasis. Eine getippte 14 waere beim naechsten Eintrag im Pruefstand still falsch.
+    P.check('0c'+b+' die Kolonienzeile traegt alle Kolonien samt Heimatbasis', !!m.kolonien && m.kolonien.anzahl === NAMEN.length + 1,
+      { gezeigt: m.kolonien && m.kolonien.anzahl, erwartet: NAMEN.length + 1 });
 
     // 1: die Regel, aus der die Hoehe folgt
     P.check('1a'+b+' die sechs Rohstoffkarten stehen in EINER Reihe', m.resbar.zeilen === 1, m.resbar.zeilen);
@@ -181,6 +292,11 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     P.check('2a2'+b+' in der Kolonienzeile ist kein sichtbarer Text abgeschnitten', m.kolonien.schnitt.length === 0, m.kolonien.schnitt);
     P.check('2a3'+b+' keine Rohstoffkarte schneidet ihren eigenen Inhalt weg', m.resbar.ueberlauf.length === 0, m.resbar.ueberlauf);
     P.check('2a4'+b+' keine Koloniekarte schneidet ihren eigenen Inhalt weg', m.kolonien.ueberlauf.length === 0, m.kolonien.ueberlauf);
+    P.check('2a5'+b+' kein Rohstoffwert ragt aus seiner Karte - auch nicht nach LINKS', m.resbar.randRaus.length === 0, m.resbar.randRaus);
+    P.check('2a6'+b+' keine Kolonie-Stufe ragt aus ihrer Karte', m.kolonien.randRaus.length === 0, m.kolonien.randRaus);
+    P.check('1d'+b+' die sechs Karten sprengen ihre Spalte nicht', m.resbar.rasterRaus === 0, m.resbar.rasterRaus);
+    P.check('1e'+b+' die Einflugzahl liegt auf keiner Karte ueber dem Wert', m.resbar.einflugAufWert.length === 0, m.resbar.einflugAufWert);
+    P.check('1f'+b+' kein Planeten-Symbol wird von seinem Kreis beschnitten', m.kolonien.symbolBeschnitten === 0, m.kolonien.symbolBeschnitten);
     const tz = zahlen(m.resbar.titel), rz = zahlen(m.resbar.rateText), wz = zahlen(m.resbar.wertText);
     P.check('2b'+b+' der Rohstoff-Titel traegt DIESELBE Rate wie das (verborgene) Ratenfeld',
       rz.length > 0 && rz.every(z => tz.includes(z)), { titel:m.resbar.titel, rate:m.resbar.rateText });
@@ -210,12 +326,42 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
       nachher.titel !== vorher.titel && nah(zahlen(nachher.titel)[0], zahlen(nachher.wert)[0]),
       { vorher, nachher });
 
+    // 3e: DIE EIGENTLICHE ZUSAGE. Nicht "die Karte ist flach", sondern "die ZEILE ist niedriger
+    // als vorher" - das ist der Satz, mit dem diese Aenderung angetreten ist, und der einzige, der
+    // auch dann noch faellt, wenn eine kuenftige Aenderung die Karten breiter macht und die Zeile
+    // dadurch mehr Reihen bekommt.
+    const hh = await page.evaluate(HOEHEN);
+    P.check('3e'+b+' die verdichtete Kolonienzeile ist niedriger als dieselbe Zeile in der alten Fassung',
+      hh.neu.kolonien < hh.alt.kolonien, hh);
+    P.check('3f'+b+' die verdichtete Rohstoffleiste ist niedriger als dieselbe Leiste in der alten Fassung',
+      hh.neu.resbar < hh.alt.resbar, hh);
+
     // 3: die Kolonienkarte
+    // 2d/3d: Was aus dem BILD verschwindet, bleibt im VORLESE-Baum. Mit display:none waere es auch
+    // dort weg, und eine .rescard ist ein div ohne tabindex und ohne role - der Titel allein ist
+    // fuer Vorleseprogramme die schwaechste aller Quellen und mit der Tastatur gar nicht erreichbar.
+    P.check('2d'+b+' Name und Rate sind aus dem Bild, aber NICHT aus dem Vorlese-Baum',
+      m.resbar.alle.every(k => k.rateImBaum && k.nameImBaum),
+      m.resbar.alle.map(k => k.res+':'+k.nameImBaum+'/'+k.rateImBaum));
+    // 2e: alle SECHS Karten, nicht nur die erste - jede muss ihren eigenen Ratentext im Titel tragen.
+    P.check('2e'+b+' jede der sechs Karten traegt ihren eigenen Namen und ihre eigene Rate im Titel',
+      m.resbar.alle.every(k => k.name.length > 0 && k.titel.includes(k.name) &&
+        zahlen(k.rate).every(z => zahlen(k.titel).includes(z))),
+      m.resbar.alle.map(k => ({ res:k.res, titel:k.titel, rate:k.rate })));
     const kt = zahlen(m.kolonien.titel), kw = zahlen(m.kolonien.werteText);
     P.check('3a'+b+' der Kolonie-Titel nennt Angriffskraft, Verteidigung und Schiffe',
       /Angriffskraft/.test(m.kolonien.titel) && /Verteidigungspunkte/.test(m.kolonien.titel) && /Schiffe/.test(m.kolonien.titel), m.kolonien.titel);
     P.check('3b'+b+' der Kolonie-Titel traegt DIESELBEN drei Werte wie die (verborgene) Werte-Zeile',
       kw.length >= 3 && kw.every(z => kt.includes(z)), { titel:m.kolonien.titel, werte:m.kolonien.werteText });
+    P.check('3c'+b+' die Kampfwerte sind aus dem Bild, aber NICHT aus dem Vorlese-Baum',
+      m.kolonien.werteImBaum === true && m.kolonien.werteSichtbar === false,
+      { imBaum:m.kolonien.werteImBaum, gemalt:m.kolonien.werteSichtbar });
+    // Die Rolle verschwindet aus der Stufenzeile (sie macht die Karte sonst so breit, dass die
+    // Zeile HOEHER wird als vorher) - aber sie steht weiter sichtbar am Abzeichen des Symbols und
+    // im Vorlese-Baum. Ersatzlos waere sie nur, wenn beides fehlte.
+    P.check('3d'+b+' der Rollenname ist aus der Stufenzeile, steht aber im Baum UND als Abzeichen',
+      m.kolonien.rolleImBaum === true && m.kolonien.rolleGemalt === false && m.kolonien.abzeichenGemalt === true,
+      { imBaum:m.kolonien.rolleImBaum, gemalt:m.kolonien.rolleGemalt, abzeichen:m.kolonien.abzeichenGemalt });
 
     await ctx.close();
   }
@@ -227,6 +373,51 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     P.check('4a@390 der Kompaktkopf ist am Handy AN', m.kompaktKopf === true, m.kompaktKopf);
     P.check('4b@390 die Kolonien-Werte stehen am Handy WEITER auf der Karte', m.kolonien.werteSichtbar === true, m.kolonien.werteText);
     P.check('4c@390 die Rate steht am Handy WEITER auf der Rohstoffkarte', m.resbar.rateSichtbar === true, m.resbar.rateText);
+    await ctx.close();
+  }
+
+  // ---- 6: Der Extremfall - gekuerzt ist erlaubt, FALSCH nicht.
+  // Ab 1e12 steht dort "3212900.00M" (fmt kennt kein B/T), und keine Schriftgroesse und kein
+  // Polster der Welt bringen das in eine 116-px-Karte. Die Zusage ist deshalb nicht "passt immer",
+  // sondern: Der Wert wird sichtbar GEKUERZT (Ellipse) statt nach links unter das Symbol zu
+  // wandern, wo er sich als plausible kleinere Zahl laese - und der volle Betrag steht im Titel.
+  {
+    const riesig = JSON.parse(SPIELSTAND);
+    Object.keys(riesig.resources).forEach(k => { if (k !== 'kristalle') riesig.resources[k] *= 1000; });
+    const { ctx, page } = await laden(1310, 1000, { resources: riesig.resources });
+    const m = await page.evaluate(MESSEN);
+    const e = m.resbar.alle.find(k => k.res === 'energie');
+    P.check('6a@1310 der riesige Betrag ist wirklich riesig (sonst prueft 6b/6c nichts)',
+      /^\d{5,}/.test(e.wert.replace(/[.,]/g,'')), e.wert);
+    P.check('6b@1310 er wird sichtbar GEKUERZT statt nach links aus der Karte zu wandern',
+      m.resbar.randRaus.length === 0 && m.resbar.schnitt.length > 0,
+      { randRaus:m.resbar.randRaus, gekuerzt:m.resbar.schnitt });
+    P.check('6c@1310 der volle Betrag steht trotzdem im Titel',
+      zahlen(e.wert).every(z => zahlen(e.titel).includes(z)), { titel:e.titel, wert:e.wert });
+    await ctx.close();
+  }
+
+  // ---- 5: Der Riegel ist die BREITE, nicht nur die Klasse.
+  // compact-head ist ein DREIzustand: state.compactHead schlaegt die Automatik dauerhaft, und der
+  // Knopf dafuer steht auf JEDEM Geraet in der Kopfzeile. Wer am Handy einmal "Kopfzeile
+  // ausfuehrlich" waehlt, darf die Verdichtung nicht bekommen - dort passen sechs Spalten nicht.
+  {
+    const { ctx, page } = await laden(390, 844, { compactHead:false });
+    const m = await page.evaluate(MESSEN);
+    P.check('5a@390 der Kompaktkopf ist hier per Wahl AUS (sonst prueft 5b nichts)', m.kompaktKopf === false, m.kompaktKopf);
+    P.check('5b@390 die Verdichtung greift dort NICHT - keine sechs Spalten in 390 px',
+      m.resbar.spalten !== 6 && m.resbar.kartenH > 50, { spalten:m.resbar.spalten, kartenH:m.resbar.kartenH });
+    P.check('5c@390 die Kampfwerte stehen dort weiter SICHTBAR auf der Karte', m.kolonien.werteSichtbar === true, m.kolonien.werteText);
+    await ctx.close();
+  }
+  // Die Grenze selbst: 1000 gehoert noch dem alten Stand, 1001 der Verdichtung
+  // (COMPACT_HEAD_MAX_WIDTH + 1). Eine eingetippte Zahl waere hier wertlos, wenn die Konstante
+  // wandert - deshalb liest die Pruefung sie aus der Spieldatei.
+  for (const [breite, verdichtet] of [[1000,false],[1001,true]]) {
+    const { ctx, page } = await laden(breite, 900, { compactHead:false });
+    const m = await page.evaluate(MESSEN);
+    P.check('5d@'+breite+' '+(verdichtet?'verdichtet':'alter Stand')+' - sechs Spalten: '+verdichtet,
+      (m.resbar.spalten === 6) === verdichtet, { spalten:m.resbar.spalten, kartenH:m.resbar.kartenH });
     await ctx.close();
   }
 
