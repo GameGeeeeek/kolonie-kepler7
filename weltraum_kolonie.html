@@ -1796,7 +1796,16 @@
        (0,0,1,0), und eine Media-Query erhoeht die Spezifitaet nicht. 1001 ist
        COMPACT_HEAD_MAX_WIDTH + 1 - genau die Grenze, an der die Automatik loslaesst. */
     @media (min-width: 1001px) {
-      body:not(.compact-head) #resbar { grid-template-columns: repeat(6, 1fr); }
+      /* DIESELBE FORM WIE DIE WERKSTOFF-ZEILE (Wunsch Sascha, 14.09.2026). Die Rohstoffleiste stand
+         als Raster ueber einer Chip-Zeile, die genau dasselbe zeigt - Symbol und Zahl - und sah
+         trotzdem anders aus: andere Hoehe, andere Polster, feste Spalten statt mitwachsender
+         Chips. Zwei Zeilen uebereinander, die dasselbe tun und sich verschieden geben.
+         Jetzt traegt sie die Masse der Werkstoff-Chips (`#tier2ResBadges.werkstoffe-kompakt`
+         weiter unten): flex-wrap statt Raster, dieselben Polster, dasselbe Abzeichen, dieselbe
+         Schriftgroesse. Die Chips wachsen mit ihrer Zahl, statt sechs gleich breite Spalten zu
+         erzwingen - dadurch passt auch ein Milliardenbetrag hinein, ohne dass die Nachbarn
+         schrumpfen. */
+      body:not(.compact-head) #resbar { display:flex; flex-wrap:wrap; gap:6px; align-items:stretch; }
       /* DIE DEKORATION SCHRUMPFT, NICHT DIE ZAHL (gemessen 14.09.2026). Bei 738 px Spalte ist eine
          Karte 116 px breit; mit 26er-Symbol, 8 px Abstand und 0,6rem Polster blieben dem Wert
          61 px - und ab 1e9 braucht er 75 px ("3212.90M", weil fmt() kein B/T kennt). Die
@@ -1807,18 +1816,23 @@
          Bei noch groesseren Betraegen greift die Ellipse (siehe .value unten); der volle Betrag
          steht dann im Titel. Das Verhaeltnis Bild zu Abzeichen ist dasselbe wie in der
          Werkstoff-Zeile (14 in 22), sonst schnitte die HUD-Ecke ins Bild. */
-      body:not(.compact-head) #resbar .rescard { padding:7px 6px; gap:6px; }
-      body:not(.compact-head) #resbar .rescard .icon-badge { width:20px; height:20px; font-size:11px; }
-      body:not(.compact-head) #resbar .rescard .icon-badge svg { width:13px; height:13px; }
+      body:not(.compact-head) #resbar .rescard { padding:3px 8px; gap:6px; min-width:0; flex:0 1 auto; }
+      body:not(.compact-head) #resbar .rescard .icon-badge { width:22px; height:22px; font-size:11px; }
+      /* Die RES_ICONS-Bilder sind fest 20 px; im 22-px-Abzeichen mit Schnittecke saessen sie
+         randlos und die Ecke schnitte ins Bild - dieselbe Zahl wie in der Werkstoff-Zeile. */
+      body:not(.compact-head) #resbar .rescard .icon-badge svg { width:14px; height:14px; }
       body:not(.compact-head) #resbar .rescard-info { display:flex; align-items:baseline; justify-content:flex-end; gap:7px; }
-      /* flex:0 1 auto UND min-width:0 sind Pflicht, nicht Geschmack (gemessen 14.09.2026): Mit
-         flex:0 0 auto ist das Feld immer genau so breit wie sein Inhalt, `text-overflow:ellipsis`
-         laeuft dann ins Leere - und weil daneben justify-content:flex-end steht, waere der
-         Ueberlauf nach LINKS gewandert, also UNTER das farbige Symbol. Der Spieler haette eine
-         plausible, aber falsche kleinere Zahl gelesen, ohne Auslassungspunkte als Warnung. Der
-         Fall ist kein Randfall: fmt() kennt kein B/T, ab 1e9 steht dort "1000.00M" (acht Zeichen
-         statt sieben), und der Lagerdeckel ist nach oben offen. */
-      body:not(.compact-head) #resbar .rescard .value { font-size:15px; flex:0 1 auto; min-width:0; }
+      /* HIER STAND `flex:0 1 auto; min-width:0` - und es ist gemessen ueberfluessig geworden
+         (14.09.2026). Solange die Leiste ein Raster aus sechs gleich breiten Spalten war, brauchte
+         es das: Ohne Schrumpf-Erlaubnis lief `text-overflow:ellipsis` ins Leere, und weil daneben
+         justify-content:flex-end steht, waere der Ueberlauf nach LINKS unter das farbige Symbol
+         gewandert - der Spieler haette eine plausible, aber FALSCHE kleinere Zahl gelesen, ohne
+         Auslassungspunkte als Warnung.
+         Seit die Chips mit ihrer Zahl wachsen, entsteht der Fall nicht mehr: Gemessen ohne die
+         beiden Angaben, bei 1e9 wie bei 1e12, faellt keine einzige Pruefung. Eine Angabe, die
+         nichts mehr tut, taeuscht eine Absicht vor - deshalb weg. Kehrt jemand zum festen Raster
+         zurueck, faellt Pruefung 6b (gemessen am Stand sabRaster). */
+      body:not(.compact-head) #resbar .rescard .value { font-size:12px; }
       /* Name, Rate und Lagerdeckel verschwinden aus dem BILD, nicht aus der Auskunft: dieselbe
          Technik wie .sr-only weiter oben. Mit display:none waeren sie auch aus dem
          Vorlese-Baum gefallen - und am PC gibt es dieselbe Gruppe wie am Handy: eine .rescard ist
@@ -1838,7 +1852,7 @@
       /* Die "+N"-Einflugzahl sass rechts oben und traf dort auf den jetzt RECHTSbuendigen Wert -
          gemessen ueberlappten beide Rechtecke, und flashGains laeuft jede Sekunde. Sie zieht
          deshalb links neben dem Symbol hoch, wo der rechtsbuendige Wert nicht hinkommt. */
-      body:not(.compact-head) #resbar .float-gain { right:auto; left:8px; top:auto; bottom:0; font-size:9.5px; }
+      body:not(.compact-head) #resbar .float-gain { right:auto; left:6px; top:auto; bottom:-1px; font-size:9px; }
     }
     /* Werkstoff-Zeile (Gleichmaß Etappe 1, 11.09.2026): Protomaterie und die Fabrik-Ketten stehen
        eingeklappt als schmale Chips (Symbol + Zahl) in EINER umbrechenden Zeile statt als zweite
@@ -4203,11 +4217,6 @@
         <div id="planetRoleBox"></div>
         <div id="orbitalStationBox"></div>
         <div id="terraformBox"></div>
-        <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 0.5rem;">
-          <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
-          <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
-          <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
-        </div>
         <div id="colonyNoteBox" style="display:flex; gap:8px; margin:0 0 1rem;">
           <input type="text" id="colonyNoteInput" placeholder="Kurze Notiz zu diesem Standort (optional)…" maxlength="48" style="flex:1;"/>
           <button id="colonyNoteSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Notiz</button>
@@ -4218,6 +4227,15 @@
              weit von den eigentlichen Gebäuden entfernt). -->
         <div class="qty-select" id="qtySelect"></div>
         <div class="buildings" id="buildings"></div>
+        <!-- ANS ENDE, nicht in die Mitte (Wunsch Sascha, 14.09.2026): Das Namensfeld stand zwischen
+             den Standort-Kaesten und der Gebaeudeliste und schob damit das, was man im Basis-Reiter
+             wirklich sucht, nach unten. Es ist ein Feld, das man einmal ausfuellt - die Gebaeude
+             sind das, weswegen man den Reiter oeffnet. -->
+        <div id="colonyRenameBox" style="display:flex; gap:8px; margin:0.5rem 0 0.5rem;">
+          <input type="text" id="colonyRenameInput" placeholder="Eigener Name für diese Kolonie…" maxlength="24" style="flex:1;"/>
+          <button id="colonyRenameSaveBtn"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Speichern</button>
+          <button id="colonyAbandonBtn" style="display:none; background:rgba(226,75,74,0.18); border-color:var(--c-danger); flex-shrink:0;" title="Kolonie aufgeben"><i class="ti ti-alert-triangle" aria-hidden="true"></i></button>
+        </div>
       </div>
 
       <div class="tab-panel" id="tab-verteidigung">
@@ -5977,14 +5995,40 @@
     }
     return res;
   }
-  async function storageGet(key, shared){
+  /* strikt (Spieler-Report 14.09.2026: "wenn Updates kommen, wird die Bauschlange gelöscht und
+     auch die Forschungsschlange") - GEMESSEN, nicht vermutet:
+
+     Der Rückfall auf den lokalen Speicher direkt darunter ist für Rundfunk-Schlüssel richtig
+     (lieber ein alter Wert als gar keiner), für den EIGENEN SPIELSTAND aber gefährlich. Antwortet
+     die Spielstand-Route kurz nicht - und genau das ist das Deploy-Fenster, in dem sich das
+     Backend neu startet -, dann lieferte storageGet still die lokale Notkopie zurück. load() kann
+     sie von einer echten Serverantwort nicht unterscheiden: Es meldete "Spielstand automatisch
+     geladen", setzte bootDataReady und schrieb diesen alten Stand beim nächsten Takt über den
+     unversehrten Serverstand. Die Versionsprüfung half nicht, sondern half MIT - die Notkopie hat
+     keine Version, gameSaveVersion fiel auf 0, der 409 löste ein Nachladen aus, und der zweite
+     Versuch schrieb mit der frisch geholten Version erfolgreich über.
+     Gemessener Ablauf (tests/test_spielstand_ersatz.js): Server v7 mit gefüllten Warteschlangen,
+     502 nur auf die Spielstand-Route, alte Notkopie mit leeren Warteschlangen -> nach der Störung
+     stand v8 mit leeren Warteschlangen auf dem Server.
+     Noch schlimmer der Fall ohne Notkopie (neues Gerät): storageGet lieferte null, load() nahm den
+     "Neue Kolonie gestartet"-Zweig und speicherte einen leeren Anfangsstand über alles.
+
+     Mit strikt=true fällt der eigene Spielstand nicht mehr zurück, sondern wirft. load() behandelt
+     das wie jeden anderen Ladefehler: bootDataReady bleibt aus, es wird NICHTS gespeichert, die
+     Daten bleiben serverseitig unversehrt. Fail-closed, wie es für eine Sicherung sein muss.
+     Ohne Serververbindung (useBackend() false) ist der lokale Speicher der reguläre Ablageort -
+     dort ändert strikt nichts. */
+  async function storageGet(key, shared, strikt){
     if (useBackend()){
       try {
         const res = await backendFetch('/storage/'+encodeURIComponent(key)+'?shared='+(shared?'true':'false'));
         if (res.status === 404) return null;
         if (!res.ok) throw new Error('backend get failed');
         return await res.json();
-      } catch(e){ /* fällt unten durch auf lokalen Speicher */ }
+      } catch(e){
+        if (strikt) throw new Error('SERVERSTAND_UNERREICHBAR');
+        /* sonst: fällt unten durch auf lokalen Speicher */
+      }
     }
     if (hasCloudStorage()){
       try { return await window.storage.get(key, shared); } catch(e){}
@@ -9577,8 +9621,15 @@
     kausalanker: `<svg viewBox="0 0 42 42" width="20" height="20"><circle cx="21" cy="8" r="4" fill="none" stroke="#f3aec6" stroke-width="2.5"/><line x1="21" y1="12" x2="21" y2="33" stroke="#f3aec6" stroke-width="2.5"/><line x1="11" y1="17" x2="31" y2="17" stroke="#f3aec6" stroke-width="2.5"/><path d="M8 26 A13 13 0 0 0 34 26" fill="none" stroke="#f3aec6" stroke-width="2.5"/><circle cx="21" cy="34" r="2.4" fill="#f9d4e0"/></svg>`
   };
 
-  const VERSION = '8.731.0';
+  const VERSION = '8.732.0';
   const PATCHNOTES = [
+  { version:'8.732.0', date:'14.09.2026', changes:[
+    '<strong>Behoben: Eintraege der Bau-Wunschliste und der Forschungs-Warteschlange konnten beim Aktualisieren verschwinden.</strong> Beide Listen wurden beim Laden gegen die neu ausgelieferten Tabellen geprueft &ndash; und ein Eintrag, dessen Voraussetzung dabei als nicht erfuellt galt, wurde <em>ohne jede Meldung</em> geloescht. Jetzt gilt: Was nur <em>vorlaeufig</em> gesperrt ist (fehlende Forschung, fehlende Allianz), bleibt stehen und wird uebersprungen &ndash; die Liste laeuft ohne den Eintrag weiter, und du bekommst einmalig gesagt, was fehlt. Entfernt wird nur noch, was wirklich erledigt ist: eine Forschung auf ihrer Hoechststufe, ein Gebaeude auf einem Standort, der dir nicht mehr gehoert, oder ein Eintrag, den es nicht mehr gibt. Auch das sagt das Spiel jetzt.',
+    '<strong>Behoben: Ein Server-Aussetzer beim Laden konnte den Spielstand ueberschreiben.</strong> Antwortete der Server beim Seitenstart einen Moment lang nicht, hat das Spiel das nicht von &bdquo;es gibt noch keinen Spielstand&ldquo; unterscheiden koennen &ndash; und im schlimmsten Fall eine neue Kolonie gestartet und ueber den echten Stand gespeichert. Jetzt wird ein Stand, den der Server nicht geliefert hat, gar nicht erst angenommen: Das Spiel speichert dann nichts, sagt dir, dass es der Server gerade nicht hergibt, und holt den Stand von allein nach.',
+    '<strong>Neu: Der Kern eines eigenen Vorpostens laesst sich reparieren.</strong> Im Karten-Menue der Station steht <em>Kern reparieren</em> &ndash; direkt neben der Lager-Abholung, denn beide nehmen aus demselben Vorrat: Was du abholst, steht der Reparatur nicht mehr zur Verfuegung. Geheilt wird aus dem <strong>Stationslager</strong>, nicht aus deinem eigenen; es kostet keinen Flottenslot und wirkt sofort. Der Eintrag sagt dir vorher, wie viele Kernpunkte er herstellt und was er dafuer verbraucht. Steht die Station noch unter Beschuss, nennt er die verbleibende Wartezeit. Reparieren darf nur der Besitzer &ndash; auch kein Verbuendeter.',
+    '<strong>Die Rohstoffleiste sieht am PC aus wie die Tier-2-Anzeige.</strong> Symbol und Zahl nebeneinander in einem schmalen Feld, wie du es von den veredelten Rohstoffen kennst. Name, Lagerdeckel und Rate nennt weiterhin der Tooltip.',
+    '<strong>Das Feld zum Umbenennen steht jetzt am Ende der Kolonienliste.</strong> Vorher stand es zwischen Kopfzeile und Liste und schob alle Kolonien nach unten.',
+  ] },
   { version:'8.731.0', date:'14.09.2026', changes:[
     '<strong>Behoben: Loecher im Gebaeude-Raster.</strong> Stand eine fertige Anlage neben einer ausbaubaren, war die fertige Kachel nur so hoch wie ihr Text &ndash; der Rest der Reihe blieb als Leerflaeche stehen. Gemessen ueber die drei Baugruppen: <strong>626 Pixel</strong> verschenkte Flaeche in einem breiten Fenster, groesste Einzelluecke 97 Pixel. Jetzt fuellt jede Kachel ihre Reihe. Das Raster wird dadurch <em>nicht</em> hoeher &ndash; die Reihe war ohnehin so hoch wie ihre hoechste Kachel.',
     '<strong>Die Knoepfe einer Reihe stehen wieder auf einer Linie.</strong> <em>Ausbauen</em> und <em>Warteschlange</em> lagen zwischen Nachbarkacheln bis zu 9 Pixel versetzt.',
@@ -9675,17 +9726,11 @@
     '<strong>Die Tiefensonde markiert jetzt auch die z&auml;hen Sektoren.</strong> Bisher hob sie nur W&auml;chter hervor; welcher Sektor doppelten Atem kostet, h&auml;ttest du dir aus den Mutatoren zusammenrechnen m&uuml;ssen. Jetzt steht es dran.',
     '<strong>Behoben: Die angezeigte Anflugzeit eines Tauchplans lie&szlig; den Nullkiel aus.</strong> Wer mindestens 25 Nullkiele mitnahm, bekam f&uuml;r die Sektoren ab dem zweiten eine andere Zeit angezeigt, als der Tauchgang hinterher wirklich brauchte. Vorschau, Start und Abrechnung rechnen das jetzt an einer einzigen Stelle.'
   ] },
-  { version:'8.712.0', date:'09.09.2026', changes:[
-    '<strong>Der Tauchplan: Ein Tauchgang kann jetzt bis zu f&uuml;nf Tiefen hintereinander anlaufen.</strong> Im Tauchreiter stellst du ein, wie weit die Route reicht &ndash; der Verband arbeitet sie von oben nach unten ab und k&auml;mpft in jedem Sektor einzeln. <strong>Jeder Sektor wird vollst&auml;ndig abgerechnet</strong>: Splitter, Bergungsgut, Beute, Kampfpunkte, Funde, Reliquien, Rekordtiefe und Meilensteine. Wer im dritten von f&uuml;nf Sektoren einen W&auml;chter bezwingt, hat seine Reliquie &ndash; auch wenn der vierte schiefgeht.',
-    '<strong>Was du verlierst, bleibt verloren.</strong> Schiffe, die in Sektor 1 fallen, k&auml;mpfen in Sektor 2 nicht mehr mit und tragen auch keine Beute mehr. Ein langer Plan wird mit jeder Tiefe gef&auml;hrlicher, und der Anflug dauert so lange wie alle geplanten Sektoren zusammen &ndash; nicht wie einer.',
-    '<strong>Die Sicherheitslinie ist die eigentliche Entscheidung.</strong> Du legst vor dem Abtauchen fest, bei welchem Anteil deiner Kampfkraft der Verband umkehrt: gar nicht, unter 75%, unter 50% oder unter 25%. Wird sie unterschritten, bricht der Plan ab &ndash; die Flotte k&auml;mpft nicht weiter und beh&auml;lt alles, was sie bis dahin geholt hat. Die Flugzeit steht dabei beim Abtauchen fest und verk&uuml;rzt sich nicht: Der Verband ist die geplante Zeit unterwegs, auch wenn er fr&uuml;her umkehrt. Eine Niederlage beendet den Plan ebenso.',
-    '<strong>Und der Plan l&auml;uft in neues Gebiet.</strong> Tiefer als eine Tiefe unter deinem Rekord kommst du nie &ndash; aber weil jeder gewonnene Sektor den Rekord hebt, arbeitet sich ein erfolgreicher Plan Schritt f&uuml;r Schritt nach unten.'
-  ] },
   ];
   // Zahl der Versionen in patchnotes-archiv.json (die aelteren, nicht mehr im Spiel liegenden
   // Eintraege). Wird von build-patchnotes.js gepflegt, nie von Hand - der Update-Tab nennt damit die
   // Restzahl, ohne das Archiv zu laden.
-  const PATCHNOTES_ARCHIV_ANZAHL = 1134;
+  const PATCHNOTES_ARCHIV_ANZAHL = 1135;
 
   const RESEARCH_DEFS = [
     { key:'rsolar', name:'Verbesserte Solarzellen', baseCost:{erz:50, kristalle:10, forschungspunkte:11}, costMult:1.2, baseDuration:20, durationMult:1.45, desc:'Wirkungsgradsteigerung aller Solaranlagen: erhöht die Energieproduktion um +2,5% je Stufe (bis +50% bei Stufe 20). Wirkt auf allen Planeten und Monden gleichzeitig. Stapelt mit „Photonenkollektoren".', effectRes:'energie', effectPerLevel:0.025, maxLevel:20, requires:[] },
@@ -14936,7 +14981,7 @@
       zweig = varianten[idx].zweig;
     }
     const zielName = (vorpostenVarianten(v).find(x => !zweig || x.zweig === zweig) || {}).name || 'nächste Stufe';
-    if (!confirm('Vorposten zur Stufe ' + ((v.stufe||1)+1) + " („" + zielName + '") ausbauen?\n\nKosten: ' + kostenText(kosten) + '. Ein Ausbau heilt nicht: angerichteter Schaden bleibt.')) return;
+    if (!confirm('Vorposten zur Stufe ' + ((v.stufe||1)+1) + " („" + zielName + '") ausbauen?\n\nKosten: ' + kostenText(kosten) + '. Ein Ausbau heilt nicht: angerichteter Schaden bleibt – dafür gibt es die Reparatur aus dem Stationslager.')) return;
     let daten = null;
     try {
       const res = await backendFetch('/vorposten/ausbauen', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId, zweig }) });
@@ -15270,6 +15315,41 @@
        selbst (vorpostenFrachtStarten) oder der Rueckfall seine Sofortbuchung; beides sagt genau
        eines, und beides weiss mehr als diese Stelle. */
     await claimPendingRewards();
+    await ladeVorposten(); render(); save();
+  }
+  /* Den Kern aus dem EIGENEN Stationslager heilen (VP-R, 14.09.2026). Die Route nimmt nur
+     `system` - der Betrag kommt NICHT aus dem Request, sondern wird auf dem Server aus dem
+     gemessenen Lagerstand gerechnet (dieselbe Funktion, aus der auch die Vorschau in
+     GET /api/vorposten stammt). Deshalb steht hier keine Kostenrechnung und keine Heilrate:
+     Was sie kostet und was sie bringt, sagt `v.reparatur`, und was sie WIRKLICH gekostet hat,
+     sagt die Antwort.
+     KEIN claimPendingRewards: Die Reparatur legt keine Belohnung an, sie heilt sofort am Ziel -
+     anders als die Abholung darueber. KEIN pay/gainResources: Die Rohstoffe liegen im
+     Stationslager, nicht beim Spieler; der eigene Bestand wird nicht angefasst.
+     Das `.catch(() => null)` hat denselben Grund wie oben - backendFetch faengt nichts ab, und
+     das Kartenmenue ist beim Klick schon zu. */
+  async function vorpostenReparieren(sysId){
+    const v = vorpostenAn(sysId);
+    if (!v || !v.eigener){ log('Dort steht kein eigener Vorposten.', 'ti-alert-triangle', 'warn'); return; }
+    const res = await backendFetch('/vorposten/reparieren', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ system: sysId }) }).catch(() => null);
+    const daten = res ? await res.json().catch(() => null) : null;
+    if (!res || !res.ok){
+      log((daten && daten.error) || 'Der Server hat die Reparatur abgelehnt.', 'ti-alert-triangle', 'warn');
+      /* NACH EINER ABLEHNUNG NEU LADEN (Durchsicht 14.09.2026). Drei der acht Ablehnungen heissen
+         der Sache nach „dein Zwischenspeicher ist alt": Kern unversehrt, Station gesperrt, Lager
+         leer. Wer nur zurueckkehrt, laesst den Spieler auf genau die veralteten Zahlen schauen,
+         die ihn zum Klick verleitet haben - und der naechste Klick faende dieselbe Ablehnung. */
+      await ladeVorposten(); render();
+      return;
+    }
+    /* Beide Zahlen kommen aus der ANTWORT und werden nicht auseinander abgeleitet: Der Server
+       rundet die drei Rohstoffe einzeln, deshalb kann der Verbrauch die Heilung um wenige
+       Einheiten uebersteigen - nie zugunsten des Besitzers. Wer eine aus der anderen rechnete,
+       zeigte eine Zahl, die der Server nie geschickt hat. */
+    /* `daten` kann trotz res.ok null sein - wenn die Antwort kein gueltiges JSON traegt, faengt
+       das .catch oben sie ab. Ohne die Absicherung flaege hier ein TypeError, und das Neuladen
+       darunter bliebe aus: Der Kern waere geheilt, das Spiel wuesste es nicht. */
+    log('Kern um ' + fmt((daten && daten.geheilt) || 0) + ' wiederhergestellt – verbraucht: ' + vorpostenLagerText(daten && daten.verbraucht) + '.', 'ti-refresh', 'good');
     await ladeVorposten(); render(); save();
   }
   /* Die Steckplatz-Verwaltung. Bewusst ein eigenes Fenster statt eines weiteren Kartenmenue-
@@ -25968,7 +26048,21 @@
       return (state.research[v.key]||0) >= v.level;
     });
   }
-  function techUnlockedGeneric(requires){ return (requires||[]).every(k => (state.research[k]||0) >= 1); }
+  /* Geht ueber DENSELBEN Normalisierer wie techUnlocked() - genau das fordert der Kommentar
+     darueber, und genau das tat diese Zeile bis zum 14.09.2026 NICHT: Sie las jede Voraussetzung
+     als blossen Schluessel. Eine Voraussetzung in Objektform waere damit nie erfuellt gewesen
+     (state.research[{...}] ist undefined), und der Aufrufer in processQueue haette den
+     Wunschlisteneintrag daraufhin STILL geloescht. Gemessen: BUILDING_DEFS benutzt die Objektform
+     heute kein einziges Mal (RESEARCH_DEFS 35-mal, die lesen aber ueber techUnlocked). Die Falle
+     war also latent - sie waere beim ersten Gebaeude mit {key,level} aufgegangen, und zwar
+     unbemerkt. Das ist der Spiegelfall von SP-1, dort las die Sperrgrund-Meldung umgekehrt
+     unbedingt req.key/req.level. */
+  function techUnlockedGeneric(requires){
+    return (requires||[]).every(req => {
+      const v = techVoraussetzung(req);
+      return (state.research[v.key]||0) >= v.level;
+    });
+  }
   // Forschungszeit-Verkuerzung durch Labore. Als Konstanten seit 01.08.2026: Der Hilfetext nannte
   // "gedeckelt bei 45% (ab ca. 15 Laboren erreicht)" - die 45% stimmten, die 15 nicht. Sie stammten
   // aus der Zeit, als der Deckel noch bei 65% lag (0,65/0,045 = 14,4). Nach der Absenkung auf 45%
@@ -34404,6 +34498,8 @@ async function claimPendingRewards(){
   // Damit der Hinweis nicht jede Sekunde erneut im Protokoll steht (tryStartQueuedResearch laeuft
   // im Haupt-Tick): je Forschung+Stufe genau einmal melden.
   let lagerWandGemeldet = {};
+  // Je Forschung genau einmal melden - tryStartQueuedResearch laeuft im Sekundentakt.
+  let forschungSperreGemeldet = {};
   function tryStartQueuedResearch(){
     if (state.activeResearch) return false;
     if (!state.researchQueue || !state.researchQueue.length) return false;
@@ -34411,9 +34507,49 @@ async function claimPendingRewards(){
       const key = state.researchQueue[i];
       const r = findeForschung(key);
       const curLvl = r ? (state.research[key]||0) : 0;
-      // Eine Allianzforschung ohne Allianz wird aus der Warteschlange geworfen statt sie zu blockieren -
-      // sonst stünde die ganze Schlange still, bis man wieder beitritt.
-      if (!r || (istAllianzForschung(key) && !inAllianz()) || !techUnlocked(r) || curLvl>=r.maxLevel){ state.researchQueue.splice(i,1); return true; }
+      /* Bis zum 14.09.2026 warf diese eine Zeile VIER verschiedene Fälle in denselben stillen
+         Wegwurf (Spieler-Report: "wenn Updates kommen, wird ... auch die Forschungsschlange
+         gelöscht"). Keiner davon sagte etwas - und gelaufen sind sie ausgerechnet im Ladepfad, wo
+         applyOfflineProgress die Schlange gegen die frisch ausgelieferten Tabellen prüft und das
+         Ergebnis vierzehn Zeilen später festschreibt. Ändert ein Update eine Voraussetzung oder
+         eine Maximalstufe, war der Eintrag weg, bevor ihn jemand sehen konnte.
+         Jetzt getrennt und jeder Fall mit eigener Sprache. Die Unterscheidung, auf die es ankommt:
+           ENDGÜLTIG (Schlüssel gibt es nicht mehr, Stufe bereits erreicht) -> entfernen, mit Grund.
+           VORÜBERGEHEND (keine Allianz, Voraussetzung fehlt) -> STEHEN LASSEN und überspringen.
+         Der alte Kommentar begründete das Wegwerfen damit, dass sonst die ganze Schlange
+         stillstünde. Das stimmte, solange es nur splice oder blockieren gab - `continue` zieht den
+         nächsten startbaren Eintrag vor, genau wie bei der Lagerwand weiter unten. Damit ist der
+         Grund für das Wegwerfen entfallen, der Schaden aber nicht.
+         Gemeldet wird je Forschung genau einmal (forschungSperreGemeldet), sonst schriebe der
+         Sekundentakt dieselbe Zeile endlos. */
+      if (!r){
+        state.researchQueue.splice(i,1);
+        log('Unbekannter Eintrag "'+key+'" aus der Forschungs-Warteschlange entfernt (diese Forschung gibt es nicht mehr).', 'ti-alert-triangle', 'warn');
+        return true;
+      }
+      if (curLvl >= r.maxLevel){
+        state.researchQueue.splice(i,1);
+        log(r.name+' hat bereits die Maximalstufe ('+r.maxLevel+') erreicht - Eintrag aus der Forschungs-Warteschlange entfernt.', 'ti-alert-triangle', 'warn');
+        return true;
+      }
+      if (istAllianzForschung(key) && !inAllianz()){
+        if (!forschungSperreGemeldet[key]){
+          forschungSperreGemeldet[key] = true;
+          log(r.name+' wartet in der Forschungs-Warteschlange: dafür brauchst du wieder eine Allianz. Der Eintrag bleibt stehen, die übrigen laufen weiter.', 'ti-alert-triangle', 'warn');
+        }
+        continue;
+      }
+      if (!techUnlocked(r)){
+        if (!forschungSperreGemeldet[key]){
+          forschungSperreGemeldet[key] = true;
+          const fehlt = (r.requires||[]).map(techVoraussetzung)
+            .filter(v => (state.research[v.key]||0) < v.level)
+            .map(v => ((RESEARCH_DEFS.find(x=>x.key===v.key)||{}).name || v.key) + (v.level > 1 ? ' Stufe '+v.level : ''))
+            .join(', ');
+          log(r.name+' wartet in der Forschungs-Warteschlange: dafür fehlt noch '+(fehlt || 'eine Voraussetzung')+'. Der Eintrag bleibt stehen, die übrigen laufen weiter.', 'ti-alert-triangle', 'warn');
+        }
+        continue;
+      }
       const cost = researchCostFor(r, curLvl+1);
       /* Gegen die RESTKOSTEN geprueft, nicht gegen die vollen (B4, 19.08.2026): Was auf dem
          Baustellen-Konto dieses Postens liegt, ist bereits beiseitegelegt und muss nie mehr ins
@@ -35780,19 +35916,48 @@ async function claimPendingRewards(){
   // Balance-/Feature-Wunsch 13.07.2026: prüft jetzt ALLE Einträge in Reihenfolge statt nur den
   // ersten - ein hinten liegender, bereits bezahlbarer Eintrag wird vorgezogen, wenn ein früherer
   // (noch) nicht bezahlbar ist, statt die ganze Liste zu blockieren.
+  // Je Standort+Gebaeude genau einmal melden - processQueue laeuft im Sekundentakt.
+  let bauSperreGemeldet = {};
   function processQueue(){
     if (!state.buildQueue || !state.buildQueue.length) return false;
     for (let i=0;i<state.buildQueue.length;i++){
       const item = state.buildQueue[i];
       const b = item.planet === 'home' ? state.buildings : (state.colonies[item.planet] ? state.colonies[item.planet].buildings : null);
-      if (!b){ state.buildQueue.splice(i,1); return true; }
+      if (!b){
+        const wegName = (BUILDING_DEFS.find(d=>d.key===item.key)||{}).name || item.key;
+        state.buildQueue.splice(i,1);
+        log(wegName+' aus der Bau-Wunschliste entfernt: der Standort dazu gehört dir nicht mehr.', 'ti-alert-triangle', 'warn');
+        return true;
+      }
       const def = BUILDING_DEFS.find(d=>d.key===item.key);
       // Dieselbe Fehlerklasse wie bei den Bauaufträgen (siehe pruneBrokenConstructionJobs): steht in
       // der gespeicherten Wunschliste ein Gebäude, das es in BUILDING_DEFS nicht (mehr) gibt, warf
       // die nächste Zeile bisher bei JEDEM Tick - der ganze Haupt-Tick blieb hängen. Eintrag
       // entfernen statt abstürzen, gleiches Muster wie die Planeten-Prüfung direkt darüber.
       if (!def){ state.buildQueue.splice(i,1); log('Unbekannter Eintrag "'+item.key+'" aus der Bau-Wunschliste entfernt (Gebäude existiert nicht mehr).', 'ti-alert-triangle'); return true; }
-      if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){ state.buildQueue.splice(i,1); return true; }
+      /* Voraussetzung (noch) nicht erfuellt: LIEGEN LASSEN, nicht wegwerfen (Spieler-Report
+         14.09.2026, "wenn Updates kommen, wird die Bauschlange geloescht"). Bis dahin flog der
+         Eintrag hier STILL heraus - ohne jede Meldung, und ausgerechnet im Ladepfad, wo
+         applyOfflineProgress die Wunschliste gegen die frisch ausgelieferten Tabellen prueft und
+         das Ergebnis vierzehn Zeilen spaeter festschreibt. Aendert ein Update die requires eines
+         Gebaeudes, war der Eintrag damit weg, bevor irgendjemand ihn sehen konnte.
+         Ein Eintrag, den der Spieler bewusst eingereiht hat, gehoert nicht geloescht, weil er
+         gerade nicht darf - er wartet, wie bei "gerade zu arm" direkt darunter. Die Schlange
+         steht dadurch NICHT still: `continue` zieht den naechsten bezahlbaren Eintrag vor.
+         Gemeldet wird je Eintrag genau einmal (siehe bauSperreGemeldet), sonst schriebe der
+         Sekundentakt dieselbe Zeile endlos. */
+      if ((def.requires||[]).length && !techUnlockedGeneric(def.requires)){
+        const merk = item.planet+':'+item.key;
+        if (!bauSperreGemeldet[merk]){
+          bauSperreGemeldet[merk] = true;
+          const fehlt = (def.requires||[]).map(techVoraussetzung)
+            .filter(v => (state.research[v.key]||0) < v.level)
+            .map(v => ((RESEARCH_DEFS.find(r=>r.key===v.key)||{}).name || v.key) + (v.level > 1 ? ' Stufe '+v.level : ''))
+            .join(', ');
+          log(def.name+' wartet in der Bau-Wunschliste: dafür fehlt noch '+(fehlt || 'eine Forschung')+'. Der Eintrag bleibt stehen, die übrigen laufen weiter.', 'ti-alert-triangle', 'warn');
+        }
+        continue;
+      }
       const lvl = b[item.key]||0;
       if (def.maxLevel && lvl >= def.maxLevel){ log(def.name+' (Warteschlange) hat bereits die Maximalstufe ('+def.maxLevel+') erreicht - Eintrag übersprungen.', 'ti-alert-triangle'); state.buildQueue.splice(i,1); return true; }
       const cost = costFor(def, lvl);
@@ -46081,7 +46246,7 @@ async function claimPendingRewards(){
          (Arbeitsregel 38). Wer die Stufenzahl aendert, aendert sie HIER mit. */
       { title:'Orbitalstation', body:'Jeder Planet (auch die Heimatbasis, keine Monde) kann eine <strong>Orbitalstation</strong> in 8 Stufen bauen (Basis-Tab); die Stufen 4-5 sind Endgame-Ausbauten und benötigen Leerentechnologie Stufe 3 sowie 3 bzw. 5 Leerensplitter, die Stufen <strong>6-8</strong> zusätzlich die Forschung <em>Kausalanker-Theorie</em> und Tier-3-Material (6 Hohlraumgitter für Stufe 6, 10 Hohlraumgitter + 8 Kausalanker für Stufe 7, 12 Hohlraumgitter + 10 Kausalanker + <strong>60 Protomaterie</strong> für Stufe 8) - die hängen über die Baukosten ihrer Fabriken am Asteroiden-Bergbau. Stufe 8 ist die erste Stufe, die Protomaterie direkt verlangt: Sie kommt ausschließlich von den Urmateriekernen im Asteroidengürtel, und sie wird einmalig je Standort fällig, nicht laufend. Die Stufen 1-5 sind dabei unverändert geblieben: gleiche Kosten, gleiche Wirkung. Beim Bau wählst du einen Fokus: <strong>Verteidigungsring</strong> (+8% Verteidigung je Stufe), <strong>Produktionsring</strong> (+3% Produktion je Stufe, nur dieser Planet) oder <strong>Dock-Ring</strong> (-6% Schiffsbauzeit je Stufe, +150 Lager je Stufe). Der Ausbau behält den Fokus; eine Umrüstung auf einen anderen Fokus kostet die halben Baukosten der aktuellen Stufe, wirkt sofort und unterliegt ebenfalls einem <strong>2-Stunden-Cooldown</strong> pro Station. Kosten verdoppeln sich je Stufe (Basis 16.000 Erz / 10.000 Kristalle / 3.200 Deuterium, zusätzlich Imperiums-Skalierung: +25% je weiterem Standort), Bauzeit 5-25 Minuten. Auf der <strong>Sektorkarte</strong> wird jede Orbitalstation als sichtbarer Ring um den Planeten dargestellt, in der Farbe des gewählten Fokus - Stufe 1 ein einzelner dünner Ring, Stufe 2 zwei Ringe, Stufe 3 drei Ringe mit kleinen Modul-Knoten und leichtem Leuchtpuls. So ist die Ausbaustufe auf einen Blick erkennbar, ohne das Baumenü zu öffnen.<br><br><strong>Seit dem 02.08.2026 gibt es einen vierten Fokus, den Signalring:</strong> +3% Expeditionsausbeute je Stufe, aber nur für Expeditionen, die von <em>dieser</em> Welt starten (bis +24% bei Vollausbau). Das ist der erste ortsgebundene Ausbeute-Bonus für Expeditionen überhaupt – bis dahin war es gleichgültig, von welcher Welt man losfliegt. Er zahlt in dieselbe additive, gedeckelte Gruppe ein wie Kodex, Forschung und Module. <strong>Nebenbei behoben:</strong> Die Fokus-Karte rechnete für den Produktionsring +4% je Stufe und zeigte bei Stufe 5 „+20% Produktion" an, während die Beschreibung daneben +3% sagte und die Rechnung real +15% gab – eine alte Balance-Änderung hatte diese eine Anzeigestelle nicht mitgenommen.' },
       { title:'Gebäude-Raster und Bau-Warteschlange', body:'Die Gebäude stehen in drei Gruppen – <strong>Produktion</strong>, <strong>Veredelung</strong>, <strong>Nutzgebäude</strong> – als Kachelraster; jeder Gruppenkopf nennt die Zahl der Gebäude und, sobald eines fertig ist, wie viele. Der Filter „Fertig Ausgebautes ausblenden" über den Gruppen lässt fertige Kacheln verschwinden, der Kopf mit dem Zähler bleibt. Die <strong>Bau-Warteschlange</strong> über der Liste zeigt je Eintrag die Zielstufe (→ Lv. N) – derselbe Bau zweimal in der Schlange heißt zwei aufeinanderfolgende Stufen. Verteidigungsanlagen stehen im Verteidigungs-Tab in demselben Raster – am PC zwei nebeneinander, am Handy untereinander.' },
-      { title:'Bau-Warteschlange (Schiffe & Verteidigungsgebäude)', body:'Schiffe und Verteidigungsgebäude werden auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort in die Warteschlange aufgenommen - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei ist (nur ein aktiver Bau je Art/Planet gleichzeitig). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr die ganze Warteschlange. So werden Ressourcen effizient genutzt. Dasselbe Prinzip gilt auch für die Gebäude-Wunschliste (Knopf "Warteschlange" bei normalen Gebäuden).' },
+      { title:'Bau-Warteschlange (Schiffe & Verteidigungsgebäude)', body:'Schiffe und Verteidigungsgebäude werden auch OHNE ausreichende Ressourcen im Moment der Bestellung sofort in die Warteschlange aufgenommen - Bezahlung und tatsächlicher Baustart passieren automatisch, sobald genug Ressourcen vorhanden UND die Baustelle frei ist (nur ein aktiver Bau je Art/Planet gleichzeitig). Ist ein früherer Auftrag in derselben Warteschlange (noch) nicht bezahlbar, wird ein späterer, bereits bezahlbarer Auftrag automatisch vorgezogen und sofort gestartet - der frühere bleibt liegen und wird bei jedem weiteren Tick erneut versucht, blockiert aber nicht mehr die ganze Warteschlange. So werden Ressourcen effizient genutzt. Dasselbe Prinzip gilt auch für die Gebäude-Wunschliste (Knopf "Warteschlange" bei normalen Gebäuden). <strong>Ein Eintrag wird nie stillschweigend gelöscht:</strong> Fehlt einem Gebäude noch eine Forschung, wird der Eintrag übersprungen und bleibt stehen, bis die Forschung da ist – du bekommst einmalig eine Meldung, welche fehlt. Entfernt wird ein Eintrag nur, wenn es das Gebäude nicht mehr gibt, du seine Maximalstufe schon erreicht hast oder der Standort dir nicht mehr gehört – auch das wird jeweils gemeldet.' },
       { title:'Planeten-Ereignisse', body:'Alle paar Stunden (2–4 h) trifft ein zufälliges <strong>lokales Ereignis</strong> einen deiner Planeten (keine Monde) und wirkt dort 10–15 Minuten – ganz passiv, ohne dass du etwas tun musst. Zwölf Varianten, überwiegend positiv: von <strong>Erzader entdeckt</strong> (+40% Erz) über <strong>Forschungsfieber</strong> (+30% Forschungspunkte) bis <strong>Ruhiger Orbit</strong> (-20% Schiffsbauzeit) – aber auch mal ein <strong>Staubsturm</strong> (-20% Produktion) oder <strong>Arbeitsunruhen</strong> (-20% Erz). Ein aktives Ereignis wird als Banner im Basis-Tab des betroffenen Planeten angezeigt (mit Restzeit) und im Log gemeldet. Pro Planet läuft höchstens ein Ereignis gleichzeitig. Nicht zu verwechseln mit den galaktischen Entscheidungs-Ereignissen, bei denen du zwischen zwei Optionen wählst – Planeten-Ereignisse sind reines Lokalwetter.' },
       { title:'Chat-Benachrichtigung & Live-Chat', body:'Der Chat-Reiter am linken Bildschirmrand zeigt einen roten Punkt, sobald in Allianz- oder globalem Chat eine neue Nachricht eingetroffen ist, seit du zuletzt geöffnet hattest - läuft automatisch im Hintergrund, ohne dass der Chat offen sein muss. Ein geöffnetes Chat-Panel aktualisiert sich alle paar Sekunden von selbst; du siehst neue Nachrichten also live, ohne das Panel zu schließen und neu zu öffnen. Wer im Verlauf hochgescrollt hat, bleibt dabei an seiner Lesestelle. Über „Ältere anzeigen" am Kopf des Verlaufs lädst du schrittweise bis zu 300 Nachrichten Historie je Kanal nach; Tages-Trennzeilen (Heute/Gestern/Datum) zeigen, wo ein Tag endet.' },
       { title:'Automatische Update-Erkennung', body:'Bleibt die Kolonie lange im selben Tab geöffnet (z.B. als installierte App), prüft sie im Hintergrund von selbst, ob eine neue Version bereitsteht - beim Zurückwechseln in den Tab und danach alle 10 Minuten. Wird eine gefunden, erscheint automatisch das Update-Fenster mit den vollständigen Patchnotes; es lässt sich nicht wegklicken, nur über "Seite neu laden" geht es weiter (dein Fortschritt bleibt dabei erhalten).' },
@@ -46170,7 +46335,7 @@ async function claimPendingRewards(){
       { title:'Veteranen-Flotten', body:'Jeder Flotten-Standort (Heimat, Kolonien, Monde) sammelt <strong>Kampferfahrung</strong>: überlebte Gefechte bringen Veteranen-XP (Siege deutlich mehr als Niederlagen - zählt für NPC-Kämpfe, Piraten-Verstecke, Spieler-Angriffe und erfolgreich abgewehrte Überfälle). Fünf Ränge: <strong>Rekrut → Erprobt (+2%) → Veteran (+4%) → Elite (+6%) → Legende (+8%)</strong> - der Bonus wirkt auf Angriffs- UND Verteidigungskraft der Flotten dieses Standorts. Schwere Verluste kosten anteilig Erfahrung (30% Flottenverlust ≈ 30% XP weg), ein Rang kann also auch wieder sinken. Das aktuelle Abzeichen siehst du im Galaxie-Tab über der Angriffsflotten-Auswahl.<br><br><strong>Seit dem 01.08.2026 hängt am Rang mehr als eine Kampfzahl</strong> – was genau, entscheidet die <strong>Rolle</strong> der Welt. Auf einer <strong>Festungs-Welt</strong> zählt der Rang auf die Verteidigung ein zweites Mal (bei „Legende" also +8% zusätzlich zu den +8%, die er ohnehin gibt). Auf einer <strong>Werft-Welt</strong> verkürzt er zusätzlich die Schiffsbauzeit dieser Welt (bis −12%). Auf einem <strong>Tiefenhafen</strong> bringt er zusätzlich Abgrundsplitter aus Tauchgängen, die von dort starten (bis +16%). Die übrigen vier Rollen bekommen bewusst nichts: Sie haben ihre eigene Wirkung, und Kampferfahrung, die Forschung beschleunigt, wäre eine Zahl ohne Geschichte. Welche Zusatzwirkung deine aktuelle Basis hat, steht direkt unter dem Veteranenrang.<br><br><strong>Seit dem 02.08.2026 zieht die Erfahrung mit um.</strong> Vorher klebte sie am Boden: Eine Flotte, die fünfzig Gefechte überstanden hatte und dann verlegt wurde, kam als Rekrut an, und der Rang blieb auf der alten Welt liegen – auch wenn dort kein Schiff mehr stand. Jetzt wandert sie <strong>anteilig</strong> mit: Wer die halbe Kampfflotte verlegt, nimmt die halbe Erfahrung mit. Sie wird beim Abflug abgezogen und reist mit; geht das Ziel unterwegs verloren, kehrt sie mit den Schiffen zurück. Gerechnet wird nur mit <em>Kampfschiffen</em> – ein Konvoi aus Frachtern hat keine Gefechtserfahrung zu vergeben.' },
       { title:'Alien-Nester und die Königin', body:'In der Galaxie nisten sich <strong>Alien-Völker</strong> ein. Anders als eine Asteroidenfestung, die einfach dasteht, ist ein Nest ein <strong>lebendiges Ziel</strong>: Es <em>wächst</em>, es <em>breitet sich aus</em>, und wer es stehen lässt, hat übermorgen mehr davon als heute. Auf der Karte erkennst du es an der pulsierenden Zellform im geöffneten System – ein Klick öffnet das Menü mit <strong>Nest angreifen</strong> – und, wenn du in einer Allianz bist und dort Admin oder Offizier, mit <strong>Allianz-Verband ausrufen</strong> gleich darunter. Der zweite Eintrag ist der wichtigere, sobald das Nest gewachsen ist: Er ruft die ganze Allianz zum gemeinsamen Schlag, ohne dass du das Nest im Allianz-Tab noch einmal heraussuchen musst.<br><br><strong>Fünf Stufen:</strong> ' + NEST_STUFEN.slice(1).map((st,i) => '<strong>' + st.name + '</strong> (' + fmt(st.lp) + ' LP)').join(', ') + '. Ein Nest reift von selbst weiter; das Kartenmenü sagt dir, <em>wann</em> die nächste Stufe kommt. Und es <strong>heilt dabei nicht</strong> – was du ihm abgenommen hast, bleibt ihm abgenommen.<br><br><strong>Vier Völker, vier Eigenarten:</strong><br>' + Object.values(ALIEN_VOELKER).map(v => '• <strong>' + v.name + '</strong> – ' + v.art + '. Wirksam dagegen: <strong>' + nestSchwaecheName(v.schwaeche) + '</strong>.').join('<br>') + '<br><br><strong>Die Schwäche ist keine Formalität:</strong> Führt dein Verband die passende Schiffsklasse mit, richtet jeder Schlag <strong>25% mehr</strong> an. Die Startvorschau sagt dir vorher, ob sie dabei ist – du sollst es nicht erst aus dem Bericht danach erfahren.<br><br><strong>Angegriffen wird über das Kartenmenü.</strong> Der Verband fliegt hin und zurück, und der Server rechnet den Schaden aus deiner Flotte. Nach jedem Schlag gilt an <em>diesem</em> Nest eine <strong>Abklingzeit von ' + NEST_ABKLING_STD + ' Stunden</strong>; Mitstreiter können in der Zwischenzeit weitermachen. Beim Fall wird die Bergung <strong>nach Schadensanteil</strong> geteilt – wer ein Drittel beigetragen hat, bekommt ein Drittel, auch wenn ein anderer den letzten Schlag geführt hat. Gezählt wird dabei, was <em>angekommen</em> ist. Dein Anteil liegt danach unter den <strong>Belohnungen</strong>, auch wenn du beim Fall gerade offline warst – und mit etwas Glück ist ein <strong>Boss-Set-Teil</strong> dabei, umso eher, je höher die Stufe des Nestes war.<br><br><strong>Die Nomaden von Vex sind der Sonderfall:</strong> Ihr Nest <em>wandert</em>. Ist es bei der Ankunft weitergezogen, findet dein Verband nichts vor – und kehrt <strong>unversehrt</strong> zurück, ohne Verluste und ohne Abklingzeit. Das ist kein Fehlschlag, sondern der Preis des Zögerns.<br><br><strong>Und die Königin.</strong> Hat ein Volk genug Nester, schlüpft am ältesten die Königin – die stärkste Stufe mit ' + fmt(NEST_STUFEN[5].lp) + ' Lebenspunkten. Sie ist das Ereignis, für das eine Allianz zusammenkommt: <strong>Fällt sie, zerfällt der ganze Schwarm ihres Volkes</strong>, alle seine Nester verschwinden mit ihr, und das Volk sammelt sich tagelang neu. Wer früh räumt, zahlt wenig und bekommt wenig; wer wachsen lässt, spielt auf die große Ausschüttung – und alle anderen bezahlen die Zwischenzeit mit.' },
       { title:'Wrackkonvois: die Beute, die entkommt', body:'Ab und zu treibt ein <strong>Wrackkonvoi</strong> durch ein freies System – ein zerbrochener Rumpf mit Trümmerspur auf der Karte, als Landmarke ein <strong>♻️</strong>. Er ist das Gegenstück zum Alien-Nest: Er hat <strong>keine Schwäche, keine Stufen</strong>, er wächst nicht – aber er <strong>entkommt</strong>. Nach <strong>' + KONVOI_LEBENSDAUER_STD + ' Stunden</strong> ist er ganz weg, und bis dahin kann er in ein Nachbarsystem driften. Wer zu lange zögert, findet nichts mehr vor – der Verband kehrt dann <strong>unversehrt</strong> zurück, ohne Verluste und ohne Abklingzeit. Das Kartenmenü und die Startvorschau sagen dir vorher, wie lange er noch da ist und ob dein Hinflug rechtzeitig ankommt.<br><br><strong>Angegriffen wird über das Kartenmenü</strong>, wie bei Festung und Nest: Der Verband fliegt hin und zurück, der Server rechnet den Schaden aus deiner Flotte, und was <em>angekommen</em> ist, zählt auf deinen Anteil. Nach jedem Schlag gilt an <em>diesem</em> Konvoi eine <strong>Abklingzeit von ' + KONVOI_ABKLING_STD + ' Stunden</strong>. Ein Konvoi ist bewusst <strong>solo zu schaffen</strong> – so groß wie ein Einsteiger-Nest.<br><br><strong>Die Bergung</strong> geht beim Fall an alle Beteiligten nach Schadensanteil und liegt danach unter den <strong>Belohnungen</strong>: <strong>Sternenessenz</strong> (die einzige Währung, die Prestige und Aufstieg übersteht – bewusst wenig, aber wiederkehrend), Kampfpunkte, Erfahrung und Kredite. Dazu würfelt der Server für jeden Beteiligten <strong>zwei Module, die es nirgends sonst gibt</strong>: die <strong>Bergungslogik</strong> (Standort, Produktion) und die <strong>Bergungspanzerung</strong> (Schiffsmodul der Schweren Linie, Hülle) – jeweils mit einer Chance je Schadensanteil. Beide sind episch, nicht schmiedbar und nicht handelbar; das Herkunfts-Schloss hält sie aus jedem anderen Fundtopf heraus.' },
-      { title:'Vorposten: eine gehaltene Präsenz auf der Karte', body:'Ein <strong>Vorposten</strong> ist die erste spielergebaute Struktur jenseits von Kolonie und Allianzbasis: Du errichtest ihn in einem fremden System (nicht im Heimatsystem, nicht bei einer eigenen Kolonie, <strong>einer je System</strong>, höchstens drei je Konto) über den Knopf <strong>„Vorposten errichten"</strong> in der Detailtafel des aufgeklappten Systems. Eine <strong>Baukolonne</strong> (ein Kolonieschiff, es kommt zurück) fliegt hin; die Baukosten sind fällig beim Start und kommen zurück, falls der Bau nicht zustande kommt. Der Server führt jeden Vorposten – Stufe, Kern, Garnison und Verteidigung sieht jeder, und jeder andere Spieler kann ihn nach dem <strong>Bauschutz</strong> angreifen.<br><br><strong>Sechs Nutzen, alle aus den Zahlen des Servers:</strong> Missionen in das System des Vorpostens sind <strong>schneller</strong> – aber nur Erkundung, Kolonisierung, Abbau und der Vorposten-Bau selbst; Anfechtung, Mondbelagerung, Spielerangriff und Spionage bleiben unberührt, damit sich das Reaktionsfenster eines Verteidigers nie verschiebt. Alle deine Standorte produzieren etwas <strong>mehr</strong> (Handelsposten-Wirkung, die Anteile aller eigenen Vorposten summieren sich, gedeckelt bei 25 %). Deine <strong>Werft</strong> baut Schiffe <strong>schneller</strong> – auf allen Standorten, denn Schiffe entstehen zu Hause, nicht am Vorposten; auch dieser Anteil summiert sich über alle eigenen Vorposten und ist gedeckelt. Ein Vorposten mit dem Zweig <em>Werft</em> trägt dazu gut das Vierfache eines gleich hohen Handelsknotens bei, eine Sternenwerft allein 35 %. Dein <strong>Handelsknoten</strong> wiederum senkt die <strong>Börsengebühr</strong> der Modulbörse und gibt dir <strong>zusätzliche Angebotsplätze</strong> – dieselbe Zahl trägt beides, und der Zweig <em>Handel</em> trägt dort das Vierfache der beiden anderen. Gesenkt wird sie, nie erlassen. Deine <strong>Späher</strong> gegen Spieler, deren Heimat den Vorposten trägt, werden seltener entdeckt, und ab Stufe 2 bleibt Aufklärung dort frisch. Und eine <strong>Garnison</strong> aus Kampfschiffen verteidigt ihn – sie verliert dabei, und fällt der Vorposten, ist sie mit ihm verloren.<br><br><strong>Deine Allianz darf mitwirken.</strong> Partner können an deinem Vorposten <strong>Garnison beisteuern</strong> und nur <strong>ihre eigenen</strong> Schiffe wieder abziehen – du kannst fremde Schiffe nicht einziehen, und sie deine nicht. Ausbauen, abbauen, Projekte und das Lager bleiben bei dir. Verluste treffen jeden Beitragenden mit derselben Quote, und fällt der Vorposten, erfährt jeder in seiner eigenen Meldung, was <em>er</em> verloren hat. Umgekehrt gilt dasselbe: An einem Vorposten deiner Allianz siehst du, wie viele der Schiffe dort deine sind, und du nutzt seinen Flugzeit-Bonus mit. Du siehst dort auch, <strong>wie viele Schiffe die Station von dir überhaupt noch annimmt</strong> – der Anteil aller Verbündeten an einer Garnison ist begrenzt, und mehr als diese Zahl flöge umsonst hin und wieder zurück. Und alles, was du auswärts stehen hast, steht gesammelt im Seitenmenü unter <strong>„Meine Schiffe auswärts"</strong> – mit dem Kernzustand der jeweiligen Station, denn fällt sie, sind diese Schiffe verloren.<br><br><strong>Und er fördert.</strong> Jeder Vorposten legt <strong>Erz, Kristalle und Deuterium</strong> in ein Lager – im selben Verhältnis wie deine eigenen Fördergebäude, und ein Handelsknoten fast doppelt so viel wie ein Festungsring. Abgeholt wird über das Kartenmenü; die Fracht landet auf deinem aktiven Standort und klemmt dort am normalen Lagerdeckel. <strong>Nach zwölf Stunden ist Schluss</strong> – was danach entsteht, verfällt, ein vergessener Vorposten ist also keine Bank. Und das Lager ist <strong>für jeden sichtbar</strong>, auch für Angreifer: Wer stürmt, soll riechen können, wo sich der Flug lohnt. Fällt der Vorposten, teilen sich die Angreifer das Lager nach Schadensanteil – bestraft wird, wer hortet, nicht wer ausbaut.<br><br><strong>Steckplätze und Sets.</strong> Ab der Wahlstufe bekommt die Station je Ausbau einen <strong>Steckplatz</strong> für ein Stationsmodul – sechs gibt es (Kernpanzerung, Geschützbank, Hangarerweiterung, Sprungrechner, Umlaufraffinerie, Horchposten), gefunden beim Sturz von Festungen und Nestern oder selbst gebaut bis „Ungewöhnlich". Je seltener das Stück, desto stärker seine Wirkung. Wer zwei zusammengehörende Module einbaut, bekommt zusätzlich ein <strong>Set</strong>: <em>Trutzring</em> (Kernpanzerung + Geschützbank), <em>Flottenbasis</em> (Hangarerweiterung + Sprungrechner) und <em>Umschlagplatz</em> (Umlaufraffinerie + Horchposten). Die <strong>Seltenheit zählt dabei nicht</strong> – ein Set belohnt Breite, die Seltenheit belohnt Tiefe, und beides kostet Steckplätze. Der <strong>Festungsring</strong> bekommt einen Platz mehr als die anderen Zweige und ist damit der einzige, der alle sechs Module und die <em>Sternwacht</em> tragen kann.<br><br><strong>Und auf der Endstufe darfst du die Ausrichtung noch einmal wählen.</strong> Die <strong>Umrüstung</strong> ist das teuerste Vorhaben, das ein Vorposten kennt – sie kostet in jedem Rohstoff mehr als der Ausbau auf die Endstufe und dauert 24 Stunden, in denen die Station angreifbar bleibt und noch die <em>alten</em> Werte hat. Wer sie sieht, weiß also, was gleich kommt. Abbrechen geht nicht. Ein Projekt, das an der alten Ausrichtung hing, wirkt danach nicht mehr – <strong>verloren ist es aber nicht</strong>: Rüstest du zurück, wirkt es wieder. Und wenn ein anderer Zweig weniger Steckplätze hat als deiner, musst du erst Module ausbauen; sonst läge eines wirkungslos in der Station.<br><br><strong>Und du darfst ihm einen eigenen Namen geben.</strong> Ab Stufe 3 heißt deine Station, wie du willst – der <strong>Stufenname bleibt daneben stehen</strong>, denn er sagt einem Angreifer, wie stark sie ist. Drei bis 24 Zeichen, Buchstaben, Ziffern, Leerzeichen und . , \' -. Ein <strong>leeres Feld entfernt</strong> den Namen wieder, und das geht jederzeit; nur das <em>Umbenennen</em> hat eine Frist. Wer stummgeschaltet ist, kann keinen Namen setzen – ein Name ist Text vor anderen, wie eine Chat-Zeile. Der Name reist in allen Meldungen mit: Wenn deine Station fällt oder abgetragen wird, gibt es sie nicht mehr, und ohne den Namen in der Meldung wüsstest du hinterher nicht, welche es war. <strong>Während die 24 Stunden laufen</strong>, nimmt die Station kein Modul mehr auf, das nach dem Wechsel keinen Platz hätte, lässt sich nicht abbauen und beginnt kein Vorhaben der <em>alten</em> Ausrichtung – jede dieser drei Handlungen würde genau den Schaden anrichten, den die Prüfung beim Start verhindert. Und weil ein Festungsring deutlich mehr <strong>Garnisonsplätze</strong> hat als die anderen Zweige, kann der Deckel beim Wechsel <em>sinken</em>: Was dann nicht mehr hineinpasst, <strong>fliegt zurück</strong> statt verloren zu gehen – deine Schiffe zuerst, denn es ist deine Entscheidung; erst danach die deiner Verbündeten, und die erfahren davon.<br><br><strong>Acht Stufen</strong>, ausgebaut gegen Rohstoffe mit zwölf Stunden Abstand; ein Ausbau heilt nicht. Ab der vierten wählst du einen <strong>Zweig</strong> (Werft, Handelsknoten oder Festungsring), der die Station umbaut und ihr eine eigene Farbe gibt. Sichtbar ist der Ausbau auf der Karte: Die Station wächst mit jeder Stufe, ab der vierten legt sich ein Habitatring um sie, später ein zweiter. <strong>Angegriffen</strong> wird über das Kartenmenü: Der Server rechnet den Durchschlag aus deiner Kraft gegen die Verteidigung, gezählt wird, was am Kern ankommt, nach dem Schlag gilt eine Abklingzeit an diesem Vorposten. Fällt er, teilen sich alle Beitragenden eine flache Beute (Kampfpunkte, Erfahrung, Kredite) nach Schadensanteil; der Besitzer erfährt es im Belohnungsfach und im Bericht. <strong>Aufgeben</strong> ist kein Klick, sondern ein <strong>Abbau</strong>: Er dauert 24 Stunden, die Station verteidigt sich bis zuletzt, und die Restzeit steht für jeden sichtbar an ihr. Ist er fertig, kehren <strong>Garnison und Module</strong> zurück; die Baukosten nicht – der Bau bleibt eine verbindliche Ortswahl.<br><br><strong>Auf der Endstufe hat jeder Zweig ein Endprojekt, das nur er kann</strong> – und jedes ist eine andere Art von Wirkung, kein weiterer Prozentpunkt. Das <strong>Sternendock</strong> (Werft) baut ohne Auftrag weiter und legt alle 24 Stunden einen Kreuzer bereit, bis zu 7 gestapelt; abgeholt wird über denselben Griff wie das Lager, und was über dem Stapel fertig wird, verfällt. Der <strong>Sternenmarkt</strong> (Handelsknoten) gibt dir 2 Angebotsplätze an der Modulbörse <em>über</em> der üblichen Grenze – die Kopfzeile der Börse nennt sie. Der <strong>Sperrfeuerleitstand</strong> (Festungsring) kostet jeden Angreifer 8 Prozentpunkte mehr Verluste; die Angriffsvorschau nennt den Aufschlag, bevor du fliegst. Jedes dauert 36 Stunden, wirkt nur an seiner Ausrichtung – rüstest du um, ruht es, und die Stationstafel sagt das – und steht dort für jeden sichtbar. Und wer die Endstufe hält, <strong>dominiert das System</strong>: Das steht an der Station, am Kartenzeichen und in der rechten Leiste, für jeden, der die Karte öffnet.<br><br><strong>Du siehst einen Allianz-Verband kommen, bevor er da ist.</strong> Ruft eine Allianz einen koordinierten Angriff auf deinen Vorposten aus, steht ab dem Abflug eine Warnung im Kartenmenü – mit Angreifer-Tag, Schiffszahl und verbleibender Zeit – und dieselbe Meldung liegt in deinem Postfach. Genau dafür ist das Fenster da: Eine Garnison lohnt sich nur, wenn du sie noch losschicken kannst. Fliegen zwei Allianzen gleichzeitig an, siehst du beide. <em>Einzelne</em> Angreifer kündigen sich nicht an – sie fliegen ohne Sammelphase, und der Server erfährt von ihnen erst bei der Ankunft; von ihnen erfährst du beim ersten Schlag.' },
+      { title:'Vorposten: eine gehaltene Präsenz auf der Karte', body:'Ein <strong>Vorposten</strong> ist die erste spielergebaute Struktur jenseits von Kolonie und Allianzbasis: Du errichtest ihn in einem fremden System (nicht im Heimatsystem, nicht bei einer eigenen Kolonie, <strong>einer je System</strong>, höchstens drei je Konto) über den Knopf <strong>„Vorposten errichten"</strong> in der Detailtafel des aufgeklappten Systems. Eine <strong>Baukolonne</strong> (ein Kolonieschiff, es kommt zurück) fliegt hin; die Baukosten sind fällig beim Start und kommen zurück, falls der Bau nicht zustande kommt. Der Server führt jeden Vorposten – Stufe, Kern, Garnison und Verteidigung sieht jeder, und jeder andere Spieler kann ihn nach dem <strong>Bauschutz</strong> angreifen.<br><br><strong>Sechs Nutzen, alle aus den Zahlen des Servers:</strong> Missionen in das System des Vorpostens sind <strong>schneller</strong> – aber nur Erkundung, Kolonisierung, Abbau und der Vorposten-Bau selbst; Anfechtung, Mondbelagerung, Spielerangriff und Spionage bleiben unberührt, damit sich das Reaktionsfenster eines Verteidigers nie verschiebt. Alle deine Standorte produzieren etwas <strong>mehr</strong> (Handelsposten-Wirkung, die Anteile aller eigenen Vorposten summieren sich, gedeckelt bei 25 %). Deine <strong>Werft</strong> baut Schiffe <strong>schneller</strong> – auf allen Standorten, denn Schiffe entstehen zu Hause, nicht am Vorposten; auch dieser Anteil summiert sich über alle eigenen Vorposten und ist gedeckelt. Ein Vorposten mit dem Zweig <em>Werft</em> trägt dazu gut das Vierfache eines gleich hohen Handelsknotens bei, eine Sternenwerft allein 35 %. Dein <strong>Handelsknoten</strong> wiederum senkt die <strong>Börsengebühr</strong> der Modulbörse und gibt dir <strong>zusätzliche Angebotsplätze</strong> – dieselbe Zahl trägt beides, und der Zweig <em>Handel</em> trägt dort das Vierfache der beiden anderen. Gesenkt wird sie, nie erlassen. Deine <strong>Späher</strong> gegen Spieler, deren Heimat den Vorposten trägt, werden seltener entdeckt, und ab Stufe 2 bleibt Aufklärung dort frisch. Und eine <strong>Garnison</strong> aus Kampfschiffen verteidigt ihn – sie verliert dabei, und fällt der Vorposten, ist sie mit ihm verloren.<br><br><strong>Deine Allianz darf mitwirken.</strong> Partner können an deinem Vorposten <strong>Garnison beisteuern</strong> und nur <strong>ihre eigenen</strong> Schiffe wieder abziehen – du kannst fremde Schiffe nicht einziehen, und sie deine nicht. Ausbauen, abbauen, Projekte und das Lager bleiben bei dir. Verluste treffen jeden Beitragenden mit derselben Quote, und fällt der Vorposten, erfährt jeder in seiner eigenen Meldung, was <em>er</em> verloren hat. Umgekehrt gilt dasselbe: An einem Vorposten deiner Allianz siehst du, wie viele der Schiffe dort deine sind, und du nutzt seinen Flugzeit-Bonus mit. Du siehst dort auch, <strong>wie viele Schiffe die Station von dir überhaupt noch annimmt</strong> – der Anteil aller Verbündeten an einer Garnison ist begrenzt, und mehr als diese Zahl flöge umsonst hin und wieder zurück. Und alles, was du auswärts stehen hast, steht gesammelt im Seitenmenü unter <strong>„Meine Schiffe auswärts"</strong> – mit dem Kernzustand der jeweiligen Station, denn fällt sie, sind diese Schiffe verloren.<br><br><strong>Und er fördert.</strong> Jeder Vorposten legt <strong>Erz, Kristalle und Deuterium</strong> in ein Lager – im selben Verhältnis wie deine eigenen Fördergebäude, und ein Handelsknoten fast doppelt so viel wie ein Festungsring. Abgeholt wird über das Kartenmenü; die Fracht landet auf deinem aktiven Standort und klemmt dort am normalen Lagerdeckel. <strong>Nach zwölf Stunden ist Schluss</strong> – was danach entsteht, verfällt, ein vergessener Vorposten ist also keine Bank. Und das Lager ist <strong>für jeden sichtbar</strong>, auch für Angreifer: Wer stürmt, soll riechen können, wo sich der Flug lohnt. Fällt der Vorposten, teilen sich die Angreifer das Lager nach Schadensanteil – bestraft wird, wer hortet, nicht wer ausbaut.<br><br><strong>Steckplätze und Sets.</strong> Ab der Wahlstufe bekommt die Station je Ausbau einen <strong>Steckplatz</strong> für ein Stationsmodul – sechs gibt es (Kernpanzerung, Geschützbank, Hangarerweiterung, Sprungrechner, Umlaufraffinerie, Horchposten), gefunden beim Sturz von Festungen und Nestern oder selbst gebaut bis „Ungewöhnlich". Je seltener das Stück, desto stärker seine Wirkung. Wer zwei zusammengehörende Module einbaut, bekommt zusätzlich ein <strong>Set</strong>: <em>Trutzring</em> (Kernpanzerung + Geschützbank), <em>Flottenbasis</em> (Hangarerweiterung + Sprungrechner) und <em>Umschlagplatz</em> (Umlaufraffinerie + Horchposten). Die <strong>Seltenheit zählt dabei nicht</strong> – ein Set belohnt Breite, die Seltenheit belohnt Tiefe, und beides kostet Steckplätze. Der <strong>Festungsring</strong> bekommt einen Platz mehr als die anderen Zweige und ist damit der einzige, der alle sechs Module und die <em>Sternwacht</em> tragen kann.<br><br><strong>Und auf der Endstufe darfst du die Ausrichtung noch einmal wählen.</strong> Die <strong>Umrüstung</strong> ist das teuerste Vorhaben, das ein Vorposten kennt – sie kostet in jedem Rohstoff mehr als der Ausbau auf die Endstufe und dauert 24 Stunden, in denen die Station angreifbar bleibt und noch die <em>alten</em> Werte hat. Wer sie sieht, weiß also, was gleich kommt. Abbrechen geht nicht. Ein Projekt, das an der alten Ausrichtung hing, wirkt danach nicht mehr – <strong>verloren ist es aber nicht</strong>: Rüstest du zurück, wirkt es wieder. Und wenn ein anderer Zweig weniger Steckplätze hat als deiner, musst du erst Module ausbauen; sonst läge eines wirkungslos in der Station.<br><br><strong>Und du darfst ihm einen eigenen Namen geben.</strong> Ab Stufe 3 heißt deine Station, wie du willst – der <strong>Stufenname bleibt daneben stehen</strong>, denn er sagt einem Angreifer, wie stark sie ist. Drei bis 24 Zeichen, Buchstaben, Ziffern, Leerzeichen und . , \' -. Ein <strong>leeres Feld entfernt</strong> den Namen wieder, und das geht jederzeit; nur das <em>Umbenennen</em> hat eine Frist. Wer stummgeschaltet ist, kann keinen Namen setzen – ein Name ist Text vor anderen, wie eine Chat-Zeile. Der Name reist in allen Meldungen mit: Wenn deine Station fällt oder abgetragen wird, gibt es sie nicht mehr, und ohne den Namen in der Meldung wüsstest du hinterher nicht, welche es war. <strong>Während die 24 Stunden laufen</strong>, nimmt die Station kein Modul mehr auf, das nach dem Wechsel keinen Platz hätte, lässt sich nicht abbauen und beginnt kein Vorhaben der <em>alten</em> Ausrichtung – jede dieser drei Handlungen würde genau den Schaden anrichten, den die Prüfung beim Start verhindert. Und weil ein Festungsring deutlich mehr <strong>Garnisonsplätze</strong> hat als die anderen Zweige, kann der Deckel beim Wechsel <em>sinken</em>: Was dann nicht mehr hineinpasst, <strong>fliegt zurück</strong> statt verloren zu gehen – deine Schiffe zuerst, denn es ist deine Entscheidung; erst danach die deiner Verbündeten, und die erfahren davon.<br><br><strong>Acht Stufen</strong>, ausgebaut gegen Rohstoffe mit zwölf Stunden Abstand; ein Ausbau heilt nicht &ndash; <strong>reparieren</strong> lässt sich der Kern aber aus dem eigenen Stationslager. Das darf nur der <strong>Besitzer</strong>, nicht die Allianz, und es geht aus demselben Vorrat, den auch die Abholung leert: Wer das Lager holt, kann danach nicht mehr davon reparieren &ndash; die Wahl gehört dir. Die Reparatur wirkt <strong>sofort</strong>, belegt keinen Flottenslot und lässt sich wiederholen, solange das Lager etwas hergibt. Nur unter laufendem Beschuss geht sie nicht: Liegt der letzte Treffer kürzer zurück als die Abklingzeit, bleibt der Kern, wie er ist &ndash; wer belagert wird, heilt nicht; wer die Belagerung überstanden hat, baut wieder auf. Wie viel ein Klick bringt und was er kostet, steht in der Stationstafel. Ab der vierten wählst du einen <strong>Zweig</strong> (Werft, Handelsknoten oder Festungsring), der die Station umbaut und ihr eine eigene Farbe gibt. Sichtbar ist der Ausbau auf der Karte: Die Station wächst mit jeder Stufe, ab der vierten legt sich ein Habitatring um sie, später ein zweiter. <strong>Angegriffen</strong> wird über das Kartenmenü: Der Server rechnet den Durchschlag aus deiner Kraft gegen die Verteidigung, gezählt wird, was am Kern ankommt, nach dem Schlag gilt eine Abklingzeit an diesem Vorposten. Fällt er, teilen sich alle Beitragenden eine flache Beute (Kampfpunkte, Erfahrung, Kredite) nach Schadensanteil; der Besitzer erfährt es im Belohnungsfach und im Bericht. <strong>Aufgeben</strong> ist kein Klick, sondern ein <strong>Abbau</strong>: Er dauert 24 Stunden, die Station verteidigt sich bis zuletzt, und die Restzeit steht für jeden sichtbar an ihr. Ist er fertig, kehren <strong>Garnison und Module</strong> zurück; die Baukosten nicht – der Bau bleibt eine verbindliche Ortswahl.<br><br><strong>Auf der Endstufe hat jeder Zweig ein Endprojekt, das nur er kann</strong> – und jedes ist eine andere Art von Wirkung, kein weiterer Prozentpunkt. Das <strong>Sternendock</strong> (Werft) baut ohne Auftrag weiter und legt alle 24 Stunden einen Kreuzer bereit, bis zu 7 gestapelt; abgeholt wird über denselben Griff wie das Lager, und was über dem Stapel fertig wird, verfällt. Der <strong>Sternenmarkt</strong> (Handelsknoten) gibt dir 2 Angebotsplätze an der Modulbörse <em>über</em> der üblichen Grenze – die Kopfzeile der Börse nennt sie. Der <strong>Sperrfeuerleitstand</strong> (Festungsring) kostet jeden Angreifer 8 Prozentpunkte mehr Verluste; die Angriffsvorschau nennt den Aufschlag, bevor du fliegst. Jedes dauert 36 Stunden, wirkt nur an seiner Ausrichtung – rüstest du um, ruht es, und die Stationstafel sagt das – und steht dort für jeden sichtbar. Und wer die Endstufe hält, <strong>dominiert das System</strong>: Das steht an der Station, am Kartenzeichen und in der rechten Leiste, für jeden, der die Karte öffnet.<br><br><strong>Du siehst einen Allianz-Verband kommen, bevor er da ist.</strong> Ruft eine Allianz einen koordinierten Angriff auf deinen Vorposten aus, steht ab dem Abflug eine Warnung im Kartenmenü – mit Angreifer-Tag, Schiffszahl und verbleibender Zeit – und dieselbe Meldung liegt in deinem Postfach. Genau dafür ist das Fenster da: Eine Garnison lohnt sich nur, wenn du sie noch losschicken kannst. Fliegen zwei Allianzen gleichzeitig an, siehst du beide. <em>Einzelne</em> Angreifer kündigen sich nicht an – sie fliegen ohne Sammelphase, und der Server erfährt von ihnen erst bei der Ankunft; von ihnen erfährst du beim ersten Schlag.' },
       { title:'Weltboss: fünf Namen, fünf Archetypen', body:'<strong>Seit dem 02.08.2026 hat der Weltboss Varianten.</strong> Name und Archetyp leiten sich aus seiner Stufe ab, die Kombination wiederholt sich erst nach 20 Stufen: fünf Namen (Leviathan der Leere, Chronos-Verschlinger, Die Singularität, Wächter des Abgrunds, Nova-Titan) und fünf Archetypen. <strong>Wandelnder Koloss</strong> ist der Normalfall. <strong>Panzer-Bastion</strong> lässt den Schwächen-Bonus kaum greifen (+15% statt +25%) und kostet rund ein Drittel mehr Schiffe. <strong>Schwarm-Titan</strong> trifft schlechter – ein Drittel weniger Verluste. <strong>Phasen-Phantom</strong> macht die Schwäche entscheidend: +50% statt +25%. <strong>Piratenboss</strong> schlägt härter zurück (rund ein Fünftel mehr Verluste), ist dafür schlecht gepanzert: +40% statt +25%. Die <strong>Trefferschwäche</strong> (ein bestimmter Schiffstyp) steht jetzt <em>vor</em> dem Angriff in der Boss-Karte, samt Hinweis, ob deine Angriffsflotte sie überhaupt dabeihat – vorher erfuhr man sie erst aus dem Bericht danach. Die <strong>HP bleiben bewusst allein von der Stufe abhängig</strong>: Die Belohnung hängt an der Stufe, ein zäherer oder dünnerer Boss würde also still die Belohnungsrate verschieben.<br><br>Im Galaxie-Tab wartet ein <strong>gemeinsamer Boss für alle Spieler</strong> mit globalem HP-Pool. Jeder Angriff (Angriffsflotte, echte Flugzeit + Treibstoff) zieht deine Angriffskraft ×0,8-1,2 als Schaden ab - es gibt keine Niederlage, aber der Boss schlägt zurück (Verluste steigen mit seiner Stufe). Beim Kill erhält <strong>jeder Beteiligte</strong> eine Belohnung proportional zu seinem Schadensanteil (Kredite, Kampfpunkte, Modul-Chance), der Top-Schädiger +50% Bonus. Schon <em>jeder einzelne Schlag</em> kann außerdem ein <strong>Boss-Set-Teil</strong> aus den Überresten bergen – die Chance wächst mit deinem Schadensanteil. 10 Minuten später erscheint der nächste Leviathan automatisch stärker (Stufe +1, HP ×1,6). Kommt deine Flotte erst nach dem Kill an, verfällt der Schlag (kleine Spesen-Entschädigung).' },
       { title:'Überfall ausspähen (mit Flugzeit)', body:'Ein erkannter Überfall lässt sich mit einem Spähschiff ausspähen. Das Schiff hat eine <strong>echte Flugzeit</strong> (gedeckelt auf die halbe Restzeit, damit der Bericht immer vor dem Einschlag ankommt) - der Countdown bis zur Ankunft steht im Überfall-Banner und in der Späh-Karte. Bei Ankunft entsteht der detaillierte Bericht, und die <strong>exakte Kampfkraft der Angreifer</strong> ersetzt im Überfall-Banner die grobe Stärke-Angabe. Das Spähschiff geht dabei immer verloren; schlägt die Flotte vor Ankunft ein, verfällt der Bericht.' },
       { title:'Piraten-Verstecke (PvE-Kette)', body:'Im Galaxie-Tab wartet dauerhaft ein <strong>Piraten-Versteck</strong> deiner aktuellen Stufe (1–10). Du greifst es mit deiner Angriffsflotte an (echte Flugzeit + Treibstoff). <strong>Sieg</strong>: Beute (skaliert mit Stufe und deiner Produktion – Frachter mitnehmen!), Kredite, Kampfpunkte, wachsende Modul-Chance, und die nächste Stufe schaltet frei. <strong>Niederlage</strong>: 20–35% Flottenverluste, die Stufe bleibt aber erhalten. Die Gegnerstärke wächst exponentiell (Stufe 1: 120 → Stufe 10: ~6.200). Stufe 10 ist der <strong>Endboss</strong> mit garantiertem Modul und 500 Bonus-Krediten – danach beginnt die Kette von vorn und du erhältst <strong>dauerhaft +2% Angriffskraft</strong> je abgeschlossenem Durchlauf (Deckel +10%). Jede Stufe hat eine <strong>Schwäche</strong> gegen einen bestimmten Schiffstyp (rotierend, wird erst im Kampfbericht enthüllt) – mit dem passenden Typ dabei gibt es +25% Kampfkraft, +10% Erfolgschance und +25% Beute bei Erfolg. Derselbe Mechanismus gilt auch beim Weltboss.' },
@@ -46261,7 +46426,7 @@ async function claimPendingRewards(){
       { title:'Vertiefte Voraussetzungen', body:'Folgeforschungen setzen jetzt echte Mindeststufen der Vorgänger-Forschung voraus (meist Stufe 5), nicht mehr nur Stufe 1 - jede Verzweigung im Forschungsbaum ist damit ein echter Meilenstein statt Formsache.' },
       { title:'Zwei neue, eigenständige Forschungszweige', body:'<strong>Diplomatie-Protokolle</strong> erhöht die Friedensdividende aus aktiven Nichtangriffspakten zusätzlich zum Grundbonus. <strong>Kolonial-Logistik</strong> erhöht das Kolonie-Limit: Ohne diese Forschung ist nur 1 Kolonie erlaubt, ab Stufe 2 kommt je 2 Stufen eine weitere hinzu (bei Maximalstufe 28 also 15 Kolonien). Monde zählen nicht mit. Beide Forschungen sind von Anfang an verfügbar, unabhängig von der übrigen Technologie-Kette.' },
       { title:'Forschung abbrechen', body:'Eine laufende Forschung lässt sich über den Knopf "Abbrechen" direkt unter der Fortschrittsanzeige vorzeitig stoppen - dabei gibt es bewusst nur <strong>50% der eingesetzten Ressourcen</strong> zurück (im Gegensatz zum Bau-Abbruch mit voller Rückerstattung), da Forschung sonst risikofrei neu gestartet werden könnte, sobald sich z.B. die Laboranzahl ändert. Danach lässt sich sofort eine andere Forschung beginnen.' },
-      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde. <strong>Zwei Fälle werden dabei unterschieden:</strong> Reichen die Ressourcen für den ersten Eintrag gerade nur <em>vorübergehend</em> nicht, wartet die Warteschlange auf ihn – die Reihenfolge, die du festgelegt hast, bleibt also gültig. Übersteigen seine Kosten dagegen deine <strong>Lagerkapazität</strong>, könnte er nie starten (über den Lagerdeckel hinaus lässt sich nichts ansammeln); ein solcher Eintrag wird deshalb <em>übersprungen</em>, damit er nicht die ganze Warteschlange dauerhaft anhält. Er bleibt an seinem Platz stehen und wird automatisch gestartet, sobald dein Lager groß genug ist – die Karte sagt dir währenddessen, welche Ressource fehlt. Relevant wird das vor allem bei den Ewigkeitsforschungen, deren Kosten je Stufe exponentiell wachsen.' },
+      { title:'Forschungswarteschlange', body:'Bis zu 10 Forschungen lassen sich vorab in eine Warteschlange legen (Knopf "Warteschlange" bei jeder freigeschalteten Forschung) - sobald die aktuelle Forschung fertig ist und genug Ressourcen da sind, startet automatisch die nächste. Praktisch bei der jetzt sehr langen Gesamtdauer, damit nicht ständig manuell nachgeschoben werden muss. Mit den Pfeil-Buttons an jedem Eintrag lässt sich die Reihenfolge nachträglich anpassen - die Stufenreihenfolge innerhalb derselben Forschung bleibt dabei immer automatisch korrekt (Stufe 5 kann nie vor Stufe 4 verarbeitet werden), und eine Verschiebung wird abgelehnt, falls sie die Voraussetzung einer anderen Forschung in der Warteschlange verletzen würde. <strong>Zwei Fälle werden dabei unterschieden:</strong> Reichen die Ressourcen für den ersten Eintrag gerade nur <em>vorübergehend</em> nicht, wartet die Warteschlange auf ihn – die Reihenfolge, die du festgelegt hast, bleibt also gültig. Übersteigen seine Kosten dagegen deine <strong>Lagerkapazität</strong>, könnte er nie starten (über den Lagerdeckel hinaus lässt sich nichts ansammeln); ein solcher Eintrag wird deshalb <em>übersprungen</em>, damit er nicht die ganze Warteschlange dauerhaft anhält. Er bleibt an seinem Platz stehen und wird automatisch gestartet, sobald dein Lager groß genug ist – die Karte sagt dir währenddessen, welche Ressource fehlt. <strong>Nach derselben Regel behandelt die Warteschlange auch fehlende Voraussetzungen:</strong> Ist die Vorgänger-Forschung noch nicht weit genug oder bist du für eine Allianzforschung gerade in keiner Allianz, wird der Eintrag übersprungen und bleibt stehen – mit einer einmaligen Meldung, was fehlt. Wirklich entfernt wird nur, was erledigt ist: eine Forschung auf ihrer Maximalstufe oder eine, die es nicht mehr gibt. Auch das wird gemeldet. Relevant wird das vor allem bei den Ewigkeitsforschungen, deren Kosten je Stufe exponentiell wachsen.' },
       /* Aus BAUSTELLE_ANTEILE ABGELEITET - die Tabelle steht rund 9.200 Zeilen weiter oben
          (nachgemessen, Regel 38), der Zugriff beim Aufbau von HELP_SECTIONS ist also gueltig.
          Eine von Hand getippte Liste wuerde beim naechsten Regler-Schritt stillschweigend
@@ -53757,6 +53922,11 @@ async function claimPendingRewards(){
     return saveResult;
   }
 
+  /* Wie oft ein unerreichbarer Server erneut versucht wird, bevor der Spieler es selbst in die
+     Hand nehmen muss. 8 x 5 s deckt das gemessene Deploy-Fenster (rund 7 s 502) mit reichlich
+     Reserve ab, ohne bei einem echten Ausfall ewig weiterzulaufen. */
+  const LADE_VERSUCHE_MAX = 8, LADE_WARTE_MS = 5000;
+  let ladeVersuche = 0;
   async function load(){
     // Warnung nur zeigen, wenn WEDER die Claude.ai-Speicherschnittstelle NOCH ein echter eigener
     // Server (useBackend) verfügbar ist – vorher wurde ein eigener Server hier fälschlich ignoriert,
@@ -53766,7 +53936,9 @@ async function claimPendingRewards(){
       if (lbNote) lbNote.innerHTML = `<i class="ti ti-alert-triangle" aria-hidden="true"></i>Dieses Spiel läuft gerade ohne geteilten Cloud-Speicher (z.B. weil die Datei lokal geöffnet wurde statt in Claude.ai) – dein eigener Fortschritt wird trotzdem gespeichert (lokal in diesem Browser), aber Bestenliste, Duelle und Allianzen können nicht mit anderen synchronisieren.`;
     }
     try {
-      const res = await storageGet(STORE_KEY, false);
+      // strikt: siehe storageGet(). Ein Stand, den der Server nicht geliefert hat, ist kein
+      // Spielstand - er darf weder angezeigt noch zurückgeschrieben werden.
+      const res = await storageGet(STORE_KEY, false, true);
       if (res && res.value){
         gameSaveVersion = res.version || 0;
         const parsedSave = JSON.parse(res.value);
@@ -53986,6 +54158,20 @@ async function claimPendingRewards(){
         if (lastOfflineSummary || loginBonus) setTimeout(() => showWelcomeBackModal(lastOfflineSummary, loginBonus), 400);
       } else { state.lastSeenVersion = VERSION; checkDailyLogin(); initDailyQuests(); bootDataReady = true; await save(); document.getElementById('loadstate').textContent = 'Neue Kolonie gestartet – wird ab jetzt automatisch gespeichert'; }
     } catch(e){
+      /* Der Server war nicht erreichbar (strikte Lesung, siehe storageGet). Das ist der Normalfall
+         für die paar Sekunden eines Deploys und heilt sich von selbst - deshalb wird hier NICHT der
+         allgemeine Fehlertext gezeigt, der zum Neuladen auffordert, sondern von allein erneut
+         geladen. Entscheidend ist, was NICHT passiert: bootDataReady bleibt aus, also speichert
+         nichts, und der unversehrte Serverstand bleibt stehen. */
+      if (e && e.message === 'SERVERSTAND_UNERREICHBAR'){
+        ladeVersuche++;
+        const wieder = ladeVersuche < LADE_VERSUCHE_MAX;
+        document.getElementById('loadstate').textContent = wieder
+          ? 'Server gerade nicht erreichbar (läuft evtl. ein Update?) - dein Spielstand liegt sicher dort und wird gleich erneut geholt…'
+          : 'Server nicht erreichbar - dein Spielstand liegt unverändert dort. Bitte die Seite neu laden. Es wurde nichts überschrieben.';
+        if (wieder) setTimeout(() => { load().then(() => { if (bootDataReady) render(); }).catch(()=>{}); }, LADE_WARTE_MS);
+        return;
+      }
       // Diesen Fehler NIE stillschweigend verschlucken: ein Ladefehler bei einem BESTEHENDEN
       // Spielstand sah für Spieler zuvor exakt wie "Fortschritt komplett weg" aus, obwohl die
       // Daten die ganze Zeit unversehrt auf dem Server lagen (siehe v8.18.3-Hotfix). Immer in die
@@ -70352,6 +70538,40 @@ function sekSternUse(key, x, y, k, unentdeckt){
             + (dockDa && v.dockBereit >= (vorpostenCache.dockMax || 7) ? ' Das Sternendock ist VOLL – was jetzt fertig wird, verfällt.' : ''),
           fn: () => vorpostenLagerHolen(sysId) });
       }
+      /* REPARATUR DIREKT NEBEN DER ABHOLUNG (VP-R, 14.09.2026), und das ist keine Formsache:
+         Beide greifen auf DENSELBEN Lagerinhalt zu - wer abholt, kann danach nicht mehr
+         reparieren. Die Wahl gehoert sichtbar nebeneinander.
+         Der Eintrag haengt am Katalogfeld `reparaturAktiv`, wie `lagerAktiv`, `projekteAktiv`,
+         `umruestenAktiv` und `nameAktiv` es tun. Solange der Serverschalter steht, erscheint er
+         gar nicht - niemand kann in die 404 laufen, auch nicht im Fenster zwischen diesem Merge
+         und dem Umlegen des Schalters.
+         `disabled` haengt an `rep.moeglich`: Der Server hat die drei Bedingungen dort BEREITS
+         verknuepft. Die drei Gruende darunter sind nur Text und stehen in derselben Reihenfolge
+         wie die Ablehnungen des Servers (unversehrt -> gesperrt -> leer) - sie treffen keine
+         zweite Entscheidung. */
+      if (vorpostenCache.reparaturAktiv){
+        const rep = v.reparatur || {};
+        /* DIE SPERRE KOMMT AUS DEM ZEITSTEMPEL, nicht aus dem Schnappschuss (Durchsicht
+           14.09.2026). `rep.gesperrt` und `rep.moeglich` sind der Stand zum Zeitpunkt des
+           Katalog-Abrufs, und der liegt bis zu zwei Minuten zurueck; die Sperre selbst dauert
+           vier Stunden. Laeuft sie zwischen zwei Abrufen ab, blieben beide auf dem alten Wert
+           stehen - der Knopf waere grau und daneben stuende „reparieren geht in 0s", weil
+           fmtDuration die negative Differenz auf null kappt. Dieselbe Anzeige entstuende
+           dauerhaft, wenn die Uhr des Geraets vorgeht.
+           Genau darum leiten ALLE Nachbarn hier aus Zeitstempeln ab (Bauschutz, Angriff,
+           Umruestung, Abbau, Umbenennungsfrist). Das ist keine zweite Entscheidung: `moeglich`
+           ist serverseitig `aktiv && !gesperrt && heilung > 0` - hier stehen dieselben drei
+           Teile, nur mit der frischeren Uhr. Autoritaet bleibt der Server, er prueft beim
+           Request erneut. */
+        const repGesperrt = rep.gesperrtBis ? (rep.gesperrtBis > jetzt) : !!rep.gesperrt;
+        let repGrund, repSperre = true;
+        if (!(rep.fehlend > 0)) repGrund = 'Der Kern ist unversehrt.';
+        else if (repGesperrt) repGrund = 'Steht noch unter Beschuss – reparieren geht in ' + fmtDuration(((rep.gesperrtBis || 0) - jetzt)/1000) + '.';
+        else if (!(rep.heilung > 0)) repGrund = 'Im Lager dieser Station liegt nichts, woraus sich reparieren ließe.';
+        else { repGrund = 'Stellt ' + fmt(rep.heilung) + ' Kernpunkte her und verbraucht dafür ' + vorpostenLagerText(rep.kosten) + ' aus dem Stationslager. Wirkt sofort, ohne Flottenslot.'; repSperre = false; }
+        eintraege.push({ icon:'ti-refresh', label:'Kern reparieren', grund: repGrund,
+          disabled: repSperre || !rep.aktiv, fn: () => vorpostenReparieren(sysId) });
+      }
       eintraege.push({ icon:'ti-adjustments', label: slots ? 'Steckplätze (' + drin + '/' + slots + ')' : 'Steckplätze',
         grund: slots ? 'Module einbauen, ausbauen oder in der Schmiede bauen.' : 'Gibt es ab Stufe ' + (vorpostenCache.zweigAb || 4) + '.',
         disabled: !slots, fn: () => vorpostenModuleOeffnen(sysId) });
@@ -70488,6 +70708,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
       + (v.dominiert ? `<div class="bmeta" data-vp-dominiert="1" style="color:#f0c674;"><i class="ti ti-medal" aria-hidden="true"></i> <strong>Dominiert dieses System</strong> – die Endstufe steht, und das sieht jeder auf der Karte.</div>` : '')
       + `<div class="bmeta"><i class="ti ti-building-castle" aria-hidden="true"></i> Kern <strong>${fmt(Math.round(kern.lp||0))}</strong> von ${fmt(kern.lpMax||0)} (${Math.round(100*Math.max(0,Math.min(1,(kern.lp||0)/Math.max(1,kern.lpMax||1))))}%)</div>`
       + kartenFuellBalken(kern.lp||0, kern.lpMax||0, farbe, 'Wie viel vom Kern noch steht - faellt er, faellt der Vorposten.')
+      /* V10: Was eine Reparatur JETZT braechte - direkt unter dem Kernbalken, weil sie genau die
+         Zahl darueber bewegt. `v.eigener` ist Bedingung, nicht Schmuck: Reparieren darf nur der
+         Besitzer, auch kein Verbuendeter (der Server weist es ab). Eine Zeile am fremden
+         Vorposten waere ein Angebot an jemanden, den der Server zurueckschickt - anders als die
+         Lagerzeile darunter, die bewusst fuer jeden sichtbar ist.
+         Alle vier Groessen (fehlend, gesperrt, gesperrtBis, heilung, kosten) kommen aus
+         `v.reparatur`; hier wird nichts nachgerechnet. Der Block geht als fertiges HTML ins
+         Menue, deshalb `escapeHtml` um den eingesetzten Text. */
+      + ((vorpostenCache.reparaturAktiv && v.eigener && ((v.reparatur||{}).fehlend > 0))
+          ? `<div class="bmeta" data-vp-reparatur="${(v.reparatur||{}).heilung||0}"><i class="ti ti-refresh" aria-hidden="true" style="color:#5dcaa5;"></i> Reparatur: ${
+              ((v.reparatur||{}).gesperrtBis ? ((v.reparatur||{}).gesperrtBis > jetzt) : !!(v.reparatur||{}).gesperrt)
+                ? `gesperrt – noch <strong>${fmtDuration(((((v.reparatur||{}).gesperrtBis)||0) - jetzt)/1000)}</strong> unter Beschuss`
+                : (((v.reparatur||{}).heilung||0) > 0
+                    ? `<strong>${fmt((v.reparatur||{}).heilung)}</strong> Kernpunkte aus dem Stationslager – kostet ${escapeHtml(vorpostenLagerText((v.reparatur||{}).kosten))}`
+                    : 'das Stationslager gibt gerade nichts her')}</div>`
+          : '')
       + `<div class="bmeta"><i class="ti ti-shield" aria-hidden="true"></i> Verteidigung <strong>${fmt(v.verteidigung||0)}</strong> · Garnison ${v.garnisonAnzahl||0} von ${grenze}${v.eigener && v.garnison ? ' – ' + fleetBreakdownHtml(v.garnison) : ''}</div>`
       /* V5: MEIN ANTEIL an einer fremden Garnison. Ohne diese Zeile sieht ein Verbuendeter nur
          die Gesamtzahl und weiss nicht, wie viele davon seine sind - und beim Fall verliert er

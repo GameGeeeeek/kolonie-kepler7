@@ -551,3 +551,90 @@ nichts belegte).
    Fehlversuch.** `MUSS_FALLEN` trägt hier zwei Richtungen: `alt` (der Stand vor der Etappe) und
    `entwurf` (der eigene erste Entwurf, aus der Git-Historie geholt). Nur die zweite belegt, dass
    die Prüfung gegen den Fehler schützt, der wirklich passiert ist.
+
+## Was still verschwindet, verschwindet zweimal: einmal die Daten, einmal die Spur (14.09.2026)
+
+Spieler-Report: „Wenn Updates kommen, wird die Bauschlange gelöscht und auch die
+Forschungsschlange." Die Suche fand **zwei unabhängige Fehler**. Der zweite erklärt die Meldung,
+der erste ist der gefährlichere — und beide teilen dieselbe Wurzel: Eine Stelle behandelt zwei
+verschiedene Lagen gleich und sagt nichts dazu.
+
+**Erst der Verdacht, der sich nicht bestätigt hat**, weil er lehrreich ist: Naheliegend war eine
+der fünf Stellen, die still einen Warteschlangen-Eintrag entfernen. Eine Messung des reinen
+Neuladens — Warteschlangen füllen, Update-Knopf drücken, nachsehen — ergab: **alles überlebt**.
+Damit war der Verdacht erledigt, nicht bestätigt, und die Suche musste woanders weitergehen. Ohne
+diese Messung wären Stunden in die falsche Richtung gegangen.
+
+### Fehler 2 (erklärt die Meldung): der stille Wegwurf beim Laden
+
+Bau-Wunschliste und Forschungs-Warteschlange waren die **einzigen zwei Listen im Spiel**, aus denen
+Einträge ohne jede Meldung verschwanden — genau die zwei aus der Meldung. Geprüft werden sie
+ausgerechnet im Ladepfad: `applyOfflineProgress()` arbeitet beide gegen die **frisch ausgelieferten
+Tabellen** ab, und vierzehn Zeilen später schreibt `load()` das Ergebnis fest. Ändert ein Update
+eine Voraussetzung oder eine Maximalstufe, ist der Eintrag weg, bevor ihn jemand sehen konnte.
+**Das ist der eine Unterschied, den nur ein Update hat.**
+
+Eine Zeile warf vier verschiedene Fälle in denselben stillen `splice`. Die Unterscheidung, auf die
+es ankommt, stand nirgends:
+
+| Lage | vorher | jetzt |
+|---|---|---|
+| Schlüssel gibt es nicht mehr, Stufe erreicht (**endgültig**) | stumm entfernt | entfernt, **mit Grund** |
+| Voraussetzung fehlt, keine Allianz (**vorübergehend**) | stumm entfernt | **bleibt stehen**, mit Grund, Schlange läuft weiter |
+
+Der alte Kommentar begründete das Wegwerfen damit, dass sonst die ganze Schlange stillstünde. Das
+stimmte, solange es nur *entfernen* oder *blockieren* gab — `continue` zieht den nächsten
+startbaren Eintrag vor. Damit war der Grund fürs Wegwerfen längst entfallen, der Schaden aber
+nicht. **Eine Begründung, die einmal gestimmt hat, gilt nicht dauerhaft: Sie gehört nachgemessen,
+wenn sich die Umgebung verändert hat.**
+
+Dazu latent gefunden: `techUnlockedGeneric()` las jede Voraussetzung als blossen Schlüssel, obwohl
+der Kommentar zwei Zeilen darüber verlangt, dass **beide** Leser über denselben Normalisierer
+gehen. `BUILDING_DEFS` benutzt die Objektform heute kein einziges Mal — die Falle wäre beim ersten
+`{key, level}` aufgegangen, und zwar unbemerkt, weil der Aufrufer daraufhin löschte. Es ist der
+Spiegelfall von SP-1.
+
+### Fehler 1 (die gefährlichere Hälfte): der Ersatzstand
+
+
+`storageGet()` fiel bei **jedem** Serverfehler still auf den lokalen Speicher zurück. Für
+Rundfunk-Schlüssel ist das richtig – ein alter Wert schlägt gar keinen. Für den eigenen Spielstand
+war es zerstörerisch, weil `load()` „der Server hat nicht geantwortet" nicht von „es gibt keinen
+Spielstand" unterscheiden konnte: Es meldete „Spielstand automatisch geladen" bzw. „Neue Kolonie
+gestartet", setzte `bootDataReady` und schrieb das Ergebnis beim nächsten Takt über den
+unversehrten Serverstand.
+
+| gemessen (tests/test_spielstand_ersatz.js) | Ergebnis am alten Stand |
+|---|---|
+| Server v7 mit gefüllten Warteschlangen, 502 nur auf die Spielstand-Route, alte Notkopie mit leeren Warteschlangen | v8 mit **leeren** Warteschlangen auf dem Server |
+| dasselbe, aber **ohne** Notkopie (neues Gerät) | „Neue Kolonie gestartet" – ein leerer Anfangsstand über **alles** |
+
+**Die zweite Zeile ist die reale**, und das ist eine Korrektur an der eigenen ersten Fassung dieses
+Eintrags: Im Serverbetrieb schreibt nichts den Spielstand nach `localStorage` (der `storageSet`-Zweig
+gilt nur bei `!useBackend()`), eine Notkopie entsteht dort also gar nicht erst. Die erste Zeile
+beschreibt Code, der existiert, aber heute nicht erreicht wird. Der reale Fall ist der **totale**
+Verlust, nicht der partielle — er passt damit *nicht* zur Spielermeldung (dort fehlten zwei Listen,
+nicht alles). Ein Befund, der einen Mechanismus belegt, belegt noch nicht, dass er der gemeldete
+war; beides getrennt zu halten hat hier die Suche nach Fehler 2 überhaupt erst ausgelöst.
+
+Die Versionsprüfung half nicht, sie half **mit**: Die Notkopie hat keine Version, `gameSaveVersion`
+fiel auf 0, der 409 löste ein Nachladen aus, und der zweite Versuch schrieb mit der frisch geholten
+Version erfolgreich über.
+
+**Übertragbar, vier Punkte:**
+
+0. **„Still" ist der eigentliche Fehler, nicht die Nebensache.** Beide Hälften waren jahrelang
+   unauffindbar, weil sie nichts hinterliessen — kein Log, kein Zähler, keine Meldung. Ein
+   eingetretener Fall war im Nachhinein nicht nachweisbar. Wo Daten entfernt werden, gehört eine
+   Spur hin, und zwar in der Sprache des Spielers.
+1. **Ein Ersatzwert muss sich als Ersatzwert zu erkennen geben.** Eine Funktion, die im Erfolgs-
+   und im Ausfall-Fall dieselbe Form zurückgibt, nimmt jedem Aufrufer die Möglichkeit, richtig zu
+   entscheiden. Wer den Unterschied braucht, bekommt ihn hier über `storageGet(key, shared, strikt)`.
+2. **Lesen und Zurückschreiben sind eine Kette.** Ein toleranter Leser ist harmlos, solange
+   niemand das Gelesene zurückschreibt. Sobald doch, wird aus „lieber ein alter Wert als keiner"
+   ein „ein alter Wert überschreibt den neuen". Bei jedem Rückfall prüfen, wer das Ergebnis
+   speichert.
+3. **Fail-closed gilt auch fürs Laden.** `bootDataReady` bleibt jetzt aus, wenn der Stand nicht
+   vom Server kam – das Spiel bleibt lieber ein paar Sekunden gesperrt (und holt selbsttätig nach),
+   als mit einem falschen Stand weiterzulaufen. Eine Sicherung, deren Ausfall wie Normalbetrieb
+   aussieht, ist keine.

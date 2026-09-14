@@ -447,6 +447,42 @@ if (SRV) {
     fremdeFelder.length === 0, { erfunden: fremdeFelder });
 }
 
+/* 10b. DIE FELDER DES REPARATUR-OBJEKTS (14.09.2026, Befund der Durchsicht).
+   ---------------------------------------------------------------------------------------------
+   10a haelt die Felder der obersten Ebene. Das Reparatur-Objekt liegt eine Ebene tiefer, und das
+   Spiel liest daraus sechs Namen (fehlend, heilung, kosten, gesperrt, gesperrtBis, aktiv). Ein
+   Tippfehler an einem davon faellt STILL aus: `rep.heilun` ist undefined, der Knopf waere grau
+   und der Grund sagte „Lager leer" - im Spiel plausibel, in Wahrheit falsch. Dieselbe Bauart wie
+   10a, nur eine Ebene tiefer: Die erlaubte Menge kommt aus server.js, nicht aus einer Liste hier. */
+{
+  const von = SRV.indexOf('reparatur: (() =>');
+  const bis = von < 0 ? -1 : SRV.indexOf('})(),', von);
+  const block = (von >= 0 && bis > von) ? SRV.slice(von, bis) : '';
+  const rueck = block.lastIndexOf('return {');
+  const literal = rueck < 0 ? '' : block.slice(rueck);
+  const erlaubt = new Set([...literal.matchAll(/(?:^|[\{,\s])([a-zA-Z_$][\w$]*)\s*:/g)].map(m => m[1]));
+  check('10b-anker: das Reparatur-Objekt ist in server.js auffindbar (sonst misst 10b nichts)',
+    erlaubt.size >= 5, { gefunden: [...erlaubt] });
+  /* NUR DA SUCHEN, WO `rep` WIRKLICH DAS REPARATUR-OBJEKT IST (gemessen 14.09.2026). Ein
+     dateiweites /\brep\./ traf auch `rep.need`/`rep.have` aus den Fraktions-Aufgaben - die
+     Pruefung meldete diese beiden prompt als „erfunden". Der Block ab `const rep = v.reparatur`
+     bis zum Ende des Menue-Eintrags ist der Geltungsbereich; ausserhalb heisst `rep` etwas
+     anderes. Der zweite Ausdruck (die Info-Zeile) ist dagegen eindeutig und darf dateiweit
+     suchen - er nennt `v.reparatur` selbst. */
+  const repVon = JS.indexOf('const rep = v.reparatur');
+  const repBlock = repVon < 0 ? '' : JS.slice(repVon, JS.indexOf('vorpostenReparieren(sysId) });', repVon));
+  check('10b-anker3: der Geltungsbereich von `rep` ist auffindbar (sonst misst 10b nichts)',
+    repVon > 0 && repBlock.length > 200, { laenge: repBlock.length });
+  const gelesen = new Set();
+  for (const m of repBlock.matchAll(/\brep\.([a-zA-Z_$][\w$]*)/g)) gelesen.add(m[1]);
+  for (const m of JS.matchAll(/\(v\.reparatur\|\|\{\}\)\.([a-zA-Z_$][\w$]*)/g)) gelesen.add(m[1]);
+  const erfunden = [...gelesen].filter(k => !erlaubt.has(k));
+  check('10b-anker2: das Spiel liest ueberhaupt Felder daraus (sonst misst 10b nichts)',
+    gelesen.size >= 4, { gelesen: [...gelesen] });
+  check('10b: jedes im Spiel gelesene Feld von `reparatur` schickt der Server wirklich',
+    erfunden.length === 0, { erfunden, erlaubt: [...erlaubt], gelesen: [...gelesen] });
+}
+
 /* 11. DER HILFETEXT IST EINE HANDGETIPPTE KOPIE (05.09.2026, Befund der Durchsicht).
    ---------------------------------------------------------------------------------------------
    Etappe V7 hat dem Vorposten-Hilfetext einen Absatz ueber Steckplaetze, Module und Sets gegeben -
