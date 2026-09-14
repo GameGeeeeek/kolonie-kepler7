@@ -89,7 +89,14 @@ check('0a: es gibt GENAU EINE Stelle, die den Reparatur-Endpunkt ruft',
   check('0c: der Netzfehler wird gefangen - wie an jeder anderen Vorposten-Aktion',
     /backendFetch\('\/vorposten\/reparieren'[^\n]*\.catch\(/.test(rumpf) || /try\s*\{/.test(rumpf),
     { auszug: (rumpf.match(/backendFetch\([^\n]{0,44}/) || [])[0] });
-  check('0d: sie laedt die Vorposten danach neu', /ladeVorposten\(\)/.test(rumpf), {});
+  /* ZWEIMAL, nicht einmal (gemessen 14.09.2026): Seit auch der Ablehnungspfad neu laedt, war eine
+     Pruefung auf EIN Vorkommen schon durch ihn erfuellt - der Stand ohne das Neuladen im
+     Erfolgspfad blieb bei 0d gruen und fiel nur noch ueber 6a. Beide Wege brauchen es: der
+     Erfolgspfad, weil der Kern geheilt ist, und der Ablehnungspfad, weil drei der acht
+     Ablehnungen „dein Zwischenspeicher ist alt" heissen. */
+  check('0d: sie laedt die Vorposten neu - auf BEIDEN Wegen, Erfolg wie Ablehnung',
+    (rumpf.match(/ladeVorposten\(\)/g) || []).length >= 2,
+    { treffer: (rumpf.match(/ladeVorposten\(\)/g) || []).length });
   /* 0e: Die Route legt KEINE Belohnung an (kein pushPendingReward, kein eigener type) - sie heilt
      synchron am Ziel. Ein claimPendingRewards() hier waere ein Zweig ins Leere und liesse kuenftig
      jemanden glauben, es gaebe eine Warteschlange, die es nicht gibt. Der Unterschied zur
