@@ -79926,6 +79926,57 @@ function sekSternUse(key, x, y, k, unentdeckt){
   }
   // Fuer ein Fenster: nichts im Bild und verdeckt sind dasselbe Nein.
   function fensterObenauf(el){ return fensterLage(el) === 'obenauf'; }
+
+  /* ===== DIE SCHIRMFRAGE (UI-9, 14.09.2026) =================================================
+
+     DER SCHADEN, GEMESSEN am heutigen Stand (900x1000, System aufgeklappt, Kampf-Wiedergabe
+     darueber): Ein Druck auf ArrowRight schob den viewBox der Galaxiekarte von
+     `327.9 150.2 201.5 225.2' auf `176.0 255.8 336.8 177.2', ein Druck auf `+' weiter auf
+     `224.1 281.2 240.5 126.6'. Die Taste bediente also die Karte UNTER einem Fenster, das sie
+     vollstaendig deckt. Dasselbe fuer die Ziffern-Kuerzel: Bei offenem Tutorial-Fenster wechselte
+     `2' den Reiter auf Verteidigung.
+
+     DIE FRAGE IST NICHT `IST DIE KARTE ZU SEHEN?', SONDERN `BEANSPRUCHT EIN FENSTER DEN SCHIRM?'
+     Das ist der Unterschied, an dem ein erster Entwurf gescheitert waere: Ob die Karte unter dem
+     Fenster im Bild liegt, ist belanglos - sie liegt es ohnehin nicht, das Fenster deckt sie ja.
+     Und umgekehrt ist eine herausgescrollte Karte KEIN Grund, die Taste zu sperren.
+
+     DAS KRITERIUM IST ABGELEITET, NICHT GEWAEHLT. Keine gepflegte Fensterliste (die veraltet
+     still beim naechsten neuen Fenster) und keine Schwelle wie `ab einem Drittel sichtbar'
+     (jede Zahl darin waere geraten). Gefragt wird die Bauweise der Seite: Der Seiteninhalt lebt
+     in `.shell'; ein Fenster liegt darueber, ausserhalb. GEMESSEN am 14.09.2026, je 390x844 und
+     900x1000, zehn von zehn:
+       kein Fenster offen        -> oberstes Element .werkstoffe-hinweis / .tab-btn  IN der Schale
+       Karte offen, kein Fenster -> .werkstoffe-hinweis / .ti                        IN der Schale
+       Kampf-Wiedergabe          -> osCv                                        AUSSERHALB
+       Statustafel offen         -> .fp-colony-btn                              AUSSERHALB
+       Tutorial-Fenster          -> .login-card                                 AUSSERHALB
+
+     ZWEI GEMESSENE VORAUSSETZUNGEN, ohne die das nicht traegt:
+     (1) elementsFromPoint ueberspringt `pointer-events:none'. Damit koennen Klick-Funken
+         (z-index 300), Konfetti (301), das Erfolgs-Abzeichen (302) und die Toast-Leiste (100)
+         die Frage gar nicht stoeren - sie tragen alle pointer-events:none. NACHGEMESSEN am
+         Browser, nicht der Dokumentation geglaubt, mit Gegenprobe: Dieselbe Deckschicht OHNE
+         pointer-events:none taucht in der Kette auf, das Messmittel taugt also.
+     (2) Die Baender am Fensterkopf duerfen die Bildmitte nicht decken. GEMESSEN mit absichtlich
+         zwoelffach wiederholtem Text: #wartungBanner reicht bis 234 px (390 breit) bzw. 89 px
+         (900 breit), #hortTicker bis 32 px - die Bildmitte liegt bei 422 bzw. 500.
+
+     DER EINE SONDERFALL, vorher bekannt und nachgemessen: Das Kartenmenue (.kmenu, z-index 9000)
+     ist ein kleines Fenster an einem Knoten und deckt die Bildmitte NICHT - bei 390x844 so wenig
+     wie bei 900x1000. Es wird deshalb GESONDERT gefragt und nicht die Deckprobe aufgebohrt; ein
+     Raster ueber die Flaeche war ausdruecklich verworfen.
+
+     WAS DIESE FUNKTION NICHT ANFASST: fensterLage() und damit die Escape-Kette. Der Boden dieser
+     Kette darf bei `weg' zugreifen (Begruendung steht dort), und der Fangschirm aus Pruefung 1d
+     wuerde ihn aushebeln, stellte man ihn auf die Schirmfrage um. */
+  function schirmBeansprucht(){
+    if (karteMenuEl) return true;
+    const oben = document.elementsFromPoint(window.innerWidth / 2, window.innerHeight / 2)[0];
+    if (!oben) return false;
+    const schale = document.querySelector('.shell');
+    return !!schale && !schale.contains(oben);
+  }
   /* Ein Fenster meldet hier seinen Tastenausgang an: WANN es offen ist, WIE es zugeht und WELCHES
      Element es im Bild ist. Der Rest - Taste pruefen, Obenauf messen, Taste anhalten - steht
      einmal hier statt siebenmal im Spiel. Die Stelle des Aufrufs bleibt der Gleichstands-
@@ -80021,6 +80072,11 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
     if (a && a.isContentEditable) return;
+    /* Liegt ein Fenster über dem Schirm, gehört die Taste ihm - nicht der Karte darunter.
+       GEMESSEN am 14.09.2026: Ohne diese Zeile schob ArrowRight bei offener Kampf-Wiedergabe den
+       viewBox von `327.9 150.2 201.5 225.2' auf `176.0 255.8 336.8 177.2'. Begründung und die
+       zehn Messwerte stehen an schirmBeansprucht(). */
+    if (schirmBeansprucht()) return;
     if (!galaxyOpenSystem){
       // Sektoransicht: dieselbe Bewegung wie die ‹ ›-Knöpfe daneben, dieselbe Funktion.
       if (e.key === 'ArrowLeft'){ e.preventDefault(); sektorNachbarKB(-1); return; }
@@ -80594,7 +80650,13 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const typing = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.isContentEditable);
     if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
     const idx = e.key === '0' ? 9 : (parseInt(e.key,10)-1);
-    if (idx>=0 && idx<TAB_SHORTCUT_ORDER.length){ switchTab(TAB_SHORTCUT_ORDER[idx]); }
+    if (!(idx>=0 && idx<TAB_SHORTCUT_ORDER.length)) return;
+    /* Dieselbe Frage wie bei der Kartenbedienung, und sie wurde hier erst durch die Schirmfrage
+       gefunden: Ein Raster über die KARTENFLÄCHE hätte diesen Fall gar nicht erfasst. GEMESSEN am
+       14.09.2026: Bei offenem Tutorial-Fenster - das überhaupt keinen Tastenausgang hat -
+       wechselte `2' den Reiter auf Verteidigung, hinter dem Fenster, unsichtbar für den Spieler. */
+    if (schirmBeansprucht()) return;
+    switchTab(TAB_SHORTCUT_ORDER[idx]);
   });
   setInterval(maybeScheduleRaid, 300000);
   setInterval(maybeSchedulePirateDebrisRaid, 300000);
