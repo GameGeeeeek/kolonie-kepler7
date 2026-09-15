@@ -43,7 +43,12 @@ const BEGRENZT = [
      dieser Pruefung gemeldet, bevor er eingetragen war - das ist der Zweck der Liste: Ein neuer
      Faktor muss hier benannt werden, mit dem Nachweis, warum er begrenzt ist. Er gibt 0,75 oder
      1 zurueck, sonst nichts (Abschnitt 4 fuehrt das aus). */
-  { was: 'Funktion mit eigenem Deckel', muster: /(fleetSpeedMultiplier|allianceBaseFlightMult|sektorFlugMult|wurmlochFlugMult)\(/ },
+  /* vorpostenFlugMult kam am 15.09.2026 dazu, als der Vorposten-Flugbonus von neun einzelnen
+     Aufrufstellen in diese Kette wanderte. Sein Deckel steht im Client selbst
+     (VORPOSTEN_FLUG_HARTDECKEL = 0,75, `Math.min` um den Serverwert): Ohne diese Klammer haenge
+     die Grenze an dem, was der Server schickt - und ein `flugDeckel: 1` druecke den Faktor auf 0.
+     Genau das ist der Nachweis, den diese Liste verlangt; Abschnitt 5 fuehrt ihn aus. */
+  { was: 'Funktion mit eigenem Deckel', muster: /(fleetSpeedMultiplier|allianceBaseFlightMult|sektorFlugMult|wurmlochFlugMult|vorpostenFlugMult)\(/ },
   { was: 'Tempo-Buff (endliche Laufzeit)', muster: /buff\.mult/ }
 ];
 const zeilen = CODE.split('\n').map(z => z.trim()).filter(z => /mult\s*\*?=/.test(z) && !/^let mult/.test(z));
@@ -109,6 +114,64 @@ if (whFn){
     werte.fremdOffen === 1 && werte.ohneZiel === 1, werte);
   check('4c: ein abgelaufenes oder fehlendes Wurmloch wirkt nicht',
     werte.abgelaufen === 1 && werte.keinWurmloch === 1, werte);
+}
+
+/* ---- 5) Der Vorposten-Faktor, ausgefuehrt (15.09.2026) ---------------------------------------
+   Seit der Ausdehnung auf jede Missionsart mit Zielsystem steht er in dieser Kette. Der Eintrag
+   in der Liste oben behauptet „begrenzt" - hier wird es gemessen, und zwar gegen den Fall, der
+   die Begrenzung ueberhaupt noetig macht: Der Deckel kommt VOM SERVER. Ein Serverstand mit
+   `flugDeckel: 1` ist kein Hirngespinst, sondern genau die Art Feld, die sich aendert, ohne dass
+   jemand an diese Kette denkt - und er druecke den Faktor ohne die Klammer auf 0. */
+let vpFn = null, vpBau = null;
+try {
+  const aAn = S.indexOf('  function vorpostenAn(sysId){');
+  const eAn = aAn >= 0 ? S.indexOf('\n', aAn) : -1;
+  const aDarf = S.indexOf('  function vorpostenDarfMitwirken(v){');
+  const eDarf = aDarf >= 0 ? S.indexOf('\n', aDarf) : -1;
+  const a = S.indexOf('  function vorpostenFlugMult(sysId){');
+  const e = a >= 0 ? S.indexOf('\n  }', a) : -1;
+  const hart = Number((S.match(/const VORPOSTEN_FLUG_HARTDECKEL = ([\d.]+);/) || [])[1]);
+  const basis = Number((S.match(/const VORPOSTEN_FLUG_DECKEL = ([\d.]+);/) || [])[1]);
+  if (a < 0 || e < 0 || aAn < 0 || aDarf < 0 || !(hart > 0) || !(basis > 0)) throw new Error('Anker nicht gefunden');
+  /* Wie bei Abschnitt 4: die AUFRUFE mitschneiden statt sie zu erraten. vorpostenFlugMult ruft
+     vorpostenAn und vorpostenDarfMitwirken; vorpostenAn ruft vorpostenImSystem, das hier durch
+     die uebergebene Liste ersetzt wird - das ist die einzige Stelle, an der der Test etwas
+     nachbaut, und sie ist reine Datenhaltung. */
+  vpFn = (vp) => new Function('liste',
+    'function vorpostenImSystem(sysId){ return (liste||[]).filter(v => v && v.sys === sysId); }\n'
+    + S.slice(aAn, eAn) + '\n' + S.slice(aDarf, eDarf) + '\n'
+    + 'const VORPOSTEN_FLUG_DECKEL = ' + basis + ';\n'
+    + 'const VORPOSTEN_FLUG_HARTDECKEL = ' + hart + ';\n'
+    + S.slice(a, e + 4) + '\n return vorpostenFlugMult;')(vp);
+} catch(err){ vpBau = String(err.message || err); }
+check('5-bau: vorpostenFlugMult laesst sich schneiden und ausfuehren', vpBau === null, { vpBau });
+if (vpFn){
+  const mit = (nutzen, eigener) => vpFn([{ sys:'vega', eigener: eigener !== false, nutzen }])('vega');
+  const werte = {
+    ohneZiel:   vpFn([])(null),
+    fremd:      vpFn([{ sys:'vega', eigener:false, verbuendet:false, nutzen:{ flug:0.9, flugDeckel:0.9 } }])('vega'),
+    normal:     mit({ flug:0.20, flugDeckel:0.5 }),
+    amDeckel:   mit({ flug:0.90, flugDeckel:0.5 }),
+    mitTor:     mit({ flug:0.90, flugDeckel:0.75 }),
+    serverGier: mit({ flug:0.99, flugDeckel:1 }),
+    deckelWeg:  mit({ flug:0.99, flugDeckel:-5 })
+  };
+  check('5a: ohne Zielsystem und an einem FREMDEN Vorposten wirkt er gar nicht',
+    werte.ohneZiel === 1 && werte.fremd === 1, werte);
+  check('5b: der Anteil wirkt, solange er unter dem Deckel liegt',
+    Math.abs(werte.normal - 0.8) < 1e-9, werte);
+  check('5c: der Deckel des Servers greift - 0,5 ohne Tor, 0,75 mit Tor',
+    Math.abs(werte.amDeckel - 0.5) < 1e-9 && Math.abs(werte.mitTor - 0.25) < 1e-9, werte);
+  /* DIE EIGENTLICHE ZUSAGE dieses Abschnitts: Was der Server auch schickt, tiefer als ein Viertel
+     geht es nie. Ohne die Klammer im Client waere `serverGier` gemessen 0 - und mit ihr faellt
+     die ganze Flugzeitkette auf null, samt jedem Reaktionsfenster, das daran haengt. */
+  check('5d: ein masslos hoher Deckel vom Server aendert daran nichts - nie unter ein Viertel',
+    werte.serverGier === 0.25, { serverGier: werte.serverGier, erwartet: 0.25, alle: werte });
+  /* Und die andere Richtung: Ein negativer Deckel darf den Faktor nicht ueber 1 heben (das waere
+     eine Flugzeit-VERLAENGERUNG aus einem kaputten Serverfeld). Gemessen kommt 1 heraus - der
+     Vorposten wirkt dann gar nicht, was der richtige Ausfall ist. */
+  check('5e: ein negativer Deckel schaltet den Bonus ab, statt den Flug zu verlaengern',
+    werte.deckelWeg === 1, { deckelWeg: werte.deckelWeg, erwartet: 1 });
 }
 
 ende();

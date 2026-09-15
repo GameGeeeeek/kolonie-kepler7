@@ -212,6 +212,26 @@ Reaktionsfenster für den Verteidiger; bei `moon-siege` hängt an der Abklingzei
 
 **Die Weiche gehört Sascha vorgelegt, nicht still aufgelöst:**
 
+> **Entschieden am 15.09.2026 – gegen die Empfehlung (i), Auftrag Sascha: „sprungtore sollen boni
+> nicht nur auf pve missionen geben".** Der Faktor steht seither in `missionDurationFor`, direkt
+> neben `allianceBaseFlightMult`, `sektorFlugMult` und `wurmlochFlugMult`, und hängt wie diese am
+> `targetSystem`. Die neun Aufrufstellen von `vorpostenFlug()` und die Funktion selbst sind
+> entfallen — eine stehengebliebene Hülle hätte den Bonus dort doppelt angewandt, `test_vorposten_
+> paritaet` 5b bewacht das.
+>
+> **Der Einwand oben trug nicht.** Er stand auf der Annahme, der Vorteil sei privat. Gemessen ist
+> er das nicht: `vorpostenFuerClient` schickt `projekte` — also auch das fertige Sprungtor — an
+> **jeden** Client, und die Karte zeichnet das Tor für jeden Betrachter. Wer angeflogen wird, sieht,
+> wodurch. Damit steht der Vorposten-Faktor genau dort, wo das Wurmloch schon stand, und der
+> Kommentar dort, der ihn als „verstecktes Reaktionsfenster" vom Wurmloch abgrenzte, ist mit
+> korrigiert.
+>
+> **Was der Bonus NICHT erreicht, und warum das keine Regel ist:** den Spielerangriff. Seine
+> Flugzeit kommt aus `pseudoDistanceSeconds(playerId)` — „die Entfernung hängt am Spieler, nicht am
+> Standort" — er übergibt gar kein Zielsystem. Dasselbe gilt für Spionage, Expedition und die
+> Mondkolonisierung. Gemessen an den Aufrufstellen, nicht gesetzt; `test_vorposten_paritaet` 5d
+> hält es fest.
+
 - **(i) — Empfehlung: Der Effekt wird auf NICHT-PvP-Missionstypen gegated.** Der Vorposten-Faktor
   wirkt nur auf Erkundung, Kolonisierung, Bergbau, eigene Expeditionen — nicht auf `moon-siege`,
   `asteroid-contest`, `player-attack`, `spy`. Damit bleibt Option A frontend-rein, **aber der Kanal

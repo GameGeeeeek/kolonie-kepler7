@@ -147,7 +147,7 @@ async function lauf(browser, opt){
     const liste = document.getElementById('fleetPositionList');
     if (!liste) return null;
     const treffer = [...liste.querySelectorAll('.fleet-position-item')]
-      .find(el => /Musterangriff/.test(el.textContent || ''));
+      .find(el => /Koordinierter Angriff/.test(el.textContent || ''));
     if (!treffer) return { da:false, alles:(liste.textContent||'').replace(/\s+/g,' ').trim().slice(0,300) };
     return { da:true, text:(treffer.textContent||'').replace(/\s+/g,' ').trim(),
              ziel: treffer.getAttribute('data-fp-vziel'), zeit: treffer.getAttribute('data-fp-vzeit') };
@@ -173,7 +173,7 @@ async function lauf(browser, opt){
   // ---- 2) Der Klick fuehrt zum Ziel, das Fadenkreuz liegt darauf --------------------------------
   await page.evaluate(() => {
     const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Musterangriff/.test(x.textContent||''));
+    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
     if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   await page.waitForTimeout(1600);
@@ -212,7 +212,7 @@ async function lauf(browser, opt){
     ["Ergebnis-Nachricht", /Angriff gegen \['\+targetTag\+'\]/],
     ["Abrechnung", /Koordinierter Angriff gegen \['\+doc\.targetTag\+'\]/],
     ["Rueckzug", /koordinierten Angriff gegen \['\+contrib\.targetTag\+'\]/],
-    ["Flottenposition", /Musterangriff auf \['\+\(muster\.targetTag\|\|'\?'\)\+'\]/]
+    ["Flottenposition", /Koordinierter Angriff auf \['\+\(muster\.targetTag\|\|'\?'\)\+'\]/]
   ].filter(([, re]) => re.test(JS)).map(([name]) => name);
   merke('3a: keine Verbands-Meldung baut ihren Zieltext mehr aus targetTag',
     rohbau.length === 0, { nochRoh: rohbau });
@@ -229,7 +229,7 @@ async function lauf(browser, opt){
   const b1 = await lauf(browser, { zielArt:'vorposten', besitzerName: boese });
   const sicher = await b1.page.evaluate(() => {
     const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Musterangriff/.test(x.textContent||''));
+    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
     return { xss: window.__xss || 0,
              bilder: liste ? liste.querySelectorAll('img').length : -1,
              text: el ? (el.textContent||'').replace(/\s+/g,' ').trim() : null };
@@ -243,7 +243,7 @@ async function lauf(browser, opt){
   const b2 = await lauf(browser, { zweiNester: true });
   await b2.page.evaluate(() => {
     const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Musterangriff/.test(x.textContent||''));
+    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
     if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   await b2.page.waitForTimeout(1600);
@@ -273,7 +273,7 @@ async function lauf(browser, opt){
       if (t && t !== window.__log[window.__log.length-1]) window.__log.push(t);
     }).observe(l, { subtree:true, childList:true, characterData:true });
     const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Musterangriff/.test(x.textContent||''));
+    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
     if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
   await b3.page.waitForTimeout(1800);

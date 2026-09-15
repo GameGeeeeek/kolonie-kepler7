@@ -237,7 +237,15 @@ zahnlos. Drei mögliche Antworten, alle in Etappe 2 zu entscheiden:
 
 **Die Regel, die dabei auf dem Spiel stand – und gehalten wird:** Der Vorposten-Hilfetext schreibt
 ausdrücklich fest, dass sich „das Reaktionsfenster eines Verteidigers nie verschiebt" (`:38597`) – im
-Code eingehalten, weil `vorpostenFlug()` die Angriffsmission nicht umschließt. **Entschieden
+Code eingehalten, weil `vorpostenFlug()` die Angriffsmission nicht umschließt.
+> **Nachtrag 15.09.2026:** Diese Zusage gibt es nicht mehr. Auf Auftrag Sascha („sprungtore sollen
+> boni nicht nur auf pve missionen geben") gilt der Vorposten-Flugbonus jetzt für **jede** Mission
+> mit Zielsystem, Angriffe eingeschlossen; `vorpostenFlug()` ist entfallen, der Faktor steht in
+> `missionDurationFor`. Der zitierte Satz im Hilfetext ist ersetzt. **Für Tarnung ändert das
+> nichts:** Die Entscheidung unten steht auf eigenen Füßen — Tarnung ändert, *was* ein Verteidiger
+> erfährt, nie *wann*. Sie stützt sich ab jetzt auf sich selbst und nicht mehr auf eine fremde
+> Zusage. Siehe `docs/vorposten-konzept.md`, Abschnitt „Die Weiche".
+ **Entschieden
 (Abschnitt 9, Punkt 3): Etappe 2 verkürzt das Fenster nicht.** Tarnung ändert ausschließlich, *was*
 der Verteidiger über einen Anflug erfährt, nie *wann*. Damit bleibt die Zusage wahr und kein
 Hilfetext muss geändert werden. Von den drei Antworten auf den Balance-Einwand darüber scheiden

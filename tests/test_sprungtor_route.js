@@ -22,10 +22,14 @@
 //       Sie braeuchte ein zweites Fixture mit NPC-Ziel, und 2a haelt dieselbe Zusage bereits an der
 //       Wurzel - gezeichnet wird ausschliesslich, was `art.sprungtor` traegt, und 2a legt fest, wer
 //       das ist. Das steht hier, statt eine Pruefung zu behaupten, die es nicht gibt.
-//   2a  DIE KOPIE-FAMILIE: Genau vier Missionsarten tragen `sprungtor:true`, und es sind die vier,
-//       deren Sendeweg vorpostenFlug() aufruft (gemessen 08.09.2026: explore, colonize, mining,
-//       vorposten-bau). Mondlandung und Bergbau-Eskorte rufen missionDurationFor direkt, alle
-//       Angriffsarten ebenso. Wer eine Aufrufstelle ergaenzt und die Tabelle vergisst, faellt hier.
+//   2a  DIE KOPIE-FAMILIE: `sprungtor:true` traegt genau die Art, deren Aufrufstelle ein
+//       ZIELSYSTEM uebergibt - seit dem 15.09.2026 sind das alle Arten der Tabelle ausser der
+//       Mondlandung (Auftrag Sascha: „sprungtore sollen boni nicht nur auf pve missionen geben";
+//       der Faktor steht seither in missionDurationFor und haengt am targetSystem). Vorher waren
+//       es fuenf. Wer eine Missionsart ergaenzt und die Tabelle vergisst, faellt hier.
+//   2b  UND DIE AUSNAHME NAMENTLICH: Die Mondlandung rechnet mit moonBaseDuration(parentKey) und
+//       uebergibt kein System. Ohne diese Pruefung waere 2a auch dann gruen, wenn jemand ihr die
+//       Marke gaebe - und die Bahn zeichnete eine Passage, die die Flugzeit nicht hat.
 //
 // GEGENPROBE: `KEPLER_SPIELDATEI` auf den Stand vor KB-26 (`git show 264b8c6:weltraum_kolonie.html`),
 // Aufruf mit KEPLER_TOR_GEGENPROBE=alt. Dort faellt 1b - die Bahn beginnt an der Sonne.
@@ -338,12 +342,25 @@ const SONNE = (() => {
     const tab = quelle.slice(tabVon, quelle.indexOf('\n  };', tabVon));
     const mitTor = [...tab.matchAll(/^\s{4}'?([\w-]+)'?:\s*\{[^\n]*sprungtor:true/gm)].map(m => m[1]).sort();
     check2('0a: ein Zielplanet in vega steht in der Spieldatei', !!ZIELPLANET, { ZIELPLANET });
-    /* Die Liste waechst mit den Aufrufstellen von vorpostenFlug() - sie ist eine Kopie-Familie,
-       kein fester Bestand. VP-1 hat mit dem Transportverband die fuenfte Aufrufstelle gebracht
-       (vorpostenFrachtFlug); die Zusage bleibt dieselbe: GENAU die Arten, deren Flugzeit ueber
-       vorpostenFlug laeuft, tragen sprungtor:true - keine mehr und keine weniger. */
-    check2('2a: genau die fuenf Arten mit vorpostenFlug tragen sprungtor:true',
-      JSON.stringify(mitTor) === JSON.stringify(['colonize','explore','mining','vorposten-bau','vorposten-fracht']), { mitTor });
+    /* Die Liste ist eine Kopie-Familie, kein fester Bestand: GENAU die Arten, deren Flugzeit ein
+       Zielsystem traegt, tragen sprungtor:true - keine mehr und keine weniger. Am 15.09.2026 sind
+       daraus fuenf Arten vierzehn geworden, weil der Faktor in die Kette gewandert ist. */
+    const ERWARTET = ['attack','colonize','explore','festung-angriff','konvoi-angriff','mining',
+      'mining-escort','nest-angriff','relocate','vorposten-angriff','vorposten-bau',
+      'vorposten-defend','vorposten-fracht','vorposten-rueckruf'];
+    check2('2a: genau die Arten mit Zielsystem tragen sprungtor:true',
+      JSON.stringify(mitTor) === JSON.stringify(ERWARTET),
+      { mitTor, zuviel: mitTor.filter(a => !ERWARTET.includes(a)),
+        fehlt: ERWARTET.filter(a => !mitTor.includes(a)) });
+    /* 2b: die Ausnahme, und WARUM sie eine ist - beides gemessen. Die Marke fehlt, UND die
+       Aufrufstelle uebergibt wirklich kein System. Nur das erste zu pruefen hiesse, eine
+       Momentaufnahme festzuschreiben statt der Regel. */
+    const alleArten = [...tab.matchAll(/^\s{4}'?([\w-]+)'?:\s*\{/gm)].map(m => m[1]).sort();
+    const mondRuf = /missionDurationFor\(moonBaseDuration\(parentKey\), \{ colonyShips:1 \}, \['colonyShips'\]\)/.test(quelle);
+    check2('2b: nur die Mondlandung traegt sie nicht - und sie uebergibt wirklich kein Zielsystem',
+      JSON.stringify(alleArten.filter(a => !mitTor.includes(a))) === JSON.stringify(['colonize-moon'])
+      && mondRuf === true,
+      { ohneMarke: alleArten.filter(a => !mitTor.includes(a)), aufrufOhneSystemGefunden: mondRuf });
 
     // ---- 1) Mit Tor ------------------------------------------------------------------------------
     const mitTorLauf = await lauf(browser, doc({ projekte:['sprungtor'] }));
@@ -416,20 +433,39 @@ const SONNE = (() => {
     /* 4c: DIE ZWEITE KOPIE-FAMILIE. 2a haelt fest, WELCHE Arten durch ein Tor fliegen; 4c haelt
        fest, dass auch jede Stelle, die so eine Mission ERZEUGT, die Marke setzt. Ohne sie faellt
        eine neue Missionsart still auf das alte Verhalten zurueck - und zwar unauffaellig, weil
-       `undefined` absichtlich der Rueckfall ist. Die Zahl ist GEMESSEN (08.09.2026): sieben
-       Erzeuger fuer fuenf Arten, weil die Erkundung drei hat (von Hand, Auto-Erkunder hin,
-       Auto-Erkunder zurueck). */
-    /* Sieben Erzeuger, aber nur SECHS fragen den heutigen Torzustand ab: Der Rueckweg des
+       `undefined` absichtlich der Rueckfall ist.
+       HIER STAND EINE ZAHL („sieben Erzeuger fuer fuenf Arten"). Am 15.09.2026 wurden aus fuenf
+       Arten vierzehn, und die Zahl war damit genau das, wovor Hausregel 33 warnt: eine
+       Momentaufnahme, die beim naechsten Zuwachs still falsch wird. Geprueft wird jetzt die
+       REGEL, und zwar JE ART: Jede Stelle, die eine Mission einer Tor-Art ERZEUGT, setzt `tor:`.
+       Eine Art ohne Erzeuger faellt ebenso auf - das waere eine Marke in MISSION_LINIEN fuer
+       etwas, das es gar nicht gibt. */
+    const erzeugerJeArt = mitTor.map(art => {
+      const re = new RegExp("type:'" + art + "'", 'g');
+      let m, gefunden = 0, ohneMarke = 0;
+      while ((m = re.exec(quelle))){
+        /* NUR ERZEUGER, nicht jede Erwaehnung: `pushReport({ type:'nest-angriff' ... })` traegt
+           denselben Text und ist ein BERICHT, keine Mission. Das Kennzeichen ist der Aufruf davor. */
+        const vor = quelle.slice(Math.max(0, m.index - 400), m.index);
+        const p = vor.lastIndexOf('missions.push({');
+        if (p < 0) continue;
+        const bis = quelle.indexOf('});', m.index);
+        const block = quelle.slice(Math.max(0, m.index - 400) + p, bis < 0 ? m.index + 600 : bis);
+        gefunden++; if (!/tor:/.test(block)) ohneMarke++;
+      }
+      return { art, gefunden, ohneMarke };
+    });
+    const luecken = erzeugerJeArt.filter(e => e.gefunden === 0 || e.ohneMarke > 0);
+    check2('4c: JEDE Stelle, die eine Mission einer Tor-Art erzeugt, setzt die Marke',
+      luecken.length === 0,
+      { luecken, erzeugerGesamt: erzeugerJeArt.reduce((a, e) => a + e.gefunden, 0) });
+    /* Und die eine dokumentierte Ausnahme bleibt namentlich stehen: Der Rueckweg des
        Auto-Erkunders uebernimmt die Marke SEINES HINWEGS, weil er auch dessen DAUER uebernimmt
        (Befund der Durchsicht an PR #614). Eine dort frisch gerechnete Marke koennte von der
-       eingefrorenen Flugzeit abweichen - genau das Auseinanderlaufen, das KB-30 behebt.
-       Gezaehlt wird deshalb BEIDES getrennt; eine Summe waere gruen, wenn eine Stelle wegfiele
-       und eine andere doppelt stuende. */
-    const erzeuger = (quelle.match(/tor: vorpostenTorAn\(/g) || []).length;
-    const ausHinweg = (quelle.match(/tor: tour\.lastLegTor/g) || []).length;
-    check2('4c: alle sieben Missionserzeuger der Tor-Arten setzen die Marke',
-      erzeuger === 6 && ausHinweg === 1,
-      { ausTorzustand: erzeuger, ausHinweg, erwartet: '6 + 1' });
+       eingefrorenen Flugzeit abweichen - genau das Auseinanderlaufen, das KB-30 behebt. */
+    check2('4c2: genau EIN Erzeuger uebernimmt die Marke statt sie neu zu fragen',
+      (quelle.match(/tor: tour\.lastLegTor/g) || []).length === 1,
+      { ausHinweg: (quelle.match(/tor: tour\.lastLegTor/g) || []).length });
     /* Und die Marke des Hinwegs wird auch wirklich GESETZT - sonst truege der Rueckweg still
        `undefined` und fiele auf das alte Verhalten zurueck, ohne dass 4c es merkt. */
     check2('4d: der Hinweg des Auto-Erkunders merkt sich seine Torlage mit der Dauer',

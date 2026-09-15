@@ -11,16 +11,20 @@
 //   2. Der BAU: In einem fremden System ohne Vorposten steht der Knopf „Vorposten errichten";
 //      der Start zahlt die Baukosten, legt eine Form-A-Mission mit Kolonieschiff an. Im
 //      Heimatsystem steht er nicht.
-//   3. DIE WEICHE (i) - als PAAR gemessen: Mit eigenem Vorposten (flug 0,15) ist die Erkundungs-
-//      Flugzeit in der Detailtafel KUERZER als ohne; die Hinflugzeit der ANFECHTUNG in der
-//      Flottenwahl ist in beiden Laeufen IDENTISCH. Ein globaler Faktor riesse 3c.
+//   3. DER FLUGZEIT-KANAL - als PAAR gemessen: Mit eigenem Vorposten (flug 0,15) ist die
+//      Erkundungs-Flugzeit in der Detailtafel KUERZER als ohne (3b), und seit dem 15.09.2026
+//      GENAUSO die Hinflugzeit der ANFECHTUNG in der Flottenwahl (3c). Bis dahin stand dort die
+//      Weiche (i) mit der gegenteiligen Erwartung; der Auftrag Sascha „sprungtore sollen boni
+//      nicht nur auf pve missionen geben" hat sie aufgeloest.
 //   4. Der Angriff: Rueckkehr der Mission bucht GENAU die Verluste des Servers, schreibt einen
 //      Bericht 'vorposten-angriff' und ruft bei `gefallen` das Belohnungsfach.
 //   5. Die Belohnung: 'vorposten' bucht Kampfpunkte/Kredite; 'vorposten-verlust' schreibt einen
 //      Bericht 'vorposten-verteidigung'.
 //
-// GEGENPROBE: vorpostenFlug in sendAnfechtungsMission einhaengen -> 3c faellt; den claim-Zweig
-// 'vorposten' entfernen -> 5a faellt (Bug-Report-Rueckfall, Kampfpunkte bleiben 0).
+// GEGENPROBE (gemessen 15.09.2026): `mult *= vorpostenFlugMult(targetSystem)` in
+// missionDurationFor auskommentieren -> 3b UND 3c fallen, der Anker 3c-anker bleibt gruen (die
+// Messung selbst ist also heil). Den claim-Zweig 'vorposten' entfernen -> 5a faellt
+// (Bug-Report-Rueckfall, Kampfpunkte bleiben 0).
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren, oeffneSektorMitSystem } = require('./lib/karte');
@@ -228,7 +232,13 @@ async function anfechtungHinflug(t){
   check('2d: im Heimatsystem gibt es keinen Bau-Knopf', !tfH.bauKnopf.da, tfH.bauKnopf);
   await tH.ctx.close();
 
-  // ---- 3) Die Weiche (i) als PAAR --------------------------------------------------------------------
+  /* ---- 3) DER FLUGZEIT-KANAL als PAAR ------------------------------------------------------
+     Bis zum 15.09.2026 hiess dieser Block „die Weiche (i)" und 3c hielt fest, dass die Anfechtung
+     UNBERUEHRT bleibt. Der Auftrag Sascha („sprungtore sollen boni nicht nur auf pve missionen
+     geben") hat die Weiche aufgeloest: Der Faktor steht jetzt in missionDurationFor und haengt am
+     Zielsystem. 3c ist deshalb UMGEDREHT - gemessen wird dieselbe Groesse, nur mit der
+     gegenteiligen Erwartung, und das Paar bleibt ein Paar: 3b die friedliche Art, 3c die
+     kaempferische, beide am gerenderten Spiel. */
   const tOhne = await tab(browser, fixture(), { ohneVorposten: true });
   await tOhne.page.waitForTimeout(2500);
   await aufKarte(tOhne);
@@ -244,7 +254,14 @@ async function anfechtungHinflug(t){
   const erkOhne = sek((kennOhne.match(/Erkundung ab ([0-9hms ]+?) ·/) || [])[1]), erkMit = sek((kennMit.match(/Erkundung ab ([0-9hms ]+?) ·/) || [])[1]);
   check('3a-anker: beide Erkundungszeiten sind lesbar', erkOhne > 0 && erkMit > 0, { kennOhne, kennMit });
   check('3b: mit eigenem Vorposten (flug 0,15) ist die Erkundung ins System KUERZER', erkMit < erkOhne, { ohne: erkOhne, mit: erkMit });
-  check('3c: die Hinflugzeit der ANFECHTUNG ist mit und ohne Vorposten IDENTISCH (PvP unberuehrt)', !!anfOhne && anfOhne === anfMit, { ohne: anfOhne, mit: anfMit, hinweis: 'ein Faktor in missionDurationFor selbst erreichte die Anfechtung' });
+  /* GEMESSEN WIRD KUERZER, NICHT „irgendwie anders": Ein Test auf blosse Ungleichheit waere auch
+     dann gruen, wenn der Faktor den Flug VERLAENGERTE. Und die Anfechtung ist hier die richtige
+     Probe, weil sie die Art ist, die der alte Hilfetext ausdruecklich ausgenommen hat. */
+  const anfOhneS = sek(anfOhne), anfMitS = sek(anfMit);
+  check('3c-anker: beide Anfechtungszeiten sind lesbar', anfOhneS > 0 && anfMitS > 0, { ohne: anfOhne, mit: anfMit });
+  check('3c: die Hinflugzeit der ANFECHTUNG ist mit eigenem Vorposten KUERZER (PvP zaehlt jetzt mit)',
+    anfMitS < anfOhneS, { ohne: anfOhne, mit: anfMit, ohneSek: anfOhneS, mitSek: anfMitS,
+      hinweis: 'der Faktor haengt seit 15.09.2026 in missionDurationFor am Zielsystem' });
   const tfMit = await tafel(tMit.page);
   check('3d: der eigene Vorposten steht als „Dein" in Chip und Knopf', /Dein Bastion/.test(tfMit.chips) && tfMit.vpKnopf, { chips: tfMit.chips.slice(0, 200) });
   await tMit.ctx.close();
