@@ -147,6 +147,7 @@ function baueKontext(zustand){
     '  abgrundIstWaechter, abgrundWaechterDef, abgrundSektorMitBann,',
     '  ABGRUND_WAECHTER_ALLE, ABGRUND_WAECHTER_STAERKE, ABGRUND_WAECHTER_SPLITTER,',
     '  ABGRUND_WAECHTER_BERGUNG, abgrundBergungsgut,',
+    '  ABGRUND_BASIS_STAERKE, ABGRUND_STAERKE_MULT,',
     '  ABGRUND_WAECHTER_NAMEN, ABGRUND_GEGEN_KOSTEN };'
   ].join('\n');
   return new Function('state', quelle)(zustand);
@@ -252,10 +253,30 @@ check('3: der Sektor traegt KEINE eigene Anflugdauer mehr (nur eine Wahrheit)',
   { dauerFeld:sehrTief.dauer });
 // Schwierigkeit geometrisch, Belohnung linear: der Abstand waechst, die Tiefe wird also von selbst
 // zur Wand - das ist der Sinn. Waere die Beute ebenfalls geometrisch, waere jede Tiefe gratis.
-const d10 = G.abgrundSektor(10), d20 = G.abgrundSektor(20), d40 = G.abgrundSektor(40);
+/* GEGEN DIE REINE KURVE, nicht gegen drei Stichproben (berichtigt 15.09.2026).
+   Die alte Fassung verglich d20.defense > d10.defense*2. Beide Werte tragen aber `mods.def` aus
+   den Mutatoren, und die werden je Tiefe UND je Stroemung neu gezogen - der Vergleich mass also
+   zwei verschiedene Wuerfe gegeneinander. GEMESSEN am 15.09.2026 fiel er deshalb auf dem LIVE
+   ausgelieferten Stand: t10=8232, t20=14346, verlangt waren >16464. Am Spiel hatte sich nichts
+   geaendert, nur der Tag.
+   Das ist genau derselbe Fehler, den die Splitter-Pruefung weiter unten am 14.09.2026 schon
+   losgeworden ist - hier stand er noch. Ein Waechter, der zusammen mit einer Reparatur entsteht,
+   erbt ihre blinden Flecken (docs/PROJECT_MEMORY.md).
+   Die AUSSAGE ist eine ueber die Tiefenkurve: Schwierigkeit geometrisch, Belohnung linear. Also
+   wird genau die geprueft - sie ist mutatorfrei und damit an jedem Tag dieselbe. */
+const reineStaerke = t => G.ABGRUND_BASIS_STAERKE * Math.pow(G.ABGRUND_STAERKE_MULT, t - 1);
 check('3: die Gegnerstaerke waechst ueberproportional',
-  d20.defense > d10.defense*2 && d40.defense > d20.defense*2,
-  { t10:d10.defense, t20:d20.defense, t40:d40.defense });
+  reineStaerke(20) > reineStaerke(10)*2 && reineStaerke(40) > reineStaerke(20)*2,
+  { t10:Math.round(reineStaerke(10)), t20:Math.round(reineStaerke(20)), t40:Math.round(reineStaerke(40)),
+    mult:G.ABGRUND_STAERKE_MULT });
+// Und die Kurve muss auch wirklich die sein, die der Sektor benutzt - sonst prueft die Zeile
+// darueber eine Formel, die im Spiel gar nicht vorkommt.
+{
+  const d = G.abgrundSektor(20);
+  check('3-anker: der Sektor rechnet mit genau dieser Kurve (sonst misst 3 eine fremde Formel)',
+    d.defense === Math.max(1, Math.round(reineStaerke(20) * d.mods.def * (d.waechter ? G.ABGRUND_WAECHTER_STAERKE : 1))),
+    { defense:d.defense, modsDef:d.mods.def, waechter:!!d.waechter });
+}
 const splitterRoh = t => Math.round(3 + t*0.8); // Basiskurve ohne Mutatorstreuung
 check('3: die Splitterausbeute waechst nur linear, nicht geometrisch',
   splitterRoh(100)/splitterRoh(50) < 2.2 && splitterRoh(200)/splitterRoh(100) < 2.2,
@@ -627,10 +648,22 @@ check('11: Waechter haben Namen UND einen eigenen Text',
 {
   const w = G.abgrundSektor(20), davor = G.abgrundSektor(19), danach = G.abgrundSektor(21);
   check('11: der Sektor traegt den Waechter', !!w.waechter && !davor.waechter && !danach.waechter);
-  // Gegen die reine Tiefenkurve gerechnet: Tiefe 20 muss deutlich ueber der Interpolation liegen.
-  const erwartetOhne = Math.sqrt(davor.defense * danach.defense);
-  check('11: eine Waechtertiefe ist spuerbar staerker als ihre Nachbarn',
-    w.defense > erwartetOhne * 1.2, { tiefe20:w.defense, nachbarmittel:Math.round(erwartetOhne) });
+  /* DER FAKTOR, nicht der Nachbarvergleich (berichtigt 15.09.2026, gleiche Ursache wie bei 3).
+     Die alte Fassung rechnete das geometrische Mittel aus Tiefe 19 und 21 und verlangte 20 % mehr.
+     Auch das vergleicht drei verschiedene Mutatorwuerfe: GEMESSEN am 15.09.2026 auf dem LIVE
+     ausgelieferten Stand kam Tiefe 20 auf 14346, das Nachbarmittel auf 16574 - die Waechtertiefe
+     sah schwaecher aus als ihre Nachbarn, obwohl der Faktor unveraendert angewandt wird.
+     Geprueft wird deshalb, was das Spiel wirklich zusagt: dass in die Staerke einer Waechtertiefe
+     der Faktor ABGRUND_WAECHTER_STAERKE eingeht und dass dieser Faktor ueberhaupt etwas bewirkt.
+     Beides ist mutatorfrei - und faellt, sobald jemand den Faktor aus der Formel nimmt. */
+  check('11: die Waechterstaerke ist ueberhaupt ein Aufschlag', G.ABGRUND_WAECHTER_STAERKE > 1,
+    { faktor:G.ABGRUND_WAECHTER_STAERKE });
+  check('11: eine Waechtertiefe traegt den Waechter-Aufschlag in ihrer Staerke',
+    w.defense === Math.max(1, Math.round(reineStaerke(20) * w.mods.def * G.ABGRUND_WAECHTER_STAERKE)),
+    { tiefe20:w.defense, ohneAufschlag:Math.round(reineStaerke(20) * w.mods.def), faktor:G.ABGRUND_WAECHTER_STAERKE });
+  check('11: eine Nachbartiefe traegt ihn NICHT (sonst waere der Aufschlag kein Unterschied)',
+    davor.defense === Math.max(1, Math.round(reineStaerke(19) * davor.mods.def)),
+    { tiefe19:davor.defense, mitAufschlag:Math.round(reineStaerke(19) * davor.mods.def * G.ABGRUND_WAECHTER_STAERKE) });
   /* GEGEN DIE INTERPOLATION, nicht gegen den Nachbarn allein (berichtigt 14.09.2026).
      Die alte Fassung verglich Tiefe 20 gegen Tiefe 19 mit Faktor 2 - und fiel damit an jedem
      achten Tag, ohne dass sich am Spiel etwas geaendert haette. Grund: Der Splitterwert traegt
