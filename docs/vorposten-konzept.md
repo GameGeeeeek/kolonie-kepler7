@@ -618,6 +618,14 @@ Nicht-PvP-Aufrufstellen (Erkundung, Kolonisierung, Abbau, Vorposten-Bau), nie in
 `missionDurationFor`; `tests/test_vorposten_paritaet.js` 5a–5c und `tests/test_vorposten_ui.js` 3c
 halten das (Anfechtungs-Hinflug mit und ohne Vorposten identisch).
 
+> **Überholt am 15.09.2026.** Der Absatz darüber beschreibt den Bauzustand vom 02.09.2026 und bleibt
+> als solcher stehen. Seither gilt: `vorpostenFlug()` existiert nicht mehr, der Faktor steht als
+> `mult *= vorpostenFlugMult(targetSystem)` **in** `missionDurationFor` und wirkt auf jede Mission
+> mit Zielsystem. Dieselben Tests halten jetzt die umgedrehte Zusage — `test_vorposten_ui` 3c misst,
+> dass der Anfechtungs-Hinflug mit Vorposten **kürzer** ist (gemessen 452 s ohne, 384 s mit).
+> Die Entscheidung und ihre Begründung stehen oben im Abschnitt „Die Weiche gehört Sascha
+> vorgelegt".
+
 **Was das Frontend selbst festlegt** (der Server prüft keine Kosten, der Spielstand ist
 klientenautoritativ): `VORPOSTEN_BAUKOSTEN` 60.000 Erz / 40.000 Kristalle / 25.000 Deuterium,
 `VORPOSTEN_AUSBAU_KOSTEN` Stufe 2: 200k/130k/80k, Stufe 3: 600k/400k/250k. Regel 57: Stufe 1 ist
@@ -630,8 +638,8 @@ zurückkehrt (Messfrage §12-3 entschieden: `colonyShips`, keine eigene Klasse).
 Start bezahlt; kommt der Bau nicht zustande (belegt, Deckel, Server weg), gehen sie über
 `gainResources` zurück, und der Bericht `vorposten-bau` nennt den Grund.
 
-**Die Nutzen-Kanäle im Frontend:** `flug` (Anteil je Stufe, nur eigene Nicht-PvP-Missionen ins
-System), `prod` (Summe aller eigenen Vorposten, additiv in der Gruppe von Modul- und Sektorbonus,
+**Die Nutzen-Kanäle im Frontend:** `flug` (Anteil je Stufe, eigene Missionen ins System — bis zum
+15.09.2026 nur Nicht-PvP, siehe den Nachtrag im Abschnitt „Stand der Umsetzung"), `prod` (Summe aller eigenen Vorposten, additiv in der Gruppe von Modul- und Sektorbonus,
 Deckel 10 %), `scan` (Entdeckungschance eigener Späher gegen Spieler mit Heimat im Vorposten-System
 × (1 − 0,25·Stufe); ab Stufe 2 gilt Aufklärung dort nie als veraltet), Garnison (rechnet der Server).
 Alle Zahlen kommen aus `GET /api/vorposten` – keine Tabelle im Frontend, kein Zahlen-Paritätstest.
