@@ -300,7 +300,44 @@ function spielstand(){
   check('2c: am fremden Vorposten steht der Eintrag nicht - nur der Besitzer darf reparieren',
     c.da === true && c.knopfDa === false, { knopfDa:c.knopfDa });
 
-  // ---- 3: die drei Gruende, in der Reihenfolge des Servers
+  /* ---- 3: die Gruende, in der Reihenfolge des Servers ------------------------------------------
+     Seit dem 15.09.2026 sind es fuenf: Die zwei Vorhaben, die die Station belegen, stehen VORN -
+     genauso wie am Endpunkt. Naennte das Menue einen anderen Grund als die Ablehnung, die man
+     bekaeme, waere es eine zweite, widersprechende Auskunft ueber dieselbe Station. */
+  /* GEGENPROBE zu den dreien, gemessen am 15.09.2026:
+       sabVpAbbau (die Abbau-Bedingung stillgelegt) -> 3-abbau und 3-abbau-vorrang fallen, 31 gruen
+       sabVpUmbau (die Umbau-Bedingung stillgelegt) -> 3-umbau faellt, 32 gruen
+     BEIDE STAENDE LEGEN DIE BEDINGUNG STILL (`if (false && ...)`), sie LOESCHEN DIE ZEILE NICHT.
+     Der erste Anlauf loeschte sie - und dann beginnt die naechste Zeile mit `else if`, also ein
+     Syntaxfehler: Der Stand parste gar nicht, 25 Pruefungen fielen, und er belegte damit nur
+     "Datei kaputt" statt "Grund fehlt". Ein Stand, der aus dem falschen Grund rot ist, ist so
+     wertlos wie einer, durch den nichts faellt. */
+  const abbauBis = now + 53 * 60 * 1000;   // 53 Minuten - kommt sonst nirgends vor
+  const gAb = await messe(vp({ abbauAb: abbauBis, reparatur: rep({ moeglich:false }) }));
+  check('3-abbau: eine Station im Abbau ist gesperrt, und der Grund nennt den Abbau',
+    gAb.knopfDa === true && gAb.gesperrt === true && /abgebaut/i.test(gAb.grund || ''), { grund:gAb.grund });
+  /* Der Abbau-Grund muss VOR dem Kernzustand greifen. Ohne diese Pruefung waere die Reihenfolge
+     unbewacht: Eine Station im Abbau MIT unversehrtem Kern saehe sonst „Der Kern ist unversehrt" -
+     wahr, aber nicht die Auskunft, die der Besitzer braucht. */
+  const gVor = await messe(vp({ abbauAb: abbauBis, kern:{ lp:6500000, lpMax:6500000 },
+    reparatur: rep({ fehlend:0, heilung:0, moeglich:false }) }));
+  check('3-abbau-vorrang: der Abbau wird auch dann genannt, wenn der Kern unversehrt ist',
+    gVor.gesperrt === true && /abgebaut/i.test(gVor.grund || '') && !/unversehrt/i.test(gVor.grund || ''), { grund:gVor.grund });
+
+  /* MIT FENSTER, NICHT AUF DIE MINUTE (berichtigt im selben Lauf, 15.09.2026). Die erste Fassung
+     verlangte /4[01]m/ bei 41 gesetzten Minuten - und mass damit die Wanduhr mit: Zwischen `now`
+     und dem Zeichnen vergeht die Laufzeit der vorigen Pruefungen, gemessen kam „noch 39m 44s"
+     heraus. Dieselbe Fehlerklasse, die test_abgrund heute schon gekostet hat.
+     Die AUSSAGE ist „die Restzeit kommt AUS umruestenAb", nicht „sie ist exakt 41 Minuten".
+     Deshalb ein Fenster, wie es 3b eine Handvoll Zeilen weiter unten auch benutzt - die Stunde
+     macht den Wert trotzdem eindeutig: Aus einer festen Zahl oder einer anderen Quelle faellt
+     kein „1h 3x/4xm". */
+  const umbauBis = now + 101 * 60 * 1000;   // 1h 41m - kommt sonst nirgends vor
+  const gUm = await messe(vp({ umruestenAb: umbauBis, umruestenZiel:'festung', reparatur: rep({ moeglich:false }) }));
+  check('3-umbau: eine Station in der Umruestung ist gesperrt, die Restzeit kommt AUS umruestenAb',
+    gUm.knopfDa === true && gUm.gesperrt === true && /umgerüstet/i.test(gUm.grund || '')
+    && /1h [34][0-9]m/.test(gUm.grund || ''), { grund:gUm.grund });
+
   const d = await messe(vp({ kern:{ lp:6500000, lpMax:6500000 }, reparatur: rep({ fehlend:0, heilung:0, moeglich:false }) }));
   check('3a: unversehrter Kern - gesperrt, und der Grund sagt „unversehrt"',
     d.knopfDa === true && d.gesperrt === true && /unversehrt/i.test(d.grund || ''), { grund:d.grund });

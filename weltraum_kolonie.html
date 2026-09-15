@@ -70674,8 +70674,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
            Teile, nur mit der frischeren Uhr. Autoritaet bleibt der Server, er prueft beim
            Request erneut. */
         const repGesperrt = rep.gesperrtBis ? (rep.gesperrtBis > jetzt) : !!rep.gesperrt;
+        /* ZWEI VORHABEN, DIE DIE STATION BELEGEN (15.09.2026). Sie stehen VORN und in derselben
+           Reihenfolge wie beim Server - sonst naennte das Menue einen anderen Grund als die
+           Ablehnung, die man bekaeme. Wer abbaut, dem ist mit „der Kern ist unversehrt" nicht
+           geholfen.
+           ABGELEITET AUS DEN ZEITSTEMPELN, nicht aus `rep.abbau`/`rep.umruestung`: aus genau dem
+           Grund, der eine Zeile weiter oben fuer die Beschuss-Sperre steht - der Katalog ist bis
+           zu zwei Minuten alt, die Zeitstempel sind die frischere Uhr. `v.abbauAb` und
+           `v.umruestenAb` stehen ohnehin schon da und werden von den Nachbar-Eintraegen
+           (Ausbauen, Umruesten, Abbau) genauso gelesen. Autoritaet bleibt der Server: Er hat
+           dieselben zwei Gruende seit heute in `moeglich` und prueft beim Request erneut. */
+        const repAbbau = (v.abbauAb || 0) > jetzt;
+        const repUmbau = (v.umruestenAb || 0) > jetzt;
         let repGrund, repSperre = true;
-        if (!(rep.fehlend > 0)) repGrund = 'Der Kern ist unversehrt.';
+        if (repAbbau) repGrund = 'Wird abgebaut – was du jetzt in den Kern steckst, geht mit der Station verloren.';
+        else if (repUmbau) repGrund = 'Wird gerade umgerüstet – noch ' + fmtDuration(((v.umruestenAb || 0) - jetzt)/1000) + '. Mit der neuen Ausrichtung kann sich die Kernobergrenze ändern.';
+        else if (!(rep.fehlend > 0)) repGrund = 'Der Kern ist unversehrt.';
         else if (repGesperrt) repGrund = 'Steht noch unter Beschuss – reparieren geht in ' + fmtDuration(((rep.gesperrtBis || 0) - jetzt)/1000) + '.';
         else if (!(rep.heilung > 0)) repGrund = 'Im Lager dieser Station liegt nichts, woraus sich reparieren ließe.';
         else { repGrund = 'Stellt ' + fmt(rep.heilung) + ' Kernpunkte her und verbraucht dafür ' + vorpostenLagerText(rep.kosten) + ' aus dem Stationslager. Wirkt sofort, ohne Flottenslot.'; repSperre = false; }
