@@ -16,9 +16,11 @@
 //   3. Die Belohnungstypen 'vorposten' und 'vorposten-verlust' haben je einen claim-Zweig.
 //   4. Die EINWEGIGE Familie (defend/rueckruf) steht in EINWEGIG_ERLAUBT von test_rundflug.js, die
 //      composition-Typen in BEIDEN Whitelists, alle vier in MISSION_LINIEN.
-//   5. Der Flugzeit-Kanal haengt NICHT in missionDurationFor (Weiche i), sondern nur an
-//      Nicht-PvP-Aufrufstellen: Anfechtung, Mondbelagerung, Spielerangriff und Spionage rufen
-//      vorpostenFlug NICHT.
+//   5. Der Flugzeit-Kanal haengt AM ZIELSYSTEM, in missionDurationFor selbst (seit 15.09.2026,
+//      Auftrag Sascha „sprungtore sollen boni nicht nur auf pve missionen geben"). Die Weiche (i)
+//      und ihre neun Aufrufstellen sind weg; geprueft wird jetzt, dass es KEINE Huelle mehr gibt
+//      (die wirkte sonst doppelt), dass die Angriffsarten ihr Zielsystem uebergeben - und dass
+//      Spielerangriff und Spionage es weiterhin nicht tun, weil sie gar keines kennen.
 //   6./7. Der Name der ersten Stufe (Rueckfaelle im Frontend) und der Hilfetext ueber Stufe 3.
 //   8. Jeder Rohstoffschluessel der drei Kostenquellen ist im Spielstand bekannt - sonst zeigt
 //      canAfford() dauerhaft "zu teuer" und die Kostenzeile den Rohschluessel (echter Fehler,
@@ -118,15 +120,49 @@ check('4c: alle vier Typen haben eine Missionslinie', linien.length === 0, { ohn
 const bauForm = JS.match(/type:'vorposten-bau'[\s\S]{0,200}?endTime: jetzt \+ flug\*1000/);
 check('4d: Bau und Angriff sind Form A (endTime = ganzer Flug)', !!bauForm && /type:'vorposten-angriff'[\s\S]{0,300}?endTime: jetzt \+ flug\*1000/.test(JS));
 
-// ---- 5) Weiche (i): der Flugzeit-Kanal erreicht kein PvP -----------------------------------------
-const mdf = JS.slice(JS.indexOf('function missionDurationFor('), JS.indexOf('function missionDurationFor(') + 3000);
-check('5a: vorpostenFlug haengt NICHT in missionDurationFor selbst', !/vorposten/i.test(mdf));
+/* ---- 5) Der Flugzeit-Kanal haengt am Zielsystem ------------------------------------------------
+   Bis zum 15.09.2026 stand hier die Weiche (i): der Kanal NUR an Nicht-PvP-Aufrufstellen, nie in
+   missionDurationFor. Der Auftrag Sascha („sprungtore sollen boni nicht nur auf pve missionen
+   geben") hat sie aufgeloest. Diese drei Pruefungen sind deshalb umgedreht - sie halten jetzt die
+   NEUE Regel fest, und zwar die Regel und nicht eine Liste: Der Faktor steht in der Kette und
+   haengt am `targetSystem`; wer ihn erreicht, entscheidet die Aufrufstelle.
+   5b IST DER WICHTIGSTE DER DREI: Eine stehengebliebene Huelle wuerde den Bonus an ihrer Stelle
+   ZWEIMAL anwenden - aus 20 % wuerden 36 %, und zwar still. */
+const mdfVon = JS.indexOf('function missionDurationFor(');
+const mdfRoh = JS.slice(mdfVon, JS.indexOf('\n  }', mdfVon));
+/* KOMMENTARE LEEREN, BEVOR GEMESSEN WIRD. Gemessen am 15.09.2026 an einem sabotierten Stand, der
+   die Faktorzeile auskommentierte: 5a blieb GRUEN, weil das Muster den Kommentar traf. Eine
+   Pruefung, die eine auskommentierte Zeile fuer eine wirkende haelt, ist genau die stille Sorte,
+   gegen die dieser Test geschrieben ist - test_flugzeit_deckel macht es an derselben Funktion
+   seit jeher so. Die Zeilenzahl bleibt erhalten, damit Ausschnitte im Zusatz noch stimmen. */
+const mdf = mdfRoh.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' ')).replace(/^\s*\/\/.*$/gm, '');
+check('5-anker: missionDurationFor laesst sich schneiden (sonst messen 5a/5c nichts)',
+  mdfVon > 0 && mdf.length > 500 && /mult \*= wurmlochFlugMult\(targetSystem\);/.test(mdf), { laenge: mdf.length });
+check('5a: der Vorposten-Faktor haengt in missionDurationFor und liest das ZIELSYSTEM',
+  /mult \*= vorpostenFlugMult\(targetSystem\);/.test(mdf),
+  { zeile: (mdf.match(/^\s*mult \*= vorpostenFlugMult.*$/m) || ['(keine)'])[0].trim() });
+const huellen = (JS.match(/vorpostenFlug\(/g) || []).length;
+check('5b: es gibt KEINE vorpostenFlug-Huelle mehr - sie wirkte jetzt doppelt',
+  huellen === 0, { huellen, hinweis: 'der Faktor steht in der Kette; eine Huelle rechnete ihn ein zweites Mal' });
+/* 5c: die Angriffsarten uebergeben ihr Zielsystem - sonst erreichte der Faktor sie gar nicht, und
+   der ganze Auftrag waere folgenlos. Gemessen an den Sendefunktionen selbst, nicht an einer Zahl. */
 function fnBlock(name){ const i = JS.indexOf('function ' + name + '('); return i < 0 ? '' : JS.slice(i, i + 4000); }
-const pvp = { sendAnfechtungsMission: fnBlock('sendAnfechtungsMission'), sendVorpostenAngriff: fnBlock('sendVorpostenAngriff'), sendSpyMission: fnBlock('sendSpyMission'), sendPlayerAttackMission: fnBlock('sendPlayerAttackMission') };
-const pvpMitFlug = Object.keys(pvp).filter(k => /vorpostenFlug\(/.test(pvp[k]));
-check('5b: Anfechtung, Vorposten-Angriff, Spionage und Spielerangriff rufen vorpostenFlug NICHT', pvpMitFlug.length === 0, { pvpMitFlug });
-const nichtPvp = (JS.match(/vorpostenFlug\(/g) || []).length;
-check('5c: der Kanal ist an Nicht-PvP-Stellen eingehaengt (Erkundung, Kolonisierung, Abbau, Bau)', nichtPvp >= 6, { aufrufe: nichtPvp });
+const kampfSender = ['sendAnfechtungsMission', 'sendVorpostenAngriff', 'sendFestungsMission'];
+/* Das ZielsystemArgument ist das VIERTE und steht am Ende des Aufrufs. Ein Muster mit `[^)]*`
+   taugt dafuer nicht - das erste Argument ist selbst ein Aufruf (asteroidFlugBasis(sysId)) und
+   enthaelt eine Klammer. Gemessen wird deshalb bis zum Zeilenende der Schluessel-Liste. */
+const ohneZiel = kampfSender.filter(k => !/missionDurationFor\([^;\n]*ATTACK_SHIP_KEYS,\s*(sysId|a\.system)\)/.test(fnBlock(k)));
+check('5c: Anfechtung, Vorposten-Angriff und Festungsschlag uebergeben ihr Zielsystem',
+  kampfSender.every(k => fnBlock(k).length > 100) && ohneZiel.length === 0, { ohneZiel });
+/* 5d: DIE GRENZE, und warum sie keine Regel ist. Der Spielerangriff rechnet mit
+   pseudoDistanceSeconds(playerId) - „die Entfernung haengt am Spieler, nicht am Standort". Er
+   hat gar kein Zielsystem, das ein Tor anfliegen koennte. Ohne diese Pruefung stuende nirgends,
+   dass das gemessen und nicht vergessen ist. */
+const spieler = fnBlock('sendPlayerAttackMission');
+check('5d: der Spielerangriff kennt kein Zielsystem - er rechnet mit der Spieler-Entfernung',
+  spieler.length > 100 && /pseudoDistanceSeconds\(playerId\)/.test(spieler)
+  && /missionDurationFor\(baseDur, attackFleet, ATTACK_SHIP_KEYS\)/.test(spieler),
+  { hinweis: 'kein viertes Argument - deshalb wirkt kein Ortsbonus, auch nicht Allianzbasis, Sektor oder Wurmloch' });
 
 /* ---- 6) Der eingetippte Rueckfallname (GR-7, 04.09.2026) --------------------------------------
    Das Frontend schreibt an vier Stellen `|| 'Ankerkern'` - der Name der ersten Stufe, falls der
