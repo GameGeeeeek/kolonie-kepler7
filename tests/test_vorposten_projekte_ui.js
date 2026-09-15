@@ -30,10 +30,29 @@ check('0a: das Spiel haelt KEINE eigene Projekttabelle - der Katalog kommt vom S
 check('0b: der Start geht an den Projekt-Endpunkt', /'\/vorposten\/projekt\/starten'/.test(src));
 /* Der Flugzeit-Deckel war bis Etappe 4 eine harte 0,5 im Spiel - eine Kopie-Familie mit dem
    Backend, und ausgerechnet die Zahl, die das Sprungtor verschiebt. Steht sie wieder hart in der
-   Rechnung, taete ein fertiges Tor nichts. */
-check('0c: der Flugzeit-Deckel kommt vom Server, nicht als harte Zahl aus der Rechnung',
-  /const deckel = \(v\.nutzen && typeof v\.nutzen\.flugDeckel === 'number'\) \? v\.nutzen\.flugDeckel : VORPOSTEN_FLUG_DECKEL;/.test(src)
-  && /return Math\.max\(1 - deckel, 1 - f\);/.test(src));
+   Rechnung, taete ein fertiges Tor nichts.
+   GEPRUEFT WIRD DIE REGEL, NICHT DIE ZEILE (15.09.2026): Diese Pruefung hing am Wortlaut einer
+   einzigen Zeile und fiel, als der Faktor in missionDurationFor wanderte und eine Klammer gegen
+   masslose Serverwerte bekam (VORPOSTEN_FLUG_HARTDECKEL). Die Absicht war nie der Wortlaut,
+   sondern: Im Rumpf von vorpostenFlugMult steht KEINE eingetippte Deckelzahl - der Wert kommt
+   vom Server, der Rueckfall aus einer benannten Konstante, und die Formel bleibt dieselbe.
+   Gemessen wird deshalb der Rumpf, und zwar auf das FEHLEN von Zahlen ausser 0 und 1. */
+{
+  const vpVon = src.indexOf('  function vorpostenFlugMult(sysId){');
+  const vpRumpf = vpVon >= 0 ? src.slice(vpVon, src.indexOf('\n  }', vpVon)) : '';
+  check('0c-anker: vorpostenFlugMult laesst sich schneiden (sonst misst 0c nichts)',
+    vpVon > 0 && vpRumpf.length > 120, { laenge: vpRumpf.length });
+  const zahlen = (vpRumpf.replace(/\/\*[\s\S]*?\*\//g, '').match(/(?<![\w.])\d+(?:\.\d+)?/g) || [])
+    .filter(z => z !== '0' && z !== '1');
+  check('0c: der Flugzeit-Deckel kommt vom Server, nicht als harte Zahl aus der Rechnung',
+    /typeof v\.nutzen\.flugDeckel === 'number'/.test(vpRumpf)
+    && /v\.nutzen\.flugDeckel/.test(vpRumpf)
+    && /VORPOSTEN_FLUG_DECKEL/.test(vpRumpf)
+    && /return Math\.max\(1 - deckel, 1 - f\);/.test(vpRumpf)
+    && zahlen.length === 0,
+    { eingetippteZahlen: zahlen,
+      hinweis: 'ausser 0 und 1 gehoert keine Zahl in diesen Rumpf - Deckel und Rueckfall sind benannt' });
+}
 /* Die REGEL, nicht das Layout (Regel 3): Im Rumpf von vorpostenProjektStarten muss der
    Abweis-Zweig VOR der Abbuchung stehen. Ein Kommentar dazwischen darf die Pruefung nicht
    umwerfen - der erste Entwurf haftete am Zeilenbild und fiel genau daran. */
