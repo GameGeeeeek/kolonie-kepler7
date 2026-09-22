@@ -67,7 +67,7 @@ async function makePage(browser, {language='de',authenticated=false,mobile=false
     assert.equal(await page.locator('html').getAttribute('lang'),'en');
     assert.match(await page.title(), /Kepler-7 Colony/);
     assert.match(await page.locator('.ll-h1').innerText(), /galaxy/i);
-    await page.locator('[data-ll-open="login"]').click();
+    await page.locator('.ll-actions [data-ll-open="login"]').click();
     assert.equal(await page.locator('#loginUsername').getAttribute('placeholder'),'Commander name');
     assert.match(await page.locator('#loginSubmitBtn').innerText(),/Log in|Sign in/i);
     assert.equal(anonymous.errors.length,0,anonymous.errors.join('\n'));
