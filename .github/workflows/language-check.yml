@@ -7,6 +7,7 @@ on:
       - 'i18n/**'
       - 'scripts/install-i18n.cjs'
       - 'tests/test_i18n*'
+      - 'weltraum_kolonie.html'
       - '.github/workflows/language-check.yml'
 permissions:
   contents: read
@@ -16,18 +17,99 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      NODE_PATH: /tmp/kepler-language-tools/node_modules
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Browser test dependencies
+        run: |
+          npm install --prefix /tmp/kepler-language-tools --no-package-lock playwright@1.56.1
+          node /tmp/kepler-language-tools/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Import reviewed translation transport once
+        run: |
+          if test -f i18n/bootstrap/assemble.py; then
+            python -m pip install beautifulsoup4==4.14.3
+            python i18n/bootstrap/assemble.py
+          fi
+      - name: Embed self-contained language bundle
+        run: |
+          node scripts/install-i18n.cjs
+          node scripts/install-i18n.cjs --check
       - name: Required project checks
         run: node tests/run.js --nur-pflicht
-      - name: Export source snapshot for isolated language development
-        run: git archive --format=tar.gz -o /tmp/kepler-source.tar.gz HEAD
+      - name: Language browser tests
+        run: node tests/test_i18n.js
+      - name: Negative control without the new feature
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const { START, END } = require('./scripts/install-i18n.cjs');
+          const s = fs.readFileSync('weltraum_kolonie.html', 'utf8');
+          const a = s.indexOf(START), b = s.indexOf(END);
+          if (a < 0 || b < a) throw new Error('Missing bundle markers');
+          fs.writeFileSync('/tmp/kepler-without-language.html', s.slice(0,a) + s.slice(b+END.length).replace(/^\n/,''));
+          NODE
+          if KEPLER_SPIELDATEI=/tmp/kepler-without-language.html node tests/test_i18n.js >/tmp/i18n-negative.log 2>&1; then
+            echo 'Regression test incorrectly accepted the old game'
+            exit 1
+          fi
+          grep -q 'Bundle is integrated in the actual game' /tmp/i18n-negative.log
+          echo 'Negative control failed at the intended feature assertion'
+      - name: Original German game sweep
+        run: node tests/sweep.js
+      - name: English game sweep
+        run: node tests/test_i18n_sweep.js
+      - name: Related layout and text regressions
+        run: |
+          node tests/test_selects.js
+          node tests/test_sprungleiste.js
+          node tests/test_sprungmarken.js
+          node tests/test_forschungstexte.js
+      - name: Package verified generated files
+        run: tar -czf /tmp/kepler-language-ready.tgz weltraum_kolonie.html i18n/en.json
       - uses: actions/upload-artifact@v4
         with:
-          name: kepler-source
-          path: /tmp/kepler-source.tar.gz
+          name: verified-language-files
+          path: /tmp/kepler-language-ready.tgz
           retention-days: 3
+  integrate:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/de-en-language-20260922' && github.repository == 'GameGeeeeek/kolonie-kepler7' && github.actor == 'GameGeeeeek'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/de-en-language-20260922
+      - name: Refuse a stale build
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-language-files
+          path: /tmp/kepler-language-artifact
+      - name: Integrate verified generated files on the feature branch only
+        run: |
+          python <<'PY'
+          import tarfile
+          allowed = {'weltraum_kolonie.html', 'i18n/en.json'}
+          with tarfile.open('/tmp/kepler-language-artifact/kepler-language-ready.tgz') as archive:
+              members = archive.getmembers()
+              assert {m.name for m in members} == allowed
+              assert all(m.isfile() for m in members)
+              archive.extractall('.', members=members, filter='data')
+          PY
+          git rm -r --ignore-unmatch i18n/bootstrap
+          git add weltraum_kolonie.html i18n/en.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(i18n): integrate verified German/English beta bundle'
+          git push origin HEAD:feat/de-en-language-20260922
