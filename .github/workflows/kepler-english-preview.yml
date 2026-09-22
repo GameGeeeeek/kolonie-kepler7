@@ -1,0 +1,42 @@
+name: Kepler English preview
+
+on:
+  push:
+    branches: [codex/kepler-english-2026-09-22]
+    paths:
+      - .github/workflows/kepler-english-preview.yml
+      - tools/i18n/**
+      - locales/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kepler-english-preview
+  cancel-in-progress: true
+
+jobs:
+  source-snapshot:
+    if: github.ref == 'refs/heads/codex/kepler-english-2026-09-22'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare translation source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kepler-translation-source
+          git ls-files -z -- '*.html' '*.js' '*.json' '*.md' '*.txt' | while IFS= read -r -d '' file; do
+            mkdir -p "/tmp/kepler-translation-source/$(dirname "$file")"
+            cp -- "$file" "/tmp/kepler-translation-source/$file"
+          done
+          git rev-parse HEAD > /tmp/kepler-translation-source/SOURCE_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kepler-translation-source
+          path: /tmp/kepler-translation-source/
+          retention-days: 1
+          if-no-files-found: error
