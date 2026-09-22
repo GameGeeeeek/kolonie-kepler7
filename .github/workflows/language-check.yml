@@ -1,0 +1,33 @@
+name: Language checks
+on:
+  push:
+    branches: [feat/de-en-language-20260922]
+  pull_request:
+    paths:
+      - 'i18n/**'
+      - 'scripts/install-i18n.cjs'
+      - 'tests/test_i18n*'
+      - '.github/workflows/language-check.yml'
+permissions:
+  contents: read
+concurrency:
+  group: language-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Required project checks
+        run: node tests/run.js --nur-pflicht
+      - name: Export source snapshot for isolated language development
+        run: git archive --format=tar.gz -o /tmp/kepler-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kepler-source
+          path: /tmp/kepler-source.tar.gz
+          retention-days: 3
