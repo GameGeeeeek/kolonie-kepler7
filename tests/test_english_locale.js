@@ -12,6 +12,20 @@ const ORIGIN = 'http://127.0.0.1:41837';
 const screenDir = process.env.K7_SCREENSHOT_DIR;
 if (screenDir) fs.mkdirSync(screenDir, {recursive:true});
 const version = (source.match(/const VERSION = '([^']+)'/) || [,''])[1];
+const GERMAN_SURFACE_PROBES = [
+  'English preview',
+  'Benötigt Minentechnik',
+  'Gebäudestufen gelten',
+  'Verteidigungsgebäude schützen',
+  'Keine Schiffe im Bau',
+  'Keine Forschung läuft',
+  'Allianzen teilen Forschung',
+  'Dein Punktestand',
+  'Erfolge, Fähigkeitsbaum',
+  'Noch keine Einträge.',
+  'Mehr dazu',
+  'Verstanden'
+];
 function savedGame() {
   const now=Date.now();
   return {tutorialSeen:true,newbieWelcomeSeen:true,
@@ -96,6 +110,11 @@ async function makePage(browser, {language='de',authenticated=false,mobile=false
         await p.waitForTimeout(150);
         assert.ok(activated,'Tab did not activate: '+tab);
         assert.equal(state.errors.length,0,language+' '+tab+': '+state.errors.join('\n'));
+        if(language==='en'){
+          const visibleText=await p.locator('body').innerText();
+          const leftovers=GERMAN_SURFACE_PROBES.filter(phrase=>visibleText.includes(phrase));
+          assert.deepEqual(leftovers,[], 'English '+tab+' still shows German surface text: '+leftovers.join(', '));
+        }
       }
       for(const attr of ['data-fleet-subtab','data-officer-subtab']){
         const keys=await p.locator('['+attr+']').evaluateAll((buttons,attr)=>buttons.map(b=>b.getAttribute(attr)),attr);
@@ -106,6 +125,14 @@ async function makePage(browser, {language='de',authenticated=false,mobile=false
         }
       }
       await p.evaluate(()=>document.querySelector('.tab-btn')?.click());
+      if(language==='en'){
+        await p.locator('#headerHelpBtn').click();
+        await p.waitForTimeout(150);
+        const helpText=await p.locator('#tab-hilfe').innerText();
+        assert.match(helpText,/Basics/);
+        assert.match(helpText,/Fleet and ships/);
+        assert.doesNotMatch(helpText,/Grundlagen|Häufige Fragen|Warum/);
+      }
       if(screenDir)await p.screenshot({path:path.join(screenDir,language+'-game.png')});
       const serialized=JSON.stringify(state.store);
       assert.ok(serialized.includes('energie'),'German resource identifier must remain unchanged');
