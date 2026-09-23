@@ -55,8 +55,8 @@ check('alle geprueften Listen gefunden', !!(M && R && C && P && T),
 const gerechnet = [
   ["Forschungen", /Die komplette Forschung \('\+RESEARCH_DEFS\.[^+]*\.length\+' Techs/],
   ["Forschungsstufen", /RESEARCH_DEFS[^']*\.reduce\(\(a,r\)=>a\+\(r\.maxLevel\|\|1\),0\)\+' Stufen/],
-  ["Standort-Modultypen", "'+MODULE_DEFS.length+' Typen"],
-  ["Schiffsklassen", "'+SHIP_CLASS_DEFS.length+' Klassen mit eigenen Slots"],
+  ["Standort-Modultypen", /\+MODULE_DEFS\.length\+\(?['"] Typen/],
+  ["Schiffsklassen", /\+SHIP_CLASS_DEFS\.length\+\(?['"] Klassen mit eigenen Slots/],
   ["Fraktions-Auftragsarten", "Object.values(FACTION_QUEST_POOLS).map(p=>p.length)"],
   /* Dazugekommen am 21.08.2026, und der Anlass ist ein Lehrstueck fuer genau diese Liste: Der
      Kompendium-Hilfetext nannte "acht Kategorien" und zaehlte acht namentlich auf, waehrend
