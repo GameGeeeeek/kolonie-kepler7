@@ -20,6 +20,20 @@ const GERMAN_SURFACE_PROBES = [
   'Keine Schiffe im Bau',
   'Keine Forschung läuft',
   'Allianzen teilen Forschung',
+  'Kommandanten-Briefing',
+  'Kampf-Kompass',
+  'Allianz-Einstieg',
+  'Allianz-Fahrplan',
+  'NÄCHSTES ZIEL',
+  'Kommandant Level',
+  'Jetzt forschbar',
+  'Ausbauen',
+  'Warteschlange',
+  'gesperrt',
+  'PRODUKTION',
+  'VEREDELUNG',
+  'NUTZGEBÄUDE',
+  'Alle Flotten',
   'Dein Punktestand',
   'Erfolge, Fähigkeitsbaum',
   'Noch keine Einträge.',
@@ -126,6 +140,19 @@ async function makePage(browser, {language='de',authenticated=false,mobile=false
       }
       await p.evaluate(()=>document.querySelector('.tab-btn')?.click());
       if(language==='en'){
+        const basisText=await p.locator('#tab-basis').innerText();
+        assert.match(basisText,/Commander briefing/i);
+        assert.match(basisText,/Best next step|starter route/i);
+        await p.evaluate(()=>document.querySelector('.tab-btn[data-tab="verteidigung"]')?.click());
+        await p.waitForTimeout(150);
+        const defenseText=await p.locator('#tab-verteidigung').innerText();
+        assert.match(defenseText,/Combat compass/i);
+        assert.match(defenseText,/Fighters beat bombers/i);
+        await p.evaluate(()=>document.querySelector('.tab-btn[data-tab="allianz"]')?.click());
+        await p.waitForTimeout(150);
+        const allianceText=await p.locator('#tab-allianz').innerText();
+        assert.match(allianceText,/Alliance roadmap|Alliance entry/i);
+        assert.match(allianceText,/Upgrade together|Enter a tag/i);
         await p.locator('#headerHelpBtn').click();
         await p.waitForTimeout(150);
         const helpText=await p.locator('#tab-hilfe').innerText();

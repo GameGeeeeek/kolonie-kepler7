@@ -4,6 +4,27 @@ const K7_TRANSLATION_PATTERNS = [
   [/^Benötigt (.+)$/, requirement => 'Requires ' + k7InlineTranslation(requirement)],
   [/^Benötigt: (.+)$/, requirement => 'Requires: ' + k7InlineTranslation(requirement)],
   [/^Requires: (.+)$/, requirement => 'Requires: ' + k7InlineTranslation(requirement)],
+  [/^Kommandant Level (\d+)$/, level => 'Commander Level ' + level],
+  [/^Nächste Happy Hour: (.+)$/, name => 'Next Happy Hour: ' + k7InlineTranslation(name)],
+  [/^\+25% Produktion aller Grundressourcen – schau in (.+) wieder rein und nutze das Zeitfenster\.$/, time => '+25% production for all basic resources - check back in ' + time + ' to use the window.'],
+  [/^… und (\d+) weitere offene Punkte \(siehe die Punkte an den Reitern\)\.$/, count => '... and ' + count + ' more open item' + (count === '1' ? '' : 's') + ' (see the dots on the tabs).'],
+  [/^Jetzt forschbar: (.+)$/, name => 'Research available now: ' + k7InlineTranslation(name)],
+  [/^Erreiche prestige level (\d+)\.$/, level => 'Reach prestige level ' + level + '.'],
+  [/^Ausbauen \(\+(\d+)\)$/, qty => 'Upgrade (+' + qty + ')'],
+  [/^BAU-WARTESCHLANGE \((\d+)\/(\d+)\)$/, (used, total) => 'BUILD QUEUE (' + used + '/' + total + ')'],
+  [/^FORSCHUNGS-WARTESCHLANGE \((\d+)\/(\d+)\)$/, (used, total) => 'RESEARCH QUEUE (' + used + '/' + total + ')'],
+  [/^übersteigt dein Lager \((.+)\) – stell in der Forschungs-Warteschlange einen Anteil fürs Baustellen-Konto ein$/, resources => 'exceeds your storage (' + k7InlineTranslation(resources) + ') - set a construction-account share in the research queue'],
+  [/^Kostet (.+) – mehr als dein Lager fasst \((.+)\)\. Stell unten einen Anteil fürs Baustellen-Konto ein, dann wird sie trotzdem bezahlbar\. Die Warteschlange läuft solange ohne sie weiter\.$/, (cost, cap) => 'Costs ' + k7InlineTranslation(cost) + ' - more than your storage can hold (' + cap + '). Set a construction-account share below to make it affordable. The queue keeps running without it for now.'],
+  [/^Kostet (.+) – mehr als dein Lager fasst \((.+)\)\. Das Baustellen-Konto spart darauf an\. Die Warteschlange läuft solange ohne sie weiter\.$/, (cost, cap) => 'Costs ' + k7InlineTranslation(cost) + ' - more than your storage can hold (' + cap + '). The construction account is saving for it. The queue keeps running without it for now.'],
+  [/^Bau-Wunschliste und Forschungs-Warteschlange fassen (\d+) statt (\d+) Einträge – du kannst weiter im Voraus planen, statt ständig nachzulegen\. Läuft der Rang aus, bleibt alles Eingereihte stehen; es lässt sich nur nichts Neues mehr darüber hinaus anhängen\.$/, (supporter, standard) => 'Build wishlist and research queue hold ' + supporter + ' instead of ' + standard + ' entries, so you can plan further ahead without constantly refilling them. If the rank expires, queued items stay in place; you just cannot add anything beyond the normal limit.'],
+  [/^(.+) gesperrt$/, name => k7InlineTranslation(name) + ' locked'],
+  [/^PLANETEN-ROLLE: (.+)$/, name => 'PLANET ROLE: ' + k7InlineTranslation(name)],
+  [/^ORBITALSTATION: (.+)$/, name => 'ORBITAL STATION: ' + k7InlineTranslation(name)],
+  [/^TERRAFORMING: (.+)$/, name => 'TERRAFORMING: ' + k7InlineTranslation(name)],
+  [/^(.+) · ohne Eigenart – Ohne Sektor-Eigenschaft – hier gilt überall der Grundwert\.$/, name => k7InlineTranslation(name) + ' - no special trait - no sector trait, base values apply here.'],
+  [/^Aktueller Typ:\s+(.+)$/, name => 'Current type: ' + k7InlineTranslation(name)],
+  [/^Zieltyp wählen, um mit dem Terraforming zu beginnen:$/, () => 'Choose a target type to begin terraforming:'],
+  [/^Noch leer - Gebäude über "Warteschlange" hinzufügen\.$/, () => 'Still empty - add buildings through "Queue".'],
   [/^(.+) Stufe (\d+)$/, (name, level) => k7InlineTranslation(name) + ' level ' + level],
   [/^(.+) \(Stufe (\d+)\)$/, (name, level) => k7InlineTranslation(name) + ' (level ' + level + ')'],
   [/^(Trümmerfeld|Kristallgürtel|Ödwelt) (.+)$/, (type, name) => k7InlineTranslation(type) + ' ' + name],
@@ -77,6 +98,27 @@ function k7InlineTranslation(text) {
     ['Kristallgürtel', 'Crystal belt'],
     ['Ödwelt', 'Barren world'],
     ['Wasserwelt', 'Ocean world'],
+    ['Heimatbasis', 'Home base'],
+    ['Produktionsschub', 'Production boost'],
+    ['Bergungsgut', 'salvage'],
+    ['Bau-Wunschliste', 'Build wishlist'],
+    ['Bau-Warteschlange', 'Build queue'],
+    ['Forschungs-Warteschlange', 'Research queue'],
+    ['Warteschlange', 'Queue'],
+    ['Bergbau-Welt', 'Mining world'],
+    ['Festungs-Welt', 'Fortress world'],
+    ['Werft-Welt', 'Shipyard world'],
+    ['Handels-Welt', 'Trade world'],
+    ['Forschungs-Welt', 'Research world'],
+    ['Logistik-Welt', 'Logistics world'],
+    ['Antimaterie-Anomalie', 'Antimatter anomaly'],
+    ['Erdähnlich', 'Earth-like'],
+    ['Todeswelt', 'Death world'],
+    ['Wüstenwelt', 'Desert world'],
+    ['Eiswelt', 'Ice world'],
+    ['Vulkanwelt', 'Volcanic world'],
+    ['Erdwelt', 'Terran world'],
+    ['Kristallwelt', 'Crystal world'],
     ['Schmugglernest', 'Smuggler nest'],
     ['Jäger', 'Fighters'],
     ['Wächter', 'Guardians']
@@ -111,8 +153,13 @@ function k7View(object) {
   return view;
 }
 const K7_TRANSLATE_SKIP_SELECTOR = 'script,style,textarea,code,pre,[translate="no"],[contenteditable="true"]';
+const K7_SINGLE_TOKEN_UI = new Set([
+  'Heimatbasis', 'Warteschlange', 'gesperrt', 'Produktion', 'Veredelung', 'Nutzgebäude', 'PRODUKTION', 'VEREDELUNG', 'NUTZGEBÄUDE',
+  'Bergbau-Welt', 'Festungs-Welt', 'Werft-Welt', 'Handels-Welt', 'Forschungs-Welt',
+  'Logistik-Welt', 'Antimaterie-Anomalie'
+]);
 function k7LooksLikeUiPhrase(key) {
-  return /[\s:().,;!?·–—"\u201e\/-]/.test(key) || /[ÄÖÜäöüß]/.test(key);
+  return K7_SINGLE_TOKEN_UI.has(key) || /[\s:().,;!?·–—"\u201e\/-]/.test(key) || /[ÄÖÜäöüß]/.test(key) || /^[A-ZÄÖÜ][A-ZÄÖÜß-]{3,}$/.test(key);
 }
 function k7TranslateWrappedText(source, conservative) {
   const key = String(source).trim();
