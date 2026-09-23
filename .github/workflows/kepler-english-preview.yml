@@ -1,0 +1,114 @@
+name: Kepler English preview
+
+on:
+  push:
+    branches: [codex/kepler-english-2026-09-22]
+    paths:
+      - .github/workflows/kepler-english-preview.yml
+      - .kepler-english-transport/**
+      - tests/test_english_locale.js
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kepler-english-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.ref == 'refs/heads/codex/kepler-english-2026-09-22'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_PATH: /tmp/kepler-i18n-tools/node_modules
+      K7_I18N_REPORT: /tmp/kepler-english-results/compiler-report.json
+      K7_SCREENSHOT_DIR: /tmp/kepler-english-results/screenshots
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify and unpack prepared sources
+        id: sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/codex/kepler-english-2026-09-22
+          mkdir -p /tmp/kepler-english-results
+          if test -d .kepler-english-transport; then
+            test "$(git hash-object weltraum_kolonie.html)" = db881c88728b38dd4ddc005f17caa12dc8eefe0d
+            cat .kepler-english-transport/[0-9][0-9][0-9].b64 | base64 --decode > /tmp/english-work-package.tgz
+            echo '7ac3f91f2355f4dc25e1c2f613e1b375de9ccedd163a00601b13b0f03c56b07c  /tmp/english-work-package.tgz' | sha256sum -c -
+            python3 - <<'PY'
+          import pathlib, tarfile
+          allowed = {'locales/en.json', 'tools/i18n/build.cjs', 'tools/i18n/runtime.js', 'tools/i18n/test.cjs', 'tools/i18n/package.json', 'tests/test_english_locale.js', 'docs/ENGLISH-LOCALIZATION.md'}
+          with tarfile.open('/tmp/english-work-package.tgz', 'r:gz') as archive:
+              members = archive.getmembers()
+              assert len(members) == len(allowed)
+              assert {m.name for m in members} == allowed
+              assert all(m.isfile() and not pathlib.Path(m.name).exists() for m in members)
+              for member in members:
+                  target = pathlib.Path(member.name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(archive.extractfile(member).read())
+          PY
+            echo 'compile=true' >> "$GITHUB_OUTPUT"
+          else
+            grep -q 'K7_ENGLISH_RUNTIME_BEGIN' weltraum_kolonie.html
+            echo 'compile=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install pinned development tools outside repository
+        run: npm install --prefix /tmp/kepler-i18n-tools --ignore-scripts --no-audit --no-fund acorn@8.15.0 acorn-walk@8.3.4 playwright@1.55.0
+      - name: Localization unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tools/i18n/test.cjs | tee /tmp/kepler-english-results/unit.log
+      - name: Compile original single-file game
+        if: steps.sources.outputs.compile == 'true'
+        run: node tools/i18n/build.cjs
+      - name: Mandatory repository checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/run.js --nur-pflicht | tee /tmp/kepler-english-results/mandatory.log
+      - name: Commit tested preview sources to the feature branch only
+        if: steps.sources.outputs.compile == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/codex/kepler-english-2026-09-22
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- weltraum_kolonie.html locales/en.json tools/i18n/build.cjs tools/i18n/runtime.js tools/i18n/test.cjs tools/i18n/package.json tests/test_english_locale.js docs/ENGLISH-LOCALIZATION.md
+          git rm -r -- .kepler-english-transport
+          git diff --cached --check
+          git commit -m 'feat(i18n): add selectable English UI preview without changing save keys'
+          git push origin HEAD:refs/heads/codex/kepler-english-2026-09-22
+      - name: Record exact tested source
+        shell: bash
+        run: |
+          git rev-parse HEAD > /tmp/kepler-english-results/TESTED_COMMIT.txt
+          sha256sum weltraum_kolonie.html > /tmp/kepler-english-results/GAME_SHA256.txt
+      - name: Install Chromium for isolated browser fixtures
+        run: /tmp/kepler-i18n-tools/node_modules/.bin/playwright install --with-deps chromium
+      - name: English and German browser checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test_english_locale.js |& tee /tmp/kepler-english-results/browser.log
+      - name: Existing German navigation sweep
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/sweep.js |& tee /tmp/kepler-english-results/sweep.log
+      - name: Keep test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kepler-english-test-evidence
+          path: /tmp/kepler-english-results/
+          retention-days: 7
+          if-no-files-found: warn
