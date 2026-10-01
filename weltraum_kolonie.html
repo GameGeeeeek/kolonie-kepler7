@@ -31977,7 +31977,14 @@ k7InitialStaticText();
     if (!pool.length) pool = [RAIDER_SHIP_POOL[0]];
     const minAtk = Math.min(...pool.map(s=>s.atk));
     const maxTypesByBudget = Math.max(1, Math.floor(safeTarget/minAtk));
-    const shuffled = [...pool].sort(()=>rng()-0.5);
+    // Fisher-Yates verbraucht je Tausch genau einen Zufallswert. Eine Zufallssortierung
+    // haengt dagegen von der Sortierstrategie des Browsers ab und kann selbst mit
+    // gleichem Seed nach einigen Aufrufen eine andere NPC-Flotte ergeben.
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--){
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const numTypes = Math.max(1, Math.min(shuffled.length, maxTypesByBudget, 1+Math.floor(rng()*3)));
     const chosen = shuffled.slice(0, numTypes);
     const fleet = {};
