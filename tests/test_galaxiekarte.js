@@ -18,6 +18,7 @@
 const { starteBrowser, devices, SPIEL_URL, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcomeSeen:true,
   resources:{energie:9e5,erz:9e5,kristalle:6e5,deuterium:4e5,antimaterie:2e4,forschungspunkte:3e4},
@@ -40,7 +41,7 @@ const check=(n,c,x)=>{ console.log((c?'OK  ':'FAIL')+' - '+n+(x!==undefined?' | 
 
 // ---- Teil A: statisch am Quelltext ------------------------------------------------------------
 function quelltext(){
-  const src = fs.readFileSync(SPIELDATEI,'utf8');
+  const src = fs.readFileSync(SPIELDATEI,'utf8').replace(/\r\n/g, '\n');
 
   check('9: der zweite Zoom/Pan-Block ist entfernt', !/function initSystemMapZoomPan/.test(src));
   check('9: es gibt kein zweites Karten-SVG mehr', !/id="mapSvg"/.test(src));
@@ -51,7 +52,12 @@ function quelltext(){
 
   // Die Hilfe MUSS die neue Bedienung beschreiben. Das ist der wiederkehrende Fehler dieses Projekts:
   // die Mechanik stimmt, eine zweite Anzeigestelle behält die alte Annahme.
-  const hilfe = (src.match(/\{ title:'Sektorkarte bedienen', body:'([\s\S]*?)' \},/)||[])[1] || '';
+  // Der sichtbare Hilfetext ist seit i18n ein zusammengesetzter Ausdruck, kein einzelnes Literal.
+  const hilfeVon = src.indexOf('const HELP_SECTIONS = [');
+  const eintragVon = src.indexOf("{ title:'Sektorkarte bedienen'", hilfeVon);
+  const eintragBis = src.indexOf("\n      { title:'", eintragVon + 1);
+  if (hilfeVon < 0 || eintragVon <= hilfeVon || eintragBis <= eintragVon) throw new Error('Kartenhilfe-Anker fehlt');
+  const hilfe = i18nFunction(src, 'return (' + src.slice(eintragVon, eintragBis).trim().replace(/,$/, '') + ');')().body;
   // Seit KB-4 (nur noch Sektoren-Karte) heißt der Weg "Tipp auf ein System" - die REGEL bleibt:
   // die Hilfe muss benennen, wie man ein System öffnet.
   check('9: die Hilfe nennt den Klick/Tipp auf ein System', /Tipp auf ein System|Klick auf ein System|Klick ein System/.test(hilfe), hilfe.slice(0,60));
@@ -71,7 +77,7 @@ function quelltext(){
 
 // ---- Teil B: Rechnen mit dem echten Layout ------------------------------------------------------
 function layoutPruefen(){
-  const src = fs.readFileSync(SPIELDATEI,'utf8');
+  const src = fs.readFileSync(SPIELDATEI,'utf8').replace(/\r\n/g, '\n');
   const hol = (name) => {
     const m = src.match(new RegExp('function '+name+'\\([\\s\\S]*?\\n  \\}\\n'));
     if (!m) throw new Error('Funktion nicht gefunden: '+name);

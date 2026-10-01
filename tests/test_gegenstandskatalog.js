@@ -9,6 +9,7 @@
 // dasselbe sagt, waere auch von einem festen Text erfuellt).
 const { SPIELDATEI, SPIEL_URL, starteBrowser } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let ok = 0, fail = 0;
 function pruef(name, bed, beleg){
@@ -104,10 +105,17 @@ async function versuche(name, fn, vorgabe){
 const DESC_MIN = 30;
 const FELD = { MODULE_DEFS:'desc', SHIP_MODULE_DEFS:'desc', ITEM_DEFS:'desc', RARE_ITEMS:'desc', ABGRUND_RELIKTE:'text' };
 const beschreibungen = [];
+// Beschreibungen koennen k7h()-Ausdruecke und Verkettungen sein; echte Tabellen lesen.
+// activate()-Callbacks werden dabei nur angelegt, niemals aufgerufen.
+const descKonstanten = (S.match(/const (?:HERKUNFT_[A-Z_]+|BELAGERUNGSPLAN_SENKUNG) = (?:'[a-z]+'|[\d.]+);/g) || []).join('\n');
+const descListen = i18nFunction(S, descKonstanten + '\nreturn {' +
+  QUELLEN.map(q => q + ':' + (bloecke[q] || '[]')).join(',') + '};')();
 for (const q of QUELLEN){
   const feld = FELD[q];
-  const re = new RegExp("key:'([a-z_0-9]+)'[\\s\\S]{0,900}?" + feld + ":'((?:[^'\\\\]|\\\\.)*)'", 'g');
-  for (const m of (bloecke[q] || '').matchAll(re)) beschreibungen.push({ liste:q, key:m[1], len:m[2].length });
+  for (const eintrag of descListen[q]){
+    if (typeof eintrag[feld] === 'string')
+      beschreibungen.push({ liste:q, key:eintrag.key, len:eintrag[feld].length });
+  }
 }
 pruef('1f-vorab: jede Liste liefert Beschreibungen',
   QUELLEN.every(q => beschreibungen.some(b => b.liste === q)),

@@ -469,9 +469,11 @@ check('12: kein neues Icon bringt eine elfte Strichstärke mit', neueStaerke.len
 // Falle, die der Offiziers-Durchgang (Abschnitt 2) schon einmal aufgedeckt hat.
 check('12: die Forschungsliste holt das Icon über den Schlüssel ab',
   /iconHtmlFor\(r\.key, 'ti-flask', '#c3bef5'\)/.test(src));
-const laufend = src.slice(src.indexOf('${r.name} → Stufe ${ar.targetLevel}') - 400, src.indexOf('${r.name} → Stufe ${ar.targetLevel}'));
+// Die Namensansicht ist lokalisiert; nur die echte Titelzeile pruefen, nicht einen geratenen
+// Ausschnitt ab Index -1, wenn der alte Literal-Anker fehlt.
+const laufend = (src.match(/<span class="bname">[^\r\n]*\$\{(?:r|k7View\(r\))\.name\} → Stufe \$\{ar\.targetLevel\}[^\r\n]*<\/span>/) || [''])[0];
 check('12: auch die Karte der laufenden Forschung tut das', /iconHtmlFor\(r\.key, 'ti-flask'/.test(laufend));
-check('12: und schreibt kein Schrift-Icon mehr fest hinein', !/<i class="ti ti-flask"[^>]*><\/i> \$\{r\.name\} →/.test(src));
+check('12: und schreibt kein Schrift-Icon mehr fest hinein', !/<i class="ti ti-flask"[^>]*><\/i> \$\{(?:r|k7View\(r\))\.name\} →/.test(src));
 
 // ---------------------------------------------------------------- offene Lücken benennen
 // Kein Fehlschlag - eine Standortbestimmung, damit die verbleibende Arbeit sichtbar bleibt.

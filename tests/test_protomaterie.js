@@ -41,9 +41,10 @@
 //   Jeder der drei Brüche riss eine einzige Prüfung - kein Kollateralschaden, keine stille Lücke.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
+const { i18nFunction } = require('./lib/i18n');
 const { check, ende } = pruefer();
 
-const S = fs.readFileSync(SPIELDATEI, 'utf8');
+const S = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 
 // Einen Quelltextblock ausführbar machen - sturzsicher (Arbeitsregel 34): Ein Fehlschlag beim
 // AUFBAU meldet sich als eigene, benannte Prüfung, statt den Lauf abzubrechen und alle Prüfungen
@@ -86,7 +87,7 @@ const bisB = vonB < 0 ? -1 : S.indexOf('\n    pay(scaledCost);', vonB);
 check('1e-anker: buildMegaProject ist auffindbar', vonB >= 0 && bisB > vonB);
 const bestaetigung = (vonB >= 0 && bisB > vonB) ? S.slice(vonB, bisB) : '';
 check('1e: die Bestätigungsabfrage liest ihre Labels über resDefFor, nicht über RES_DEFS.find',
-  /resDefFor\(r\)\.label/.test(bestaetigung) && !/RES_DEFS\.find\(x=>x\.key===r\)/.test(bestaetigung));
+  /(?:resDefFor\(r\)|k7View\(resDefFor\(r\)\))\.label/.test(bestaetigung) && !/RES_DEFS\.find\(x=>x\.key===r\)/.test(bestaetigung));
 
 // ---- 2) Kein eingefrorener Spielstand ---------------------------------------------------------
 check('2: applyStateDefaults legt das Feld an (sonst `undefined + 8` = NaN und der Server lehnt den GANZEN Spielstand ab)',
@@ -457,7 +458,7 @@ check('7b: und Protokoll UND Bericht nennen ihn beim Namen',
         + '  const PROTOMATERIE_LAGER_BASIS = ' + K.basis + ';\n'
         + '  const PROTOMATERIE_LAGER_JE_AUFBEREITUNG = ' + K.jeStufe + ';\n'
         + abgeleitete + '\n';
-      txt = new Function(kopf + 'return (' + eintrag + ').body;')();
+      txt = i18nFunction(S, kopf + 'return (' + eintrag + ').body;')();
     } catch (e) { fehler = e.message; }
     check('8b-bau: der Hilfe-Eintrag lässt sich zusammensetzen', typeof txt === 'string', fehler);
     if (typeof txt === 'string') {

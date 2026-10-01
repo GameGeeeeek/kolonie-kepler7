@@ -276,6 +276,30 @@ const MESSEN = () => {
   };
 };
 
+// Am Gruppenende darf Sticky nur innerhalb seiner eigenen Gruppe bleiben. Ein schmaler
+// Rest kann keinen breiteren Titel voll zeigen; er muss aber den vorhandenen Platz nutzen.
+// Die bisherige Ein-Pixel-Grenze fuer Rechteckmessungen bleibt unveraendert.
+function titelWischFehler(gruppe, reihe){
+  if (!gruppe.imBild) return null;
+  const d = gruppe.diagnose;
+  if (!d || !d.gruppe || !d.gruppeCss || !reihe) return 'Gruppengeometrie fehlt';
+  const g = d.gruppe, css = d.gruppeCss, t = d.titel;
+  const links = g.left + parseFloat(css.borderLeftWidth) + parseFloat(css.paddingLeft);
+  const rechts = g.right - parseFloat(css.borderRightWidth) - parseFloat(css.paddingRight);
+  if (![links, rechts, reihe.left, reihe.right].every(Number.isFinite) || rechts < links)
+    return 'Gruppeninhalt ist nicht messbar';
+  const platz = Math.max(0, Math.min(rechts, reihe.right) - Math.max(links, reihe.left));
+  if (!platz) return null; // Nur Rahmen/Polster der bereits herausgewischten Gruppe bleibt.
+  if (!gruppe.titelSichtbar || !t || ![t.left, t.right, t.width].every(Number.isFinite) || t.width <= 0)
+    return 'Titel fehlt oder ist verborgen';
+  if (t.left < links - 1 || t.right > rechts + 1)
+    return 'Titel greift ueber seinen eigenen Gruppeninhalt hinaus';
+  if (platz >= t.width - 1)
+    return gruppe.titelImBild ? null : 'Titel ist trotz ausreichenden Platzes abgeschnitten';
+  const titelRest = Math.max(0, Math.min(t.right, reihe.right) - Math.max(t.left, reihe.left));
+  return titelRest > 0 && titelRest >= platz - 1 ? null : 'Titel nutzt den sichtbaren Gruppenrest nicht';
+}
+
 // ---- Der Vergleichsstand fuer die Kopfhoehe -----------------------------------------------------
 // KEIN Vorgabepfad auf eine Sitzungskopie (lib/umgebung.js begruendet, warum): Im Regelfall wird
 // er aus der AKTUELLEN Spieldatei abgeleitet - dieselbe Datei plus eine Regel, die die Gruppen
@@ -344,18 +368,36 @@ function aufraeumenVergleich(){
         const lr = letzt.getBoundingClientRect();
         const k = document.getElementById('heroStatsMehr');
         const sichtb = el => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+        const box = b => b ? { left:b.left, right:b.right, top:b.top, bottom:b.bottom, width:b.width, height:b.height } : null;
+        const rs = getComputedStyle(r);
         return { letzterGanzImBild: lr.left >= rr.left - 1 && lr.right <= rr.right + 1,
                  knopfSichtbar: !!k && !k.hidden,
                  icon: (document.getElementById('heroStatsMehrIcon') || {}).className || '',
                  letzter: chips.length ? chips[chips.length - 1].querySelector('.hstat-value').id : null,
+                 diagnose: { reihe:box(rr), scrollLeft:r.scrollLeft, scrollWidth:r.scrollWidth,
+                   clientWidth:r.clientWidth, endRest:r.scrollWidth - r.clientWidth - r.scrollLeft,
+                   scrollBehavior:rs.scrollBehavior, overflowX:rs.overflowX, devicePixelRatio:window.devicePixelRatio },
                  // Fuer 3f: welche Gruppe ist am Ende der Reihe noch zu sehen, und steht ihr Titel dann im Bild?
                  gruppen: [...r.querySelectorAll('.hstat-gruppe')].filter(sichtb).map(g => {
                    const gb = g.getBoundingClientRect();
                    const t = g.querySelector('.hstat-gruppe-titel');
                    const tb = t ? t.getBoundingClientRect() : null;
+                   const gs = getComputedStyle(g), ts = t ? getComputedStyle(t) : null;
                    return { schluessel: g.getAttribute('data-hstat-gruppe'),
-                            imBild: gb.right > rr.left + 1 && gb.left < rr.right - 1,
-                            titelImBild: !!tb && tb.left >= rr.left - 1 && tb.right <= rr.right + 1 && tb.width > 0 };
+                             imBild: gb.right > rr.left + 1 && gb.left < rr.right - 1,
+                             titelImBild: !!tb && tb.left >= rr.left - 1 && tb.right <= rr.right + 1 && tb.width > 0,
+                             titelSichtbar: !!t && sichtb(t) && tb.height > 0 && ts.visibility === 'visible' &&
+                               Number(ts.opacity) > 0 && (t.textContent || '').trim().length > 0,
+                             diagnose: { gruppe:box(gb), titel:box(tb), titelText:t ? t.textContent : null,
+                               gruppeCss:{ display:gs.display, overflowX:gs.overflowX, paddingLeft:gs.paddingLeft, paddingRight:gs.paddingRight,
+                                 borderLeftWidth:gs.borderLeftWidth, borderRightWidth:gs.borderRightWidth },
+                               titelCss:ts ? { position:ts.position, left:ts.left, right:ts.right, display:ts.display,
+                                 fontFamily:ts.fontFamily, fontSize:ts.fontSize, fontWeight:ts.fontWeight } : null,
+                               chips:[...g.querySelectorAll('.hstat')].filter(sichtb).map(c => {
+                                 const cb = c.getBoundingClientRect();
+                                 return { id:(c.querySelector('.hstat-value') || {}).id, box:box(cb),
+                                   imBild:cb.right > rr.left + 1 && cb.left < rr.right - 1 };
+                               }) } };
                  }) };
       });
       neu[w].zurueck = await page.evaluate(async () => {
@@ -595,18 +637,24 @@ function aufraeumenVergleich(){
      der Hinweis-Knopf fuehrt - war auch der Konto-Titel weg: vier Zahlen ohne jede Beschriftung.
      Gemessen VOR der Behebung (Standort-Titel im Bild, Endstellung): 360 nein, 390 nein, 700 nein,
      1000 ja, 1400 ja, 1500 ja. Danach: ueberall ja.
-     GEPRUEFT WIRD DIE REGEL, nicht die Stellung: Der Titel JEDER Gruppe, die am Ende der Reihe noch
-     zu sehen ist, muss dann auch im Bild stehen. Eine Gruppe, die ganz herausgewischt ist, braucht
-     ihren Titel nicht - sie steht ja auch nicht da. */
+     GEPRUEFT WIRD DIE REGEL, nicht die Stellung: Wo der sichtbare Gruppeninhalt Platz fuer den
+     ganzen Titel bietet, muss dieser ganz im Bild bleiben. Ein schmalerer auslaufender Rest
+     darf den Titel mit seiner Gruppe hinausschieben - vollstaendig passte er dort nur mit einem
+     Uebergriff auf die Folgegruppe. Der Titel muss dann den noch vorhandenen Platz nutzen und
+     innerhalb der eigenen Gruppe bleiben. Ganz herausgewischte Gruppen brauchen keinen Titel. */
   const wischFehler = gewischt.flatMap(w => {
     const e = neu[w] && neu[w].ende;
     if (!e || !e.gruppen) return [w + 'px: keine Endmessung'];
-    return e.gruppen.filter(g => g.imBild && !g.titelImBild)
-      .map(g => w + 'px: Gruppe ' + g.schluessel + ' ist am Ende sichtbar, ihr Titel aber nicht');
+    return e.gruppen.flatMap(g => {
+      const grund = titelWischFehler(g, e.diagnose && e.diagnose.reihe);
+      return grund ? [w + 'px: Gruppe ' + g.schluessel + ': ' + grund] : [];
+    });
   });
-  merke('3f: ans Ende gewischt steht der Titel jeder noch sichtbaren Gruppe im Bild',
+  merke('3f: ans Ende gewischt nutzt jeder Gruppentitel den sichtbaren Platz, ohne seine Gruppe zu verlassen',
     gewischt.length > 0 && wischFehler.length === 0,
     { breiten:gewischt, fehler:wischFehler,
+      diagnose: wischFehler.length ? gewischt.filter(w => neu[w].ende && neu[w].ende.gruppen &&
+        neu[w].ende.gruppen.some(g => titelWischFehler(g, neu[w].ende.diagnose && neu[w].ende.diagnose.reihe))).map(w => ({ breite:w, ende:neu[w].ende })) : [],
       gemessen: gewischt.map(w => w + ':' + (neu[w].ende && neu[w].ende.gruppen ? neu[w].ende.gruppen.map(g => g.schluessel + (g.imBild ? '' : '(weg)') + '=' + g.titelImBild).join(',') : '?')).join(' ') });
   /* Und die Ausgangsstellung, die zweite gemessene Wischstellung: Was da ist, ist beschriftet. */
   const startFehler = BREITEN.flatMap(w => {

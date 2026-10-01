@@ -98,11 +98,18 @@ function spielstand(slotsVoll){
 }
 
 (async () => {
+  console.log('DIAG - Vorposten-Lager: Browserstart');
   const browser = await starteBrowser();
+  let messNummer = 0;
   async function messe(vpDoc, opt){
     opt = opt || {};
+    const messung = ++messNummer, messStart = Date.now();
+    console.log('DIAG - Vorposten-Lager: Messung beginnt | '+JSON.stringify({ messung,
+      eigener:vpDoc.eigener, lager:vpDoc.lager, dockBereit:vpDoc.dockBereit || 0,
+      belohnung:opt.belohnung || null, projektfenster:!!opt.projektDefs }));
     const ctx = await browser.newContext({ viewport:{ width:1280, height:1000 } });
     const page = await ctx.newPage();
+    page.on('crash', () => console.log('DIAG - Vorposten-Lager: Browserseite abgestuerzt | '+JSON.stringify({ messung })));
     const errs = []; page.on('pageerror', e => errs.push(String(e)));
     let schreibZaehler = 0;
     const st = { ['leaderboard:'+ICH]: JSON.stringify({ id:ICH, name:'Ich', score:9000, ships:20, bp:9, lastSeen:now, ownedPlanets:[] }),
@@ -241,6 +248,9 @@ function spielstand(slotsVoll){
     const logMit = await page.evaluate(() => (window.__logMit || []).slice()).catch(() => []);
     const logText = (logMit || []).join(' | ');
     await ctx.close();
+    console.log('DIAG - Vorposten-Lager: Messung beendet | '+JSON.stringify({ messung,
+      dauerMs:Date.now()-messStart, menueLaenge:g.text === null ? null : g.text.length,
+      projektLaenge:projektText === null ? null : projektText.length, schreibZaehler, fehler:errs.slice(0,3) }));
     return { ...g, errs, flotte, logText, logMit, projektText, schreibZaehler };
   }
 

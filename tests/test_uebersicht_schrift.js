@@ -140,13 +140,35 @@ async function messe(browser, vp){
     const erste = gruppen[0];
     // Die Abzeichenzeile wandert mit der Schrift - ihr Trefferfeld muss den Tap weiterhin
     // bekommen (Arbeitsregel 53: wer verschiebt, misst die neue Stelle mit).
-    let tipp = null;
+    let tipp = null, tippDiagnose = null;
     const zeile = svg.querySelector('[data-sektor-hinweise-treffer]');
     if (zeile){
       zeile.scrollIntoView({ block:'center' });
       const rc = zeile.getBoundingClientRect();
       const el = document.elementFromPoint(rc.left + rc.width/2, rc.top + rc.height/2);
       tipp = el ? (el.closest('[data-sektor-hinweise-treffer]') ? 'zeile' : (el.closest('[data-sektor]') ? 'region' : el.tagName)) : null;
+      // Nur nach einem fehlgeschlagenen Treffer lesen: weder nachscrollen noch warten.
+      // INPUT allein trennt ein verdeckendes Suchfeld nicht von falschen Zielkoordinaten.
+      if (tipp !== 'zeile'){
+        const beschreibe = node => {
+          if (!node) return null;
+          const b = node.getBoundingClientRect(), s = getComputedStyle(node);
+          return { tag:node.tagName, id:node.id || null, klasse:node.getAttribute('class'),
+            typ:node.getAttribute('type'), rolle:node.getAttribute('role'),
+            rect:{ left:b.left, top:b.top, right:b.right, bottom:b.bottom, width:b.width, height:b.height },
+            position:s.position, zIndex:s.zIndex, pointerEvents:s.pointerEvents,
+            display:s.display, visibility:s.visibility, overflow:s.overflow, scrollBehavior:s.scrollBehavior };
+        };
+        const x = rc.left + rc.width/2, y = rc.top + rc.height/2;
+        const ahnen = [];
+        for (let n = el; n && ahnen.length < 6; n = n.parentElement) ahnen.push(beschreibe(n));
+        tippDiagnose = { punkt:{ x, y }, ziel:beschreibe(zeile), treffer:beschreibe(el), ahnen,
+          stapel:document.elementsFromPoint(x, y).slice(0, 8).map(beschreibe), svg:beschreibe(svg),
+          viewBox:svg.getAttribute('viewBox'), scrollX:window.scrollX, scrollY:window.scrollY,
+          viewport:{ width:window.innerWidth, height:window.innerHeight },
+          scrollHeight:Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+          scrollBehavior:getComputedStyle(document.documentElement).scrollBehavior };
+      }
     }
     return { da:true, gruppen:gruppen.length, skala:+skala.toFixed(3),
       nameUser: namen.length ? Math.min.apply(null, namen.map(n => n.fs)) : 0,
@@ -155,7 +177,7 @@ async function messe(browser, vp){
       systemzeilen: systemzeilen.length, koll,
       titel: erste ? (erste.querySelector('title') || {}).textContent || '' : '',
       aria: erste ? erste.getAttribute('aria-label') || '' : '',
-      tipp };
+      tipp, tippDiagnose };
   });
   await ctx.close();
   return r;
@@ -200,6 +222,6 @@ async function messe(browser, vp){
   // null hiesse: elementFromPoint hat gar nichts getroffen (Zeile ausserhalb des Fensters) -
   // das ist KEIN Bestehen, sondern eine Messung, die nicht stattgefunden hat (Arbeitsregel 28).
   check('5: die Abzeichenzeile bekommt den Tap weiterhin (sie ist mitgewandert)',
-    handy.tipp === 'zeile', { getroffen: handy.tipp });
+    handy.tipp === 'zeile', { getroffen: handy.tipp, diagnose: handy.tippDiagnose });
   ende();
 })();

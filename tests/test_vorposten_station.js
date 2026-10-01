@@ -18,6 +18,7 @@
 //
 // Gegenprobe: siehe Fuss der Datei.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
@@ -38,12 +39,19 @@ check('0a: die Silhouette kennt alle drei Zweige und einen Rueckfall ohne Zweig'
    Dass so ein Eintrag pruefbar ist, macht test_statthalter 13b seit jeher vor; fuer den
    Vorposten fehlte der Waechter, deshalb blieb das Zelt unbemerkt stehen. Geprueft wird die
    REGEL: Das Zeichen im Hilfetext ist dasselbe, das karteSystemBadges tatsaechlich setzt. */
+// Die wirklichen Hilfe-Eintraege auswerten: k7h teilt den Text im Quelltext auf,
+// und ein Treffer im Uebersetzungswoerterbuch ist noch keine sichtbare Hilfestelle.
+const landmarkenEintrag = src.match(/^\s*\{ title:'Landmarken: was in einem System steht', body:(.+) \},?\s*$/m);
+const landmarkenHilfe = landmarkenEintrag ? i18nFunction(src, 'return (' + landmarkenEintrag[1] + ');')() : '';
+const vorpostenEintrag = src.match(/^\s*\{ title:'Vorposten: eine gehaltene Präsenz auf der Karte', body:(.+) \},?\s*$/m);
+const vorpostenHilfe = vorpostenEintrag ? i18nFunction(src, 'return (' + vorpostenEintrag[1] + ');')() : '';
 check('0c: die Hilfe nennt fuer den Vorposten das Zeichen, das die Karte auch setzt',
-  /Ein <strong>🛰<\/strong> zeigt einen <strong>Vorposten<\/strong>/.test(src)
+  /Ein <strong>🛰<\/strong> zeigt einen <strong>Vorposten<\/strong>/.test(landmarkenHilfe)
   && /badges\.push\(\{ icon: '🛰'/.test(src)
   && !/⛺/.test(src), { zeltNochDa: /⛺/.test(src) });
 check('0d: und die Hilfe behauptet nicht mehr drei Stufen, wo die Leiter acht hat',
-  !/<strong>Drei Stufen<\/strong>/.test(src) && /<strong>Acht Stufen<\/strong>/.test(src));
+  !/<strong>Drei Stufen<\/strong>/.test(src)
+  && !/<strong>Drei Stufen<\/strong>/.test(vorpostenHilfe) && /<strong>Acht Stufen<\/strong>/.test(vorpostenHilfe));
 /* GEPRUEFT WIRD DIE REGEL, NICHT DER WORTLAUT (04.09.2026). Diese Pruefung stand zweimal:
    einmal mit der Formel und dem Faktor 2.0 eingetippt, einmal ausgewertet. Der eingetippte
    Faktor ist eine Momentaufnahme - der Kollisionsschieber bekommt inzwischen VORPOSTEN_SICHT

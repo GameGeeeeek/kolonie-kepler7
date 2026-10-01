@@ -15,6 +15,7 @@
 // SUN_TYPES per Regex herausgezogen und ausgeführt) - nicht aus dem Gedächtnis eingetippt
 // (Hausregel 2). Beide Anker werden vorab auf Existenz geprüft (Hausregel 6).
 const fs = require('fs');
+const { fileURLToPath } = require('url');
 const { starteBrowser, SPIEL_URL, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
@@ -39,7 +40,7 @@ function backend(store) {
 
 // Erwarteten Sonnentyp für ein System aus der getesteten Datei ableiten.
 function sonnentypAus(dateiUrl, systemId) {
-  const pfad = decodeURIComponent(new URL(dateiUrl).pathname);
+  const pfad = fileURLToPath(dateiUrl);
   const quelle = fs.readFileSync(pfad, 'utf8');
   const sunM = quelle.match(/const SUN_TYPES = \[[\s\S]*?\n  \];/);
   const hashM = quelle.match(/function hashStringToFloat\(str\)\{[\s\S]*?\n  \}/);

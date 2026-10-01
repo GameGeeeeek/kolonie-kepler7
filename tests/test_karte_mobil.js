@@ -93,9 +93,31 @@ function backend(store) {
     const tabs = document.querySelector('.tabs');
     const leisteUnten = (tabs && getComputedStyle(tabs).position === 'sticky')
       ? Math.round(tabs.getBoundingClientRect().bottom) : 0;
+    // Diagnose ohne Eingriff: Bei einem Versatz unterscheiden diese Werte ein geklemmtes
+    // Scroll-Ziel am Dokumentende von einem nachtraeglich eingeblendeten Banner/Overlay.
+    // Weder nachscrollen noch die Toleranz aendern - die fachliche Pruefung bleibt dieselbe.
+    const bounds = el => {
+      if (!el) return null;
+      const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+      return { top: Math.round(rect.top), bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left), right: Math.round(rect.right),
+        width: Math.round(rect.width), height: Math.round(rect.height),
+        display: style.display, position: style.position, visibility: style.visibility };
+    };
+    const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    const maxScroll = Math.max(0, scrollHeight - window.innerHeight);
+    const bannerUndOverlays = [...document.querySelectorAll('[id*="Banner"], [id*="Overlay"], [id*="banner"], [id*="overlay"]')]
+      .map(el => ({ id: el.id, ...bounds(el) }))
+      .filter(el => el.width > 0 && el.height > 0 && el.display !== 'none' && el.visibility !== 'hidden');
     return { sichtbar: !!(b && b.offsetParent), scrollY: Math.round(window.scrollY),
              karteOben: Math.round(w.top), karteH: Math.round(w.height),
-             tafelOben: Math.round(r.top), leisteUnten };
+             tafelOben: Math.round(r.top), leisteUnten,
+             scrollHeight, innerHeight: window.innerHeight, maxScroll,
+             scrollZiel: Math.round(window.scrollY + w.top - leisteUnten),
+             amDokumentende: window.scrollY >= maxScroll - 2,
+             bounds: { karte: bounds(document.querySelector('#tab-karte .map-wrap')),
+               tafel: bounds(t), leiste: bounds(tabs), tabPane: bounds(document.getElementById('tab-karte')) },
+             bannerUndOverlays };
   });
   check('2a: mit offenem System ist der ✕-Knopf sichtbar', offen.sichtbar, offen);
   // Seit KB-7 scrollt das Öffnen zur KARTE, nicht zur Tafel ("Karte fährt nach unten"-Report,

@@ -30,6 +30,7 @@
 //   was er falsch macht, ist die Meldung und der fehlende Bericht - das messen 4a/4b/4d) und 4e.
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, SERVER_JS, starteBrowser, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
+const { i18nFunction } = require('./lib/i18n');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -52,11 +53,12 @@ const emptySigZeile = JS.match(/const emptySig=([^;]*);/);
 check('0c: die Karte steht in BEIDEN Signaturen des Kastens (mit und ohne Nachrichten)',
   !!newsSigZeile && /zielSig/.test(newsSigZeile[1]) && !!emptySigZeile && /zielSig/.test(emptySigZeile[1]),
   { news: newsSigZeile && newsSigZeile[1].slice(0, 80), leer: emptySigZeile && emptySigZeile[1].slice(0, 80) });
-const hilfe = HTML.match(/\{ title:'Galaxie-Ziel der Woche', body:'([^']*)' \}/);
+const hilfeEintrag = JS.match(/^\s*\{ title:'Galaxie-Ziel der Woche', body:(.+) \},?\s*$/m);
+const hilfe = hilfeEintrag ? i18nFunction(JS, 'return (' + hilfeEintrag[1] + ');')() : '';
 check('0d: die Hilfe (Lebendige Galaxie) hat einen vollstaendigen Eintrag - Art, Zaehlung, Deckel, Belohnung, Bedingung',
-  !!hilfe && /Alien-Nestern/.test(hilfe[1]) && /gewerteter Schlag/.test(hilfe[1]) && /je Kommandant und Tag/.test(hilfe[1])
-    && /Sternenstaub/.test(hilfe[1]) && /verfehltes Ziel zahlt nichts/.test(hilfe[1]) && /Ohne eigenen Server/.test(hilfe[1]),
-  hilfe ? hilfe[1].slice(0, 120) : null);
+  !!hilfe && /Alien-Nestern/.test(hilfe) && /gewerteter Schlag/.test(hilfe) && /je Kommandant und Tag/.test(hilfe)
+    && /Sternenstaub/.test(hilfe) && /verfehltes Ziel zahlt nichts/.test(hilfe) && /Ohne eigenen Server/.test(hilfe),
+  hilfe ? hilfe.slice(0, 120) : null);
 
 // ---------------------------------------------------------------- 0e) Paritaet zum Backend
 if (SERVER_JS) {
@@ -74,7 +76,7 @@ if (SERVER_JS) {
   const fehlend = icons.filter(ic => !new RegExp('\\b' + ic + '\\b').test(HTML));
   check('0e: jedes Symbol des Server-Katalogs kommt im Frontend vor (Icon-Font ist ein Teilsatz)',
     icons.length === 4 && fehlend.length === 0, { icons, fehlend });
-  const h = hilfe ? hilfe[1] : '';
+  const h = hilfe;
   check('0e2: die Zahlen im Hilfetext sind die des Servers - Tagesdeckel, Kredite, Staub, Klemmen',
     deckel > 0 && basis > 0 && je > 0 && kappe > 0 && staub > 0 && min > 0 && max > 0
       && new RegExp('Höchstens ' + deckel + ' Beiträge je Kommandant und Tag').test(h)

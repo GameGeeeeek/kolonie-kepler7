@@ -11,6 +11,7 @@
 //   5) ein bereits weggeklickter Tab zeigt beim ersten Besuch in dieser Sitzung gar nichts
 //   6) waehrend des Tutorials wird nichts angezeigt (sonst redet das Spiel doppelt)
 const { starteBrowser, SPIEL_URL, SPIELDATEI } = require('./lib/umgebung');
+const { i18nFunction } = require('./lib/i18n');
 const fs = require('fs');
 
 const FILE = SPIEL_URL;
@@ -21,10 +22,22 @@ const MEIN_ID = 'u';
 const jetzt = Date.now();
 
 // ------------------------------------------------------- 1) statische Pruefung an der Spieldatei
-const html = fs.readFileSync(SPIELDATEI, 'utf8');
+const html = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const hintBlock = (html.match(/const TAB_HINTS = \{[\s\S]*?\n  \};/) || [])[0] || '';
-const eintraege = [...hintBlock.matchAll(/^\s{4}(\w+): \{ icon:'([^']+)', help:'([^']+)',\s*\n\s*text:'([\s\S]*?)' \},?$/gm)]
-  .map(m => ({ tab: m[1], icon: m[2], help: m[3], text: m[4] }));
+if (!hintBlock) throw new Error('TAB_HINTS-Quelltextanker fehlt');
+// Texte enthalten echte Sprachaufrufe und Zahlen aus der Aufstiegs-Konfiguration.
+// Den deutschen Objektwert prüfen, nicht String-Literale samt textEn-Quelltext sammeln.
+const hinweisAbhaengigkeiten = [
+  /const ASCENSION_MIN_PRESTIGE = [^;\n]+;/,
+  /const ASCENSION_MIN_SCORE = [^;\n]+;/,
+  /function fmtVoll\(n\)\{[^\n]+\}/
+].map(re => {
+  const m = html.match(re);
+  if (!m) throw new Error('TAB_HINTS-Abhängigkeit fehlt: ' + re);
+  return m[0];
+});
+const hinweise = i18nFunction(html, hinweisAbhaengigkeiten.join('\n') + '\n' + hintBlock + '\nreturn TAB_HINTS;')();
+const eintraege = Object.entries(hinweise).map(([tab, eintrag]) => ({ tab, ...eintrag }));
 const iconWhitelist = new Set([...html.matchAll(/^\s*\.(ti-[a-z0-9-]+):before/gm)].map(m => m[1]));
 const helpKeys = new Set([...html.matchAll(/\{ key:'(\w+)', icon:'ti-[a-z0-9-]+', title:'/g)].map(m => m[1]));
 const tabKeys = [...new Set([...html.matchAll(/data-tab="([a-z]+)"/g)].map(m => m[1]))];

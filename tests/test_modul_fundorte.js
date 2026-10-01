@@ -23,6 +23,7 @@
 // Namen vergleichen statt zaehlen).
 const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, ruhigeUhren, logMitschnitt, logZeilen } = require('./lib/umgebung');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -58,7 +59,7 @@ const HERKUNFT_DECLS = (JS.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).jo
 // KEINE Pruefnamen, und die geforderte "was fallen MUSS"-Liste liesse sich nicht vergleichen.
 let KERN = null, kernFehler = null;
 try {
-KERN = new Function(HERKUNFT_DECLS + ';\n'
+KERN = i18nFunction(JS, HERKUNFT_DECLS + ';\n'
   + 'const MODULE_DEFS = ' + literalAus('MODULE_DEFS', '[', ']') + ';\n'
   + 'const SHIP_MODULE_DEFS = ' + literalAus('SHIP_MODULE_DEFS', '[', ']') + ';\n'
   + 'const MODUL_HERKUNFT_TEXT = ' + literalAus('MODUL_HERKUNFT_TEXT', '{', '}') + ';\n'
@@ -287,13 +288,14 @@ const post = (z, p) => z.posts.filter(x => x.p === p);
   const s4 = await seite(browser, z4);
   const sam = !KERN ? { modulText: '', modulAlsVerbrauch: 'x', material: 'x', reliquie: 'x' } : (() => {
     const p = KERN.MODULE_DEFS.find(x => x.key === 'panzerung');
+    const schiffsmodul = KERN.SHIP_MODULE_DEFS[0];
     return {
       modulText: KERN.sammlungAnteilText({ art: 'standortmodul', key: 'panzerung', name: p.name }),
-      // DERSELBE Schluessel, nur eine andere Katalog-Art: So misst die Gegenrichtung wirklich die
-      // Art-Schranke und nicht bloss einen unbekannten Schluessel.
-      modulAlsVerbrauch: KERN.sammlungAnteilText({ art: 'verbrauch', key: 'panzerung', name: 'x' }),
-      material: KERN.sammlungAnteilText({ art: 'material', key: 'sternenstaub', name: 'x' }),
-      reliquie: KERN.sammlungAnteilText({ art: 'reliquie', key: 'irgendwas', name: 'x' })
+      // Ohne Art-Schranke waehlt die Funktion fuer diese Arten SHIP_MODULE_DEFS. Ein dort
+      // existierender Schluessel macht die Gegenprobe wirksam statt nur die Suche erfolglos.
+      modulAlsVerbrauch: KERN.sammlungAnteilText({ art: 'verbrauch', key: schiffsmodul.key, name: 'x' }),
+      material: KERN.sammlungAnteilText({ art: 'material', key: schiffsmodul.key, name: 'x' }),
+      reliquie: KERN.sammlungAnteilText({ art: 'reliquie', key: schiffsmodul.key, name: 'x' })
     };
   })();
   check('2a: die Sammlung nennt bei einem Modul den Anteil und die Topfgroesse',

@@ -129,6 +129,32 @@ async function lage(page){
     if (!svg) return { fehler: 'kein SVG mit .planet-node' };
     const OBJEKTE = '.planet-node';
     const kasten = el => { try { const b = el.getBBox(); return b && b.width ? { x:b.x, y:b.y, w:b.width, h:b.height } : null; } catch(e){ return null; } };
+    const koerperInkMessen = (el, gruppe, box) => {
+      const fallback = grund => ({ box, quelle: 'getBBox', grund });
+      try {
+        if (!['circle', 'image'].includes(el.tagName) || el.children.length)
+          return fallback('kein einfacher Kreis oder Bildkörper');
+        for (let a = el; a; a = a.parentElement) {
+          const s = getComputedStyle(a);
+          if (a.hasAttribute('transform') || s.transform !== 'none' || s.filter !== 'none' ||
+              s.vectorEffect !== 'none' || s.clipPath !== 'none' || s.maskImage !== 'none')
+            return fallback('Körperlayout oder Maleffekt nicht sicher bestimmbar');
+          if (a === gruppe) break;
+        }
+        const stil = getComputedStyle(el);
+        let kontur = 0;
+        if (stil.stroke !== 'none') {
+          // Bild-Strokes sowie quadratische Strichenden sind hier nicht modelliert.
+          // Beim Kreis umfassen runde/stumpfe Enden auch gestrichelte Ringe sicher.
+          if (el.tagName !== 'circle' || !/^\d+(?:\.\d+)?px$/.test(stil.strokeWidth) ||
+              !['butt', 'round'].includes(stil.strokeLinecap))
+            return fallback('Körperkontur nicht sicher bestimmbar');
+          kontur = parseFloat(stil.strokeWidth) / 2;
+        }
+        return { box: { x: box.x - kontur, y: box.y - kontur,
+          w: box.w + 2 * kontur, h: box.h + 2 * kontur }, quelle: 'Körper und Kontur', kontur };
+      } catch (e) { return fallback(String(e.message || e)); }
+    };
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
       let el = g.querySelector('image') || g.querySelector('circle.body');
@@ -139,14 +165,87 @@ async function lage(page){
       if (!el) return;
       const b = kasten(el), ganz = kasten(g);
       if (!b || !ganz) return;
-      flaechen.push({ nr: flaechen.length, b, ganz,
+      flaechen.push({ nr: flaechen.length, b, ganz, koerperInk: koerperInkMessen(el, g, b),
+        koerper: { tag: el.tagName, klasse: el.getAttribute('class'),
+          cy: el.getAttribute('cy'), r: el.getAttribute('r') },
+        polygone: [...g.querySelectorAll('polygon')].map(kasten).filter(Boolean),
         art: [...g.attributes].map(a => a.name).filter(n => n.startsWith('data-')).join(',') });
       g.__nr = flaechen.length - 1;
     });
     const texte = [...svg.querySelectorAll('text.planet-label')];
+    // 1b/1c vergleichen weiterhin die getBBox-Flächen des Entflechters. Nur 1h darf bei
+    // einfachen Texten die sichtbare Glyphenhöhe statt der unsichtbaren Font-Linebox nutzen.
+    const glyphenMessen = (t, stil) => {
+      const computedFont = [stil.fontStyle || 'normal', stil.fontWeight || 'normal',
+        stil.fontSize, stil.fontFamily].join(' ');
+      const basis = { computedFont, letterSpacing: stil.letterSpacing,
+        textAnchor: stil.textAnchor, dominantBaseline: stil.dominantBaseline,
+        alignmentBaseline: stil.alignmentBaseline, baselineShift: stil.baselineShift };
+      try {
+        const ctx = document.createElement('canvas').getContext('2d');
+        if (!ctx) return { ...basis, fehler: 'kein Canvas-2D-Kontext' };
+        ctx.font = computedFont;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.direction = stil.direction === 'rtl' ? 'rtl' : 'ltr';
+        const spacingUnterstuetzt = 'letterSpacing' in ctx;
+        if (spacingUnterstuetzt) ctx.letterSpacing = stil.letterSpacing === 'normal' ? '0px' : stil.letterSpacing;
+        const m = ctx.measureText(t.textContent || '');
+        return { ...basis, canvasFont: ctx.font, textAlign: ctx.textAlign, textBaseline: ctx.textBaseline,
+          direction: ctx.direction, canvasLetterSpacing: spacingUnterstuetzt ? ctx.letterSpacing : null,
+          spacingUnterstuetzt, width: m.width,
+          actualBoundingBoxAscent: m.actualBoundingBoxAscent, actualBoundingBoxDescent: m.actualBoundingBoxDescent,
+          actualBoundingBoxLeft: m.actualBoundingBoxLeft, actualBoundingBoxRight: m.actualBoundingBoxRight };
+      } catch (e) { return { ...basis, fehler: String(e.message || e) }; }
+    };
+    const eigenInkMessen = (t, stil, box, glyphen) => {
+      const fallback = grund => ({ box, quelle: 'getBBox', grund });
+      try {
+        // Canvas und SVG sind nur in diesem einfachen alphabetischen Fall vergleichbar.
+        // Bei Sonderlayout wird nicht geraten, sondern die bisherige strenge Box behalten.
+        if (!box || t.children.length || ['rotate', 'textLength', 'lengthAdjust', 'transform'].some(a => t.hasAttribute(a)) ||
+            ['x', 'y', 'dx', 'dy'].some(a => t[a].baseVal.numberOfItems > 1) ||
+            stil.transform !== 'none' || stil.writingMode !== 'horizontal-tb' || stil.direction !== 'ltr' ||
+            !['auto', 'alphabetic'].includes(stil.dominantBaseline) ||
+            !['auto', 'baseline'].includes(stil.alignmentBaseline) || !['0px', '0'].includes(stil.baselineShift))
+          return fallback('kein einfacher horizontaler alphabetischer Text');
+        if (stil.fontVariant !== 'normal' || !['normal', '100%'].includes(stil.fontStretch) ||
+            stil.fontFeatureSettings !== 'normal' || stil.fontVariationSettings !== 'normal' ||
+            stil.textTransform !== 'none' || stil.textDecorationLine !== 'none' ||
+            stil.textShadow !== 'none' || stil.filter !== 'none' || stil.vectorEffect !== 'none' ||
+            (!glyphen.spacingUnterstuetzt && !['normal', '0px'].includes(stil.letterSpacing)))
+          return fallback('Schrift- oder Maleffekt nicht in Canvas-Metrik enthalten');
+        const n = t.getNumberOfChars();
+        if (!n) return fallback('keine gerenderten Zeichen');
+        const baselineY = t.getStartPositionOfChar(0).y;
+        for (let i = 0; i < n; i++)
+          if (t.getStartPositionOfChar(i).y !== baselineY || t.getRotationOfChar(i) !== 0)
+            return fallback('wechselnde Grundlinie oder Zeichendrehung');
+        const ascent = glyphen.actualBoundingBoxAscent, descent = glyphen.actualBoundingBoxDescent;
+        if (![baselineY, ascent, descent].every(Number.isFinite) || ascent + descent <= 0)
+          return fallback('keine belastbare Glyphenmetrik');
+        let kontur = 0;
+        if (stil.stroke !== 'none') {
+          if (!/^\d+(?:\.\d+)?px$/.test(stil.strokeWidth) || !['round', 'bevel'].includes(stil.strokeLinejoin))
+            return fallback('Konturausdehnung nicht sicher bestimmbar');
+          kontur = parseFloat(stil.strokeWidth) / 2;
+        }
+        // Horizontal bleibt die volle getBBox-Breite ZUZÜGLICH der Kontur bestehen.
+        // Die runde/abgeschrägte Kontur reicht höchstens eine halbe Strichbreite über
+        // die Glyphen hinaus: keine Fehlertoleranz.
+        return { box: { x: box.x - kontur, y: baselineY - ascent - kontur,
+          w: box.w + 2 * kontur, h: ascent + descent + 2 * kontur },
+          quelle: 'Glyphen und Kontur', baselineY, kontur };
+      } catch (e) { return fallback(String(e.message || e)); }
+    };
     const labels = texte.map(t => {
       const eigen = t.closest(OBJEKTE);
-      return { text:(t.textContent||'').trim().slice(0, 28), box: kasten(t),
+      const stil = getComputedStyle(t);
+      const box = kasten(t), glyphen = glyphenMessen(t, stil);
+      return { text:(t.textContent||'').trim().slice(0, 28), box,
+               finalY: t.getAttribute('y'), transform: t.getAttribute('transform'),
+               font: { family: stil.fontFamily, size: stil.fontSize, weight: stil.fontWeight, lineHeight: stil.lineHeight },
+               glyphen, eigenInk: eigenInkMessen(t, stil, box, glyphen),
                eigenNr: eigen && eigen.__nr !== undefined ? eigen.__nr : -1 };
     }).filter(l => l.box);
     return { flaechen, labels };
@@ -154,6 +253,14 @@ async function lage(page){
 }
 
 const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+const eigenVergleich = (label, flaeche) => {
+  const text = label.eigenInk, koerper = flaeche.koerperInk;
+  if (text.quelle !== 'getBBox' && koerper.quelle !== 'getBBox')
+    return { textBox: text.box, koerperBox: koerper.box, quelle: 'Glyphen und beide Konturen' };
+  // Keine gemischte Messung: Schon ein unsicherer Partner behält den gesamten alten Test.
+  return { textBox: label.box, koerperBox: flaeche.b, quelle: 'getBBox',
+    grund: [text.grund, koerper.grund].filter(Boolean).join('; ') };
+};
 const mitteIn = (k, f) => {
   const cx = f.ganz.x + f.ganz.w/2, cy = f.ganz.y + f.ganz.h/2;
   return cx >= k.x && cx <= k.x + k.w && cy >= k.y && cy <= k.y + k.h;
@@ -288,9 +395,26 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
      nach oben "über ihr eigenes Objekt hinweg" zu schieben und dabei DARAUF zu landen. Gemessen
      wird gegen den KÖRPER, nicht gegen die Gruppe - die Beschriftung ist selbst Teil ihrer Gruppe,
      deren Box sie also immer vollständig enthält, und die Prüfung wäre sonst nie grün. */
-  const aufSichSelbst = namen.filter(x => schneidet(x.box, l.flaechen[x.eigenNr].b)).map(x => x.text);
+  const aufSichSelbst = namen.filter(x => {
+    const v = eigenVergleich(x, l.flaechen[x.eigenNr]);
+    return schneidet(v.textBox, v.koerperBox);
+  }).map(x => {
+    const f = l.flaechen[x.eigenNr];
+    const vergleich = eigenVergleich(x, f);
+    // Der Entflechter speichert das urspruengliche y nicht. Fuer Asteroidenkuerzel ist die
+    // Renderer-Formel cy + Ringradius + 7 ablesbar; die SVG-Werte sind bereits gerundet,
+    // deshalb getrennt als naeherungsweise Rekonstruktion ausweisen.
+    const asteroidRing = /data-map-asteroid/.test(f.art) && f.koerper.tag === 'circle';
+    return { text: x.text, textBox: x.box, eigenInk: x.eigenInk, koerperBox: f.b,
+      koerperInk: f.koerperInk, vergleich, koerper: f.koerper,
+      polygonBoxen: f.polygone, font: x.font, glyphen: x.glyphen, finalY: x.finalY, transform: x.transform,
+      urspruenglichesY: null,
+      ausgangsYRekonstruiert: asteroidRing ? +(Number(f.koerper.cy) + Number(f.koerper.r) + 7).toFixed(1) : null,
+      ueberlappungsHoehe: Math.min(vergleich.textBox.y + vergleich.textBox.h, vergleich.koerperBox.y + vergleich.koerperBox.h) -
+        Math.max(vergleich.textBox.y, vergleich.koerperBox.y) };
+  });
   check('1h: keine Beschriftung liegt auf dem Körper ihres eigenen Objekts',
-    aufSichSelbst.length === 0, aufSichSelbst.join(' | ') || 'keine');
+    aufSichSelbst.length === 0, aufSichSelbst.length ? aufSichSelbst : 'keine');
 
   check('1f: keine Skriptfehler beim Zeichnen', fehler.length === 0, fehler.slice(0, 2).join(' | ') || 'keine');
 

@@ -54,14 +54,14 @@ check('0b: canAscend() liest die Funktionen, nicht die Konstanten',
 
 /* 0c: DIE REGEL. Jede Zeile, die eine der beiden Konstanten liest, ist entweder ihre Deklaration,
    ein Kommentar, eine Zeile der zwei Funktionen - oder sie sagt dazu, dass es der ERSTE Aufstieg
-   ist ("beim ersten Mal"). Alles andere ist eine Anzeigestelle mit der alten festen Schwelle. */
+   ist ("beim ersten Mal" / "first appears at prestige"). Alles andere ist eine Anzeigestelle mit der alten festen Schwelle. */
 {
   const koerper = (fnPrestige || '') + '\n' + (fnScore || '');
   const verstoesse = JS.split('\n').filter(z => /ASCENSION_MIN_PRESTIGE|ASCENSION_MIN_SCORE/.test(z))
     .filter(z => !/^\s*\/\//.test(z))
     .filter(z => !/^\s*const ASCENSION_MIN_(PRESTIGE|SCORE) = \d+;/.test(z))
     .filter(z => koerper.indexOf(z.trim()) < 0)
-    .filter(z => !/beim ersten Mal/.test(z));
+    .filter(z => !/beim ersten Mal|first appears at prestige/.test(z));
   check('0c: keine Stelle liest die Konstanten als LEBENDE Schwelle - nur als Grundwert "beim ersten Mal"',
     verstoesse.length === 0, verstoesse.map(z => z.trim().slice(0, 100)));
 }

@@ -75,8 +75,9 @@ check('1: jedes tiefenfreigeschaltete Schiff hat einen desc-Text',
 const werft = js.slice(js.indexOf('const shipRows = visibleShipDefs.map'));
 const karte = werft.slice(0, werft.indexOf('const superBlock'));
 check('2: die Schiffskarte rendert def.desc', /\$\{(?:def|k7View\(def\))\.desc \? `<div class="bmeta"/.test(karte));
+const descAnzeige = karte.match(/\$\{(?:def|k7View\(def\))\.desc \? `<div class="bmeta"[^`]*`/);
 check('2: und tut das generisch, nicht nur fuer eine Handvoll Schluessel',
-  !/def\.key===.(lotsenboot|kessel|bergungskran)/.test(karte.match(/def\.desc[\s\S]{0,400}/)[0]));
+  !!descAnzeige && !/def\.key\s*={2,3}\s*['"](?:lotsenboot|kessel|bergungskran)['"]/.test(descAnzeige[0]));
 // Die alte nicheDesc-Zeile muss daneben stehen bleiben - sie erklaert die 30 anderen Schiffe.
 check('2: die nicheDesc-Zeile ist weiter da', /\$\{(?:def|k7View\(def\))\.nicheDesc \? `<div class="bmeta"/.test(karte));
 
