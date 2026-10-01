@@ -162,7 +162,7 @@ if (API){
 const anzeigen = (JS.match(/· Signatur \$\{shipSignatur\(k\)\}/g) || []).length;
 check('6a: beide Anzeigestellen der Flottenauswahl zeigen die Signatur', anzeigen === 2, { gefunden: anzeigen });
 // Gegenprobe: Es gibt wirklich zwei solche Zeilen - sonst waere 6a eine Behauptung ueber nichts.
-const zeilen = (JS.match(/Angriffspunkte je Schiff:/g) || []).length;
+const zeilen = (require('./lib/i18n').ohneI18nWoerterbuch(JS).match(/Angriffspunkte je Schiff:/g) || []).length;
 check('6b: und es gibt genau zwei solche Zeilen (Gegenprobe zu 6a)', zeilen === 2, { gefunden: zeilen });
 
 ende();

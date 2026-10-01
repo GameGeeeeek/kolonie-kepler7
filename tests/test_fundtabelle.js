@@ -11,6 +11,7 @@
 //   5) die neuen Zustandsfelder haben Vorgabewerte (sonst NaN/undefined bei Altstaenden)
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -22,16 +23,13 @@ const block = (name) => (src.match(new RegExp('const ' + name + ' = \\[[\\s\\S]*
 // ---------------------------------------------------------------- Verbrauchsgegenstaende
 const itemSrc = block('ITEM_DEFS');
 check('ITEM_DEFS gefunden', itemSrc.length > 100);
-// Ein Eintrag beginnt mit { key:'…' auf Einrueckungsebene 4 und laeuft bis zum naechsten.
-const rohEintraege = itemSrc.split(/\n    \{ key:'/).slice(1);
-const items = rohEintraege.map(t => ({
-  key: (t.match(/^(\w+)'/) || [])[1],
-  name: (t.match(/name:'([^']+)'/) || [])[1],
-  icon: (t.match(/icon:'([^']+)'/) || [])[1],
-  desc: (t.match(/desc:'((?:[^'\\]|\\.)*)'/) || [])[1] || '',
-  rarity: (t.match(/rarity:'(\w+)'/) || [])[1],
-  hatActivate: /activate:/.test(t)
-}));
+// Beschreibungen sind seit der Lokalisierung auch Ausdruecke mit k7h(), nicht nur Literale.
+// Die echte Tabelle auswerten; activate() bleibt dabei unangetastet und wird NICHT ausgefuehrt.
+const herkunft = (src.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
+const planKonstante = src.match(/const BELAGERUNGSPLAN_SENKUNG = [\d.]+;/);
+check('Belagerungsplan-Beschreibung liest die echte Senkung', !!planKonstante);
+if (!planKonstante) process.exit(1);
+const items = i18nFunction(src, herkunft + ';\n' + planKonstante[0] + '\n' + itemSrc + '\nreturn ITEM_DEFS;')();
 check('1: Gegenstaende geparst', items.length >= 19 && items.every(i => i.key), items.length);
 check('1: jeder Gegenstand hat ein Icon aus der Whitelist',
   items.every(i => whitelist.has(i.icon)), items.filter(i => !whitelist.has(i.icon)).map(i => i.key + '=' + i.icon));
@@ -40,7 +38,7 @@ const kurz = items.filter(i => (i.desc || '').length < 55);
 check('1: jede Beschreibung ist ein vollstaendiger Satz (>= 55 Zeichen)', kurz.length === 0,
   kurz.map(i => i.key + '=' + (i.desc || '').length));
 check('1: jeder Gegenstand hat eine activate()-Funktion',
-  items.every(i => i.hatActivate), items.filter(i => !i.hatActivate).map(i => i.key));
+  items.every(i => typeof i.activate === 'function'), items.filter(i => typeof i.activate !== 'function').map(i => i.key));
 
 const doppelt = items.map(i => i.key).filter((k, idx, a) => a.indexOf(k) !== idx);
 check('2: keine doppelten Gegenstands-Schluessel', doppelt.length === 0, doppelt);

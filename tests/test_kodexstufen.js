@@ -13,6 +13,7 @@
 //   5) die Belohnungslogik laeuft wirklich: einloesen, kein zweites Mal, Bonus wirkt
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -113,12 +114,20 @@ check('5: und verweigert nicht erreichte Stufen',
   /if \(!codexTierDone\(t\)\)\{ log\('Diese Kodex-Stufe ist noch nicht erreicht/.test(src));
 
 // ---------------------------------------------------------------- 6) Hilfe mitgezogen
+// Die sichtbare Hilfe auswerten: k7h("Stufen") trennt im Quelltext die HTML-Zeichenkette.
+const hilfeVon = src.indexOf('const HELP_SECTIONS = [');
+const kodexVon = src.indexOf("{ title:'Expeditions-Kette & Kodex'", hilfeVon);
+const kodexBis = src.indexOf("\n      { title:'", kodexVon + 1);
+check('6-anker: der Kodex-Hilfeeintrag ist sauber abgegrenzt',
+  hilfeVon >= 0 && kodexVon > hilfeVon && kodexBis > kodexVon);
+const kodexHilfe = kodexVon > hilfeVon && kodexBis > kodexVon
+  ? i18nFunction(src, 'return (' + src.slice(kodexVon, kodexBis).trim().replace(/,$/, '') + ');')().body : '';
 check('6: die Hilfe erklärt die Kodex-Stufen',
-  /sieben <strong>Stufen<\/strong>/.test(src) && /dauerhaften Beutebonus/.test(src));
+  /sieben <strong>Stufen<\/strong>/.test(kodexHilfe) && /dauerhaften Beutebonus/.test(kodexHilfe));
 // Die Hilfe nennt die Summe der Beuteboni als Zahl - genau die Sorte zweite Anzeigestelle, die beim
 // Hinzufuegen einer Stufe stehen bleibt (CLAUDE.md Regel 6). Gegen den echten Wert pruefen.
 check('6: und nennt die richtige Gesamtsumme der Beuteboni',
-  new RegExp('zusammen bis zu \\+' + Math.round(summe*100) + '%').test(src),
+  new RegExp('zusammen bis zu \\+' + Math.round(summe*100) + '%').test(kodexHilfe),
   { erwartet: Math.round(summe*100)+'%' });
 
 console.log(fail ? '\nFAIL' : '\nPASS');

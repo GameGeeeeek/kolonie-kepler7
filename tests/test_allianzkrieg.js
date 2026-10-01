@@ -25,6 +25,7 @@
 // dort nur die MELDUNG (4b), nicht der Betrag. 2c faellt, weil der alte Client die Route gar nicht ruft und
 // den Grund des Servers deshalb nie sieht.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer, logMitschnitt, logZeilen } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -46,8 +47,10 @@ check('0c: der war-victory-Zweig nennt den Staub (r.staub) - und addiert ihn nic
   /r\.type === 'war-victory'\)\{[\s\S]{0,900}?r\.staub \? /.test(JS) && !/state\.staub[^\n]*r\.staub/.test(JS));
 check('0d: Ehrentitel „Kriegsherren" mit exklusiver Quelle und Vergabe ab drei Siegen',
   /key:'kriegsherren'[^}]*exclusiveSource:true/.test(JS) && /const KRIEGSHERREN_SIEGE = 3;/.test(JS) && /function grantKriegsherrenTitleIfEarned\(/.test(JS));
+const kriegeEintrag = JS.match(/^\s*\{ title:'Kriege', body:(.+) \},?\s*$/m);
+const kriegeHilfetext = kriegeEintrag ? i18nFunction(JS, 'return (' + kriegeEintrag[1] + ');')() : '';
 check('0e: der Hilfe-Eintrag „Kriege" nennt den Server, +10, den Tagesdeckel und den Trostpreis',
-  /title:'Kriege', body:'[^']*Kriegspunkte vergibt der Server[^']*\+10[^']*3 Angriffe am Tag[^']*Trostpreis/.test(JS));
+  /Kriegspunkte vergibt der Server[\s\S]*\+10[\s\S]*3 Angriffe am Tag[\s\S]*Trostpreis/.test(kriegeHilfetext));
 check('0f: Bericht-Typ war-defeat in Kategorie, Renderer und Symbolwahl',
   /'asteroid-verteidigung','war-defeat'\] \}/.test(JS) && /r\.type === 'war-defeat'\)\{/.test(JS) && /r\.type==='war-defeat' \? 'ti-skull'/.test(JS));
 check('0g: Erklaeren und Frieden gehen ueber die Routen - mit 404-Rueckfall',

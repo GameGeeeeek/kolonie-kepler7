@@ -27,6 +27,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, SERVER_JS, pruefer, ueberspringen } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -83,8 +84,8 @@ if (fnRoh) {
   // Aufgefallen ist das nur, weil der Oberflächentest daneben den echten Text las (15.08.2026).
   const fmtRoh = literalAus(js, 'function fmt(n){', '{', '}');
   check('3-vorab: die echte fmt() gefunden', !!fmtRoh);
-  const echtesFmt = fmtRoh ? eval('(function fmt(n)' + fmtRoh + ')') : (n => String(n));
-  const bedingungText = eval('(function(fmt){ return function kosmetikBedingungText(b)' + fnRoh + '; })')(echtesFmt);
+  const echtesFmt = fmtRoh ? i18nFunction(js, 'return function fmt(n)' + fmtRoh)() : (n => String(n));
+  const bedingungText = i18nFunction(js, 'fmt', 'return function kosmetikBedingungText(b)' + fnRoh + ';')(echtesFmt);
   const arten = Array.from(new Set(DEFS.map(d => d.bedingung && d.bedingung.typ)));
   const unuebersetzt = [];
   for (const def of DEFS) {

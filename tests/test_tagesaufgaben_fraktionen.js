@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Fraktions-Tagesaufgaben v8.298.25.
 //
 // Ausgangslage: Der Fraktions-Ausbau hat sechs Systeme gebracht (Auftragspools, Feindschaft,
@@ -20,7 +21,7 @@ const fs = require('fs');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const NEU = ['shopbuy', 'warsupport', 'rank', 'repcare'];
 
 // ---------------------------------------------------------------- Block ausführbar machen
@@ -61,7 +62,7 @@ function baue(opts){
     return { nr };
   };
   const factionRankSum = () => ['kartell','legion','void','schatten'].reduce((a,f)=>a+factionRankOf(f).nr, 0);
-  new Function('ctx', 'state', 'galaxyCache', 'FACTION_DIPLOMACY', 'REP_RANKS',
+  i18nFunction(src, 'ctx', 'state', 'galaxyCache', 'FACTION_DIPLOMACY', 'REP_RANKS',
     'factionEffectLevel', 'factionRankOf', 'factionRankSum', 'warSupportedSide', 'warFactionIdByName',
     'SKILL_TREE', 'TIER2_DEFS', 'tier2TotalLevel', 'skillPointsSpent',
     defsBlock + progBlock + ';ctx.DEFS=DAILY_QUEST_DEFS;ctx.progress=dailyQuestProgress;'
@@ -91,7 +92,7 @@ check('1: der Pool hat 25 Vorlagen', u.ctx.DEFS.length === 25, u.ctx.DEFS.length
 {
   const fs2 = require('fs');
   const { SPIELDATEI: DATEI } = require('./lib/umgebung');
-  const roh = fs2.readFileSync(DATEI, 'utf8');
+  const roh = fs2.readFileSync(DATEI, 'utf8').replace(/\r\n/g, '\n');
   const stellen = [...roh.matchAll(/aus (\d+) Vorlagen gezogen/g), ...roh.matchAll(/damit (\d+) Vorlagen/g)]
     .map(m => Number(m[1]));
   check('1: Tutorial UND Hilfe nennen dieselbe Poolgroesse',
@@ -233,7 +234,7 @@ check('6: factionRankSum ist die gemeinsame Quelle für Aufgabe und Tagesmarke',
   const vonS = src.indexOf('  function factionRankSum(){');
   // factionRankOf liest aus einer frei setzbaren Tabelle, damit die Raenge im Test bestimmbar sind.
   function summeFuer(raenge){
-    const f = new Function('FACTION_DIPLOMACY', 'factionRankOf',
+    const f = i18nFunction(src, 'FACTION_DIPLOMACY', 'factionRankOf',
       src.slice(vonS, src.indexOf('\n  }', vonS) + 4) + ';return factionRankSum;'
     )({ kartell:1, legion:1, void:1, schatten:1 }, fid => ({ nr: raenge[fid] }));
     return f();

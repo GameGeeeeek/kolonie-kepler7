@@ -213,7 +213,7 @@ const knopfInfo = (page, attr, instKey) => page.evaluate(([a,k])=>{
   }
 
   // ------------------------------------------------------ Quelltext-Prüfungen
-  const src = fs.readFileSync(SPIELDATEI, 'utf8');
+  const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
   check('Q: die Typ-Pruefung existiert genau einmal',
     (src.match(/function typeAlreadyEquipped\(/g)||[]).length === 1
     && (src.match(/function moduleTypeOf\(/g)||[]).length === 1);

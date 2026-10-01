@@ -22,6 +22,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -117,11 +118,15 @@ const itemBlock = block('ITEM_DEFS');
 // uebrigen 15 wurden von allen folgenden Pruefungen stillschweigend uebersprungen. Jetzt wird am
 // Eintragsanfang getrennt und in jedem Stueck einzeln gesucht.
 const stuecke = itemBlock.split(/\n\s*\{ key:'/).slice(1);
+const senkung = js.match(/const BELAGERUNGSPLAN_SENKUNG = ([^;\r\n]+);/);
+if (!senkung) throw new Error('BELAGERUNGSPLAN_SENKUNG nicht gefunden');
+const BELAGERUNGSPLAN_SENKUNG = new Function('return (' + senkung[1] + ');')();
 function descAus(st){
-  const m = st.match(/desc:\s*'([\s\S]*?)'\s*,\s*(?:chance|rarity|craftOnly|eventKey|quelle|icon|activate|forKey|effect)\s*:/);
+  const m = st.match(/desc:\s*([\s\S]*?),\s*(?:chance|rarity|craftOnly|eventKey|quelle|icon|activate|forKey|effect)\s*:/);
   if (!m) return '';
-  // '+ausdruck+' -> ein Platzhalter. Alles andere bleibt, wie es dasteht.
-  return m[1].replace(/'\s*\+[\s\S]*?\+\s*'/g, '42');
+  // Nur den Beschreibungsausdruck ausfuehren, keine activate()-Funktion. Dadurch werden auch
+  // geklammerte, doppelt quotierte Texte und HTML-escapte Uebersetzungen vollstaendig geprueft.
+  return i18nFunction(js, 'BELAGERUNGSPLAN_SENKUNG', 'return (' + m[1] + ');')(BELAGERUNGSPLAN_SENKUNG);
 }
 const items = stuecke.map(st => ({
   key: (st.match(/^([a-z_0-9]+)'/)||[])[1],
@@ -131,8 +136,8 @@ const items = stuecke.map(st => ({
      Seit v8.599.0 leitet der Belagerungsplan seine Prozentzahl aus der Konstante ab, statt sie
      einzutippen (Arbeitsregel 38) - der alte Ausdruck `desc:'([^']*)'` schnitt am ersten
      Apostroph ab und meldete einen unvollstaendigen Satz, den es gar nicht gab. Gelesen wird
-     deshalb bis zum naechsten FELD, und die eingesetzten Teile werden durch ihren Platzhalter
-     ersetzt: Geprueft werden Laenge und Schlusszeichen, nicht der eingesetzte Wert. */
+     deshalb bis zum naechsten FELD. Der Ausdruck wird mit echten Sprachhelfern und der echten
+     Balance-Konstante ausgewertet; geprueft werden Laenge und Schlusszeichen. */
   desc: descAus(st),
   rarity: (st.match(/rarity:'([a-z]+)'/)||[])[1] || null,
   hatAktion: /activate:\s*\(\)\s*=>/.test(st)

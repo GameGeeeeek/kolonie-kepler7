@@ -14,6 +14,7 @@
 //   5) die Hilfe nennt die richtige Anzahl
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -102,7 +103,7 @@ function baue(state){
   const BASE_PLANET_IDS = new Set(DEFS.PLANETS.map(p => p.id));
   const baseStarSystems = () => DEFS.STAR_SYSTEMS;
   const unikatDefs = () => DEFS.UNIKATE;
-  new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
+  i18nFunction(src, 'ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'ACHIEVEMENTS', 'SHIP_DEFS', 'MODULE_DEFS',
     'BUILDING_DEFS', 'FACTION_DIPLOMACY', 'allFleets', 'allBuildingSets',
     'BASE_PLANET_COUNT', 'BASE_STAR_SYSTEM_COUNT', 'BASE_PLANET_IDS', 'baseStarSystems',
     'ABGRUND_RELIKTE', 'ABGRUND_KONSTELLATIONEN', 'unikatDefs', 'FESTUNG_STUFEN', 'ALIEN_VOELKER', 'NPCS',

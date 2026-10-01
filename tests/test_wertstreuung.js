@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Hauptwert-Streuung je Fund (v8.444.0, Build-System Etappe 2, Wunsch Sascha).
 //
 // ARCHITEKTUR: Jeder FUND wuerfelt seinen Hauptwert 90-110%, kodiert als "wNN"-Token im
@@ -38,8 +39,8 @@ const qSubs = fnAus('function moduleSubsOf(instKey){');
 const qWert = fnAus('function moduleWertOf(instKey){');
 check('1a: moduleSubsOf und moduleWertOf gefunden', qSubs.length > 200 && qWert.length > 100);
 const konst = 'const MODULE_WERT_MIN = 90, MODULE_WERT_MAX = 110;\n';
-const subsVon = new Function(konst + qSubs + '\nreturn moduleSubsOf;')();
-const wertVon = new Function(konst + qWert + '\nreturn moduleWertOf;')();
+const subsVon = i18nFunction(HTML, konst + qSubs + '\nreturn moduleSubsOf;')();
+const wertVon = i18nFunction(HTML, konst + qWert + '\nreturn moduleWertOf;')();
 check('1b: das w-Token ist KEIN Zweitwert',
   JSON.stringify(subsVon('waffen:selten:1:prod15.w104')) === JSON.stringify([{ effect: 'prod', value: 0.015 }]));
 check('1c: moduleWertOf liest den Wurf, klemmt Ausreisser und gibt Altbestand 100',
@@ -53,7 +54,7 @@ check('1c: moduleWertOf liest den Wurf, klemmt Ausreisser und gibt Altbestand 10
 {
   const qInfo = fnAus('function moduleInstanceInfo(instKey){');
   check('2a: moduleInstanceInfo gefunden', qInfo.length > 300);
-  const info = new Function('MODULE_DEFS', 'MODULE_RARITY', 'moduleLevelOf', 'moduleLevelMult',
+  const info = i18nFunction(HTML, 'MODULE_DEFS', 'MODULE_RARITY', 'moduleLevelOf', 'moduleLevelMult',
     'moduleSubsOf', 'moduleWertOf', 'abgrundTiefenSkala',
     qInfo + '\nreturn moduleInstanceInfo;')(
     [{ key: 'waffen', effect: 'atk', base: 0.05 }],
@@ -92,7 +93,7 @@ check('3b: die Fragment-Fertigung bleibt bei 100% (kein Token im gefertigten Sch
     const logs = [];
     const state = { modules: inv, shipModules: {} };
     // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): immer offen, siehe test_modulschloss.
-    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
+    const fn = i18nFunction(HTML, 'state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
       'moduleLevelOf', 'moduleWertOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo',
       'log', 'playSound', 'render', 'save',
       quelle + '\nreturn fuseModules;')(
@@ -126,14 +127,14 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - Wert-Pa
   const srv = fs.readFileSync(SERVER_JS, 'utf8');
   const reM = srv.match(/const MODULE_INSTKEY_RE = (\/[^\n]+\/);/);
   check('6a: die Boersen-Validierung gefunden', !!reM);
-  const re = reM ? new Function('return ' + reM[1] + ';')() : /$^/;
+  const re = reM ? i18nFunction(HTML, 'return ' + reM[1] + ';')() : /$^/;
   check('6b: die strenge Boersen-Regex akzeptiert Schluessel MIT Wurf-Token',
     re.test('panzerung:ungewoehnlich:1:prod15.w104') && re.test('waffen:exotisch:10:w96') &&
     !re.test('waffen:selten:1:prod15:extra'));
   const qSrvVon = srv.indexOf('function moduleWertMultServer(instKey) {');
   const qSrvBis = srv.indexOf('\n}', qSrvVon);
   check('6c: moduleWertMultServer existiert', qSrvVon > 0 && qSrvBis > qSrvVon);
-  const srvWert = new Function(srv.slice(qSrvVon, qSrvBis + 2) + '\nreturn moduleWertMultServer;')();
+  const srvWert = i18nFunction(HTML, srv.slice(qSrvVon, qSrvBis + 2) + '\nreturn moduleWertMultServer;')();
   check('6d: der Server liest den Wurf identisch (104 -> 1.04, ohne Token -> 1, geklammert)',
     Math.abs(srvWert('waffen:selten:1:prod15.w104') - 1.04) < 1e-9 &&
     srvWert('waffen:selten') === 1 && Math.abs(srvWert('x:y:1:w999') - 1.1) < 1e-9);

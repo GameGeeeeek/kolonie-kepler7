@@ -148,8 +148,14 @@ check('3: kein Abgrund-Feld haengt an Kolonien oder Planeten',
   check('4: der Aufstiegs-Dialog nennt den Abgrund', /Abgrund/.test(aDlg));
   check('4: und sagt ausdruecklich, was dort VERLOREN geht',
     /verloren/.test(aDlg) && /Werkstatt/.test(aDlg), aDlg.length);
-  const hilfe = src.slice(src.indexOf("{ title:'Prestige', body:'"));
-  const eintrag = hilfe.slice(0, hilfe.indexOf("' },"));
+  // body ist seit der Uebersetzung ein Ausdruck, kein einzelnes String-Literal mehr.
+  // Bis zum naechsten Hilfeeintrag begrenzen; fehlende Anker duerfen nicht Nachbartexte pruefen.
+  const hilfeStart = js.indexOf("{ title:'Prestige', body:");
+  if (hilfeStart < 0) throw new Error('Prestige-Hilfe nicht gefunden');
+  const hilfe = js.slice(hilfeStart);
+  const hilfeEnde = hilfe.search(/\r?\n\s*\{ title:/);
+  if (hilfeEnde < 0) throw new Error('Ende der Prestige-Hilfe nicht gefunden');
+  const eintrag = hilfe.slice(0, hilfeEnde);
   check('4: der Hilfe-Abschnitt Prestige nennt beide Faelle',
     /Abgrund-Fortschritt/.test(eintrag) && /Aufzeichnungen/.test(eintrag));
   check('4: und nennt den Grund fuer den Unterschied (Kompendium)',

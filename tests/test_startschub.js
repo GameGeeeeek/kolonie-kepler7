@@ -92,7 +92,7 @@ const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebun
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const ICH = 'u-ich';
 const QUOTE = { kepler: 5, meridian: 5, wispern: 3, solmark: 4, obsidian: 3, pulsar: 4, ilyra: 3, rand: 3 };
 const MIN_ABSTAND = 30;

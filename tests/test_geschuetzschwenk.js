@@ -102,7 +102,7 @@ async function bodenband(browser, datei){
 }
 
 (async () => {
-  const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+  const quelle = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kepler-schwenk-'));
   const a0 = kopieMitWinkel(quelle, '0',   path.join(tmp, 'richt0.html'));
   const a9 = kopieMitWinkel(quelle, '0.9', path.join(tmp, 'richt9.html'));

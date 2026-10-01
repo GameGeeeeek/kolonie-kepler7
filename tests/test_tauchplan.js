@@ -37,7 +37,7 @@
 //                 der Fehler, gegen den dieser Test gebaut ist.
 const fs = require('fs');
 const { SPIELDATEI } = require('./lib/umgebung');
-const src = fs.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8');
+const src = fs.readFileSync(process.env.KEPLER_SPIELDATEI || SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
 const ergebnis = {};

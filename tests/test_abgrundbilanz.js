@@ -26,6 +26,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -202,7 +203,8 @@ check('C: die Verluste bleiben multiplikativ verrechnet (nie exakt null)',
   // Herkunfts-Konstanten aus der Datei ableiten (Regel 40/43): MODULE_DEFS traegt seit A2 auch
   // HERKUNFT_KONVOI; eine feste Vierer-Namensliste riesse den Literal-Parser mit "... is not defined".
   const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
-  const MD = new Function(herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
+  // Zusammengesetzte Beschreibungen brauchen den deutschen Anzeigehelfer, keine Spielumgebung.
+  const MD = i18nFunction(js, herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
   const obenWirksam = MD.filter(d => d.quelle === 'abgrund').map(d => d.key).sort();
   check('D: die Abgrund-Standortmodule sind genau diese',
     obenWirksam.join() === ['drucktank','echolotmast','krustenpresse','nullfeldanker','prisenwaage','splitterofen','taktschmiede','wrackleser'].join(), obenWirksam);

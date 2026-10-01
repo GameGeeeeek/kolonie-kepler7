@@ -26,6 +26,7 @@
 // Test grün (richtig so: die Box zieht mit), aber 1 schlägt an, sobald die Auszahlung nicht mehr
 // aus LEAGUE_DEFS liest.
 const fs = require('fs');
+const { ohneI18nWoerterbuch } = require('./lib/i18n');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -66,7 +67,8 @@ const pnVon = S.indexOf('  const PATCHNOTES = [');
 const pnBis = pnVon < 0 ? -1 : S.indexOf('\n  ];', pnVon);
 check('3-anker: der PATCHNOTES-Block ist sauber abgegrenzt', pnVon >= 0 && pnBis > pnVon, { pnVon, pnBis });
 if (pnVon >= 0 && pnBis > pnVon) {
-  const ohnePatchnotes = S.slice(0, pnVon) + S.slice(pnBis);
+  // Uebersetzungsdaten koennen historische Woerter enthalten, ohne eine Live-Anzeige zu sein.
+  const ohnePatchnotes = ohneI18nWoerterbuch(S.slice(0, pnVon) + S.slice(pnBis));
   const alteWerte = DEFS.filter(l => l.prodMin > 0).map(l => l.prodMin * 5); // 60/30/15
   const treffer = [];
   ohnePatchnotes.split('\n').forEach((z, i) => {

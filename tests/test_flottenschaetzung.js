@@ -14,11 +14,12 @@
 // Schaetzung leitet sich aus ATTACK_SHIP_KEYS/SHIP_DEFS ab, ein neues Schiff ist automatisch drin.
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 function schnitt(von, bis){
   const a = src.indexOf(von), b = src.indexOf(bis, a);
   if (a < 0 || b < 0) throw new Error('Abschnitt nicht gefunden: ' + von);
@@ -32,7 +33,7 @@ function schnitt(von, bis){
 // eine handgepflegte Liste waere genau die Sorte Zweitkopie, die dieser Test bekaempft.
 // Endmarke ist das Array-Ende selbst (Einrueckung mit drei Leerzeichen), nicht die naechste
 // Konstante: Dazwischen steht Code, der BUILDING_DEFS anfasst und hier nichts zu suchen hat.
-const defsSlice   = schnitt('const SHIP_DEFS = [', '\n  ];\n  const SUPER_SPEED') + '\n  ];';
+const defsSlice   = schnitt('const SHIP_DEFS = [', '\n  ];') + '\n  ];';
 // Endmarke: die Stelle, an der bis v8.497.0 'const CARGO_PER_FRACHTER = 300' stand - die Konstante
 // ist in der Tabelle CARGO_PER_SHIP aufgegangen, an ihrem Platz steht jetzt der Verweis darauf.
 // Die Marke muss GENAU dort bleiben: Der Ausschnitt braucht alles bis dahin, unter anderem
@@ -50,7 +51,7 @@ const kostenNamen = [...new Set([...defsSlice.matchAll(/costFn:\s*(\w+)/g)].map(
 
 const ctx = {};
 const superWeight = schnitt('const SUPERSCHLACHTSCHIFF_DEF_WEIGHT = ', '\n');
-new Function('ctx', 'var ' + kostenNamen.join(', ') + ';\n' + defsSlice + '\n' + superWeight + '\n' + dimSlice + '\n' + cargoSlice + '\n' + keysSlice
+i18nFunction(src, 'ctx', 'var ' + kostenNamen.join(', ') + ';\n' + defsSlice + '\n' + superWeight + '\n' + dimSlice + '\n' + cargoSlice + '\n' + keysSlice
   + ';ctx.SHIP_DEFS=SHIP_DEFS; ctx.KEYS=ATTACK_SHIP_KEYS; ctx.atk=shipBaseAtk;'
   + 'ctx.eAtk=estimateEnemyFleetAtk; ctx.eDef=estimateEnemyFleetDefense; ctx.dim=diminishingShipCount;')(ctx);
 

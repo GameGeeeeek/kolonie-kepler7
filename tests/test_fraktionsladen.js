@@ -18,7 +18,7 @@ const fs = require('fs');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const whitelist = new Set([...src.matchAll(/^\s*\.(ti-[a-z0-9-]+):before/gm)].map(m => m[1]));
 
 // ---------------------------------------------------------------- Block ausführbar machen

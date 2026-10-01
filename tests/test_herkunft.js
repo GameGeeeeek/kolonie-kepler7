@@ -23,6 +23,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -247,14 +248,13 @@ const MD = (() => {
   const i = js.indexOf('const MODULE_DEFS = [');
   let d=0, s=js.indexOf('[', i), k=s;
   for (; k<js.length; k++){ if(js[k]==='[')d++; else if(js[k]===']'){d--; if(!d)break;} }
-  // Die desc-Texte enthalten HTML, aber keine Funktionsaufrufe - das Array ist als Literal lesbar,
-  // sobald die Herkunfts-Konstanten definiert sind.
+  // Die desc-Texte enthalten HTML und echte Sprachhelfer; deren Abhaengigkeiten werden mitgeladen.
   // ALLE HERKUNFT_*-Konstanten werden AUS DER DATEI abgeleitet, nicht eingetippt (Hausregel 43):
   // Fuer jede neue Herkunft (v8.463.0 HERKUNFT_UNIKAT, A2 HERKUNFT_KONVOI fuer die Wrackkonvois)
   // steht sonst frueher oder spaeter ein ReferenceError beim Literal-Parsen - eine Namensliste
   // waere blind gegen genau die Erweiterung, die diesen Test spaeter reisst.
   const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
-  return new Function(herkunftDecls + '; return ' + js.slice(s,k+1))();
+  return i18nFunction(js, herkunftDecls + '; return ' + js.slice(s,k+1))();
 })();
 const abgrundKeys = MD.filter(d => d.quelle === 'abgrund').map(d => d.key);
 check('C: die echten MODULE_DEFS tragen die Abgrund-Module', abgrundKeys.length >= 4, abgrundKeys);

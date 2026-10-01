@@ -129,7 +129,8 @@ check('Kolonisier-Sperre nutzt dasselbe Limit wie colonizePlanet',
 // ---------------------------------------------------------------- 6. Text ohne Markup
 check('costText() liefert reinen Text', /function costText\(cost\)\{/.test(src));
 const menueBlock = src.slice(src.indexOf('function openKarteMenu'), src.indexOf('const SUN_X ='));
-check('die Menuetexte werden escapet', /escapeHtml\(e\.label\)/.test(menueBlock) && /escapeHtml\(e\.grund\)/.test(menueBlock));
+// Die Beschriftung darf vor dem Escapen durch die Sprachansicht gehen.
+check('die Menuetexte werden escapet', /escapeHtml\((?:e|k7View\(e\))\.label\)/.test(menueBlock) && /escapeHtml\(e\.grund\)/.test(menueBlock));
 check('im Menue steht kein costHtml (das waere sichtbares Icon-Markup)', !/costHtml\(/.test(menueBlock));
 
 // ---------------------------------------------------------------- 7. Aufgeraeumt und dokumentiert

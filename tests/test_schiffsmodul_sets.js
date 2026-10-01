@@ -20,6 +20,7 @@
 // GEGENPROBE (in beide Richtungen): Gegen den Stand vor dieser Etappe (KEPLER_SPIELDATEI auf eine
 // Kopie ohne SHIP_MODULE_SET_DEFS) fallen alle Pruefungen ab 1a.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -163,7 +164,7 @@ if (typeof bonus === 'function') {
       && (() => { try { new Function(herkunft); return true; } catch (e){ return false; } })(),
       herkunft.slice(0, 200));
     try {
-      zeile = new Function(herkunft + '\n' + teile.join('\n') + '\nreturn shipModuleSetZeilenHtml;')();
+      zeile = i18nFunction(S, herkunft + '\n' + teile.join('\n') + '\nreturn shipModuleSetZeilenHtml;')();
     } catch (e) { f2 = e.message; }
   }
   check('2-bau2: die Anzeigefunktion laeuft', typeof zeile === 'function', f2);

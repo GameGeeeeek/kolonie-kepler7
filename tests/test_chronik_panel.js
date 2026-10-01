@@ -23,6 +23,7 @@
 // endet; ohne escapeHtml faellt 3; mit <br>-Ersetzung statt CSS faellt 4; ohne chronikSig in den
 // beiden Signatur-Zeilen faellt 6; ohne die 14-Tage-Zeile faellt 5.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -39,7 +40,7 @@ const BLOCK = JS.slice(von, bis);
 
 // Ausfuehren statt lesen. escapeHtml wird gestellt - der Test misst, DASS maskiert wird, nicht wie
 // die Maskierung der Spieldatei im Einzelnen aussieht (die hat ihre eigenen Tests).
-const bau = new Function('galaxyCache', 'jetzt', `
+const bau = i18nFunction(JS, 'galaxyCache', 'jetzt', `
   const _urspruenglich = Date.now;
   Date.now = () => jetzt;
   function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

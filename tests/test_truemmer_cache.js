@@ -127,7 +127,7 @@ const lies = page => page.evaluate(()=>{
 
   // ------------------------------------------------------- 4) Signatur enthält den Namen
   {
-    const src = fs.readFileSync(SPIELDATEI, 'utf8');
+    const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
     const fn = src.slice(src.indexOf('function renderDebrisBox'), src.indexOf('// ===== Prisenhof'));
     check('4: es gibt genau eine renderDebrisBox-Definition',
       (src.match(/function renderDebrisBox/g)||[]).length === 1, (src.match(/function renderDebrisBox/g)||[]).length);

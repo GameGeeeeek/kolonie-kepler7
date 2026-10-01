@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Die Schiffsklassen-Module wirken in der VERTEIDIGUNG - und die muss in beiden Repos gleich
 // gerechnet werden (21.08.2026, Auftrag Sascha).
 //
@@ -72,7 +73,7 @@ function schneideDeklaration(quelle, von){
   return null;
 }
 function fuehreAus(code, rueckgabe){
-  try { return new Function(code + '\nreturn ' + rueckgabe + ';')(); } catch (e) { return null; }
+  try { return i18nFunction(FRONT, code + '\nreturn ' + rueckgabe + ';')(); } catch (e) { return null; }
 }
 /* Ein geschnittener Block leitet oft aus anderen Konstanten ab (SHIP_MODULE_DEFS etwa aus
    HERKUNFT_ABGRUND). Gesammelt wird deshalb, was der Block WIRKLICH BENUTZT, und transitiv das,

@@ -17,9 +17,11 @@ const fePhasen = schnitt(FEsrc, '// ===== Kampfphasen', '// ===== Verteidigungs-
 const feForm   = schnitt(FEsrc, '// ===== Verteidigungs-Aufstellung', '  // Signatur-Cache-Muster');
 const feBal    = schnitt(FEsrc, 'const FLEET_BALANCE_MAX_BONUS', '// ===== Schiffsklassen');
 const FE={};
-new Function('ctx','state', feKonter+feBal+fePhasen+feForm+
+// Der Slice enthaelt auch Modultexte und deren i18n-Registrierung. Beides ist fuer die
+// Kampfrechnung neutral; ohne diese Abhaengigkeiten brach schon HEAD mit "k7h undefined" ab.
+new Function('ctx','state','k7h','k7RegisterDefinitions', feKonter+feBal+fePhasen+feForm+
   ';ctx.resolve=resolveBattlePhases;ctx.chance=battleWinChance;ctx.MIN=PHASE_CHANCE_MIN;ctx.MAX=PHASE_CHANCE_MAX;'+
-  'ctx.form=formationDefenseMult;ctx.FORMS=DEFENSE_FORMATIONS;ctx.PHASES=BATTLE_PHASES;')(FE, { defenseFormation:'ausgewogen' });
+  'ctx.form=formationDefenseMult;ctx.FORMS=DEFENSE_FORMATIONS;ctx.PHASES=BATTLE_PHASES;')(FE, { defenseFormation:'ausgewogen' }, text=>text, ()=>{});
 
 const bePhasen = schnitt(BEsrc, '// ===== Kampfphasen', '// ===== Verteidigungs-Aufstellung');
 const beForm   = schnitt(BEsrc, '// ===== Verteidigungs-Aufstellung', 'const COUNTER_BONUS');

@@ -24,11 +24,13 @@
 //   7) kein DEFS-Kostenposten benutzt einen Schluessel, den das Kostensystem nicht kennt
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+// Die Funktions-Endanker gelten fuer LF und CRLF, ohne versehentlich spaetere UI-Bloecke mitzunehmen.
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 
 // ---------------------------------------------------------------- Block ausführbar machen
 const von = src.indexOf('  function costAmountAvailable(r){');
@@ -105,7 +107,7 @@ function baue(opts){
   check('4: Kredite haben in der Kostenzeile ein Icon', /ti-diamond/.test(miniResIcon('credits')), miniResIcon('credits'));
   // Gegenprobe am echten Aufruf: costHtml baut Icon + Menge + Label zusammen.
   const ch = src.slice(src.indexOf('  function costHtml(cost){'), src.indexOf('\n  }\n', src.indexOf('  function costHtml(cost){')) + 4);
-  const costHtml = new Function('resDefFor', 'miniResIcon', 'fmt', 'costAmountAvailable', ch + ';return costHtml;')(
+  const costHtml = i18nFunction(src, 'resDefFor', 'miniResIcon', 'fmt', 'costAmountAvailable', ch + ';return costHtml;')(
     resDefFor, miniResIcon, n => String(n), () => 0);
   const html = costHtml({ credits: 280 });
   check('4: die Kostenzeile schreibt „280 Kredite"', html.includes('280 Kredite'), html);
@@ -122,7 +124,7 @@ check('5: der Zeitschätzer liest denselben Bestand', /const have = costAmountAv
   const rd = src.slice(src.indexOf('  function resDefFor(key){'), src.indexOf('\n  }\n', src.indexOf('  function resDefFor(key){')) + 4);
   const resDefFor = new Function('RES_DEFS', 'TIER2_DEFS', rd + ';return resDefFor;')([], []);
   const ch = src.slice(src.indexOf('  function costHtml(cost){'), src.indexOf('\n  }\n', src.indexOf('  function costHtml(cost){')) + 4);
-  const bauCostHtml = have => new Function('resDefFor', 'miniResIcon', 'fmt', 'costAmountAvailable', ch + ';return costHtml;')(
+  const bauCostHtml = have => i18nFunction(src, 'resDefFor', 'miniResIcon', 'fmt', 'costAmountAvailable', ch + ';return costHtml;')(
     resDefFor, () => '', n => String(n), () => have);
   check('5: bei voller Kasse ist die Kredit-Kostenzeile nicht als fehlend markiert',
     !bauCostHtml(500)({ credits: 280 }).includes('short'));

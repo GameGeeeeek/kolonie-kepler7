@@ -20,11 +20,14 @@
 // GEGENPROBE (Arbeitsregel 1, beim Einführen ausgeführt): am alten Stand fällt der Test durch
 // (kein HERKUNFT_BOSS, keine Sets, setBonusAt kennt keine Stufen).
 const fs = require('fs');
+const { i18nFunction, ohneI18nWoerterbuch } = require('./lib/i18n');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
-const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+const JS_MIT_I18N = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+// Sonst kann eine entfernte Live-Anzeige weiterhin im Uebersetzungswoerterbuch gefunden werden.
+const JS = ohneI18nWoerterbuch(JS_MIT_I18N);
 
 // Die HERKUNFT_*-Konstanten werden aus der Datei SELBST gezogen, nicht als feste Liste getippt
 // (Regel 40/43): eine getippte Liste veraltet, sobald eine weitere dazukommt - genau so ist
@@ -38,8 +41,8 @@ function parseArray(name) {
   const bis = JS.indexOf('\n  ];', von);
   if (bis < 0) return null;
   try {
-    return new Function(herkunftDecls + '; return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))();
-  } catch (e) { return null; }
+    return i18nFunction(JS_MIT_I18N, herkunftDecls + '; return ' + JS.slice(von + ('const ' + name + ' = ').length, bis + 5))();
+  } catch (e) { console.error(name + ': ' + e.message); return null; }
 }
 function funktionsRumpf(name) {
   const von = JS.indexOf('function ' + name + '(');
@@ -138,7 +141,8 @@ check('2a: kein Teil-Effekt und kein Stufen-Bonus nutzt atk/raidloss',
     { stellen: (JS.match(/d\.quelle === HERKUNFT_BOSS && d\.bossKey === bossKey/g) || []).length });
   // Die Anzeige kennt die Stufen: Fortschrittszaehler und naechste Stufe stehen im Markup.
   check('5c: die Standort-Ansicht zeigt Fortschritt und nächste Stufe',
-    JS.includes('Boss-Set „${s.name}" ${have.length}/${s.req.length}') && JS.includes('nächste Stufe (${naechste.teile} Teile)'));
+    /Boss-Set „\$\{(?:s|k7View\(s\))\.name\}" \$\{have\.length\}\/\$\{s\.req\.length\}/.test(JS)
+    && JS.includes('nächste Stufe (${naechste.teile} Teile)'));
 }
 
 ende();

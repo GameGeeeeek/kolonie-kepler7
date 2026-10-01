@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Hauptwert-Neuschmieden (v8.451.0, Task #42): das Gegenstueck zum Substat-Reroll.
 //
 // HINTERGRUND: Seit der Wert-Streuung (v8.444.0) war ein schwacher Hauptwert-Wurf endgueltig -
@@ -51,7 +52,7 @@ function macheWelt(inv, fragmente, wurf, isShip){
              rar: { label: 'Test' }, def: { name: typ } };
   };
   // moduleLockMitnehmen-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss), siehe test_modulschloss.
-  const api = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLockMitnehmen', 'moduleInstanceInfo',
+  const api = i18nFunction(HTML, 'state', 'MODULE_FRAGMENT_VALUE', 'moduleLockMitnehmen', 'moduleInstanceInfo',
     'shipModuleInstanceInfo', 'wertWuerfeln', 'log', 'playSound', 'render', 'save',
     konstanten + '\n' + wertQuelle + '\n' + quelle
     + '\nreturn { moduleWertRerollCost, rerollModuleWert };')(

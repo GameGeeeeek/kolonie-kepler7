@@ -33,7 +33,7 @@
 const fs = require('fs');
 const { starteBrowser, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
-const S = fs.readFileSync(SPIELDATEI, 'utf8');
+const S = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const JS = S.match(/<script>([\s\S]*)<\/script>/)[1];
 
 /* ---- 0) Quelltext ---------------------------------------------------------------------------- */

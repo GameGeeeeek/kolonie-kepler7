@@ -29,7 +29,7 @@ const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebun
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
 const { check, ende } = pruefer();
 
-const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
+const HTML = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
 /* ---- 0) Quelltext ---------------------------------------------------------------------------- */

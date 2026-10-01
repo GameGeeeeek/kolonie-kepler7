@@ -84,8 +84,16 @@ function spielstand(lagerStufe, wenigVorrat, slotsVoll){
     lastTick: now, colonyNames:{}, modules:{}, shipModules:{}, nextPlanetEventCheck: now+36e5, nextTraderCheck: now+36e5,
     weeklySystemsSeen:14, schubGesehen:true, lastSeenReportTime: now });
 }
+let laufNummer = 0;
 async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
+  const messung = ++laufNummer, messStart = Date.now();
+  console.log('DIAG - Vorposten-Zustand: Lauf beginnt | '+JSON.stringify({ messung,
+    offeneKontexte:browser.contexts().length, module:vp.module, projekte:vp.projekte,
+    anflug:vp.anflug, belohnung:belohnung ? belohnung.type : null }));
   const ctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
+  // Alle Aufrufer nutzen nur die gemessenen Daten. Keine der bis zu 18 Spielseiten muss
+  // bis zum Dateiende weiterlaufen; auch ein fehlgeschlagener Messaufruf gibt sie frei.
+  try {
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', e => errs.push(String(e)));
   let belohnungRaus = false;
@@ -137,13 +145,20 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
   });
   await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
   await page.waitForTimeout(800);
-  await oeffneSystemUeberSektoren(page, SYS);
+  const systemGeoeffnet = await oeffneSystemUeberSektoren(page, SYS);
   await page.waitForTimeout(1200);
   /* GEMESSEN WIRD AM DOM, nicht an der Zeichenkette: querySelectorAll zaehlt echte Knoten, ein
      Zaehlen von "data-vp-modul" im HTML-Text zaehlte auch ein Vorkommen im Kommentar mit. */
   const mess = await page.evaluate(() => {
     const n = document.querySelector('[data-map-vorposten]');
-    if (!n) return { da:false };
+    if (!n) return { da:false, diagnose:{
+      bereit:document.readyState,
+      aktiveReiter:[...document.querySelectorAll('.tab-btn.active')].map(e => e.getAttribute('data-tab')),
+      systemName:(document.getElementById('systemNavName') || {}).textContent || '',
+      sektoren:document.querySelectorAll('#galaxyMapSvg [data-sektor]').length,
+      sektorsysteme:[...document.querySelectorAll('#galaxyMapSvg [data-sektor-sys]')].map(e => e.getAttribute('data-sektor-sys')),
+      kartenLaenge:(document.getElementById('galaxyMapSvg') || {}).innerHTML?.length || 0
+    } };
     const teile = (sel) => Array.from(n.querySelectorAll(sel));
     const lage = (el) => { const b = el.getBoundingClientRect(); return Math.round(b.left) + 'x' + Math.round(b.top); };
     return {
@@ -228,7 +243,14 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
   let gespeichert = null;
   try { gespeichert = JSON.parse(st['kepler7-save-v3']); } catch (e) {}
   const logs = await page.evaluate(() => (window.__logs || []).slice());
-  return { ctx, page, errs, mess, liste, menue, gespeichert, logs };
+  console.log('DIAG - Vorposten-Zustand: Lauf beendet | '+JSON.stringify({ messung,
+    dauerMs:Date.now()-messStart, systemGeoeffnet, marker:mess.da, diagnose:mess.diagnose,
+    offeneKontexte:browser.contexts().length, fehler:errs.slice(0,3),
+    letzteLogzeilen:mess.da ? undefined : logs.slice(-5) }));
+  return { errs, mess, liste, menue, gespeichert, logs };
+  } finally {
+    await ctx.close();
+  }
 }
 (async () => {
   const browser = await starteBrowser();
@@ -322,12 +344,13 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
   check('6a: ohne Anflug kein Alarmring', voll.mess.alarm.length === 0, { alarm: voll.mess.alarm });
   const fern = await lauf(browser, doc({ anflug:[{ tag:'XYZ', ankunftAt: now + 2 * 3600000, schiffe: 40 }] }));
   const nah  = await lauf(browser, doc({ anflug:[{ tag:'XYZ', ankunftAt: now + 5 * 60000, schiffe: 40 }] }));
-  check('6b: ein Anflug legt einen Alarmring um den Marker', fern.mess.alarm.length === 1 && nah.mess.alarm.length === 1,
-    { fern: fern.mess.alarm, nah: nah.mess.alarm });
+  check('6b: ein Anflug legt einen Alarmring um den Marker', fern.mess.da && nah.mess.da && fern.mess.alarm.length === 1 && nah.mess.alarm.length === 1,
+    { markerFern:fern.mess.da, markerNah:nah.mess.da, fern: fern.mess.alarm, nah: nah.mess.alarm });
   check('6c: je naeher der Einschlag, desto schneller schlaegt der Ring', (() => {
+    if (!fern.mess.da || !nah.mess.da) return false;
     const f = parseFloat(fern.mess.alarm[0] || '0'), n = parseFloat(nah.mess.alarm[0] || '0');
     return f > 0 && n > 0 && n < f;
-  })(), { fern: fern.mess.alarm[0], nah: nah.mess.alarm[0] });
+  })(), { fern: (fern.mess.alarm || [])[0], nah: (nah.mess.alarm || [])[0] });
 
   // ---- 7) Gezeichnet wird nur, was auch wirkt --------------------------------------------------
   /* HIER STAND "das Bodenlager bleibt ein Bodenlager" (04.09.2026 umgeschrieben). Die Regel gibt
@@ -503,7 +526,6 @@ async function lauf(browser, vp, belohnung, lagerStufe, wenigVorrat, slotsVoll){
   check('8: keine Skriptfehler in irgendeinem Lauf', alleLaeufe.every(l => l.errs.length === 0),
     { fehler: alleLaeufe.flatMap(l => l.errs).slice(0, 3) });
 
-  for (const l of alleLaeufe) await l.ctx.close();
   await browser.close();
   ende();
 })();

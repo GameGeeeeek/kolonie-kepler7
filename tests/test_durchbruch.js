@@ -20,6 +20,7 @@
 // GEGENPROBE (Arbeitsregel 1, beim Einfuehren in beide Richtungen ausgefuehrt): am alten
 // Stand (v8.460.0) fehlt der Block komplett - 0a schlaegt an.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -56,7 +57,7 @@ function macheWelt(inv, fragmente){
     return { key: typ, type: typ, rarity, level: parseInt(String(instKey).split(':')[2] || '1', 10),
              rar: { label: 'Test' }, def: { name: typ, effect: 'atk' } };
   };
-  const api = new Function('state', 'Math', 'MODULE_FRAGMENT_VALUE', 'MODULE_SUB_POOL_LOC',
+  const api = i18nFunction(JS, 'state', 'Math', 'MODULE_FRAGMENT_VALUE', 'MODULE_SUB_POOL_LOC',
     'MODULE_SUB_POOL_SHIP', 'MODULE_SUB_EFFECT_LABEL', 'moduleUpgradeCost', 'moduleLockMitnehmen',
     'moduleInstanceInfo', 'shipModuleInstanceInfo', 'findEquippedModuleSlot',
     'log', 'playSound', 'render', 'save',

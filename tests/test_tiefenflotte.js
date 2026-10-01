@@ -26,7 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const { SPIELDATEI } = require('./lib/umgebung');
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
 let fail=false;

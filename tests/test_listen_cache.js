@@ -318,13 +318,45 @@ async function spiel(browser, zustand){
       check('6: #'+id+' ist gerendert', start > 500, start);
       check('6: #'+id+' lässt sich markieren', await markiere(page, id) === true);
     }
+    // Bei verlorener Marke unterscheiden: echtes geändertes Markup oder unnötiges Neuschreiben.
+    // Nur lesen/beobachten; weder Spielzustand, Uhr noch DOM-Inhalt werden verändert.
+    await page.evaluate(() => {
+      window.__listenCacheDiagnose = {};
+      for (const id of ['npcList','factionBox','colonyDashboard']){
+        const box = document.getElementById(id);
+        if (!box) continue;
+        const d = { vorher:box.innerHTML, letztes:box.innerHTML, schreibvorgaenge:0, aenderungen:[] };
+        d.beobachter = new MutationObserver(() => {
+          d.schreibvorgaenge++;
+          const jetzt = box.innerHTML;
+          if (jetzt !== d.letztes && d.aenderungen.length < 3){
+            let stelle = 0;
+            while (stelle < d.letztes.length && stelle < jetzt.length && d.letztes[stelle] === jetzt[stelle]) stelle++;
+            d.aenderungen.push({ stelle, vorher:d.letztes.slice(Math.max(0,stelle-100),stelle+250),
+              nachher:jetzt.slice(Math.max(0,stelle-100),stelle+250) });
+          }
+          d.letztes = jetzt;
+        });
+        d.beobachter.observe(box, { childList:true });
+        window.__listenCacheDiagnose[id] = d;
+      }
+    });
     await page.waitForTimeout(3400);
     const nach = await page.evaluate(()=>{
-      const w = x => { const b=document.getElementById(x); return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke),
-        canvas: b?b.querySelectorAll('canvas').length:-1 }; };
-      return { npc:w('npcList'), fak:w('factionBox'), kol:w('colonyDashboard') };
+      const w = x => { const b=document.getElementById(x), d=window.__listenCacheDiagnose[x];
+        if (d) d.beobachter.disconnect();
+        return { da:!!(b && b.firstElementChild && b.firstElementChild.__marke),
+          canvas:b?b.querySelectorAll('canvas').length:-1,
+          markupGleich:!!(b && d && b.innerHTML === d.vorher),
+          laengeVorher:d?d.vorher.length:-1, laengeNachher:b?b.innerHTML.length:-1,
+          schreibvorgaenge:d?d.schreibvorgaenge:-1, aenderungen:d?d.aenderungen:[] }; };
+      const result = { npc:w('npcList'), fak:w('factionBox'), kol:w('colonyDashboard'),
+        letzteLogzeilen:(window.__logZeilen||[]).slice(-5) };
+      delete window.__listenCacheDiagnose;
+      return result;
     });
     check('6: #npcList wird über mehrere Ticks NICHT neu geschrieben', nach.npc.da === true, nach.npc);
+    if (!nach.npc.da) console.log('DIAG - NPC-Cache: letzte Protokollzeilen | '+JSON.stringify(nach.letzteLogzeilen));
     check('6: #factionBox ebenso', nach.fak.da === true, nach.fak);
     check('6: #colonyDashboard ebenso', nach.kol.da === true, nach.kol);
     // refreshPlanetMiniIcons() läuft seit v8.311.0 nur noch beim echten Neuaufbau - dieselbe

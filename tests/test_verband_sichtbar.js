@@ -54,10 +54,16 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
      Spiel hatte den richtigen Namen laengst - „Koordinierter Angriff" stand an 35 Stellen, der
      falsche an fuenf spielersichtbaren. GEPRUEFT WIRD DER CODE OHNE KOMMENTARE: Die internen
      Namen (`alliance-muster-attack`, `/api/musterattack/*`, `musterAttackId`) bleiben und
-     duerfen nicht anschlagen, die Kommentare, die sie erklaeren, ebenso wenig. */
-  const ohneKommentare = JS.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+     duerfen nicht anschlagen, die Kommentare, die sie erklaeren, ebenso wenig. Die
+     unveraenderliche Patchnotes-Historie darf die damalige Umbenennung weiterhin beschreiben. */
+  const pnStart = JS.indexOf('  const PATCHNOTES = [');
+  const pnEnde = pnStart < 0 ? -1 : JS.indexOf('\n  ];', pnStart);
+  check('1e-anker: der historische PATCHNOTES-Block ist abgegrenzt', pnStart >= 0 && pnEnde > pnStart,
+    { pnStart, pnEnde });
+  const live = pnStart >= 0 && pnEnde > pnStart ? JS.slice(0, pnStart) + JS.slice(pnEnde + '\n  ];'.length) : '';
+  const ohneKommentare = live.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('1e: der alte Name "Musterangriff" steht in keinem Text des Spiels mehr',
-    !/Musterangriff/.test(ohneKommentare),
+    live.length > 0 && !/Musterangriff/.test(ohneKommentare),
     { rest: (ohneKommentare.match(/.{0,60}Musterangriff.{0,60}/) || [])[0] || null });
 }
 

@@ -18,6 +18,7 @@
 //
 // Dazu die sechs neuen selbst: eigene Fundstufe, Verrechnungsstelle, Deckel, Icon, Beschreibung.
 const { SPIELDATEI } = require('./lib/umgebung');
+const { i18nFunction } = require('./lib/i18n');
 const fs = require('fs');
 
 let fail = false;
@@ -38,7 +39,8 @@ function arrAus(name){
   if (i < 0) throw new Error('Array nicht gefunden: '+name);
   let d = 0, s = js.indexOf('[', i), k = s;
   for (; k < js.length; k++){ if (js[k]==='[') d++; else if (js[k]===']'){ d--; if(!d) break; } }
-  return new Function(herkunftDecls + "; return "+js.slice(s, k+1)+';')();
+  // Die Definitionen setzen Beschreibungstexte mit k7h zusammen; hier wird Deutsch geprueft.
+  return i18nFunction(js, herkunftDecls + "; return "+js.slice(s, k+1)+';')();
 }
 const MODULE_DEFS = arrAus('MODULE_DEFS');
 const SHIP_MODULE_DEFS = arrAus('SHIP_MODULE_DEFS');
@@ -205,9 +207,11 @@ check('der Kampfbericht nennt ihn ebenfalls', /r\.abgrundBallast\) body \+=/.tes
 check('die Hilfe beschreibt die zweite Fundstufe', /title:'Die zweite Fundstufe – ab Tiefe 40'/.test(js));
 // Die Hilfe ist auf ZWEI Eintraege verteilt (ein einzelner waere ueber der 2000-Zeichen-Grenze
 // gelandet, die tests/test_abgrund.js zieht). Geprueft wird, dass alle sechs irgendwo vorkommen.
-const hilfeVon = js.indexOf("title:'Die zweite Fundstufe");
-const hilfeBis = js.indexOf("ausschließlich Tauchbeute", hilfeVon);
-const hilfeText = js.slice(hilfeVon, hilfeBis);
+// Die beiden echten body-Ausdruecke auswerten, nicht zusammengesetzte k7h-Texte als Literale
+// suchen. Auf Hilfeeintraege begrenzen; Woerterbuch und Nachbareintraege zaehlen nicht mit.
+const hilfeEintraege = [...js.matchAll(/^\s*(\{ title:'(?:Die zweite Fundstufe[^']*|Drucklot und Ballastspiegel[^']*)', body:[^\r\n]+\}),?\s*$/gm)];
+if (hilfeEintraege.length !== 2) throw new Error('Die zwei Hilfeeintraege der zweiten Fundstufe fehlen');
+const hilfeText = hilfeEintraege.map(m => i18nFunction(js, 'return ('+m[1]+').body;')()).join('\n');
 const fehlend = neueKeys.filter(k => {
   const def = MODULE_DEFS.concat(SHIP_MODULE_DEFS).find(d => d.key === k);
   return !def || hilfeText.indexOf('<strong>'+def.name+'</strong>') < 0;

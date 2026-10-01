@@ -14,11 +14,13 @@
 //   6) Altstaende mit dem ALTEN Format werden ersetzt statt als "?" angezeigt
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { ohneI18nWoerterbuch } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+// Das Woerterbuch enthaelt dieselben Templates wie die Anzeige, ist aber kein Nachweis fuer sie.
+const src = ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
 
 /* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
    herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
@@ -222,7 +224,7 @@ check('6: deliver bucht ab, have nicht',
 check('6: Gold-Aufträge schreiben die Fragmente gut',
   /if \(q\.rewardFragments\) state\.moduleFragments = \(state\.moduleFragments\|\|0\) \+ q\.rewardFragments;/.test(src));
 check('6: die Anzeige zeigt Stufe und Fortschrittsbalken',
-  /<strong style="color:\$\{tier\.color\};">\$\{tier\.label\}<\/strong>/.test(src) &&
+  /<strong style="color:\$\{tier\.color\};">\$\{(?:tier|k7View\(tier\))\.label\}<\/strong>/.test(src) &&
   /width:\$\{pct\}%; background:\$\{tier\.color\}/.test(src));
 check('6: es gibt einen Zähler für Gold-Aufträge mit Vorgabewert',
   /state\.factionGoldQuestsDone = \(state\.factionGoldQuestsDone\|\|0\) \+ 1;/.test(src) &&

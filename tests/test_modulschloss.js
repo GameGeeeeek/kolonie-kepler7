@@ -19,6 +19,7 @@
 // GEGENPROBE (Arbeitsregel 1, beim Einfuehren in beide Richtungen ausgefuehrt): am alten
 // Stand (v8.457.0) fallen 1a und die Folge-Pruefungen durch.
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
@@ -44,7 +45,7 @@ function macheWelt(modules, shipModules){
                   moduleFragments: 0, dailyQuests: null };
   const logs = [];
   const infoStub = () => ({ rar: { label: 'Test' }, def: { name: 'Modul' }, level: 1 });
-  const api = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf',
+  const api = i18nFunction(JS, 'state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf',
     'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
     kern + '\n' + JS.slice(geschwVon, geschwBis) + '\n' + JS.slice(dismVon, dismBis) + '\n' + JS.slice(bulkVon, bulkBis)
     + '\nreturn { lockKeyFor, modulGesperrt, toggleModuleLock, moduleLockMitnehmen, fuseGeschwister, dismantleModule, bulkDismantleModules };')(

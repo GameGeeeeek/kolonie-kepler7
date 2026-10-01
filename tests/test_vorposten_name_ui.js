@@ -69,9 +69,9 @@ check('0a: das Spiel haelt KEINE eigenen Namensregeln - Muster, Laenge und Stufe
      Regel ueber vpTitel im Spiel (eng vs. weit). */
   const stellen = {
     kartenTooltip: /<title>\$\{escapeHtml\(vpTitel\(vp\)\)\}/.test(src),
-    kartenLabel: /planet-label[\s\S]{0,400}?vp\.eigenName \|\| vp\.name/.test(src),
+    kartenLabel: /planet-label[\s\S]{0,400}?vp\.eigenName \|\| (?:vp\.name|k7View\(vp\)\.name)/.test(src),
     angriffsmission: /type:'vorposten-angriff'[^}]*stufeName: vpTitel\(v\)/.test(src),
-    schnellzugriff: /data-vorposten-menu[\s\S]{0,400}?vpHier\.eigenName \|\| vpHier\.name/.test(src)
+    schnellzugriff: /data-vorposten-menu[\s\S]{0,400}?vpHier\.eigenName \|\| (?:vpHier\.name|k7View\(vpHier\)\.name)/.test(src)
   };
   check('0f: jede Beschriftung einer Station kennt den eigenen Namen - Karte, Tooltip, Angriffsmission, Schnellzugriff',
     Object.values(stellen).every(Boolean), stellen);
