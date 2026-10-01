@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Etappe E1+E2 des Wirtschafts-Rebalance-Konzepts (docs/wirtschaft-rebalance-konzept.md):
 // (E1) Verkaufs- und Veredelungsroute binden höchstens ROUTE_MAX_FRACHTER Frachter, je
 //      Verkaufsressource bzw. Umwandlungspaar läuft höchstens EINE Route; bestehende Routen
@@ -19,7 +20,7 @@ const fs = require('fs');
 const { SPIELDATEI, SERVER_JS, pruefer } = require('./lib/umgebung');
 
 const { check, ende } = pruefer();
-const S = fs.readFileSync(SPIELDATEI, 'utf8');
+const S = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 
 // ---------- 1: Anker und Blöcke ----------
 const kAnfang = S.indexOf('const ROUTE_INTERVAL_MS');
@@ -31,7 +32,7 @@ check('1c: MARKET_BASE_PRICES existiert', S.indexOf('const MARKET_BASE_PRICES') 
 let api = null;
 try {
   const block = S.slice(Math.max(0, kAnfang), Math.max(0, kEnde));
-  const bauer = new Function('fx', `
+  const bauer = i18nFunction(S, 'fx', `
     const state = fx.state;
     const logs = fx.logs;
     const log = (msg) => logs.push(String(msg));
@@ -122,13 +123,13 @@ if (api) {
           { type: 'sell', frachter: 10, resource: 'kristalle' },
           { type: 'credits', frachter: 15 }
         ] };
-        new Function('state', 'log', 'ROUTE_MAX_FRACHTER', S.slice(sAnfang, sSchluss + 1))(state, (m) => logs.push(m), DECKEL);
+        i18nFunction(S, 'state', 'log', 'ROUTE_MAX_FRACHTER', S.slice(sAnfang, sSchluss + 1))(state, (m) => logs.push(m), DECKEL);
         const [a, b, c, d] = state.tradeRoutes;
         check('4a: Routen über dem Deckel werden auf den Deckel gestutzt', a.frachter === DECKEL && b.frachter === DECKEL, { a: a.frachter, b: b.frachter });
         check('4b: Routen unter dem Deckel und Kredit-Routen bleiben unangetastet', c.frachter === 10 && d.frachter === 15);
         check('4c: das Stutzen wird gemeldet (mit Anzahl freier Frachter)', logs.length === 1 && /490/.test(logs[0]), { logs });
         const logs2 = [];
-        new Function('state', 'log', 'ROUTE_MAX_FRACHTER', S.slice(sAnfang, sSchluss + 1))(state, (m) => logs2.push(m), DECKEL);
+        i18nFunction(S, 'state', 'log', 'ROUTE_MAX_FRACHTER', S.slice(sAnfang, sSchluss + 1))(state, (m) => logs2.push(m), DECKEL);
         check('4d: idempotent - zweiter Lauf stutzt nichts und meldet nichts', logs2.length === 0 && a.frachter === DECKEL);
       } catch (e) {
         check('4a: Routen über dem Deckel werden auf den Deckel gestutzt', false, String(e).slice(0, 160));
@@ -184,7 +185,7 @@ check('6d: das Frachter-Eingabefeld deckelt über maxForType alle Routentypen',
 
 // ---------- 7: Backend-Parität der Basispreise ----------
 if (SERVER_JS && fs.existsSync(SERVER_JS)) {
-  const SV = fs.readFileSync(SERVER_JS, 'utf8');
+  const SV = fs.readFileSync(SERVER_JS, 'utf8').replace(/\r\n/g, '\n');
   const mFront = (S.match(/const MARKET_BASE_PRICES = \{([^}]*)\}/) || [])[1] || '';
   const front = {};
   for (const m of mFront.matchAll(/(\w+):\s*([\d.]+)/g)) front[m[1]] = Number(m[2]);

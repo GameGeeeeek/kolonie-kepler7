@@ -69,6 +69,6 @@ check('1e: die Anzeige nutzt die gezaehlten Werte, keine Literale',
 check('3a: der Tooltip erklaert "gleichartig" (Zweitwerte duerfen abweichen)',
   (JS.match(/Noch 1 gleichartiges Modul \(gleicher Typ, Seltenheit und Stufe – Zweitwerte dürfen abweichen\)/g) || []).length === 2);
 check('3b: die Hilfe nennt den Fortschritts-Hinweis',
-  JS.includes('fehlt nur noch eines, zeigt die Inventar-Karte „2/3 zum Verschmelzen"'));
+  JS.replace(/\\"/g, '"').includes('fehlt nur noch eines, zeigt die Inventar-Karte „2/3 zum Verschmelzen"'));
 
 ende();

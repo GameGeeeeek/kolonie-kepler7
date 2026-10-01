@@ -23,6 +23,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -47,7 +48,8 @@ const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1
 // Herkunfts-Konstanten aus der Datei ableiten, nicht eintippen (Regel 40/43): SHIP_MODULE_DEFS
 // enthaelt seit A2 quelle:HERKUNFT_KONVOI, eine feste Namensliste riesse hier den Literal-Parser.
 const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
-const lade = n => new Function(herkunftDecls + "; return "+arrAus(n))();
+// Die Definitionen setzen Beschreibungstexte mit k7h zusammen; hier wird Deutsch geprueft.
+const lade = n => i18nFunction(js, herkunftDecls + "; return "+arrAus(n))();
 
 const SHIP_MODULE_DEFS = lade('SHIP_MODULE_DEFS');
 const SHIP_CLASS_DEFS  = lade('SHIP_CLASS_DEFS');

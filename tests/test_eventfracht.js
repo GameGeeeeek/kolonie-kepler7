@@ -12,6 +12,7 @@
 // auf "das Wort Frachtraum steht da" waere in beiden Faellen gruen.
 const { SPIELDATEI } = require('./lib/spieldatei');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -61,7 +62,7 @@ let bauFehler = null;
 function messen(fn){
   for (let runde = 0; runde < 80; runde++){
     try {
-      const bau = new Function('state', sortiert() + '\nreturn { fleetCargoCapacity, mineLaderaum, shipClassKeyFor, CARGO_PER_SHIP, MINE_CARGO_JE_SCHIFF };');
+      const bau = i18nFunction(S, 'state', sortiert() + '\nreturn { fleetCargoCapacity, mineLaderaum, shipClassKeyFor, CARGO_PER_SHIP, MINE_CARGO_JE_SCHIFF };');
       return fn(bau);
     } catch (e) {
       const m = /^(\w+) is not defined/.exec(e.message);

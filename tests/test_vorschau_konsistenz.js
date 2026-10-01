@@ -55,8 +55,10 @@ check('die Frachtraum-Schaetzung ruft sie', /EXPEDITION_MAX_RESOURCE_FIND_BASE \
 check('die Fundaufloesung ruft sie', src.includes('const baseRewardMult = expeditionRewardMult('));
 const formelKopien = [...src.matchAll(/prestigePerkCount\('expedition'\)\*0\.04/g)];
 check('die Beute-Formel steht nur noch einmal im Code', formelKopien.length === 1, formelKopien.length);
+const rewardVon = src.indexOf('function expeditionRewardMult(');
+const rewardBis = rewardVon < 0 ? -1 : src.indexOf('\n  }', rewardVon);
 check('und sie enthaelt den Kodex-Bonus, der der Schaetzung fehlte',
-  /function expeditionRewardMult[\s\S]{0,400}codexExpeditionBonus\(\)/.test(src));
+  rewardVon >= 0 && rewardBis > rewardVon && /codexExpeditionBonus\(\)/.test(src.slice(rewardVon, rewardBis)));
 
 // ---- C: Flottenparade ---------------------------------------------------------------------------
 // Die Reihenfolge muss aus dem echten Schiffsbestand kommen, nicht aus einer getippten Liste.

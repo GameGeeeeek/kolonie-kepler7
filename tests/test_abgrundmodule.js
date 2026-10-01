@@ -21,6 +21,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
@@ -47,7 +48,8 @@ const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1
 // eine neue Herkunft (v8.463.0 HERKUNFT_UNIKAT, A2 HERKUNFT_KONVOI) fehlte einer festen
 // Namensliste sonst und riesse den Literal-Parser mit "... is not defined".
 const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
-const MODULE_DEFS = new Function(herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
+// Die Definitionen setzen Beschreibungstexte mit k7h zusammen; hier wird Deutsch geprueft.
+const MODULE_DEFS = i18nFunction(js, herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
 const VIER = ['drucktank','echolotmast','splitterofen','nullfeldanker'];
 const defOf = k => MODULE_DEFS.find(d => d.key === k);
 
@@ -197,8 +199,11 @@ check('7: in Tiefe 1 ist sie spuerbar, aber keine Gewissheit',
 // Der Fund muss auch ohne Waechter moeglich sein, sonst ist der Abgrund fuer jeden verschlossen,
 // dessen Flotte fuer eine Zehnertiefe (noch) nicht reicht.
 check('7: der Fund haengt nicht am Waechter', C(5,false) > 0);
+// CRLF und LF sind derselbe Kontrollfluss. Fehlende Anker duerfen nicht als Index -1 mitrechnen.
+const vergabe = js.indexOf('abgrundModulName = grantAbgrundModule(tiefe)');
+const waechterZweig = js.search(/if \(sektor\.waechter\)\{\r?\n\s*\/\/ Erstsieg/);
 check('7: und die Vergabe steht ausserhalb des Waechter-Zweigs',
-  js.indexOf('abgrundModulName = grantAbgrundModule(tiefe)') < js.indexOf('if (sektor.waechter){\n              // Erstsieg'));
+  vergabe >= 0 && waechterZweig >= 0 && vergabe < waechterZweig);
 // Seltenheit an der Tiefe: die zweite Belohnungsachse, die einen Spieler mit Drucktank weitertauchen laesst.
 check('7: die Seltenheit haengt an der Tiefe', /Math\.min\(0\.45, t\/150\)/.test(fnAus('grantAbgrundModule')));
 

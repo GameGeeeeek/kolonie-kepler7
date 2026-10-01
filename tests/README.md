@@ -43,6 +43,20 @@ geändert wird. Liegt `kolonie-kepler7-backend` nicht daneben, **überspringen s
 Tests, die einen echten Backend-Server starten (Sitzungsverwaltung, Mengenschutz, Wiederkehr-Quote),
 gehören ins Backend-Repo und liegen bewusst nicht hier.
 
+## Isolierte Funktionen und Sprachumstellung
+
+Reine Rechentests mit ausgeschnittenem Spielcode verwenden bei Sprach-Abhängigkeiten
+`i18nFunction(spielquelle, ...parameter, funktionsrumpf)` aus `lib/i18n.js` oder
+`i18nKontext(spielquelle)` für einen VM-Kontext. Der Helfer liest die echten Sprachfunktionen
+aus derselben Spieldatei wie der Test; insbesondere bleibt HTML-Escaping wirksam. Browser- und
+Sprachtests laden weiterhin das vollständige Spiel. Quelltext-Scans nach Anzeigestellen dürfen
+das Übersetzungswörterbuch nicht als zusätzliche Live-Anzeige zählen.
+
+Vor zeilenbasierten Ausschnitten CRLF zu LF normalisieren. Anker vor dem Ausschneiden prüfen;
+zusammengesetzte Beschreibungen nach Möglichkeit auswerten statt nur `desc:'…'` zu suchen.
+Nach einer Harness-Reparatur müssen die bestehenden Prüfungen erhalten bleiben und eine gezielt
+beschädigte Spielkopie weiterhin an der fachlichen Assertion scheitern.
+
 ## Einen neuen Test schreiben
 
 ```js

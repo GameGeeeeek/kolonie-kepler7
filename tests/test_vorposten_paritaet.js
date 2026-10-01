@@ -199,7 +199,7 @@ check('6-anker: der Name der ersten Stufe ist im Server auffindbar', !!ersteStuf
 const GATTUNG = /^(Vorposten|neue Stufe)$/;
 const FAECHER = [
   /stufeName *: *[^,;\n]{0,160}?\|\| *'([^']+)'/g,
-  /\.stufeName *\|\| *'([^']+)'/g,
+  /\.stufeName *\|\| *(?:k7t\()?['"]([^'"\n]+)['"]/g,
   /vorposten\.name\)? *\|\| *'([^']+)'/g
 ];
 const zeileUm = i => {

@@ -13,6 +13,7 @@
 //      Verbrauchsstelle in der Spieldatei geprueft.
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -44,7 +45,7 @@ function baue(werte){
   // aus der Spieldatei injizieren, sonst prueft der Test gegen eine dritte Kopie.
   const kmdStufe = Number((src.match(/COMMANDER_PROD_PER_LEVEL = ([\d.]+)/) || [])[1]);
   const kmdDeckel = Number((src.match(/COMMANDER_PROD_CAP = ([\d.]+)/) || [])[1]);
-  new Function('ctx', 'state', 'PROD_BONUS_CAP', 'productionBonusRaw', 'attackCombatBonusRaw',
+  i18nFunction(src, 'ctx', 'state', 'PROD_BONUS_CAP', 'productionBonusRaw', 'attackCombatBonusRaw',
     'defenseCombatBonusRaw', 'moduleBonusAt', 'moduleBonusTotal', 'allBuildingSets', 'commanderLevel',
     'PRESTIGE_PROD_PER_LEVEL', 'PRESTIGE_PROD_CAP', 'COMMANDER_PROD_PER_LEVEL', 'COMMANDER_PROD_CAP',
     block + ';ctx.G=BONUS_GROUPS;'

@@ -13,11 +13,12 @@
 //   6) Backend-Paritaet: Marktrabatt und Fraktions-Systemangriffe sind NICHT verschaerft
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 
 // ---------------------------------------------------------------- Block ausführbar machen
 // Seit v8.298.23 ist repTierOf tabellengetrieben (REP_RANKS, acht Raenge) - der Block muss
@@ -32,7 +33,7 @@ const block = src.slice(von, endeBlock);
 function baue(rep){
   const ctx = {};
   const state = { factionRep: Object.assign({ kartell:0, legion:0, void:0, schatten:0 }, rep || {}), embassySeats:{}, embassyOpenedAt:{} };
-  new Function('ctx', 'state', 'FACTION_DIPLOMACY', 'REP_MIN', 'REP_MAX', 'factionRepOf',
+  i18nFunction(src, 'ctx', 'state', 'FACTION_DIPLOMACY', 'REP_MIN', 'REP_MAX', 'factionRepOf',
     // Ab v8.298.24 drehen Botschaften dieselben vier Hebel in die Gegenrichtung (embassyMult).
     // Hier bewusst OHNE Botschaftsviertel gestellt, damit dieser Test weiter die reinen
     // Feindschafts-Mali misst - das Zusammenspiel prueft test_botschaft.js.

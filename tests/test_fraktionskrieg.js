@@ -315,7 +315,7 @@ check('10: neue Kriege laufen über startFactionWar',
   check('11: längere IDs zuerst', /sort\(\(a,b\) => b\.length - a\.length\)/.test(block));
   // Und die Übersetzung muss auch WIRKLICH angewandt werden, nicht nur definiert sein.
   check('11: wird in der Nachrichtenliste angewandt',
-    /text: systemNamenErsetzen\(n\.text\)/.test(feSrc));
+    /text: systemNamenErsetzen\((?:n|k7View\(n\))\.text\)/.test(feSrc));
 
   // Die Regel selbst nachrechnen - mit dem echten Funktionsquelltext und echten Systemnamen.
   const sysStart = feSrc.split('\n').findIndex(z => z.startsWith('  const STAR_SYSTEMS = ['));

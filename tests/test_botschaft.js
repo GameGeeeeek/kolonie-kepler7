@@ -16,11 +16,12 @@
 //   9) Gebaeude, Anzeige, Hilfe, Erfolge, Speicherfelder
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const STD = 3600 * 1000;
 
 // ---------------------------------------------------------------- Block ausführbar machen
@@ -68,7 +69,7 @@ function baue(opts){
   };
   // Aufzeichnend: das Schliessen MUSS hierueber laufen (Rivalitaeten), das Raeumen NICHT.
   const changeFactionRep = (fid, d) => { repAenderungen.push([fid, d]); state.factionRep[fid] = (state.factionRep[fid]||0) + d; };
-  new Function('ctx', 'state', 'log', 'Date', 'FACTION_DIPLOMACY', 'REP_MIN', 'REP_MAX',
+  i18nFunction(src, 'ctx', 'state', 'log', 'Date', 'FACTION_DIPLOMACY', 'REP_MIN', 'REP_MAX',
     'factionRepOf', 'factionRankOf', 'changeFactionRep', 'setFactionRepRaw', 'factionNameOf',
     'repTierOf', 'allBuildingSets', 'fmtDuration', 'playSound',
     'checkAchievements', 'render', 'save', 'factionEffectLevel', 'allianceTechFrac',

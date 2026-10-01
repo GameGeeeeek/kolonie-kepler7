@@ -32,8 +32,8 @@ if (!SERVER_JS) ueberspringen('Vergleicht Frontend und Backend - das Backend-Rep
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const feSrc = fs.readFileSync(SPIELDATEI, 'utf8');
-const beSrc = fs.readFileSync(SERVER_JS, 'utf8');
+const feSrc = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
+const beSrc = fs.readFileSync(SERVER_JS, 'utf8').replace(/\r\n/g, '\n');
 
 // ---- Frontend: STAR_SYSTEMS zeilenweise lesen --------------------------------------------------
 // Zeilenweise statt per Regex über die ganze Datei: Die Einträge stehen je auf einer Zeile, und

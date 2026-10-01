@@ -396,8 +396,8 @@ merke('5a: der Verstaerker verdoppelt den Ueberschuss, nicht den Faktor - und se
 
 // ---- 6) Sichtbar, bevor jemand abtaucht -------------------------------------------------------
 merke('6a: die Regel steht am Sektor, in der Sonde, im Bestiarium und im Bericht',
-  /Seine Regel – \$\{escapeHtml\(sektor\.waechter\.regel\.name\)\}/.test(js)
-    && /v\.waechter\.regel\?' \('\+escapeHtml\(v\.waechter\.regel\.name\)\+'\)'/.test(js)
+  /Seine Regel – \$\{escapeHtml\((?:sektor\.waechter\.regel|k7View\(sektor\.waechter\.regel\))\.name\)\}/.test(js)
+    && /v\.waechter\.regel\?' \('\+escapeHtml\((?:v\.waechter\.regel|k7View\(v\.waechter\.regel\))\.name\)\+'\)'/.test(js)
     && /geschafft && sek\.waechter\.regel \?/.test(js)
     && /sektor\.waechter\.regel \? ' \('\+sektor\.waechter\.regel\.name/.test(js),
   {});

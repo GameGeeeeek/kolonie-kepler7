@@ -74,11 +74,11 @@ check('1: jedes tiefenfreigeschaltete Schiff hat einen desc-Text',
 // ist. Was hier wirklich schiefgehen kann, ist das Fehlen der Anzeigestelle.
 const werft = js.slice(js.indexOf('const shipRows = visibleShipDefs.map'));
 const karte = werft.slice(0, werft.indexOf('const superBlock'));
-check('2: die Schiffskarte rendert def.desc', /\$\{def\.desc \? `<div class="bmeta"/.test(karte));
+check('2: die Schiffskarte rendert def.desc', /\$\{(?:def|k7View\(def\))\.desc \? `<div class="bmeta"/.test(karte));
 check('2: und tut das generisch, nicht nur fuer eine Handvoll Schluessel',
   !/def\.key===.(lotsenboot|kessel|bergungskran)/.test(karte.match(/def\.desc[\s\S]{0,400}/)[0]));
 // Die alte nicheDesc-Zeile muss daneben stehen bleiben - sie erklaert die 30 anderen Schiffe.
-check('2: die nicheDesc-Zeile ist weiter da', /\$\{def\.nicheDesc \? `<div class="bmeta"/.test(karte));
+check('2: die nicheDesc-Zeile ist weiter da', /\$\{(?:def|k7View\(def\))\.nicheDesc \? `<div class="bmeta"/.test(karte));
 
 // ---- 3) Die zweite Anzeigestelle: die Bau-Bruecke im Abgrund (CLAUDE.md Regel 6) ----
 // Die Bruecke nannte Bestand, Preis und Freischalttiefe - alles ausser dem Grund, so ein Schiff zu
@@ -232,7 +232,7 @@ check('4: die Benoetigt-Zeile nennt die fehlende Rekordtiefe samt aktuellem Stan
 // Font und erscheint als leeres Kaestchen - check-icons.js faengt das ebenfalls, hier steht es
 // direkt bei der Zeile, die es benutzt.
 {
-  const m = karte.match(/def\.desc \? `<div class="bmeta"[^`]*?<i class="ti (ti-[a-z0-9-]+)"/);
+  const m = karte.match(/(?:def|k7View\(def\))\.desc \? `<div class="bmeta"[^`]*?<i class="ti (ti-[a-z0-9-]+)"/);
   check('7: die Wirkungszeile benutzt ein Icon', !!m, m && m[1]);
   if (m) check('7: und dieses Icon steht im Font-Subset',
     new RegExp('\\.'+m[1]+':before\\{content:"').test(src), m[1]);

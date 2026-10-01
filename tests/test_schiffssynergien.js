@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Schiffsmodul-Synergien (v8.437.0, Modul-Ausbau Etappe 1, Idee Sascha).
 //
 // GEPRUEFT WERDEN REGELN, die kritischen AUSGEFUEHRT:
@@ -32,7 +33,7 @@ function arrAus(name){
   if (i < 0) return null;
   let d = 0, st = JS.indexOf('[', i), k = st;
   for (; k < JS.length; k++){ if (JS[k]==='[') d++; else if (JS[k]===']'){ d--; if(!d) break; } }
-  try { return new Function(herkunftDecls + "; return "+JS.slice(st, k+1)+';')(); }
+  try { return i18nFunction(HTML, herkunftDecls + "; return "+JS.slice(st, k+1)+';')(); }
   // Den Grund NICHT verschlucken: Fehlt dem Praeambel-Text eine Herkunfts-Konstante, ist das
   // ein ReferenceError - und ohne diese Zeile meldete 1a nur "mods:null", was nach einem
   // kaputten Anker aussieht statt nach einer fehlenden Konstante. Gemessen am 02.09.2026 mit
@@ -87,7 +88,7 @@ check('2b: jeder Einzelwert bleibt klein (<= 0.10 - Synergien sind Zulage, kein 
     + fnAus('shipSynergyAktiv') + '\n' + fnAus('shipSynergyBonusFor') + '\n' + fnAus('shipModuleBonusFor');
   check('3a: alle Funktionen gefunden - inklusive der Set-Bausteine', quelle.length > 600
     && /SHIP_MODULE_SET_DEFS/.test(quelle) && /function shipModuleSetBonus/.test(quelle), quelle.length);
-  const mach = (ausruestung) => new Function('SHIP_SYNERGY_DEFS', 'equippedShipModulesAt', 'shipModuleInstanceInfo',
+  const mach = (ausruestung) => i18nFunction(HTML, 'SHIP_SYNERGY_DEFS', 'equippedShipModulesAt', 'shipModuleInstanceInfo',
     quelle + '\nreturn shipModuleBonusFor;')(SYN, (kl) => ausruestung[kl] || [], () => null);
   const sy = SYN.find(x => x.key === 'konvoi');
   const voll = { frachter: ['fr_triebwerke:selten'], aufklaerer: ['au_sensoren:episch:1:x'] };
@@ -109,7 +110,7 @@ check('2b: jeder Einzelwert bleibt klein (<= 0.10 - Synergien sind Zulage, kein 
 
 // ---- 4) Anzeige und Hilfe verdrahtet
 check('4a: aktive und fast-fertige Synergiezeilen stehen im Markup',
-  JS.includes('Synergie „${syn.name}" aktiv') && JS.includes('Synergie „${syn.name}": nur noch ${fehlt} fehlt'));
+  /Synergie „\$\{(?:syn|k7View\(syn\))\.name\}" aktiv/.test(JS) && /Synergie „\$\{(?:syn|k7View\(syn\))\.name\}": nur noch \$\{fehlt\} fehlt/.test(JS));
 check('4b: der Hilfe-Abschnitt nennt die Synergien und ihre Neutralitaet',
   /Synergien:<\/strong> Sechs benannte Modul-Kombinationen/.test(JS));
 

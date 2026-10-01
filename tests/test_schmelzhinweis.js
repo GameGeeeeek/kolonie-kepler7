@@ -28,9 +28,9 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 // im selben title-Attribut stehen wie die Seltenheits-Zeile des jeweiligen Systems.
 const REGELN = 'Erhalten bleiben Stufe und Substats DIESES Moduls; der beste Hauptwert-Wurf der drei wandert ins Ergebnis. Verbraucht wird zuerst dieses Modul, dann gleichartige (gleicher Typ, Seltenheit und Stufe – Zweitwerte dürfen abweichen).';
 check('1a: der Standort-Verschmelzen-Knopf nennt die Regeln',
-  JS.includes('${MODULE_RARITY[nextRar].label} verschmelzen. ' + REGELN));
+  JS.includes('${k7View(MODULE_RARITY[nextRar]).label} verschmelzen. ' + REGELN));
 check('1b: der Klassen-Verschmelzen-Knopf nennt die Regeln',
-  JS.includes('${MODULE_RARITY[nextRarS].label} verschmelzen. ' + REGELN));
+  JS.includes('${k7View(MODULE_RARITY[nextRarS]).label} verschmelzen. ' + REGELN));
 
 // ---- 2) der Tooltip sagt die Wahrheit (Abgleich mit fuseModules)
 const von = JS.indexOf('function fuseModules(isShip, instKey){');

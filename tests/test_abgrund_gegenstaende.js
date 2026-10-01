@@ -23,6 +23,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 // v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
@@ -49,12 +50,13 @@ function arrAus(name){
   return js.slice(s, k+1);
 }
 const zahl = n => Number((js.match(new RegExp('const '+n+' = ([\\d.]+)'))||[])[1]);
+const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
 
 const SECHS = ['ab_tiefenlot','ab_bannspule','ab_rueckholanker','ab_sternenkarte','ab_waechterruf','ab_grundberuehrung'];
 
 // ---- 1) Vollstaendigkeit (Regel 7) ----
-// ITEM_DEFS enthaelt Funktionen (activate) und laesst sich nicht als Literal auswerten - deshalb
-// hier je Eintrag am Quelltext, aber mit den ECHTEN Feldern, nicht mit einer Wunschliste.
+// Nur den Datenkopf vor activate auswerten: Beschreibungen koennen mit k7h zusammengesetzt sein.
+// Der Aktivierungsrumpf wird dabei weder geladen noch ausgefuehrt.
 const itemBlock = arrAus('ITEM_DEFS');
 const ICON_KEYS = new Set(Array.from(js.matchAll(/^\s{4}([a-z][a-z0-9_]*): `<svg/gm)).map(m=>m[1]));
 for (const k of SECHS){
@@ -69,7 +71,8 @@ for (const k of SECHS){
   const icon = (eintrag.match(/icon:'([^']+)'/)||[])[1];
   check('1: '+k.padEnd(18)+' hat ein eigenes gezeichnetes Icon unter item_'+k, ICON_KEYS.has('item_'+k));
   check('1: '+k.padEnd(18)+' hat ein ti-*-Symbol als Rueckfall', /^ti-/.test(icon||''), { icon });
-  const desc = (eintrag.match(/desc:'((?:[^'\\]|\\.)*)'/)||[])[1] || '';
+  const daten = i18nFunction(js, herkunftDecls+'; return ('+eintrag+'null});')();
+  const desc = daten.desc || '';
   check('1: '+k.padEnd(18)+' vollstaendige Beschreibung', desc.length >= 180, { laenge: desc.length });
   check('1: '+k.padEnd(18)+' Abgrund-Herkunft', /quelle:HERKUNFT_ABGRUND/.test(eintrag));
   // chance:0 wuerde den Eintrag aus JEDEM Pool werfen - auch aus dem Abgrund-Pool (fundPool).
@@ -88,9 +91,8 @@ const IAM = new Function('MODULE_DEFS, SHIP_MODULE_DEFS, HERKUNFT_ABGRUND',
 // Herkunfts-Konstanten aus der Datei ableiten, nicht eintippen (Regel 40/43): Sowohl MODULE_DEFS
 // als auch SHIP_MODULE_DEFS nutzen inzwischen HERKUNFT_UNIKAT (v8.463.0) UND HERKUNFT_KONVOI (A2) -
 // eine feste Namensliste riesse den Literal-Parser bei jeder neuen Herkunft mit "... is not defined".
-const herkunftDecls = (js.match(/const HERKUNFT_[A-Z_]+ = '[a-z]+'/g) || []).join('; ');
-const MD = new Function(herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
-const SMD = new Function(herkunftDecls + "; return "+arrAus('SHIP_MODULE_DEFS'))();
+const MD = i18nFunction(js, herkunftDecls + "; return "+arrAus('MODULE_DEFS'))();
+const SMD = i18nFunction(js, herkunftDecls + "; return "+arrAus('SHIP_MODULE_DEFS'))();
 const istAbgrund = IAM(MD, SMD, 'abgrund');
 const abgrundStandort = MD.filter(d=>d.quelle==='abgrund').map(d=>d.key);
 const abgrundSchiff   = SMD.filter(d=>d.quelle==='abgrund').map(d=>d.key);

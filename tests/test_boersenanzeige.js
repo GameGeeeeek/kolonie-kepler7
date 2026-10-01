@@ -39,7 +39,7 @@ check('1c: dieselbe Sichtbarkeits-Regel wie im Inventar (Substats ODER Wurf != 1
 // nicht in Kopf- oder Fusstext: Beschreibung davor, Anbieter danach.
 {
   const pos = quelle.indexOf('substatZeile(info.subs, info.wert)');
-  const beschreibung = quelle.indexOf('${info?info.def.desc:\'\'}');
+  const beschreibung = quelle.search(/\$\{info\?(?:info\.def|k7View\(info\.def\))\.desc:''\}/);
   const anbieter = quelle.indexOf('Anbieter:');
   check('1d: die Guete-Zeile steht in der Angebotskarte (nach Beschreibung, vor Anbieter)',
     beschreibung > -1 && anbieter > -1 && beschreibung < pos && pos < anbieter,

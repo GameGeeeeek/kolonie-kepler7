@@ -172,7 +172,7 @@ check('6a: die Hilfe nennt die neue Stufenzahl', new RegExp('Orbitalstation</str
    riss, als Etappe D die achte Stufe brachte, obwohl der Hilfetext korrekt mitgezogen war
    (Arbeitsregel 3: die REGEL pruefen, nicht die Momentaufnahme). */
 check('6b: und sie nennt die neue Bedingung beim Namen',
-  new RegExp('Stufen <strong>6-' + maxLevel + '<\\/strong> zusätzlich die Forschung <em>Kausalanker-Theorie<\\/em>').test(S));
+  new RegExp('Stufen <strong>6-' + maxLevel + '<\\/strong> zusätzlich die Forschung <em>Kausalanker-Theorie<\\/em>').test(S.replace(/" \+ k7h\("([^"<>]+)"\) \+ "/g, '$1')));
 check('6b2: und die Protomaterie-Stufe steht mit ihrer Menge im Hilfetext',
   /60 Protomaterie/.test(S) && /Protomaterie/.test(S));
 check('6c: und sie sagt ausdrücklich, dass die Stufen 1-5 unverändert sind',

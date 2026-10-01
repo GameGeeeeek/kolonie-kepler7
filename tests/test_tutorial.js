@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Einfuehrungsrundgang (TUTORIAL_STEPS) v8.298.27.
 //
 // Ausgangslage: Der Fraktions-Ausbau hat sechs Systeme, 20 Tagesaufgaben und 15 Erfolge gebracht -
@@ -26,20 +27,20 @@ const fs = require('fs');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 
 // ---------------------------------------------------------------- Schritte laden
 const von = src.indexOf('  const TUTORIAL_STEPS = [');
 const bis = src.indexOf('\n  ];', von) + 5;
 check('TUTORIAL_STEPS gefunden', von > 0 && bis > von);
 if (von < 0 || bis < von){ console.log('\nFAIL'); process.exit(1); }
-const STEPS = new Function(src.slice(von, bis) + ';return TUTORIAL_STEPS;')();
+const STEPS = i18nFunction(src, src.slice(von, bis) + ';return TUTORIAL_STEPS;')();
 
 // Die Konstanten, gegen die die Tutorial-Zahlen geprueft werden - direkt aus der Spieldatei.
 const raengeBlock = src.slice(src.indexOf('  const REP_RANKS = ['), src.indexOf('\n  ];', src.indexOf('  const REP_RANKS = [')) + 5);
-const REP_RANKS = new Function(raengeBlock + ';return REP_RANKS;')();
+const REP_RANKS = i18nFunction(src, raengeBlock + ';return REP_RANKS;')();
 const namenBlock = src.slice(src.indexOf('  const FACTION_RANK_NAMES = {'), src.indexOf('\n  };', src.indexOf('  const FACTION_RANK_NAMES = {')) + 5);
-const RANK_NAMES = new Function(namenBlock + ';return FACTION_RANK_NAMES;')();
+const RANK_NAMES = i18nFunction(src, namenBlock + ';return FACTION_RANK_NAMES;')();
 const zahl = (re, was) => { const m = src.match(re); check('Konstante '+was+' gefunden', !!m); return m ? m[1] : null; };
 const MIN_RANK = Number(zahl(/const EMBASSY_MIN_RANK = (\d+);/, 'EMBASSY_MIN_RANK'));
 const GRACE_TAGE = Number(zahl(/const REP_DECAY_GRACE_MS = (\d+)\*24\*3600\*1000;/, 'REP_DECAY_GRACE_MS'));
@@ -119,7 +120,7 @@ check('4: der Verfallssatz wird nicht halb zitiert',
 {
   const setzt = src.slice(src.indexOf('function renderTutorialStep'), src.indexOf('\n  }', src.indexOf('function renderTutorialStep')));
   check('6: renderTutorialStep setzt den Text per textContent',
-    /tutorialText'\)\.textContent = step\.text;/.test(setzt) && !/tutorialText'\)\.innerHTML/.test(setzt));
+    /tutorialText'\)\.textContent = (?:step|k7View\(step\))\.text;/.test(setzt) && !/tutorialText'\)\.innerHTML/.test(setzt));
   for (const s of STEPS){
     check('6: "'+s.title.slice(0,28)+'" enthält kein HTML-Tag', !/<[a-z/][^>]*>/i.test(s.title + ' ' + s.text));
     check('6: "'+s.title.slice(0,28)+'" enthält keine HTML-Entity', !/&(?:[a-z]+|#\d+);/i.test(s.title + ' ' + s.text));
@@ -163,7 +164,7 @@ for (const s of STEPS){
     // Die Poolgroesse im Text muss zu DAILY_QUEST_DEFS passen, und die Zahl der taeglich gezogenen
     // zu DAILY_QUEST_ACTIVE_COUNT - wieder Regel 6.
     const defsQ = src.slice(src.indexOf('  const DAILY_QUEST_DEFS = ['), src.indexOf('  const DAILY_QUEST_ACTIVE_COUNT', src.indexOf('  const DAILY_QUEST_DEFS = [')));
-    const POOL = new Function(defsQ + ';return DAILY_QUEST_DEFS.length;')();
+    const POOL = i18nFunction(src, defsQ + ';return DAILY_QUEST_DEFS.length;')();
     const AKTIV = Number((src.match(/const DAILY_QUEST_ACTIVE_COUNT = (\d+);/)||[])[1]);
     check('9: die genannte Poolgröße stimmt mit DAILY_QUEST_DEFS überein',
       tag.text.includes(POOL+' Vorlagen'), { imText: POOL+' Vorlagen', konstante: POOL });
@@ -197,12 +198,12 @@ for (const s of STEPS){
     }
     // ZAHLEN gegen die Konstanten - nicht gegen mein Gedaechtnis.
     const offBlock = src.slice(src.indexOf('  const OFFICERS = ['), src.indexOf('\n  ];', src.indexOf('  const OFFICERS = [')) + 5);
-    const OFF = new Function(offBlock + ';return OFFICERS;')();
+    const OFF = i18nFunction(src, offBlock + ';return OFFICERS;')();
     check('10: die Offiziers-Zahl stimmt mit OFFICERS überein',
       new RegExp(ZAHLWORT[OFF.length] + ' Offiziere', 'i').test(mod.text),
       { imText: ZAHLWORT[OFF.length] + ' Offiziere', konstante: OFF.length });
     const rarBlock = src.slice(src.indexOf('  const MODULE_RARITY = {'), src.indexOf('\n  };', src.indexOf('  const MODULE_RARITY = {')) + 5);
-    const RAR = new Function(rarBlock + ';return MODULE_RARITY;')();
+    const RAR = i18nFunction(src, rarBlock + ';return MODULE_RARITY;')();
     const rarKeys = Object.keys(RAR);
     check('10: die Seltenheits-Zahl stimmt mit MODULE_RARITY überein',
       new RegExp(ZAHLWORT[rarKeys.length] + ' Seltenheiten', 'i').test(mod.text),

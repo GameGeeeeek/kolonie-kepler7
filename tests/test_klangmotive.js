@@ -20,7 +20,7 @@ const fs = require('fs');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
-const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n').match(/<script>([\s\S]*)<\/script>/)[1];
 
 // SOUND_MOTIVE ausfuehrbar herausschneiden.
 const von = JS.indexOf('const SOUND_MOTIVE = {');

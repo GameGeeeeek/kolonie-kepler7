@@ -64,7 +64,7 @@ check('Ueberfallbericht kennzeichnet die Phasen als die des Angreifers', erhalte
 check('formationReportLine nimmt ein wessen-Argument', /function formationReportLine\(formationKey, mult, wessen\)/.test(src));
 check('battlePhaseReportHtml nimmt ein Sicht-Argument', /function battlePhaseReportHtml\(phasen, ausSichtVon\)/.test(src));
 check('und beide geben es auch aus',
-  /Aufstellung'\+\(wessen\?' '\+wessen:''\)/.test(src) && /\(ausSichtVon\?' für '\+ausSichtVon:''\)/.test(src));
+  /(?:Aufstellung'|k7h\("Aufstellung"\)\))\+\(wessen\?' '\+wessen:''\)/.test(src) && /\(ausSichtVon\?' für '\+ausSichtVon:''\)/.test(src));
 
 // Rueckwaertskompatibel: Die bestehenden Aufrufe ohne das neue Argument duerfen sich nicht aendern.
 check('der Ueberfall-Bericht (raid) ruft die Aufstellung weiterhin ohne Zusatz auf',

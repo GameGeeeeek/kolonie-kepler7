@@ -19,7 +19,7 @@ const fs = require('fs');
 const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
-const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
+const HTML = fs.readFileSync(SPIELDATEI, 'utf8').replace(/\r\n/g, '\n');
 const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 
 // ---- Extraktion (Regel 6: Anker-Existenz VOR dem Slice pruefen)

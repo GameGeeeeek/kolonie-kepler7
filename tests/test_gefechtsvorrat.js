@@ -22,6 +22,7 @@
 //
 // GEGENPROBE (Arbeitsregel 1, beidseitig gefahren - Zahlen im Kopf von test_kettenauslastung).
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 const { SPIELDATEI, SERVER_JS, pruefer, ueberspringen } = require('./lib/umgebung');
 
 const { check, ende } = pruefer();
@@ -48,7 +49,7 @@ try {
     + '\n' + bisEnde('  const TIER2_DEFS = [')
     + '\n' + schnitt('  function resLabel(key){', '\n  }') + '\n  }'
     + '\n' + schnitt('  const GEFECHTSVORRAETE = [', '  // ===== Enterung');
-  API = new Function('state', 'log', quelle
+  API = i18nFunction(JS, 'state', 'log', quelle
     + '\n; return { GEFECHTSVORRAETE, gefechtsvorratEinsetzen, gefechtsvorratVorschau, gefechtsvorratAn, gefechtsvorratDef };');
   // Einmal WIRKLICH rechnen, nicht nur bauen (Regel 34).
   const probe = API({ resources: {}, gefechtsvorrat: {} }, () => {});

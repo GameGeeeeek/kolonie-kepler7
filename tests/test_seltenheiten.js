@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Sieben Modul-Seltenheiten (v8.443.0, Build-System Etappe 1, Wunsch Sascha).
 //
 // DIE ZWEI NEUEN STUFEN: Ungewoehnlich (+30%, zwischen Gewoehnlich und Selten, normaler
@@ -31,7 +32,7 @@ const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
 const tabVon = JS.indexOf('const MODULE_RARITY = {');
 const tabBis = JS.indexOf('\n  };', tabVon);
 check('1a: MODULE_RARITY gefunden', tabVon > 0 && tabBis > tabVon);
-const RAR = new Function(JS.slice(tabVon, tabBis + 5) + '\nreturn MODULE_RARITY;')();
+const RAR = i18nFunction(HTML, JS.slice(tabVon, tabBis + 5) + '\nreturn MODULE_RARITY;')();
 const ORDNUNG = Object.keys(RAR);
 // Auf die REGEL umgestellt (16.08.2026, Arbeitsregel 3): Vorher stand hier die Liste der sieben
 // Stufen Zeichen fuer Zeichen. Mit Primordial als achter riss sie, obwohl die gepruefte
@@ -52,7 +53,7 @@ check('1d: jede Stufe hat Label und eigene Farbe',
 // ---- 2) Nebentabellen vollstaendig (aus der Datei geparst, gegen die GEPARSTE Ordnung)
 const objAus = (name) => {
   const m = JS.match(new RegExp('const ' + name + ' = \\{([^\\n]*)\\};'));
-  return m ? new Function('return {' + m[1] + '};')() : null;
+  return m ? i18nFunction(HTML, 'return {' + m[1] + '};')() : null;
 };
 const frag = objAus('MODULE_FRAGMENT_VALUE'), sell = objAus('MODULE_SELL_CREDITS'),
       craft = objAus('MODULE_FRAGMENT_CRAFT_COST'), subR = objAus('MODULE_SUB_RANGE');
@@ -70,7 +71,7 @@ check('2c: die Fertigungstabelle laesst GENAU die drei Sonderwege aus',
   craft && ORDNUNG.filter(k => craft[k] === undefined));
 const shipOrder = (JS.match(/const SHIP_MODULE_RARITY_ORDER = \[([^\]]*)\];/) || ['', ''])[1];
 check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
-  new Function('return [' + shipOrder + '];')().join(',') === ORDNUNG.join(','));
+  i18nFunction(HTML, 'return [' + shipOrder + '];')().join(',') === ORDNUNG.join(','));
 
 // ---- 3) Schmelzkette ausgefuehrt
 {
@@ -90,7 +91,7 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
                 fnAus('function fuseAnzahl(inv, instKey, idx){') + '\n' +
                 fnAus('function fuseModules(isShip, instKey){');
   check('3a: nextRarityOf und fuseModules gefunden', qNext.length > 100 && qFuse.length > 900);
-  const naechste = new Function('MODULE_RARITY', qNext + '\nreturn nextRarityOf;')(RAR);
+  const naechste = i18nFunction(HTML, 'MODULE_RARITY', qNext + '\nreturn nextRarityOf;')(RAR);
   check('3b: die Kette laeuft luecklos von gewoehnlich bis exotisch und endet dort',
     ORDNUNG.every((k, i) => naechste(k) === (ORDNUNG[i+1] || null)));
   const mach = (inv) => {
@@ -98,7 +99,7 @@ check('2d: die Schiffsmodul-Rangliste kennt dieselben sieben Stufen',
     const state = { modules: inv, shipModules: {} };
     // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): die Schmelze fragt jetzt
     // das Schloss ab; hier immer offen - die Sperr-Faelle prueft test_modulschloss.
-    const fn = new Function('state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
+    const fn = i18nFunction(HTML, 'state', 'MODULE_RARITY', 'MODULE_FUSE_COUNT', 'nextRarityOf', 'modulGesperrt',
       'moduleLevelOf', 'moduleWertOf', 'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
       qFuse + '\nreturn fuseModules;')(
       state, RAR, 3, naechste, () => false,
@@ -145,7 +146,7 @@ if (!SERVER_JS) return ueberspringen('Backend-Repo liegt nicht daneben - MODULE_
   const srv = fs.readFileSync(SERVER_JS, 'utf8');
   const m = srv.match(/const MODULE_RARITY_MULT = \{([^\n]*)\};/);
   check('5a: Backend-Kopie gefunden', !!m);
-  const be = m ? new Function('return {' + m[1] + '};')() : {};
+  const be = m ? i18nFunction(HTML, 'return {' + m[1] + '};')() : {};
   const abweichung = ORDNUNG.filter(k => be[k] !== RAR[k].mult);
   check('5b: Backend-Multiplikatoren stimmen Stufe fuer Stufe mit dem Frontend ueberein',
     abweichung.length === 0 && Object.keys(be).length === ORDNUNG.length,

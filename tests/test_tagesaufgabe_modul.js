@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Tagesaufgabe "Modul-Werkbank" (v8.454.0, Task #45).
 //
 // HINTERGRUND: Der Tages-Pool (22 Vorlagen) kannte das komplette Modul-System nicht, obwohl
@@ -29,7 +30,7 @@ const defsVon = JS.indexOf('const DAILY_QUEST_DEFS = [');
 const defsBis = defsVon < 0 ? -1 : JS.indexOf('\n  ];', defsVon);
 check('1: DAILY_QUEST_DEFS gefunden', defsVon > 0 && defsBis > defsVon);
 if (defsVon < 0) return ende();
-const DEFS = new Function(JS.slice(defsVon, defsBis + 5) + ';return DAILY_QUEST_DEFS;')();
+const DEFS = i18nFunction(HTML, JS.slice(defsVon, defsBis + 5) + ';return DAILY_QUEST_DEFS;')();
 const def = DEFS.find(d => d.key === 'modul');
 check('1a: es gibt die Vorlage "modul"', !!def, def && def.name);
 if (!def) return ende();
@@ -81,7 +82,7 @@ for (const fn of ['equipModule', 'equipShipModule']){
     const state = { modules: Object.assign({}, inv), shipModules: {}, moduleFragments: 0,
                     dailyQuests: mitDaily ? { modulCount: 0 } : null };
     // modulGesperrt-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): immer offen.
-    const fn = new Function('state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf', 'modulGesperrt',
+    const fn = i18nFunction(HTML, 'state', 'MODULE_FRAGMENT_VALUE', 'moduleLevelOf', 'modulGesperrt',
       'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'render', 'save',
       quelle + '\nreturn dismantleModule;')(
       state, { selten: 3 }, () => 1, () => false,

@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Reroll+ mit Substat-Sperre (v8.457.0, Task #48, Build-System-Fortsetzung).
 //
 // HINTERGRUND: Der normale Reroll wuerfelt ALLE Zweitwerte neu - wer eine Spitzen-Zeile hat,
@@ -57,7 +58,7 @@ function macheWelt(inv, fragmente){
   };
   // moduleLockMitnehmen-Stub (Arbeitsregel 9, v8.458.0 Modul-Schloss): die Migration selbst
   // prueft test_modulschloss.
-  const api = new Function('state', 'Math', 'MODULE_FRAGMENT_VALUE', 'MODULE_SUB_POOL_LOC',
+  const api = i18nFunction(HTML, 'state', 'Math', 'MODULE_FRAGMENT_VALUE', 'MODULE_SUB_POOL_LOC',
     'MODULE_SUB_POOL_SHIP', 'MODULE_SUB_EFFECT_LABEL', 'moduleRerollCost', 'moduleLockMitnehmen',
     'moduleInstanceInfo', 'shipModuleInstanceInfo', 'log', 'playSound', 'render', 'save',
     konst + '\n' + subsQuelle + '\n' + wertQuelle + '\n' + quelle

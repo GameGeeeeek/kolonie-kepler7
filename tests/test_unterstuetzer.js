@@ -1,3 +1,4 @@
+const { i18nFunction } = require('./lib/i18n');
 // Unterstuetzer-Abzeichen und Sofort-Hintergrund (28.07.2026, v8.327.0).
 //
 // Zwei Spieler-Reports aus einer Meldung:
@@ -105,7 +106,7 @@ const QUELLEN = [
   fnAus('versucheKofiAutoFreischaltung')
 ].join('\n');
 function ladeAutomatik(u){
-  const f = new Function('umgebung', `
+  const f = i18nFunction(src, 'umgebung', `
     const { state, useBackend, log, save, render, loadLeaderboard, backendFetch } = umgebung;
     ${QUELLEN}
     return { versuch: versucheKofiAutoFreischaltung, sperreLoesen: () => { kofiAutoLetzterVersuch = 0; } };

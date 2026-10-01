@@ -29,6 +29,7 @@ const path = require('path');
 // still ignoriert und eine Gegenprobe liest die ECHTE Datei - sie sieht dann aus wie
 // bestanden (CLAUDE.md, Korrektur zu Regel 14).
 const { SPIELDATEI } = require('./lib/spieldatei');
+const { i18nFunction } = require('./lib/i18n');
 const src = fs.readFileSync(SPIELDATEI, 'utf8');
 const js = src.match(/<script>([\s\S]*)<\/script>/)[1];
 // v8.714.0: abgrundWaechterDef liest die Regeltabelle - sie gehoert mit in den Kontext, sonst
@@ -581,7 +582,8 @@ function markenKontext(zustand, summe){
     'function log(){} function fmt(x){ return String(x); } function playSound(){} function save(){} function render(){}',
     'return { holeAbgrundAllianzMarke };'
   ].join('\n');
-  return new Function('state', quelle)(zustand);
+  // Die Meldung liest jetzt die Anzeigeansicht; deren echte Abhaengigkeit gehoert zum Kontext.
+  return i18nFunction(js, 'state', quelle)(zustand);
 }
 {
   const zustand = { research:{}, player:{id:'u',name:'A'},

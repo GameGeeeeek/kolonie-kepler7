@@ -18,6 +18,7 @@
 //      Zusatzmarke ab Rang 7, doppelte Gold-Chance ab Rang 8
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
+const { i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -49,7 +50,7 @@ function baue(rep, kontakt, jetzt){
   // (dann wuerde das Ueberschwappen auf den Rivalen mit ausgeloest - Pruefpunkt 6).
   const setFactionRepRaw = (fid, w) => { rivalGesetzt.push(fid); state.factionRep[fid] = Math.max(REP_MIN, Math.min(REP_MAX, Math.round(w))); };
   const changeFactionRep = () => { throw new Error('changeFactionRep darf im Verfall nicht aufgerufen werden'); };
-  new Function('ctx', 'state', 'log', 'Date', 'REP_MIN', 'REP_MAX', 'FACTION_DIPLOMACY',
+  i18nFunction(src, 'ctx', 'state', 'log', 'Date', 'REP_MIN', 'REP_MAX', 'FACTION_DIPLOMACY',
     'factionRepOf', 'setFactionRepRaw', 'changeFactionRep', 'factionNameOf', 'TRIBUTE_COST',
     // Ab v8.298.24 setzt eine Botschaft den Verfall aus (Paket 6/6). Hier auf "keine Botschaft"
     // gestellt, damit dieser Test weiter den reinen Verfall misst; die Kopplung prueft test_botschaft.js.
