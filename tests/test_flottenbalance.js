@@ -13,7 +13,9 @@ function schnitt(s, von, bis){ const a=s.indexOf(von), b=s.indexOf(bis,a); if(a<
 const feKonter = schnitt(FEsrc, 'const COUNTER_ROLE_DEFS = [', '// ===== Taktik-Stance =====');
 const feBal    = schnitt(FEsrc, 'const FLEET_BALANCE_MAX_BONUS', '// ===== Schiffsklassen');
 const feCtx={};
-new Function('ctx', feKonter + feBal + ';ctx.f=fleetDiversityMult;ctx.OF=COUNTER_ROLE_OF;ctx.cm=counterMultiplier;ctx.ATK=COUNTER_ROLE_ATK;')(feCtx);
+// Der Slice enthaelt auch Modultexte und deren i18n-Registrierung. Beides ist fuer die
+// Flottenrechnung neutral; ohne diese Abhaengigkeiten brach schon HEAD mit "k7h undefined" ab.
+new Function('ctx','k7h','k7RegisterDefinitions', feKonter + feBal + ';ctx.f=fleetDiversityMult;ctx.OF=COUNTER_ROLE_OF;ctx.cm=counterMultiplier;ctx.ATK=COUNTER_ROLE_ATK;')(feCtx, text=>text, ()=>{});
 
 const beAtk    = schnitt(BEsrc, 'const COUNTER_ROLE_ATK = {', '};') + '};';
 const beKonter = schnitt(BEsrc, 'const COUNTER_ROLE_DEFS = [', 'function counterMultiplier');

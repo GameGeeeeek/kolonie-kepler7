@@ -32832,7 +32832,7 @@ async function claimPendingRewards(){
     if (!useBackend()) return;
     try {
       for (let i = 0; i < 10; i++){
-        const res = await backendFetch('/pending-rewards/claim', { method:'POST' });
+        const res = await backendFetch('/pending-rewards/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ stimmePaketVersion: 1 }) });
         if (!res.ok) break;
         const data = await res.json();
         if (!data.reward) break;
@@ -33374,6 +33374,19 @@ async function claimPendingRewards(){
            woertlich "fuer deinen Bug-Report" meldet. */
         if (r.type === 'verzeichnis-stimme'){
           const teile = belohnungGabenBuchen(r);
+          const zahl = v => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0; };
+          const fragmente = zahl(r.fragmente);
+          const schiffe = zahl(r.schiffe && r.schiffe.schlachtschiff);
+          if (fragmente){
+            state.moduleFragments = (state.moduleFragments||0) + fragmente;
+            teile.push('+'+fmtVoll(fragmente)+' '+(K7_LANGUAGE === 'en' ? 'module fragments' : 'Modulfragmente'));
+          }
+          // Fester Zielort, unabhaengig vom gerade angezeigten Planeten. Alte reine Kredit-Gaben
+          // bleiben gueltig. Ein neuer Server gibt das Paket nur an Clients mit obiger Faehigkeit.
+          if (schiffe){
+            state.fleet.schlachtschiff = (state.fleet.schlachtschiff||0) + schiffe;
+            teile.push('+'+fmtVoll(schiffe)+' '+(K7_LANGUAGE === 'en' ? 'battleships' : 'Schlachtschiffe')+' ('+k7t('Heimatbasis')+')');
+          }
           log('Danke für deine Stimme auf browsermmorpg.com: '+(teile.join(', ') || 'nichts erhalten')+'.', 'ti-award', 'ok');
           playSound('achieve');
           pushReport({ type:'verzeichnis-stimme', gaben: teile });
@@ -40592,10 +40605,26 @@ async function claimPendingRewards(){
   const STIMME_ABSTAND_MS = 6 * 3600 * 1000;
   const STIMME_ERSTE_PRUEFUNG_MS = 8000;      // nach dem Start erst laden lassen, dann fragen
   const STIMME_PRUEFTAKT_MS = 5 * 60 * 1000;
-  let stimmeInfo = null;                      // { belohnung:{credits}|null, naechsteAb } aus /api/me
+  let stimmeInfo = null;                      // { belohnung: Paket-Vorschau|null, naechsteAb } aus /api/me
   let stimmeTaktGestartet = false;
   let stimmeVerdrahtet = false;
   function stimmeLink(){ return STIMME_VOTE_URL + '&' + STIMME_LINK_PARAM + '=' + encodeURIComponent(accountUsername || ''); }
+  function stimmeBelohnungVorschau(r){
+    if (!r || typeof r !== 'object') return '';
+    const zahl = v => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0; };
+    const teile = [];
+    const schiffe = zahl(r.schiffe && r.schiffe.schlachtschiff), fragmente = zahl(r.fragmente), credits = zahl(r.credits);
+    if (schiffe) teile.push(fmtVoll(schiffe)+' '+(K7_LANGUAGE === 'en' ? 'battleships' : 'Schlachtschiffe')+' ('+k7t('Heimatbasis')+')');
+    if (fragmente) teile.push(fmtVoll(fragmente)+' '+(K7_LANGUAGE === 'en' ? 'module fragments' : 'Modulfragmente'));
+    if (credits) teile.push(fmtVoll(credits)+' '+k7t('Kredite'));
+    const zufall = r.zufallsRohstoff;
+    const arten = zufall && Array.isArray(zufall.arten) ? zufall.arten.filter(k => ['erz','kristalle','deuterium'].includes(k)) : [];
+    const max = zahl(zufall && zufall.max);
+    if (max && arten.length) teile.push((K7_LANGUAGE === 'en' ? 'up to ' : 'bis zu ')+fmtVoll(max)
+      +(K7_LANGUAGE === 'en' ? ' resources in one randomly chosen type: ' : ' Rohstoffe in einer zufällig gewählten Sorte: ')
+      +arten.map(k => k7t(resLabel(k))).join(' / '));
+    return teile.join(', ');
+  }
   // Nie ueber einem anderen Fenster: Willkommen, Tutorial, Konflikt, Profil ... sind alle .login-overlay.
   function stimmeAnderesFensterOffen(){
     return Array.from(document.querySelectorAll('.login-overlay')).some(el => el.id !== 'stimmeOverlay' && getComputedStyle(el).display !== 'none');
@@ -40610,10 +40639,11 @@ async function claimPendingRewards(){
     const a = document.getElementById('stimmeLink'); if (a) a.href = stimmeLink();
     const bel = document.getElementById('stimmeBelohnungText');
     if (bel){
-      const cr = stimmeInfo.belohnung ? (Math.floor(Number(stimmeInfo.belohnung.credits)) || 0) : 0;
-      bel.innerHTML = cr
-        ? 'Als Dank gibt es <strong>+'+fmt(cr)+(" " + k7h("Kredite") + "</strong>, sobald deine Stimme gezählt ist – alle sechs Stunden möglich.")
-        : 'Abstimmen ist alle sechs Stunden möglich.';
+      const paket = stimmeBelohnungVorschau(stimmeInfo.belohnung);
+      bel.textContent = paket
+        ? (K7_LANGUAGE === 'en' ? 'Your reward: ' : 'Als Dank gibt es ')+paket
+          +(K7_LANGUAGE === 'en' ? ', once your vote is confirmed – available every six hours.' : ', sobald deine Stimme bestätigt ist – alle sechs Stunden möglich.')
+        : (K7_LANGUAGE === 'en' ? 'Voting is available every six hours.' : 'Abstimmen ist alle sechs Stunden möglich.');
     }
     if (!stimmeVerdrahtet){
       stimmeVerdrahtet = true;
@@ -46659,7 +46689,9 @@ async function claimPendingRewards(){
       { title:'Patchnotes per E-Mail', body:'In den Kontoeinstellungen lässt sich der Erhalt von Patchnotes-Mails an- und abschalten (nur relevant, sobald es einen automatischen Versand gibt).' },
       { title:'Freunde einladen', body:("Einladen geht nur über deinen persönlichen <strong>Einladungs-Link</strong> (Einstellungen → Freunde einladen → Link kopieren): klickt ein neuer Spieler darauf, registriert sich und meldet sich zum ersten Mal an, wird die Verknüpfung sofort fest gespeichert. Die eigentliche Gutschrift (<strong>500 Erz + 500 Kristalle</strong> für den Neuling, <strong>50 Kredite</strong> für dich) erfolgt automatisch, sobald der neue Spieler <strong>Kommandanten-Level 5</strong> erreicht - das verhindert, dass Wegwerf-Accounts nur für den Bonus angelegt werden. Nur einmal pro Konto einlösbar, kein Einladen des eigenen Kontos möglich. Nur mit eigenem Server verfügbar.<br><br><strong>Patenschaft:</strong> Wer sich über deinen Link registriert, ist <strong>" + k7h("30 Tage") + "</strong> lang dein <strong>Schützling</strong> – und du sein <strong>Pate</strong>. Schafft der Schützling in dieser Zeit einen Meilenstein zum ersten Mal (erster gewonnener Spielerangriff, erste abgewehrte Attacke, erster Schlag gegen ein Nest oder eine Festung, erster Handel am Markt, fünf Tage in Folge angemeldet), bekommt ihr <strong>" + k7h("beide") + "</strong> etwas: 200 Kredite und 3 Sternenstaub für den Schützling, 150 Kredite und 3 Sternenstaub für den Paten – jeder Meilenstein genau einmal. Den Stand mit Häkchen zeigt die Karte „Patenschaft\" unter Einstellungen → Freunde einladen; ein Pate kann bis zu zehn Schützlinge gleichzeitig haben.") },
       { title:'Bonuscodes', body:'Gelegentlich gibt es <strong>Bonuscodes</strong> auf den Kanälen des Spiels (TikTok, Instagram, YouTube, Discord). Eingelöst werden sie unter <strong>Einstellungen → Bonuscode einlösen</strong>. Groß- und Kleinschreibung, Bindestriche und Leerzeichen sind dabei egal - wer „sternen-staub 25" tippt, hat den Code. <strong>Jeder Code gilt nur eine begrenzte Zeit</strong> (meist ein paar Tage) und <strong>nur einmal je Konto</strong>; manche gelten außerdem nur für die ersten N Spieler, die schnell genug sind. Klappt es nicht, sagt dir die Zeile unter dem Feld auch warum - abgelaufen, schon eingelöst, aufgebraucht oder schlicht unbekannt. Die Belohnung landet über die Belohnungs-Warteschlange auf deinem Konto und steht danach dauerhaft als <strong>Bericht</strong> unter „Sonstiges". Nur mit eigenem Server verfügbar.' },
-      { title:'Stimme auf browsermmorpg.com', body:'Kolonie Kepler-7 steht im Spiele-Verzeichnis <strong>browsermmorpg.com</strong>, das nach Stimmen sortiert – jede Stimme bringt neue Kommandanten in die Galaxie. Alle <strong>sechs Stunden</strong> erinnert dich das Spiel daran; abstimmen dauert zehn Sekunden und braucht dort kein Konto. Sobald deine Stimme gezählt ist, landet als Dank eine kleine Gutschrift (Kredite) in deinem Belohnungsfach – die Höhe steht in der Erinnerung. „Später" verschiebt die Erinnerung um sechs Stunden.' },
+      { title:'Stimme auf browsermmorpg.com', body: K7_LANGUAGE === 'en'
+        ? 'Vote for Kepler-7 Colony on <strong>browsermmorpg.com</strong> to help new commanders find the game. The game reminds you every <strong>six hours</strong>. Once the directory confirms your vote, your reward is <strong>10 battleships at your home base, 4 module fragments, 2,000 credits</strong> and <strong>1–20,000 units of one randomly selected resource</strong>: ore, crystals or deuterium. The server rolls the resource type and amount once per rewarded vote. Opening the voting page alone does not award anything. The reward report records what you received. <strong>Later</strong> postpones the reminder for six hours; if rewards are disabled, the reminder does not promise a reward.'
+        : 'Stimme auf <strong>browsermmorpg.com</strong> für Kolonie Kepler-7 ab, damit neue Kommandanten das Spiel finden. Alle <strong>sechs Stunden</strong> erinnert dich das Spiel daran. Sobald das Verzeichnis deine Stimme bestätigt, erhältst du <strong>10 Schlachtschiffe auf der Heimatbasis, 4 Modulfragmente, 2.000 Kredite</strong> und <strong>1–20.000 Einheiten einer zufällig gewählten Rohstoffart</strong>: Erz, Kristalle oder Deuterium. Sorte und Menge würfelt der Server einmal pro belohnter Stimme aus. Nur das Öffnen der Abstimmungsseite gibt noch keine Belohnung. Der Bericht hält deine tatsächliche Gutschrift fest. „Später" verschiebt die Erinnerung um sechs Stunden; bei abgeschalteten Belohnungen verspricht die Erinnerung keine Gabe.' },
       { title:'Kolonie teilen', body:'Der Button "Kolonie teilen" (Punktestand-Tab) erzeugt ein Bild mit Avatar, Level, Punktestand und den wichtigsten Eckdaten (Kolonien, Monde, Flotte, Kampfpunkte) - zum Teilen auf sozialen Netzwerken. Auf dem Handy öffnet sich meist direkt das Teilen-Menü des Betriebssystems, am Desktop wird das Bild heruntergeladen. Läuft komplett im Browser, ohne Server-Kontakt.' },
       { title:'Freundesliste', body:'Du kannst andere Spieler als <strong>Freunde merken</strong>: Öffne ihr Profil (in der Bestenliste auf den Namen tippen) und wähle im „···"-Menü <strong>„Als Freund merken"</strong>. Deine Freunde erscheinen dann gebündelt im Galaxie-Tab unter <strong>Rangliste & Ruhm → Nachrichten → Freunde</strong> - mit Online-Status (grüner Punkt = in den letzten Minuten aktiv) und aktuellem Punktestand. Direkt daneben kannst du ihnen eine <strong>Nachricht schreiben</strong>, ihr <strong>Profil öffnen</strong> oder sie wieder <strong>entfernen</strong>. Die Liste ist eine persönliche Merkliste (max. '+KOMFORT_GRENZEN.freunde.standard+', mit Unterstützer-Rang '+KOMFORT_GRENZEN.freunde.unterstuetzer+'), liegt in deinem Spielstand und übersteht Prestige und Aufstieg. Nur mit eigenem Server verfügbar.' },
       { title:'Rahmen-Stufen im Spielerprofil', body:("Klickst du in der Bestenliste auf einen Spieler, öffnet sich ein großes Profil mit einem farbigen <strong>Rahmen um den Avatar</strong>, der die höchste erreichte Stufe zeigt: <strong>Bronze</strong> (ab Level 10), <strong>" + k7h("Silber") + "</strong> (ab Prestige 1), <strong>Gold</strong> (Top 10 der Bestenliste), <strong>Platin</strong> (ab Prestige 5), <strong>Diamant</strong> (mind. 1 Aufstieg) und <strong>Legendär</strong> (Bestenlisten-Platz 1, mit pulsierendem Glüh-Effekt). Es zählt immer die höchste zutreffende Stufe, es gibt kein separates Freischalten - jeder Fortschritt, den du ohnehin schon hast, schaltet die passende Stufe automatisch frei.") },

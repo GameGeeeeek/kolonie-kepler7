@@ -216,7 +216,9 @@ Der Eintrag ist `https://browsermmorpg.com/game-kolonie-kepler-7--1799` (Nummer 
 - **Stimmen werden belohnt (Auftrag Sascha, 11.09.2026):** Das Spiel erinnert alle sechs Stunden mit
   einem Fenster („Eine Stimme für die Galaxie", Link mit dem Registrierungsnamen als Parameter), und
   der Server belohnt eine gezählte Stimme über den **Postback** des Verzeichnisses („pay players for
-  voting") mit Kredite ins Belohnungsfach – Backend `GET /api/stimme/rueckruf`, Doku
+  voting") mit 10 Schlachtschiffen auf der Heimatbasis, 4 Modulfragmenten, 2.000 Krediten und
+  1–20.000 Einheiten genau einer zufälligen Rohstoffart (Erz, Kristalle oder Deuterium) ins
+  Belohnungsfach – Backend `GET`/`POST /api/stimme/rueckruf`, Doku
   `kolonie-kepler7-backend/docs/verzeichnis-stimme.md`. Was noch aus dem Konto dort abzulesen ist:
   der **Platzhalter für den Spielernamen** in der Postback-Adresse und der Parameter, den das
   Verzeichnis an die Vote-Adresse anhängt (`STIMME_LINK_PARAM` im Spiel, Vorgabe `username`). Ein
