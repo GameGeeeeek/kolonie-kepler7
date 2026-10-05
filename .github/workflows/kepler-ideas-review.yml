@@ -1,0 +1,38 @@
+name: Kepler ideas isolated review
+on:
+  push:
+    branches: ["feat/kepler-ideas-20261005"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kepler-ideas-review-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  snapshot:
+    if: github.ref == 'refs/heads/feat/kepler-ideas-20261005'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: frontend
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: master
+          path: backend
+          persist-credentials: false
+      - name: Export tracked source only, without git credentials or runtime data
+        run: |
+          mkdir -p snapshot/frontend snapshot/backend
+          git -C frontend archive HEAD | tar -x -C snapshot/frontend
+          git -C backend archive HEAD | tar -x -C snapshot/backend
+          printf 'frontend %s\nbackend %s\n' "$(git -C frontend rev-parse HEAD)" "$(git -C backend rev-parse HEAD)" > snapshot/REVISIONS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kepler-ideas-source
+          path: snapshot/
+          retention-days: 1
+          if-no-files-found: error
