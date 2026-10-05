@@ -209,6 +209,26 @@
 .ti-volume:before{content:"\eb51"}
 .ti-world:before{content:"\eb54"}
 .ti-x:before{content:"\eb55"}
+/* K7-005: Scoped layout; large touch targets, no change to the galaxy canvas. */
+.k7-map-favorites { margin:0 0 12px; min-width:0; }
+.k7-map-favorites summary { cursor:pointer; padding:12px 0; }
+.k7-map-favorite-form { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; margin:12px 0; }
+.k7-map-favorite-form label { display:grid; gap:4px; font-size:12px; min-width:0; }
+.k7-map-favorite-form input,.k7-map-favorite-form select { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }
+.k7-map-favorites button,.k7-map-favorites input,.k7-map-favorites select { min-height:44px; }
+.k7-map-favorite-row { display:flex; flex-wrap:wrap; align-items:flex-start; gap:8px; }
+.k7-map-favorite-row > div { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+.k7-map-favorite-row p { margin:4px 0; white-space:pre-wrap; }
+.k7-map-favorite-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.k7-map-favorite-actions button { white-space:normal; }
+.k7-map-favorites :focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.k7-tactical-trial { margin:12px 0; min-width:0; overflow-wrap:anywhere; }
+.k7-tactical-trial summary { cursor:pointer; padding:12px 0; }
+.k7-trial-content { display:flex; flex-direction:column; gap:8px; padding:8px 0; }
+.k7-trial-content p,.k7-trial-content h4 { margin:0; }
+.k7-trial-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.k7-tactical-trial button { min-height:44px; white-space:normal; }
+.k7-tactical-trial :focus-visible { outline:2px solid currentColor; outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -4391,6 +4411,7 @@
              Vorgabe alles an - der Standard sieht exakt aus wie vorher. Der aktive Zustand wird in
              buildGalaxyMap() aus state.karteEbenen gespiegelt (überlebt so auch den Spielstand-Load
              NACH dem Verdrahten). -->
+        <div id="mapFavoritesBox" class="k7-map-favorites"></div>
         <div id="karteEbenenLeiste" class="pillen-leiste">
           <button class="planet-pill" data-karte-ebene="routen" title="Eigene Missionslinien zwischen den Systemen ein-/ausblenden"><i class="ti ti-rocket" aria-hidden="true"></i>Routen</button>
           <button class="planet-pill" data-karte-ebene="fraktionen" title="NPC-Territorium (Ring und Wappen am System) ein-/ausblenden"><i class="ti ti-flag" aria-hidden="true"></i>Fraktionen</button>
@@ -4459,6 +4480,7 @@
           <div id="worldBossBox"><div class="bmeta">lädt…</div></div>
           <div id="pirateLairBox"></div>
           <div class="npc-list" id="npcList"></div>
+          <div id="tacticalTrialBox" class="k7-tactical-trial"></div>
 
           <div class="section-title" style="margin-top:1.5rem;"><i class="ti ti-flag" aria-hidden="true"></i>Territorien-Kontrolle</div>
           <div id="territoryBox"><div class="bmeta">lädt…</div></div>
@@ -35615,7 +35637,7 @@ async function claimPendingRewards(){
     // sie. Nur kuenftige Durchlaeufe geben sie nicht noch einmal.
     const keepResearchMilestones = state.researchMilestones;
     const keepPerks = perkKey ? (state.prestigePerks||[]).concat([perkKey]) : (state.prestigePerks||[]);
-    const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
+    const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepMapSystemBookmarks = state.mapSystemBookmarks, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     // Erstsiege gegen die acht Statthalter (E2) - dieselbe Familie wie die Zeile darueber:
     // eine einmalige Auszahlung in Sternenessenz, der Marker ueberlebt deshalb beide Resets.
@@ -35718,7 +35740,7 @@ async function claimPendingRewards(){
       xp:keepXp, prestige:newPrestige, achievements:keepAch, levelRewardsClaimed:keepClaimed, researchMilestones:keepResearchMilestones||{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:keepSkillTree||{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, embassySeats:{}, embassyOpenedAt:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:keepExotic||{}, veteranTraining:keepVeteran||{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, recyclerAuftraege:{}, asteroidEskorten:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true, vorboten:state.vorboten||{},
-      prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
+      prestigePerks:keepPerks, themeKey:keepThemeKey, favoritePlanets:keepFavorites, mapSystemBookmarks:keepMapSystemBookmarks, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Login-Serie ist Treue-Fortschritt, kein Wirtschaftsfortschritt - Schutzschilde und die
       // "Meilenstein bereits eingelöst"-Marker müssen den Reset überleben wie loginStreak selbst
       // (RHS wird vor der state-Neuzuweisung ausgewertet, liest also die alten Werte).
@@ -35969,7 +35991,7 @@ async function claimPendingRewards(){
     // Bereits mehrfach eingesammelte Essenz wird NICHT nachtraeglich abgezogen - wer sie hat, behaelt
     // sie. Nur kuenftige Durchlaeufe geben sie nicht noch einmal.
     const keepResearchMilestones = state.researchMilestones;
-    const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
+    const keepThemeKey = state.themeKey, keepFavorites = state.favoritePlanets, keepMapSystemBookmarks = state.mapSystemBookmarks, keepLoginDate = state.lastLoginDate, keepLoginStreak = state.loginStreak;
     const keepBossClaims = state.claimedBossKills || [];
     // Erstsiege gegen die acht Statthalter (E2) - dieselbe Familie wie die Zeile darueber:
     // eine einmalige Auszahlung in Sternenessenz, der Marker ueberlebt deshalb beide Resets.
@@ -36013,7 +36035,7 @@ async function claimPendingRewards(){
       xp:keepXp, prestige:0, achievements:keepAch, levelRewardsClaimed:keepClaimed, researchMilestones:keepResearchMilestones||{}, buildQueue:[], researchQueue:[], constructionQueue:[], debrisFields:{}, trader:null, nextTraderCheck:0, soundOn:state.soundOn, notifOn:state.notifOn,
       rareItems:keepRare, inventory:keepInventory, buffs:[], unlocked:keepUnlocked, mineDebuff:null, defenseSabotage:null, allianceResearch:keepAllianceRes, allianceContributed:keepAllianceContrib,
       skillTree:{}, dailyQuests:null, veteranXp:{}, factionRep:{}, factionLastContact:{}, embassySeats:{}, embassyOpenedAt:{}, factionQuest:null, factionOrders:{}, nextFactionGiftAt:0, pirateLairStage:1, pirateLairPrestige:0, weeklyLeague:{weekKey:null,startScore:0,lastResult:null,boardSnapshot:[]}, dayStats:null, dailyHistory:[], notifiedPactOffers:[], scoreHistory:[], lastScoreSnapshot:0, moons:{}, megaProjects:{}, exoticResearch:{}, veteranTraining:{}, orbitalStations:{}, planetEvents:{}, nextPlanetEventCheck:0, planetSpecialization:{}, spyIntel:{}, npcScaling:{}, scoreLog:[], colonyNames:{}, pendingRoleChange:{}, debrisFieldTrackers:{}, recyclerAuftraege:{}, asteroidEskorten:{}, battleStats:{wins:0,losses:0}, tutorialSeen:true, seenTabHints:state.seenTabHints||{}, referralNudgeShown:true, vorboten:state.vorboten||{},
-      prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
+      prestigePerks:[], themeKey:keepThemeKey, favoritePlanets:keepFavorites, mapSystemBookmarks:keepMapSystemBookmarks, lastLoginDate:keepLoginDate, loginStreak:keepLoginStreak,
       // Wie beim Prestige: Login-Serien-Begleitfelder überstehen auch den Aufstieg-Reset.
       streakShields:state.streakShields||0, claimedStreakMilestones:(state.claimedStreakMilestones||[]).slice(), comebackQuest:null,
       // Der eingestellte Anteil des Baustellen-Kontos ueberlebt auch den Aufstieg - dieselbe
@@ -67175,7 +67197,136 @@ function sekSternUse(key, x, y, k, unentdeckt){
     lastGalaxyMapMarkup = null;
     buildGalaxyMap();
   }
+  // K7-005: Personal map bookmarks. Colony favourites/notes keep their existing storage.
+  // Systems are checked against visibleSystems on every read and every jump: a saved id is
+  // never permission to reveal a hidden location. These preferences grant no game reward.
+  function mapFavoriteTarget(kind, id){
+    if (typeof id !== 'string' || id.length > 120) return null;
+    if (kind === 'colony'){
+      if (id !== 'home' && !Object.prototype.hasOwnProperty.call(state.colonies || {}, id)) return null;
+      return {kind, id, name:planetDisplayName(id)};
+    }
+    if (kind === 'system'){
+      const sys = visibleSystems().find(s => s.id === id);
+      return sys ? {kind, id, name:k7View(sys).name} : null;
+    }
+    return null;
+  }
+  function mapSystemBookmarks(){
+    const rows = Array.isArray(state.mapSystemBookmarks) ? state.mapSystemBookmarks : [];
+    const seen = new Set();
+    return rows.filter(row => {
+      if (!row || typeof row.id !== 'string' || row.id.length > 120 || seen.has(row.id)) return false;
+      seen.add(row.id); return true;
+    }).map(row => ({id:row.id, note:typeof row.note === 'string' ? row.note : ''}));
+  }
+  function mapFavoriteRows(){
+    const rows = ['home', ...Object.keys(state.colonies || {})]
+      .filter(id => state.favoritePlanets && state.favoritePlanets[id])
+      .map(id => ({...mapFavoriteTarget('colony', id), note:colonyNoteOf(id), available:true}));
+    for (const row of mapSystemBookmarks()){
+      const target = mapFavoriteTarget('system', row.id);
+      rows.push({kind:'system', id:row.id, name:target ? target.name : k7Ui('Nicht mehr verfügbar', 'No longer available'),
+        note:row.note, available:!!target});
+    }
+    return rows;
+  }
+  function mapFavoriteSave(kind, id, note){
+    if (!mapFavoriteTarget(kind, id) || typeof note !== 'string') return false;
+    if (kind === 'colony'){
+      if (!state.favoritePlanets || typeof state.favoritePlanets !== 'object' || Array.isArray(state.favoritePlanets)) state.favoritePlanets = {};
+      state.favoritePlanets[id] = true;
+      // Use the existing note writer, including the current comfort limit and persistence.
+      renameColonyNote(id, note);
+    } else {
+      const rows = mapSystemBookmarks();
+      const at = rows.findIndex(row => row.id === id);
+      if (at < 0 && rows.length >= 32) return false;
+      const value = {id, note:note.trim().slice(0,240)};
+      if (at < 0) rows.push(value); else rows[at] = value;
+      state.mapSystemBookmarks = rows;
+      save();
+    }
+    return true;
+  }
+  function mapFavoriteRemove(kind, id){
+    if (kind === 'colony'){
+      if (!mapFavoriteTarget(kind, id)) return false;
+      if (state.favoritePlanets) delete state.favoritePlanets[id];
+      // Removing a bookmark must not erase the note from the colony's existing editor.
+    } else if (kind === 'system'){
+      state.mapSystemBookmarks = mapSystemBookmarks().filter(row => row.id !== id);
+    } else return false;
+    save(); return true;
+  }
+  function mapFavoriteJump(kind, id){
+    if (!mapFavoriteTarget(kind, id)) return false;
+    if (kind === 'colony') findMyColony(id);
+    else { switchTab('karte'); switchToSystem(id); }
+    return true;
+  }
+  let lastMapFavoritesSig = null, mapFavoriteNotice = '', mapFavoriteDraft = null;
+  function renderMapFavorites(){
+    const box = document.getElementById('mapFavoritesBox');
+    if (!box || bedienungLaeuft('mapFavoritesBox')) return;
+    const rows = mapFavoriteRows();
+    const colonies = ['home', ...Object.keys(state.colonies || {})].map(id => mapFavoriteTarget('colony', id)).filter(Boolean);
+    const systems = visibleSystems().map(s => ({kind:'system', id:s.id, name:k7View(s).name}));
+    const sig = JSON.stringify([K7_LANGUAGE, rows, colonies, systems]);
+    if (lastMapFavoritesSig === sig) return;
+    lastMapFavoritesSig = sig;
+    const options = list => list.map(t => `<option value="${escapeHtml(t.kind+':'+t.id)}">${escapeHtml(t.name)}</option>`).join('');
+    box.innerHTML = `<details data-keep-open="map-favorites"${detailsOpenAttr('map-favorites')}>
+      <summary><i class="ti ti-star" aria-hidden="true"></i> ${k7Ui('Kartenfavoriten und Notizen', 'Map favourites and notes')} (${rows.length})</summary>
+      <p class="bmeta">${k7Ui('Persönliche Sprungziele. Kolonien verwenden deine bisherigen Favoriten und Notizen; zusätzlich sind 32 sichtbare Systeme speicherbar.', 'Personal shortcuts. Colonies use your existing favourites and notes; you can also save 32 visible systems.')}</p>
+      <form id="mapFavoriteForm" class="k7-map-favorite-form">
+        <label>${k7Ui('Ziel', 'Destination')}<select id="mapFavoriteTarget"><optgroup label="${k7Ui('Eigene Kolonien', 'Your colonies')}">${options(colonies)}</optgroup><optgroup label="${k7Ui('Sichtbare Systeme', 'Visible systems')}">${options(systems)}</optgroup></select></label>
+        <label>${k7Ui('Eigene Kurznotiz', 'Personal note')}<input id="mapFavoriteNote" type="text" maxlength="240" translate="no" autocomplete="off"></label>
+        <button type="submit">${k7Ui('Favorit speichern', 'Save favourite')}</button>
+        <span id="mapFavoriteStatus" role="status" aria-live="polite">${escapeHtml(mapFavoriteNotice)}</span>
+      </form>
+      <div class="k7-map-favorite-list">${rows.map((row,i) => `<article class="card-row k7-map-favorite-row">
+        <div><strong translate="no">${escapeHtml(row.name)}</strong><p class="bmeta" translate="no">${escapeHtml(row.note)}</p></div>
+        <div class="k7-map-favorite-actions"><button type="button" data-mf-jump="${i}"${row.available?'':' disabled'} aria-label="${escapeHtml(k7Ui('Zur Karte: ', 'Show on map: ')+row.name)}">${k7Ui('Karte', 'Map')}</button>
+        <button type="button" data-mf-edit="${i}"${row.available?'':' disabled'} aria-label="${escapeHtml(k7Ui('Notiz bearbeiten: ', 'Edit note: ')+row.name)}">${k7Ui('Bearbeiten', 'Edit')}</button>
+        <button type="button" data-mf-delete="${i}" aria-label="${escapeHtml(k7Ui('Favorit entfernen: ', 'Remove favourite: ')+row.name)}">${k7Ui('Entfernen', 'Remove')}</button></div></article>`).join('') || `<p class="bmeta">${k7Ui('Noch keine Favoriten gespeichert.', 'No favourites saved yet.')}</p>`}</div>
+      </details>`;
+    const form = box.querySelector('form'), select = box.querySelector('select'), input = box.querySelector('input');
+    function selected(){ const at = select.value.indexOf(':'); return [select.value.slice(0,at), select.value.slice(at+1)]; }
+    function fillNote(){
+      const [kind,id] = selected();
+      input.maxLength = kind === 'colony' ? komfortGrenze('notizZeichen') : 240;
+      input.value = kind === 'colony' ? colonyNoteOf(id) : (mapSystemBookmarks().find(r=>r.id===id)||{}).note || '';
+    }
+    if (mapFavoriteDraft && [...select.options].some(o=>o.value===mapFavoriteDraft.target)){
+      select.value=mapFavoriteDraft.target; fillNote(); input.value=mapFavoriteDraft.note;
+    } else fillNote();
+    function rememberDraft(){ mapFavoriteDraft={target:select.value,note:input.value}; }
+    input.addEventListener('input',rememberDraft);
+    select.addEventListener('change',()=>{fillNote();rememberDraft();});
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const [kind,id] = selected();
+      const ok = mapFavoriteSave(kind,id,input.value);
+      mapFavoriteNotice = ok ? k7Ui('Gespeichert.', 'Saved.') : k7Ui('Ziel nicht verfügbar oder 32 Systemfavoriten erreicht.', 'Destination unavailable or 32 system favourites already saved.');
+      box.querySelector('#mapFavoriteStatus').textContent=mapFavoriteNotice;
+      if (ok){ mapFavoriteDraft=null; if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); lastMapFavoritesSig=null; renderMapFavorites(); }
+    });
+    for (const button of box.querySelectorAll('[data-mf-jump]')) button.onclick = () => {
+      const row=rows[Number(button.dataset.mfJump)];
+      if (!mapFavoriteJump(row.kind,row.id)){ lastMapFavoritesSig=null; renderMapFavorites(); }
+    };
+    for (const button of box.querySelectorAll('[data-mf-edit]')) button.onclick = () => {
+      const row=rows[Number(button.dataset.mfEdit)]; select.value=row.kind+':'+row.id; fillNote(); rememberDraft(); input.focus();
+    };
+    for (const button of box.querySelectorAll('[data-mf-delete]')) button.onclick = () => {
+      const row=rows[Number(button.dataset.mfDelete)]; mapFavoriteRemove(row.kind,row.id); lastMapFavoritesSig=null; renderMapFavorites();
+    };
+  }
+  // End K7-005.
+
   function buildGalaxyMap(){
+    renderMapFavorites();
     // Messpunkt (Etappe G-1): zählt die String-Aufbauten. Von außen beobachtbar, weil der
     // Markup-Vergleich am Ende eingesparte wie durchgeführte Aufbauten sonst unsichtbar macht -
     // ein Test (test_karte_auffangnetz) kann nur so belegen, dass das Auffangnetz wirklich spart.
@@ -68886,6 +69037,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (activeSystem !== targetSystem) switchToSystem(targetSystem); else buildMap();
   }
   function renderMapBaseLinks(){
+    renderMapFavorites();
     const box = document.getElementById('mapBaseLinks');
     if (!box) return;
     const colonyIds = Object.keys(state.colonies||{});
@@ -73011,6 +73163,86 @@ function sekSternUse(key, x, y, k, unentdeckt){
     render();
     return true;
   }
+  // K7-016: deterministic training, not a prediction of live combat. The supplied fleet and
+  // integrity are exercise-only. Never read account strength, charge resources, or grant loot.
+  const TACTICAL_TRIAL_WAVES = [
+    {key:'bomber',de:'Bomberanflug',en:'Incoming bombers',
+      hintDe:'Bomber bedrohen die schweren Schiffe. Ein Jägerschirm fängt sie ab.',
+      hintEn:'Bombers threaten your capital ships. A fighter screen intercepts them.',
+      losses:{screen:4,strike:25,barrage:42}},
+    {key:'capital',de:'Schwere Blockade',en:'Capital-ship blockade',
+      hintDe:'Die Blockade besteht aus Großkampfschiffen. Bomber durchbrechen ihre Panzerung.',
+      hintEn:'Capital ships form the blockade. Bombers penetrate their armour.',
+      losses:{screen:42,strike:4,barrage:25}},
+    {key:'fighter',de:'Jägerschwarm',en:'Fighter swarm',
+      hintDe:'Viele leichte Jäger nähern sich. Das Sperrfeuer schwerer Schiffe schützt die Formation.',
+      hintEn:'Many light fighters approach. A capital-ship barrage protects your formation.',
+      losses:{screen:25,strike:42,barrage:4}}
+  ];
+  function newTacticalTrial(){ return {wave:0,integrity:100,status:'ready',history:[]}; }
+  function resolveTacticalTrial(run, tactic, expectedWave){
+    if (!run || run.status!=='ready' || !Number.isInteger(run.wave) || run.wave!==expectedWave ||
+        run.wave<0 || run.wave>=TACTICAL_TRIAL_WAVES.length || !Number.isFinite(run.integrity) ||
+        run.integrity<=0 || run.integrity>100 || !Array.isArray(run.history) || run.history.length!==run.wave) return null;
+    const wave=TACTICAL_TRIAL_WAVES[run.wave];
+    if (!Object.prototype.hasOwnProperty.call(wave.losses,tactic)) return null;
+    const lost=Math.min(run.integrity,wave.losses[tactic]);
+    return {wave:run.wave,integrity:run.integrity-lost,status:'result',
+      history:[...run.history,{wave:run.wave,tactic,lost}]};
+  }
+  function continueTacticalTrial(run){
+    if (!run || run.status!=='result') return null;
+    const finished=run.integrity<=0 || run.wave+1>=TACTICAL_TRIAL_WAVES.length;
+    return {...run,wave:finished?run.wave:run.wave+1,status:finished?'finished':'ready'};
+  }
+  let tacticalTrialRun = newTacticalTrial();
+  function renderTacticalTrial(){
+    const box=document.getElementById('tacticalTrialBox');
+    if (!box) return;
+    const run=tacticalTrialRun, wave=TACTICAL_TRIAL_WAVES[run.wave];
+    const actions=[['screen',k7Ui('Jägerschirm', 'Fighter screen')],['strike',k7Ui('Bomberstoß', 'Bomber strike')],['barrage',k7Ui('Schweres Sperrfeuer', 'Capital barrage')]];
+    const label=key=>(actions.find(a=>a[0]===key)||[])[1]||key;
+    const fleet=[['jaeger',12],['bomber',6],['schlachtschiff',3]].map(([key,count])=>{
+      const def=SHIP_DEFS.find(d=>d.key===key);return count+' × '+(def?k7View(def).name:key);
+    }).join(' · ');
+    const heading=k7Ui('Taktische Prüfung: Die Blockade', 'Tactical trial: The blockade');
+    let body='';
+    if (run.status==='ready'){
+      body=`<h4>${k7Ui('Welle', 'Wave')} ${run.wave+1}/3: ${escapeHtml(k7Ui(wave.de,wave.en))}</h4>
+        <p>${escapeHtml(k7Ui(wave.hintDe,wave.hintEn))}</p>
+        <div class="k7-trial-actions">${actions.map(([key,name])=>`<button type="button" data-trial-tactic="${key}" data-trial-wave="${run.wave}">${escapeHtml(name)}</button>`).join('')}</div>`;
+    } else if(run.status==='result'){
+      const last=run.history[run.history.length-1];
+      body=`<p role="status">${escapeHtml(label(last.tactic))}: −${last.lost} ${k7Ui('Integrität', 'integrity')}.</p>
+        <p>${escapeHtml(k7Ui(wave.hintDe,wave.hintEn))}</p>
+        <button type="button" data-trial-next>${run.integrity<=0||run.wave===2?k7Ui('Auswertung', 'Results'):k7Ui('Nächste Welle', 'Next wave')}</button>`;
+    } else {
+      const won=run.integrity>0 && run.history.length===3;
+      body=`<h4 role="status">${won?k7Ui('Blockade überwunden', 'Blockade cleared'):k7Ui('Übung gescheitert', 'Trial failed')}</h4>
+        <p>${run.integrity>=85?k7Ui('Alle Konter richtig gewählt.', 'All counters selected correctly'):k7Ui('Nutze die Hinweise jeder Welle und probiere eine andere Aufstellung.', 'Use each wave’s hints and try another deployment.')}</p>
+        <button type="button" data-trial-reset>${k7Ui('Mit gleicher Flotte wiederholen', 'Retry with the same fleet')}</button>`;
+    }
+    box.innerHTML=`<details data-keep-open="tactical-trial"${detailsOpenAttr('tactical-trial')}>
+      <summary><i class="ti ti-target" aria-hidden="true"></i> ${heading}</summary>
+      <div class="k7-trial-content"><p class="bmeta">${k7Ui('Kostenlose Übung mit vorgegebener Flotte. Keine echten Verluste, Belohnungen oder Rangliste. Kein Zeitdruck. Neustart der Seite setzt nur die Übung zurück.', 'Free trial with a supplied fleet. No real losses, rewards, or ranking. No time pressure. Reloading resets only the trial.')}</p>
+      <p>${escapeHtml(fleet)}</p>
+      <p class="bmeta">${k7Ui('Vereinfachte Übungsregeln, keine Live-Kampfprognose: richtiger Konter −4, neutrale Wahl −25, ungünstige Wahl −42 Integrität. Ziel: mindestens 85 Integrität nach drei Wellen.', 'Simplified training rules, not a live-combat forecast: correct counter −4, neutral choice −25, poor choice −42 integrity. Goal: at least 85 integrity after three waves.')}</p>
+      <p><strong>${k7Ui('Flottenintegrität', 'Fleet integrity')}: ${run.integrity}/100</strong></p>
+      ${body}
+      ${run.history.length?`<ol>${run.history.map(h=>`<li>${k7Ui('Welle', 'Wave')} ${h.wave+1}: ${escapeHtml(label(h.tactic))}, −${h.lost}</li>`).join('')}</ol>`:''}
+      ${run.status!=='finished'?`<button type="button" data-trial-reset>${k7Ui('Übung neu beginnen', 'Restart trial')}</button>`:''}
+      </div></details>`;
+    box.querySelectorAll('[data-trial-tactic]').forEach(button=>button.onclick=()=>{
+      const next=resolveTacticalTrial(tacticalTrialRun,button.dataset.trialTactic,Number(button.dataset.trialWave));
+      if (!next) return;
+      tacticalTrialRun=next;renderTacticalTrial();
+    });
+    const next=box.querySelector('[data-trial-next]');
+    if(next)next.onclick=()=>{const updated=continueTacticalTrial(tacticalTrialRun);if(updated){tacticalTrialRun=updated;renderTacticalTrial();}};
+    box.querySelectorAll('[data-trial-reset]').forEach(button=>button.onclick=()=>{tacticalTrialRun=newTacticalTrial();renderTacticalTrial();});
+  }
+  // End K7-016.
+
   function switchTab(tab){
     // Scrollposition je Tab merken (Etappe S-4): beim Verlassen sichern, beim Zurückkommen
     // wiederherstellen. Bisher blieb schlicht die Höhe des alten Tabs stehen.
@@ -73026,7 +73258,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const hProfile = document.getElementById('headerProfileBtn');
     if (hProfile) hProfile.classList.toggle('active', tab==='einstellungen');
     if (tab === 'hilfe') renderHelpBox();
-    if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); }
+    if (tab === 'galaxie'){ loadLeaderboard(); loadGlobalChat(); renderTacticalTrial(); }
     if (tab === 'berichte'){ loadNotificationEvents(); if (myAllianceTag() && useBackend()) loadSharedIntel().then(() => { lastIntelSig = null; renderIntelBox(); }); }
     if (tab === 'einstellungen'){ loadNotificationPrefs(); renderPushStatus(); ladePatenschaft(); }
     if (tab === 'allianz'){ syncOwnAllianceRole(); loadAlliances(); loadAllianceTechData(); loadAllianceBase(); loadAllianceBanner(); loadAllianceMembers(); loadAllianceMessages(); loadAllianceChronicle(); loadAllianceWars(); loadAllianceDominance(); loadAllianceAdminSettings(); loadAllianceDonationRanking(); }
