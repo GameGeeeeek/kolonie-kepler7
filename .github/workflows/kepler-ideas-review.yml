@@ -39,6 +39,7 @@ jobs:
         if: steps.transport.outputs.present == 'true'
         shell: bash
         run: |
+          cp weltraum_kolonie.html "$RUNNER_TEMP/k7-baseline.html"
           python3 - <<'PY'
           import base64, gzip, hashlib, json
           from pathlib import Path
@@ -53,6 +54,17 @@ jobs:
               target = Path(name)
               target.parent.mkdir(parents=True, exist_ok=True)
               target.write_text(content, encoding='utf-8')
+          target = Path('docs/IDEEN-CODEX-TODO.md')
+          text = target.read_text()
+          corrections = {
+            'Keine zweite Übersetzungsarchitektur neben PR #643.': 'Die aktuelle Architektur unter locales/ und tools/i18n/ weiterverwenden; PR #643 ist ein älterer, gesondert abzugleichender Entwurf.',
+            'Status: Bestehende Arbeit fortsetzen, PR #643.': 'Status: Aktuelle Implementierung auf main ausbauen; älteren PR #643 nur nach Abgleich verwenden.',
+            'Codex-Auftrag: Den vorhandenen Entwurf weiterführen.': 'Codex-Auftrag: Die bestehende main-Implementierung unter locales/ und tools/i18n/ weiterführen.'
+          }
+          for old, new in corrections.items():
+              assert text.count(old) == 1, old
+              text = text.replace(old,new)
+          target.write_text(text)
           PY
           git apply --check tools/implementation/k7-first.patch
           git apply tools/implementation/k7-first.patch
@@ -97,15 +109,20 @@ jobs:
               assert names(green) == names(result.stdout), (name,'different assertions in the counterexample')
               path.unlink()
           PY
-      - name: Existing map and tab regressions
+      - name: Existing HTTP regressions on unchanged baseline
         if: steps.transport.outputs.present == 'true'
         env:
           KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
         run: |
           set -euo pipefail
-          node tests/test_karte_handy_bedienung.js 2>&1 | tee .review-logs/existing-map-mobile.log
-          node tests/test_kartenfokus.js 2>&1 | tee .review-logs/existing-map-focus.log
-          node tests/sweep.js 2>&1 | tee .review-logs/tab-sweep.log
+          KEPLER_SPIELDATEI="$RUNNER_TEMP/k7-baseline.html" node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js 2>&1 | tee .review-logs/baseline-http.log
+      - name: Same HTTP regressions on the feature
+        if: steps.transport.outputs.present == 'true'
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js 2>&1 | tee .review-logs/feature-http.log
       - name: Commit verified source on this feature branch only
         if: steps.transport.outputs.present == 'true'
         env:
@@ -116,7 +133,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          printf '\n### Geprüfter Zwischenstand\n\nGitHub Actions Run %s: Pflichtprüfungen, Favoriten-Browsertest, Taktik-Logiktest, beide roten Gegenproben, bestehende Handy-/Fokusprüfungen und Tab-Sweep bestanden. Nicht durchgeführt: vollständige Projektsuite, Produktionsfreigabe.\n' "$GITHUB_RUN_ID" >> docs/IDEEN-CODEX-TODO.md
+          printf '\n### Geprüfter Zwischenstand\n\nGitHub Actions Run %s: sieben Pflichtprüfungen, 24 Favoriten-Browserprüfungen, 13 Taktik-Logikprüfungen und beide roten Gegenproben bestanden. Die bestehenden Handy-/Fokusprüfungen und der Tab-Sweep bestanden unverändert über einen lokalen HTTP-Testserver sowohl am Basisstand als auch am Feature. Der vorherige file://-Lauf blieb hinter der Loginmaske, weil relative /api-Aufrufe dort keine HTTP-Herkunft haben; keine Loginlogik und keine Assertions wurden dafür abgeschwächt. Nicht durchgeführt: vollständige Projektsuite, produktiver Backend-Test, Produktionsfreigabe.\n' "$GITHUB_RUN_ID" >> docs/IDEEN-CODEX-TODO.md
           git add -- weltraum_kolonie.html tests/test_map_favorites.js tests/test_tactical_trial.js docs/IDEEN-CODEX-TODO.md
           git rm -- tools/implementation/transport-1.b64 tools/implementation/transport-2.b64 tools/implementation/transport-3.b64 tools/implementation/transport-4.b64 tools/implementation/READY
           rm tools/implementation/k7-first.patch
