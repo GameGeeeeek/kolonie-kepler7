@@ -2,6 +2,7 @@ name: Kepler ideas isolated review
 on:
   push:
     branches: ["feat/kepler-ideas-20261005"]
+    paths: [".github/workflows/kepler-ideas-review.yml", "tools/implementation/READY"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,30 +10,124 @@ concurrency:
   group: kepler-ideas-review-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  snapshot:
+  review:
     if: github.ref == 'refs/heads/feat/kepler-ideas-20261005'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
-          path: frontend
           persist-credentials: false
+      - name: Check for a complete transport
+        id: transport
+        run: |
+          if test -f tools/implementation/READY; then echo 'present=true' >> "$GITHUB_OUTPUT"; else echo 'present=false' >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
+        if: steps.transport.outputs.present == 'true'
         with:
           repository: GameGeeeeek/kolonie-kepler7-backend
-          ref: master
-          path: backend
+          ref: '543c9c4a933633fbbd00a6697e995f12fa2c413a'
+          path: .review-backend
           persist-credentials: false
-      - name: Export tracked source only, without git credentials or runtime data
-        run: |
-          mkdir -p snapshot/frontend snapshot/backend
-          git -C frontend archive HEAD | tar -x -C snapshot/frontend
-          git -C backend archive HEAD | tar -x -C snapshot/backend
-          printf 'frontend %s\nbackend %s\n' "$(git -C frontend rev-parse HEAD)" "$(git -C backend rev-parse HEAD)" > snapshot/REVISIONS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/setup-node@v4
+        if: steps.transport.outputs.present == 'true'
         with:
-          name: kepler-ideas-source
-          path: snapshot/
-          retention-days: 1
-          if-no-files-found: error
+          node-version: '22'
+      - name: Verify transport and apply exact patch
+        if: steps.transport.outputs.present == 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, hashlib, json
+          from pathlib import Path
+          transport = ''.join(Path(f'tools/implementation/transport-{i}.b64').read_text().strip() for i in range(1,5))
+          compressed = base64.b64decode(transport, validate=True)
+          assert hashlib.sha256(compressed).hexdigest() == 'b27a3fdeb4660a2c3cf7f0dee838b48725b61b06d0cca441ef6401784ec0a651', 'Transport checksum mismatch'
+          files = json.loads(gzip.decompress(compressed))
+          allowed = {'tools/implementation/k7-first.patch','tests/test_map_favorites.js','tests/test_tactical_trial.js','docs/IDEEN-CODEX-TODO.md'}
+          assert set(files) == allowed, 'Unexpected transport paths'
+          for name, content in files.items():
+              assert isinstance(content, str)
+              target = Path(name)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding='utf-8')
+          PY
+          git apply --check tools/implementation/k7-first.patch
+          git apply tools/implementation/k7-first.patch
+      - name: Install isolated browser test dependencies
+        if: steps.transport.outputs.present == 'true'
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Required checks and new behaviour tests
+        if: steps.transport.outputs.present == 'true'
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          mkdir -p .review-logs
+          node tests/run.js --nur-pflicht 2>&1 | tee .review-logs/required.log
+          node tests/test_tactical_trial.js 2>&1 | tee .review-logs/trial.log
+          node tests/test_map_favorites.js 2>&1 | tee .review-logs/favorites.log
+      - name: Verify deliberately broken copies fail the same assertions
+        if: steps.transport.outputs.present == 'true'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, subprocess
+          source = Path('weltraum_kolonie.html').read_text()
+          mutations = [
+            ('trial','tests/test_tactical_trial.js','losses:{screen:4,strike:25,barrage:42}','losses:{screen:5,strike:25,barrage:42}','correct counter deals exactly four damage'),
+            ('favorites','tests/test_map_favorites.js','const sys = visibleSystems().find(s => s.id === id);','const sys = STAR_SYSTEMS.find(s => s.id === id);','hiddenRejected')
+          ]
+          for name, test, old, new, expected in mutations:
+              assert source.count(old) == 1, (name,'mutation anchor is not unique')
+              path = Path(os.environ['RUNNER_TEMP']) / ('k7-broken-'+name+'.html')
+              path.write_text(source.replace(old,new,1))
+              env = dict(os.environ,KEPLER_SPIELDATEI=str(path))
+              result = subprocess.run(['node',test],env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
+              Path('.review-logs/'+name+'-counterexample.log').write_text(result.stdout)
+              print(result.stdout)
+              assert result.returncode == 1, (name,'broken copy did not fail correctly')
+              assert 'FAIL - '+expected in result.stdout, (name,'failed for an unrelated reason')
+              green = Path('.review-logs/'+('trial' if name=='trial' else 'favorites')+'.log').read_text()
+              names = lambda text: [line.split(' - ',1)[1] for line in text.splitlines() if line.startswith(('OK - ','FAIL - '))]
+              assert names(green) == names(result.stdout), (name,'different assertions in the counterexample')
+              path.unlink()
+          PY
+      - name: Existing map and tab regressions
+        if: steps.transport.outputs.present == 'true'
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tests/test_karte_handy_bedienung.js 2>&1 | tee .review-logs/existing-map-mobile.log
+          node tests/test_kartenfokus.js 2>&1 | tee .review-logs/existing-map-focus.log
+          node tests/sweep.js 2>&1 | tee .review-logs/tab-sweep.log
+      - name: Commit verified source on this feature branch only
+        if: steps.transport.outputs.present == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/feat/kepler-ideas-20261005'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          printf '\n### Geprüfter Zwischenstand\n\nGitHub Actions Run %s: Pflichtprüfungen, Favoriten-Browsertest, Taktik-Logiktest, beide roten Gegenproben, bestehende Handy-/Fokusprüfungen und Tab-Sweep bestanden. Nicht durchgeführt: vollständige Projektsuite, Produktionsfreigabe.\n' "$GITHUB_RUN_ID" >> docs/IDEEN-CODEX-TODO.md
+          git add -- weltraum_kolonie.html tests/test_map_favorites.js tests/test_tactical_trial.js docs/IDEEN-CODEX-TODO.md
+          git rm -- tools/implementation/transport-1.b64 tools/implementation/transport-2.b64 tools/implementation/transport-3.b64 tools/implementation/transport-4.b64 tools/implementation/READY
+          rm tools/implementation/k7-first.patch
+          git commit -m 'feat: map notes and isolated tactical trial with regression guards'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.extraheader="AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/feat/kepler-ideas-20261005
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.transport.outputs.present == 'true'
+        with:
+          name: kepler-ideas-review-logs
+          path: .review-logs/
+          include-hidden-files: true
+          retention-days: 5
+          if-no-files-found: ignore
