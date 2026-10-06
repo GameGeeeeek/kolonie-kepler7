@@ -22,7 +22,7 @@ const { SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
-const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = require('./lib/i18n').ohneI18nWoerterbuch(HTML.match(/<script>([\s\S]*)<\/script>/)[1]);
 
 // ---- 1) beide Inventare, EINE Zaehlung je Karte
 /* Seit dem Inventar-Deckel (21.08.2026) bekommt fuseAnzahl einen vorab gebauten Zaehler-Index

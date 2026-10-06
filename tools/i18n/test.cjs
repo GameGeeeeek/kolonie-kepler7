@@ -4,7 +4,12 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { compile, htmlSegments, decode } = require('./build.cjs');
-const CATALOG = { Energie:'Energy', Bauen:'Build', Beschreibung:'Description', 'A & B':'A < B & C', 'Geschlossen':'Closed' };
+const { validate: validateTranslation } = require('./quality.cjs');
+const CATALOG = { Energie:'Energy', Bauen:'Build', Beschreibung:'Description', 'A & B':'A < B & C', 'Geschlossen':'Closed',
+  'Du hast {0}.':'You have {0}.',
+  'Du hast {0} Forschung abgeschlossen.':'You completed {0} research projects.',
+  'Spieler {0} erhält {1} Kredite.':'Player {0} receives {1} credits.',
+  '{0} hat die Forschung abgeschlossen.':'{0} completed the research.' };
 function fixture(body) {
   return '<!doctype html><html lang="de"><body><script>\n(function(){\n' + body + '\n})();\n</script></body></html>';
 }
@@ -29,6 +34,17 @@ function execute(body, options = {}) {
   return {context, built, original, storage};
 }
 const DEFINITIONS = "const RES_DEFS=[{key:'energie',name:'Energie',label:'Energie',nicheDesc:'Beschreibung'}];";
+test('translation quality permits locale formatting while preserving values and signs', () => {
+  assert.deepEqual(validateTranslation('+2,5% je Stufe, maximal −50%.','+2.5% per level, capped at −50%.'),[]);
+  assert.ok(validateTranslation('maximal −50%.','capped at +50%.').length);
+  assert.ok(validateTranslation('Kosten: 1.250 Erz.','Cost: 125 ore.').length);
+});
+test('translation quality rejects lost variables, duplicate rewards and changed markup', () => {
+  assert.ok(validateTranslation('{0}: +20 XP.','{0}: XP.').length);
+  assert.ok(validateTranslation('{0}: +20 XP.','{0}: +20 XP, +20 XP.').length);
+  assert.ok(validateTranslation('<strong>Nur NPC</strong>','<em>NPC only</em>').length);
+  assert.deepEqual(validateTranslation('<strong>{0}: +20 XP.</strong>','<strong>{0}: +20 XP.</strong>'),[]);
+});
 test('registered display labels translate without modifying definitions or save keys', () => {
   const {context,built} = execute(DEFINITIONS + `
     const el={}; el.innerHTML = '<b>' + RES_DEFS[0].label + '</b>';
@@ -82,6 +98,22 @@ test('default German behavior and unknown translations are retained', () => {
   const {context} = execute(DEFINITIONS + `const el={};el.innerHTML='<b>Bauen</b>'+RES_DEFS[0].label;globalThis.result=[el.innerHTML,k7t('unknown')];`, {search:''});
   assert.deepEqual(Array.from(context.result), ['<b>Bauen</b>Energie','unknown']);
   assert.equal(context.document.documentElement.lang, 'de');
+});
+test('dynamic authored messages preserve names and numeric captures', () => {
+  const {context}=execute("globalThis.result=[k7t('Spieler Energie erhält 1.250 Kredite.'),k7t('Jäger hat die Forschung abgeschlossen.')];");
+  assert.deepEqual(Array.from(context.result),['Player Energie receives 1.250 credits.','Jäger completed the research.']);
+});
+test('dynamic translation prefers the most specific authored sentence', () => {
+  const {context}=execute("globalThis.result=k7t('Du hast 3 Forschung abgeschlossen.');");
+  assert.equal(context.result,'You completed 3 research projects.');
+});
+test('dynamic captures keep existing HTML escaping at the display boundary', () => {
+  const {context}=execute("globalThis.result=k7h('Spieler <img src=x onerror=boom> erhält 12 Kredite.');");
+  assert.equal(context.result,'Player &lt;img src=x onerror=boom&gt; receives 12 credits.');
+});
+test('German mode retains dynamic messages and unknown text', () => {
+  const {context}=execute("globalThis.result=[k7t('Spieler Energie erhält 12 Kredite.'),k7t('unbekannte Nachricht')];",{search:'?lang=de'});
+  assert.deepEqual(Array.from(context.result),['Spieler Energie erhält 12 Kredite.','unbekannte Nachricht']);
 });
 test('supported URL language overrides stored preference; invalid languages fall back', () => {
   assert.equal(execute('globalThis.result=K7_LANGUAGE;', {search:'?lang=de',storage:{'kepler7-ui-language':'en'}}).context.result,'de');

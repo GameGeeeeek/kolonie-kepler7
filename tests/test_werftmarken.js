@@ -74,7 +74,7 @@ const COUNTER_ROLE_OF = new Function(rollenBlock + '; return COUNTER_ROLE_OF;')(
 // befristete Allianz-Projekt mit. Die Vorgabe ist 0 (kein Konvoi), damit alle Rohdauer-Pruefungen
 // weiter unten die UNGEBREMSTE Dauer messen - die Konvoi-Wirkung wird getrennt geprueft.
 let konvoiRest = 0;
-const fe = new Function('SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF', 'allianceBuffLeft',
+const fe = require('./lib/i18n').i18nFunction(src, 'SHIP_DEFS', 'RESEARCH_DEFS', 'state', 'COUNTER_ROLE_OF', 'allianceBuffLeft',
   src.slice(von, bis) +
   '; return { SHIP_MARK_MAX, SHIP_MARK_PER_STEP, SHIP_MARK_ROMAN, SHIP_MARK_STEPS, SHIP_MARK_COST_BASE,' +
   ' SHIP_MARK_COST_KEYS, SHIP_MARK_GATES, SHIP_MARK_ITEMS, shipMarkClassFactor, shipMarkCost, shipMarkOf,' +

@@ -39,7 +39,7 @@ check('Bestandszahlen aus der Spieldatei gelesen', SPECIALS_TOTAL > 40 && RARE_F
 function baueUmgebung(codex, claimed){
   const ctx = {};
   const state = { codexClaimed: claimed || {} };
-  new Function('ctx', 'state', 'ensureExpeditionCodex', 'EXPEDITION_SPECIAL_EVENTS', 'RARE_ITEMS', block +
+  i18nFunction(src, 'ctx', 'state', 'ensureExpeditionCodex', 'EXPEDITION_SPECIAL_EVENTS', 'RARE_ITEMS', block +
     ';ctx.TIERS=CODEX_TIERS;ctx.need=codexTierNeed;ctx.done=codexTierDone;ctx.claimed=codexTierClaimed;ctx.bonus=codexExpeditionBonus;'
   )(ctx, state, () => codex, new Array(SPECIALS_TOTAL).fill(0).map((_, i) => ({ key: 's' + i })),
     new Array(RARE_FINDBAR).fill(0).map((_, i) => ({ key: 'r' + i, chance: 0.01 })));

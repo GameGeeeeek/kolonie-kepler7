@@ -37,7 +37,7 @@ const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x 
 
 // ---- 1) die Regel am Quelltext
 {
-  const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1]);
   check('1: es gibt eine gemeinsame Quelle', /function allianzVerbandEintraege\(/.test(JS));
   // Sie muss BEIDE Beitragsarten kennen - sonst waere die zweite Stelle wieder vergessen.
   const fn = JS.slice(JS.indexOf('function allianzVerbandEintraege('), JS.indexOf('function allianzVerbandZeile('));

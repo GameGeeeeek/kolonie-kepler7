@@ -126,7 +126,9 @@ for (const [name, fn] of [['die Leerlauf-Karte','leerlaufKarte'],
                           ['der Zielkasten','renderNextGoalBox'],
                           ['das Willkommensfenster','showWelcomeBackModal'],
                           ['die Reiterpunkte','updateTabBedarfBadges']]){
-  check('4: '+name+' liest aus der Bedarfsliste', /spielBedarfGecacht\(\)/.test(fnAus(fn)));
+  const body=fnAus(fn);
+  const sharedActions=fn==='showWelcomeBackModal'&&/k7ReturnActions\(\)/.test(body)&&/spielBedarfGecacht\(\)/.test(fnAus('k7ReturnActions'));
+  check('4: '+name+' liest aus der Bedarfsliste', /spielBedarfGecacht\(\)/.test(body)||sharedActions);
 }
 // Pruefung C: Die Liste MUSS in der Signatur des Zielkastens stehen, sonst friert die Zeile ein.
 {

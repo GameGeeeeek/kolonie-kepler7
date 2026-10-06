@@ -174,8 +174,8 @@ const boxText = page => page.evaluate(() => {
     if (!box) return null;
     const zeile = Array.from(box.querySelectorAll('*')).find(el => el.textContent && el.textContent.indexOf('Buntname') !== -1);
     if (!zeile) return { gefunden: false, html: box.innerHTML.slice(0, 200) };
-    // Das Element, das den Namen UNMITTELBAR enthält - nicht die ganze Zeile.
-    const span = Array.from(box.querySelectorAll('span')).filter(s => s.textContent.trim() === 'Buntname').pop();
+    // Die bestehende Formatierung sitzt außerhalb der geschützten Textgrenze des Namens.
+    const span = Array.from(box.querySelectorAll('span:not([translate="no"])')).filter(s => s.textContent.trim() === 'Buntname').pop();
     return { gefunden: true, farbe: span ? span.getAttribute('style') : null,
              umfeld: span && span.parentElement ? span.parentElement.innerHTML.slice(0, 300) : null };
   });
@@ -191,7 +191,7 @@ const boxText = page => page.evaluate(() => {
   // Prüfung 4 nur, dass irgendwo ein style-Attribut steht.
   const ohne = await a.page.evaluate(() => {
     const box = document.getElementById('leaderboard');
-    const span = Array.from(box.querySelectorAll('span')).filter(s => s.textContent.trim() === 'Farbtest').pop();
+    const span = Array.from(box.querySelectorAll('span:not([translate="no"])')).filter(s => s.textContent.trim() === 'Farbtest').pop();
     return span ? (span.getAttribute('style') || '') : null;
   });
   check('4: ein Spieler ohne Kosmetik bekommt KEINE Farbe', ohne === null || !/color:\s*#/.test(ohne), { ohne });

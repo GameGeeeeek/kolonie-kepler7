@@ -36,7 +36,7 @@ const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
-const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1]);
 
 // ---- 1) Quelltext ----------------------------------------------------------------------------
 {
@@ -81,12 +81,13 @@ const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script
     check('1e-' + fn.replace('(', '') + ': sichert den Spielstand über die gemeinsame Stelle',
       i >= 0 && /await spielstandVorAnfrageSichern\(/.test(block), { gefunden: i >= 0 });
   }
-  /* EINE Stelle für ALLE fünf Aufrufer (Markt, Sammelauftrag, drei Börsen-Routen), nicht fünf
-     Kopien derselben Meldung. Ein sechster Aufruf, der sie vergisst, fällt bei 1h auf. */
+  /* EINE Stelle für alle Aufrufer: Markt, Sammelauftrag, drei Börsen-Routen sowie seit
+     06.10.2026 Allianzoperation und Expeditionsentscheidung. Die drei Börsen-Routen
+     werden bei 1h weiterhin einzeln vor ihrer Anfrage geprüft. */
   check('1f: es gibt EINE gemeinsame Sicherung',
     /async function spielstandVorAnfrageSichern\(/.test(ohneK));
   const nutzer = (ohneK.match(/await spielstandVorAnfrageSichern\(/g) || []).length;
-  check('1g: und alle FÜNF Aufrufer benutzen sie', nutzer === 5, { nutzer });
+  check('1g: alle fünf Handels- und zwei neuen Fortschritts-Aufrufer benutzen sie', nutzer === 7, { nutzer });
   /* Die Meldung darf es genau EINMAL geben - sie war bis zum 06.09.2026 in drei Kopien im
      Umlauf, und eine Umformulierung hätte an drei Stellen nachgezogen werden müssen. */
   const meldungen = (ohneK.match(/ließ sich gerade nicht speichern/g) || []).length;

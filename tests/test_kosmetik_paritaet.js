@@ -150,10 +150,11 @@ check('6: der Server überschreibt die Kosmetik im Bestenlisten-Eintrag (lesend 
 // eigene Bedingung. Eine zweite, kuerzere Liste daneben kann deshalb nur falsch werden.
 // Geprueft wird die REGEL: die drei stabilen Oberbegriffe ja, einzelne Bedingungsarten nein.
 {
-  const von = js.indexOf('Namensfarbe und Emblem erscheinen');
-  const bis = von < 0 ? -1 : js.indexOf('</div>', von);
+  const liveHelpSource=require('./lib/i18n').ohneI18nWoerterbuch(js);
+  const von = liveHelpSource.indexOf('Namensfarbe und Emblem erscheinen');
+  const bis = von < 0 ? -1 : liveHelpSource.indexOf('</div>', von);
   check('7-anker: die Einleitungszeile der Kosmetik-Box laesst sich schneiden', von > 0 && bis > von, { von, bis });
-  const zeile = (von > 0 && bis > von) ? js.slice(von, bis) : '';
+  const zeile = (von > 0 && bis > von) ? liveHelpSource.slice(von, bis) : '';
   const verraeter = ['Prestige', 'Aufstieg', 'Kampfpunkte', 'Rekordtiefe', 'Sektor-Bosse',
                      'abgewehrte Angriffe', 'Asteroidenfestungen', 'Königin'];
   const gefunden = verraeter.filter(w => zeile.indexOf(w) >= 0);

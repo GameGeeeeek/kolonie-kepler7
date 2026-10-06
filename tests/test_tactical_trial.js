@@ -1,0 +1,37 @@
+'use strict';
+const fs=require('fs'), vm=require('vm'), assert=require('node:assert/strict');
+const {SPIELDATEI}=require('./lib/spieldatei');
+const source=fs.readFileSync(SPIELDATEI,'utf8');
+const start='  const TACTICAL_TRIAL_WAVES = [',end='  let tacticalTrialRun = newTacticalTrial();';
+assert.equal(source.split(start).length-1,1,'one scenario definition');
+assert.equal(source.split(end).length-1,1,'one checked extraction end');
+const code=source.slice(source.indexOf(start),source.indexOf(end));
+const phases=(source.match(/const BATTLE_PHASES = (\[[\s\S]*?\]);/)||[])[1];assert.ok(phases,'existing combat phase definitions');
+const engine=(source.match(/function resolveBattlePhases\([^)]*\)\{[\s\S]*?\n  \}/)||[])[0];assert.ok(engine,'existing combat engine');
+const shipKeys=['jaeger','bomber','schlachtschiff'];
+const SHIP_DEFS=shipKeys.map(key=>{const m=source.match(new RegExp("\\{ key:'"+key+"'[^\\n]*?atk:(\\d+)"));assert.ok(m,'actual base stats '+key);return {key,atk:Number(m[1])};});
+const sandbox={SHIP_DEFS}; vm.createContext(sandbox);
+vm.runInContext('const BATTLE_PHASES='+phases+';const PHASE_CHANCE_MIN=.14,PHASE_CHANCE_MAX=.86;'+engine,sandbox);
+vm.runInContext(code+'\nthis.api={newTacticalTrial,resolveTacticalTrial,continueTacticalTrial};',sandbox);
+const {newTacticalTrial,resolveTacticalTrial,continueTacticalTrial}=sandbox.api;
+let checks=0, failed=0;function check(name,value){checks++;if(!value)failed++;console.log((value?'OK':'FAIL')+' - '+name);}
+check('scenario logic does not read the account or RNG',!/\bstate\b|Math\.random|save\(|resources|credits|fetch\(/.test(code));
+const first=newTacticalTrial(),snapshot=JSON.stringify(first);
+const once=resolveTacticalTrial(first,'screen',0);
+check('input state is not mutated',JSON.stringify(first)===snapshot);
+check('correct counter deals exactly four damage',once.integrity===96&&once.status==='result');
+check('result comes from all three actual combat phases',once.history[0].phasen.length===3&&once.history[0].siege===3);
+check('a repeated click cannot resolve another wave',resolveTacticalTrial(once,'screen',0)===null);
+check('a stale wave is rejected',resolveTacticalTrial(continueTacticalTrial(once),'screen',0)===null);
+check('unknown tactics fail closed',resolveTacticalTrial(first,'__proto__',0)===null);
+check('invalid numeric state fails closed',resolveTacticalTrial({...first,integrity:NaN},'screen',0)===null);
+check('next is not accepted before a result',continueTacticalTrial(first)===null);
+function play(choices){let run=newTacticalTrial();for(const choice of choices){if(run.status!=='ready')break;run=continueTacticalTrial(resolveTacticalTrial(run,choice,run.wave));}return run;}
+const best=play(['screen','strike','barrage']);
+check('all three correct counters finish with 88 integrity',best.status==='finished'&&best.integrity===88&&best.history.length===3);
+const worst=play(['barrage','screen','strike']);
+check('a losing run reaches zero, never a negative number',worst.status==='finished'&&worst.integrity===0);
+check('replaying identical decisions yields identical results',JSON.stringify(play(['screen','strike','barrage']))===JSON.stringify(best));
+check('a new run has a fresh history',newTacticalTrial().history!==newTacticalTrial().history);
+check('the trial is reachable from the actual galaxy tab',source.includes('id="tacticalTrialBox"')&&source.includes("loadGlobalChat(); renderTacticalTrial();"));
+console.log((failed?'FAIL':'PASS')+' '+checks+' checks');if(failed)process.exitCode=1;

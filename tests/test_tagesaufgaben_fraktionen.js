@@ -92,7 +92,7 @@ check('1: der Pool hat 25 Vorlagen', u.ctx.DEFS.length === 25, u.ctx.DEFS.length
 {
   const fs2 = require('fs');
   const { SPIELDATEI: DATEI } = require('./lib/umgebung');
-  const roh = fs2.readFileSync(DATEI, 'utf8').replace(/\r\n/g, '\n');
+  const roh = require('./lib/i18n').ohneI18nWoerterbuch(fs2.readFileSync(DATEI, 'utf8').replace(/\r\n/g, '\n'));
   const stellen = [...roh.matchAll(/aus (\d+) Vorlagen gezogen/g), ...roh.matchAll(/damit (\d+) Vorlagen/g)]
     .map(m => Number(m[1]));
   check('1: Tutorial UND Hilfe nennen dieselbe Poolgroesse',

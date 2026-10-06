@@ -1,0 +1,87 @@
+name: Kepler ideas regression checks
+on:
+  push:
+    branches: ["feat/kepler-ideas-20261005"]
+  pull_request:
+    branches: [main]
+    paths:
+      - weltraum_kolonie.html
+      - tests/**
+      - .github/workflows/kepler-ideas-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kepler-ideas-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  targeted-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 'dda5d5d3c1dbfb5eeef9ecf5c88227014415c1ef'
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser test dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Required checks and feature behaviour
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          mkdir -p .review-logs
+          node tests/run.js --nur-pflicht 2>&1 | tee .review-logs/required.log
+          node tests/test_tactical_trial.js 2>&1 | tee .review-logs/trial.log
+          node tests/test_map_favorites.js 2>&1 | tee .review-logs/favorites.log
+      - name: Counterexamples must fail the same assertions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, subprocess
+          source = Path('weltraum_kolonie.html').read_text()
+          mutations = [
+            ('trial','tests/test_tactical_trial.js','const battle=resolveBattlePhases(base*run.integrity/100,base*0.8,wave.counters[tactic],undefined,undefined,()=>draws[roll++]);','const battle={siege:3,phasen:[]};','result comes from all three actual combat phases'),
+            ('favorites','tests/test_map_favorites.js','const sys = visibleSystems().find(s => s.id === id);','const sys = STAR_SYSTEMS.find(s => s.id === id);','hiddenRejected')
+          ]
+          for name, test, old, new, expected in mutations:
+              assert source.count(old) == 1, (name,'mutation anchor is not unique')
+              target = Path(os.environ['RUNNER_TEMP']) / ('k7-broken-'+name+'.html')
+              target.write_text(source.replace(old,new,1))
+              try:
+                  env = dict(os.environ,KEPLER_SPIELDATEI=str(target))
+                  result = subprocess.run(['node',test],env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
+                  Path('.review-logs/'+name+'-counterexample.log').write_text(result.stdout)
+                  print(result.stdout)
+                  assert result.returncode == 1, (name,'broken copy did not fail correctly')
+                  assert 'FAIL - '+expected in result.stdout, (name,'failed for an unrelated reason')
+                  green = Path('.review-logs/'+name+'.log').read_text()
+                  names = lambda text: [line.split(' - ',1)[1] for line in text.splitlines() if line.startswith(('OK - ','FAIL - '))]
+                  assert names(green) == names(result.stdout), (name,'different assertions in the counterexample')
+              finally:
+                  target.unlink(missing_ok=True)
+          PY
+      - name: Existing map and tab regressions over HTTP
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js 2>&1 | tee .review-logs/existing-http.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-ideas-review-logs
+          path: .review-logs/
+          include-hidden-files: true
+          retention-days: 5
+          if-no-files-found: ignore

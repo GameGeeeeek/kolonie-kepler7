@@ -247,7 +247,7 @@ const ABLAGE = path.join(os.tmpdir(), 'kepler-pruflauf');
 fs.mkdirSync(ABLAGE, { recursive: true });
 
 const alle = fs.readdirSync(path.join(WURZEL, 'tests'))
-  .filter(f => f.endsWith('.js') && f !== 'run.js')
+  .filter(f => f.endsWith('.js') && f !== 'run.js' && f !== 'http-run.js')
   .sort();
 
 /* Reihum verteilen. Die Zuordnung haengt NUR an der sortierten Liste und der Stueckzahl - zwei

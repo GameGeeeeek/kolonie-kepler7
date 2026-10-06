@@ -913,7 +913,7 @@ function aufraeumenVergleich(){
   // Anker wird deshalb im Quelltext gemessen - und VOR der Benutzung auf Existenz geprueft, damit
   // eine umbenannte Meldung nicht als bestanden durchgeht.
   {
-    const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+    const quelle = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
     const ANKER = 'Verteidigungspunkte dort: ';
     const treffer = quelle.split(ANKER).length - 1;
     const stelle = treffer === 1 ? quelle.substr(quelle.indexOf(ANKER), 80) : '';
@@ -932,7 +932,7 @@ function aufraeumenVergleich(){
      Ueberfall-Meldung daneben (4h) seit UI-6 ueber fmt() laeuft; zwei Schreibweisen in derselben
      Protokollspalte sind genau die Fehlerklasse, um die es hier geht. */
   {
-    const quelle = fs.readFileSync(SPIELDATEI, 'utf8');
+    const quelle = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
     const STELLEN = [
       ['Kasten „Markiertes Ziel" im Galaxie-Reiter', 'angegriffen · Angriffskraft ${'],
       ['Protokoll: Piratenflotte abfangen',          "' ab (Angriffskraft '+"],

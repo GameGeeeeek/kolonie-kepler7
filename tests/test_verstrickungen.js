@@ -64,7 +64,7 @@ if (!blockFraktion || !blockVeteran || !blockDoktrin || !blockDokFn || !blockSpy
 // factionEffectLevel wird injiziert: 0 = kein Effekt, 1 = freundlich, 2 = verbündet.
 function fraktionsBonus(fid, stufe){
   const ctx = {};
-  new Function('ctx', 'factionEffectLevel',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'factionEffectLevel',
     blockFraktion + ';ctx.b=factionOutsideBonus;ctx.t=FACTION_OUTSIDE;'
   )(ctx, () => stufe);
   return { bonus: ctx.b(fid), tabelle: ctx.t };
@@ -87,7 +87,7 @@ check('Legion-Bündnis: +3% freundlich / +6% verbündet (Backend-Spiegel)',
 // Rangtabelle (die hat ihren eigenen Ort und darf sich unabhängig verschieben).
 function vetExtra(rolle, rangBonus, art){
   const ctx = {};
-  new Function('ctx', 'planetRoleOf', 'veteranRankOf',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'planetRoleOf', 'veteranRankOf',
     blockVeteran + ';ctx.f=veteranRoleExtra;ctx.t=VETERAN_ROLE_EXTRA;'
   )(ctx, () => (rolle ? { key: rolle } : null), () => ({ bonus: rangBonus }));
   return { wert: ctx.f('home', art), tabelle: ctx.t };
@@ -115,7 +115,7 @@ check('ohne Kampferfahrung ist die Kopplung überall 0',
 // --- E: Doktrin-Synergie -------------------------------------------------------------------------
 function doktrin(key, rollen){
   const ctx = {};
-  new Function('ctx', 'state', 'hasRoleAnywhere',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'state', 'hasRoleAnywhere',
     blockDoktrin + ';' + blockDokFn.replace('function doctrineSynActive', 'function doctrineSynActive')
     + '\n  function activeDoctrine(){ return state.doctrine ? DOCTRINE_DEFS.find(d=>d.key===state.doctrine) : null; }'
     + ';ctx.m=doctrineMultOf;ctx.a=doctrineSynActive;ctx.d=DOCTRINE_DEFS;'
@@ -156,7 +156,7 @@ check('die Synergie einer Doktrin fasst nur ihre eigene Seite an',
 // als Eigenschaft geprueft und nicht nur behauptet.
 function doktrinB(key, rollen){
   const ctx = {};
-  new Function('ctx', 'state', 'hasRoleAnywhere',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'state', 'hasRoleAnywhere',
     blockDoktrin + ';' + blockDokFn
     + '\n  function activeDoctrine(){ return state.doctrine ? DOCTRINE_DEFS.find(d=>d.key===state.doctrine) : null; }'
     + '\n  function doctrineBonusOf(kanal){ const doc = activeDoctrine(); if (!doc) return 0; const grund = doc[kanal] || 0;'

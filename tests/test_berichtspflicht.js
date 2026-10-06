@@ -28,7 +28,7 @@
 // Was bleibt uebrig, wenn man Ergebnis-Pille und Zeitstempel abzieht? Bei der leeren Karte ist das
 // exakt nichts, bei jeder sprechenden etwas.
 
-const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, SERVER_JS, pruefer } = require('./lib/umgebung');
 const fs = require('fs');
 
 const { check, ende } = pruefer();
@@ -59,8 +59,22 @@ const ZEICHNER = (zA > 0 && zEnde > 0) ? zRest.slice(0, zEnde) : '';
    wurde. Das ist derselbe Fehler, gegen den dieser Test gebaut ist, nur im Messwerkzeug: Ein
    Muster, das eine SCHREIBWEISE kodiert statt der Sache (Hausregel 3/40). Waere nur der Erzeuger
    dagewesen und der Zweig nicht, haette 1a den Fehlschlag verschwiegen. */
+// The encounter adapter creates one shared result object for report and reward.
+// Read its actual producer when the companion backend is available.
+const serverTypes = [];
+const adapterFile = SERVER_JS && require('path').join(require('path').dirname(SERVER_JS), 'k7-ideas.js');
+if (adapterFile && fs.existsSync(adapterFile)) {
+  const adapter = fs.readFileSync(adapterFile, 'utf8');
+  const from = adapter.indexOf('function resolveEncounter('), to = adapter.indexOf('function encounterView(', from);
+  check('1-server: serverseitiger Wrack-Auflöser gefunden', from >= 0 && to > from);
+  const block = from >= 0 && to > from ? adapter.slice(from, to) : '';
+  for (const match of block.matchAll(/const (\w+)\s*=\s*\{type:'([a-z0-9-]+)'/g)) {
+    if (new RegExp('addReport\\(id,\\s*' + match[1] + '\\)').test(block)) serverTypes.push(match[2]);
+  }
+  check('1-server: Wrack-Ergebnis erreicht den Berichtsadapter', serverTypes.includes('expedition-choice'));
+}
 const erzeugt = [...new Set([...OHNE_HISTORIE.matchAll(/pushReport\(\s*\{[\s\S]{0,120}?\btype: *'([a-z0-9-]+)'/g)]
-  .map(m => m[1]))].sort();
+  .map(m => m[1]).concat(serverTypes))].sort();
 const gezeichnet = new Set((ZEICHNER.match(/r\.type *=== *'[a-z0-9-]+'/g) || []).map(t => t.split("'")[1]));
 
 check('1-vorab: es werden ueberhaupt Berichtsarten erzeugt', erzeugt.length >= 15, { anzahl: erzeugt.length });
@@ -79,7 +93,7 @@ check('1a: JEDE erzeugte Berichtsart hat einen Zeichner-Zweig', ohneZweig.length
 // gehoert zu einer Art, die der SERVER erzeugt. Die stehen namentlich hier, damit ein Wegfall
 // auffaellt statt stillschweigend zu passieren.
 const VOM_SERVER = new Set(['attack-sent','attack-received','sabotage-sent','sabotage-received',
-                            'raid','npc-attack','player-attack']);
+                            'raid','npc-attack','player-attack','expedition-choice']);
 const ohneErzeuger = [...gezeichnet].filter(t => !erzeugt.includes(t) && !VOM_SERVER.has(t)).sort();
 check('1b: kein Zeichner-Zweig ohne Erzeuger', ohneErzeuger.length === 0, { ohneErzeuger });
 

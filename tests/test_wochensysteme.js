@@ -51,7 +51,7 @@ const genSrc = src.slice(genVon, genBis);
 // Eine frische, voneinander unabhängige Ausführung des Generators. Zweimal aufgerufen ergibt das zwei
 // vollständig getrennte Galaxien - genau die Ausgangslage zweier Spieler an zwei Rechnern.
 function neueGalaxie(){
-  return new Function(
+  return require('./lib/i18n').i18nFunction(src,
     starSrc + '\n' + planetSrc + '\n' + typeSrc + '\n' + genSrc + '\n' +
     'return { STAR_SYSTEMS, PLANETS, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_COUNT, WEEKLY_SYSTEMS_PER_WEEK,' +
     ' WEEKLY_SYSTEM_EPOCH, WEEKLY_SYSTEM_MAX, WEEKLY_ORBIT_POS, WEEKLY_PLANET_TYPES, WEEK_MS,' +

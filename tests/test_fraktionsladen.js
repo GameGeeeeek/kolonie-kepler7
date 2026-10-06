@@ -39,7 +39,7 @@ function baue(opts){
   };
   const meldungen = [];
   const protokoll = { signale: 0, kontakt: [] };
-  new Function('ctx', 'state', 'log', 'fmt', 'playSound', 'checkAchievements', 'render', 'save',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'state', 'log', 'fmt', 'playSound', 'checkAchievements', 'render', 'save',
     'factionEffectLevel', 'factionNameOf', 'maybeSpawnSignal', 'moduleInstanceInfo', 'touchFactionContact',
     block + ';ctx.SHOPS=FACTION_SHOPS;ctx.FAVOR=FAVOR_PER_TIER;ctx.WAR=FAVOR_WAR_SUPPORT;' +
     'ctx.favorOf=factionFavorOf;ctx.add=addFactionFavor;ctx.buy=buyFactionShopItem;ctx.item=factionShopItem;ctx.gibModul=gibModul;'

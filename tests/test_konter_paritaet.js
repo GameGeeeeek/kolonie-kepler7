@@ -12,7 +12,8 @@ function lade(datei, von, bis, exportZeile){
   const a = s.indexOf(von); const b = s.indexOf(bis, a);
   if (a<0||b<0) throw new Error('Block nicht gefunden in '+datei);
   const ctx = {};
-  new Function('ctx', s.slice(a,b) + ';' + exportZeile)(ctx);
+  const evaluate = datei === SPIELDATEI ? (...args) => require('./lib/i18n').i18nFunction(s, ...args) : (...args) => new Function(...args);
+  evaluate('ctx', s.slice(a,b) + ';' + exportZeile)(ctx);
   return ctx;
 }
 const FE = lade(SPIELDATEI,

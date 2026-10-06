@@ -47,7 +47,7 @@ const JS = SPIEL.match(/<script>([\s\S]*)<\/script>/)[1];
 {
   const schnitt = (von, bis) => JS.slice(JS.indexOf(von), JS.indexOf(bis));
   const u = {};
-  new Function('u', schnitt('const MODULE_SUB_MIN', 'function rollModuleSubs(') +
+  require('./lib/i18n').i18nFunction(SPIEL, 'u', schnitt('const MODULE_SUB_MIN', 'function rollModuleSubs(') +
     '\nu.g = moduleSubGuete; u.mg = moduleGuete; u.stufe = modulGueteStufe; u.MIN = MODULE_SUB_MIN; u.MAX = MODULE_SUB_MAX;')(u);
 
   check('2: der schlechtestmoegliche Wurf ergibt Guete 0', u.g(u.MIN/1000) === 0, u.g(u.MIN/1000));

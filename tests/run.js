@@ -241,7 +241,7 @@ try {
 // ---------------------------------------------------------------------------------- Testdateien
 if (!nurPflicht) {
   const dateien = fs.readdirSync(__dirname)
-    .filter(f => f.endsWith('.js') && f !== 'run.js')
+    .filter(f => f.endsWith('.js') && f !== 'run.js' && f !== 'http-run.js')
     .filter(f => !nurNummer || NUMMER_TESTS.includes(f))
     .filter(f => !filter.length || filter.some(t => f.includes(t)))
     .sort();

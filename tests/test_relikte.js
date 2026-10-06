@@ -276,7 +276,8 @@ check('6: es gibt einen Erfolg fuer die vollstaendige Sammlung',
   /key:'abgrundkabinett'/.test(js) && /ABGRUND_RELIKTE\.every/.test(js));
 
 // Regel 6: die Hilfe nennt Zahlen, die aus den Daten kommen muessen.
-const hilfe = js.slice(js.indexOf('Reliquien – was ein Wächter zurücklässt'));
+const liveHelpSource=require('./lib/i18n').ohneI18nWoerterbuch(js);
+const hilfe = liveHelpSource.slice(liveHelpSource.indexOf('Reliquien – was ein Wächter zurücklässt'));
 // Beide Pruefungen suchten bis zur zweiten Reihe die LITERALE 'zwölf' und 'Tiefe 120' - obwohl
 // der Kommentar darueber schon sagte, die Zahlen muessten aus den Daten kommen. Sie taten es
 // nicht, und ein Erweitern der Tabelle haette den Hilfetext still falsch werden lassen, ohne dass

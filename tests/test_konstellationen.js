@@ -318,7 +318,8 @@ check('7: gezaehlt wird der tatsaechlich gekaempfte Sektor, nicht der ungebannte
 check('7: es gibt einen Erfolg fuer alle Konstellationen',
   /key:'abgrundkonst'/.test(js) && /ABGRUND_KONSTELLATIONEN\.every/.test(js));
 // Regel 6: Die Hilfe muss dieselbe Zahl nennen wie das Array, sonst veraltet sie beim naechsten Zuwachs.
-const hilfe = js.slice(js.indexOf("Konstellationen – wenn Mutatoren zusammengehören"));
+const liveHelpSource=require('./lib/i18n').ohneI18nWoerterbuch(js);
+const hilfe = liveHelpSource.slice(liveHelpSource.indexOf("Konstellationen – wenn Mutatoren zusammengehören"));
 const hilfeZahl = { 'neun':9, 'acht':8, 'zehn':10, 'elf':11, 'zwölf':12 };
 const genannt = Object.keys(hilfeZahl).find(w => hilfe.slice(0,2500).includes('<strong>'+w+'</strong>'));
 check('7: die Hilfe nennt dieselbe Anzahl Konstellationen wie das Array',

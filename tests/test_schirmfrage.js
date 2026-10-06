@@ -52,6 +52,7 @@ const AUSNAHMEN = [
   { was: 'statustafelObenauf', grund: 'misst bereits selbst' },
   { was: 'fensterLage',  grund: 'Boden der Escape-Kette - darf bei `weg` zugreifen, Begruendung steht dort' },
   { was: "role') !== 'button'", grund: 'folgt dem Fokus (e.target), nicht der Flaeche' },
+  { was: "event.target.closest('[data-claim-quest],[data-quest-nav]')", grund: 'bedient ausschließlich die fokussierte Tagesaufgabe; Enter/Leertaste und Wiederholung werden geprüft' },
   { was: 'closeLoginModal', grund: 'gehoert dem Fenster selbst, gated durch dessen Offen-Zustand' },
 ];
 {

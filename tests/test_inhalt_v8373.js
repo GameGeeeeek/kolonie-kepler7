@@ -90,7 +90,7 @@ function schnitt(text, von, bis, ohneEnde){
     // haetten (CLAUDE.md, Arbeitsregel 34).
     let feCtx = {}, beCtx = {}, baufehler = '';
     try {
-      new Function('ctx', feBlock + '\n;ctx.f=worldBossArchetype;ctx.t=WORLDBOSS_ARCHETYPEN;')(feCtx);
+      require('./lib/i18n').i18nFunction(src, 'ctx', feBlock + '\n;ctx.f=worldBossArchetype;ctx.t=WORLDBOSS_ARCHETYPEN;')(feCtx);
       new Function('ctx', beBlock + '\n;ctx.f=worldBossArchetypeOf;')(beCtx);
     } catch (e) { baufehler = String(e && e.message || e); }
     check('1-bau: beide Bloecke lassen sich ausführen', !baufehler && !!feCtx.f && !!beCtx.f, baufehler);
