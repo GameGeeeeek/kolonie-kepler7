@@ -73,9 +73,20 @@ function schnitt(text, von, bis, ohneEnde){
     check('1: Frontend und Backend ergeben fuer Stufe 1-12 denselben Boss und dieselben Faktoren', ab.length === 0, ab.slice(0,3));
     const verschieden = new Set([1,2,3,4,5].map(l => feCtx.f(l).ohneMult + '/' + feCtx.f(l).verlustMult));
     check('1: die fuenf Bosse unterscheiden sich wirklich', verschieden.size >= 4, [...verschieden]);
-    // Der Malus-statt-Bonus-Punkt, woertlich am Server geprueft.
-    check('1: der Server gibt vollen Schaden, WENN der Schiffstyp da ist (Malus statt Bonus)',
-      /const schadenMult = hatSchwaeche \? 1 : raidBoss\.ohneMult;/.test(be));
+    // Die optionale Bossphase ergaenzt seit 06.10.2026 einen Faktor. Die normale
+    // Schwaeche bleibt ein Malus bei fehlendem Schiffstyp. Die echte Zuweisung
+    // ausfuehren statt deren alte Schreibweise zu verlangen.
+    const faktorQuelle = be.match(/const schadenMult = ([^;\r\n]+);/);
+    check('1: die echte Schadensfaktor-Zuweisung ist gefunden', !!faktorQuelle);
+    let faktor = null;
+    try { if (faktorQuelle) faktor = new Function('hatSchwaeche', 'raidBoss', 'phase', 'return ' + faktorQuelle[1] + ';'); }
+    catch (e) { check('1: die Schadensfaktor-Zuweisung laesst sich ausfuehren', false, String(e)); }
+    for (const ohneMult of [0.75, 0.8, 1]) {
+      check('1: ohne optionale Phase gibt ein vorhandener Schiffstyp vollen Schaden, Faktor ' + ohneMult,
+        !!faktor && faktor(true, {ohneMult}, null) === 1);
+      check('1: ohne optionale Phase bleibt bei fehlendem Schiffstyp der Boss-Malus, Faktor ' + ohneMult,
+        !!faktor && faktor(false, {ohneMult}, null) === ohneMult);
+    }
     // 07.08.2026 (v8.438.0) neu gefasst: Der Schock-Status darf die Schwaeche zusaetzlich decken
     // (statusVorher.schock ? true : ...), die REGEL "ohne Schwaeche immer voller Schaden" bleibt -
     // geprueft wird der Term IN der Zuweisung, nicht mehr die woertliche alte Zeile (Arbeitsregel 3).

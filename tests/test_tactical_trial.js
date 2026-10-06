@@ -6,7 +6,12 @@ const start='  const TACTICAL_TRIAL_WAVES = [',end='  let tacticalTrialRun = new
 assert.equal(source.split(start).length-1,1,'one scenario definition');
 assert.equal(source.split(end).length-1,1,'one checked extraction end');
 const code=source.slice(source.indexOf(start),source.indexOf(end));
-const sandbox={}; vm.createContext(sandbox);
+const phases=(source.match(/const BATTLE_PHASES = (\[[\s\S]*?\]);/)||[])[1];assert.ok(phases,'existing combat phase definitions');
+const engine=(source.match(/function resolveBattlePhases\([^)]*\)\{[\s\S]*?\n  \}/)||[])[0];assert.ok(engine,'existing combat engine');
+const shipKeys=['jaeger','bomber','schlachtschiff'];
+const SHIP_DEFS=shipKeys.map(key=>{const m=source.match(new RegExp("\\{ key:'"+key+"'[^\\n]*?atk:(\\d+)"));assert.ok(m,'actual base stats '+key);return {key,atk:Number(m[1])};});
+const sandbox={SHIP_DEFS}; vm.createContext(sandbox);
+vm.runInContext('const BATTLE_PHASES='+phases+';const PHASE_CHANCE_MIN=.14,PHASE_CHANCE_MAX=.86;'+engine,sandbox);
 vm.runInContext(code+'\nthis.api={newTacticalTrial,resolveTacticalTrial,continueTacticalTrial};',sandbox);
 const {newTacticalTrial,resolveTacticalTrial,continueTacticalTrial}=sandbox.api;
 let checks=0, failed=0;function check(name,value){checks++;if(!value)failed++;console.log((value?'OK':'FAIL')+' - '+name);}
@@ -15,6 +20,7 @@ const first=newTacticalTrial(),snapshot=JSON.stringify(first);
 const once=resolveTacticalTrial(first,'screen',0);
 check('input state is not mutated',JSON.stringify(first)===snapshot);
 check('correct counter deals exactly four damage',once.integrity===96&&once.status==='result');
+check('result comes from all three actual combat phases',once.history[0].phasen.length===3&&once.history[0].siege===3);
 check('a repeated click cannot resolve another wave',resolveTacticalTrial(once,'screen',0)===null);
 check('a stale wave is rejected',resolveTacticalTrial(continueTacticalTrial(once),'screen',0)===null);
 check('unknown tactics fail closed',resolveTacticalTrial(first,'__proto__',0)===null);
