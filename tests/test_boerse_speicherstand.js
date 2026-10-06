@@ -36,7 +36,7 @@ const fs = require('fs');
 const { SPIELDATEI, SPIEL_URL, starteBrowser, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 
-const JS = fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1]);
 
 // ---- 1) Quelltext ----------------------------------------------------------------------------
 {

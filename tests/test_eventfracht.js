@@ -12,7 +12,7 @@
 // auf "das Wort Frachtraum steht da" waere in beiden Faellen gruen.
 const { SPIELDATEI } = require('./lib/spieldatei');
 const fs = require('fs');
-const { i18nFunction } = require('./lib/i18n');
+const { i18nFunction, ohneI18nWoerterbuch } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
@@ -184,7 +184,7 @@ for (const k of EVENT_MIT_FRACHT){
   check('8a-' + k + ': die Werftkarte nennt den Frachtraum', !!zeile && zeile.includes('Frachtraum'),
     zeile ? zeile.trim().slice(0, 100) : '(keine meta-Zeile gefunden)');
 }
-const descZeile = S.split('\n').find(z => z.includes('Schwere Bergebäume'));
+const descZeile = ohneI18nWoerterbuch(S).split('\n').find(z => z.includes('Schwere Bergebäume'));
 check('8b: die Modulbeschreibung nennt die betroffenen Schiffe namentlich',
   !!descZeile && ['Enterschiff', 'Phantomschiff', 'Riftwächter', 'Schürfschiff'].every(n => descZeile.includes(n)),
   descZeile ? descZeile.trim().slice(0, 120) : '(nicht gefunden)');

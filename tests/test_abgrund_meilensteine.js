@@ -42,7 +42,9 @@ const { starteBrowser, SPIELDATEI, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 const PFAD = path.resolve(process.env.KEPLER_SPIELDATEI || SPIELDATEI);
 const FILE = 'file://' + PFAD;
-const S = fs.readFileSync(PFAD, 'utf8');
+// Search live help, not a duplicate title in the complete translation catalogue.
+const { ohneI18nWoerterbuch } = require('./lib/i18n');
+const S = ohneI18nWoerterbuch(fs.readFileSync(PFAD, 'utf8'));
 
 // Bloecke ueber ihre GRENZE schneiden, nie ueber eine geschaetzte Zeichenzahl - ein geratenes
 // Fenster ist kein Scope, und der Anker gehoert selbst geprueft (Hausregel 6).

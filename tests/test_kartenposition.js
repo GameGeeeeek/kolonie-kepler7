@@ -33,7 +33,7 @@ if (layoutVon < 0 || layoutBis < layoutVon || hashVon < 0){ console.log('\nFAIL'
 // Spiel) plus so viele Wochen-Systeme, wie der jeweilige Fall braucht.
 function layout(systeme, alleSysteme){
   // 69 Basis + 30 Schub + 178 Wochen = 277 Plätze (seit dem Startschub am 02.09.2026; vorher 69 + 208).
-  return new Function('STAR_SYSTEMS', 'BASE_STAR_SYSTEM_COUNT', 'SCHUB_SYSTEM_COUNT', 'WEEKLY_SYSTEM_MAX', 'systeme',
+  return require('./lib/i18n').i18nFunction(src, 'STAR_SYSTEMS', 'BASE_STAR_SYSTEM_COUNT', 'SCHUB_SYSTEM_COUNT', 'WEEKLY_SYSTEM_MAX', 'systeme',
     src.slice(hashVon, hashBis) + '\n' + src.slice(layoutVon, layoutBis) +
     '\nreturn { pos: galaxySpiralLayout(systeme), ratio: galaxyFillRatio(), SLOTS: GALAXY_SPIRAL_SLOTS, RMAX: GALAXY_SPIRAL_RMAX };'
   )(alleSysteme, 69, 30, 178, systeme);
@@ -162,7 +162,7 @@ const sichtbar = (alle, entdeckt) => alle.filter(s => !s.hidden || entdeckt);
   const genVon = src.indexOf('  const WEEKLY_SYSTEMS_PER_WEEK = ');
   const genBis = src.indexOf('  extendWeeklySystems(Date.now());');
   const typeVon = src.indexOf('const PLANET_TYPE_INFO = {'), typeBis = src.indexOf('\n  };', typeVon);
-  const echt = n => new Function('n',
+  const echt = n => require('./lib/i18n').i18nFunction(src, 'n',
     arrayLiteral('STAR_SYSTEMS') + '\n' + arrayLiteral('PLANETS') + '\n' + src.slice(typeVon, typeBis+5) + '\n' +
     src.slice(genVon, genBis) + '\nweeklySystemCount = () => n; extendWeeklySystems(0);\n' +
     src.slice(hashVon, hashBis) + '\n' + src.slice(layoutVon, layoutBis) +

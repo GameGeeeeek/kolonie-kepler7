@@ -199,9 +199,10 @@ check('7: der Hinweis über der Eskortenauswahl droht nicht mehr mit Totalverlus
   !src.includes('drohen unterwegs Verluste bis hin zum Totalverlust'));
 check('7: die Hilfe erklärt die drei Ausgänge einer Begegnung',
   src.includes('Was bei einer Begegnung passiert'));
+const liveHelpSource=require('./lib/i18n').ohneI18nWoerterbuch(src);
 check('7: die Hilfe nennt den Trümmerfeld- und Hyperjäger-Hinweis',
-  /Trümmerfeld/.test(src.slice(src.indexOf('Was bei einer Begegnung passiert'), src.indexOf('Was bei einer Begegnung passiert') + 2000)) &&
-  /Hyperjäger/.test(src.slice(src.indexOf('Was bei einer Begegnung passiert'), src.indexOf('Was bei einer Begegnung passiert') + 2000)));
+  /Trümmerfeld/.test(liveHelpSource.slice(liveHelpSource.indexOf('Was bei einer Begegnung passiert'), liveHelpSource.indexOf('Was bei einer Begegnung passiert') + 2000)) &&
+  /Hyperjäger/.test(liveHelpSource.slice(liveHelpSource.indexOf('Was bei einer Begegnung passiert'), liveHelpSource.indexOf('Was bei einer Begegnung passiert') + 2000)));
 
 console.log(fail ? '\nFAIL' : '\nPASS');
 process.exit(fail ? 1 : 0);

@@ -5,40 +5,76 @@ function k7PersonalGoals() {
 }
 function k7WishSet() {
   const wanted = k7PersonalGoals().wishSet;
-  return MODULE_SET_DEFS.find(s => s.bossKey && s.key === wanted) || MODULE_SET_DEFS.find(s => s.bossKey);
+  return k7LootSets().find(s=>s.key===wanted)||k7LootSets().find(s=>s.bossKey);
+}
+function k7LootSets(){return MODULE_SET_DEFS.map(s=>({...s,art:'standort'})).concat(SHIP_MODULE_SET_DEFS.map(s=>({...s,key:'schiff:'+s.key,art:'schiff'})));}
+function k7LootItems(){return MODULE_DEFS.map(def=>({id:'standort:'+def.key,art:'standort',def})).concat(SHIP_MODULE_DEFS.map(def=>({id:'schiff:'+def.key,art:'schiff',def})));}
+function k7OwnsLoot(def,art){
+  const stock=art==='schiff'?state.shipModules:state.modules,equipped=art==='schiff'?state.equippedShipModules:state.equippedModules;
+  return Object.entries(stock||{}).some(([key,count])=>count>0&&moduleTypeOf(key)===def.key)||Object.values(equipped||{}).some(list=>Array.isArray(list)&&list.some(key=>moduleTypeOf(key)===def.key));
 }
 function k7SetOwnership(set) {
-  return set.req.map(key => ({def: MODULE_DEFS.find(d => d.key === key), owned: besitztModulTyp(state, key)})).filter(row => row.def);
+  const defs=set.art==='schiff'?SHIP_MODULE_DEFS:MODULE_DEFS;
+  return set.req.map(key=>{const def=defs.find(d=>d.key===key);return {def,owned:!!def&&k7OwnsLoot(def,set.art)};}).filter(row=>row.def);
 }
 function k7SelectWish(key) {
-  if (!MODULE_SET_DEFS.some(s => s.bossKey && s.key === key)) return false;
+  if (!k7LootSets().some(s=>s.key===key)) return false;
   k7PersonalGoals().wishSet = key; save(); renderK7LootCompass(); return true;
+}
+function k7ItemWishes(){const goals=k7PersonalGoals();return [...new Set([...(Array.isArray(goals.wishItems)?goals.wishItems:[]),...(Array.isArray(goals.wishParts)?goals.wishParts.map(key=>'standort:'+key):[])])].filter(id=>k7LootItems().some(item=>item.id===id)).slice(0,100);}
+function k7ToggleItemWish(id){
+  if(!k7LootItems().some(item=>item.id===id))return false;
+  const old=k7ItemWishes();if(!old.includes(id)&&old.length>=100)return false;
+  k7PersonalGoals().wishItems=old.includes(id)?old.filter(key=>key!==id):old.concat(id);
+  k7PersonalGoals().wishParts=k7PersonalGoals().wishItems.filter(key=>key.startsWith('standort:')).map(key=>key.slice(9));save();renderK7LootCompass();return true;
+}
+function k7LootSource(def,art){
+  const source=modulFundort(def,art==='schiff'?SHIP_MODULE_DEFS:MODULE_DEFS,art),requirements=[],links=[];
+  let label=k7t(source.text),chance=null;
+  if(source.herkunft==='boss'){
+    label=k7t('Passender Allianz-Raid-Boss; weitere serverbestimmte Boss-Set-Funde bei Festungen, Nestern und Weltboss.');
+    requirements.push(k7t('Allianzmitgliedschaft und passende Raid-Welle für den gezielten Boss-Pool.'));
+    links.push({tab:'allianz:uebersicht',text:k7t('Allianz-Raid')},{tab:'galaxie:kampf',text:k7t('Weltboss')},{tab:'karte',text:k7t('Sektorkarte')});
+  }else if(source.herkunft==='abgrund'){
+    const research=RESEARCH_DEFS.find(d=>d.key===ABGRUND_REQ_RESEARCH);
+    requirements.push(k7t('Benötigte Forschung')+': '+k7t(research.name)+' 1',k7t('Mindesttiefe')+': '+source.minTiefe+' · '+k7t('Rekordtiefe')+': '+((state.abgrund||{}).best||0));
+    links.push({tab:'galaxie:abgrund',text:k7t('Abgrund')});
+  }else if(source.herkunft==='fertigung'){
+    requirements.push(k7t('Nur gezielte Fertigung; kein Zufallsfund.'));
+    if(def.craftCost)requirements.push(k7t('Kosten für Gewöhnlich')+': '+Object.entries(tier2ModuleCraftCost(def,'gewoehnlich')).map(([key,n])=>fmt(n)+' '+resLabel(key)).join(', '));
+    links.push({tab:'offiziere:schiffsmodule',text:k7t('Schiffsmodul-Fertigung')});
+  }else if(source.herkunft==='event'){
+    const event=EVENT_CALENDAR.find(e=>e.key===def.eventKey),active=activeCalendarEventDef();
+    requirements.push((event?k7t(event.name):def.eventKey)+' · '+k7t(active&&active.key===def.eventKey?'Event ist aktiv':'Event ist derzeit nicht aktiv'));
+    chance=EVENT_MODULE_CHANCE;links.push({tab:'expedition',text:k7t('Expedition starten')},{tab:'galaxie:info',text:k7t('Ereigniskalender')});
+  }else if(source.herkunft==='unikat'){
+    requirements.push(k7t(def.fundort||source.text));
+    links.push({tab:def.key==='waechterauge'?'galaxie:abgrund':'galaxie:kampf',text:k7t(def.fundort||source.text)});
+  }else if(source.herkunft==='konvoi')links.push({tab:'karte',text:k7t('Sichtbare Wrackkonvois')});
+  else if(source.herkunft==='normal')links.push({tab:'expedition',text:k7t('Expedition starten')},{tab:'galaxie:diplo',text:k7t('Fraktionen')});
+  else requirements.push(k7t('Gezielte Vergabe; kein Zufallsfund.'));
+  return {...source,label,requirements,links,chance,showShare:['normal','abgrund','boss'].includes(source.herkunft)&&source.anteil!==null};
+}
+function k7LootRow(def,art){
+  const source=k7LootSource(def,art),id=art+':'+def.key,marked=k7ItemWishes().includes(id),owned=k7OwnsLoot(def,art);
+  return `<div class="k7-item"><div class="k7-row"><strong>${escapeHtml(k7t(def.name))}</strong><span class="${owned?'k7-good':'k7-warn'}">${k7h(owned?'Vorhanden':'Fehlt')}</span><button data-k7-item-wish="${id}">${k7h(marked?'Wunsch entfernen':'Wunsch merken')}</button></div><div class="k7-muted">${k7View(def).desc||''}<p>${escapeHtml(source.label)}</p>${source.requirements.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}${source.showShare?`<p>${(source.anteil*100).toFixed(1)}% · ${k7h('Anteil im zulässigen Fundtopf, keine Chance je Aktivität')}</p>`:''}${source.chance!==null?`<p>${(source.chance*100).toFixed(1)}% · ${k7h('Chance je erfolgreicher Expedition während dieses aktiven Events')}</p>`:''}</div><div class="k7-row">${source.links.map(link=>`<button data-k7-go="${link.tab}">${escapeHtml(link.text)}</button>`).join('')}</div></div>`;
 }
 function renderK7LootCompass() {
   const box = document.getElementById('k7LootCompass'); if (!box) return;
   const selected = k7WishSet(); if (!selected) return;
-  const wishes = Array.isArray(k7PersonalGoals().wishParts) ? k7PersonalGoals().wishParts : [];
   const rows = k7SetOwnership(selected);
   let html = `<details class="k7-ideas" data-keep-open="k7loot"${detailsOpenAttr('k7loot')}><summary><i class="ti ti-target" aria-hidden="true"></i> ${k7h('Beutekompass und Wunschliste')} (${rows.filter(r=>r.owned).length}/${rows.length})</summary>
-    <div class="k7-row"><label for="k7WishSet">${k7h('Set auswählen')}</label><select id="k7WishSet">${MODULE_SET_DEFS.filter(s=>s.bossKey).map(s=>`<option value="${s.key}"${s.key===selected.key?' selected':''}>${escapeHtml(k7View(s).name)}</option>`).join('')}</select></div>
-    <p class="k7-muted">${escapeHtml(k7View(selected).desc)}</p>`;
-  for (const row of rows) {
-    const d = row.def, source = modulFundort(d, MODULE_DEFS, 'standort'), marked = wishes.includes(d.key);
-    html += `<div class="k7-item"><div class="k7-row"><i class="ti ${d.icon||'ti-target'}" aria-hidden="true"></i><strong>${escapeHtml(k7View(d).name)}</strong><span class="${row.owned?'k7-good':'k7-warn'}">${k7h(row.owned?'Vorhanden':'Fehlt')}</span><button data-k7-wish="${d.key}">${k7h(marked?'Wunsch entfernen':'Wunsch merken')}</button></div>
-      <div class="k7-muted">${escapeHtml(k7View(d).desc.replace(/<[^>]+>/g,''))}<br>${source.anteil===null?'':(source.anteil*100).toFixed(1)+'% · '+k7h('Anteil im Set-Fundtopf, keine Chance je Kampf')}</div></div>`;
-  }
-  html += `<p class="k7-muted">${k7h('Weitere zulässige Quellen: Asteroidenfestungen, Alien-Nester und Weltboss. Der Server bestimmt Boss-Set und Seltenheit; dort ist ein bestimmtes Set nicht garantiert.')}</p>
-    <div class="k7-row"><button data-k7-go="allianz:uebersicht">${k7h('Allianz-Raid')}</button><button data-k7-go="galaxie:kampf">${k7h('Weltboss')}</button><button data-k7-go="karte">${k7h('Sektorkarte')}</button></div>
-    ${!state.player.allianceTag?'<p class="k7-warn">'+k7h('Allianzmitgliedschaft und eine laufende Raid-Welle erforderlich.')+'</p>':''}</details>`;
+    <div class="k7-row"><label for="k7WishSet">${k7h('Set auswählen')}</label><select id="k7WishSet">${k7LootSets().map(s=>`<option value="${s.key}"${s.key===selected.key?' selected':''}>${escapeHtml(k7t(s.name))}</option>`).join('')}</select></div>
+    <p class="k7-muted">${escapeHtml(k7t(selected.desc))}</p><p class="k7-muted">${k7h('Besitz vervollständigt die Sammlung. Set-Boni wirken erst durch passende Ausrüstung.')}</p>`;
+  for(const row of rows)html+=k7LootRow(row.def,selected.art);
+  const items=k7LootItems(),picked=items.find(item=>item.id===k7PersonalGoals().wishItem)||items[0];
+  html+=`<h4>${k7h('Einzelne Gegenstände und Wunschziele')}</h4><label for="k7WishItem">${k7h('Gegenstand auswählen')}</label><select id="k7WishItem">${items.map(item=>`<option value="${item.id}"${item===picked?' selected':''}>${escapeHtml(k7t(item.def.name))} · ${k7h(item.art==='schiff'?'Schiffsmodul':'Standortmodul')}</option>`).join('')}</select>${k7LootRow(picked.def,picked.art)}`;
+  for(const id of k7ItemWishes()){const item=items.find(row=>row.id===id);if(item.id!==picked.id&&!rows.some(row=>selected.art===item.art&&row.def.key===item.def.key))html+=k7LootRow(item.def,item.art);}
+  html+='</details>';
   setBoxHtml(box, 'k7LootCompass', html);
   box.querySelector('#k7WishSet').onchange = e => k7SelectWish(e.target.value);
-  box.querySelectorAll('[data-k7-wish]').forEach(btn => btn.onclick = () => {
-    const key = btn.dataset.k7Wish;
-    if (!bosssetTeile(selected.bossKey).some(d=>d.key===key)) return;
-    const old = Array.isArray(k7PersonalGoals().wishParts)?k7PersonalGoals().wishParts:[];
-    k7PersonalGoals().wishParts = old.includes(key)?old.filter(k=>k!==key):old.concat(key).slice(0,20);
-    save(); renderK7LootCompass();
-  });
+  box.querySelector('#k7WishItem').onchange=e=>{k7PersonalGoals().wishItem=e.target.value;save();e.target.blur();renderK7LootCompass();};
+  box.querySelectorAll('[data-k7-item-wish]').forEach(btn=>btn.onclick=()=>k7ToggleItemWish(btn.dataset.k7ItemWish));
   k7BindGoalLinks(box);
 }
 function k7BindGoalLinks(box) {
@@ -60,17 +96,20 @@ function k7SaveBlueprint(name) {
   save(); renderK7Blueprints(); return true;
 }
 function k7BlueprintPreview(plan, planet) {
+  if(planet!=='home'&&!Object.hasOwn(state.colonies||{},planet))return [];
   const buildings = planet==='home'?state.buildings:(state.colonies[planet]||{}).buildings;
   if (!buildings || !plan || !Array.isArray(plan.steps)) return [];
   return plan.steps.map(step => {
     if(!step||typeof step!=='object')return null;
-    const def = BUILDING_DEFS.find(d=>d.key===step.key && d.category!=='defense');
+    const def = BUILDING_DEFS.find(d=>d.key===step.key);
     if (!def || !Number.isInteger(step.level) || step.level<1 || step.level>(def.maxLevel||100)) return null;
     const current = buildings[def.key]||0;
     const queued = (state.buildQueue||[]).filter(q=>q.planet===planet && q.key===def.key).length
       + (state.constructionQueue||[]).filter(q=>q.planet===planet && q.key===def.key && q.kind==='building').reduce((sum,q)=>sum+(q.qty||1),0);
     const remaining = Math.max(0,step.level-current-queued);
-    return {def, target:step.level, current, queued, remaining, unlocked:techUnlockedGeneric(def.requires), cost:costForRange(def,current+queued,remaining)};
+    const moonBlocked=!!def.moonOnly&&!isMoonKey(planet);
+    const unsupported=def.category==='defense';
+    return {def, target:step.level, current, queued, remaining, moonBlocked, unsupported, unlocked:!unsupported&&!moonBlocked&&techUnlockedGeneric(def.requires), cost:costForRange(def,current+queued,remaining)};
   }).filter(Boolean);
 }
 function k7QueueBlueprintStep(id, key, planet) {
@@ -90,7 +129,7 @@ function renderK7Blueprints() {
   if (plan) {
     html += `<div class="k7-row"><label for="k7PlanSelect">${k7h('Plan auswählen')}</label><select id="k7PlanSelect">${plans.map(p=>`<option translate="no" value="${escapeHtml(p.id)}"${p===plan?' selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select><button id="k7DeletePlan">${k7h('Löschen')}</button></div>`;
     for (const row of k7BlueprintPreview(plan,state.activeBasePlanet)) html += `<div class="k7-item"><strong>${escapeHtml(k7View(row.def).name)}</strong> ${row.current} → ${row.target}${row.queued?' · '+row.queued+' '+k7h('Bereits eingeplant'):''}<div class="k7-muted">${row.remaining?costHtml(row.cost):k7h('Erreicht')}</div>
-      ${!row.unlocked?`<div class="k7-warn">${k7h('Voraussetzungen fehlen')}: ${(row.def.requires||[]).map(r=>{const v=techVoraussetzung(r);return escapeHtml(k7View(RESEARCH_DEFS.find(d=>d.key===v.key)||{name:v.key}).name)+' '+v.level;}).join(', ')}</div>`:''}
+      ${!row.unlocked?`<div class="k7-warn">${k7h('Voraussetzungen fehlen')}: ${row.unsupported?k7h('Verteidigungsbauwerke gehören nicht zu Ausbauvorlagen.')+' · ':''}${row.moonBlocked?k7h('Nur auf einem eigenen Mond')+' · ':''}${(row.def.requires||[]).map(r=>{const v=techVoraussetzung(r);return escapeHtml(k7View(RESEARCH_DEFS.find(d=>d.key===v.key)||{name:v.key}).name)+' '+v.level;}).join(', ')}</div>`:''}
       ${row.remaining?`<button data-k7-plan-step="${row.def.key}"${!row.unlocked?' disabled':''}>${k7h('Nächste Stufe einreihen')}</button>`:''}</div>`;
   } else html += `<p class="k7-muted">${k7h('Noch kein Bauplan gespeichert.')}</p>`;
   html += '</details>'; setBoxHtml(box,'k7Blueprints',html);
@@ -102,50 +141,17 @@ function renderK7Blueprints() {
   box.querySelectorAll('[data-k7-plan-step]').forEach(btn=>btn.onclick=()=>{k7QueueBlueprintStep(plan.id,btn.dataset.k7PlanStep,state.activeBasePlanet);renderK7Blueprints();});
 }
 // A dry run through the existing refinery engine includes its actual input consumption.
-function k7NetRates() {
-  const gross = ratesPerSecond(), stock = {...state.resources};
-  for (const [key,rate] of Object.entries(gross)) stock[key]=(stock[key]||0)+Math.max(0,rate);
-  const before = {...stock};
-  for (const def of TIER2_DEFS) tier2Step(def,stock,1);
-  const rates = {};
-  for (const key of new Set([...Object.keys(stock),...Object.keys(gross)])) rates[key]=(gross[key]||0)+(stock[key]||0)-(before[key]||0);
-  return rates;
-}
-function k7ResearchBottleneck(key) {
-  const def = RESEARCH_DEFS.find(d=>d.key===key); if (!def) return null;
-  const level = (state.research[key]||0)+1, finished=level>def.maxLevel;
-  const cost = finished?{}:researchCostFor(def,level), account=finished?'':baustelleSchluessel(key,level);
-  const rest=finished?{}:baustelleRestKosten(cost,account), net=k7NetRates(), bank=account?baustelleStand(account):{};
-  const target=baustelleZiel(), saving=target && target.schluessel===account;
-  const rows=Object.entries(rest).map(([res,amount])=>{
-    const have=costAmountAvailable(res), missing=Math.max(0,amount-have), cap=res==='credits'?Infinity:(TIER2_DEFS.find(d=>d.key===res)?tier2StorageCap(TIER2_DEFS.find(d=>d.key===res)):storageCap());
-    const rate=net[res]||0, share=saving?baustelleAnteil():0;
-    // A funded oversized target can eventually complete through the existing account.
-    const oversized=amount>cap, accountRate=Math.max(0,(ratesPerSecond()[res]||0)*share);
-    const effective=oversized&&share>0?accountRate:rate-baustelleAbzweigRate(res,rate);
-    const blocked=missing>0 && (effective<=0 || oversized&&share<=0);
-    return {res,amount,have,missing,cap,rate,effective,bank:bank[res]||0,blocked,oversized,eta:missing===0?0:blocked?null:missing/effective};
-  });
-  return {def,level,finished,unlocked:techUnlocked(def),rows,eta:rows.some(r=>r.eta===null)?null:Math.max(0,...rows.map(r=>r.eta))};
-}
-let k7ResearchTarget = '';
-function renderK7Bottleneck() {
-  const box=document.getElementById('k7Bottleneck');if(!box||isTypingIn('k7Bottleneck'))return;
-  const defs=RESEARCH_DEFS.filter(d=>(state.research[d.key]||0)<d.maxLevel);
-  const target=defs.find(d=>d.key===k7ResearchTarget)||defs[0];if(!target){box.innerHTML='';return;}
-  k7ResearchTarget=target.key;const view=k7ResearchBottleneck(target.key);
-  let html=`<details class="k7-ideas" data-keep-open="k7engpass"${detailsOpenAttr('k7engpass')}><summary><i class="ti ti-flask" aria-hidden="true"></i> ${k7h('Engpassanalyse')}</summary><div class="k7-row"><label for="k7ResearchTarget">${k7h('Forschungsziel')}</label><select id="k7ResearchTarget">${defs.map(d=>`<option value="${d.key}"${d.key===target.key?' selected':''}>${escapeHtml(k7View(d).name)}</option>`).join('')}</select></div>`;
-  if(!view.unlocked)html+=`<p class="k7-warn">${k7h('Voraussetzungen fehlen')}: ${(target.requires||[]).map(req=>{const r=techVoraussetzung(req);return escapeHtml(k7View(RESEARCH_DEFS.find(d=>d.key===r.key)||{name:r.key}).name)+' '+r.level;}).join(', ')}</p>`;
-  for(const row of view.rows)html+=`<div class="k7-item"><strong>${escapeHtml(k7t(resDefFor(row.res).label))}</strong><div class="k7-muted">${k7h('Restbedarf')}: ${fmt(row.missing)} · ${k7h('Nettozufluss')}: ${fmt(row.rate)}/s<br>${k7h('Lagergrenze')}: ${Number.isFinite(row.cap)?fmt(row.cap):'∞'} · ${k7h('Baustellen-Konto')}: ${fmt(row.bank)}</div>${row.blocked?`<div class="k7-warn">${k7h(row.res==='credits'?'Kredite haben keinen passiven Zufluss. Handel oder bestehende Aufträge nutzen.':row.oversized?'Lager ausbauen oder Forschungs-Konto nutzen':'Keine positive Produktion')}</div>`:''}</div>`;
-  html+=`<p class="k7-muted">${view.eta===null?k7h('Keine garantierte Wartezeit; zuerst den Engpass beheben.'):view.eta===0?k7h('Bezahlbar'):k7h('Geschätzte Wartezeit bei unveränderten Bedingungen')+': '+fmtDuration(view.eta)}</p><p class="k7-muted">${k7h('Vorschau verändert weder Ressourcen noch Warteschlangen.')}</p></details>`;
-  setBoxHtml(box,'k7Bottleneck',html);box.querySelector('#k7ResearchTarget').onchange=e=>{k7ResearchTarget=e.target.value;e.target.blur();renderK7Bottleneck();};
-}
+function renderK7Bottleneck(boxId){return k7RenderPlanningBottleneck(boxId);}
 function k7AvailableTrophies() { return ACHIEVEMENTS.filter(a=>!!state.achievements[a.key]); }
+function k7ProfileTrophies(){
+  const available=k7AvailableTrophies(),list=k7PersonalGoals().trophies||[];
+  return `<div class="k7-grid" aria-label="${k7h('Trophäenhalle')}">${[0,1,2].map(slot=>{const trophy=available.find(a=>a.key===list[slot]);return `<div class="k7-item">${trophy?`<i class="ti ${escapeHtml(trophy.icon)}" aria-hidden="true"></i> <strong>${escapeHtml(k7View(trophy).name)}</strong><p class="k7-muted">${escapeHtml(k7View(trophy).desc)}</p>`:`<span class="k7-muted">${k7h('Leerer Ausstellungsplatz')}</span>`}</div>`;}).join('')}</div>`;
+}
 function k7SetTrophy(slot,key) {
   if(!Number.isInteger(slot)||slot<0||slot>2||key&&!k7AvailableTrophies().some(a=>a.key===key))return false;
   const list=Array.isArray(k7PersonalGoals().trophies)?k7PersonalGoals().trophies.slice(0,3):['','',''];
   if(key)for(let i=0;i<3;i++)if(i!==slot&&list[i]===key)list[i]='';
-  list[slot]=key;k7PersonalGoals().trophies=list;save();return true;
+  list[slot]=key;k7PersonalGoals().trophies=list;lastCmdProfileSig=null;save();renderCommanderProfile();return true;
 }
 function renderK7Trophies() {
   const box=document.getElementById('k7Trophies');if(!box||isTypingIn('k7Trophies'))return;
@@ -154,8 +160,9 @@ function renderK7Trophies() {
   setBoxHtml(box,'k7Trophies',html);box.querySelectorAll('[data-k7-trophy]').forEach(select=>select.onchange=()=>{k7SetTrophy(Number(select.dataset.k7Trophy),select.value);select.blur();renderK7Trophies();});
 }
 function renderK7Ideas() {
+  if(activeTab==='karte')renderK7MapTasks();
   if(['expedition','sammlung','allianz'].includes(activeTab)){k7RefreshProgress();renderK7ServerIdeas();}
-  if(activeTab==='basis'){renderK7Blueprints();renderK7FeedbackToggle();}
+  if(activeTab==='basis'){renderK7Bottleneck('k7BottleneckBasis');renderK7Blueprints();renderK7FeedbackToggle();}
   if(activeTab==='forschung')renderK7Bottleneck();
   if(activeTab==='sammlung'){renderK7LootCompass();renderK7Archive();}
   if(activeTab==='galaxie')renderK7Trophies();
@@ -167,7 +174,7 @@ async function k7RefreshProgress(force=false){
   try{
     const response=await backendFetch('/k7/progress');
     if(response.status===404){k7ServerUnavailable=true;renderK7ServerIdeas();return;}
-    if(!response.ok)throw new Error();k7ServerProgress=await response.json();renderK7ServerIdeas();
+    if(!response.ok)throw new Error();k7ServerProgress=await response.json();renderK7ServerIdeas();k7RenderReturnEncounters();
   }catch(_){k7ServerNotice=k7t('Fortschritt konnte nicht geladen werden. Bitte später erneut versuchen.');}
 }
 async function k7ServerAction(path,body={},paid=false){
@@ -252,9 +259,11 @@ function renderK7ServerIdeas(){
     if(!tag||!doc||unavailable){box.innerHTML='';return;}
     let html=`<details class="k7-ideas" data-keep-open="k7op"${detailsOpenAttr('k7op')}><summary><i class="ti ti-users" aria-hidden="true"></i> ${k7h('Allianzoperation')}</summary><p class="k7-muted">${k7h('Aufklärung → Versorgung → Angriff. Aufklärungsdaten kosten 100 Energie und benötigen einen stationierten Spionagekreuzer oder Forscher. Versorgung kostet 250 Erz und 100 Kristalle. Aktive Beiträge senken die Gegenwehr bzw. die Verlustquote um je 10%. Nach dem finalen Sieg erhalten weiterhin zugehörige Beitragende einmalig 40 Kredite, auch offline.')}</p>`;
     if(!op&&amIAllianceMusterLeader())html+=k7ActionButton('operation/start','Operation beginnen',{tag},!['idle','gathering'].includes(doc.phase));
-    if(op){html+=`<p>${k7h('Phase')}: ${k7h(({scout:'Aufklärung',supply:'Versorgung',attack:'Angriff',completed:'Abgeschlossen'})[op.phase]||op.phase)}</p>`;
+    if(op){html+=`<p>${k7h('Phase')}: ${k7h(({scout:'Aufklärung',supply:'Versorgung',attack:'Angriff',completed:'Abgeschlossen',cancelled:'Abgebrochen'})[op.phase]||op.phase)}</p>`;
       if(['scout','supply'].includes(op.phase))html+=k7ActionButton('operation/contribute',op.phase==='scout'?'Aufklärungsdaten liefern':'Versorgung liefern',{tag,role:op.phase},!['idle','gathering'].includes(doc.phase));
       if(op.phase==='attack')html+=`<p class="k7-muted">${k7h('Flotten schließen sich über den vorhandenen Raid-Beitritt an. Normale Kampfverluste und Raid-Regeln gelten.')}</p>`;
+      html+=`<p class="k7-muted">${k7h('Ein Austritt entfernt die Wirkung des Beitrags und den Anspruch auf die Teilnehmergabe. Ein Abbruch vor dem Abflug beendet die Zusatzoperation ohne Erstattung oder Teilnehmergabe; der normale Raid bleibt bestehen.')}</p>`;
+      if(!op.completedAt&&!op.cancelledAt&&amIAllianceMusterLeader())html+=k7ActionButton('operation/cancel','Operation abbrechen',{tag},!['idle','gathering'].includes(doc.phase));
     }
     if(doc.bossKey==='panzerhuelle'){
       html+=`<h4>${k7h('Schildzyklus')}</h4><p class="k7-muted">${k7h('Optionale Bossvariante: Ab 50% Hülle gilt ×0,65 Schaden, mit Bombern ×0,90. Unter 50% Hülle gilt ×1,20 Schaden und ×0,80 Gegenwehr. Die vorhandene Trefferschwäche gilt zusätzlich. Die Phase wird zu Beginn jeder Welle festgelegt.')}</p>`;
@@ -336,7 +345,8 @@ function renderK7Archive() {
   let html=`<details class="k7-ideas" data-keep-open="k7archive"${detailsOpenAttr('k7archive')}><summary><i class="ti ti-list-details" aria-hidden="true"></i> ${k7h('Entdeckerarchiv')}</summary><p class="k7-muted">${k7h('Archivtexte öffnen sich erst nach einer tatsächlichen Entdeckung. Einmal geöffnete Geschichten bleiben erhalten.')}</p>`;
   for(const entry of K7_ARCHIVE){
     const open=!!unlocked[entry.system],system=visibleSystems().find(s=>s.id===entry.system);
-    html+=`<article class="k7-item"><strong>${open?escapeHtml(k7View(entry).title):k7h('Noch nicht erkundet')}</strong>${open?`<p class="k7-muted">${escapeHtml(k7View(entry).text)}</p>${system?`<button data-k7-archive-map="${entry.system}">${k7h('Kartenziel öffnen')}</button>`:''}`:''}</article>`;
+    const origin=STAR_SYSTEMS.find(s=>s.id===entry.system);
+    html+=`<article class="k7-item"><strong>${open?escapeHtml(k7View(entry).title):k7h('Noch nicht erkundet')}</strong>${open?`<p class="k7-muted">${k7h('Herkunft')}: ${escapeHtml(k7t(origin.name))} · ${k7h('Fundbedingung: System oder einen seiner Planeten erkundet.')}</p><p class="k7-muted">${escapeHtml(k7View(entry).text)}</p>${system?`<button data-k7-archive-map="${entry.system}">${k7h('Kartenziel öffnen')}</button>`:''}`:''}</article>`;
   }
   const chapters=[
     [1,'Das erste Geschäft','Das Aschen-Kartell nennt Handel eine Sprache. Dein erster guter Kontakt öffnet die Tür zu seinem Archiv: Verträge sind dort Erinnerungen, keine Freundschaften.'],
@@ -344,7 +354,7 @@ function renderK7Archive() {
     [300,'Was nicht verkauft wird','Im inneren Dossier steht eine Regel: Nicht jede Information ist eine Ware. Das Kartell bewahrt auch Geschichten, die es nicht preisgibt. Dein Ruf hat dir Vertrauen verschafft, keinen Anspruch auf alles.']
   ];
   html+=`<h4>${escapeHtml(k7t(FACTION_DIPLOMACY.kartell.name))}</h4>`;
-  for(const [rep,title,text]of chapters)html+=`<article class="k7-item">${unlocked['kartell:'+rep]?`<strong>${escapeHtml(k7t(title))}</strong><p class="k7-muted">${escapeHtml(k7t(text))}</p>`:`<span class="k7-muted">${k7h('Ruf')} ${rep}</span>`}</article>`;
+  for(const [rep,title,text]of chapters)html+=`<article class="k7-item">${unlocked['kartell:'+rep]?`<strong>${escapeHtml(k7t(title))}</strong><p class="k7-muted">${k7h('Herkunft')}: ${escapeHtml(k7t(FACTION_DIPLOMACY.kartell.name))} · ${k7h('Fundbedingung')}: ${k7h('Ruf')} ≥ ${rep}</p><p class="k7-muted">${escapeHtml(k7t(text))}</p>`:`<span class="k7-muted">${k7h('Ruf')} ${rep}</span>`}</article>`;
   html+='</details>';setBoxHtml(box,'k7Archive',html);
   box.querySelectorAll('[data-k7-archive-map]').forEach(btn=>btn.onclick=()=>{const id=btn.dataset.k7ArchiveMap;if(!visibleSystems().some(s=>s.id===id))return;switchTab('karte');galaxyOeffne(id);});
 }
@@ -378,7 +388,36 @@ function k7OfflineLootDelta(before) {
 function k7ReturnExtras(summary) {
   if(!summary)return '';
   let html=(summary.loot||[]).map(row=>`<div class="card-row"><span>${k7h('Neue Beute')}: ${escapeHtml(k7t(row.name))}</span><span>+${fmt(row.count)}</span></div>`).join('');
-  const full=RES_DEFS.filter(d=>(state.resources[d.key]||0)>=storageCap());
-  if(full.length)html+=`<p class="k7-warn">${k7h('Lager voll')}: ${full.map(d=>escapeHtml(k7View(d).label)).join(', ')}</p>`;
-  return html;
+  const full=[...RES_DEFS,...TIER2_DEFS,{key:'protomaterie',label:'Protomaterie'}].filter(d=>k7ResourceCapacity(d.key)>0&&(state.resources[d.key]||0)>=k7ResourceCapacity(d.key));
+  if(full.length)html+=`<p class="k7-warn">${k7h('Lager voll')}: ${full.map(d=>escapeHtml(k7t(d.label))).join(', ')}</p>`;
+  return html+'<div id="k7ReturnEncounters">'+k7ReturnEncounters(summary)+'</div>';
+}
+function k7EncounterReportHtml(result){
+  const label=({salvage:'Sicher bergen',inspect:'Gründlich untersuchen',return:'Umkehren'})[result.choice]||'Sicher bergen';
+  const resources=Object.entries(result.resources||{}).filter(([,n])=>Number.isFinite(n)&&n>0);
+  return `<strong>${k7h(label)}</strong>${result.automatic?' · '+k7h('Automatische sichere Bergung'):''}<p>${resources.length?k7h('Zusätzlicher Fund')+': '+resources.map(([key,n])=>fmt(n)+' '+escapeHtml(resLabel(key))).join(', '):k7h('Keine zusätzliche Beute')}. ${k7h('Lagergrenzen gelten.')}</p>`;
+}
+function k7ReturnEncounters(summary){
+  if(!summary||!Number.isFinite(summary.since))return '';
+  return (k7ServerProgress&&k7ServerProgress.encounters||[]).filter(e=>e.status==='resolved'&&e.resolvedAt>=summary.since&&e.result).map(e=>`<article class="k7-item"><i class="ti ti-rocket" aria-hidden="true"></i> ${k7h('Wrack-Entscheidung')} · ${k7EncounterReportHtml({...e.result,choice:e.choice})}</article>`).join('');
+}
+function k7RenderReturnEncounters(){const box=document.getElementById('k7ReturnEncounters');if(box)box.innerHTML=k7ReturnEncounters(lastOfflineSummary);}
+function k7ResourceCapacity(key) {
+  if(key==='credits')return Infinity;
+  if(key==='protomaterie')return protomaterieCap();
+  const def=TIER2_DEFS.find(d=>d.key===key);
+  return def?Math.max(tier2StorageCap(def),def.storageBase):storageCap();
+}
+function k7ReturnActions() {
+  const candidates=spielBedarfGecacht().filter(b=>b.art==='aktion').concat([
+    {tab:'basis',text:k7t('Kolonie und Bau-Wunschliste prüfen')},
+    {tab:'forschung',text:k7t('Nächstes Forschungsziel planen')},
+    {tab:'karte',text:k7t('Erkundungen und Kartenziele prüfen')}
+  ]);
+  const tabs=new Set(),rows=[];
+  for(const row of candidates){
+    if(tabs.has(row.tab)||!document.querySelector('.tab-btn[data-tab="'+row.tab+'"]'))continue;
+    tabs.add(row.tab);rows.push(row);if(rows.length===3)break;
+  }
+  return rows;
 }

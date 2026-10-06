@@ -14,13 +14,14 @@
 //   6) Altstaende mit dem ALTEN Format werden ersetzt statt als "?" angezeigt
 const { SPIELDATEI } = require('./lib/umgebung');
 const fs = require('fs');
-const { ohneI18nWoerterbuch } = require('./lib/i18n');
+const { ohneI18nWoerterbuch, i18nFunction } = require('./lib/i18n');
 
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
 // Das Woerterbuch enthaelt dieselben Templates wie die Anzeige, ist aber kein Nachweis fuer sie.
-const src = ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
+const raw = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = ohneI18nWoerterbuch(raw);
 
 /* Der PATCHNOTES-Block wird fuer die verneinenden und die zaehlenden Pruefungen unten
    herausgeschnitten (CLAUDE.md Regel 46). Grund: Ein Patchnote, der eine Behebung beschreibt,
@@ -69,7 +70,7 @@ function baue(opts){
   const versteckte = sysVon < 0 || sysBis < 0 ? 0
     : (src.slice(sysVon, sysBis).match(/hidden:\s*true/g) || []).length;
   const STAR_SYSTEMS_STUB = Array.from({ length: versteckte }, (_, i) => ({ id: 'verborgen' + i, hidden: true }));
-  new Function('ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS', 'factionRankOf',
+  i18nFunction(raw, 'ctx', 'state', 'fmt', 'useBackend', 'attackPower', 'currentFleet', 'QUEST_DURATION_MS', 'factionRankOf',
     'RANK_GOLD_CHANCE_FROM', 'RANK_QUEST_TIME_FROM', 'RANK_QUEST_TIME_BONUS', 'abgrundFreigeschaltet', 'STAR_SYSTEMS',
     block + ';ctx.TIERS=QUEST_TIERS;ctx.POOLS=FACTION_QUEST_POOLS;ctx.gen=generateFactionQuest;' +
     'ctx.tierOf=questTierOf;ctx.tplOf=questTemplateOf;ctx.GOLDFRAG=QUEST_GOLD_FRAGMENTS;'

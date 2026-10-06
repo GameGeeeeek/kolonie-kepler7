@@ -19,7 +19,7 @@ const fs = require('fs');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
 
 // ---------------------------------------------------------------- Mechanik ausführbar machen
 const von = src.indexOf('  const BOARD_POWER_PER_SHIP');

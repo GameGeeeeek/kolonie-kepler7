@@ -116,7 +116,7 @@ const ABHAENGIG = (() => { const me = fs.readFileSync(__filename, 'utf8'); const
   return [...me.slice(von, bis).matchAll(/check\('([^']+)'/g)].map(m => m[1]).filter(n => !/^(0-vorab|0a):/.test(n)); })();
 
 function neueGalaxie(){
-  return new Function(starSrc + '\n' + planetSrc + '\n' + typeSrc + '\n' + genSrc + '\n' +
+  return require('./lib/i18n').i18nFunction(src, starSrc + '\n' + planetSrc + '\n' + typeSrc + '\n' + genSrc + '\n' +
     'return { STAR_SYSTEMS, PLANETS, BASE_STAR_SYSTEM_COUNT, BASE_PLANET_COUNT, WEEKLY_SYSTEM_MAX, WEEKLY_SYSTEM_EPOCH, WEEK_MS,' +
     ' SCHUB_SYSTEMS, SCHUB_SYSTEM_COUNT, extendWeeklySystems, extendSchubSystems, WEEKLY_RING };')();
 }

@@ -46,7 +46,7 @@ function baue(opts){
     STAR_SYSTEMS.push({ id:'s'+i, name:'System '+i });
     PLANETS.push({ id:'p'+i, system:'s'+i });
   }
-  new Function('ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'EXPEDITION_CHAIN_NEEDED', 'RARE_ITEMS',
+  require('./lib/i18n').i18nFunction(src, 'ctx', 'state', 'PLANETS', 'STAR_SYSTEMS', 'EXPEDITION_CHAIN_NEEDED', 'RARE_ITEMS',
     'RES_DEFS', 'randomFindableRareItem', 'grantRandomModule', 'gainResources', 'addXp',
     'recordCodexRare', 'ensureExpeditionCodex', 'fmt', 'moduleBonusTotal',
     // Tiefenspur (v8.342.0): Die neue Peilung fragt abgrundFreigeschaltet() ab und braucht beim

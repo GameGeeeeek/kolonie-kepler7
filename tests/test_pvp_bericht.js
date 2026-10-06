@@ -21,7 +21,7 @@ const fs = require('fs');
 let fail = false;
 const check = (n, c, x) => { console.log((c ? 'OK  ' : 'FAIL') + ' - ' + n + (x !== undefined ? ' | ' + JSON.stringify(x) : '')); fail = fail || !c; };
 
-const src = fs.readFileSync(SPIELDATEI, 'utf8');
+const src = require('./lib/i18n').ohneI18nWoerterbuch(fs.readFileSync(SPIELDATEI, 'utf8'));
 
 /* Der PATCHNOTES-Block wird fuer die Pruefungen unten herausgeschnitten (CLAUDE.md Regel 46).
    Grund: Ein Patchnote, der eine Behebung beschreibt, ZITIERT die alte Formulierung - und reisst

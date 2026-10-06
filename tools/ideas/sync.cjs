@@ -7,7 +7,8 @@ for (const [name, start, end, anchor] of [
   ['runtime.js', '/* K7_IDEAS_BEGIN */', '/* K7_IDEAS_END */', '  function render(){'],
   ['styles.css', '/* K7_IDEAS_CSS_BEGIN */', '/* K7_IDEAS_CSS_END */', '</style>']
 ]) {
-  const content = start + '\n' + fs.readFileSync(path.join(__dirname, name), 'utf8').trimEnd() + '\n' + end + '\n';
+  const code=fs.readFileSync(path.join(__dirname,name),'utf8').trimEnd()+(name==='runtime.js'?['economy.js','map-tasks.js','mobile.js'].map(part=>'\n'+fs.readFileSync(path.join(__dirname,part),'utf8').trimEnd()).join(''):'');
+  const content = start + '\n' + code + '\n' + end + '\n';
   const begin = html.indexOf(start), finish = html.indexOf(end);
   if ((begin >= 0) !== (finish >= 0)) throw new Error('Incomplete source markers: ' + name);
   if (name === 'styles.css') {

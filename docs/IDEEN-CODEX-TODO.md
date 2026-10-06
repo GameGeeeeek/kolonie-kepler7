@@ -4,9 +4,33 @@ Stand der Umsetzung: 06.10.2026
 Projekt: GameGeeeeek/kolonie-kepler7
 Backend: GameGeeeeek/kolonie-kepler7-backend
 
+## Abschluss: alle Aufträge nacheinander
+
+Am 06.10.2026 hat der Nutzer ausdrücklich die vollständige Umsetzung aller Ideen nacheinander beauftragt. Alle 16 Aufträge sind in v8.743.0 umgesetzt und geprüft. Die unten gesondert dokumentierte v8.742.0 ist der historische Ausgangsstand.
+
+Reihenfolge: Zuerst K7-001 vollständig abgearbeitet, danach K7-002 bis K7-016 jeweils gegen ihren gesamten Codex-Auftrag und ihre Abnahmekriterien geprüft und fehlenden Umfang ergänzt. Bereits erfüllte Aufträge wurden belegt abgeschlossen; zusätzliche, nicht beauftragte Szenarien oder Beutequellen wurden nicht ergänzt.
+
+Abgeschlossen: K7-001 bis K7-016 wurden nacheinander gegen ihren gesamten Auftrag abgearbeitet. Der vollständige Projektprüflauf ist grün: 458 Testdateien und sieben Pflichtprüfungen, Exit-Code 0, drei parallele Gruppen. Gebäude-Raster, Bildruhe und Spielstand-Ersatz waren unter Last rot und in der automatischen Einzelwiederholung grün. Spiel- und Backend-Stand blieben während des gesamten Laufs unverändert; origin/main blieb bei 945cd2b899946d78173221cbb87d4587851bee4d. Keine Produktionsveröffentlichung.
+
+### Vollständiger beauftragter Umfang (v8.743.0)
+
+K7-001: Alle 14.515 inventarisierten Autoren-Texte sind katalogisiert, einschließlich Definitionen, kompletter Hilfe (17 Kategorien, 287 Einträge), Tutorial, Berichten und Servermeldungen. 90 sprachübergreifend identische Begriffe/Eigennamen sind absichtlich unverändert. 77 Forschungs-/Modulbeschreibungen, Fachwortliste und zahlreiche Textkorrekturen wurden manuell geprüft. Übrige Texte stammen aus lokalen Übersetzungsentwürfen mit Zahlen-/Variablen-/Markupprüfung; keine Behauptung einer manuellen Einzelprüfung aller Texte. `test_english_complete`, `test_english_locale` und 24 I18n-Prüfungen prüfen auch unveränderte persönliche Inhalte. Vorgehen: `tools/i18n/README.md`.
+
+K7-002 bis K7-004: Rückkehrbericht mit realen Nettoänderungen einschließlich Raffinerieausgabe/Verbrauch, allen Lagerarten und genau drei Folgeaktionen. Beutekompass für alle Standort-/Schiffssets und einzelne Module, persistente Wünsche, wirkliche Quellen/Kosten/Zugänge und belegte Chancen. Bau-/Forschungsengpass und wirkliche nächste Stufe auf einer Spielstandkopie einschließlich negativer Produktion, voller Lager und Kontofinanzierung. Nachweise: `test_k7_return_report`, `test_k7_loot_compass`, `test_k7_economy`.
+
+K7-005 und K7-006: Favoriten/Notizen plus gespeicherte Aufgabenfilter für eigene Kolonien, sichtbare Beute, eigene Allianzbasis und aktive Missionen; verborgene Positionen und abgelaufene Ziele gesperrt. Kernabläufe, Tagesaufgaben/Servergaben, Ausrüstung und Kartenbedienung auf 360/390/430/1200 CSS-Pixeln, lange Rückkehr-/Profildialoge, Touchziele, Tastaturabholung und Doppelklickschutz. Bewusste spätere Käufe bleiben möglich. Nachweise: `test_k7_map_tasks`, `test_k7_mobile_flows`, 92 Spielablauf- und 24 bestehende Favoritenprüfungen.
+
+K7-007 bis K7-012: Die gespeicherte Fünf-Etappen-Kampagne mit zwei Enden und einmaliger kleiner Gabe erfüllt den Auftrag. Das einzelne Wrack-Ereignis verwendet überall dieselbe Entscheidung; jede Auflösung erhält einen serverseitigen Bericht, auch Umkehr/leere Untersuchung. Rückkehrbericht nutzt denselben tatsächlichen Offlinezeitraum. Pechschutz bleibt genau ein quellengebundener Zwölf-Siege-Pilot (+1/12 seltenes Teil je finalem Sieg; 144-Siege-Modell). Ausbauvorlagen prüfen Eigentum, Zielstufen, Restkosten, Voraussetzungen und Schlangen; Mondziele/Verteidigungsvorlagen sind begründet gesperrt. Fünf Archivorte und drei Kapitel einer Fraktion zeigen Herkunft/Fundbedingungen und dauerhafte Entdeckung. Drei rechtmäßig freigeschaltete Trophäenplätze erscheinen auch im Kommandantenprofil. Nachweise: 30 Planungsprüfungen, `test_k7_completion_details`, Sprach- und HTTP-Prüfungen.
+
+K7-013 bis K7-016: Ereignisfeedback bleibt abschaltbar, respektiert Bewegung/Ton und wird durch bloßes Rendern nicht erneut ausgelöst. Eine Operation im bestehenden Raid umfasst Aufklärung/Versorgung/Angriff; Leitung kann vor Abflug ohne Erstattung abbrechen. Austritt entfernt Wirkung und Teilnehmeranspruch; Offlinegabe einmalig. Genau eine Schildvariante mit zwei echten Phasen, Konter, Vorschau und Bericht sowie genau eine isolierte, reproduzierbare Drei-Wellen-Übung mit vorgegebener Flotte erfüllen den jeweiligen Auftrag. Nachweise: tatsächliche HTTP-Kampfauflösung, Frontend-/Backend-Parität, 14 Trainingsprüfungen und Klickdurchlauf.
+
+Gegenproben: 52 Frontend-Spiel-/Layoutmutationen, drei I18n-Mutationen und acht Backend-Mutationen schlagen jeweils an der erwarteten Assertion fehl. Backend gezielt: 72 neue HTTP-Prüfungen, Start, geteilter Speicher und Balance grün. Bestehende Quelltextprüfungen lesen Hilfetexte ohne den neuen Sprachkatalog und isolierte Berechnungen mit dem tatsächlichen Sprachhelfer. Gegenproben sichern die Texte, Berechnungen, gemeinsamen Aufrufer und den neuen fokussierten Tastaturzugriff. Kopfzeilenprüfungen messen nur wirkliche Anzeigestellen; Kosmetikprüfungen prüfen die ursprüngliche Formatierung außerhalb der privaten Textgrenze. Rückkehr-/Profilprüfungen trennen den abgeschlossenen Spielstart und den asynchronen Fortschrittsabruf von ihren unveränderten Anforderungen an Anzeige, Ressourcen und Navigation. Drei Quelltext-Gegenproben enden vor Browserstart (`tools/ideas/source-preflight.cjs`); die vollständigen unveränderten Browserprüfungen laufen zusätzlich. Der unten dokumentierte 451-Dateien-Volltest gehört ausschließlich zum vorherigen Ausgangsstand v8.742.0.
+
+Release-Abschluss v8.743.0: Versionsnummer erst nach dem grünen Volltest gegen origin/main geprüft. Patchnotes, Archiv, Feed und version.txt gemeinsam erzeugt. Danach 14 Abschlussprüfungen ohne Fehler (Exit-Code 0). Die Spiellogik wurde nach dem Volltest nicht geändert.
+
 ## Status und Abgrenzung
 
-Der Nutzer hat am 05.10.2026 mit „alle umsetzten“ alle 16 Punkte zur Umsetzung beauftragt. Dies ist keine automatische Produktionsfreigabe. Der aktuelle Umsetzungsstand folgt unten; offene Punkte sind nicht als fertig zu behandeln. Aufwand und Priorität sind qualitative Planungsschätzungen, keine Zeit- oder Kostenzusagen.
+Der Nutzer hat mit „alles umsetzten eins nach dme anderen“ alle 16 Punkte vollständig zur Umsetzung beauftragt. Der Abschlussstand v8.743.0 steht oben; die erste Ausbaustufe v8.742.0 ist unten als Historie gekennzeichnet. Eine Produktionsveröffentlichung braucht weiterhin eine gesonderte Freigabe. Aufwand und Priorität sind qualitative Planungsschätzungen, keine Zeit- oder Kostenzusagen.
 
 Die Projektregeln, vorhandene Konzeptdateien und offene Arbeiten wurden zur Planung gelesen. Es wurde keine vollständige Inventur des gesamten Frontend- und Backend-Codes vorgenommen. „Vorschlag“ bedeutet deshalb nicht, dass garantiert jede Teilfunktion fehlt. Codex muss vorhandene Implementierungen und offene PRs je Aufgabe prüfen und nur die fehlende Erweiterung bauen.
 
@@ -18,7 +42,7 @@ Die Projektregeln, vorhandene Konzeptdateien und offene Arbeiten wurden zur Plan
 - Freiflug ist laut dokumentierter Entscheidung ausdrücklich ausgeschlossen. Keine manuelle Schiffssteuerung und kein Wechsel in das separate Projekt Void Sector.
 - Bestehende Module, Sets, Raids, Abgrund-, Handels-, Allianz- und Fortschrittssysteme erweitern statt parallel neu erfinden.
 
-### Tatsächlicher Stand dieses Umsetzungsschritts
+### Historischer Ausgangsstand v8.742.0
 
 Arbeitszweig: `feat/kepler-ideas-20261005`, Basis Frontend `945cd2b899946d78173221cbb87d4587851bee4d` und Backend `543c9c4a933633fbbd00a6697e995f12fa2c413a`.
 
@@ -47,9 +71,9 @@ Gezielte Prüfungen: 7 Pflichtprüfungen, 30 Planungsprüfungen, 92 Spielablaufp
 
 Belegte vorhandene Bausteine für die nächsten Schritte: `showWelcomeBackModal`, `applyOfflineProgress`, `lastOfflineSummary`, `spielBedarfGecacht` (K7-002); `MODULE_SET_DEFS`, `modulFundort`, `besitztModulTyp`, `bosssetTeile` (K7-003); `researchCostFor`, `ratesPerSecond`, `storageCap` und Baustellen-Konto (K7-004); `costForRange`, `currentBuildings`, `BUILDING_DEFS` (K7-010). Vor weiteren Änderungen die Regeln, tatsächlichen Aufrufer und Backend-Verantwortung erneut prüfen.
 
-### Weiterarbeit
+### Auslieferung
 
-Zuerst die beiden Feature-PRs prüfen. Veröffentlichung nur nach gesonderter Freigabe, Backend vor Frontend. Weitere Ausbaustufen bleiben eigenständige Arbeit: insbesondere die vollständige Englischübersetzung und die Abnahme zusätzlicher alter Dialoge. Keine parallele zweite Implementierung dieser 16 ersten Stufen beginnen.
+Alle 16 Aufträge sind abgeschlossen. Die fertigen Änderungen stehen in [Frontend-PR #646](https://github.com/GameGeeeeek/kolonie-kepler7/pull/646) und [Backend-PR #275](https://github.com/GameGeeeeek/kolonie-kepler7-backend/pull/275). Veröffentlichung nur nach gesonderter Freigabe, Backend vor Frontend.
 
 ### Arbeitsregeln für Codex
 
@@ -81,7 +105,7 @@ Erledigt, wenn jede ausgewählte Aufgabe ein belegtes Implementierungsziel und k
 
 ## K7-001 – Deutsch/Englisch fertigstellen
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Groß; tatsächlicher Restumfang nach Inventur.
 
 Idee: Das gesamte relevante Spiel soll in beiden Sprachen verständlich sein, nicht nur die Navigation.
@@ -94,7 +118,7 @@ Erledigt, wenn: Sprachwechsel vor und nach Anmeldung funktioniert, die Auswahl e
 
 ## K7-002 – Persönlicher Rückkehrbericht
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Beim Wiederkommen auf einen Blick verstehen, was passiert ist und was jetzt sinnvoll wäre.
@@ -107,7 +131,7 @@ Erledigt, wenn: Jede Angabe auf tatsächlich gespeicherten Ereignissen bzw. der 
 
 ## K7-003 – Beutekompass und Set-Wunschliste
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Spieler können gezielt auf ein gewünschtes Modul oder vollständiges Set hinarbeiten.
@@ -120,7 +144,7 @@ Erledigt, wenn: Herkunft und Set-Boni aus den vorhandenen Definitionen stammen, 
 
 ## K7-004 – Wirtschafts- und Engpassanzeige
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Nicht nur „zu wenig Ressourcen“, sondern nachvollziehbar zeigen, was ein Vorhaben blockiert.
@@ -133,7 +157,7 @@ Erledigt, wenn: Negative Produktion, volle Lager, Baukonten und weitere bestehen
 
 ## K7-005 – Kartenfavoriten und Aufgabenfilter
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Klein bis mittel.
 
 Idee: Wichtige Ziele schneller finden, ohne ständig dieselben Koordinaten zu suchen.
@@ -146,7 +170,7 @@ Erledigt, wenn: Markierungen nach erneutem Login erhalten bleiben, Umbenennen/L�
 
 ## K7-006 – Mobile Bedienung durchgehend verbessern
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Die zentralen Spielabläufe sollen am Handy ohne Fummelei funktionieren.
@@ -163,7 +187,7 @@ Erledigt, wenn: Die beauftragten Abläufe auf 360, 390 und 430 CSS-Pixel breiten
 
 ## K7-007 – Erste zusammenhängende Story-Kampagne
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel bis groß.
 
 Idee: „Das verstummte Forschungsschiff“ – aus einem Notruf wird eine kleine Geschichte mit einer echten Entscheidung.
@@ -176,7 +200,7 @@ Erledigt, wenn: Fortschritt gespeichert wird, Reihenfolge und Wahl serverseitig 
 
 ## K7-008 – Expeditionen mit Entscheidungen
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Groß.
 
 Idee: Eine Expedition meldet eine Anomalie. Der Spieler entscheidet: sicher bergen, gründlich untersuchen oder umkehren.
@@ -189,7 +213,7 @@ Erledigt, wenn: Das Ereignis nur einmal entschieden werden kann, Zufallsergebnis
 
 ## K7-009 – Pechschutz für ausgewählte Set-Teile
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel bis groß.
 
 Idee: Wer denselben zulässigen Boss oft besiegt, macht auch bei unpassender Beute sichtbaren Fortschritt zu seinem Wunschstück.
@@ -202,7 +226,7 @@ Erledigt, wenn: Exklusive Herkunftsregeln erhalten bleiben, Zufallsfunde weiterh
 
 ## K7-010 – Kolonie-Baupläne
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Eine bewährte Bau-Reihenfolge als „Bergbaukolonie“, „Forschung“ oder „Handel“ auf einer weiteren Kolonie wiederverwenden.
@@ -215,7 +239,7 @@ Erledigt, wenn: Bereits erreichte Ziele übersprungen werden, unzulässige Ziele
 
 ## K7-011 – Entdeckerarchiv und Fraktionsgeschichten
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Besondere Orte und Fraktionen erhalten kleine Geschichten, die durch Erkundung bzw. Ruf sichtbar werden.
@@ -228,7 +252,7 @@ Erledigt, wenn: Enthüllungsbedingungen korrekt greifen, Einträge in Deutsch/En
 
 ## K7-012 – Persönliche Trophäenhalle
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Klein bis mittel.
 
 Idee: Erste Bosssiege, seltene Funde und besondere Allianzleistungen sichtbar ausstellen können.
@@ -241,7 +265,7 @@ Erledigt, wenn: Nur rechtmäßig freigeschaltete Trophäen auswählbar sind, Aus
 
 ## K7-013 – Sichtbares Feedback und mehr Leben in der Kolonie
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Mittel.
 
 Idee: Erfolge und Aktivität nicht nur als Zahlen sehen: fertiges Bauwerk, Flottenankunft, neuer Fund oder kleines Stationsmanöver.
@@ -258,7 +282,7 @@ Erledigt, wenn: Rückmeldungen nicht durch jedes Neurendern erneut ausgelöst we
 
 ## K7-014 – Allianzoperation mit unterschiedlichen Aufgaben
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Sehr groß.
 
 Idee: Eine Gruppe erfüllt gemeinsam Aufklärung, Versorgung und Angriff. Nicht jeder Teilnehmer muss dieselbe stärkste Flotte besitzen.
@@ -271,7 +295,7 @@ Erledigt, wenn: Beiträge serverseitig belegt werden, nicht teilnehmende Konten 
 
 ## K7-015 – Bossvariante mit echten Kampfphasen
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Groß.
 
 Idee: Ein Schildträger-Boss wechselt nachvollziehbar zwischen Schildphase und verwundbarer Phase. Vorbereitung und Flottenwahl haben erkennbaren Einfluss.
@@ -284,7 +308,7 @@ Erledigt, wenn: Phasen aus der tatsächlichen Kampfberechnung hervorgehen, Vorsc
 
 ## K7-016 – Taktische Prüfungen mit vorgegebener Flotte
 
-Status: Erste Ausbaustufe implementiert und geprüft (v8.742.0); Umfang und Grenzen in der Umsetzungstabelle oben.
+Status: Erledigt – vollständiger beauftragter Umfang implementiert und geprüft (v8.743.0); aktuelle Abschlussnachweise oben.
 Aufwand: Groß.
 
 Idee: Eine taktische Aufgabe mit gleicher Ausgangsflotte für alle – Erfolg durch Entscheidungen statt allein durch jahrelang angesammelte Stärke.

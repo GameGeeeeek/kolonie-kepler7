@@ -28,7 +28,7 @@ const path = require('path');
 
 const WURZEL = __dirname;
 const offline = process.argv.includes('--offline');
-const git = (...a) => spawnSync('git', a, { cwd: WURZEL, encoding: 'utf8' });
+const git = (...a) => spawnSync('git', a, { cwd: WURZEL, encoding: 'utf8', maxBuffer:64*1024*1024 });
 
 // "8.503.0" -> [8,503,0]; unbrauchbare Eingaben werden zu null, damit sie nie als "groesste"
 // Version durchrutschen.

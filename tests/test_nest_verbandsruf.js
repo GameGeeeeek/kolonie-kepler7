@@ -48,7 +48,7 @@ const MUSS_FALLEN = {
 };
 
 const HTML = fs.readFileSync(SPIELDATEI, 'utf8');
-const JS = HTML.match(/<script>([\s\S]*)<\/script>/)[1];
+const JS = require('./lib/i18n').ohneI18nWoerterbuch(HTML.match(/<script>([\s\S]*)<\/script>/)[1]);
 const SAVE_KEY = 'kepler7-save-v3';
 const SYS = 'chronos';
 const NEST_ID = 'nest-vruf-1';

@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fixture=require('./lib/ideas-fixture');
 let checks=0;function check(name,value){assert.ok(value,name);console.log('OK - '+name);checks++;}
 (async()=>{
-  const f=await fixture('plans:k7Blueprints,savePlan:k7SaveBlueprint,preview:k7BlueprintPreview,queue:k7QueueBlueprintStep,bank:k7ResearchBottleneck,net:k7NetRates,wish:k7SelectWish,ownership:k7SetOwnership,sets:()=>MODULE_SET_DEFS,planets:()=>PLANETS,defaults:applyStateDefaults,trophy:k7SetTrophy,trophies:k7AvailableTrophies,render:renderK7Ideas');
+  const f=await fixture('plans:k7Blueprints,savePlan:k7SaveBlueprint,preview:k7BlueprintPreview,queue:k7QueueBlueprintStep,bank:key=>k7TargetBottleneck("research",key),wish:k7SelectWish,ownership:k7SetOwnership,sets:()=>MODULE_SET_DEFS,planets:()=>PLANETS,defaults:applyStateDefaults,trophy:k7SetTrophy,trophies:k7AvailableTrophies,render:renderK7Ideas');
   try{
     check('normal game starts without script errors',f.errors.length===0);
     const result=await f.page.evaluate(()=>{

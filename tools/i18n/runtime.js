@@ -50,6 +50,44 @@ const K7_TRANSLATION_PATTERNS = [
   [/^· (\d+) gedrosselt$/, count => '- ' + count + ' throttled']
 ];
 const K7_LANGUAGE_KEY = 'kepler7-ui-language';
+const K7_TRANSLATION_CACHE = new Map();
+let k7DynamicCatalogue = null;
+function k7DynamicTranslation(source) {
+  if (!k7DynamicCatalogue) {
+    const heads = new Map(), loose = [];
+    for (const [key, target] of Object.entries(K7_TRANSLATIONS)) {
+      const variables = [...key.matchAll(/\{(\d+)\}/g)];
+      if (!variables.length || variables.length > 8) continue;
+      const pieces = key.split(/\{\d+\}/);
+      const longest = pieces.reduce((a,b) => a.length >= b.length ? a : b, '');
+      if (longest.trim().length < 4) continue;
+      const indices = variables.map(match => Number(match[1]));
+      const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const expression = '^' + pieces.map(escape).join('([\\s\\S]*?)') + '$';
+      const record = {regex:new RegExp(expression), target, indices, longest, weight:pieces.join('').length, prefix:pieces[0], suffix:pieces.at(-1)};
+      const head = pieces[0].slice(0,8);
+      if (!head) loose.push(record);
+      else { const records = heads.get(head) || []; records.push(record); heads.set(head,records); }
+    }
+    k7DynamicCatalogue = {heads,loose};
+  }
+  const candidates = [...k7DynamicCatalogue.loose];
+  for (let length=1;length<=Math.min(8,source.length);length++) {
+    const records=k7DynamicCatalogue.heads.get(source.slice(0,length));
+    if(records)candidates.push(...records);
+  }
+  candidates.sort((a,b)=>b.weight-a.weight);
+  for (const record of candidates) {
+    if (!source.startsWith(record.prefix) || !source.endsWith(record.suffix) || !source.includes(record.longest)) continue;
+    const match=record.regex.exec(source);
+    if (!match) continue;
+    const values=new Map(record.indices.map((key,i)=>[key,match[i+1]]));
+    if ([...record.target.matchAll(/\{(\d+)\}/g)].some(m=>!values.has(Number(m[1])))) continue;
+    // Captures can contain player names or values. Only the authored sentence is translated.
+    return record.target.replace(/\{(\d+)\}/g,(_,key)=>values.get(Number(key)));
+  }
+  return null;
+}
 const K7_LANGUAGE = (() => {
   let language;
   try { language = new URLSearchParams(location.search).get('lang'); } catch (_) {}
@@ -63,10 +101,17 @@ function k7t(text) {
   if (K7_LANGUAGE !== 'en') return text;
   const source = String(text);
   if (Object.prototype.hasOwnProperty.call(K7_TRANSLATIONS, source)) return K7_TRANSLATIONS[source];
+  if (K7_TRANSLATION_CACHE.has(source)) return K7_TRANSLATION_CACHE.get(source);
   for (const [pattern, replacement] of K7_TRANSLATION_PATTERNS) {
     const match = source.match(pattern);
     if (!match) continue;
     return typeof replacement === 'function' ? replacement(...match.slice(1)) : source.replace(pattern, replacement);
+  }
+  const dynamic = k7DynamicTranslation(source);
+  if (dynamic !== null) {
+    if (K7_TRANSLATION_CACHE.size >= 2048) K7_TRANSLATION_CACHE.clear();
+    K7_TRANSLATION_CACHE.set(source,dynamic);
+    return dynamic;
   }
   return text;
 }
@@ -128,6 +173,10 @@ function k7h(text) {
   return String(k7t(text)).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+function k7PreserveUserText(escapedText) {
+  // Callers retain their existing escapeHtml call. This span marks provenance for the observer.
+  return '<span translate="no">' + escapedText + '</span>';
+}
 function k7RegisterDefinitions(value) {
   if (!value || typeof value !== 'object' || K7_DEFINITION_OBJECTS.has(value)) return;
   K7_DEFINITION_OBJECTS.add(value);
@@ -172,7 +221,9 @@ function k7TranslateWrappedText(source, conservative) {
 }
 function k7TranslateTextNode(node, conservative = true) {
   if (!node || !node.parentElement || node.parentElement.closest(K7_TRANSLATE_SKIP_SELECTOR)) return;
-  const translated = k7TranslateWrappedText(node.nodeValue, conservative);
+  // Action labels are authored UI; player-owned text inside them has an explicit skip span.
+  const actionLabel = node.parentElement.matches('button,label,.section-title,.help-category-header');
+  const translated = k7TranslateWrappedText(node.nodeValue, conservative && !actionLabel);
   if (translated !== node.nodeValue) node.nodeValue = translated;
 }
 function k7TranslateElementAttributes(element, conservative = true) {
