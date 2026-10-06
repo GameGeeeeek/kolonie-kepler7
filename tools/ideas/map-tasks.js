@@ -1,9 +1,15 @@
 const K7_MAP_FILTERS={all:'Alle Aufgaben',colonies:'Eigene Kolonien',loot:'Sichtbare Beuteziele',alliance:'Allianztreffpunkt',missions:'Laufende Missionen'};
+function k7ColonyLabel(id){
+  if(state.colonyNames&&state.colonyNames[id])return state.colonyNames[id];
+  if(id==='home')return k7t('Heimatbasis');
+  if(isMoonKey(id))return k7Ui('Mond von ','Moon of ')+k7ColonyLabel(moonParentKey(id));
+  return k7t(planetDisplayName(id));
+}
 function k7MapTasks(filter='all'){
   if(!Object.hasOwn(K7_MAP_FILTERS,filter))return [];
   const visible=new Set(visibleSystems().map(s=>s.id)),rows=[];
   if(filter==='all'||filter==='colonies')for(const id of ['home',...Object.keys(state.colonies||{})]){
-    const system=planetSystemOf(id);if(visible.has(system))rows.push({key:'colony:'+id,kind:'colony',id,system,name:planetDisplayName(id),private:true,label:k7t('Eigene Kolonien')});
+    const system=planetSystemOf(id);if(visible.has(system))rows.push({key:'colony:'+id,kind:'colony',id,system,name:k7ColonyLabel(id),private:true,label:k7t('Eigene Kolonien')});
   }
   if(filter==='all'||filter==='loot')for(const target of k7LootTargets())rows.push({...target,key:'loot:'+target.id,label:k7t('Sichtbare Beuteziele')});
   const base=state.allianceBase;

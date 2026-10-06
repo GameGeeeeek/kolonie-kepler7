@@ -5,6 +5,12 @@ const source=fs.readFileSync(path.join(root,'weltraum_kolonie.html'),'utf8');
 const files=[];
 const sourceOnly=new Set(['live-rally-message','focus-keyboard-listener','live-coordinated-name']);
 try{for(const [name,test,before,after,mustFail]of [
+ ['trial-goal','test_k7_release_guards.js','const won=run.integrity>=85 && run.history.length===3;','const won=run.integrity>0 && run.history.length===3;','sub-goal trial result is reported as failure'],
+ ['blueprint-special','test_k7_release_guards.js','&&(!specialItem||specialAvailable>=1)','&&true','missing'],
+ ['blueprint-reservation','test_k7_release_guards.js','Math.max(0,(state.rareItems[specialItem]||0)-(state.buildQueue||[]).filter(q=>SPECIAL_UNIT_ITEMS[q.key]===specialItem).length)','(state.rareItems[specialItem]||0)','reserved'],
+ ['economy-combined','test_k7_release_guards.js','eta=missing<=effective*untilFull?missing/effective:untilFull+(missing-effective*untilFull)/accountRate;','eta=amount/accountRate;','mixed'],
+ ['colony-default-name','test_k7_release_guards.js',"if(id==='home')return k7t('Heimatbasis');","if(id==='home')return 'Heimatbasis';",'home'],
+ ['map-request-race','test_k7_release_guards.js','if(request!==mapPlayersRequest||system!==activeSystem)return;','','stale player-map response cannot replace the current system'],
  ['live-defense-format','test_kopfzeile_chips.js',"Verteidigungspunkte dort: '+fmt(defensePower(","Verteidigungspunkte dort: '+String(defensePower(",'4h: die Ueberfall-Meldung nennt die Verteidigungspunkte in derselben Schreibweise'],
  ['cosmetic-color','test_kosmetik_auswahl.js',"nf_gold:     { art:'namensfarbe', name:'Gold',        farbe:'#fac775'","nf_gold:     { art:'namensfarbe', name:'Gold',        farbe:''",'4: der Name in der Bestenliste trägt die Farbe'],
  ['codex-tier-bonus','test_kodexstufen.js','need:30, reward:{ essence:6, expBonus:0.03 }','need:30, reward:{ essence:6, expBonus:0.99 }','3: der dauerhafte Gesamtbonus bleibt maßvoll (<= 15%)'],

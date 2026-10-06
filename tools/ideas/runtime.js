@@ -109,7 +109,10 @@ function k7BlueprintPreview(plan, planet) {
     const remaining = Math.max(0,step.level-current-queued);
     const moonBlocked=!!def.moonOnly&&!isMoonKey(planet);
     const unsupported=def.category==='defense';
-    return {def, target:step.level, current, queued, remaining, moonBlocked, unsupported, unlocked:!unsupported&&!moonBlocked&&techUnlockedGeneric(def.requires), cost:costForRange(def,current+queued,remaining)};
+    const specialItem=SPECIAL_UNIT_ITEMS[def.key]||null;
+    const specialAvailable=specialItem?Math.max(0,(state.rareItems[specialItem]||0)-(state.buildQueue||[]).filter(q=>SPECIAL_UNIT_ITEMS[q.key]===specialItem).length):0;
+    const specialMissing=specialItem?Math.max(0,remaining-specialAvailable):0;
+    return {def, target:step.level, current, queued, remaining, moonBlocked, unsupported, specialItem, specialAvailable, specialMissing, unlocked:!unsupported&&!moonBlocked&&techUnlockedGeneric(def.requires)&&(!specialItem||specialAvailable>=1), cost:costForRange(def,current+queued,remaining)};
   }).filter(Boolean);
 }
 function k7QueueBlueprintStep(id, key, planet) {
@@ -128,7 +131,7 @@ function renderK7Blueprints() {
     <p class="k7-muted">${k7h('Planung zeigt Restkosten. Jede Übernahme reiht genau eine Stufe in die bestehende Bau-Wunschliste ein; ihre normalen Kosten und Regeln gelten.')}</p>`;
   if (plan) {
     html += `<div class="k7-row"><label for="k7PlanSelect">${k7h('Plan auswählen')}</label><select id="k7PlanSelect">${plans.map(p=>`<option translate="no" value="${escapeHtml(p.id)}"${p===plan?' selected':''}>${escapeHtml(p.name)}</option>`).join('')}</select><button id="k7DeletePlan">${k7h('Löschen')}</button></div>`;
-    for (const row of k7BlueprintPreview(plan,state.activeBasePlanet)) html += `<div class="k7-item"><strong>${escapeHtml(k7View(row.def).name)}</strong> ${row.current} → ${row.target}${row.queued?' · '+row.queued+' '+k7h('Bereits eingeplant'):''}<div class="k7-muted">${row.remaining?costHtml(row.cost):k7h('Erreicht')}</div>
+    for (const row of k7BlueprintPreview(plan,state.activeBasePlanet)) html += `<div class="k7-item"><strong>${escapeHtml(k7View(row.def).name)}</strong> ${row.current} → ${row.target}${row.queued?' · '+row.queued+' '+k7h('Bereits eingeplant'):''}<div class="k7-muted">${row.remaining?costHtml(row.cost):k7h('Erreicht')}${row.specialItem&&row.remaining?' · '+row.remaining+' '+escapeHtml(k7View(RARE_ITEMS.find(item=>item.key===row.specialItem)||{name:row.specialItem}).name)+' ('+row.specialAvailable+'/'+row.remaining+')':''}</div>
       ${!row.unlocked?`<div class="k7-warn">${k7h('Voraussetzungen fehlen')}: ${row.unsupported?k7h('Verteidigungsbauwerke gehören nicht zu Ausbauvorlagen.')+' · ':''}${row.moonBlocked?k7h('Nur auf einem eigenen Mond')+' · ':''}${(row.def.requires||[]).map(r=>{const v=techVoraussetzung(r);return escapeHtml(k7View(RESEARCH_DEFS.find(d=>d.key===v.key)||{name:v.key}).name)+' '+v.level;}).join(', ')}</div>`:''}
       ${row.remaining?`<button data-k7-plan-step="${row.def.key}"${!row.unlocked?' disabled':''}>${k7h('Nächste Stufe einreihen')}</button>`:''}</div>`;
   } else html += `<p class="k7-muted">${k7h('Noch kein Bauplan gespeichert.')}</p>`;

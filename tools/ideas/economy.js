@@ -19,9 +19,12 @@ function k7CostBottleneck(cost,account){
   const rest=account?baustelleRestKosten(cost,account):cost,bank=account?baustelleStand(account):{},economy=k7EconomySnapshot();
   return Object.entries(rest).map(([res,amount])=>{
     const have=costAmountAvailable(res),missing=Math.max(0,amount-have),cap=k7ResourceCapacity(res),rate=economy.net[res]||0,accountRate=((economy.bankRates[account]||{})[res]||0);
-    const oversized=amount>cap,throughAccount=accountRate>0&&(oversized||rate<=0),effective=throughAccount?accountRate:rate+accountRate,blocked=missing>0&&(effective<=0||oversized&&!throughAccount);
-    // Funding all remaining cost via the account is conservative when free stock cannot grow.
-    const eta=missing===0?0:blocked?null:(throughAccount?amount:missing)/effective;
+    const oversized=amount>cap,effective=rate+accountRate,blocked=missing>0&&accountRate<=0&&(effective<=0||oversized);
+    let eta=missing===0?0:blocked?null:missing/effective;
+    if(missing>0&&!blocked&&accountRate>0){
+      if(rate>0){const untilFull=Math.max(0,cap-have)/rate;eta=missing<=effective*untilFull?missing/effective:untilFull+(missing-effective*untilFull)/accountRate;}
+      else if(effective<=0||(rate<0&&eta>have/-rate))eta=amount/accountRate;
+    }
     return {res,amount,have,missing,cap,rate,gross:economy.gross[res]||0,consumption:economy.consumption[res]||0,effective,bank:bank[res]||0,accountRate,blocked,oversized,eta};
   });
 }
