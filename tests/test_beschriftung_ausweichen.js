@@ -311,7 +311,9 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
      einem Wert macht. */
   const haeufigster = (werte) => {
     const zaehler = {};
-    for (const v of werte){ const k = v.toFixed(1); zaehler[k] = (zaehler[k] || 0) + 1; }
+    // SVG rounding can produce both -0.0 and 0.0 for a centered label.
+    // They are the same measured offset, so they must share one reference bucket.
+    for (const v of werte){ const k = String(Number(v.toFixed(1))); zaehler[k] = (zaehler[k] || 0) + 1; }
     let besterK = null, besteN = 0;
     for (const k of Object.keys(zaehler)) if (zaehler[k] > besteN){ besteN = zaehler[k]; besterK = k; }
     return { wert: besterK === null ? null : parseFloat(besterK), anzahl: besteN };
