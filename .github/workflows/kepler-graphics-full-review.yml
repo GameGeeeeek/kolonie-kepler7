@@ -39,7 +39,13 @@ jobs:
         run: |
           mv .review-backend ../kolonie-kepler7-backend
           npm install --no-save --package-lock=false playwright@1.62.1
-          npx playwright install --with-deps chromium
+          npm ci --prefix ../kolonie-kepler7-backend --omit=dev
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
           git rev-parse HEAD > /tmp/kepler-tested-commit.txt
           sha256sum weltraum_kolonie.html kepler-graphics.css kepler-gfx-*.png ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
       - name: Full suite partition through actual HTTP origins

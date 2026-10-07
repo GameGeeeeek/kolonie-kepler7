@@ -33,7 +33,12 @@ jobs:
       - name: Install isolated test dependencies
         run: |
           npm install --no-save --package-lock=false playwright@1.62.1
-          npx playwright install --with-deps chromium
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
       - name: Required checks and actual graphics interactions
         env:
           KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
@@ -43,3 +48,11 @@ jobs:
           node tests/http-run.js test_planeten_texturen.js test_kartenbeschriftung.js test_asteroid_trefferflaeche.js test_karte_handy_bedienung.js test_kartenfokus.js test_kartenresize.js test_kartengroesse.js test_uebersicht_schrift.js
       - name: Behavioral and layout counterexamples must fail
         run: node tools/check-graphics-counterexamples.cjs
+      - name: Compare map findings with the release baseline
+        if: failure()
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          git fetch --no-tags --depth=1 origin 6550cb2fdd25f5d5012c61cf06c09d42f6f3b229
+          git show 6550cb2fdd25f5d5012c61cf06c09d42f6f3b229:weltraum_kolonie.html > /tmp/kepler-release-baseline.html
+          KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
