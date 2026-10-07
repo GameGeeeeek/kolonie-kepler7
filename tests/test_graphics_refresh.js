@@ -2,7 +2,7 @@
 // Real game, isolated local API. The counterexample removes only forwarding of build actions.
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
-const {oeffneSystemUeberSektoren}=require('./lib/karte');
+const {oeffneSektorMitSystem,oeffneSystemUeberSektoren}=require('./lib/karte');
 const source=fs.readFileSync(SPIELDATEI,'utf8');
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
@@ -71,6 +71,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.evaluate(()=>__gfxReview.show('karte'));
   if(await page.locator('#galaxyBackBtn').isVisible())await page.locator('#galaxyBackBtn').click();
   await page.locator('#galaxyBackBtn').waitFor({state:'hidden'});
+  assert.equal(await oeffneSektorMitSystem(page,'kepler'),true,'actual sector containing Kepler is open');
   const sectorHeight=await page.locator('#tab-karte .map-wrap').evaluate(el=>el.getBoundingClientRect().height);
   await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());
   const map=await page.evaluate(()=>{const root=document.getElementById('mapPlanetVisual');return {shown:!root.hidden,art:root.querySelector('img')?.getAttribute('src'),rockArt:document.querySelector('[data-planet="vesna"] [data-gfx-planet]')?.getAttribute('href'),unknown:root.textContent.includes('Nicht erkundet'),height:document.getElementById('graphicsMapLayout').getBoundingClientRect().height};});
