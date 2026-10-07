@@ -69,6 +69,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   const identity=await page.evaluate(()=>{const image=document.querySelector('#shipyardVisual .gfx-ship-model');__gfxReview.render();return image===document.querySelector('#shipyardVisual .gfx-ship-model');});
   check('unchanged render retains the large ship image node',identity);
   await page.evaluate(()=>__gfxReview.show('karte'));
+  if(await page.locator('#galaxyBackBtn').isVisible())await page.locator('#galaxyBackBtn').click();
+  await page.locator('#galaxyBackBtn').waitFor({state:'hidden'});
   const sectorHeight=await page.locator('#tab-karte .map-wrap').evaluate(el=>el.getBoundingClientRect().height);
   await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());
   const map=await page.evaluate(()=>{const root=document.getElementById('mapPlanetVisual');return {shown:!root.hidden,art:root.querySelector('img')?.getAttribute('src'),rockArt:document.querySelector('[data-planet="vesna"] [data-gfx-planet]')?.getAttribute('href'),unknown:root.textContent.includes('Nicht erkundet'),height:document.getElementById('graphicsMapLayout').getBoundingClientRect().height};});
@@ -82,6 +84,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('planet inspector opens the existing actions menu',await page.locator('.kmenu').isVisible());
   await page.keyboard.press('Escape');
   check('escape closes only the actions menu and retains the system',await page.locator('.kmenu').count()===0&&await page.locator('#mapPlanetVisual').isVisible());
+  // Recover after a failed navigation check so controlled faults cannot hide later checks.
+  if(!await page.locator('#mapPlanetVisual').isVisible()){await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());}
   await page.locator('#mapPlanetVisual [data-gfx-colony="rhea"]').click();
   check('open colony changes the actual base and basis tab',await page.evaluate(()=>__gfxReview.state().activeBasePlanet==='rhea'&&document.getElementById('tab-basis').classList.contains('active')));
   for(const tab of ['basis','flotte','karte']){

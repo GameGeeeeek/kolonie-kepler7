@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [0, 1, 2, 3]
+        part: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ubuntu-latest
     timeout-minutes: 100
     steps:
@@ -36,13 +36,13 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.62.1
           npx playwright install --with-deps chromium
           git rev-parse HEAD > /tmp/kepler-tested-commit.txt
-          sha256sum weltraum_kolonie.html ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
+          sha256sum weltraum_kolonie.html kepler-graphics.css kepler-gfx-*.png ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
       - name: Full suite partition through actual HTTP origins
         shell: bash
         run: |
           set -euo pipefail
           set +e
-          node tests/http-run.js --part=${{ matrix.part }}/4 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
+          node tests/http-run.js --part=${{ matrix.part }}/8 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
           result=${PIPESTATUS[0]}
           set -e
           # Same final judgment as pruflauf.js: retry only red files individually.

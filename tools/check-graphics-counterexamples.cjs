@@ -8,7 +8,7 @@ const cases=[
  ['disconnected',replace(source,'if (button && !button.disabled) button.click();','if (button && !button.disabled) void button;'),[
   'illustrated building action upgrades the selected actual building','illustrated ship action creates exactly one real local build order']],
  ['closing-menu',replace(source,'e.stopPropagation();planetMapMenu(e,b.dataset.gfxPlanetMenu);','planetMapMenu(e,b.dataset.gfxPlanetMenu);'),[
-  'planet inspector opens the existing actions menu']],
+  'planet inspector opens the existing actions menu','escape closes only the actions menu and retains the system']],
  ['untranslated-stats',replace(source,'<span class="k">${escapeHtml(k7t(k))}</span>','<span class="k">${k}</span>'),[
   'English graphics use translated stats, counts and roles']],
  ['late-map-layout',replace(source,'// Apply the inspector layout before measuring the map or targeting the camera.\n    renderGraphicsMap();','// Counterexample: layout changes after the camera has already been measured.'),[
