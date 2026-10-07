@@ -12,10 +12,15 @@ const { SPIELDATEI, WURZEL } = require('./lib/spieldatei');
 async function main() {
   const names = process.argv.slice(2);
   const full = names.length === 1 && names[0] === '--full';
-  if (!full && (!names.length || names.some(name => !/^(?:test_[a-zA-Z0-9_]+|sweep)\.js$/.test(name)))) {
+  const split = names.length === 1 && /^--part=(\d+)\/([1-9]\d*)$/.exec(names[0]);
+  if (split && Number(split[1]) >= Number(split[2])) throw new Error('Invalid test partition');
+  const suite = full || !!split;
+  if (!suite && (!names.length || names.some(name => !/^(?:test_[a-zA-Z0-9_]+|sweep)\.js$/.test(name)))) {
     throw new Error('Supply test_*.js or sweep.js basenames from the tests directory');
   }
-  const tests = full ? [path.join(WURZEL, 'pruflauf.js')] : names.map(name => path.join(__dirname, name));
+  const partition = split ? fs.readdirSync(__dirname).filter(name => /^test_.*\.js$/.test(name) || name === 'sweep.js').sort()
+    .filter((name,index) => index % Number(split[2]) === Number(split[1])) : [];
+  const tests = full ? [path.join(WURZEL, 'pruflauf.js')] : split ? [path.join(__dirname,'run.js')] : names.map(name => path.join(__dirname, name));
   for (const test of tests) {
     if (!fs.statSync(test).isFile()) throw new Error('Not a test file: ' + test);
   }
@@ -56,13 +61,13 @@ async function main() {
   let failed = false;
   try {
     for (let i = 0; i < tests.length; i++) {
-      console.log('\nHTTP regression: ' + (full ? 'complete repository suite' : names[i]));
+      console.log('\nHTTP regression: ' + (full ? 'complete repository suite' : split ? names[0]+' ('+partition.length+' tests)' : names[i]));
       const code = await new Promise((resolve, reject) => {
         const child = spawn(process.execPath,
-          ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i]],
+          ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i], ...partition],
           { env: { ...process.env, KEPLER_TESTDATEI: origin,
-            ...(full ? {NODE_OPTIONS: ((process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(path.join(__dirname,'lib/http-test-origin.js'))).trim()} : {}) },
-            stdio: 'inherit', ...(full ? {} : {timeout: 180000}) });
+            ...(suite ? {NODE_OPTIONS: ((process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(path.join(__dirname,'lib/http-test-origin.js'))).trim()} : {}) },
+            stdio: 'inherit', ...(suite ? {} : {timeout: 180000}) });
         child.once('error', reject);
         child.once('exit', (status, signal) => resolve(signal ? 1 : status));
       });

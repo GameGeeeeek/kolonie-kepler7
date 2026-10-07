@@ -1,0 +1,52 @@
+name: Kepler graphics full review
+on:
+  push:
+    branches: [codex/kepler-graphics-refresh]
+    paths: [.github/workflows/kepler-graphics-full-review.yml]
+permissions:
+  contents: read
+jobs:
+  complete-suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: dda5d5d3c1dbfb5eeef9ecf5c88227014415c1ef
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare complete repository test environment
+        run: |
+          mv .review-backend ../kolonie-kepler7-backend
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+          git rev-parse HEAD > /tmp/kepler-tested-commit.txt
+          sha256sum weltraum_kolonie.html ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
+      - name: Full suite partition through actual HTTP origins
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/http-run.js --part=${{ matrix.part }}/4 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
+          sha256sum -c /tmp/kepler-tested-source.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-full-review-${{ matrix.part }}
+          path: |
+            /tmp/kepler-tested-commit.txt
+            /tmp/kepler-tested-source.txt
+            /tmp/kepler-full-${{ matrix.part }}.log
+            /tmp/kepler7-fehlschlaege/*.log
+          retention-days: 7
