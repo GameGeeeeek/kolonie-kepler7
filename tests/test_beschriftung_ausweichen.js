@@ -371,7 +371,14 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
     return !eigenF || !natuerlich[eigenF.art];
   }).map(x => x.text);
   check('1g: keine überdeckte Beschriftung blieb mangels Bezugsgröße ungeprüft',
-    uebergangen.length === 0, uebergangen.join(' | ') || 'keine');
+    uebergangen.length === 0, uebergangen.length ? {
+      texte: uebergangen,
+      lage: l.labels.filter(x => uebergangen.includes(x.text)).map(x => ({
+        text: x.text, box: x.box, eigenNr: x.eigenNr,
+        eigenF: l.flaechen[x.eigenNr],
+        fremdeF: l.flaechen.filter(f => f.nr !== x.eigenNr && schneidet(x.box, f.b))
+      }))
+    } : 'keine');
 
   // 1d - der Rahmen
   const weit = namen.filter(x => {
