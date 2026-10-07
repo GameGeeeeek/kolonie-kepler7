@@ -66197,6 +66197,9 @@ async function claimPendingRewards(){
     const kbWarOffen = !!galaxyOpenSystem;
     galaxyOpenSystem = systemId;
     activeSystem = systemId;
+    // Apply the inspector layout before measuring the map or targeting the camera.
+    renderGraphicsMap();
+    kbRundBis = 0;
     // Der Kasten wechselt beim Öffnen von der Vollhöhe der Sektor-Ansichten auf die 420px der
     // Systemebene. Die Kamerafahrt rechnet ihr Ziel aus dem KASTEN-Verhältnis - der Wechsel muss
     // deshalb VOR der Zielberechnung passieren, sonst endet die Fahrt im Vollhöhen-Verhältnis
@@ -66259,6 +66262,7 @@ async function claimPendingRewards(){
   function galaxySchliesse(){
     if (!galaxyOpenSystem) return;
     galaxyOpenSystem = null;
+    renderGraphicsMap();
     lastGalaxyMapMarkup = null;
     // KEINE Kamerafahrt beim Schließen (KB-7): Der Rückweg führt in die Sektoransicht, die ihre
     // viewBox selbst setzt - eine noch laufende Fahrt würde sie per rAF eine halbe Sekunde lang
@@ -74997,11 +75001,11 @@ document.addEventListener('keydown',event=>{
   }
   function renderGraphicsMap(){
     const box = document.getElementById('mapPlanetVisual');
-    if (!box || activeTab!=='karte') return;
-    const systemOpen = document.getElementById('galaxyBackBtn').style.display!=='none';
+    if (!box) return;
+    const systemOpen = !!galaxyOpenSystem;
     box.hidden = !systemOpen;
     document.getElementById('graphicsMapLayout').classList.toggle('gfx-system-layout',systemOpen);
-    if (!systemOpen) return;
+    if (!systemOpen || activeTab!=='karte') return;
     const planets = PLANETS.filter(p=>p.system===activeSystem);
     const p = planets.find(p=>p.id===gfxPlanet) || planets.find(p=>state.colonies[p.id]) || planets.find(p=>state.discovered[p.id]) || planets[0];
     if (!p) { box.hidden=true; return; }

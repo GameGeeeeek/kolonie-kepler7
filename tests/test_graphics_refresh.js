@@ -68,11 +68,16 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('illustrated ship action creates exactly one real local build order',queued===1,{queued});
   const identity=await page.evaluate(()=>{const image=document.querySelector('#shipyardVisual .gfx-ship-model');__gfxReview.render();return image===document.querySelector('#shipyardVisual .gfx-ship-model');});
   check('unchanged render retains the large ship image node',identity);
-  await page.evaluate(()=>__gfxReview.show('karte'));await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());
+  await page.evaluate(()=>__gfxReview.show('karte'));
+  const sectorHeight=await page.locator('#tab-karte .map-wrap').evaluate(el=>el.getBoundingClientRect().height);
+  await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());
   const map=await page.evaluate(()=>{const root=document.getElementById('mapPlanetVisual');return {shown:!root.hidden,art:root.querySelector('img')?.getAttribute('src'),rockArt:document.querySelector('[data-planet="vesna"] [data-gfx-planet]')?.getAttribute('href'),unknown:root.textContent.includes('Nicht erkundet'),height:document.getElementById('graphicsMapLayout').getBoundingClientRect().height};});
   check('known colony gets its correct planet illustration',map.shown&&map.art==='kepler-gfx-planet-ocean.png'&&!map.unknown,map);
   check('asteroid is never replaced by an ocean illustration',!map.rockArt,map);
   check('desktop system overview avoids intrinsic SVG height growth',map.height>300&&map.height<600,map);
+  const camera=await page.evaluate(()=>{const r=document.querySelector('#tab-karte .map-wrap').getBoundingClientRect(),v=document.getElementById('galaxyMapSvg').viewBox.baseVal;return {height:r.height,mapRatio:r.height/r.width,cameraRatio:v.height/v.width};});
+  check('desktop map height remains stable when a system opens',Math.abs(sectorHeight-camera.height)<=2,{sectorHeight,...camera});
+  check('initial system camera matches the actual map aspect ratio',Math.abs(camera.mapRatio-camera.cameraRatio)<0.01,camera);
   await page.locator('#mapPlanetVisual [data-gfx-planet-menu]').click();
   check('planet inspector opens the existing actions menu',await page.locator('.kmenu').isVisible());
   await page.keyboard.press('Escape');

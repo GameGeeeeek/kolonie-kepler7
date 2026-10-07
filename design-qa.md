@@ -95,7 +95,7 @@ Decorative images have empty alt text; meaningful illustrations have descriptive
 Reduced motion is respected when scrolling to the full lists. No added animation loop exists.
 The preview's captured error console was empty after the tested interactions.
 
-Twenty targeted checks pass. Controlled counterexamples prove that disconnected actions,
+Twenty-two targeted checks pass. Controlled counterexamples prove that disconnected actions,
 immediate menu closure, untranslated stats, misaligned frame, oversized map and mobile hit-area
 regressions are rejected. Existing planet texture, map-label and sector-width tests also pass.
 The complete repository test run is recorded separately in the pull request before release.
@@ -105,6 +105,9 @@ areas shrank to 22px in the two-column layout. The inspector now stacks below th
 1480px. The unchanged asteroid target test fails before this CSS correction and passes after it
 (26px targets on both tested desktop and mobile, no overlaps, real taps open the menu). Its
 regression check and the existing map interaction/resize checks are part of graphics CI.
+The inspector layout is applied before the native camera is measured. Wide sector/system maps
+share a 480px height, while the existing mobile and flat-window behavior is retained. The native
+map size/resize checks and the new initial-aspect and stable-height guards pass.
 
 ## Implementation checklist
 

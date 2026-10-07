@@ -11,12 +11,14 @@ const cases=[
   'planet inspector opens the existing actions menu']],
  ['untranslated-stats',replace(source,'<span class="k">${escapeHtml(k7t(k))}</span>','<span class="k">${k}</span>'),[
   'English graphics use translated stats, counts and roles']],
+ ['late-map-layout',replace(source,'// Apply the inspector layout before measuring the map or targeting the camera.\n    renderGraphicsMap();','// Counterexample: layout changes after the camera has already been measured.'),[
+  'initial system camera matches the actual map aspect ratio']],
  ['broken-layout',replace(source,'</head>',`<style>
  #kanzelrahmen { width:600px!important; }
  @media(min-width:1400px) and (min-height:850px) { .gfx-system-layout {grid-template-rows:850px auto!important;} .gfx-system-layout .map-wrap {height:850px!important;} }
  @media(max-width:760px) { .gfx-hotspot {min-height:34px!important;} .gfx-hotspot[data-gfx-building="mine"] {left:26%!important;top:44%!important;} .gfx-hotspot[data-gfx-building="solar"] {left:58%!important;top:39%!important;} }
  </style></head>`),[
-  'wide desktop frame stays aligned with the expanded game column','desktop system overview avoids intrinsic SVG height growth','mobile building controls have 44px targets without overlaps']]
+  'wide desktop frame stays aligned with the expanded game column','desktop system overview avoids intrinsic SVG height growth','desktop map height remains stable when a system opens','mobile building controls have 44px targets without overlaps']]
 ];
 try {
  for(const [name,html,expected] of cases){
