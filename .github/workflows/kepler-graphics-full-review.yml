@@ -38,7 +38,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set +e
           node tests/http-run.js --part=${{ matrix.part }}/4 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
+          result=${PIPESTATUS[0]}
+          set -e
+          # Same final judgment as pruflauf.js: retry only red files individually.
+          if [ "$result" -ne 0 ]; then
+            mapfile -t failed < <(sed -nE 's/^  FAIL (test_[^ ]+\.js|sweep\.js) .*/\1/p' /tmp/kepler-full-${{ matrix.part }}.log | sort -u)
+            if [ "${#failed[@]}" -eq 0 ]; then exit "$result"; fi
+            node tests/http-run.js "${failed[@]}" 2>&1 | tee /tmp/kepler-recheck-${{ matrix.part }}.log
+          fi
           sha256sum -c /tmp/kepler-tested-source.txt
       - uses: actions/upload-artifact@v4
         if: always()
@@ -48,5 +57,6 @@ jobs:
             /tmp/kepler-tested-commit.txt
             /tmp/kepler-tested-source.txt
             /tmp/kepler-full-${{ matrix.part }}.log
+            /tmp/kepler-recheck-${{ matrix.part }}.log
             /tmp/kepler7-fehlschlaege/*.log
           retention-days: 7

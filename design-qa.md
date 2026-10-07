@@ -100,6 +100,12 @@ immediate menu closure, untranslated stats, misaligned frame, oversized map and 
 regressions are rejected. Existing planet texture, map-label and sector-width tests also pass.
 The complete repository test run is recorded separately in the pull request before release.
 
+The full regression run exposed a desktop map target regression at 1400px: belt asteroid hit
+areas shrank to 22px in the two-column layout. The inspector now stacks below the map until
+1480px. The unchanged asteroid target test fails before this CSS correction and passes after it
+(26px targets on both tested desktop and mobile, no overlaps, real taps open the menu). Its
+regression check and the existing map interaction/resize checks are part of graphics CI.
+
 ## Implementation checklist
 
 - [x] Real assets integrated into all three approved directions.
