@@ -1,6 +1,7 @@
 'use strict';
 // Read-only, loopback-only server for tests whose existing API fixtures use /api URLs.
 // Usage: node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js
+// Full suite with the same isolated HTTP origin: node tests/http-run.js --full
 // KEPLER_SPIELDATEI selects a baseline/counterexample without modifying the checkout.
 const fs = require('fs');
 const http = require('http');
@@ -10,16 +11,19 @@ const { SPIELDATEI, WURZEL } = require('./lib/spieldatei');
 
 async function main() {
   const names = process.argv.slice(2);
-  if (!names.length || names.some(name => !/^(?:test_[a-zA-Z0-9_]+|sweep)\.js$/.test(name))) {
+  const full = names.length === 1 && names[0] === '--full';
+  if (!full && (!names.length || names.some(name => !/^(?:test_[a-zA-Z0-9_]+|sweep)\.js$/.test(name)))) {
     throw new Error('Supply test_*.js or sweep.js basenames from the tests directory');
   }
-  const tests = names.map(name => path.join(__dirname, name));
+  const tests = full ? [path.join(WURZEL, 'pruflauf.js')] : names.map(name => path.join(__dirname, name));
   for (const test of tests) {
     if (!fs.statSync(test).isFile()) throw new Error('Not a test file: ' + test);
   }
   const game = fs.readFileSync(SPIELDATEI);
   const assets = new Map();
-  for (const name of ['tabler-icons-full.woff2', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png']) {
+  const assetNames = ['tabler-icons-full.woff2', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'kepler-graphics.css',
+    ...fs.readdirSync(WURZEL).filter(name => /^kepler-gfx-[a-z-]+\.png$/.test(name))];
+  for (const name of assetNames) {
     const file = path.join(WURZEL, name);
     if (fs.existsSync(file)) assets.set('/' + name, fs.readFileSync(file));
   }
@@ -36,7 +40,7 @@ async function main() {
     } else if (target === '/version.txt' && version) {
       data = Buffer.from(version[1]); mime = 'text/plain; charset=utf-8';
     } else if (assets.has(target)) {
-      data = assets.get(target); mime = target.endsWith('.woff2') ? 'font/woff2' : 'image/png';
+      data = assets.get(target); mime = target.endsWith('.woff2') ? 'font/woff2' : target.endsWith('.css') ? 'text/css; charset=utf-8' : 'image/png';
     } else {
       // No API, repository, credential or arbitrary filesystem access. The tests own API mocks.
       res.writeHead(404); res.end(); return;
@@ -52,11 +56,13 @@ async function main() {
   let failed = false;
   try {
     for (let i = 0; i < tests.length; i++) {
-      console.log('\nHTTP regression: ' + names[i]);
+      console.log('\nHTTP regression: ' + (full ? 'complete repository suite' : names[i]));
       const code = await new Promise((resolve, reject) => {
         const child = spawn(process.execPath,
           ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i]],
-          { env: { ...process.env, KEPLER_TESTDATEI: origin }, stdio: 'inherit', timeout: 180000 });
+          { env: { ...process.env, KEPLER_TESTDATEI: origin,
+            ...(full ? {NODE_OPTIONS: ((process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(path.join(__dirname,'lib/http-test-origin.js'))).trim()} : {}) },
+            stdio: 'inherit', ...(full ? {} : {timeout: 180000}) });
         child.once('error', reject);
         child.once('exit', (status, signal) => resolve(signal ? 1 : status));
       });
