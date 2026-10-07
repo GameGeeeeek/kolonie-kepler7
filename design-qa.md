@@ -127,3 +127,7 @@ final result: passed
 ### Final map camera verification
 
 The actual game was reopened with a fresh preview origin at 1487 × 1058 after the final camera/layout correction. The system map measures 480px, all planets and native map controls fit, the selected ocean illustration loads, the detail column aligns with the map, and there is no horizontal overflow. Screenshot: `docs/graphics-review/26-karte-kamera-final.png`. The temporary viewport was reset afterward. The baseline font and map-size checks pass; the added desktop-font counterexample fails exactly at 6.3 visible pixels, confirming the 9px readability guard.
+
+### Cross-platform map typography
+
+Chrome on the Linux review runners exposed two existing failures. Running the same checks against release `6550cb2` reproduced the identical five narrow-screen overlaps and 0.85 SVG-unit intersections between asteroid rims and alliance tags. The update separates the complete Pulsar label/hint block by twelve visible pixels on narrow screens and adds two SVG units between holder tags and the rim. Font sizes, hint hit areas, region geometry, and all original collision assertions remain intact. Both local typography checks and the 22 graphics checks pass after the correction; the Linux checks run first in graphics CI to confirm it on the originally failing platform.
