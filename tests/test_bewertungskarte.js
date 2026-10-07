@@ -110,7 +110,10 @@ const ohneKommentare = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
   });
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
   const browser = await starteBrowser();
-  const seite = await browser.newPage({ viewport: { width: 900, height: 700 } });
+  // Eigener Themenserver, kein Spiel-Fixture: Playwrights Worker-Sperre injiziert
+  // navigator.serviceWorker auch in opaque Sandbox-Rahmen und wirft dort selbst.
+  // Die Karte registriert keinen Worker; ihre Sandbox-/Konsolenprüfungen bleiben aktiv.
+  const seite = await browser.newPage({ viewport: { width: 900, height: 700 }, serviceWorkers: 'allow' });
   const fehler = [];
   seite.on('pageerror', e => fehler.push(String(e.message).slice(0, 120)));
   seite.on('console', m => { if (m.type() === 'error') fehler.push(m.text().slice(0, 120)); });

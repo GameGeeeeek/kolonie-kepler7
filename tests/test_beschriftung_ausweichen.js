@@ -311,7 +311,9 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
      einem Wert macht. */
   const haeufigster = (werte) => {
     const zaehler = {};
-    for (const v of werte){ const k = v.toFixed(1); zaehler[k] = (zaehler[k] || 0) + 1; }
+    // SVG rounding can produce both -0.0 and 0.0 for a centered label.
+    // They are the same measured offset, so they must share one reference bucket.
+    for (const v of werte){ const k = String(Number(v.toFixed(1))); zaehler[k] = (zaehler[k] || 0) + 1; }
     let besterK = null, besteN = 0;
     for (const k of Object.keys(zaehler)) if (zaehler[k] > besteN){ besteN = zaehler[k]; besterK = k; }
     return { wert: besterK === null ? null : parseFloat(besterK), anzahl: besteN };
@@ -371,7 +373,14 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
     return !eigenF || !natuerlich[eigenF.art];
   }).map(x => x.text);
   check('1g: keine überdeckte Beschriftung blieb mangels Bezugsgröße ungeprüft',
-    uebergangen.length === 0, uebergangen.join(' | ') || 'keine');
+    uebergangen.length === 0, uebergangen.length ? {
+      texte: uebergangen,
+      lage: l.labels.filter(x => uebergangen.includes(x.text)).map(x => ({
+        text: x.text, box: x.box, eigenNr: x.eigenNr,
+        eigenF: l.flaechen[x.eigenNr],
+        fremdeF: l.flaechen.filter(f => f.nr !== x.eigenNr && schneidet(x.box, f.b))
+      }))
+    } : 'keine');
 
   // 1d - der Rahmen
   const weit = namen.filter(x => {

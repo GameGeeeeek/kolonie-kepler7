@@ -112,7 +112,8 @@ async function messen(browser, name, vp, mobil){
 (async () => {
   const browser = await starteBrowser();
   for (const [name, vp, mobil] of [['Handy', { width: 390, height: 844 }, true],
-                                   ['PC', { width: 1400, height: 900 }, false]]) {
+                                   ['PC', { width: 1400, height: 900 }, false],
+                                   ['PC breit', { width: 1600, height: 1040 }, false]]) {
     const m = await messen(browser, name, vp, mobil);
     check('0-vorab (' + name + '): Guertel-Vorkommen auf der Karte gefunden', m.anzahl >= 2, m.anzahl);
     if (m.anzahl < 2) continue;

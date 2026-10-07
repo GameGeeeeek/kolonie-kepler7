@@ -1,0 +1,79 @@
+name: Kepler graphics full review
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/kepler-graphics-refresh]
+    paths:
+      - .github/workflows/kepler-graphics-full-review.yml
+      - tests/http-run.js
+      - tests/lib/http-test-origin.js
+      - tests/test_uebersicht_schrift.js
+      - tests/test_beschriftung_ausweichen.js
+      - kepler-graphics.css
+      - kepler-gfx-*.png
+permissions:
+  contents: read
+concurrency:
+  group: graphics-full-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  complete-suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: dda5d5d3c1dbfb5eeef9ecf5c88227014415c1ef
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare complete repository test environment
+        run: |
+          mv .review-backend ../kolonie-kepler7-backend
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npm ci --prefix ../kolonie-kepler7-backend --omit=dev
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
+          git rev-parse HEAD > /tmp/kepler-tested-commit.txt
+          sha256sum weltraum_kolonie.html kepler-graphics.css kepler-gfx-*.png ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
+      - name: Full suite partition through actual HTTP origins
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node tests/http-run.js --part=${{ matrix.part }}/8 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
+          result=${PIPESTATUS[0]}
+          set -e
+          # Same final judgment as pruflauf.js: retry only red files individually.
+          if [ "$result" -ne 0 ]; then
+            mapfile -t failed < <(sed -nE 's/^  FAIL (test_[^ ]+\.js|sweep\.js) .*/\1/p' /tmp/kepler-full-${{ matrix.part }}.log | sort -u)
+            if [ "${#failed[@]}" -eq 0 ]; then exit "$result"; fi
+            node tests/http-run.js "${failed[@]}" 2>&1 | tee /tmp/kepler-recheck-${{ matrix.part }}.log
+          fi
+          sha256sum -c /tmp/kepler-tested-source.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-full-review-${{ matrix.part }}
+          path: |
+            /tmp/kepler-tested-commit.txt
+            /tmp/kepler-tested-source.txt
+            /tmp/kepler-full-${{ matrix.part }}.log
+            /tmp/kepler-recheck-${{ matrix.part }}.log
+            /tmp/kepler7-fehlschlaege/*.log
+          retention-days: 7
