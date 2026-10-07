@@ -36,4 +36,12 @@ try {
   console.log('OK - '+name+' rejects exactly '+expected.length+' intended faults');
   for(const line of failures)console.log(line);
  }
+ const fontFile=path.join(temporary,'small-desktop-labels.html');
+ fs.writeFileSync(fontFile,replace(source,'(15*uF).toFixed(1)','(15*(window.innerWidth>700?1:uF)).toFixed(1)'));
+ const fontResult=spawnSync(process.execPath,['tests/http-run.js','test_uebersicht_schrift.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:fontFile},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
+ const fontOutput=(fontResult.stdout||'')+(fontResult.stderr||'');
+ const fontFailures=fontOutput.split('\n').filter(line=>line.startsWith('FAIL - '));
+ if(fontResult.status!==1||fontFailures.length!==1||!fontFailures[0].startsWith('FAIL - 1b: PC-Regionsnamen')){console.error(fontOutput);throw Error('Desktop readability counterexample must fail exactly its visible-pixel check');}
+ console.log('OK - small-desktop-labels rejects exactly 1 intended fault');
+ console.log(fontFailures[0]);
 } finally { fs.rmSync(temporary,{recursive:true,force:true}); }

@@ -196,11 +196,12 @@ async function messe(browser, vp){
   // proportional kleiner als der Name, deshalb zwei verschiedene Werte.
   check('1: am Handy ist der Regionsname mindestens 8 px und die Metazeile mindestens 5 px',
     handy.nameMin >= 8 && handy.metaMin >= 5, { name: handy.nameMin, meta: handy.metaMin, skala: handy.skala });
-  // Die Gegenrichtung, und sie ist die Haelfte der Zusage: Am PC ist der Faktor gemessen 0,76
-  // und wird auf 1 gedeckelt - dort steht die Schrift also byte-genau wie vorher bei 15
-  // Nutzereinheiten. Eine Aenderung, die den PC mit aufblaest, faellt hier.
-  check('1b: am PC bleibt die Schrift, wie sie war (Faktor 1, kein Aufblasen)',
-    pc.nameUser === 15, { fontSizeNutzer: pc.nameUser, effektivPx: pc.nameMin });
+  // The compact illustrated desktop map can need scaling too. Verify visible pixels:
+  // at least 9px, but no enlargement beyond the original size or that minimum.
+  // A fixed 15 SVG units would allow illegible 6.3px labels in the new frame.
+  check('1b: PC-Regionsnamen bleiben lesbar und wachsen nur bis zur Mindestgroesse',
+    pc.nameMin >= 8.9 && pc.nameMin <= Math.max(9, 15 * pc.skala) + 0.2,
+    { fontSizeNutzer: pc.nameUser, effektivPx: pc.nameMin, skala: pc.skala });
 
   check('2a: am Handy steht keine "N Systeme"-Zeile mehr', handy.systemzeilen === 0, { zeilen: handy.systemzeilen });
   check('2b: am PC steht sie weiterhin (dort ist sie lesbar)', pc.systemzeilen === 8, { zeilen: pc.systemzeilen });

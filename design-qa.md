@@ -105,10 +105,12 @@ areas shrank to 22px in the two-column layout. The inspector now stacks below th
 1480px. The unchanged asteroid target test fails before this CSS correction and passes after it
 (26px targets on both tested desktop and mobile, no overlaps, real taps open the menu). Its
 regression check and the existing map interaction/resize checks are part of graphics CI.
-The inspector layout is applied before the native camera is measured. Wide selected-region/system maps
-share a 480px height; the overall galaxy overview keeps its original height and text scale. The existing mobile and flat-window behavior is retained. The native
+The inspector layout is applied before the native camera is measured. Wide desktop maps
+share a 480px height across their levels. Region labels retain their existing automatic minimum
+size. Their desktop check measures visible pixels (at least 9px, no needless enlargement) instead
+of requiring fixed SVG units; a 15-unit name would shrink to 6.3px in the compact frame. The existing mobile and flat-window behavior is retained. The native
 map size/resize checks and the new initial-aspect and stable-height guards pass.
-Six controlled counterexamples exercise ten intended faults; failed navigation is restored only
+Seven controlled counterexamples exercise eleven intended faults; failed navigation is restored only
 after its assertions so the remaining checks still run. Source-file reads remain file based, while
 the test preload redirects actual game navigation to the isolated HTTP server.
 
