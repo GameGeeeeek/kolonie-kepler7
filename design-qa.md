@@ -153,3 +153,25 @@ header-height tests pass without assertion changes.
 The final actual views were inspected in `28-kolonie-hud-final.png`, `29-werft-hud-final.png`,
 `30-karte-hud-final.png` (1487 × 1058), and `31-kolonie-hud-mobile.png` (390 × 844).
 The desktop card cuts and mobile scene/control placement are intact; the viewport override was reset.
+
+### Complete-suite release evidence
+
+All 460 test files were executed against the immutable game/assets at
+`e599427c1f10a7dc9e51f7a326f19040d432b8c9` in run `37694408193`.
+Partitions 0–6 passed without a failed test; partition 7 found only
+`test_bewertungskarte.js`, including its isolated retry. Playwright's worker-blocking
+init script itself accessed `navigator.serviceWorker` in the unrelated opaque
+rating-card iframe and caused its console-error guard to fail. That fixture now
+explicitly retains normal worker settings on its own theme-page server. Its
+sandbox, storage, cookie, request-origin and console assertions remain unchanged.
+The isolated local retry passed, and Linux run `37696835255`, job `113050530505`,
+passed the separate `Sandboxed rating-card regression` step. The production game,
+stylesheet, all eleven assets and shared fixture harness are byte-identical
+between the full-suite source and this fixture correction (`8a05625668bcc2ad9b7e65ebaac372a85c8a8fe1`).
+Only this red file was rechecked, following the repository's isolated-retry rule.
+
+Graphics run `37694413857`, job `113042400066`, passed at the full-suite source:
+22 graphics checks, existing targeted guards and all seven controlled
+counterexamples (eleven intentionally rejected faults). Ideas run `37694414008`
+also passed. Version 8.745.0 and German patchnotes are assigned after this review;
+the numbering checks and final PR checks validate the resulting release metadata.
