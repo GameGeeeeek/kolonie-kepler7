@@ -123,3 +123,7 @@ the test preload redirects actual game navigation to the isolated HTTP server.
 - [x] Browser error console checked.
 
 final result: passed
+
+### Final map camera verification
+
+The actual game was reopened with a fresh preview origin at 1487 × 1058 after the final camera/layout correction. The system map measures 480px, all planets and native map controls fit, the selected ocean illustration loads, the detail column aligns with the map, and there is no horizontal overflow. Screenshot: `docs/graphics-review/26-karte-kamera-final.png`. The temporary viewport was reset afterward. The baseline font and map-size checks pass; the added desktop-font counterexample fails exactly at 6.3 visible pixels, confirming the 9px readability guard.
