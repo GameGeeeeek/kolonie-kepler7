@@ -65,7 +65,7 @@ async function main() {
       const code = await new Promise((resolve, reject) => {
         const child = spawn(process.execPath,
           ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i], ...partition],
-          { env: { ...process.env, KEPLER_TESTDATEI: origin,
+          { env: { ...process.env, KEPLER_HTTP_TEST_ORIGIN: origin,
             ...(suite ? {NODE_OPTIONS: ((process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(path.join(__dirname,'lib/http-test-origin.js'))).trim()} : {}) },
             stdio: 'inherit', ...(suite ? {} : {timeout: 180000}) });
         child.once('error', reject);
