@@ -1,0 +1,45 @@
+name: Kepler graphics review
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - weltraum_kolonie.html
+      - kepler-graphics.css
+      - kepler-gfx-*.png
+      - tests/test_graphics_refresh.js
+      - tools/check-graphics-counterexamples.cjs
+      - .github/workflows/kepler-graphics-review.yml
+permissions:
+  contents: read
+concurrency:
+  group: graphics-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  graphics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: dda5d5d3c1dbfb5eeef9ecf5c88227014415c1ef
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated test dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Required checks and actual graphics interactions
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          node tests/run.js --nur-pflicht
+          node tests/test_graphics_refresh.js
+          node tests/test_planeten_texturen.js
+          node tests/test_kartenbeschriftung.js
+      - name: Behavioral and layout counterexamples must fail
+        run: node tools/check-graphics-counterexamples.cjs
