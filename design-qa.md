@@ -133,3 +133,23 @@ The actual game was reopened with a fresh preview origin at 1487 × 1058 after t
 Chrome on the Linux review runners exposed two existing failures. Running the same checks against release `6550cb2` reproduced the identical five narrow-screen overlaps and 0.85 SVG-unit intersections between asteroid rims and alliance tags. The update separates the complete Pulsar label/hint block by six visible pixels on narrow screens and adds one SVG unit between holder tags and the rim. Font sizes, hint hit areas, region geometry, and all original collision assertions remain intact. Both local typography checks and the 22 graphics checks pass. The actual 360px view was inspected in `docs/graphics-review/27-karte-beschriftung-mobile.png`. The Linux checks run first in graphics CI to confirm the spacing on the originally failing platform.
 
 The detailed Linux measurements also exposed a reference-bucket error in the collision test: centered SVG labels rounded to both `-0.0` and `0.0`, splitting one measured offset into two buckets and falsely reporting a missing reference. Rounded values are normalized numerically before counting; all eight assertions and collision rules remain intact. The original release still fails its own-body collision guard. Diagnostics now include exact object rectangles for missing references. The native placement algorithm retains its original candidates and limits.
+
+Linux verification passed at `56dc8bbb65ac6671013d730c4f4d1d8577478514`: original region-overlap checks, all eight dense-belt collision assertions, 22 graphics checks, and the existing texture, label, hit-area, interaction, focus, resize and map-size checks. Seven controlled counterexamples reject eleven intended faults. GitHub Actions run: `37690262505`, job `113028327188`, conclusion `success`.
+
+### Final HUD consistency and test isolation
+
+The complete suite found four additional issues. New panels and selectors now use the existing
+single HUD corner formula and border tokens; keyboard selection has an inset focus ring. The
+grouped header retains its original available width while the illustrated main column expands.
+The unchanged form-language and header-chip guards pass locally after these corrections.
+
+HTTP fixtures now preserve navigation query/hash values. Service workers default to blocked in
+fixture contexts, matching their previous file-origin isolation; explicit worker opt-in remains
+available. This prevents worker fetches from bypassing the mocked release HTML. Temporary HTML
+copies retain their own documents and receive only whitelisted companion fonts, CSS and images
+from the same test origin. The previously failing update-overlay, notification-target and
+header-height tests pass without assertion changes.
+
+The final actual views were inspected in `28-kolonie-hud-final.png`, `29-werft-hud-final.png`,
+`30-karte-hud-final.png` (1487 × 1058), and `31-kolonie-hud-mobile.png` (390 × 844).
+The desktop card cuts and mobile scene/control placement are intact; the viewport override was reset.

@@ -18,9 +18,25 @@ const sameFile = value => {
     return process.platform === 'win32' ? target.toLowerCase() === gameFile.toLowerCase() : target === gameFile;
   } catch { return false; }
 };
-const wrapPage = page => {
+const companionAsset = /^(?:tabler-icons-full\.woff2|kepler-graphics\.css|kepler-gfx-[a-z-]+\.png)$/;
+const wrapPage = async page => {
+  // Some regressions navigate to their own modified HTML copy in a temp folder.
+  // Keep that document intact, but give it the same stylesheet, font and graphics
+  // as the actual game. Missing temp-folder assets would falsify layout comparisons.
+  await page.route('file://**/*', async route => {
+    let name;
+    try { name = path.basename(fileURLToPath(route.request().url())); } catch { return route.continue(); }
+    if (!companionAsset.test(name)) return route.continue();
+    await route.fulfill({response: await route.fetch({url: new URL(name, url).href})});
+  });
   const goto = page.goto.bind(page);
-  page.goto = (target, options) => goto(sameFile(target) ? new URL('weltraum_kolonie.html', url).href : target, options);
+  page.goto = (target, options) => {
+    if (!sameFile(target)) return goto(target, options);
+    const source = new URL(target), redirected = new URL('weltraum_kolonie.html', url);
+    redirected.search = source.search;
+    redirected.hash = source.hash;
+    return goto(redirected.href, options);
+  };
   return page;
 };
 const wrapContext = context => {
@@ -32,7 +48,11 @@ const launch = environment.starteBrowser;
 environment.starteBrowser = async (...args) => {
   const browser = await launch(...args);
   const newContext = browser.newContext.bind(browser), newPage = browser.newPage.bind(browser);
-  browser.newContext = async (...args) => wrapContext(await newContext(...args));
-  browser.newPage = async (...args) => wrapPage(await newPage(...args));
+  // The original file-origin fixtures cannot install a service worker. Keep that
+  // isolation on HTTP too: a worker's own fetch bypasses Playwright page routes,
+  // replacing mocked release HTML with the server's current HTML. Tests which
+  // explicitly need workers can still opt in with serviceWorkers: 'allow'.
+  browser.newContext = async (options = {}) => wrapContext(await newContext({serviceWorkers:'block', ...options}));
+  browser.newPage = async (options = {}) => wrapPage(await newPage({serviceWorkers:'block', ...options}));
   return browser;
 };
