@@ -7,6 +7,7 @@ for(const [fault,label] of [
   ['dialog','body-mounted fleet dialog keeps its visible keyboard ring'],
   ['font','body-mounted dialog heading uses the illustrated heading font'],
   ['warning','animated warning tab retains a stable keyboard ring'],
+  ['subtab','subtab keyboard ring appears immediately without a shadow transition'],
   ['theme','selected theme inline shadow cannot hide keyboard focus'],
   ['mobile','main panel fits 390px sammlung'],
   ['hover','settings jump links retain their hover feedback']

@@ -14,6 +14,7 @@ const faults={
   dialog:'#fwahlOverlay#fwahlOverlay [data-fwahl-zu]:focus-visible{box-shadow:none!important}',
   font:'#fwahlOverlay .fwahl-titel{font-family:serif!important}',
   warning:'#game-root#game-root .tab-btn-alert:focus-visible{box-shadow:none!important}',
+  subtab:'#game-root#game-root #fleetSubtabs .fleet-subtab:focus-visible{transition:box-shadow 10s!important}',
   theme:'#game-root #themePicker [data-theme-key="ocean"]:focus-visible{box-shadow:0 0 0 2px #fff!important}',
   mobile:'@media(max-width:400px){#tab-sammlung.active{min-width:700px!important}}',
   hover:'#tab-einstellungen .jumpnav a:hover{background:#19223a!important;color:#b8bfd4!important}'
@@ -64,12 +65,12 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     },fault));
     const headerTabs={berichte:'#headerReportsBtn',hilfe:'#headerHelpBtn',einstellungen:'#headerProfileBtn'};
     const show=async tab=>{await page.locator(headerTabs[tab]||'.tab-btn[data-tab="'+tab+'"]').click();await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});};
-    const focus=async selector=>{
+    const focus=async (selector,settle=400)=>{
       const el=page.locator(selector).first();await el.evaluate(e=>e.blur());
-      await el.press('Tab');await page.keyboard.press('Shift+Tab');await page.waitForTimeout(400);
+      await el.press('Tab');await page.keyboard.press('Shift+Tab');if(settle)await page.waitForTimeout(settle);
       return el.evaluate(e=>{const s=getComputedStyle(e),rgb=getComputedStyle(document.documentElement).getPropertyValue('--gfx-focus').trim();
         const color=document.createElement('span');color.style.color=rgb;document.body.appendChild(color);const normalized=getComputedStyle(color).color;color.remove();
-        return {focused:document.activeElement===e&&e.matches(':focus-visible'),shadow:s.boxShadow,ring:s.boxShadow.includes('inset')&&s.boxShadow.includes(normalized),animation:s.animationName};});
+        return {focused:document.activeElement===e&&e.matches(':focus-visible'),shadow:s.boxShadow,ring:s.boxShadow.includes('inset')&&s.boxShadow.includes(normalized),animation:s.animationName,transition:s.transitionDuration};});
     };
     if(!probe||probe==='surface'){
       await show('basis');
@@ -105,6 +106,11 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       await show('basis');await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.add('tab-btn-alert'));
       const warning=await focus('.tab-btn[data-tab="basis"]');check('animated warning tab retains a stable keyboard ring',warning.focused&&warning.ring,warning);
       await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.remove('tab-btn-alert'));
+    }
+    if(!probe||probe==='subtab'){
+      await show('flotte');
+      const subtab=await focus('#fleetSubtabs [data-fleet-subtab]',0);
+      check('subtab keyboard ring appears immediately without a shadow transition',subtab.focused&&subtab.ring&&subtab.transition==='0s',subtab);
     }
     if(!probe||probe==='hover'){
       await page.evaluate(()=>__harmony.show('einstellungen'));

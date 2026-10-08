@@ -226,6 +226,8 @@ Confirmed review findings fixed in this change:
 - Affordable order pulses, warning tab animation and the selected theme's inline
   shadow could hide keyboard focus. A prioritized inset ring survives clipped
   corners; affordable orders pause their decorative pulse while focused.
+  The full suite also exposed delayed subtab feedback: native shadow transitions
+  are now disabled during keyboard focus, making the ring appear immediately.
 - The fleet picker is attached outside `#game-root`. Its keyboard scope and fonts
   now explicitly match the game. The final picker capture verifies the new font.
 - Higher-specificity surface rules could suppress jump-link, close-button and
@@ -239,7 +241,7 @@ isolated API. It checks native and illustrated surface tokens, actual keyboard
 navigation, the body-mounted picker, native theme selection, hover feedback,
 collection filtering and all 16 panels at 320, 390, 756 and 1487 pixels.
 Native color/shadow transitions are allowed to settle before exact measurements.
-Eight independently injected CSS faults must fail their named assertions;
+Nine independently injected CSS faults must fail their named assertions;
 the source files are never modified by those counterexamples.
 
 Limits: alliance entry and empty server-backed reports/market states were visible
