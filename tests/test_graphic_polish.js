@@ -90,6 +90,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.evaluate(()=>{__gfxReview.state().constructionQueue=[];__gfxReview.state().activeResearch=null;__gfxReview.show('fortschritt');});
   const trophies=await page.locator('.gfx-trophy-hall').evaluateAll(halls=>halls.map(h=>({cases:h.querySelectorAll('.gfx-trophy-case').length,plinths:h.querySelectorAll('.gfx-trophy-plinth').length})));
   check('profile displays three actual trophy cases with distinct empty state',trophies.length>0&&trophies.every(h=>h.cases===3&&h.plinths===3),trophies);
+  const trophyLayout=await page.locator('.gfx-trophy-hall').evaluateAll(halls=>halls.every(h=>getComputedStyle(h).display==='grid'&&[...h.children].every(c=>c.getBoundingClientRect().width<h.getBoundingClientRect().width/2)));
+  check('desktop trophy cases occupy three real columns',trophyLayout);
   for(const width of [320,390,756,1280]){
     await page.setViewportSize({width,height:844});await page.evaluate(()=>__gfxReview.show('basis'));
     const nav=await page.locator('.tabs').evaluate(nav=>({height:nav.getBoundingClientRect().height,font:Math.min(...[...nav.querySelectorAll('.tab-btn')].map(b=>parseFloat(getComputedStyle(b).fontSize))),targets:[...nav.querySelectorAll('.tab-btn')].every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44;}),page:document.documentElement.scrollWidth<=innerWidth}));
