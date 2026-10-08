@@ -10,6 +10,9 @@ const fault=process.env.K7_HARMONY_FAULT||'',probe=process.env.K7_HARMONY_PROBE|
 const faults={
   surface:'.gfx-inspector{background:#040404!important}',
   focus:'#game-root #buildings [data-build="mine"]:focus-visible{box-shadow:none!important;animation:none!important}',
+  dialog:'#fwahlOverlay [data-fwahl-zu]:focus-visible{box-shadow:none!important}',
+  warning:'#game-root .tab-btn-alert:focus-visible{box-shadow:none!important}',
+  theme:'#game-root #themePicker [data-theme-key="ocean"]:focus-visible{box-shadow:0 0 0 2px #fff!important}',
   mobile:'@media(max-width:400px){#tab-sammlung.active{min-width:700px!important}}',
   hover:'#tab-einstellungen .jumpnav a:hover{background:#19223a!important;color:#b8bfd4!important}'
 };
@@ -30,7 +33,7 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     });
     await new Promise(r=>server.listen(0,'127.0.0.1',r));
     const origin='http://127.0.0.1:'+server.address().port,store={};
-    store['kepler7-save-v3']=JSON.stringify({tutorialSeen:true,newbieWelcomeSeen:true,powerSave:false,headerCompact:true,
+    store['kepler7-save-v3']=JSON.stringify({tutorialSeen:true,newbieWelcomeSeen:true,powerSave:false,headerCompact:true,uiJumpNav:true,
       commandPoints:1000,credits:12345,resources:{energie:90000,erz:90000,kristalle:90000,deuterium:60000,antimaterie:1000,forschungspunkte:3000},
       buildings:{solar:8,mine:2,raffinerie:4,synth:3,lager:25,labor:5,habitat:2,werftkern:3},research:{rkampf:1,rkolonisation:1},
       fleet:{ships:3,jaeger:2,cruisers:1,destroyers:0,forscher:2,missions:[]},discovered:{rhea:true,aion:true,draconis:true},activeBasePlanet:'home',
@@ -69,7 +72,7 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       await show('basis');
       const surfaces=await page.evaluate(()=>{
         const root=document.documentElement,old=root.style.getPropertyValue('--gfx-panel');root.style.setProperty('--gfx-panel','rgb(21, 40, 53)');
-        const native=getComputedStyle(document.querySelector('#buildings .card-row')).backgroundColor,gfx=getComputedStyle(document.querySelector('#colonyVisual .gfx-inspector')).backgroundColor;
+        const native=getComputedStyle(document.querySelector('#buildings [data-build="mine"]').closest('.card-row')).backgroundColor,gfx=getComputedStyle(document.querySelector('#colonyVisual .gfx-inspector')).backgroundColor;
         if(old)root.style.setProperty('--gfx-panel',old);else root.style.removeProperty('--gfx-panel');return {native,gfx};
       });
       check('native and illustrated panels follow the same surface token',surfaces.native==='rgb(21, 40, 53)'&&surfaces.gfx===surfaces.native,surfaces);
@@ -80,14 +83,18 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       check('affordable native order retains a stable inset keyboard ring',native.focused&&native.ring&&native.animation==='none',native);
       if(!probe){
         const illustrated=await focus('#colonyVisual [data-gfx-building="mine"]');check('illustrated selection shares the inset keyboard ring',illustrated.focused&&illustrated.ring,illustrated);
-        await show('galaxie');await page.locator('#npcList [data-attack]').first().click();await page.locator('#fwahlOverlay.open').waitFor({state:'visible'});
-        const dialog=await focus('#fwahlOverlay [data-fwahl-zu]');check('body-mounted fleet dialog keeps its visible keyboard ring',dialog.focused&&dialog.ring,dialog);
-        await page.locator('#fwahlOverlay [data-fwahl-zu]').click();
-        // raidPulse animates box-shadow even in power-save mode. It must not win over keyboard focus.
-        await show('basis');await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.add('tab-btn-alert'));
-        const warning=await focus('.tab-btn[data-tab="basis"]');check('animated warning tab retains a stable keyboard ring',warning.focused&&warning.ring,warning);
-        await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.remove('tab-btn-alert'));
       }
+    }
+    if(!probe||probe==='dialog'){
+      await show('galaxie');await page.locator('#npcList [data-attack]').first().click();await page.locator('#fwahlOverlay.open').waitFor({state:'visible'});
+      const dialog=await focus('#fwahlOverlay [data-fwahl-zu]');check('body-mounted fleet dialog keeps its visible keyboard ring',dialog.focused&&dialog.ring,dialog);
+      await page.locator('#fwahlOverlay [data-fwahl-zu]').click();
+    }
+    if(!probe||probe==='warning'){
+      // raidPulse animates box-shadow even in power-save mode. It must not win over keyboard focus.
+      await show('basis');await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.add('tab-btn-alert'));
+      const warning=await focus('.tab-btn[data-tab="basis"]');check('animated warning tab retains a stable keyboard ring',warning.focused&&warning.ring,warning);
+      await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.remove('tab-btn-alert'));
     }
     if(!probe||probe==='hover'){
       await page.evaluate(()=>__harmony.show('einstellungen'));
@@ -95,11 +102,12 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       const before=await link.evaluate(e=>({bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}));
       await link.hover();const after=await link.evaluate(e=>({bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color}));
       check('settings jump links retain their hover feedback',before.bg!==after.bg&&before.color!==after.color,{before,after});
-      if(!probe){
-        await page.locator('#themePicker [data-theme-key="ocean"]').click();
-        check('native theme selection remains effective and persisted',await page.evaluate(()=>__harmony.state().themeKey==='ocean'&&getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim().toLowerCase()==='#378add'));
-        const theme=await focus('#themePicker [data-theme-key="ocean"]');check('selected theme inline shadow cannot hide keyboard focus',theme.focused&&theme.ring,theme);
-      }
+    }
+    if(!probe||probe==='theme'){
+      await page.evaluate(()=>__harmony.show('einstellungen'));
+      await page.locator('#themePicker [data-theme-key="ocean"]').click();
+      check('native theme selection remains effective and persisted',await page.evaluate(()=>__harmony.state().themeKey==='ocean'&&getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim().toLowerCase()==='#378add'));
+      const theme=await focus('#themePicker [data-theme-key="ocean"]');check('selected theme inline shadow cannot hide keyboard focus',theme.focused&&theme.ring,theme);
     }
     if(!probe||probe==='mobile'){
       for(const width of (probe?[390]:[320,390,756,1487])){
