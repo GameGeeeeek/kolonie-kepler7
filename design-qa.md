@@ -175,3 +175,111 @@ Graphics run `37694413857`, job `113042400066`, passed at the full-suite source:
 counterexamples (eleven intentionally rejected faults). Ideas run `37694414008`
 also passed. Version 8.745.0 and German patchnotes are assigned after this review;
 the numbering checks and final PR checks validate the resulting release metadata.
+
+## Whole-game visual harmony — 8 October 2026
+
+The user's approved illustrated v8.746.0 style is the reference for this update.
+Fresh captures from this review cover all 13 main tabs, reports, help, settings
+and the actual fleet picker. The same native game and local marketing fixture
+were used; no production player action was submitted. Captures are stored in
+[`harmony-2026-10-08`](docs/graphics-review/harmony-2026-10-08).
+
+Overall visual health: the native cards and illustrated inspectors now share
+opaque navy surfaces, technical borders, brighter secondary text and consistent
+headings. Category, resource, warning and reward colors keep their meanings.
+The existing 23 illustrations, 14 themes, selectable alliance banners, native
+dimensions and battle replay remain intact. The catalogue shows unowned items
+at readable contrast while retaining the explicit possession badge.
+
+| Reviewed view | Visual finding / resulting behavior | Actual capture |
+| --- | --- | --- |
+| Basis | Colony inspector and native building cards use the same surface; costs and warning text retain their colors. | [Basis](docs/graphics-review/harmony-2026-10-08/nachher-basis.png) |
+| Verteidigung | Fortress controls and inspector follow the shared palette and heading style. | [Defense](docs/graphics-review/harmony-2026-10-08/nachher-verteidigung.png) |
+| Forschung | Queue, inspector, prerequisite area and technology links share the console materials. | [Research](docs/graphics-review/harmony-2026-10-08/nachher-forschung.png) |
+| Flotte | Status bar, native subtabs, ship list and illustrated inspector are consistent. | [Fleet](docs/graphics-review/harmony-2026-10-08/nachher-flotte-desktop.png) |
+| Expedition | Heading, journey area and familiar launch controls match the other illustrated views. | [Expedition](docs/graphics-review/harmony-2026-10-08/nachher-expedition.png) |
+| Sektorkarte | Existing sector geometry and map controls retain their layout alongside the common navigation. | [Map](docs/graphics-review/harmony-2026-10-08/nachher-karte.png) |
+| Galaxie | NPC cards gain opaque surfaces and clearer secondary labels; combat colors remain distinct. | [Galaxy](docs/graphics-review/harmony-2026-10-08/nachher-galaxie.png) |
+| Allianz | Entry cards, subtabs and hero body match; selectable banner artwork remains independent. | [Alliance entry](docs/graphics-review/harmony-2026-10-08/nachher-allianz.png) |
+| Offiziere | Portrait cards, module subtabs and descriptions use the common materials. | [Officers](docs/graphics-review/harmony-2026-10-08/nachher-offiziere.png) |
+| Markt | Credit/shop cards and explanatory notes match the orbital market illustration. | [Market](docs/graphics-review/harmony-2026-10-08/nachher-markt.png) |
+| Punktestand | Breakdown cards, profile panel and section headings follow the same visual hierarchy. | [Score](docs/graphics-review/harmony-2026-10-08/nachher-punkte.png) |
+| Fortschritt | Commander and statistics cards no longer show conflicting transparent backgrounds. | [Progress](docs/graphics-review/harmony-2026-10-08/nachher-fortschritt.png) |
+| Sammlung | Unknown entries are readable; “noch nicht” continues to distinguish ownership. | [Collection](docs/graphics-review/harmony-2026-10-08/nachher-sammlung.png) |
+| Berichte | Empty reports/messages states share text contrast; native refresh action remains available. | [Reports](docs/graphics-review/harmony-2026-10-08/nachher-berichte.png) |
+| Hilfe | Category cards and disclosure labels match the common raised surfaces. | [Help](docs/graphics-review/harmony-2026-10-08/nachher-hilfe.png) |
+| Einstellungen | Account cards, section headers and existing native preferences retain their hierarchy. | [Settings](docs/graphics-review/harmony-2026-10-08/nachher-einstellungen.png) |
+| Flottenwahl | Document-mounted picker receives the same surface and fonts as the main game. | [Fleet dialog](docs/graphics-review/harmony-2026-10-08/nachher-flottendialog.png) |
+
+Before and after progress captures were inspected together at 756 × 884:
+[before](docs/graphics-review/harmony-2026-10-08/vorher-fortschritt.png),
+[after](docs/graphics-review/harmony-2026-10-08/nachher-fortschritt.png).
+Fixture restarts and normal ticks changed some displayed values, so this is a
+visual material comparison, not a pixel-identical gameplay-state comparison.
+The 390 × 844 [colony](docs/graphics-review/harmony-2026-10-08/nachher-basis-mobile.png)
+and [catalogue](docs/graphics-review/harmony-2026-10-08/nachher-sammlung-mobile.png)
+were inspected for wrapping and visible controls; the wide fleet view uses
+1487 × 1058. The temporary viewport override was reset afterwards.
+
+Confirmed review findings fixed in this change:
+
+- Affordable order pulses, warning tab animation and the selected theme's inline
+  shadow could hide keyboard focus. A prioritized inset ring survives clipped
+  corners; affordable orders pause their decorative pulse while focused.
+  The full suite also exposed delayed subtab feedback: native shadow transitions
+  are now disabled during keyboard focus, making the ring appear immediately.
+- The fleet picker is attached outside `#game-root`. Its keyboard scope and fonts
+  now explicitly match the game. The final picker capture verifies the new font.
+- Higher-specificity surface rules could suppress jump-link, close-button and
+  officer-card hover feedback. Reduced specificity and an explicit officer hover
+  rule preserve the original feedback.
+- The catalogue combined row and child opacity, making undiscovered descriptions
+  unnecessarily faint. The explicit ownership badge now carries that distinction.
+
+`test_visual_harmony.js` uses the real HTML and stylesheet over HTTP with an
+isolated API. It checks native and illustrated surface tokens, actual keyboard
+navigation, the body-mounted picker, native theme selection, hover feedback,
+collection filtering and all 16 panels at 320, 390, 756 and 1487 pixels.
+Native color/shadow transitions are allowed to settle before exact measurements.
+Nine independently injected CSS faults must fail their named assertions;
+the source files are never modified by those counterexamples.
+
+Limits: alliance entry and empty server-backed reports/market states were visible
+in the preview; this does not establish live alliance transactions or market
+prices. Existing automated behavior checks cover the preserved game flows.
+Screenshots and keyboard checks are not a comprehensive accessibility certification.
+Final immutable-source test and release evidence is recorded below after completion.
+
+### Complete colony and defense catalogue
+
+The illustrated home base now exposes all 29 native economic buildings, and the
+fortress exposes all 23 native defense installations. These are always expanded
+grids, with the existing building models, translated names, selected-location
+levels and explicit research/item/moon restrictions. Finished entries remain in
+this overview when the native detailed list's completed-building filter is on.
+Original game cards remain authoritative for costs, quantities and build actions.
+
+Desktop evidence: [all buildings](docs/graphics-review/harmony-2026-10-08/nachher-alle-gebaeude.png)
+and [all defenses](docs/graphics-review/harmony-2026-10-08/nachher-alle-verteidigung.png).
+The [390px catalogue](docs/graphics-review/harmony-2026-10-08/nachher-alle-gebaeude-mobile.png)
+wraps into two columns. Selecting the last building, Botschaftsviertel, was also
+visually verified to bring its [native details and order](docs/graphics-review/harmony-2026-10-08/nachher-gebaeude-auswahl-mobile.png)
+into view, below the sticky navigation. The temporary viewport is reset after QA.
+
+Independent review found that leaving focus on a distant selected tile hid the
+updated inspector several screens above it. Selection now moves keyboard focus
+to the new detail heading and brings the inspector into view immediately, using
+the native measured sticky-navigation offset. Regression checks cover this on
+320, 390, 756 and 1487px layouts and observe the actual visible result. Controlled faults
+remove a catalogue entry, its focus transfer and its scroll action independently.
+
+Final immutable-source review: [run 37829077257](https://github.com/GameGeeeeek/kolonie-kepler7/actions/runs/37829077257)
+passed all eight isolated partitions on `083a9a4bc6a77609b2b9154c6685560797c35929`:
+462 test files, 518 aggregate checks including each partition's required checks,
+zero failures. HTML, graphics stylesheet, all 23 images and the pinned backend
+source passed the before/after SHA-256 freeze verification in every partition.
+[Targeted graphics review](https://github.com/GameGeeeeek/kolonie-kepler7/actions/runs/37829085005)
+also passed: 78 harmony checks, 67 graphics-expansion checks, existing native
+subtab keyboard behavior and all nine harmony plus six expansion counterexamples.
+Independent adversarial review of the final native navigation correction found
+no further confirmed issue. Release metadata is checked separately after numbering.

@@ -13,8 +13,20 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-2';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261008-8';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
+}
+if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
+ const anchor="defs.map(d=>{\n      const status=gfxFacilityState";assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,"defs.slice(0,-1).map(d=>{\n      const status=gfxFacilityState");
+}
+if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-focus'){
+ const anchor='if(heading)sprungFokusSetzen(heading);';assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,'if(false&&heading)sprungFokusSetzen(heading);');
+}
+if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-scroll'){
+ const anchor='if(detail)detail.scrollIntoView(';assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,'if(false&&detail)detail.scrollIntoView(');
 }
 const currentCss=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
 const cssStart=currentCss.indexOf('.gfx-picker {'),cssEnd=currentCss.indexOf('.gfx-heading {');
@@ -26,7 +38,7 @@ const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,sta
   stage:b=>gfxColonyStage(b),selectBuilding:k=>{gfxBuilding=k;renderGraphicsColony();},
   selectShip:k=>{gfxShip=k;renderGraphicsShipyard();},map:renderGraphicsMap,
   selectDefense:k=>{gfxDefense=k;renderGraphicsDefense();},selectResearch:k=>{gfxResearch=k;renderGraphicsResearch();},
-  expeditionType:()=>selectedExpeditionType,officers:OFFICERS.map(o=>o.key),shipKeys:SHIP_DEFS.map(d=>d.key),planetArt:GFX_PLANET_ART};\n`+end);
+  expeditionType:()=>selectedExpeditionType,officers:OFFICERS.map(o=>o.key),shipKeys:SHIP_DEFS.map(d=>d.key),planetArt:GFX_PLANET_ART,facilityDefs:()=>BUILDING_DEFS.map(d=>({key:d.key,name:k7View(d).name,category:d.category})),levels:()=>currentBuildings()};\n`+end);
 let checks=0,failed=0;
 const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL')+' - '+name+(ok||!data?'':' '+JSON.stringify(data)));};
 (async()=>{
@@ -69,6 +81,48 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#welcomeBackDismissBtn').click();
   await page.evaluate(()=>{for(const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay']){const e=document.getElementById(id);if(e)e.style.display='none';}__gfxReview.show('basis');});
   check('game boots without JavaScript errors',errors.length===0,errors);
+  const catalogueResults=[],catalogueFocus=[];
+  for(const [tab,root,kind,key] of [['basis','colonyVisual','building','habitat'],['verteidigung','defenseVisual','defense','plasma']]){
+    await page.evaluate(t=>__gfxReview.show(t),tab);
+    catalogueResults.push(await page.locator('#'+root).evaluate((box,kind)=>{
+      const defs=__gfxReview.facilityDefs().filter(d=>kind==='defense'?d.category==='defense':d.category!=='defense'),levels=__gfxReview.levels();
+      const buttons=[...box.querySelectorAll('[data-gfx-facility="'+kind+'"]')];
+      return {kind,expected:defs.length,actual:buttons.length,ok:buttons.length===defs.length&&defs.every((d,i)=>{
+        const b=buttons[i],r=b.getBoundingClientRect();
+        return b.dataset.gfxKey===d.key&&b.querySelector('.gfx-facility-name').textContent===d.name&&b.querySelector('.gfx-facility-level').textContent==='Stufe '+(levels[d.key]||0)&&r.width>0&&r.height>=44&&getComputedStyle(b).display!=='none';
+      })};
+    },kind));
+    await page.locator('#'+root+' [data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]').press('Enter');
+    const selection=await page.locator('#'+root).evaluate((box,{kind,key})=>{
+      const b=box.querySelector('[data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]'),a=box.querySelector('[data-gfx-action="'+kind+'"]');
+      return {selected:b.getAttribute('aria-pressed')==='true'&&box.querySelectorAll('[data-gfx-facility][aria-pressed="true"]').length===1&&a.dataset.gfxKey===key,focused:document.activeElement===box.querySelector('.gfx-inspector h3')};
+    },{kind,key});
+    check(kind+' catalogue selects the native inspector beyond scene hotspots',selection.selected,selection);
+    catalogueFocus.push(selection.focused);
+  }
+  check('all native buildings and defense facilities are directly visible with their actual names and local levels',catalogueResults.every(r=>r.ok),catalogueResults);
+  check('catalogue keyboard selection moves focus to the updated native details',catalogueFocus.every(Boolean),catalogueFocus);
+  check('locked defense tile remains readable and exposes the real missing research',await page.locator('#defenseVisual').evaluate(box=>{
+    const b=box.querySelector('[data-gfx-facility][data-gfx-key="plasma"]'),notice=box.querySelector('.gfx-facility-notice'),action=box.querySelector('[data-gfx-build="defense"]');
+    return b.textContent.includes('gesperrt')&&getComputedStyle(b).opacity==='1'&&notice.textContent.includes('Panzer')&&action.hidden;
+  }));
+  await page.evaluate(()=>__gfxReview.show('basis'));
+  await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key="habitat"]').click();
+  const habitatBefore=await page.evaluate(()=>__gfxReview.levels().habitat||0);
+  await page.locator('#colonyVisual [data-gfx-build="building"]').click();
+  check('catalogue selection upgrades the real economic building and updates its local level',await page.evaluate(before=>{
+    const b=document.querySelector('#colonyVisual [data-gfx-facility][data-gfx-key="habitat"]');
+    return __gfxReview.levels().habitat===before+1&&b.querySelector('.gfx-facility-level').textContent==='Stufe '+(before+1);
+  },habitatBefore));
+  const nativeCanvas=await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key="habitat"] canvas').evaluate(c=>{
+    const pixels=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return pixels.some((n,i)=>i%4===3&&n>0);
+  });
+  check('catalogue miniatures are painted native building models',nativeCanvas);
+  await page.evaluate(()=>{const st=__gfxReview.state();st.buildings.solar=40;st.uiHideMaxed=true;__gfxReview.render();});
+  check('finished buildings remain in the overview when hidden from the detailed list',await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key="solar"]').isVisible()&&await page.locator('#buildings [data-build="solar"]').count()===0);
+  await page.evaluate(()=>{const st=__gfxReview.state();st.uiHideMaxed=false;st.activeBasePlanet='rhea';__gfxReview.render();});
+  check('colony switch updates catalogue levels from the selected colony rather than the home base',await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key="solar"] .gfx-facility-level').textContent()==='Stufe 3');
+  await page.evaluate(()=>{const st=__gfxReview.state();st.activeBasePlanet='home';st.buildings.solar=8;__gfxReview.render();__gfxReview.show('verteidigung');__gfxReview.selectDefense('turm');});
   await page.evaluate(()=>__gfxReview.show('verteidigung'));
   check('a browser retaining the previous CSS receives the new usable controls',await page.locator('#defenseVisual select').evaluate(e=>e.getBoundingClientRect().height>=44));
   const defenseMirror=await page.evaluate(()=>{const a=document.querySelector('#defenseVisual [data-gfx-build="defense"]'),b=document.querySelector('#defenseBuildings [data-build="turm"]');return !!a&&!!b&&a.disabled===b.disabled&&a.textContent===b.textContent;});
@@ -135,6 +189,25 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.evaluate(()=>__gfxReview.show('verteidigung'));
   const spots=await page.locator('#defenseVisual .gfx-hotspot').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};}));
   check('mobile fortress controls have 44px targets without overlaps',spots.every(a=>a.h>=44)&&spots.every((a,i)=>spots.slice(i+1).every(b=>a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y)),spots);
+  for(const width of [320,390,756,1487]){
+    await page.setViewportSize({width,height:844});
+    for(const [tab,id] of [['basis','colonyVisual'],['verteidigung','defenseVisual']]){
+      await page.evaluate(t=>__gfxReview.show(t),tab);
+      const fit=await page.locator('#'+id+' .gfx-facility-grid').evaluate(grid=>{
+        const r=grid.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&grid.scrollWidth<=grid.clientWidth+1&&[...grid.querySelectorAll('button')].every(b=>{
+          const a=b.getBoundingClientRect();return a.left>=r.left-1&&a.right<=r.right+1&&a.width>=44&&a.height>=44&&b.scrollWidth<=b.clientWidth+1;
+        });
+      });
+      check(tab+' complete catalogue fits '+width+'px with readable touch targets',fit);
+      await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
+      // Observe the actual result; the bound also rejects a missing navigation step.
+      try{await page.waitForFunction(id=>{const r=document.querySelector('#'+id+' .gfx-inspector h3').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;},id,{timeout:2000});}catch{}
+      const detailPosition=await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
+        const r=h.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:innerHeight};
+      });
+      check(tab+' distant catalogue selection brings updated details into view at '+width+'px',detailPosition.top>=0&&detailPosition.bottom<=detailPosition.height,detailPosition);
+    }
+  }
   const saved=JSON.parse(store['kepler7-save-v3']);saved.lastTick=Date.now()-60000;store['kepler7-save-v3']=JSON.stringify(saved);
   await page.goto(origin+'/?lang=en');await page.waitForFunction(()=>window.__gfxReview&&__gfxReview.ready());
   for(const [tab,expected] of [['verteidigung','Planetary fortress'],['forschung','Research center'],['expedition','Expedition center'],['markt','Orbital trading port']]){
