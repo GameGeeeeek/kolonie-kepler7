@@ -10,9 +10,10 @@ const fault=process.env.K7_HARMONY_FAULT||'',probe=process.env.K7_HARMONY_PROBE|
 const faults={
   surface:'.gfx-inspector{background:#040404!important}',
   focus:'#game-root #buildings [data-build="mine"]:focus-visible{box-shadow:none!important;animation:none!important}',
-  dialog:'#fwahlOverlay [data-fwahl-zu]:focus-visible{box-shadow:none!important}',
+  // Repeated IDs deliberately outweigh the production focus guard, including its replay exclusion.
+  dialog:'#fwahlOverlay#fwahlOverlay [data-fwahl-zu]:focus-visible{box-shadow:none!important}',
   font:'#fwahlOverlay .fwahl-titel{font-family:serif!important}',
-  warning:'#game-root .tab-btn-alert:focus-visible{box-shadow:none!important}',
+  warning:'#game-root#game-root .tab-btn-alert:focus-visible{box-shadow:none!important}',
   theme:'#game-root #themePicker [data-theme-key="ocean"]:focus-visible{box-shadow:0 0 0 2px #fff!important}',
   mobile:'@media(max-width:400px){#tab-sammlung.active{min-width:700px!important}}',
   hover:'#tab-einstellungen .jumpnav a:hover{background:#19223a!important;color:#b8bfd4!important}'
