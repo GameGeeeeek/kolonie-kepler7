@@ -249,3 +249,26 @@ in the preview; this does not establish live alliance transactions or market
 prices. Existing automated behavior checks cover the preserved game flows.
 Screenshots and keyboard checks are not a comprehensive accessibility certification.
 Final immutable-source test and release evidence is recorded below after completion.
+
+### Complete colony and defense catalogue
+
+The illustrated home base now exposes all 29 native economic buildings, and the
+fortress exposes all 23 native defense installations. These are always expanded
+grids, with the existing building models, translated names, selected-location
+levels and explicit research/item/moon restrictions. Finished entries remain in
+this overview when the native detailed list's completed-building filter is on.
+Original game cards remain authoritative for costs, quantities and build actions.
+
+Desktop evidence: [all buildings](docs/graphics-review/harmony-2026-10-08/nachher-alle-gebaeude.png)
+and [all defenses](docs/graphics-review/harmony-2026-10-08/nachher-alle-verteidigung.png).
+The [390px catalogue](docs/graphics-review/harmony-2026-10-08/nachher-alle-gebaeude-mobile.png)
+wraps into two columns. Selecting the last building, Botschaftsviertel, was also
+visually verified to bring its [native details and order](docs/graphics-review/harmony-2026-10-08/nachher-gebaeude-auswahl-mobile.png)
+into view, below the sticky navigation. The temporary viewport is reset after QA.
+
+Independent review found that leaving focus on a distant selected tile hid the
+updated inspector several screens above it. Selection now moves keyboard focus
+to the new detail heading and scrolls the inspector into view. Regression checks
+cover this on 320, 390, 756 and 1487px layouts. They observe the smooth scroll's
+actual result rather than assuming a fixed animation duration. Controlled faults
+remove a catalogue entry, its focus transfer and its scroll action independently.

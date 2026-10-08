@@ -24,6 +24,10 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-focus'){
  const anchor='heading.focus({preventScroll:true});';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'if(false)heading.focus({preventScroll:true});');
 }
+if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-scroll'){
+ const anchor='if(detail)detail.scrollIntoView(';assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,'if(false&&detail)detail.scrollIntoView(');
+}
 const currentCss=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
 const cssStart=currentCss.indexOf('.gfx-picker {'),cssEnd=currentCss.indexOf('.gfx-heading {');
 assert(cssStart>=0&&cssEnd>cssStart,'verified previous stylesheet reconstruction');
