@@ -158,7 +158,11 @@ async function swipeLeft(page, cdp, box, dist){
         await page.waitForTimeout(800);
         const active = await page.evaluate(t=>{
           const b=document.querySelector(`[${t.attr}="${t.val}"]`);
-          return b ? /5dcaa5|e0a548|c3bef5/.test(b.getAttribute('style')||'') : false;
+          // Bebilderte Expeditionskarten signalisieren ihre Auswahl semantisch;
+          // die anderen Leisten verwenden weiterhin ihre bisherigen Inline-Farben.
+          return b ? b.hasAttribute('aria-pressed')
+            ? b.getAttribute('aria-pressed') === 'true'
+            : /5dcaa5|e0a548|c3bef5/.test(b.getAttribute('style')||'') : false;
         }, tapInfo);
         check(label+': Antippen des hintersten Eintrags greift', active, {aktiv:active});
       }

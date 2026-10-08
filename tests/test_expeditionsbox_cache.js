@@ -17,9 +17,10 @@
 //      NICHT neu gesetzt. Das geht nur gut, weil die alten Knoten samt Handler stehen bleiben -
 //      und genau das muss belegt sein, nicht angenommen.
 //   3. Eine echte Aenderung baut die Box sofort wieder auf.
-//   4. Die waagerechte Scrollposition der Wischleiste (data-hscroll="exptype") ueberlebt den
-//      Neuaufbau. setBoxHtml ruft intern setHtmlPreservingScroll - das darf beim Umbau nicht
-//      verloren gehen.
+//   4. Die bebilderten Typkarten passen ohne waagerechten Ueberhang in die echte Ansicht.
+//      Danach erzeugt eine kontrollierte Test-Anordnung horizontalen Ueberlauf: Dessen
+//      Scrollposition muss einen Neuaufbau weiterhin ueberleben. setBoxHtml ruft intern
+//      setHtmlPreservingScroll - dieser Zwischenspeicher-Vertrag gilt unabhaengig vom Layout.
 //   5. Das Flottenname-Feld verliert beim Tippen nicht den Fokus (isTypingIn-Schutz bleibt).
 const { starteBrowser, devices, SPIEL_URL } = require('./lib/umgebung');
 
@@ -99,7 +100,7 @@ const markeDa = (page) => page.evaluate(() => {
   // ---------------------------------------------------------------- 2) Knoepfe wirken weiter
   // Die Verdrahtung liegt IM if-Zweig; nach uebersprungenen Ticks wurde sie NICHT neu gesetzt.
   const vorher = await page.evaluate(()=>{
-    const b=document.querySelector('[data-expedition-type].sel, [data-expedition-type]');
+    const b=document.querySelector('[data-expedition-type][aria-pressed="true"], [data-expedition-type].sel, [data-expedition-type]');
     return b ? b.getAttribute('data-expedition-type') : null;
   });
   const andererTyp = await page.evaluate(()=>{
@@ -113,7 +114,9 @@ const markeDa = (page) => page.evaluate(() => {
     await page.waitForTimeout(700);
     const jetztAktiv = await page.evaluate(t=>{
       const b=document.querySelector('[data-expedition-type="'+t+'"]');
-      return !!b && /5dcaa5/.test(b.getAttribute('style')||'');
+      return !!b && (b.hasAttribute('aria-pressed')
+        ? b.getAttribute('aria-pressed') === 'true'
+        : /5dcaa5/.test(b.getAttribute('style')||''));
     }, andererTyp);
     check('2: der Klick nach drei uebersprungenen Ticks wirkt noch', jetztAktiv === true);
     // 3) und die echte Aenderung hat die Box neu gebaut
@@ -123,9 +126,24 @@ const markeDa = (page) => page.evaluate(() => {
 
   // ---------------------------------------------------------------- 4) Scrollposition
   const hatLeiste = await page.evaluate(()=>!!document.querySelector('#expeditionBox [data-hscroll="exptype"]'));
-  check('4: die Wischleiste mit data-hscroll ist da', hatLeiste === true);
+  check('4: der Typkarten-Container mit data-hscroll ist da', hatLeiste === true);
   if (hatLeiste){
+    const layout = await page.evaluate(()=>{
+      const bar=document.querySelector('#expeditionBox [data-hscroll="exptype"]');
+      const r=bar.getBoundingClientRect();
+      const cards=[...bar.querySelectorAll('[data-expedition-type]')];
+      return cards.length===6 && cards.every(card=>{
+        const c=card.getBoundingClientRect();
+        return c.left>=r.left-1 && c.right<=r.right+1;
+      });
+    });
+    check('4: alle sechs echten Typkarten passen in die Ansicht', layout === true);
+    // Der neue Kartenraster braucht kein waagerechtes Scrollen. Ein gezieltes Test-Layout
+    // macht den bisherigen Scroll-Vertrag trotzdem pruefbar, statt ihn nur zu ueberspringen.
+    await page.addStyleTag({content:'\n#expeditionBox [data-hscroll="exptype"] { display:flex!important; overflow-x:auto!important; gap:8px!important; }\n#expeditionBox [data-hscroll="exptype"] > button { min-width:160px!important; flex:0 0 160px!important; }'});
     await page.evaluate(()=>{ document.querySelector('#expeditionBox [data-hscroll="exptype"]').scrollLeft = 60; });
+    const vorherLinks=await page.evaluate(()=>document.querySelector('#expeditionBox [data-hscroll="exptype"]').scrollLeft);
+    check('4: die kontrollierte Ueberlauf-Anordnung wurde wirklich gescrollt', vorherLinks > 0, vorherLinks);
     // Eine echte Aenderung erzwingen, damit die Box wirklich neu geschrieben wird.
     await page.evaluate(()=>{ if (typeof state !== 'undefined'){ state.expeditionRisk = state.expeditionRisk === 'hoch' ? 'normal' : 'hoch'; } });
     await page.evaluate(()=>{ const b=document.querySelector('[data-expedition-risk]'); if(b) b.click(); });
@@ -133,7 +151,7 @@ const markeDa = (page) => page.evaluate(() => {
     const links = await page.evaluate(()=>{
       const e=document.querySelector('#expeditionBox [data-hscroll="exptype"]'); return e?e.scrollLeft:-1;
     });
-    check('4: die waagerechte Scrollposition ueberlebt den Neuaufbau', links > 0, links);
+    check('4: die waagerechte Scrollposition ueberlebt den Neuaufbau', vorherLinks > 0 && Math.abs(links-vorherLinks)<=1, {vorher:vorherLinks,nachher:links});
   }
 
   // ---------------------------------------------------------------- 5) Tippen behaelt den Fokus
