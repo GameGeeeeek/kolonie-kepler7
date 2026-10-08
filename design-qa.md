@@ -272,3 +272,14 @@ to the new detail heading and brings the inspector into view immediately, using
 the native measured sticky-navigation offset. Regression checks cover this on
 320, 390, 756 and 1487px layouts and observe the actual visible result. Controlled faults
 remove a catalogue entry, its focus transfer and its scroll action independently.
+
+Final immutable-source review: [run 37829077257](https://github.com/GameGeeeeek/kolonie-kepler7/actions/runs/37829077257)
+passed all eight isolated partitions on `083a9a4bc6a77609b2b9154c6685560797c35929`:
+462 test files, 518 aggregate checks including each partition's required checks,
+zero failures. HTML, graphics stylesheet, all 23 images and the pinned backend
+source passed the before/after SHA-256 freeze verification in every partition.
+[Targeted graphics review](https://github.com/GameGeeeeek/kolonie-kepler7/actions/runs/37829085005)
+also passed: 78 harmony checks, 67 graphics-expansion checks, existing native
+subtab keyboard behavior and all nine harmony plus six expansion counterexamples.
+Independent adversarial review of the final native navigation correction found
+no further confirmed issue. Release metadata is checked separately after numbering.
