@@ -268,7 +268,7 @@ into view, below the sticky navigation. The temporary viewport is reset after QA
 
 Independent review found that leaving focus on a distant selected tile hid the
 updated inspector several screens above it. Selection now moves keyboard focus
-to the new detail heading and scrolls the inspector into view. Regression checks
-cover this on 320, 390, 756 and 1487px layouts. They observe the smooth scroll's
-actual result rather than assuming a fixed animation duration. Controlled faults
+to the new detail heading and brings the inspector into view immediately, using
+the native measured sticky-navigation offset. Regression checks cover this on
+320, 390, 756 and 1487px layouts and observe the actual visible result. Controlled faults
 remove a catalogue entry, its focus transfer and its scroll action independently.

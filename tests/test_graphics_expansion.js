@@ -13,7 +13,7 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-7';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261008-8';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
@@ -21,8 +21,8 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
  source=source.replace(anchor,"defs.slice(0,-1).map(d=>{\n      const status=gfxFacilityState");
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-focus'){
- const anchor='heading.focus({preventScroll:true});';assert.equal(source.split(anchor).length,2);
- source=source.replace(anchor,'if(false)heading.focus({preventScroll:true});');
+ const anchor='if(heading)sprungFokusSetzen(heading);';assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,'if(false&&heading)sprungFokusSetzen(heading);');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-scroll'){
  const anchor='if(detail)detail.scrollIntoView(';assert.equal(source.split(anchor).length,2);
@@ -200,8 +200,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
       });
       check(tab+' complete catalogue fits '+width+'px with readable touch targets',fit);
       await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
-      // Smooth scrolling over fifteen mobile catalogue rows takes longer than a fixed 500ms.
-      // Observe its real endpoint; the two-second bound also rejects a missing navigation step.
+      // Observe the actual result; the bound also rejects a missing navigation step.
       try{await page.waitForFunction(id=>{const r=document.querySelector('#'+id+' .gfx-inspector h3').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;},id,{timeout:2000});}catch{}
       const detailPosition=await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
         const r=h.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:innerHeight};
