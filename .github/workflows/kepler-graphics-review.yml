@@ -10,11 +10,13 @@ on:
       - tests/test_graphics_expansion.js
       - tests/test_hscroll.js
       - tests/test_expeditionsbox_cache.js
+      - tests/test_visual_harmony.js
       - tests/test_bewertungskarte.js
       - tests/http-run.js
       - tools/check-graphics-counterexamples.cjs
       - tools/check-graphics-expansion-counterexamples.cjs
       - tools/check-expedition-graphics-counterexamples.cjs
+      - tools/check-visual-harmony-counterexamples.cjs
       - .github/workflows/kepler-graphics-review.yml
 permissions:
   contents: read
@@ -24,7 +26,7 @@ concurrency:
 jobs:
   graphics:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -71,3 +73,23 @@ jobs:
           git fetch --no-tags --depth=1 origin 6550cb2fdd25f5d5012c61cf06c09d42f6f3b229
           git show 6550cb2fdd25f5d5012c61cf06c09d42f6f3b229:weltraum_kolonie.html > /tmp/kepler-release-baseline.html
           KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
+  harmony:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser dependency
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Actual native controls, keyboard focus, themes and responsive panels
+        run: node tests/test_visual_harmony.js
+      - name: Controlled visual faults must fail the corresponding checks
+        run: node tools/check-visual-harmony-counterexamples.cjs
