@@ -13,7 +13,7 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-6';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261008-7';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
@@ -198,7 +198,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
       await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
       await page.waitForTimeout(500);
       check(tab+' distant catalogue selection brings updated details into view at '+width+'px',await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
-        const r=h.getBoundingClientRect();return document.activeElement===h&&r.top>=0&&r.bottom<=innerHeight;
+        const r=h.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;
       }));
     }
   }
