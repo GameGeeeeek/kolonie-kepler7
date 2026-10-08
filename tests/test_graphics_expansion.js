@@ -196,10 +196,13 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
       });
       check(tab+' complete catalogue fits '+width+'px with readable touch targets',fit);
       await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
-      await page.waitForTimeout(500);
-      check(tab+' distant catalogue selection brings updated details into view at '+width+'px',await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
-        const r=h.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;
-      }));
+      // Smooth scrolling over fifteen mobile catalogue rows takes longer than a fixed 500ms.
+      // Observe its real endpoint; the two-second bound also rejects a missing navigation step.
+      try{await page.waitForFunction(id=>{const r=document.querySelector('#'+id+' .gfx-inspector h3').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;},id,{timeout:2000});}catch{}
+      const detailPosition=await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
+        const r=h.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:innerHeight};
+      });
+      check(tab+' distant catalogue selection brings updated details into view at '+width+'px',detailPosition.top>=0&&detailPosition.bottom<=detailPosition.height,detailPosition);
     }
   }
   const saved=JSON.parse(store['kepler7-save-v3']);saved.lastTick=Date.now()-60000;store['kepler7-save-v3']=JSON.stringify(saved);
