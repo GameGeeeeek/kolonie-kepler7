@@ -78,8 +78,10 @@ const SAB = process.env.KEPLER_REITERGRUPPEN_GEGENPROBE || '';
 //   * 3b faellt bei sabotageB weiterhin - jetzt aber ueber die ausgeschriebene BESTAND-Reihe und
 //     nicht mehr ueber einen Vergleich der Datei mit sich selbst.
 const MUSS_FALLEN = {
-  alt:       ['V3','V4','1a','1b','1c','1d','2a','2b','2c','2d','2f','2e','3a','5a','5b','7b'],
-  sabotageA: ['5b','6a','8','9b'],
+  // Re-measured 08.10.2026: the old 8.5px grid also violates readable scrolling and 44px targets.
+  alt:       ['V3','V4','1a','1b','1c','1d','2a','2b','2c','2d','2f','2e','3a','5a','5b','7b','9a','9b'],
+  // Re-measured 08.10.2026: manual reveal and the new 44px target retain hit/size guarantees.
+  sabotageA: ['5b','6a'],
   sabotageB: ['1c','3b'],
   sabotageC: ['5b','6a'],
   sabotageD: ['2b'],
@@ -252,6 +254,9 @@ const MESSEN = () => {
     breite: Math.round(lr.width),
     anzeige: ls.display,
     spalten: ls.gridTemplateColumns,
+    wischbar: leiste.scrollWidth > leiste.clientWidth,
+    minSchrift: Math.min(...knoepfe.map(b => parseFloat(getComputedStyle(b).fontSize))),
+    wischHinweis: (() => { const h=document.querySelector('.gfx-nav-hint'); return !!h && sichtbar(h); })(),
     gruppenDirekt: direkt.length,
     gruppenGesamt: alleGruppen.length,
     gruppenSchluessel: direkt.map(g => g.getAttribute('data-tab-gruppe')),
@@ -305,11 +310,14 @@ const MESSEN = () => {
       return liste;
     }, []),
     treffer: knoepfe.map(b => {
+      // Auch anfangs außerhalb der Wischleiste liegende Reiter müssen erreichbar bleiben.
+      b.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'});
       const r = b.getBoundingClientRect();
       const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return { tab:b.getAttribute('data-tab'), ok: !!el && (el === b || b.contains(el)), traf: kurz(el) };
     }),
     sammlungBreite: (() => { const s = leiste.querySelector('.tab-btn[data-tab="sammlung"]'); return s ? Math.round(s.getBoundingClientRect().width) : null; })(),
+    sammlungHoehe: (() => { const s = leiste.querySelector('.tab-btn[data-tab="sammlung"]'); return s ? Math.round(s.getBoundingClientRect().height) : null; })(),
     scrollBreite: document.documentElement.scrollWidth,
     fensterBreite: window.innerWidth
   };
@@ -566,14 +574,14 @@ async function warteBisRuhe(page){
     merke('8: die Mitte jedes der 13 Knöpfe trifft den Knopf selbst (1900/1600/1400/390)',
       trefferFehler.length === 0, trefferFehler.slice(0, 6));
 
-    // ---- 9: Das Handy-Raster -------------------------------------------------------------------
+    // ---- 9: Lesbare Handy-Wischleiste -----------------------------------------------------------
     const h = messung[390];
-    const spalten = h ? String(h.spalten).trim().split(/\s+/) : [];
-    merke('9a: bei 390 px ist .tabs ein Raster mit sechs Spalten',
-      !!h && h.anzeige === 'grid' && spalten.length === 6, h ? { anzeige:h.anzeige, spalten:h.spalten } : null);
-    merke('9b: bei 390 px ist „Sammlung" so breit wie der Inhaltsbereich der Leiste (±2 px)',
-      !!h && h.sammlungBreite !== null && Math.abs(h.sammlungBreite - h.breite) <= 2,
-      h ? { sammlung:h.sammlungBreite, leiste:h.breite } : null);
+    merke('9a: bei 390 px ist .tabs eine lesbare Wischleiste mit sichtbarem Hinweis',
+      !!h && h.anzeige === 'flex' && h.wischbar && h.wischHinweis && h.minSchrift >= 12 && h.hoehe <= 80,
+      h ? { anzeige:h.anzeige, wischbar:h.wischbar, hinweis:h.wischHinweis, schrift:h.minSchrift, hoehe:h.hoehe } : null);
+    merke('9b: bei 390 px bleibt „Sammlung" mindestens 44 px breit und hoch',
+      !!h && h.sammlungBreite >= 44 && h.sammlungHoehe >= 44,
+      h ? { breite:h.sammlungBreite, hoehe:h.sammlungHoehe } : null);
 
     // ---- 10: Kein Querscrollen, keine Fehler ---------------------------------------------------
     merke('10: bei 390 px scrollt das Dokument nicht in die Breite',

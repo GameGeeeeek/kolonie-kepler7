@@ -266,12 +266,16 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     await page.waitForTimeout(3000);
     await page.evaluate(ids => ids.forEach(i => { const o=document.getElementById(i); if(o) o.style.display='none'; }), OVERLAYS);
     await page.waitForTimeout(800);
+    // Controlled regressions affect the compact presentation only, never the full-header contract.
+    if(process.env.K7_DENSITY_FAULT==='compact-clipping')await page.addStyleTag({content:'body.compact-head .dash-colony-card{max-width:172px!important} body.compact-head .dash-colony-name-text{white-space:nowrap!important;overflow:hidden!important} body.compact-head .dash-colony-level{white-space:nowrap!important}'});
+    if(process.env.K7_DENSITY_FAULT==='gains')await page.addStyleTag({content:'body.compact-head #resbar .float-gain{right:10px!important;top:6px!important;left:auto!important;bottom:auto!important;font-size:11px!important}'});
     return { ctx, page };
   };
 
   // ---- 1/2/3: der PC-Fall, bei beiden gemessenen Breiten
   for (const breite of [1310, 1600]) {
-    const { ctx, page } = await laden(breite);
+    // The automatic compact header now extends to 1380px. This block tests the full header explicitly.
+    const { ctx, page } = await laden(breite, 1000, { compactHead:false });
     const m = await page.evaluate(MESSEN);
     const b = '@' + breite;
 
@@ -386,7 +390,7 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
   {
     const riesig = JSON.parse(SPIELSTAND);
     Object.keys(riesig.resources).forEach(k => { if (k !== 'kristalle') riesig.resources[k] *= 1000; });
-    const { ctx, page } = await laden(1310, 1000, { resources: riesig.resources });
+    const { ctx, page } = await laden(1310, 1000, { resources: riesig.resources, compactHead:false });
     const m = await page.evaluate(MESSEN);
     const e = m.resbar.alle.find(k => k.res === 'energie');
     P.check('6a@1310 der riesige Betrag ist wirklich riesig (sonst prueft 6b/6c nichts)',
@@ -428,5 +432,14 @@ const alsZahl = t => { if (t === undefined || t === null) return null;
     await ctx.close();
   }
 
+  // Compact mode must also carry long colony names, roles and large real balances without clipping.
+  for(const breite of [390,1310]){
+    const {ctx,page}=await laden(breite,844,{compactHead:true});
+    const m=await page.evaluate(MESSEN);
+    P.check('7a@'+breite+' der Kompaktkopf ist fuer diese Gegenrichtung AN',m.kompaktKopf===true,m.kompaktKopf);
+    P.check('7b@'+breite+' lange Kolonienamen und Rollen werden nicht abgeschnitten',m.kolonien.schnitt.length===0&&m.kolonien.ueberlauf.length===0,{schnitt:m.kolonien.schnitt,ueberlauf:m.kolonien.ueberlauf});
+    P.check('7c@'+breite+' Ressourcenzuwaechse ueberdecken keinen Bestandswert',m.resbar.einflugAufWert.length===0,m.resbar.einflugAufWert);
+    await ctx.close();
+  }
   await P.ende(async () => { await browser.close(); });
 })().catch(async e => { console.error(e); console.log('\nFAIL'); process.exit(1); });
