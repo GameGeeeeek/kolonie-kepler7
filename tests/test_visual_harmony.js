@@ -70,11 +70,16 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     };
     if(!probe||probe==='surface'){
       await show('basis');
-      const surfaces=await page.evaluate(()=>{
-        const root=document.documentElement,old=root.style.getPropertyValue('--gfx-panel');root.style.setProperty('--gfx-panel','rgb(21, 40, 53)');
+      const oldSurface=await page.evaluate(()=>{
+        const root=document.documentElement,old=root.style.getPropertyValue('--gfx-panel');root.style.setProperty('--gfx-panel','rgb(21, 40, 53)');return old;
+      });
+      // Native card backgrounds transition for 150 ms; measure the settled surface.
+      await page.waitForTimeout(250);
+      const surfaces=await page.evaluate(old=>{
+        const root=document.documentElement;
         const native=getComputedStyle(document.querySelector('#buildings [data-build="mine"]').closest('.card-row')).backgroundColor,gfx=getComputedStyle(document.querySelector('#colonyVisual .gfx-inspector')).backgroundColor;
         if(old)root.style.setProperty('--gfx-panel',old);else root.style.removeProperty('--gfx-panel');return {native,gfx};
-      });
+      },oldSurface);
       check('native and illustrated panels follow the same surface token',surfaces.native==='rgb(21, 40, 53)'&&surfaces.gfx===surfaces.native,surfaces);
     }
     if(!probe||probe==='focus'){
