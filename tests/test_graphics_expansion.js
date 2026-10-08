@@ -13,7 +13,7 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-3';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261008-4';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
 }
 const currentCss=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
