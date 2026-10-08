@@ -11,6 +11,8 @@ on:
       - tests/test_hscroll.js
       - tests/test_expeditionsbox_cache.js
       - tests/test_visual_harmony.js
+      - tests/test_graphic_polish.js
+      - tools/check-graphic-polish-counterexamples.cjs
       - tests/test_bewertungskarte.js
       - tests/http-run.js
       - tools/check-graphics-counterexamples.cjs
@@ -24,6 +26,26 @@ concurrency:
   group: graphics-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
+  polish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser dependency
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Audit findings through real native game rendering
+        run: node tests/test_graphic_polish.js
+      - name: Every controlled audit regression must fail
+        run: node tools/check-graphic-polish-counterexamples.cjs
   graphics:
     runs-on: ubuntu-latest
     timeout-minutes: 30
