@@ -3279,7 +3279,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-  <link rel="stylesheet" href="kepler-graphics.css?v=20261008-5">
+  <link rel="stylesheet" href="kepler-graphics.css?v=20261008-6">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -74977,11 +74977,39 @@ document.addEventListener('keydown',event=>{
       setBoxHtml(target,'gfxButton|'+box.id,button.innerHTML);
     }
   }
+  // The complete catalogue stays visible, including research goals and finished buildings.
+  function gfxFacilityState(def,buildings){
+    if(def.moonOnly&&!isMoonKey(state.activeBasePlanet))return {locked:true,label:k7t('nur auf Monden'),reason:k7t('Dieses Gebäude kann nur auf einem kolonisierten Mond errichtet werden - zum Mond wechseln (☾-Symbol), falls vorhanden.')};
+    if(def.special&&!state.unlocked[def.key]){
+      const item=RARE_ITEMS.find(r=>r.key===def.unlockItem);
+      return {locked:true,label:k7t('gesperrt'),reason:k7t('Voraussetzung:')+' '+escapeHtml(item?k7View(item).name:def.unlockItem)};
+    }
+    if(!techUnlockedGeneric(def.requires)){
+      const requirements=(def.requires||[]).filter(r=>{const v=techVoraussetzung(r);return (state.research[v.key]||0)<v.level;}).map(r=>{
+        const v=techVoraussetzung(r),research=RESEARCH_DEFS.find(d=>d.key===v.key);
+        return escapeHtml(research?k7View(research).name:v.key)+' · '+k7t('Stufe')+' '+v.level;
+      }).join(', ');
+      return {locked:true,label:k7t('gesperrt'),reason:k7t('Voraussetzung:')+' '+requirements};
+    }
+    return {locked:false,label:def.maxLevel&&(buildings[def.key]||0)>=def.maxLevel?k7t('Maximalstufe erreicht'):'',reason:''};
+  }
+  function gfxFacilityCatalogue(defs,selected,kind,buildings){
+    const title=kind==='defense'?'Alle Verteidigungsanlagen':'Alle Gebäude';
+    return '<section class="gfx-catalogue" aria-label="'+k7t(title)+'"><h3>'+k7t(title)+' <span>'+defs.length+'</span></h3><div class="gfx-facility-grid">'+defs.map(d=>{
+      const status=gfxFacilityState(d,buildings),level=buildings[d.key]||0;
+      const model=isoBausatz(d.key)?'<canvas data-bicon="'+d.key+'" width="64" height="64" aria-hidden="true"></canvas>':iconHtmlFor(d.key,d.icon,d.fg);
+      return '<button type="button" class="gfx-facility" data-gfx-facility="'+kind+'" data-gfx-key="'+d.key+'" aria-pressed="'+(d.key===selected)+'"><span class="gfx-facility-model">'+model+'</span><span class="gfx-facility-name">'+escapeHtml(k7View(d).name)+'</span><span class="gfx-facility-level">'+k7t('Stufe')+' '+level+'</span>'+(status.label?'<small class="gfx-facility-status">'+(status.locked?'<i class="ti ti-lock" aria-hidden="true"></i> ':'')+status.label+'</small>':'')+'</button>';
+    }).join('')+'</div></section>';
+  }
+  function gfxFacilityNotice(def,buildings){
+    const status=gfxFacilityState(def,buildings);
+    return status.reason?'<p class="gfx-facility-notice">'+status.reason+'</p>':'';
+  }
   function renderGraphicsColony(){
     const box = document.getElementById('colonyVisual');
     if (!box || activeTab!=='basis') return;
-    const buildings = currentBuildings();
-    const def = BUILDING_DEFS.find(d=>d.key===gfxBuilding) || BUILDING_DEFS.find(d=>d.key==='mine');
+    const buildings = currentBuildings(),defs=BUILDING_DEFS.filter(d=>d.category!=='defense');
+    const def = defs.find(d=>d.key===gfxBuilding) || defs.find(d=>d.key==='mine');
     const spots = GFX_BUILDING_SPOTS.filter(s=>BUILDING_DEFS.some(d=>d.key===s.key));
     const stage = gfxColonyStage(buildings), level=buildings[def.key]||0;
     const stageLabel = stage==='outpost' ? k7t('Außenposten') : stage==='settlement' ? k7t('Siedlung') : k7t('Entwickelte Kolonie');
@@ -74994,11 +75022,11 @@ document.addEventListener('keydown',event=>{
       <div class="gfx-layout"><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-colony-${stage}.png" alt="${k7t('Illustration deiner Kolonie')}" decoding="async">
         ${spots.map(s=>{ const d=BUILDING_DEFS.find(b=>b.key===s.key); return `<button type="button" class="gfx-hotspot" style="left:${s.x}%;top:${s.y}%" data-gfx-building="${d.key}" aria-pressed="${d.key===def.key}"><i class="ti ${d.icon}" aria-hidden="true"></i>${escapeHtml(k7View(d).name)} · ${buildings[d.key]||0}</button>`; }).join('')}
       </div><aside class="gfx-inspector"><span class="gfx-eyebrow">${k7t('Gebäude')}</span><h3>${escapeHtml(k7View(def).name)}</h3><span class="gfx-level">${k7t('Stufe')} ${level}</span>
-        ${production ? '<p>'+production.innerHTML+'</p>' : ''}${gfxActionHtml('building',def.key)}
+        ${production ? '<p>'+production.innerHTML+'</p>' : '<p>'+escapeHtml(k7t(def.effectDesc||''))+'</p>'}${gfxFacilityNotice(def,buildings)}${gfxActionHtml('building',def.key)}
         <p>${k7t('Die Kolonie wächst mit deinen Gebäudestufen.')}</p>
         <button type="button" data-gfx-list="buildings">${k7t('Alle Gebäude')} <i class="ti ti-list-details" aria-hidden="true"></i></button>
-      </aside></div><footer class="gfx-metrics"><span>${k7t('Gebäudestufen')}: <b>${Object.values(buildings).reduce((a,n)=>a+(Number(n)||0),0)}</b></span><span>${k7t('Schiffe am Standort')}: <b>${Object.values(currentFleet()).reduce((a,n)=>a+(Number(n)||0),0)}</b></span><span>${k7t('Bauaufträge')}: <b>${(state.constructionQueue||[]).filter(j=>j.planet===state.activeBasePlanet).length}</b></span></footer></section>`;
-    if (setBoxHtml(box,'colonyVisual',html)) wireGraphics(box);
+      </aside></div>${gfxFacilityCatalogue(defs,def.key,'building',buildings)}<footer class="gfx-metrics"><span>${k7t('Gebäudestufen')}: <b>${Object.values(buildings).reduce((a,n)=>a+(Number(n)||0),0)}</b></span><span>${k7t('Schiffe am Standort')}: <b>${Object.values(currentFleet()).reduce((a,n)=>a+(Number(n)||0),0)}</b></span><span>${k7t('Bauaufträge')}: <b>${(state.constructionQueue||[]).filter(j=>j.planet===state.activeBasePlanet).length}</b></span></footer></section>`;
+    if (setBoxHtml(box,'colonyVisual',html)) { wireGraphics(box); refreshBuildingIcons(box); }
     gfxSyncAction(box,'building',def.key);
   }
   function renderGraphicsShipyard(){
@@ -75032,6 +75060,13 @@ document.addEventListener('keydown',event=>{
     if (setBoxHtml(box,'mapPlanetVisual',html)) { wireGraphics(box); refreshPlanetMiniIcons(box); }
   }
   function wireGraphics(box){
+    box.querySelectorAll('[data-gfx-facility]').forEach(b=>b.onclick=()=>{
+      const kind=b.dataset.gfxFacility,key=b.dataset.gfxKey;
+      if(kind==='building'){gfxBuilding=key;renderGraphicsColony();}else{gfxDefense=key;renderGraphicsDefense();}
+      // Rebuilding the inspector must not drop keyboard focus into the page body.
+      const selected=box.querySelector('[data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]');
+      if(selected)selected.focus({preventScroll:true});
+    });
     box.querySelectorAll('[data-gfx-building]').forEach(b=>b.onclick=()=>{gfxBuilding=b.dataset.gfxBuilding;renderGraphicsColony();});
     box.querySelectorAll('[data-gfx-ship-picker]').forEach(b=>b.onchange=()=>{gfxShip=b.value;renderGraphicsShipyard();});
     box.querySelectorAll('[data-gfx-ship]').forEach(b=>b.onclick=()=>{gfxShip=b.dataset.gfxShip;renderGraphicsShipyard();});
@@ -75058,8 +75093,8 @@ document.addEventListener('keydown',event=>{
       <div class="gfx-layout"><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-defense-fortress.png" alt="${k7t('Illustration der Verteidigungsanlagen')}" decoding="async">
       ${spots.map(p=>{const d=defs.find(d=>d.key===p.key);return `<button class="gfx-hotspot" type="button" data-gfx-defense="${d.key}" aria-pressed="${d.key===def.key}" style="left:${p.x}%;top:${p.y}%">${escapeHtml(k7View(d).name)} · ${buildings[d.key]||0}</button>`;}).join('')}</div>
       <aside class="gfx-inspector">${gfxPicker(defs,def.key,'data-gfx-defense-picker','Alle Verteidigungsanlagen')}<h3>${escapeHtml(k7View(def).name)}</h3><div class="gfx-defense-model"><canvas data-bicon="${def.key}" width="160" height="120" aria-hidden="true"></canvas><span class="gfx-level">${k7t('Stufe')} ${buildings[def.key]||0}</span></div>
-      ${production?'<p>'+production.innerHTML+'</p>':'<p>'+escapeHtml(k7t(def.effectDesc||''))+'</p>'}${gfxActionHtml('defense',def.key)}<button type="button" data-gfx-list="defenseBuildings">${k7t('Zur Anlagenliste')}</button></aside></div>
-      <footer class="gfx-metrics"><span>${k7t('Anlagenstufen')}: <b>${defs.reduce((n,d)=>n+(buildings[d.key]||0),0)}</b></span><span>${k7t('Verteidigungspunkte')}: <b>${escapeHtml(document.getElementById('defenseCentralValue').textContent)}</b></span></footer></section>`;
+      ${production?'<p>'+production.innerHTML+'</p>':'<p>'+escapeHtml(k7t(def.effectDesc||''))+'</p>'}${gfxFacilityNotice(def,buildings)}${gfxActionHtml('defense',def.key)}<button type="button" data-gfx-list="defenseBuildings">${k7t('Zur Anlagenliste')}</button></aside></div>
+      ${gfxFacilityCatalogue(defs,def.key,'defense',buildings)}<footer class="gfx-metrics"><span>${k7t('Anlagenstufen')}: <b>${defs.reduce((n,d)=>n+(buildings[d.key]||0),0)}</b></span><span>${k7t('Verteidigungspunkte')}: <b>${escapeHtml(document.getElementById('defenseCentralValue').textContent)}</b></span></footer></section>`;
     if(setBoxHtml(box,'defenseVisual',html)){
       wireGraphics(box);refreshBuildingIcons(box);
       box.querySelectorAll('[data-gfx-defense]').forEach(b=>b.onclick=()=>{gfxDefense=b.dataset.gfxDefense;renderGraphicsDefense();});

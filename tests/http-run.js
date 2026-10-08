@@ -2,6 +2,7 @@
 // Read-only, loopback-only server for tests whose existing API fixtures use /api URLs.
 // Usage: node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js
 // Full suite with the same isolated HTTP origin: node tests/http-run.js --full
+// Release metadata checks through the same origin: node tests/http-run.js --nummer
 // KEPLER_SPIELDATEI selects a baseline/counterexample without modifying the checkout.
 const fs = require('fs');
 const http = require('http');
@@ -12,15 +13,16 @@ const { SPIELDATEI, WURZEL } = require('./lib/spieldatei');
 async function main() {
   const names = process.argv.slice(2);
   const full = names.length === 1 && names[0] === '--full';
+  const numbering = names.length === 1 && names[0] === '--nummer';
   const split = names.length === 1 && /^--part=(\d+)\/([1-9]\d*)$/.exec(names[0]);
   if (split && Number(split[1]) >= Number(split[2])) throw new Error('Invalid test partition');
-  const suite = full || !!split;
+  const suite = full || !!split || numbering;
   if (!suite && (!names.length || names.some(name => !/^(?:test_[a-zA-Z0-9_]+|sweep)\.js$/.test(name)))) {
     throw new Error('Supply test_*.js or sweep.js basenames from the tests directory');
   }
   const partition = split ? fs.readdirSync(__dirname).filter(name => /^test_.*\.js$/.test(name) || name === 'sweep.js').sort()
     .filter((name,index) => index % Number(split[2]) === Number(split[1])) : [];
-  const tests = full ? [path.join(WURZEL, 'pruflauf.js')] : split ? [path.join(__dirname,'run.js')] : names.map(name => path.join(__dirname, name));
+  const tests = full ? [path.join(WURZEL, 'pruflauf.js')] : split || numbering ? [path.join(__dirname,'run.js')] : names.map(name => path.join(__dirname, name));
   for (const test of tests) {
     if (!fs.statSync(test).isFile()) throw new Error('Not a test file: ' + test);
   }
@@ -64,7 +66,7 @@ async function main() {
       console.log('\nHTTP regression: ' + (full ? 'complete repository suite' : split ? names[0]+' ('+partition.length+' tests)' : names[i]));
       const code = await new Promise((resolve, reject) => {
         const child = spawn(process.execPath,
-          ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i], ...partition],
+          ['--require', path.join(__dirname, 'lib/http-test-origin.js'), tests[i], ...(numbering ? ['--nummer'] : partition)],
           { env: { ...process.env, KEPLER_HTTP_TEST_ORIGIN: origin,
             ...(suite ? {NODE_OPTIONS: ((process.env.NODE_OPTIONS || '') + ' --require ' + JSON.stringify(path.join(__dirname,'lib/http-test-origin.js'))).trim()} : {}) },
             stdio: 'inherit', ...(suite ? {} : {timeout: 180000}) });
