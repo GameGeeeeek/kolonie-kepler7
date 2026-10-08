@@ -59,6 +59,10 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   const collection=await page.locator('#sammlungBox').evaluate(box=>({raw:/<(?:strong|em)>/.test(box.textContent),icons:[...box.querySelectorAll('.gfx-collection-item')].filter(r=>/Siegesschmiede|Kampfrausch|Siegesschirm/.test(r.textContent)).map(r=>!!r.querySelector('.bicon svg')),emphasis:box.querySelectorAll('.gfx-collection-item strong,.gfx-collection-item em').length}));
   check('collection renders native emphasis without literal HTML',!collection.raw&&collection.emphasis>0,collection);
   check('collection restores all three audited module icons',collection.icons.length===3&&collection.icons.every(Boolean),collection);
+  const unowned=page.locator('#sammlungBox .gfx-collection-item[data-item-owned="false"]').filter({hasText:'Siegesschmiede'});
+  await unowned.hover();
+  const readable=await unowned.evaluate(r=>({opacity:getComputedStyle(r).opacity,meta:[...r.querySelectorAll('.bmeta')].map(e=>getComputedStyle(e).opacity)}));
+  check('collection unowned text remains readable after native pointer feedback',readable.opacity==='1'&&readable.meta.every(o=>o==='1'),readable);
   const materials=await page.locator('#sammlungBox [data-gfx-material]').evaluateAll(els=>els.map(e=>({key:e.dataset.gfxMaterial,style:e.getAttribute('style')})));
   check('all six rare materials use distinct native-keyed item illustrations',materials.length===6&&new Set(materials.map(m=>m.key)).size===6&&new Set(materials.map(m=>m.style)).size===6,materials);
   check('collection permits emphasis but escapes attributes and executable markup',await page.evaluate(()=>{const v=__gfxReview.rich('<strong>Wert</strong><em>Text</em><img src=x onerror="alert(1)"><strong onclick="x">Bad</strong>');return v.includes('<strong>Wert</strong>')&&v.includes('<em>Text</em>')&&!/<img|onclick="|onerror="/.test(v)&&v.includes('&lt;img');}));
