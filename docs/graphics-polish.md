@@ -33,3 +33,11 @@ Use case: stylized-concept. Asset type: ONE sprite atlas of six rare collectible
 Neue echte Browserprüfungen und gezielte Gegenproben stehen in `tests/test_graphic_polish.js` und `tools/check-graphic-polish-counterexamples.cjs`. Die bisherigen vollständigen Katalog-, Tastatur-, Sprach-, Karten- und Spielprüfungen bleiben bestehen. Ihre Katalogprüfung sucht nun jeden tatsächlichen Schlüssel innerhalb der sichtbaren Gruppen und ignoriert ausschließlich unsichtbare Trennzeichen im Namen.
 
 Vor Veröffentlichung: gezielte Prüfungen und Gegenproben, Sichtkontrolle auf Desktop und Handy, adversariale Codeprüfung, vollständiger unveränderter Stand auf acht isolierten Linux-Prüfern, danach Versionsnummer und erzeugte Patchnotes. Prüfergebnisse werden vor dem Merge ergänzt.
+
+### Adversariale Durchsicht
+
+Die Durchsicht prüfte Besitz-/Hover-Zustände, native Auftragsarten, Leeren zuvor gefüllter Historien, tatsächliche CSS-Layouts, Schlüsselzuordnung, escaped Texte sowie die Weiterleitung an bestehende Aktionen. Bestätigte Befunde sind behoben: normalisierte Hover-Inline-Stile machten die alte Opazitätsausnahme wirkungslos; Verteidigungsaufträge verwenden nativ `building`; leere Historien müssen die Metazeile löschen; die Vitrinen benötigen ausdrücklich `display:grid`. Jeder dieser vier Fälle hat eine gezielte Browserprüfung und eine kontrollierte fehlerhafte Gegenprobe. Die vier weiteren Gegenproben prüfen Modulbilder, Formatierung, Gegneridentität und Navigationsschrift.
+
+Der bestehende vollständige Katalogtest wies außerdem einen überlangen Abschlussstatus bei 320 px nach. Der Status bricht jetzt um; dieselbe unveränderte geometrische Zusage bestand anschließend. Die Überlaufprüfung des ausführlichen Kopfes bei 1001 px fordert diesen Kopf nun ausdrücklich mit `compactHead:false` an, weil die neue automatische Grenze bei 1380 px liegt. Sie behält alle vorherigen Überlauf-, Knopf- und Zeilenprüfungen.
+
+Die Sichtprüfung umfasst die drei echten Vitrinenspalten, Diagramme mit tatsächlichen Vorschauzeitpunkten, eigene Gegnerporträts, Materialbilder, lesbare Sammelbeschreibungen nach Hover und Kartenunterzeilen am Handy. Originalaufnahmen liegen im lokalen Audit-Verzeichnis unter `nachher-*.jpg`.

@@ -7,6 +7,8 @@ const fault=process.env.K7_POLISH_FAULT;
 if(fault==='icons')source=source.replace("if (g.art === 'standortmodul' || g.art === 'schiffsmodul') return moduleIconHtml","if (false) return moduleIconHtml");
 if(fault==='emphasis')source=source.replace('sammlungBeschreibungHtml(k7View(g).desc)','escapeHtml(k7View(g).desc)');
 if(fault==='enemies')source=source.replace('const i=GFX_ENEMY_KEYS.indexOf(n.id);','const i=0;');
+if(fault==='defense-activity')source=source.replace("const nativeKind=kind==='defense'?'building':kind;",'const nativeKind=kind;');
+if(fault==='history-clear')source=source.replace("setBoxHtml(document.getElementById('scoreHistorySvgMeta'),'scoreHistorySvgMeta','');",'').replace("setBoxHtml(document.getElementById(svgId+'Meta'),svgId+'Meta','');",'');
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
 const html=source.replace(end,`\nwindow.__gfxReview={collection:renderSammlung,rich:sammlungBeschreibungHtml,portrait:gfxEnemyPortrait,npcDefs:()=>NPCS,activity:gfxActivityHtml,trophies:k7ProfileTrophies,ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,
@@ -23,7 +25,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    if(req.url.split('?')[0]==='/'){res.writeHead(200,{'Content-Type':'text/html'});return res.end(html);}
    const p=path.resolve(WURZEL,req.url.split('?')[0].slice(1));
    if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
-   const faults={navigation:'\n#game-root .tabs .tab-btn{font-size:8.5px!important}',readability:'\n#sammlungBox#sammlungBox .gfx-collection-item[data-item-owned="false"]{opacity:.55!important}'};
+   const faults={navigation:'\n#game-root .tabs .tab-btn{font-size:8.5px!important}',readability:'\n#sammlungBox#sammlungBox .gfx-collection-item[data-item-owned="false"]{opacity:.55!important}',trophies:'\n.gfx-trophy-hall{display:block!important}'};
    res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(p.endsWith('.css')&&faults[fault]?fs.readFileSync(p,'utf8')+faults[fault]:fs.readFileSync(p));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));

@@ -711,6 +711,9 @@ function aufraeumenVergleich(){
      (oben wie unten) und klebt rechts - nicht eine eigene Zeile links darunter. */
   {
     const WEIT = JSON.stringify(Object.assign({}, ruhigeUhren(), {
+      // Keep the wrapped-header counterexample explicit: the automatic compact
+      // header now extends to 1380px; a player can still request the full header.
+      compactHead: false,
       tutorialSeen: true, newbieWelcomeSeen: true,
       seenTabHints: { basis:1, verteidigung:1, forschung:1, flotte:1, expedition:1, karte:1,
                       galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1, sammlung:1 },
