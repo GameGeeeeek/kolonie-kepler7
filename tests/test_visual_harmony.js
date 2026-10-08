@@ -20,7 +20,7 @@ const faults={
 assert(!fault||Object.hasOwn(faults,fault),'known controlled CSS fault');
 let checks=0,failed=0;
 function check(name,ok,data){checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL')+' - '+name+(!ok&&data?' '+JSON.stringify(data):''));}
-const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','galaxie','allianz','offiziere','markt','punkte','fortschritt','sammlung'];
+const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','galaxie','allianz','offiziere','markt','punkte','fortschritt','sammlung','berichte','hilfe','einstellungen'];
 (async()=>{
   let server,browser;
   try {
@@ -61,7 +61,8 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     check('actual stylesheet and controlled probe response arrived',await page.evaluate(f=>{
       const s=getComputedStyle(document.documentElement);return s.getPropertyValue('--harmony-fixture-loaded').trim()==='yes'&&s.getPropertyValue('--harmony-fixture-fault').trim()===(f||'none');
     },fault));
-    const show=async tab=>{await page.locator('.tab-btn[data-tab="'+tab+'"]').click();await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});};
+    const headerTabs={berichte:'#headerReportsBtn',hilfe:'#headerHelpBtn',einstellungen:'#headerProfileBtn'};
+    const show=async tab=>{await page.locator(headerTabs[tab]||'.tab-btn[data-tab="'+tab+'"]').click();await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});};
     const focus=async selector=>{
       const el=page.locator(selector).first();await el.evaluate(e=>e.blur());
       await el.press('Tab');await page.keyboard.press('Shift+Tab');await page.waitForTimeout(400);
