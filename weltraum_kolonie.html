@@ -75000,7 +75000,8 @@ document.addEventListener('keydown',event=>{
   }
   function gfxActivityHtml(kind,key){
     const research=kind==='research'&&state.activeResearch&&state.activeResearch.key===key?state.activeResearch:null;
-    const job=research||(state.constructionQueue||[]).find(j=>j.kind===kind&&j.key===key&&j.planet===state.activeBasePlanet);
+    const nativeKind=kind==='defense'?'building':kind;
+    const job=research||(state.constructionQueue||[]).find(j=>j.kind===nativeKind&&j.key===key&&j.planet===state.activeBasePlanet);
     const def=kind==='research'?RESEARCH_DEFS.find(d=>d.key===key):BUILDING_DEFS.find(d=>d.key===key)||SHIP_DEFS.find(d=>d.key===key);
     return job?'<div class="gfx-activity"><i class="ti ti-clock" aria-hidden="true"></i>'+k7t(research||job.startTime?'Aktiver Auftrag':'In der Warteschlange')+' · '+escapeHtml(def?k7View(def).name:key)+'</div>':'';
   }
@@ -79918,6 +79919,8 @@ document.addEventListener('keydown',event=>{
       // genauso, childElementCount ebenfalls (der Hinweis-Text ist ein <text>-Kindelement).
       if (hist.length < 2){
         setBoxHtml(scoreHistorySvg, 'scoreHistorySvg', `<text x="350" y="70" text-anchor="middle" style="font-size:12px; fill:#7d8199;">Noch nicht genug Verlaufsdaten (Snapshot alle 5 Minuten).</text>`);
+        setBoxHtml(document.getElementById('scoreHistorySvgMeta'),'scoreHistorySvgMeta','');
+        scoreHistorySvg.removeAttribute('aria-label');
       } else {
         gfxHistoryChart(scoreHistorySvg,hist,'score','#afa9ec',fmt,140);
       }
@@ -79932,6 +79935,8 @@ document.addEventListener('keydown',event=>{
       const hist = (state.scoreHistory||[]).filter(h => typeof h[field] === 'number');
       if (hist.length < 2){
         setBoxHtml(svg, svgId, `<text x="350" y="55" text-anchor="middle" style="font-size:12px; fill:#7d8199;">${k7h("Noch nicht genug Verlaufsdaten.")}</text>`);
+        setBoxHtml(document.getElementById(svgId+'Meta'),svgId+'Meta','');
+        svg.removeAttribute('aria-label');
         return;
       }
       gfxHistoryChart(svg,hist,field,color,fmtFn,110);

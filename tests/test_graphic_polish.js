@@ -23,7 +23,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    if(req.url.split('?')[0]==='/'){res.writeHead(200,{'Content-Type':'text/html'});return res.end(html);}
    const p=path.resolve(WURZEL,req.url.split('?')[0].slice(1));
    if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
-   res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(p.endsWith('.css')&&fault==='navigation'?fs.readFileSync(p,'utf8')+'\n#game-root .tabs .tab-btn{font-size:8.5px!important}':fs.readFileSync(p));
+   const faults={navigation:'\n#game-root .tabs .tab-btn{font-size:8.5px!important}',readability:'\n#sammlungBox#sammlungBox .gfx-collection-item[data-item-owned="false"]{opacity:.55!important}'};
+   res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(p.endsWith('.css')&&faults[fault]?fs.readFileSync(p,'utf8')+faults[fault]:fs.readFileSync(p));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const origin='http://127.0.0.1:'+server.address().port,store={};
@@ -80,8 +81,12 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
     const chart=await page.locator('#'+id).evaluate(svg=>{const meta=document.getElementById(svg.id+'Meta'),p=[...svg.querySelectorAll('circle')];return {times:meta.querySelectorAll('.gfx-chart-times span').length,rows:meta.querySelectorAll('tbody tr').length,label:svg.getAttribute('aria-label'),fraction:p.length===3?(Number(p[1].getAttribute('cx'))-Number(p[0].getAttribute('cx')))/(Number(p[2].getAttribute('cx'))-Number(p[0].getAttribute('cx'))):0,titles:p.every(p=>p.querySelector('title').textContent.includes(' · '))};});
     check(id+' shows real times, values and proportionate snapshot spacing',chart.times===2&&chart.rows===3&&chart.label&&chart.titles&&Math.abs(chart.fraction-.25)<.001,chart);
   }
+  await page.evaluate(()=>{__gfxReview.state().scoreHistory=[];__gfxReview.render();});
+  check('empty history clears former chart times and values',await page.locator('.gfx-chart-meta').evaluateAll(els=>els.every(e=>!e.textContent.trim())));
   const activity=await page.evaluate(()=>{const s=__gfxReview.state();s.constructionQueue=[{kind:'building',key:'solar',planet:'home',startTime:1},{kind:'building',key:'mine',planet:'rhea',startTime:1},{kind:'ship',key:'jaeger',planet:'home',startTime:null}];s.activeResearch={key:'rsolar',endTime:Date.now()+60000};return {running:__gfxReview.activity('building','solar'),foreign:__gfxReview.activity('building','mine'),waiting:__gfxReview.activity('ship','jaeger'),research:__gfxReview.activity('research','rsolar')};});
   check('activity distinguishes running, queued and foreign-site orders',activity.running.includes('Aktiver Auftrag')&&activity.foreign===''&&activity.waiting.includes('In der Warteschlange')&&activity.research.includes('Aktiver Auftrag'),activity);
+  const defenseActivity=await page.evaluate(()=>{__gfxReview.state().constructionQueue.push({kind:'building',key:'plasma',planet:'home',startTime:1});return __gfxReview.activity('defense','plasma');});
+  check('defense activity reads native building jobs',defenseActivity.includes('Aktiver Auftrag')&&defenseActivity.includes('Plasma'),defenseActivity);
   await page.evaluate(()=>{__gfxReview.state().constructionQueue=[];__gfxReview.state().activeResearch=null;__gfxReview.show('fortschritt');});
   const trophies=await page.locator('.gfx-trophy-hall').evaluateAll(halls=>halls.map(h=>({cases:h.querySelectorAll('.gfx-trophy-case').length,plinths:h.querySelectorAll('.gfx-trophy-plinth').length})));
   check('profile displays three actual trophy cases with distinct empty state',trophies.length>0&&trophies.every(h=>h.cases===3&&h.plinths===3),trophies);
