@@ -11,6 +11,7 @@ const faults={
   surface:'.gfx-inspector{background:#040404!important}',
   focus:'#game-root #buildings [data-build="mine"]:focus-visible{box-shadow:none!important;animation:none!important}',
   dialog:'#fwahlOverlay [data-fwahl-zu]:focus-visible{box-shadow:none!important}',
+  font:'#fwahlOverlay .fwahl-titel{font-family:serif!important}',
   warning:'#game-root .tab-btn-alert:focus-visible{box-shadow:none!important}',
   theme:'#game-root #themePicker [data-theme-key="ocean"]:focus-visible{box-shadow:0 0 0 2px #fff!important}',
   mobile:'@media(max-width:400px){#tab-sammlung.active{min-width:700px!important}}',
@@ -63,7 +64,7 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     const show=async tab=>{await page.locator('.tab-btn[data-tab="'+tab+'"]').click();await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});};
     const focus=async selector=>{
       const el=page.locator(selector).first();await el.evaluate(e=>e.blur());
-      await el.press('Tab');await page.keyboard.press('Shift+Tab');await page.waitForTimeout(200);
+      await el.press('Tab');await page.keyboard.press('Shift+Tab');await page.waitForTimeout(400);
       return el.evaluate(e=>{const s=getComputedStyle(e),rgb=getComputedStyle(document.documentElement).getPropertyValue('--gfx-focus').trim();
         const color=document.createElement('span');color.style.color=rgb;document.body.appendChild(color);const normalized=getComputedStyle(color).color;color.remove();
         return {focused:document.activeElement===e&&e.matches(':focus-visible'),shadow:s.boxShadow,ring:s.boxShadow.includes('inset')&&s.boxShadow.includes(normalized),animation:s.animationName};});
@@ -90,9 +91,11 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
         const illustrated=await focus('#colonyVisual [data-gfx-building="mine"]');check('illustrated selection shares the inset keyboard ring',illustrated.focused&&illustrated.ring,illustrated);
       }
     }
-    if(!probe||probe==='dialog'){
+    if(!probe||probe==='dialog'||probe==='font'){
       await show('galaxie');await page.locator('#npcList [data-attack]').first().click();await page.locator('#fwahlOverlay.open').waitFor({state:'visible'});
       const dialog=await focus('#fwahlOverlay [data-fwahl-zu]');check('body-mounted fleet dialog keeps its visible keyboard ring',dialog.focused&&dialog.ring,dialog);
+      const fonts=await page.evaluate(()=>({dialog:getComputedStyle(document.querySelector('#fwahlOverlay .fwahl-titel')).fontFamily,illustrated:getComputedStyle(document.querySelector('#colonyVisual .gfx-heading h2')).fontFamily}));
+      check('body-mounted dialog heading uses the illustrated heading font',fonts.dialog===fonts.illustrated,fonts);
       await page.locator('#fwahlOverlay [data-fwahl-zu]').click();
     }
     if(!probe||probe==='warning'){

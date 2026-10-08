@@ -5,6 +5,7 @@ for(const [fault,label] of [
   ['surface','native and illustrated panels follow the same surface token'],
   ['focus','affordable native order retains a stable inset keyboard ring'],
   ['dialog','body-mounted fleet dialog keeps its visible keyboard ring'],
+  ['font','body-mounted dialog heading uses the illustrated heading font'],
   ['warning','animated warning tab retains a stable keyboard ring'],
   ['theme','selected theme inline shadow cannot hide keyboard focus'],
   ['mobile','main panel fits 390px sammlung'],
