@@ -75063,9 +75063,10 @@ document.addEventListener('keydown',event=>{
     box.querySelectorAll('[data-gfx-facility]').forEach(b=>b.onclick=()=>{
       const kind=b.dataset.gfxFacility,key=b.dataset.gfxKey;
       if(kind==='building'){gfxBuilding=key;renderGraphicsColony();}else{gfxDefense=key;renderGraphicsDefense();}
-      // Rebuilding the inspector must not drop keyboard focus into the page body.
-      const selected=box.querySelector('[data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]');
-      if(selected)selected.focus({preventScroll:true});
+      // Selecting a distant catalogue tile brings its actual costs and order back into view.
+      const detail=box.querySelector('.gfx-inspector'),heading=detail&&detail.querySelector('h3');
+      if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
+      if(detail)detail.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
     });
     box.querySelectorAll('[data-gfx-building]').forEach(b=>b.onclick=()=>{gfxBuilding=b.dataset.gfxBuilding;renderGraphicsColony();});
     box.querySelectorAll('[data-gfx-ship-picker]').forEach(b=>b.onchange=()=>{gfxShip=b.value;renderGraphicsShipyard();});

@@ -6,7 +6,7 @@ for(const [fault,label] of [
  ['prerequisites','unmet prerequisite remains visibly locked'],
  ['cache','a browser retaining the previous CSS receives the new usable controls'],
  ['catalogue','all native buildings and defense facilities are directly visible with their actual names and local levels'],
- ['catalogue-focus','catalogue keyboard selection retains focus on the rebuilt selected tile']
+ ['catalogue-focus','catalogue keyboard selection moves focus to the updated native details']
 ]){
  const r=spawnSync(process.execPath,['tests/test_graphics_expansion.js'],{cwd:root,env:{...process.env,K7_GFX_EXPANSION_FAULT:fault},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
  const output=(r.stdout||'')+(r.stderr||''),failures=output.split('\n').filter(l=>l.startsWith('FAIL - '));

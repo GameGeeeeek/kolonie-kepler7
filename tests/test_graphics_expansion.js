@@ -21,8 +21,8 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
  source=source.replace(anchor,"defs.slice(0,-1).map(d=>{\n      const status=gfxFacilityState");
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-focus'){
- const anchor='if(selected)selected.focus({preventScroll:true});';assert.equal(source.split(anchor).length,2);
- source=source.replace(anchor,'if(false&&selected)selected.focus({preventScroll:true});');
+ const anchor='heading.focus({preventScroll:true});';assert.equal(source.split(anchor).length,2);
+ source=source.replace(anchor,'if(false)heading.focus({preventScroll:true});');
 }
 const currentCss=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
 const cssStart=currentCss.indexOf('.gfx-picker {'),cssEnd=currentCss.indexOf('.gfx-heading {');
@@ -91,13 +91,13 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
     await page.locator('#'+root+' [data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]').press('Enter');
     const selection=await page.locator('#'+root).evaluate((box,{kind,key})=>{
       const b=box.querySelector('[data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]'),a=box.querySelector('[data-gfx-action="'+kind+'"]');
-      return {selected:b.getAttribute('aria-pressed')==='true'&&box.querySelectorAll('[data-gfx-facility][aria-pressed="true"]').length===1&&a.dataset.gfxKey===key,focused:document.activeElement===b};
+      return {selected:b.getAttribute('aria-pressed')==='true'&&box.querySelectorAll('[data-gfx-facility][aria-pressed="true"]').length===1&&a.dataset.gfxKey===key,focused:document.activeElement===box.querySelector('.gfx-inspector h3')};
     },{kind,key});
     check(kind+' catalogue selects the native inspector beyond scene hotspots',selection.selected,selection);
     catalogueFocus.push(selection.focused);
   }
   check('all native buildings and defense facilities are directly visible with their actual names and local levels',catalogueResults.every(r=>r.ok),catalogueResults);
-  check('catalogue keyboard selection retains focus on the rebuilt selected tile',catalogueFocus.every(Boolean),catalogueFocus);
+  check('catalogue keyboard selection moves focus to the updated native details',catalogueFocus.every(Boolean),catalogueFocus);
   check('locked defense tile remains readable and exposes the real missing research',await page.locator('#defenseVisual').evaluate(box=>{
     const b=box.querySelector('[data-gfx-facility][data-gfx-key="plasma"]'),notice=box.querySelector('.gfx-facility-notice'),action=box.querySelector('[data-gfx-build="defense"]');
     return b.textContent.includes('gesperrt')&&getComputedStyle(b).opacity==='1'&&notice.textContent.includes('Panzer')&&action.hidden;
@@ -195,6 +195,11 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
         });
       });
       check(tab+' complete catalogue fits '+width+'px with readable touch targets',fit);
+      await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
+      await page.waitForTimeout(500);
+      check(tab+' distant catalogue selection brings updated details into view at '+width+'px',await page.locator('#'+id+' .gfx-inspector h3').evaluate(h=>{
+        const r=h.getBoundingClientRect();return document.activeElement===h&&r.top>=0&&r.bottom<=innerHeight;
+      }));
     }
   }
   const saved=JSON.parse(store['kepler7-save-v3']);saved.lastTick=Date.now()-60000;store['kepler7-save-v3']=JSON.stringify(saved);
