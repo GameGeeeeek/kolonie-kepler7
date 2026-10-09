@@ -86,7 +86,20 @@ async function starte(browser, saveJson){
   await page.route('**/api/**', backend(store));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(SPIEL_URL);
-  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { timeout: 60000 });
+  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { state:'attached', timeout: 60000 });
+  // Der Bootanker bleibt ein sichtbarer nativer Reiter. Dafür das mobile Menü wirklich öffnen,
+  // anschließend schließen, ohne den beim Laden gewählten Reiter zu verändern.
+  const menu = page.locator('#commandMenuToggle');
+  if (await menu.count()){
+    await page.waitForFunction(()=>document.getElementById('loadstate')?.textContent.startsWith('Spielstand automatisch geladen'), null, { timeout:60000 });
+    await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
+      .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }));
+    await page.locator('#welcomeBackDismissBtn').waitFor({ state:'visible', timeout:60000 });
+    await page.locator('#welcomeBackDismissBtn').click();
+    await menu.waitFor({ state:'visible', timeout:60000 }); await menu.click();
+    await page.locator('.tab-btn[data-tab="galaxie"]').waitFor({ state:'visible', timeout:60000 });
+    await page.locator('#commandNavClose').click();
+  } else await page.locator('.tab-btn[data-tab="galaxie"]').waitFor({ state:'visible', timeout:60000 });
   return { page, ctx, store, errs };
 }
 

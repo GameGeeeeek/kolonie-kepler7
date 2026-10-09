@@ -3279,7 +3279,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-<link rel="stylesheet" href="kepler-graphics.css?v=20261009-command-15">
+<link rel="stylesheet" href="kepler-graphics.css?v=20261009-command-19">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -4132,7 +4132,7 @@
       </div>
 
     <div class="command-tools"><button type="button" data-command-header="headerHelpBtn"><i class="ti ti-info-circle" aria-hidden="true"></i>Hilfe</button><button type="button" data-command-header="headerReportsBtn"><i class="ti ti-mail" aria-hidden="true"></i>Berichte</button><details><summary>Mehr</summary><button type="button" data-command-header="headerFeedbackBtn">Bug/Vorschlag</button><button type="button" data-command-header="headerKofiBtn">Kaffee</button><button type="button" data-command-header="headerLogoutBtn">Abmelden</button></details></div>
-    <button type="button" id="commandAccountBtn" class="command-account"><span id="commandAvatar" aria-hidden="true"></span><span><b id="commandPlayerName"></b><small><span>Level</span> <span id="commandPlayerLevel"></span></small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+    <button type="button" id="commandAccountBtn" class="command-account"><span id="commandAvatar" aria-hidden="true"></span><span><b id="commandPlayerName" translate="no"></b><small><span>Level</span> <span id="commandPlayerLevel"></span></small></span><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
   </aside>
 
   <div class="shell">
@@ -48910,6 +48910,7 @@ async function claimPendingRewards(){
   }
   function springeZuKartenziel(system, selektor){
     if (!system) return false;
+    closeFpPanel();
     switchTab('karte');
     galaxyOeffne(system);
     render();
@@ -66454,7 +66455,7 @@ async function claimPendingRewards(){
     // (Etappe "Sektor-Eigenschaften": ein Bonus, den nur der Quelltext kennt, gibt es nicht).
     // Verloren geht sie nicht - Titel und aria-label nennen sie an beiden Formfaktoren.
     const uZeileMeta = uSchmal ? 16 : 27;
-    const uZeileHinweis = uSchmal ? 33 : 44;
+    const uZeileHinweis = uSchmal ? 40 : 44;
     let inner = '', gesamt = 0;
     for (const sk of SEKTOR_DEFS){
       const mg = gruppen.get(sk.key);
@@ -73646,7 +73647,6 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const options=ids.map(id=>'<option translate="no" value="'+escapeHtml(id)+'">'+escapeHtml(commandPlanetName(id))+'</option>').join('');
     setBoxHtml(picker,'commandPlanets',options);
     if(picker.value!==state.activeBasePlanet)picker.value=state.activeBasePlanet;
-    document.getElementById('commandPlayerName').setAttribute('translate','no');
     setBoxText(document.getElementById('commandPlayerName'),state.player.name||k7t('Kommandant'));
     setBoxText(document.getElementById('commandPlayerLevel'),String(commanderLevel(state.xp||0))+(state.prestige?' · P'+state.prestige:''));
     const avatar=avatarSvg(state.player.avatarKey)||'<i class="ti ti-user-circle" aria-hidden="true"></i>';
@@ -79865,7 +79865,8 @@ document.addEventListener('keydown',event=>{
       const collectAllBtnHtml = collectCount >= 2 ? `<button id="collectAllBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(93,202,165,0.18); border-color:rgba(93,202,165,0.55);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alles einsammeln (${collectCount})</button>` : '';
       const claimAllBtnHtml = (!collectAllBtnHtml && claimableCount >= 2) ? `<button id="claimAllQuestsBtn" style="font-size:10.5px; padding:5px 10px; background:rgba(250,199,117,0.15); border-color:rgba(250,199,117,0.4);"><i class="ti ti-check" aria-hidden="true" style="margin-right:3px;"></i>Alle abholen (${claimableCount})</button>` : '';
       // Markup-Signatur (v8.382.0): 3,9 kB/s, ueber sechs Ticks byte-gleich gemessen.
-      const dailyQuestHtml = `<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${collectAllBtnHtml}${claimAllBtnHtml}${openDefs.map(d => {
+      const questCloseHead = dailyQuestBar.closest('#commandQuests') ? `<div class="command-quests-head"><strong>${k7h('Tagesaufgaben')}</strong><button id="commandQuestsCloseBtn" type="button" aria-label="${escapeHtml(k7t('Schließen'))}"><i class="ti ti-x" aria-hidden="true"></i></button></div>` : '';
+      const dailyQuestHtml = `${questCloseHead}<div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">${collectAllBtnHtml}${claimAllBtnHtml}${openDefs.map(d => {
         const prog = Math.min(d.target, dailyQuestProgress(d.key));
         const done = prog >= d.target;
         const bg = done ? 'rgba(250,199,117,0.18)' : 'rgba(255,255,255,0.06)';
@@ -79888,6 +79889,12 @@ document.addEventListener('keydown',event=>{
         dailyQuestBar.querySelectorAll('[data-claim-quest]').forEach(el => el.onclick = () => claimDailyQuest(el.getAttribute('data-claim-quest')));
         dailyQuestBar.querySelectorAll('[data-quest-nav]').forEach(el => el.onclick = () => { const def = DAILY_QUEST_DEFS.find(d=>d.key===el.getAttribute('data-quest-nav')); if (def) navToQuestTarget(def.nav); });
         dailyQuestBar.querySelectorAll('[data-reroll-quest]').forEach(el => el.onclick = (ev) => { ev.stopPropagation(); rerollDailyQuest(el.getAttribute('data-reroll-quest')); });
+        const questCloseBtn = dailyQuestBar.querySelector('#commandQuestsCloseBtn');
+        if (questCloseBtn) questCloseBtn.onclick = () => {
+          const summary = dailyQuestBar.closest('#commandQuests').querySelector('summary');
+          summary.click();
+          summary.focus({preventScroll:true});
+        };
       }
       const claimAllQuestsBtn = document.getElementById('claimAllQuestsBtn');
       if (claimAllQuestsBtn) claimAllQuestsBtn.onclick = claimAllDailyQuests;

@@ -18,11 +18,10 @@ const cases=[
  </style></head>`),[
   'desktop map height remains stable when a system opens']],
  ['broken-layout',replace(source,'</head>',`<style>
- #kanzelrahmen { width:600px!important; }
- @media(min-width:1400px) and (min-height:850px) { .gfx-system-layout {grid-template-rows:850px auto!important;} .gfx-system-layout .map-wrap {height:850px!important;} }
+ @media(min-width:1400px) and (min-height:850px) { body.command-ui .shell {transform:translateX(8px)!important;} .gfx-system-layout {grid-template-rows:850px auto!important;} .gfx-system-layout .map-wrap {height:850px!important;} }
  @media(max-width:760px) { .gfx-hotspot {min-height:34px!important;} .gfx-hotspot[data-gfx-building="mine"] {left:26%!important;top:44%!important;} .gfx-hotspot[data-gfx-building="solar"] {left:58%!important;top:39%!important;} }
  </style></head>`),[
-  'wide desktop frame stays aligned with the expanded game column','desktop system overview avoids intrinsic SVG height growth','mobile building controls have 44px targets without overlaps']]
+  'wide desktop command surface stays aligned with the native game column','desktop system overview avoids intrinsic SVG height growth','mobile building controls have 44px targets without overlaps']]
 ];
 try {
  for(const [name,html,expected] of cases){
@@ -30,7 +29,9 @@ try {
   const result=spawnSync(process.execPath,['tests/test_graphics_refresh.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:file},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
   const output=(result.stdout||'')+(result.stderr||'');
   const failures=output.split('\n').filter(line=>line.startsWith('FAIL - '));
-  if(result.status!==1||failures.length!==expected.length||!expected.every(label=>failures.some(line=>line.startsWith('FAIL - '+label)))){
+  if(result.error||result.signal||result.status!==1||failures.length!==expected.length||!expected.every(label=>failures.some(line=>line.startsWith('FAIL - '+label)))
+    ||!output.includes('OK - game boots without JavaScript errors')||!output.includes('OK - interactions produce no JavaScript errors')
+    ||!output.split(/\r?\n/).includes('22 checks, '+expected.length+' failures')){
    console.error(output);throw Error(name+': counterexample did not fail exactly its intended checks (exit '+result.status+')');
   }
   console.log('OK - '+name+' rejects exactly '+expected.length+' intended faults');
@@ -41,7 +42,12 @@ try {
  const fontResult=spawnSync(process.execPath,['tests/http-run.js','test_uebersicht_schrift.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:fontFile},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
  const fontOutput=(fontResult.stdout||'')+(fontResult.stderr||'');
  const fontFailures=fontOutput.split('\n').filter(line=>line.startsWith('FAIL - '));
- if(fontResult.status!==1||fontFailures.length!==1||!fontFailures[0].startsWith('FAIL - 1b: PC-Regionsnamen')){console.error(fontOutput);throw Error('Desktop readability counterexample must fail exactly its visible-pixel check');}
+ const fontRecords=fontOutput.split(/\r?\n/).flatMap(line=>{const m=/^(OK|FAIL)\s+- (.*?)(?: \| .*)?$/.exec(line);return m?[{status:m[1],label:m[2]}]:[];});
+ if(fontResult.error||fontResult.signal||fontResult.status!==1||(fontResult.stderr||'').trim()
+   ||fontFailures.length!==1||!fontFailures[0].startsWith('FAIL - 1b: PC-Regionsnamen')
+   ||fontRecords.length!==15||new Set(fontRecords.map(r=>r.label)).size!==15
+   ||!fontRecords.some(r=>r.status==='OK'&&r.label==='6: keine JS-Fehler in allen drei Uebersichtskontexten')
+   ||!fontOutput.split(/\r?\n/).includes('FAIL')){console.error(fontOutput);throw Error('Desktop readability counterexample must complete all 15 guards and fail exactly its visible-pixel check with green final JavaScript guard');}
  console.log('OK - small-desktop-labels rejects exactly 1 intended fault');
  console.log(fontFailures[0]);
 } finally { fs.rmSync(temporary,{recursive:true,force:true}); }

@@ -66,10 +66,21 @@ async function zeichne(browser, raid, rolle){
   await page.route('**/api/**', backend(store));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(SPIEL_URL);
-  await page.waitForSelector('.tab-btn[data-tab="allianz"]', { timeout: 60000 });
-  await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
+  await page.waitForSelector('.tab-btn[data-tab="allianz"]', { state: 'attached', timeout: 60000 });
+  // This fixture has no lastLoginDate; its actual daily-login dialog is scheduled after load.
+  // Dismissing a still-hidden element too early cannot prevent that later native overlay.
+  await page.locator('#welcomeBackDismissBtn').waitFor({ state: 'visible', timeout: 60000 });
+  await page.locator('#welcomeBackDismissBtn').click();
+  await page.locator('#welcomeBackOverlay').waitFor({ state: 'hidden' });
+  await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
     .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }));
-  await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="allianz"]'); if (b) b.click(); });
+  const menue = page.locator('#commandMenuToggle');
+  if (await menue.isVisible()) {
+    if (await menue.getAttribute('aria-expanded') !== 'true') await menue.click();
+    await page.locator('#commandNav.open').waitFor({ state: 'visible' });
+  }
+  await page.locator('.tab-btn[data-tab="allianz"]').click();
+  await page.locator('#tab-allianz.active').waitFor({ state: 'visible' });
   await page.waitForTimeout(3500);
   const m = await page.evaluate(() => {
     const b = document.getElementById('allianceRaidBox');

@@ -1,31 +1,15 @@
-// Der Rahmen der Kanzel (Bündel F, 06.09.2026, Grafik-Aufnahme; Freigabe Sascha).
-//
-//   node tests/test_kanzelrahmen.js
-//
-// Seit Orbitalglas (14.08.2026) sagt die Oberfläche „du siehst durch eine Scheibe" - aber die
-// Scheibe hatte keinen Rahmen. Vier Eckstreben schließen das Bild.
-//
-// ZWEI FASSUNGEN WURDEN AM BILD GEMESSEN UND VERWORFEN, und beide Gründe sind Regeln hier:
-//   1. Am FENSTER in voller Breite: Die Spielspalte ist mittig und 780 px breit, die Fensterecken
-//      liegen weit daneben - die Streben saßen im leeren Hintergrund und rahmten den Browser.
-//      Daraus wird 1a: Der Rahmen ist genau so breit wie der Inhalt.
-//   2. An der HÜLLE (.shell::after): .shell ist die ganze scrollende Seite und mehrere tausend
-//      Pixel hoch - die unteren Streben lagen am Seitenende, der Randabfall war über die volle
-//      Scrollhöhe gezogen und unsichtbar. Daraus wird 1b: Der Rahmen hat Fensterhöhe, nicht
-//      Seitenhöhe, und bleibt beim Scrollen stehen.
-//
-// DIE REGELN, DIE HIER GEHALTEN WERDEN:
-//   A) Der Rahmen ist genau so breit wie die Spielspalte, und beide lesen DIESELBE Größe.
-//   B) Er klebt am Fenster und hat Fensterhöhe.
-//   C) Er nimmt keinen Klick - an KEINER Stelle des Bildschirms, auch nicht in den Ecken, wo der
-//      Chat-Reiter und der Zurück-Knopf der Karte sitzen.
-//   D) Er kostet den Energiesparmodus nichts: kein backdrop-filter, keine Animation.
-//
-// Gegenprobe: siehe Fuß der Datei.
-const fs = require('fs');
-const { starteBrowser, SPIEL_URL, SPIELDATEI, pruefer } = require('./lib/umgebung');
+// Die sichtbare Spiel- und Bildfläche der gewählten Kommandozentrale.
+// Der historische Kanzelrahmen bleibt als harmlose, ausgeblendete Deko erhalten.
+// Positiv geprüft werden jetzt die an der Navigation ausgerichtete native Spielspalte,
+// die tatsächlich bemalten Hintergrund-Canvases in Fenstergröße und unverdeckte Bedienelemente.
+// Die bisherigen strengen 1px-Geometrieschranken, das vollständige Trefferraster und der
+// Reiter-Hit-Test bleiben erhalten; fehlende Flächen sind Fehler und werden nicht übersprungen.
+// Aufruf: node tests/http-run.js test_kanzelrahmen.js
+const fs = require('fs'), path = require('path');
+const { starteBrowser, SPIEL_URL, SPIELDATEI, WURZEL, pruefer } = require('./lib/umgebung');
 const { check, ende } = pruefer();
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
+const CSS = fs.readFileSync(path.join(WURZEL, 'kepler-graphics.css'), 'utf8');
 const ICH = 'u-ich';
 const now = Date.now();
 
@@ -46,11 +30,10 @@ check('0b: kein Weichzeichner und keine Animation im Rahmen',
   !!regel && !/backdrop-filter/.test(regel) && !/animation/.test(regel));
 /* A) EINE Quelle für die Breite. Zwei getippte 780 wären die nächste Kopie-Familie, die
    auseinanderläuft - genau die wiederkehrende Fehlerklasse dieses Projekts. */
-check('0c: Rahmen und Inhalt lesen dieselbe Breitengröße',
-  /:root \{ --spielbreite: 780px; \}/.test(S)
-  && /#game-root \{[^}]*max-width: var\(--spielbreite\)/.test(S)
-  && !!regel && /width:min\(100vw, var\(--spielbreite\)\)/.test(regel)
-  && /:root \{ --spielbreite: min\(1300px, calc\(100vw - 470px\)\); \}/.test(S));
+check('0c: Spielspalte und Navigation lesen dieselbe native Breitenquelle, die alte Deko bleibt aus',
+  /body\.command-ui #game-root \{[^}]*width:calc\(100% - var\(--command-rail\)\)/.test(CSS)
+  && /\.command-rail \{[^}]*width:var\(--command-rail\)/.test(CSS)
+  && /body\.command-ui #kanzelrahmen \{[^}]*display:none/.test(CSS));
 
 function spielstand(){
   const g = {}; for (const t of ['basis','forschung','werft','flotte','karte','galaxie','allianz','markt','fortschritt','verteidigung','module','profil','sammlung']) g[t] = true;
@@ -88,35 +71,63 @@ function spielstand(){
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display='none'; }));
 
   const m = await page.evaluate(() => {
-    const rah = document.getElementById('kanzelrahmen');
-    const wur = document.getElementById('game-root');
-    if (!rah || !wur) return { da:false };
-    const r = rah.getBoundingClientRect(), w = wur.getBoundingClientRect();
-    const stil = getComputedStyle(rah);
-    /* C) Der Rahmen darf an KEINER Stelle Treffer nehmen. Gerastert wird der ganze Bildschirm,
-       nicht nur ein Punkt: Ein einzelner Griff hätte zufällig neben ihm liegen können. */
+    const rah = document.getElementById('kanzelrahmen'), wur = document.getElementById('game-root');
+    const shell = wur && wur.querySelector('.shell'), hero = wur && wur.querySelector('.hero'), nav = document.getElementById('commandNav');
+    const bilder = ['bgnebel', 'bgstars'].map(id => document.getElementById(id));
+    if (!rah || !wur || !shell || !hero || !nav || bilder.some(el => !el)) return { da:false };
+    const r = rah.getBoundingClientRect(), w = wur.getBoundingClientRect(), s = shell.getBoundingClientRect();
+    const h = hero.getBoundingClientRect(), n = nav.getBoundingClientRect(), stil = getComputedStyle(rah);
+    const sichtbar = el => {
+      for (let p = el; p; p = p.parentElement) {
+        const cs = getComputedStyle(p);
+        if (cs.display === 'none' || cs.visibility !== 'visible' || +cs.opacity <= 0) return false;
+      }
+      return true;
+    };
+    const hintergrund = bilder.map(el => {
+      const b = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      let bemalt = false, malFehler = null;
+      try {
+        if (el.width > 0 && el.height > 0) {
+          const ctx = el.getContext('2d');
+          if (ctx) bemalt = ctx.getImageData(0, 0, el.width, el.height).data.some((v, i) => i % 4 === 3 && v > 0);
+        }
+      } catch (e) { malFehler = String(e); }
+      return { id:el.id, breite:b.width, hoehe:b.height, links:b.left, oben:b.top,
+        pos:cs.position, zeiger:cs.pointerEvents, angezeigt:cs.display !== 'none' && cs.visibility === 'visible' && +cs.opacity > 0,
+        filter:cs.backdropFilter, animation:cs.animationName, bemalt, malFehler };
+    });
+    // Das ganze Fenster rasteren: keine der Deko-Flächen darf irgendwo einen Klick abfangen.
+    const deko = [rah, ...bilder];
     let treffer = 0;
     for (let y = 4; y < window.innerHeight; y += 24)
       for (let x = 4; x < window.innerWidth; x += 24)
-        if (document.elementFromPoint(x, y) === rah) treffer++;
-    return { da:true,
-      breite: Math.round(r.width), inhaltBreite: Math.round(w.width),
-      hoehe: Math.round(r.height), fenster: window.innerHeight,
-      pos: stil.position, zeiger: stil.pointerEvents,
-      links: Math.round(r.left), inhaltLinks: Math.round(w.left),
-      treffer };
+        if (deko.includes(document.elementFromPoint(x, y))) treffer++;
+    return { da:document.body.classList.contains('command-ui') && [wur,shell,hero,nav].every(sichtbar)
+      && w.width > 0 && s.width > 0 && s.height > 0 && h.height > 0 && n.width > 0,
+      rahmenAus:stil.display === 'none' && r.width === 0 && r.height === 0,
+      breite:s.width, inhaltBreite:w.width, links:s.left, inhaltLinks:w.left, inhaltRechts:w.right,
+      heroLinks:h.left, heroBreite:h.width, navLinks:n.left, navRechts:n.right,
+      fenster:window.innerHeight, fensterBreite:document.documentElement.clientWidth,
+      zeiger:stil.pointerEvents, hintergrund, treffer };
   });
 
-  check('1-vorab: der Rahmen steht im Bild, ohne Skriptfehler',
-    m.da === true && errs.length === 0, { da: m.da, fehler: errs.slice(0,2) });
-  check('1a: der Rahmen ist genau so breit wie die Spielspalte und liegt darüber',
-    Math.abs(m.breite - m.inhaltBreite) <= 1 && Math.abs(m.links - m.inhaltLinks) <= 1,
-    { rahmen: [m.links, m.breite], inhalt: [m.inhaltLinks, m.inhaltBreite] });
-  check('1b: er klebt am Fenster und hat Fensterhöhe, nicht Seitenhöhe',
-    m.pos === 'fixed' && Math.abs(m.hoehe - m.fenster) <= 1,
-    { position: m.pos, hoehe: m.hoehe, fenster: m.fenster });
-  check('1c: er nimmt an keiner Stelle des Bildschirms einen Klick',
-    m.zeiger === 'none' && m.treffer === 0, { pointerEvents: m.zeiger, trefferpunkte: m.treffer });
+  check('1-vorab: sichtbare Spiel- und bemalte Bildflächen stehen im Bild, ohne Skriptfehler',
+    m.da === true && m.rahmenAus && m.hintergrund.every(b => b.angezeigt && b.bemalt) && errs.length === 0,
+    { da:m.da, rahmenAus:m.rahmenAus, bilder:m.hintergrund, fehler:errs.slice(0,2) });
+  check('1a: Spiel- und Kopffläche stimmen auf einen Pixel mit der nativen Spielspalte neben der Navigation überein',
+    m.da && Math.abs(m.breite - m.inhaltBreite) <= 1 && Math.abs(m.links - m.inhaltLinks) <= 1
+      && Math.abs(m.heroBreite - m.inhaltBreite) <= 1 && Math.abs(m.heroLinks - m.inhaltLinks) <= 1
+      && Math.abs(m.inhaltLinks - m.navRechts) <= 1 && Math.abs(m.navLinks) <= 1
+      && Math.abs(m.inhaltRechts - m.fensterBreite) <= 1,
+    { flaeche:[m.links,m.breite], inhalt:[m.inhaltLinks,m.inhaltBreite], hero:[m.heroLinks,m.heroBreite], navigation:[m.navLinks,m.navRechts], fenster:m.fensterBreite });
+  check('1b: beide Bildflächen kleben am Fenster und haben Fenstermaße, ohne Weichzeichner oder CSS-Animation',
+    m.da && m.hintergrund.every(b => b.pos === 'fixed' && Math.abs(b.hoehe - m.fenster) <= 1
+      && Math.abs(b.breite - m.fensterBreite) <= 1 && Math.abs(b.links) <= 1 && Math.abs(b.oben) <= 1
+      && b.filter === 'none' && b.animation === 'none'), m.hintergrund);
+  check('1c: keine Deko-Fläche nimmt an irgendeiner Stelle des Bildschirms einen Klick',
+    m.da && m.zeiger === 'none' && m.hintergrund.every(b => b.zeiger === 'none') && m.treffer === 0,
+    { pointerEvents:m.zeiger, bilder:m.hintergrund, trefferpunkte:m.treffer });
 
   // Und der Beweis, dass darunter noch bedient werden kann: ein Reiterwechsel muss durchgehen.
   const gewechselt = await page.evaluate(async () => {
@@ -134,13 +145,5 @@ function spielstand(){
   ende();
 })().catch(e => { console.log('FAIL - Ausnahme: ' + (e && e.stack || e)); process.exit(1); });
 //
-// GEGENPROBE GEMESSEN 06.09.2026, in ZWEI Richtungen - die Sabotage ist hier die wichtigere:
-//   grün: node tests/test_kanzelrahmen.js                                     (9 von 9)
-//   rot am Stand vor Bündel F: acht von neun (alles außer 1d - dort gibt es den Rahmen nicht,
-//     und ein Reiterknopf ist selbstverständlich weiter anklickbar).
-//   rot bei SABOTIERTEM Rahmen (pointer-events:auto statt none, sonst unverändert): 0a, 1c und 1d.
-//     GEMESSEN: 1216 der abgerasterten Bildschirmpunkte treffen dann den Rahmen statt das, was
-//     darunter liegt, und der Sektorkarte-Reiter ist nicht mehr der oberste Treffer an seiner
-//     eigenen Stelle. Genau das ist der Schaden, den eine Deko-Ebene über der ganzen Oberfläche
-//     anrichten kann - deshalb rastert 1c den ganzen Bildschirm ab und prüft nicht einen Punkt.
-//   Prüfnamen aller drei Läufe per diff verglichen und identisch (9 zu 9 zu 9).
+// Die historischen Rahmen-Gegenproben vom 06.09.2026 gehörten zur früheren Rahmenansicht.
+// Die neue Flächengeometrie muss an der tatsächlich sichtbaren Spielspalte sabotiert werden.

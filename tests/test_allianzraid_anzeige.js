@@ -87,12 +87,23 @@ async function starte(browser, url, raid){
   await page.route('**/api/**', backend(store));
   await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
   await page.goto(url);
-  await page.waitForSelector('.tab-btn[data-tab="allianz"]', { timeout: 60000 });
-  await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
+  await page.waitForSelector('.tab-btn[data-tab="allianz"]', { state:'attached', timeout: 60000 });
+  await page.waitForFunction(()=>document.getElementById('loadstate')?.textContent.startsWith('Spielstand automatisch geladen'), null, { timeout:60000 });
+  await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
     .forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }); });
-  await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="allianz"]'); if (b) b.click(); });
+  await page.locator('#welcomeBackDismissBtn').waitFor({ state:'visible', timeout:60000 });
+  await page.locator('#welcomeBackDismissBtn').click();
+  const menu = page.locator('#commandMenuToggle');
+  if (await menu.count()) await menu.waitFor({ state:'visible', timeout:60000 });
+  await oeffneReiter(page, 'allianz');
   await page.waitForTimeout(3500);
   return { page, ctx, errs };
+}
+
+async function oeffneReiter(page, key){
+  const menu = page.locator('#commandMenuToggle');
+  if (await menu.isVisible() && await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
+  await page.locator('.tab-btn[data-tab="'+key+'"]').click();
 }
 
 const textVon = (page, id) => page.evaluate(i => {
@@ -247,7 +258,7 @@ const textVon = (page, id) => page.evaluate(i => {
     fs.writeFileSync(datei, kaputt);
     try {
       const { page, ctx, errs } = await starte(browser, 'file://' + datei, null);
-      await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (b) b.click(); });
+      await oeffneReiter(page, 'fortschritt');
       await page.waitForTimeout(2500);
       for (const id of ['dominanceBox', 'allianceTitlesBox', 'levelBox', 'dailyLoginBox']){
         const t = await textVon(page, id);

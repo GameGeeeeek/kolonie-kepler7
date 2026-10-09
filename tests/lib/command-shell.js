@@ -36,6 +36,14 @@ async function run(surface='all'){
  if(fault==='nav-alignment')css=replace(css,'body.command-ui #game-root .command-rail .tab-btn { justify-content:flex-start; }','');
  if(fault==='status-height')css+='\nbody.command-ui{--command-status-height:56px!important}';
  if(fault==='queue-offset')css+='\nbody.command-ui #buildQueueBox{scroll-margin-top:0!important}';
+ // Restore both parts of the prior heading: its wider native monospace title and unwrapped row.
+ if(fault==='research-wrap')css+='\nbody.command-ui #game-root .gfx-research h2{font-family:var(--font-mono)!important}body.command-ui .gfx-research .gfx-heading{flex-wrap:nowrap!important}body.command-ui .gfx-research .gfx-heading > div{max-width:none!important}body.command-ui .gfx-research .gfx-location{max-width:45%!important;text-align:right!important}';
+ if(fault==='quest-clearance')css+='\n@media(max-width:900px){body.command-ui #dailyQuestBar{bottom:68px!important;left:12px!important;right:12px!important}}';
+ if(fault==='quest-empty')css+='\nbody.command-ui #dailyQuestBar [data-claim-quest],body.command-ui #dailyQuestBar [data-quest-nav]{visibility:hidden!important}';
+ if(fault==='quest-close')source=replace(source,"          summary.click();\n          summary.focus({preventScroll:true});","          void summary;\n          summary.focus({preventScroll:true});");
+ if(fault==='quest-mobile-position')css+='\n@media(min-width:621px) and (max-width:900px){body.command-ui #dailyQuestBar{position:absolute!important;top:calc(100% + 4px)!important;bottom:auto!important;left:auto!important;right:0!important;width:min(520px,calc(100vw - 30px))!important}}';
+ if(fault==='quest-hit')css+='\nbody.command-ui #dailyQuestBar [data-claim-quest],body.command-ui #dailyQuestBar [data-quest-nav]{pointer-events:none!important}';
+ if(fault==='player-write')source=replace(source,"    setBoxText(document.getElementById('commandPlayerName'),state.player.name||k7t('Kommandant'));","    document.getElementById('commandPlayerName').setAttribute('translate','no');\n    setBoxText(document.getElementById('commandPlayerName'),state.player.name||k7t('Kommandant'));");
  if(fault==='status')source=replace(source,"const entry=document.body.classList.contains('command-ui')?document.getElementById('commandStatusBtn'):fpToggleBtn;","const entry=fpToggleBtn;");
  const end='\n})();\n</script>\n</body>';assert.equal(source.split(end).length,2,'unique script end');
  const html=source.replace(end,'\nwindow.__command={ready:()=>bootDataReady,state:()=>state,render,show:switchTab,active:()=>activeTab,defs:BUILDING_DEFS};\n'+end);
@@ -135,7 +143,16 @@ async function run(surface='all'){
     const chips=await page.locator('.hero-stats .hstat').evaluateAll(es=>es.filter(e=>getComputedStyle(e).display!=='none').map(e=>{const r=e.getBoundingClientRect();return {id:e.querySelector('[id]')?.id,visible:r.width>0&&r.height>0,fit:e.scrollWidth<=e.clientWidth+1,left:r.left,right:r.right};}));
     check('disclosed account and location metrics remain reachable at '+width,chips.length>=8&&chips.every(r=>r.visible&&r.fit&&r.left>=0&&r.right<=width+1),chips);
     await page.locator('#commandStats > summary').click();
-    await page.locator('#commandQuests > summary').click();check('daily quests retain their native claim controls at '+width,await page.locator('#dailyQuestBar').isVisible()&&await page.locator('#dailyQuestBar [data-claim-quest],[data-quest-nav]').count()>0);await page.locator('#commandQuests > summary').click();
+    await page.locator('#commandQuests > summary').click();
+    const questControls=page.locator('#dailyQuestBar [data-claim-quest],#dailyQuestBar [data-quest-nav]');
+    check('daily quests retain their native claim controls at '+width,await page.locator('#dailyQuestBar').isVisible()&&await questControls.count()>0);
+    const questHits=[];
+    for(const index of [...new Set([0,await questControls.count()-1])].filter(i=>i>=0)){
+     const control=questControls.nth(index);await control.scrollIntoViewIfNeeded();
+     questHits.push(await control.evaluate(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};}));
+    }
+    check('first and last native quest actions remain physically reachable at '+width,questHits.length>0&&questHits.every(r=>r.width>=43.99&&r.height>=43.99&&r.hit),questHits);
+    await page.locator('#commandQuestsCloseBtn').click();
     await page.locator('#commandChatBtn').click();
     await page.waitForFunction(()=>{const panel=document.getElementById('chatPanel'),transform=getComputedStyle(panel).transform;return panel.classList.contains('open')&&(transform==='none'||transform==='matrix(1, 0, 0, 1, 0, 0)');});
     check('native chat is visible above the navigation at '+width,await page.locator('#chatPanelTabAlliance').evaluate(e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}));
@@ -181,6 +198,8 @@ async function run(surface='all'){
    check('fleet summary includes a recycler assignment without a missions-array entry',await page.locator('#commandMissionSummary').innerText()==='Flotteneinsätze · 1'&&(await page.locator('#fleetPositionList').innerText()).includes('Recycler sammeln'));
    await page.locator('#fpCloseBtn').click();
    await page.evaluate(()=>{const s=__command.state();s.recyclerAuftraege={};s.debrisFields.rhea={};s.colonies.rhea.fleet.recycler=0;__command.render();});
+   const playerWrites=await page.evaluate(()=>{const player=document.getElementById('commandPlayerName'),observer=new MutationObserver(()=>{});observer.observe(player,{attributes:true});for(let i=0;i<3;i++)__command.render();const records=observer.takeRecords().map(r=>r.attributeName);observer.disconnect();return {protected:player.getAttribute('translate')==='no',records};});
+   check('player name remains protected without repeated attribute writes in a quiet HUD',playerWrites.protected&&playerWrites.records.length===0,playerWrites);
   }
   if(selected.includes('status')){
    for(const width of [390,1487]){await page.setViewportSize({width,height:844});await page.locator('#commandStatusBtn').click();
@@ -210,14 +229,18 @@ async function run(surface='all'){
    }
   }
   if(selected.includes('sticky')){
-   for(const width of (fault?[390]:[390,320])){
+   for(const width of (fault&&fault!=='research-wrap'?[390]:[390,320])){
    await page.setViewportSize({width,height:844});
    let actuallyScrolled=0;
    for(const key of TABS){
     await page.evaluate(key=>__command.show(key),key);
     await page.evaluate(()=>window.scrollTo(0,Math.max(0,document.documentElement.scrollHeight-innerHeight)));
-    const measure=await page.locator('#commandMenuToggle').evaluate(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,scroll:scrollY,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)),overflow:document.documentElement.scrollWidth-innerWidth,outside:[...document.querySelectorAll('#tab-'+__command.active()+' *')].filter(x=>{const b=x.getBoundingClientRect();return b.width&&b.right>innerWidth+1;}).slice(0,8).map(x=>({id:x.id,cl:x.className,right:x.getBoundingClientRect().right}))};});
+    const measure=await page.locator('#commandMenuToggle').evaluate(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,scroll:scrollY,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,outside:[...document.querySelectorAll('#tab-'+__command.active()+' *')].filter(x=>{const b=x.getBoundingClientRect();return b.width&&b.right>document.documentElement.clientWidth+1;}).slice(0,8).map(x=>({id:x.id,cl:x.className,right:x.getBoundingClientRect().right}))};});
     check('menu stays reachable while reading long '+key+' content at '+width,measure.top>=0&&measure.bottom<=844&&measure.hit&&measure.overflow<=2,measure);
+    if(key==='forschung'){
+     const heading=await page.locator('.gfx-research .gfx-heading').evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height,children:[...e.children].map(c=>{const b=c.getBoundingClientRect();return {left:b.left,right:b.right,width:b.width,height:b.height,fit:c.scrollWidth<=c.clientWidth+1};})};});
+     check('research title and progress fit together inside the mobile content column at '+width,heading.width>10&&heading.height>10&&heading.left>=0&&heading.right<=width+1&&heading.children.length>=2&&heading.children.every(c=>c.width>10&&c.height>10&&c.left>=heading.left-1&&c.right<=heading.right+1&&c.fit),heading);
+    }
     if(measure.scroll>=300)actuallyScrolled++;
     if(measure.hit){
      await page.locator('#commandMenuToggle').click();
@@ -243,7 +266,23 @@ async function run(surface='all'){
     await page.locator('#commandStatusBtn').click();
     const drawers=await page.evaluate(()=>{const panel=document.getElementById('fleetPositionPanel').getBoundingClientRect(),status=document.querySelector('.command-status').getBoundingClientRect();return {panel:panel.toJSON(),status:status.toJSON(),padding:parseFloat(getComputedStyle(document.querySelector('.shell-inner')).paddingBottom)};});
     check('fleet drawer and content clearance follow the actual status height at '+width,drawers.panel.top>=top&&drawers.panel.right<=width-right&&drawers.panel.bottom<=drawers.status.top+0.01&&drawers.padding>=drawers.status.height+19.99,{scenario,drawers});
-    await page.locator('#fpCloseBtn').click();await page.locator('#commandMenuToggle').click();
+    await page.locator('#fpCloseBtn').click();
+    await page.locator('#commandQuests > summary').click();
+    const questPlacement=await page.locator('#dailyQuestBar').evaluate(e=>{
+     const visible=el=>{for(let p=el;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible'||+s.opacity<=0)return false;}const r=el.getBoundingClientRect();return r.width>0&&r.height>0;};
+     const r=e.getBoundingClientRect(),status=document.querySelector('.command-status').getBoundingClientRect();
+     return {visible:visible(e),width:r.width,height:r.height,controls:[...e.querySelectorAll('[data-claim-quest],[data-quest-nav]')].filter(visible).length,left:r.left,right:r.right,bottom:r.bottom,statusTop:status.top};
+    });
+    check('daily quests clear the actual status bar and horizontal PWA safe areas at '+width,questPlacement.visible&&questPlacement.width>20&&questPlacement.height>20&&questPlacement.controls>0&&questPlacement.left>=left+11.99&&questPlacement.right<=width-right-11.99&&questPlacement.bottom<=questPlacement.statusTop-11.99,{scenario,questPlacement});
+    await page.waitForFunction(()=>{const e=document.getElementById('commandQuestsCloseBtn');if(!e)return false;getComputedStyle(e).transform;return e.getAnimations().every(a=>!(a instanceof CSSTransition&&a.transitionProperty==='transform'&&a.playState!=='finished'));});
+    const questClose=await page.locator('#commandQuestsCloseBtn').evaluate(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};});
+    check('daily quests provide a reachable native close action at '+width,questClose.width>=43.99&&questClose.height>=43.99&&questClose.hit,questClose);
+    await page.locator('#commandQuestsCloseBtn').click();
+    const questClosed=await page.locator('#commandQuests').evaluate(e=>({closed:!e.open,focused:document.activeElement===e.querySelector('summary')}));
+    check('daily quest close action closes its details and restores summary focus at '+width,questClosed.closed&&questClosed.focused,questClosed);
+    // Preserve all later guards when the controlled close-forwarding fault keeps the popup open.
+    if(!questClosed.closed)await page.locator('#commandQuests > summary').press('Space');
+    await page.locator('#commandMenuToggle').click();
     const close=await page.locator('#commandNavClose').evaluate(e=>{const r=e.getBoundingClientRect();return {top:r.top,left:r.left,bottom:r.bottom,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};});
     check('mobile drawer close control avoids the PWA safe areas at '+width,close.top>=top&&close.left>=left&&close.bottom<=height-bottom&&close.hit,close);
     await page.locator('#commandNavClose').click();await insets.evaluate(e=>e.remove());

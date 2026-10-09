@@ -124,13 +124,35 @@ async function starte(browser, stand, vorbelegung){
   // das nie kommt. Die einzelnen Wartezeiten weiter unten waren nur die Symptome; nachgewiesen
   // an einem Suite-Lauf, in dem der Allianz-Beitrag auch nach 30 s nicht geschrieben war,
   // waehrend derselbe Test einzeln in Sekunden durchlief.
-  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { timeout: 60000 });
-  await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
-  await page.evaluate(()=>{const b=document.querySelector('.tab-btn[data-tab="galaxie"]');if(b)b.click();});
+  await page.waitForSelector('.tab-btn[data-tab="galaxie"]', { state:'attached', timeout: 60000 });
+  await page.waitForFunction(()=>document.getElementById('loadstate')?.textContent.startsWith('Spielstand automatisch geladen'), null, { timeout:60000 });
+  await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
+  // Die Fixture hat noch keinen Tageslogin; das nach load() eingeplante Fenster echt schließen.
+  await page.locator('#welcomeBackDismissBtn').waitFor({ state:'visible', timeout:60000 });
+  // Eine beim Laden fällige Tauchmission öffnet darüber ihre automatische Wiedergabe. Deren
+  // nativen Ausgang zuerst bedienen; durch die Deckschicht auf das Willkommen zu klicken
+  // würde gerade den realen Bedienweg umgehen, den dieser Bootanker absichert.
+  const startstand=JSON.parse(stand);
+  const faelligeTauchmission=(startstand.fleet?.missions||[])
+    .some(m=>m.type==='abgrund'&&m.endTime<=Date.now());
+  // Mit Allianzbeitrag wird die Auflösung erst nach dessen asynchroner Buchung fertig. Nicht
+  // die zufällige Sichtbarkeit zum Welcome-Zeitpunkt, sondern die zugesagte Wiedergabe messen.
+  if(faelligeTauchmission&&startstand.autoWatchLiveRaid!==false){
+    await page.locator('#battleModalOverlay').waitFor({state:'visible',timeout:60000});
+  }
+  if (await page.locator('#battleModalOverlay').isVisible()){
+    await page.locator('#battleModalCloseBtn').click();
+    await page.locator('#battleModalOverlay').waitFor({ state:'hidden' });
+  }
+  await page.locator('#welcomeBackDismissBtn').click();
+  // Bei 900 px liegt der echte Reiter seit dem Kommando-HUD im geschlossenen Menü.
+  const menu = page.locator('#commandMenuToggle');
+  if (await menu.count()){ await menu.waitFor({ state:'visible', timeout:60000 }); await menu.click(); }
+  await page.locator('.tab-btn[data-tab="galaxie"]').click();
   // Seit v8.325.0 hat der Abgrund einen EIGENEN Unterreiter im Galaxie-Tab. Vorher lag die Box im
   // Kampf-Panel; wer hier weiter "kampf" klickt, misst eine unsichtbare Box (Hoehe 0).
   await page.waitForSelector('[data-galaxy-subtab="abgrund"]', { timeout: 30000 });
-  await page.evaluate(()=>{const b=document.querySelector('[data-galaxy-subtab="abgrund"]');if(b)b.click();});
+  await page.locator('[data-galaxy-subtab="abgrund"]').click();
   // Und zuletzt auf die Box selbst - erst wenn sie Inhalt hat, laeuft das Spiel wirklich.
   await page.waitForFunction(()=>{ const b=document.getElementById('abgrundBox'); return !!b && b.childElementCount > 0; }, null, { timeout: 30000 });
   return { ctx, page, errs, store };
