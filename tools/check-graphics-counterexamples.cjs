@@ -1,8 +1,8 @@
 'use strict';
 // Each controlled fault must fail only its corresponding behavior/layout checks.
+// Optional case names keep targeted diagnostics under the same complete strict guards.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),source=fs.readFileSync(path.join(root,'weltraum_kolonie.html'),'utf8');
-const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-graphics-review-'));
 const replace=(text,anchor,replacement)=>{if(text.split(anchor).length!==2)throw Error('Counterexample anchor must be unique: '+anchor);return text.replace(anchor,replacement);};
 const cases=[
  ['disconnected',replace(source,'if (button && !button.disabled) button.click();','if (button && !button.disabled) void button;'),[
@@ -23,8 +23,11 @@ const cases=[
  </style></head>`),[
   'wide desktop command surface stays aligned with the native game column','desktop system overview avoids intrinsic SVG height growth','mobile building controls have 44px targets without overlaps']]
 ];
+const requested=process.argv.slice(2),fontCase='small-desktop-labels';
+if(requested.some(name=>name!==fontCase&&!cases.some(test=>test[0]===name)))throw Error('Unknown controlled graphics regression');
+const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-graphics-review-'));
 try {
- for(const [name,html,expected] of cases){
+ for(const [name,html,expected] of cases.filter(test=>!requested.length||requested.includes(test[0]))){
   const file=path.join(temporary,name+'.html');fs.writeFileSync(file,html);
   const result=spawnSync(process.execPath,['tests/test_graphics_refresh.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:file},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
   const output=(result.stdout||'')+(result.stderr||'');
@@ -34,9 +37,11 @@ try {
     ||!output.split(/\r?\n/).includes('22 checks, '+expected.length+' failures')){
    console.error(output);throw Error(name+': counterexample did not fail exactly its intended checks (exit '+result.status+')');
   }
+  for(const line of output.split(/\r?\n/).filter(line=>line.startsWith('MEASURE - native map-menu Escape ')))console.log('MEASURE - '+name+' '+line.slice('MEASURE - '.length));
   console.log('OK - '+name+' rejects exactly '+expected.length+' intended faults');
   for(const line of failures)console.log(line);
  }
+ if(!requested.length||requested.includes(fontCase)){
  const fontFile=path.join(temporary,'small-desktop-labels.html');
  fs.writeFileSync(fontFile,replace(source,'(15*uF).toFixed(1)','(15*(window.innerWidth>700?1:uF)).toFixed(1)'));
  const fontResult=spawnSync(process.execPath,['tests/http-run.js','test_uebersicht_schrift.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:fontFile},encoding:'utf8',timeout:120000,maxBuffer:4*1024*1024});
@@ -50,4 +55,5 @@ try {
    ||!fontOutput.split(/\r?\n/).includes('FAIL')){console.error(fontOutput);throw Error('Desktop readability counterexample must complete all 15 guards and fail exactly its visible-pixel check with green final JavaScript guard');}
  console.log('OK - small-desktop-labels rejects exactly 1 intended fault');
  console.log(fontFailures[0]);
+ }
 } finally { fs.rmSync(temporary,{recursive:true,force:true}); }

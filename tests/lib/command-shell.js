@@ -173,6 +173,9 @@ async function run(surface='all'){
    await page.setViewportSize({width:1487,height:1058});await page.evaluate(()=>__command.show('basis'));
    check('all building definitions remain selectable once',await page.locator('#colonyVisual [data-gfx-facility]').count()===await page.evaluate(()=>__command.defs.filter(d=>d.category!=='defense').length));
    await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key=mine]').click();
+   // A wish-list order is processed on the native second tick when it becomes affordable.
+   // Keep this order pending, as below for Rhea, so its fixed count is meaningful across awaits.
+   await page.evaluate(()=>{Object.keys(__command.state().resources).forEach(k=>__command.state().resources[k]=0);__command.render();});
    await page.locator('#colonyVisual [data-gfx-queue]').click();
    check('inspector queue uses the selected building and native planet',await page.evaluate(()=>__command.state().buildQueue.some(j=>j.key==='mine'&&j.planet==='home')));
    check('status queue count follows the native pending queue',await page.locator('#commandQueueSummary').innerText()==='Bau-Warteschlange · 1');
@@ -202,7 +205,12 @@ async function run(surface='all'){
    check('player name remains protected without repeated attribute writes in a quiet HUD',playerWrites.protected&&playerWrites.records.length===0,playerWrites);
   }
   if(selected.includes('status')){
-   for(const width of [390,1487]){await page.setViewportSize({width,height:844});await page.locator('#commandStatusBtn').click();
+   for(const width of [390,1487]){
+    await page.setViewportSize({width,height:844});
+    // Complete the native 150ms resize follow-up before testing a new opening. The separate
+    // resize below still exercises that follow-up with an already open drawer.
+    await page.waitForTimeout(200);
+    await page.locator('#commandStatusBtn').click();
     check('status entry opens the native fleet drawer immediately at '+width,await page.locator('#fleetPositionPanel').isVisible()&&await page.locator('#commandStatusBtn').getAttribute('aria-expanded')==='true');
     if(await page.locator('#fleetPositionPanel').isVisible()){
      const placement=await page.locator('#fpCloseBtn').evaluate(e=>{const r=e.getBoundingClientRect(),p=document.getElementById('fleetPositionPanel').getBoundingClientRect();return {top:p.top,bottom:p.bottom,closeTop:r.top,closeBottom:r.bottom,closeRight:r.right,hit:e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};});

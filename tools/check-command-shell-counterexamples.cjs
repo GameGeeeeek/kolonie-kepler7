@@ -39,8 +39,9 @@ const cases=[
  ['player-write','data',['player name remains protected without repeated attribute writes']]
 ];
 const requested=process.argv.slice(2);if(requested.some(f=>!cases.some(c=>c[0]===f)))throw Error('Unknown controlled regression');
-const preciseCounts={'status-box':15,'research-wrap':57,'quest-clearance':15,'quest-empty':15,'quest-close':15,'quest-mobile-position':15,'quest-hit':68,'player-write':4};
+const preciseCounts={'status':19,'status-box':15,'research-wrap':57,'quest-clearance':15,'quest-empty':15,'quest-close':15,'quest-mobile-position':15,'quest-hit':68,'player-write':4};
 const exactFailures={
+ 'status':[390,1487].map(w=>'status remains usable across resizing at '+w),
  'status-box':['fleet drawer and content clearance follow the actual status height at 320','daily quests clear the actual status bar and horizontal PWA safe areas at 320'],
  'research-wrap':['research title and progress fit together inside the mobile content column at 320'],
  'quest-clearance':[320,844].map(w=>'daily quests clear the actual status bar and horizontal PWA safe areas at '+w),

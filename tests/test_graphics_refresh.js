@@ -100,6 +100,11 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   const planetAction=page.locator('#mapPlanetVisual [data-gfx-planet-menu]');
   // Viewport-only scrolling can leave a tall inspector behind the fixed bottom status bar.
   await planetAction.evaluate(e=>e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
+  // Native focus can also scroll horizontally when the controlled shell offset overflows.
+  // Finish that real focus scroll before the pointer opens a menu that closes on any page scroll.
+  await planetAction.focus();
+  // Use the same browser scroll preparation as locator.click() before measuring stability.
+  await planetAction.scrollIntoViewIfNeeded();
   await planetAction.evaluate(e=>new Promise((resolve,reject)=>{
    let previous,stable=0;const start=performance.now();
    const frame=()=>{const r=e.getBoundingClientRect(),pose=[scrollX,scrollY,r.x,r.y,r.width,r.height];
@@ -111,8 +116,27 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   assert.equal(planetHit.hit,true,'actual planet inspector action is the native pointer hit: '+JSON.stringify(planetHit));
   await planetAction.click();
   check('planet inspector opens the existing actions menu',await page.locator('.kmenu').isVisible());
+  // Read the actual menu/scroll/focus state without changing the native Escape handler.
+  // The clipped centre matches fensterLage(), including menus partly outside the viewport.
+  const escapeWitness=()=>page.evaluate(()=>{
+   const menus=[...document.querySelectorAll('.kmenu')],menu=menus[0],system=document.getElementById('mapPlanetVisual');
+   const describe=element=>element?{tag:element.tagName,id:element.id,class:String(element.className),html:element.outerHTML.slice(0,350)}:null;
+   const rect=element=>element?element.getBoundingClientRect().toJSON():null;
+   const menuRect=rect(menu),systemRect=rect(system);
+   let centre=null,hit=null;
+   if(menuRect){
+    const left=Math.max(menuRect.left,0),top=Math.max(menuRect.top,0),right=Math.min(menuRect.right,innerWidth),bottom=Math.min(menuRect.bottom,innerHeight);
+    if(right>left&&bottom>top){centre=[(left+right)/2,(top+bottom)/2];hit=document.elementFromPoint(...centre);}
+   }
+   return {menuCount:menus.length,systemVisible:!!systemRect&&systemRect.width>0&&systemRect.height>0&&getComputedStyle(system).visibility==='visible',
+    menuRect,systemRect,centre,centerHit:describe(hit),centerBelongsToMenu:!!menu&&!!hit&&(hit===menu||menu.contains(hit)),
+    scroll:{x:scrollX,y:scrollY},focus:describe(document.activeElement),viewBox:document.getElementById('galaxyMapSvg')?.getAttribute('viewBox')};
+  });
+  const escapeBefore=await escapeWitness();
   await page.keyboard.press('Escape');
-  check('escape closes only the actions menu and retains the system',await page.locator('.kmenu').count()===0&&await page.locator('#mapPlanetVisual').isVisible());
+  const escapeAfter=await escapeWitness(),escapeTrace={before:escapeBefore,after:escapeAfter};
+  console.log('MEASURE - native map-menu Escape '+JSON.stringify(escapeTrace));
+  check('escape closes only the actions menu and retains the system',await page.locator('.kmenu').count()===0&&await page.locator('#mapPlanetVisual').isVisible(),escapeTrace);
   // Recover after a failed navigation check so controlled faults cannot hide later checks.
   if(!await page.locator('#mapPlanetVisual').isVisible()){await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());}
   await page.locator('#mapPlanetVisual [data-gfx-colony="rhea"]').click();
