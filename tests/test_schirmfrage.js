@@ -150,7 +150,8 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
 const HINWEISLAGE = () => {
   const bar=document.getElementById('tabHintBar'),svg=document.getElementById('galaxyMapSvg');
   return {display:bar?getComputedStyle(bar).display:null,height:bar?.getBoundingClientRect().height||0,
-    scroll:scrollY,svgTop:svg?.getBoundingClientRect().top};
+    scroll:scrollY,svgTop:svg?.getBoundingClientRect().top,
+    focus:{tag:document.activeElement?.tagName,id:document.activeElement?.id||'',hint:document.activeElement?.getAttribute('data-tab-hint-dismiss')}};
 };
 
 async function oeffneKartenreiter(page){
@@ -188,11 +189,55 @@ async function warteAufRuhigeKarte(page){
 
 const kartenKlicklage = (page, punkt) => page.evaluate(p=>{
   const hit=p.hit?document.elementFromPoint(p.x,p.y):null,menu=document.querySelector('.kmenu');
-  const svg=document.getElementById('galaxyMapSvg');
+  const svg=document.getElementById('galaxyMapSvg'),hint=document.getElementById('tabHintBar');
   return {hitTarget:hit?{tag:hit.tagName,id:hit.id,planet:hit.closest('[data-planet]')?.getAttribute('data-planet')||null}:null,
     menu:menu?{visible:!!menu.getClientRects().length,bounds:menu.getBoundingClientRect().toJSON()}:null,
-    viewBox:svg?.getAttribute('viewBox'),scroll:scrollY,svg:svg?.getBoundingClientRect().toJSON()};
+    viewBox:svg?.getAttribute('viewBox'),scroll:scrollY,svg:svg?.getBoundingClientRect().toJSON(),
+    hint:hint?{display:getComputedStyle(hint).display,height:hint.getBoundingClientRect().height}:null,
+    focus:{tag:document.activeElement?.tagName,id:document.activeElement?.id||'',hint:document.activeElement?.getAttribute('data-tab-hint-dismiss')}};
 },punkt);
+
+async function beginneNativeRenderMessung(page){
+  await page.evaluate(()=>{
+    const button=document.querySelector('[data-build="mine"]');
+    if(!button||typeof button.onclick!=='function'||!button.onclick.toString().includes("btn.getAttribute('data-build')"))
+      throw new Error('Der tatsächlich zugewiesene native Bau-Handler als Render-Anker fehlt');
+    // render() weist diesen nativen Handler am Ende jedes Durchlaufs neu zu, auch wenn seine
+    // Texte/Styles unverändert bleiben. Nur die Funktionsidentität lesen: keine Ersetzung
+    // von Renderer, Timer, Handler oder Scroll-/Kartenmechanismus.
+    window.__schirmRenderMessung={handler:button.onclick,seit:performance.now()};
+  });
+}
+
+async function warteAufNativenRender(page){
+  const handle=await page.waitForFunction(()=>{
+    const messung=window.__schirmRenderMessung,button=document.querySelector('[data-build="mine"]');
+    if(!messung||!button||typeof button.onclick!=='function'||button.onclick===messung.handler)return false;
+    if(!button.onclick.toString().includes("btn.getAttribute('data-build')"))return false;
+    return{seit:messung.seit,beobachtet:performance.now(),scroll:scrollY,
+      hinweisHoehe:document.getElementById('tabHintBar')?.getBoundingClientRect().height||0,echterHandlerGewechselt:true};
+  },null,{polling:'raf',timeout:6000});
+  const messung=await handle.jsonValue();await handle.dispose();
+  return messung;
+}
+
+const nativerPlanetentreffer = page => page.evaluate(() => {
+  const svg=document.getElementById('galaxyMapSvg'),sr=svg.getBoundingClientRect();
+  const knoten=[...svg.querySelectorAll('.planet-node[data-planet]')]
+    .filter(n=>n.getAttribute('data-planet')!=='__home__');
+  const proben=[];
+  for(const node of knoten){
+    for(const teil of [...node.querySelectorAll('image,circle,ellipse,path,text'),node]){
+      const r=teil.getBoundingClientRect();if(!r.width||!r.height)continue;
+      const x=r.left+r.width/2,y=r.top+r.height/2;
+      if(x<Math.max(0,sr.left)||x>Math.min(innerWidth,sr.right)||y<Math.max(0,sr.top)||y>Math.min(innerHeight,sr.bottom))continue;
+      const hit=document.elementFromPoint(x,y);
+      if(hit&&node.contains(hit))return{planet:node.getAttribute('data-planet'),x,y,hit:true};
+      if(proben.length<8)proben.push({planet:node.getAttribute('data-planet'),x,y,hit:hit?.id||hit?.tagName||null});
+    }
+  }
+  return{hit:false,knoten:knoten.length,karte:sr.toJSON(),proben};
+});
 
 (async () => {
   const browser = await starteBrowser();
@@ -267,12 +312,19 @@ const kartenKlicklage = (page, punkt) => page.evaluate(p=>{
     await page.keyboard.press('2'); await page.waitForTimeout(600);
     const t1 = await page.evaluate(REITER);
     check(P('2: mit Fenster wechselt die Ziffer den Reiter NICHT'), t1 === t0, { t0, t1 });
+    // Den sichtbaren Ersthinweis unmittelbar nach einem echten nativen Render nachreichen.
+    // So erfasst dieser Fall auch die nächste Renderphase, ohne die Spieluhr zu manipulieren.
+    await beginneNativeRenderMessung(page);
+    console.log('INFO - '+P('nativer Render vor Tutorial-Ausgang')+' | '+JSON.stringify(await warteAufNativenRender(page)));
     const hinweisVor=await page.evaluate(HINWEISLAGE);
     // Der native Ausgang reicht den während des Tutorials unterdrückten Ersthinweis sofort
     // nach. Bloßes Verstecken verschöbe dessen Layoutwirkung bis zum nächsten Spieltick.
     await page.locator('#tutorialSkipBtn').click();
     await page.locator('#tutorialOverlay').waitFor({state:'hidden'});
     console.log('INFO - '+P('nativer Tutorial-Ausgang')+' | '+JSON.stringify({vor:hinweisVor,nach:await page.evaluate(HINWEISLAGE)}));
+    // Dieser echte Ersthinweis bleibt sichtbar, während das native Kartenmenü geöffnet wird.
+    // Verstanden hier wegzuklicken würde den gemessenen verzögerten Scrollfehler verdecken.
+    await page.locator('#tabHintBar [data-tab-hint-dismiss="karte"]').waitFor({state:'visible',timeout:6000});
     await page.waitForTimeout(300);
 
     /* DER SONDERFALL, vorher gemessen: Das Kartenmenue deckt die Bildmitte NICHT (390x844 wie
@@ -288,39 +340,31 @@ const kartenKlicklage = (page, punkt) => page.evaluate(p=>{
     // Ein Gruppenzentrum kann zwischen Planet und Beschriftung liegen oder außerhalb der
     // sichtbaren Karte. Nach der Overlayfolge ausschließlich einen wirklich gemalten Treffer
     // wählen und den nativen Pointerweg benutzen, damit Drag-/Close-Handler ebenfalls wirken.
-    const menuDa = await page.evaluate(() => {
-      const svg = document.getElementById('galaxyMapSvg'), sr = svg.getBoundingClientRect();
-      const knoten = [...svg.querySelectorAll('.planet-node[data-planet]')]
-        .filter(n => n.getAttribute('data-planet') !== '__home__');
-      const proben = [];
-      for (const node of knoten){
-        for (const teil of [...node.querySelectorAll('image,circle,ellipse,path,text'),node]){
-          const r = teil.getBoundingClientRect();
-          if (!r.width || !r.height) continue;
-          const x=r.left+r.width/2, y=r.top+r.height/2;
-          if (x<Math.max(0,sr.left) || x>Math.min(innerWidth,sr.right) || y<Math.max(0,sr.top) || y>Math.min(innerHeight,sr.bottom)) continue;
-          const hit = document.elementFromPoint(x,y);
-          if (hit && node.contains(hit)) return { planet:node.getAttribute('data-planet'), x,y, hit:true };
-          if (proben.length<8) proben.push({ planet:node.getAttribute('data-planet'),x,y,hit:hit?.id||hit?.tagName||null });
-        }
-      }
-      return { hit:false, knoten:knoten.length, karte:sr.toJSON(), proben };
-    });
+    const menuDa=await nativerPlanetentreffer(page);
     if (menuDa.hit) await page.mouse.click(menuDa.x,menuDa.y);
     const sofort=await kartenKlicklage(page,menuDa);
+    await beginneNativeRenderMessung(page);
     await page.waitForTimeout(800);
+    const nativerRender=await warteAufNativenRender(page);
     const nach800ms=await kartenKlicklage(page,menuDa);
     const kmenuOffen = await page.locator('.kmenu').isVisible();
-    if (kmenuOffen){
-      check(P('1c-anker: das Kartenmenue liess sich oeffnen (sonst ist 1c ungeprueft)'), menuDa.hit, { menuDa,sofort,nach800ms });
-      const k0 = await page.evaluate(VIEWBOX);
-      await page.keyboard.press('ArrowRight'); await page.waitForTimeout(600);
-      check(P('1c: bei offenem Kartenmenue bewegt ArrowRight die Karte NICHT'),
-        (await page.evaluate(VIEWBOX)) === k0, { k0, menuDa });
-      await page.keyboard.press('Escape'); await page.waitForTimeout(400);
-    } else {
-      check(P('1c-anker: das Kartenmenue liess sich oeffnen (sonst ist 1c ungeprueft)'), false, { menuDa,sofort,nach800ms });
+    check(P('1c-anker: das Kartenmenue liess sich oeffnen (sonst ist 1c ungeprueft)'),menuDa.hit&&kmenuOffen,{menuDa,sofort,nach800ms,nativerRender});
+    if(!kmenuOffen){
+      // Der ursprüngliche Wächter ist bereits streng rot. Nur zur vollständigen Gegenprobe
+      // das echte Menü erneut öffnen, damit auch der unveränderte Tastenwächter ausgeführt
+      // wird. Koordinate/Hit/Stabilität werden erneut gemessen; kein force-/Script-Klick.
+      await page.locator('#galaxyMapSvg').scrollIntoViewIfNeeded();
+      await warteAufRuhigeKarte(page);
+      const wiederaufnahme=await nativerPlanetentreffer(page);
+      if(!wiederaufnahme.hit)throw new Error('Kein echter Planetentreffer zur Fortsetzung: '+JSON.stringify(wiederaufnahme));
+      await page.mouse.click(wiederaufnahme.x,wiederaufnahme.y);
+      await page.locator('.kmenu').waitFor({state:'visible'});
+      console.log('INFO - '+P('native Menü-Wiederaufnahme nach rotem Anker')+' | '+JSON.stringify(await kartenKlicklage(page,wiederaufnahme)));
     }
+    const k0=await page.evaluate(VIEWBOX);
+    await page.keyboard.press('ArrowRight');await page.waitForTimeout(600);
+    check(P('1c: bei offenem Kartenmenue bewegt ArrowRight die Karte NICHT'),(await page.evaluate(VIEWBOX))===k0,{k0,menuDa});
+    await page.keyboard.press('Escape');await page.waitForTimeout(400);
 
     /* M4 als Dauerwaechter: Eine Deckschicht mit pointer-events:none darf die Schirmfrage nicht
        stoeren - sonst sperrten Klick-Funken, Konfetti und Erfolgs-Abzeichen die Tasten. Die
