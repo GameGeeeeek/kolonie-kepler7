@@ -68,7 +68,7 @@ for(const [tab,col] of Object.entries(want)){
 // Farbfuss auch im RUHENDEN Zustand vorhanden (der eigentliche Orientierungsgewinn)
 const rest=await page.evaluate(()=>{const x=document.querySelector('.tab-btn[data-tab="markt"]');
   const s=getComputedStyle(x,'::after'); return {content:s.content, bg:s.backgroundColor, op:s.opacity};});
-check('ruhender Reiter hat Farbfuss', rest.bg==='rgb(93, 202, 165)' && parseFloat(rest.op)>0, rest);
+check('ruhender Reiter hat Farbfuss', rest.bg==='rgb(250, 199, 117)' && parseFloat(rest.op)>0, rest);
 check('keine JS-Fehler', errs.length===0, errs.slice(0,3));
 await ctx.close(); await b.close();
 console.log(fail?'\nFAIL':'\nPASS'); process.exit(fail?1:0);})();

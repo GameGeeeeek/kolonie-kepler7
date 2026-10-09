@@ -106,18 +106,20 @@ function speicher(mitEreignis) {
 // Was der SPIELER hat: nicht "ist ein Element vorhanden", sondern "kommt der Tap an"
 // (Hausregel 49 - ein Sichtbarkeits-Test hätte diesen Fehler nie gefunden).
 const lese = () => {
-  const bar = document.querySelector('.tabs');
+  const command = document.body.classList.contains('command-ui');
+  const bar = document.querySelector(command ? '.hero' : '.tabs');
   const bb = bar.getBoundingClientRect();
   const eb = document.getElementById('eventBanner');
-  const sicht = Array.prototype.slice.call(document.querySelectorAll('.edge-tab'))
+  const sicht = Array.prototype.slice.call(document.querySelectorAll(command ? '.edge-tab,#commandChatBtn,#commandStatusBtn' : '.edge-tab'))
     .filter(e => getComputedStyle(e).display !== 'none');
-  const btns = Array.prototype.slice.call(bar.querySelectorAll('.tab-btn'));
+  const btns = command ? (window.innerWidth<=900 ? [document.getElementById('commandMenuToggle')] : Array.from(document.querySelectorAll('.tabs .tab-btn'))) : Array.from(bar.querySelectorAll('.tab-btn'));
   const trifft = el => {
     const r = el.getBoundingClientRect();
     const t = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
     return t ? (t === el || el.contains(t) || t.contains(el)) : false;
   };
   return {
+    command,
     bannerHoehe: eb ? Math.round(eb.getBoundingClientRect().height) : 0,
     bannerSichtbar: !!eb && getComputedStyle(eb).display !== 'none',
     leiste: [Math.round(bb.top), Math.round(bb.bottom)],
@@ -184,8 +186,8 @@ async function messen(browser, g, mitEreignis) {
 
       // Ohne diese Prüfung wäre die Hauptaussage darunter vacuous: Bleibt das Banner weg, ist
       // "nichts verdeckt" trivial erfüllt (Hausregel 37).
-      check(p + 'Vorab: mit gesetztem Ereignis steht das Banner wirklich und schiebt die Leiste',
-        mit.bannerSichtbar && mit.bannerHoehe > 60 && mit.leiste[0] > ohne.leiste[0],
+      check(p + 'Vorab: das Ereignis-Banner steht wirklich; die feste Kopfzeile bleibt erreichbar',
+        mit.bannerSichtbar && mit.bannerHoehe > 60 && (mit.command ? mit.leiste[0]===ohne.leiste[0] : mit.leiste[0] > ohne.leiste[0]),
         { bannerSichtbar: mit.bannerSichtbar, bannerHoehe: mit.bannerHoehe,
           leisteOhne: ohne.leiste, leisteMit: mit.leiste });
 

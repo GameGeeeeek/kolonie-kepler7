@@ -302,6 +302,18 @@ async function boot(browser, viewport, geraet, saveZusatz) {
        Kompaktstreifen, der vertikal schneidet und den Planeten so oder so zeigt. */
     const { page, ctx, fehler } = await boot(browser, { width: 480, height: 900 }, null, { compactHead: false });
     check('0-vorab: Boot ohne Skriptfehler (480 px, ausfuehrlicher Kopf)', fehler.length === 0, fehler.slice(0, 2));
+    if(await page.locator('body.command-ui').count()){
+      // The selected HUD shows the native colony image instead of the old decorative hero SVG.
+      await page.locator('#colonyVisual .gfx-scene').scrollIntoViewIfNeeded();
+      await page.waitForFunction(()=>{const image=document.querySelector('#colonyVisual .gfx-landscape');return image&&image.complete&&image.naturalWidth>0;});
+      if(process.env.K7_COLONY_COMMAND_FAULT==='shift')await page.addStyleTag({content:'#colonyVisual .gfx-landscape{transform:translateX(100%)!important}'});
+      const scene=await page.locator('#colonyVisual .gfx-scene').evaluate(e=>{
+        const image=e.querySelector('.gfx-landscape'),s=e.getBoundingClientRect(),r=image.getBoundingClientRect();
+        return {loaded:image.complete&&image.naturalWidth>0,src:image.getAttribute('src'),height:s.height,left:s.left,right:s.right,width:s.width,imageWidth:r.width,imageCentre:r.left+r.width/2};
+      });
+      check('3a: die native Kolonieszene ersetzt sichtbar das Banner und ihr Bild ist geladen',scene.loaded&&scene.height>80&&/^kepler-gfx-colony-[a-z]+\.png$/.test(scene.src),scene);
+      check('3b: das Zentrum des Koloniebildes bleibt innerhalb der sichtbaren Szene am schmalen Fenster',scene.width>0&&scene.imageWidth>=scene.width-2&&scene.imageCentre>scene.left&&scene.imageCentre<scene.right&&scene.left>=0&&scene.right<=480,scene);
+    }else{
     const banner = await page.evaluate(() => {
       const svg = document.querySelector('.hero svg[viewBox="0 0 720 190"], svg[viewBox="0 0 720 190"]');
       if (!svg) return null;
@@ -316,6 +328,7 @@ async function boot(browser, viewport, geraet, saveZusatz) {
       !!banner && banner.ringMitte !== undefined && banner.svgHoehe > 80, banner);
     check('3b: die Mitte des Planetenrings liegt INNERHALB des sichtbaren Banners (mit xMid lag sie rechts ausserhalb)',
       !!banner && banner.ringMitte !== undefined && banner.ringMitte > banner.links && banner.ringMitte < banner.rechts, banner);
+    }
     await ctx.close();
   }
 

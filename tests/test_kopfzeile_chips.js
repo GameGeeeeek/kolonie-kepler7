@@ -212,6 +212,7 @@ async function seite(browser, url, breite, konto){
   await page.waitForTimeout(2800);
   await page.evaluate(ids => ids.forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; }), OVERLAYS);
   await page.waitForTimeout(700);
+  if(await page.locator('#commandStats').count())await page.locator('#commandStats').evaluate(e=>{e.open=true;});
   return { ctx, page, fehler };
 }
 
@@ -592,6 +593,9 @@ function aufraeumenVergleich(){
     unterkanteFehler.length === 0,
     { fehler:unterkanteFehler, gemessen: BREITEN.map(w => w + ':' + (neu[w] ? neu[w].kopfUnten : '?') + '/' + (alt[w] ? alt[w].kopfUnten : '?')).join(' ') });
 
+  // The command centre discloses and wraps these same metrics; the shared HUD checks
+  // measure its actual reachable bounds instead of the former horizontal swipe geometry.
+  if(!fs.readFileSync(SPIELDATEI,'utf8').includes('id="commandNav"')){
   // ---- 3: Die Lesbarkeit -------------------------------------------------------------------------
   const sichtFehler = BREITEN.filter(w => {
     const x = neu[w]; if (!x) return true;
@@ -777,6 +781,7 @@ function aufraeumenVergleich(){
     await ctx.close();
   }
 
+  }
   // ---- 4: Ein Format je Groesse, an ALLEN Anzeigestellen ------------------------------------------
   {
     const { ctx, page, fehler } = await seite(browser, SPIEL_URL, 1400);
@@ -966,6 +971,7 @@ function aufraeumenVergleich(){
   merke('J1: keine Skriptfehler auf irgendeiner der gemessenen Seiten', fehlerAlle.length === 0, fehlerAlle.slice(0, 3));
 
   await browser.close();
+  if(fs.readFileSync(SPIELDATEI,'utf8').includes('id="commandNav"')) fail=(await require('./lib/command-shell').run('hud'))!==0||fail;
   aufraeumenVergleich();
 
   if (SAB){

@@ -1,5 +1,8 @@
 // Die zweite Ebene: klebende Statusleiste, Handy-Hoehe der fuenf Knopfzeilen, der aktive Knopf in
 // einer wischbaren Zeile, unbekannte und leere Unterreiter-Schluessel (UI-5a, 12.09.2026).
+// Kommandozentrale (09.10.2026): Das klebende Band ist #commandTopbar im .hero,
+// auf Handy UND Desktop. A misst dessen echte Grenzen; die historische horizontale
+// Leiste bleibt fuer alte Fixtures unter demselben Vertrag erreichbar. B-E bleiben erhalten.
 //
 // DIESER WAECHTER IST DIE ZUSAMMENFUEHRUNG VON ZWEIEN (12.09.2026). Neben ihm stand
 // `test_unterreiter_ebene2.js` mit 15 Pruefungen, die dieselben drei Zusagen mit denselben Mitteln
@@ -245,6 +248,10 @@ async function seite(browser, breite, stand){
      'kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay']
       .forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; });
   });
+  // Controlled regression of the new header relationship, without editing the game.
+  if (process.env.K7_SECONDARY_COMMAND_FAULT === 'top') {
+    await page.addStyleTag({ content:'body.command-ui .fleet-sticky{top:0!important}' });
+  }
   return { ctx, page };
 }
 async function reiter(page, tab){
@@ -283,9 +290,10 @@ const A_MESSEN = (zielPos) => {
   const scrollbar = document.documentElement.scrollHeight - window.innerHeight;
   window.scrollTo(0, Math.min(zielPos, Math.max(0, scrollbar)));
   return new Promise(fertig => setTimeout(() => {
-    const tabs = document.querySelector('.tabs');
-    if (!tabs) return fertig({ fehlt:'.tabs' });
-    const ts = getComputedStyle(tabs), tr = tabs.getBoundingClientRect();
+    const command = document.body.classList.contains('command-ui');
+    const tabs = document.querySelector(command ? '#commandTopbar' : '.tabs');
+    if (!tabs) return fertig({ fehlt:command ? '#commandTopbar' : '.tabs' });
+    const ts = getComputedStyle(command ? tabs.closest('.hero') : tabs), tr = tabs.getBoundingClientRect();
     const klebt = ts.position === 'sticky';
     // Das klebende BAND der Reiterleiste - nur wenn sie wirklich klebt, sonst gibt es keines.
     const band = klebt ? [tr.top, tr.bottom] : null;
@@ -313,7 +321,7 @@ const A_MESSEN = (zielPos) => {
       });
     fertig({
       scrollbar, scrollY: Math.round(window.scrollY),
-      compact: document.body.classList.contains('compact-head'),
+      command, compact: document.body.classList.contains('compact-head'),
       tabsPos: ts.position, tabsHoehe: Math.round(tr.height), tabsRect: [Math.round(tr.top), Math.round(tr.bottom)],
       sprungAbstand: getComputedStyle(document.documentElement).getPropertyValue('--sprung-abstand').trim(),
       leistenHoehe: getComputedStyle(document.documentElement).getPropertyValue('--leisten-hoehe').trim(),
@@ -445,22 +453,22 @@ const daseinsRiegel = m => !!m && !m.fehlt && m.knoepfe > 0 && m.sichtbar > 0;
     await ctx.close();
   }
 
-  // ================= A6 + B0: am PC darf sich nichts geaendert haben ==============================
+  // ================= A6 + B0: denselben Vertrag auch am PC halten ================================
   {
     const { ctx, page } = await seite(browser, 1400, spielstand({ fleetSubTab: 'werft' }));
     await reiter(page, 'flotte');
     const a = await page.evaluate(A_MESSEN, 1400);
     const leisten = a.zweite || [];
-    /* Am PC klebt die Reiterleiste NICHT (gemessen: position=static), die Statusleiste gehoert
-       deshalb weiter auf ihre eigenen 4 px. Statt diese 4 einzutippen - die Zahl, um die es hier
-       geht - stellt A6 dieselbe HERKUNFTS-Frage wie A7, nur andersherum: Der gerechnete `top`
-       darf am PC gerade NICHT die gemessene Leistenhoehe sein (gemessen 94 px), und die Leiste
-       darf nicht nach unten gerutscht sein. Faellt der `body.compact-head`-Vorsatz der neuen
-       Regel weg, trifft beides zu. */
+    /* Die Kommando-Kopfzeile klebt auch am PC. Dort muss die zweite Ebene ebenfalls aus der
+       gemessenen Hoehe folgen, unter ihr liegen und wirklich getroffen werden. Historische
+       Fixtures behalten die Gegenrichtung: ohne klebenden Kopf liegt die zweite Ebene oben,
+       ihr Klebepunkt darf gerade NICHT die gemessene Leistenhoehe sein. */
     const hoeheZahl = parseFloat(a.leistenHoehe);
-    const versetzt = leisten.filter(l => l.rect[0] > 60 || Math.abs(parseFloat(l.cssTop) - hoeheZahl) <= 0.5);
-    merke('A6: am PC klebt die Reiterleiste nicht und die zweite Ebene steht unveraendert oben',
-      a.compact === false && a.tabsPos === 'static' && leisten.length >= 1 && versetzt.length === 0,
+    const versetzt = a.command
+      ? leisten.filter(l => !l.imBild || !l.getroffen || !(l.unterhalb >= 0) || l.ueberlappung > 0 || Math.abs(parseFloat(l.cssTop) - hoeheZahl) > 0.5)
+      : leisten.filter(l => l.rect[0] > 60 || Math.abs(parseFloat(l.cssTop) - hoeheZahl) <= 0.5);
+    merke('A6: am PC folgt die zweite Ebene der tatsaechlichen Kopfzeile und bleibt antippbar',
+      a.compact === false && a.tabsPos === (a.command ? 'sticky' : 'static') && leisten.length >= 1 && versetzt.length === 0,
       { compact: a.compact, tabsPos: a.tabsPos, leistenHoehe: a.leistenHoehe, sprungAbstand: a.sprungAbstand,
         leisten: leisten.map(l => ({ id: l.id, cssTop: l.cssTop, rect: l.rect })) });
 

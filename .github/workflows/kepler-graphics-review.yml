@@ -5,6 +5,14 @@ on:
     paths:
       - weltraum_kolonie.html
       - kepler-graphics.css
+      - tests/test_command_shell.js
+      - tests/lib/command-shell.js
+      - tools/check-command-shell-counterexamples.cjs
+      - tools/check-command-secondary-counterexample.cjs
+      - tests/test_zweite_ebene.js
+      - tests/test_formensprache.js
+      - tests/test_resource_animation_frames.js
+      - tools/check-resource-animation-counterexample.cjs
       - kepler-gfx-*.png
       - tests/test_graphics_refresh.js
       - tests/test_graphics_expansion.js
@@ -39,7 +47,7 @@ concurrency:
 jobs:
   polish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,6 +63,14 @@ jobs:
           fi
       - name: Audit findings through real native game rendering
         run: node tests/test_graphic_polish.js
+      - name: Selected command-centre HUD and controlled regressions
+        run: |
+          node tests/test_command_shell.js
+          node tools/check-command-shell-counterexamples.cjs
+          node tests/http-run.js test_zweite_ebene.js
+          node tools/check-command-secondary-counterexample.cjs
+          node tests/test_resource_animation_frames.js
+          node tools/check-resource-animation-counterexample.cjs
       - name: Remaining illustrated systems and native actions
         run: node tests/test_visual_details.js
       - name: Remaining audit counterexamples must fail
@@ -67,7 +83,7 @@ jobs:
           node tools/check-mobile-polish-counterexamples.cjs
   graphics:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -121,7 +137,7 @@ jobs:
           KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
   harmony:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

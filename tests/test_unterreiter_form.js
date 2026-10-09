@@ -1,4 +1,6 @@
 // Die Form der zweiten Navigationsebene (Gleichmaß Etappe UI-5c, 12.09.2026).
+// Kommandozentrale: Die Rail hat bewusst 3px-Ecken. Die zweite Ebene bleibt beim
+// nativen --cut-sm; ein originaler Bauknopf dient jetzt als unabhaengige Vergleichsform.
 //
 // WAS HIER ABGESICHERT WIRD
 // -------------------------
@@ -202,6 +204,7 @@ async function seite(browser, store, breite){
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay']
     .forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; }));
   await page.waitForTimeout(600);
+  if(process.env.K7_SUBTAB_COMMAND_FAULT==='cut')await page.addStyleTag({content:'.fleet-subtab{clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)!important}'});
   return { ctx, page, errs };
 }
 async function reiter(page, tab, ms){
@@ -254,11 +257,12 @@ async function reiter(page, tab, ms){
       stufenWerte.every(v => /^\d+(\.\d+)?px$/.test(v)) && new Set(stufenWerte).size === 4, stufen);
 
     const vergleich = await page.evaluate(() => {
-      const b = document.querySelector('.tabs .tab-btn');
-      return b ? { schnitt:getComputedStyle(b).clipPath, tab:b.getAttribute('data-tab') } : null;
+      const selector=document.body.classList.contains('command-ui') ? '#buildings button.buy' : '.tabs .tab-btn';
+      const b = document.querySelector(selector);
+      return b ? { schnitt:getComputedStyle(b).clipPath, selector } : null;
     });
     const zahlAus = s => { const m = /polygon\(\s*(\d+(?:\.\d+)?)px/.exec(String(s || '')); return m ? m[1] + 'px' : null; };
-    merke('V4: Vorbedingung - der Vergleichsknopf .tab-btn trägt die Schnittformel des Hauses auf Stufe --cut-sm',
+    merke('V4: Vorbedingung - der native Vergleichsknopf trägt die Schnittformel des Hauses auf Stufe --cut-sm',
       !!vergleich && /^polygon\(/.test(vergleich.schnitt) && zahlAus(vergleich.schnitt) === stufen.sm,
       { vergleich, stufeSm:stufen.sm });
 
@@ -271,7 +275,7 @@ async function reiter(page, tab, ms){
     const schnittFehler = schnitte
       .filter(s => !vergleich || s.schnitt !== vergleich.schnitt)
       .map(s => s.name + ': ' + s.schnitt + ' statt ' + (vergleich ? vergleich.schnitt : '(kein Vergleich)'));
-    merke('1a: jede der sechs Zeilen trägt zeichengleich denselben Eckenschnitt wie ein .tab-btn',
+    merke('1a: jede der sechs Zeilen trägt zeichengleich denselben Eckenschnitt wie der native Vergleichsknopf',
       schnitte.length === 6 && !!vergleich && schnittFehler.length === 0,
       { fehler:schnittFehler, gemessen:schnitte.map(s => s.name + '=' + zahlAus(s.schnitt)) });
     const stufeFehler = schnitte.filter(s => zahlAus(s.schnitt) !== stufen.sm)

@@ -82,6 +82,7 @@ function backend(store) {
   // Seit KB-4 führt der Spielerweg über die Sektoren (Übersicht -> Region -> System).
   await oeffneSystemUeberSektoren(page, 'kepler');
   await page.waitForTimeout(2200);   // Kamerafahrt + sanftes Scrollen ausklingen lassen
+  if(process.env.K7_MAP_COMMAND_FAULT==='cover')await page.addStyleTag({content:'body.command-ui #tab-karte .map-wrap{transform:translateY(-64px)!important}'});
   const offen = await page.evaluate(() => {
     const b = document.getElementById('systemTafelZu');
     const t = document.getElementById('systemTafel');
@@ -90,8 +91,10 @@ function backend(store) {
     // Die Sticky-Reiter-Leiste des kompakten Kopfs ist die OBERE Schranke des Scroll-Ziels
     // (KB-10): Die Karte soll direkt UNTER ihr beginnen, nicht von ihr verdeckt werden. Die
     // Schranke wird GEMESSEN, nicht eingetippt (Hausregel 2) - ohne Sticky-Leiste ist sie 0.
-    const tabs = document.querySelector('.tabs');
-    const leisteUnten = (tabs && getComputedStyle(tabs).position === 'sticky')
+    const command=document.body.classList.contains('command-ui');
+    const tabs = document.querySelector(command ? '#commandTopbar' : '.tabs');
+    const sticky = tabs && getComputedStyle(command ? tabs.closest('.hero') : tabs).position === 'sticky';
+    const leisteUnten = sticky
       ? Math.round(tabs.getBoundingClientRect().bottom) : 0;
     // Diagnose ohne Eingriff: Bei einem Versatz unterscheiden diese Werte ein geklemmtes
     // Scroll-Ziel am Dokumentende von einem nachtraeglich eingeblendeten Banner/Overlay.
@@ -109,7 +112,7 @@ function backend(store) {
     const bannerUndOverlays = [...document.querySelectorAll('[id*="Banner"], [id*="Overlay"], [id*="banner"], [id*="overlay"]')]
       .map(el => ({ id: el.id, ...bounds(el) }))
       .filter(el => el.width > 0 && el.height > 0 && el.display !== 'none' && el.visibility !== 'hidden');
-    return { sichtbar: !!(b && b.offsetParent), scrollY: Math.round(window.scrollY),
+    return { command, leisteKlebt:!!sticky, sichtbar: !!(b && b.offsetParent), scrollY: Math.round(window.scrollY),
              karteOben: Math.round(w.top), karteH: Math.round(w.height),
              tafelOben: Math.round(r.top), leisteUnten,
              scrollHeight, innerHeight: window.innerHeight, maxScroll,
@@ -120,6 +123,8 @@ function backend(store) {
              bannerUndOverlays };
   });
   check('2a: mit offenem System ist der ✕-Knopf sichtbar', offen.sichtbar, offen);
+  check('2-Header: die Kommando-Kopfzeile bildet tatsaechlich das sichtbare klebende Band',
+    !offen.command || (offen.leisteKlebt && offen.leisteUnten>0),offen.bounds.leiste);
   // Seit KB-7 scrollt das Öffnen zur KARTE, nicht zur Tafel ("Karte fährt nach unten"-Report,
   // gemessen -457 px). Seit KB-10 ist das Ziel die Kante UNTER der Sticky-Leiste: vorher lag
   // die Kastenoberkante bei 0 und die Leiste verdeckte die obere Kartenhälfte samt Sonne

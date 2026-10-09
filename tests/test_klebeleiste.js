@@ -25,6 +25,10 @@
 const { starteBrowser, SPIELDATEI, ruhigeUhren } = require('./lib/umgebung');
 const path = require('path');
 const fs = require('fs');
+if(fs.readFileSync(SPIELDATEI,'utf8').includes('id="commandNav"')){
+  require('./lib/command-shell').run('sticky').then(code=>process.exitCode=code);
+  return;
+}
 const FILE = 'file://' + path.resolve(SPIELDATEI);
 
 function backend(store){ return async r => {

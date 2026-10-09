@@ -139,7 +139,7 @@ function backend(store) {
       const el = document.querySelector(sel);
       hoehen[sel] = el ? Math.round(el.getBoundingClientRect().height) : null;
     }
-    const leiste = document.querySelector('.tabs');
+    const leiste = document.body.classList.contains('command-ui') ? document.querySelector('.hero') : document.querySelector('.tabs');
     const lb = leiste ? leiste.getBoundingClientRect() : null;
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     return { vorher, nachher: Math.round(window.scrollY),

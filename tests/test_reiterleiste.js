@@ -1,3 +1,8 @@
+// Command-centre geometry: original sections, responsive reachability, focus and readable HUD.
+// Historical horizontal-layout checks below remain available for a historical fixture.
+if(require("fs").readFileSync(require("./lib/umgebung").SPIELDATEI,"utf8").includes('id="commandNav"')){
+ require("./lib/command-shell").run('nav').then(code=>{process.exitCode=code;});return;
+}
 // Die Reiterleiste auf dem Handy: alle zwölf Reiter gleichzeitig erreichbar?
 //
 // WAS HIER ABGESICHERT WIRD (01.08.2026)
