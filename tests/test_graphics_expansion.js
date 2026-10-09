@@ -13,7 +13,7 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-12';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261009-13';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
@@ -150,7 +150,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   const labStable=await page.evaluate(()=>{const img=document.querySelector('#researchVisual .gfx-landscape');__gfxReview.state().resources.forschungspunkte+=3;__gfxReview.render();return img===document.querySelector('#researchVisual .gfx-landscape');});
   check('research income updates retain the laboratory image',labStable);
   await page.evaluate(()=>__gfxReview.show('expedition'));
-  check('all six expedition types are illustrated native controls',await page.locator('#expeditionBox [data-expedition-type] img').count()===6);
+  check('all six expedition types are illustrated native controls',await page.locator('#expeditionBox [data-expedition-type] .gfx-expedition-art').count()===6);
   await page.locator('#expeditionBox [data-expedition-type="salvage"]').click();
   check('illustrated mission selection changes the native expedition type',await page.evaluate(()=>__gfxReview.expeditionType()==='salvage')&&await page.locator('#expeditionVisual').textContent().then(t=>t.includes('Bergungsexpedition')));
   check('no fake travelling mission is shown while the mission list is empty',await page.locator('#expeditionsActive .gfx-journey').count()===0);
@@ -173,7 +173,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#shipyardVisual [data-gfx-ship="frachter"]').click();
   check('new freight ship image is tied to the real freight ship action',await page.locator('#shipyardVisual .gfx-ship-model').getAttribute('src')==='kepler-gfx-ship-frachter.png'&&await page.locator('#shipyardVisual [data-gfx-build]').getAttribute('data-gfx-key')==='frachter');
   await page.locator('#shipyardVisual [data-gfx-ship-picker]').selectOption('bomber');
-  check('other ship classes use their own detailed native hull rather than a wrong illustration',await page.locator('#shipyardVisual canvas[data-ship-icon="bomber"]').count()===1&&await page.locator('#shipyardVisual .gfx-ship-model').count()===0);
+  check('other ship classes use their own detailed native hull rather than a wrong illustration',await page.locator('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]').count()===1&&await page.locator('#shipyardVisual .gfx-ship-model').count()===0);
   check('class picker contains every native ship class',await page.locator('#shipyardVisual [data-gfx-ship-picker] option').count()===await page.evaluate(()=>__gfxReview.shipKeys.length));
   const alpha=await page.evaluate(async()=>{const result=[];for(const key of ['ice','volcano','desert','moon']){const i=new Image();i.src='kepler-gfx-planet-'+key+'.png';await i.decode();const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;const x=c.getContext('2d');x.drawImage(i,0,0);result.push({key,corner:x.getImageData(0,0,1,1).data[3],center:x.getImageData(c.width/2,c.height/2,1,1).data[3]});}return result;});
   check('new planet surfaces load with genuinely transparent backgrounds',alpha.every(a=>a.corner===0&&a.center>=250),alpha);

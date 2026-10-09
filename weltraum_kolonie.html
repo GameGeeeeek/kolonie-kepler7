@@ -3279,7 +3279,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-  <link rel="stylesheet" href="kepler-graphics.css?v=20261008-12">
+  <link rel="stylesheet" href="kepler-graphics.css?v=20261009-13">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -7412,10 +7412,7 @@ k7InitialStaticText();
   // 'mod_'+key griffe für sie ins Leere, und schlimmer noch, 'schild'/'lager' würden dann quer
   // zwischen den Familien treffen.
   //
-  // WO DIESE FUNKTION BEWUSST NICHT AUFGERUFEN WIRD: in den schmalen Fertigungs-Knöpfen
-  // (data-craft-mythic-loc/-ship, data-fragcraft-loc/-ship). Das sind Textknöpfe mit
-  // font-size:10px; ein 24px-SVG sprengt dort die Zeile. Sie behalten das Schrift-Icon - und zwar
-  // für BEIDE Modulfamilien gleich, damit die Ausnahme eine Regel ist und kein vergessener Rest.
+  // Die Fragment-Fertigung verwendet dieselben Modulbilder in größeren Auswahlkarten.
   function moduleIconHtml(def, isShip, color){
     const stil = color ? ` style="color:${color};"` : '';
     if (!def) return `<i class="ti ti-box" aria-hidden="true"${stil}></i>`;
@@ -21044,7 +21041,7 @@ k7InitialStaticText();
           <div><div class="bname"><i class="ti ti-sparkles" aria-hidden="true" style="color:#fac775; margin-right:3px;"></i>Wochen-Angebot: ${k7View(deal).name}</div>
           <div class="bmeta">${k7View(deal).desc}${dealClaimed?' <span style="color:#5dcaa5;">· diese Woche bereits genutzt</span>':''}</div></div>
         </div>
-        <button data-buy-weekly-deal="1" ${(!dealAfford||dealClaimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${dealClaimed?'Genutzt':fmt(deal.cost)+' Kr.'}</button>
+        <button data-buy-weekly-deal="1" ${(!dealAfford||dealClaimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${dealClaimed?'Genutzt':k7t('Kaufen')+' · '+fmt(deal.cost)+' Kr.'}</button>
       </div>`;
     // Tagesangebot: zwei benannte Module statt Lotterie.
     const dailyCards = dailyOffers.map(o => {
@@ -21057,7 +21054,7 @@ k7InitialStaticText();
           <div class="bmeta">${k7View(o.def).desc}</div>
           <div class="bmeta" style="color:#7d8199;">Heutiges ${o.isShip?'Schiffsklassen':k7t("Standort")}-Angebot · wechselt um Mitternacht${claimed?' · <span style="color:#5dcaa5;">heute bereits gekauft</span>':''}</div></div>
         </div>
-        <button data-daily-offer="${o.slot}" ${(!afford||claimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${claimed?'Genutzt':fmt(o.cost)+' Kr.'}</button>
+        <button data-daily-offer="${o.slot}" ${(!afford||claimed)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${claimed?'Genutzt':k7t('Kaufen')+' · '+fmt(o.cost)+' Kr.'}</button>
       </div>`;
     }).join('');
     const dailyHead = dailyOffers.length
@@ -21097,7 +21094,7 @@ k7InitialStaticText();
           ${qtyBar}
           ${jumpBtn}</div>
         </div>
-        <button data-shop-buy="${item.key}" ${(!affordable||active)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${active?'Aktiv':(item.preisText ? item.preisText : (item.bulk&&qty>1?qty+'× für '+fmt(item.cost*qty)+' Kr.':fmt(item.cost)+' Kr.'))}</button>
+        <button data-shop-buy="${item.key}" ${(!affordable||active)?'disabled':''} style="font-size:10.5px; white-space:nowrap;">${active?'Aktiv':(item.preisText ? k7Ui('Einlösen','Redeem')+' · '+item.preisText : k7t('Kaufen')+' · '+(item.bulk&&qty>1?qty+'× für '+fmt(item.cost*qty)+' Kr.':fmt(item.cost)+' Kr.'))}</button>
       </div>`;
     }).join('');
     box.querySelectorAll('[data-shop-buy]').forEach(btn => {
@@ -31494,14 +31491,16 @@ k7InitialStaticText();
       return `<span style="color:${have>=v?'#c7cbe0':'#e24b4a'};">${fmt(v)} ${label}</span>`;
     }).join(' · ') : '';
     if (lvl === 0){
-      box.innerHTML = `<div class="card-row" style="border-color:rgba(195,190,245,0.5);">
+      box.innerHTML = `<div class="card-row gfx-flagship-card" style="border-color:rgba(195,190,245,0.5);">
+        ${gfxFlagshipPortraitHtml(lvl)}
         <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.18); color:#c3bef5;"><i class="ti ti-rocket" aria-hidden="true"></i></div>
           <div><div class="bname">Flaggschiff bauen</div><div class="bmeta">Stelle dein einzigartiges Kapitalschiff in Dienst. Kosten: ${costHtml}</div></div>
         </div>
         <button data-flagship-build="1" ${afford?'':'disabled'} style="white-space:nowrap;">${k7h("Bauen")}</button>
       </div>`;
     } else {
-      box.innerHTML = `<div class="card-row" style="border-color:rgba(195,190,245,0.6); background:rgba(195,190,245,0.06);">
+      box.innerHTML = `<div class="card-row gfx-flagship-card" style="border-color:rgba(195,190,245,0.6); background:rgba(195,190,245,0.06);">
+        ${gfxFlagshipPortraitHtml(lvl)}
         <div class="left"><div class="bicon" style="background:rgba(195,190,245,0.22); color:#c3bef5;"><i class="ti ti-rocket" aria-hidden="true"></i></div>
           <div><div class="bname">${escapeHtml(k7View(fs).name||k7t("Flaggschiff"))} <button data-flagship-rename="1" title="Umbenennen" style="font-size:9px; padding:2px 6px; margin-left:4px;">Name</button></div>
           <div class="bmeta">${k7h("Stufe")} ${lvl}/${FLAGSHIP_MAX_LEVEL} · aktuell <strong style="color:#5dcaa5;">+${bonusPct}%</strong> Angriff & Verteidigung</div>
@@ -47431,12 +47430,12 @@ async function claimPendingRewards(){
       const isOpen = helpOpenSections.has(sec.key);
       return `
         <div class="help-category ${isOpen?'open':''}" data-help-cat="${sec.key}">
-          <div class="help-category-header">
+          <button type="button" class="help-category-header" aria-expanded="${isOpen}" aria-controls="help-body-${sec.key}">
             <div class="bicon" style="background:rgba(var(--primary-rgb),0.15); color:#c3bef5;"><i class="ti ${sec.icon}" aria-hidden="true"></i></div>
             <div class="bname">${k7View(sec).title}</div>
             <i class="ti ti-chevron-right chevron" aria-hidden="true"></i>
-          </div>
-          <div class="help-category-body">
+          </button>
+          <div class="help-category-body" id="help-body-${sec.key}">
             ${sec.entries.map(e => `<div class="help-entry"><div class="help-entry-title">${k7View(e).title}</div><div class="help-entry-body">${k7View(e).body}</div></div>`).join('')}
           </div>
         </div>
@@ -47445,8 +47444,10 @@ async function claimPendingRewards(){
     box.querySelectorAll('[data-help-cat]').forEach(catEl => {
       catEl.querySelector('.help-category-header').onclick = () => {
         const key = catEl.getAttribute('data-help-cat');
+        const keepFocus = document.activeElement === catEl.querySelector('.help-category-header');
         if (helpOpenSections.has(key)) helpOpenSections.delete(key); else helpOpenSections.add(key);
         renderHelpBox();
+        if(keepFocus) box.querySelector('[data-help-cat="'+key+'"] .help-category-header')?.focus({preventScroll:true});
       };
     });
     if (jumpToKey){
@@ -47817,7 +47818,7 @@ async function claimPendingRewards(){
       box.innerHTML = statsHtml + `<div class="bmeta">Berichte sind nur verfügbar, wenn das Spiel über einen eigenen Server läuft.</div>`;
       return;
     }
-    if (!reportsCache.length){ box.innerHTML = statsHtml + archivHtml + `<div class="bmeta">Noch keine Berichte.</div>`; return; }
+    if (!reportsCache.length){ box.innerHTML = statsHtml + archivHtml + `<div class="gfx-empty-state"><i class="ti ti-list-details" aria-hidden="true"></i><div><strong>${k7Ui('Noch keine Berichte','No reports yet')}</strong><p>${k7Ui('Hier erscheinen die Berichte deiner Kämpfe.','Your combat reports will appear here.')}</p></div></div>`; return; }
     // Kategorie-Pills zählen mit, wie viele Berichte JEWEILS dazu passen würden (unabhängig vom
     // Ergebnis-Filter) - macht auf einen Blick sichtbar, wo überhaupt etwas zu finden ist.
     const filterBarHtml = `
@@ -74986,6 +74987,51 @@ document.addEventListener('keydown',event=>{
     {key:'habitat',x:43,y:57}, {key:'raffinerie',x:28,y:70}
   ]);
   const GFX_SHIP_KEYS = ['jaeger','cruisers','destroyers','ships','frachter','carrier'];
+  // Shared artwork reads native keys; selection, prices and unlocks stay in their native renderers.
+  const GFX_ORBITAL_KEYS = ['def','prod','dock','signal'];
+  const GFX_EXPEDITION_KEYS = ['short','standard','deep','salvage','research','mining'];
+  function gfxAtlasTile(keys,key,columns,css,label){
+    const i=keys.indexOf(key);
+    if(i<0)return '';
+    const rows=Math.ceil(keys.length/columns);
+    return `<span class="gfx-atlas-tile ${css}" role="img" aria-label="${escapeHtml(label)}" style="--tile-x:${columns>1?(i%columns)*100/(columns-1):0}%;--tile-y:${rows>1?Math.floor(i/columns)*100/(rows-1):0}%"></span>`;
+  }
+  function gfxOrbitalPortraitHtml(key){
+    const def=ORBITAL_FOCI.find(f=>f.key===key);
+    return def?gfxAtlasTile(GFX_ORBITAL_KEYS,key,2,'gfx-orbital-art',k7View(def).name):'';
+  }
+  function gfxTerraformWorldHtml(type){
+    const info=PLANET_TYPE_INFO[type]||{},art=GFX_PLANET_ART[type];
+    if(['todeswelt','leerenwelt','erdwelt','wasserwelt'].includes(type))return gfxAtlasTile(['todeswelt','leerenwelt','erdwelt','wasserwelt'],type,2,'gfx-world-art',k7View(info).label||type);
+    return art?`<img class="gfx-world-image" src="kepler-gfx-planet-${art}.png" alt="${escapeHtml(k7View(info).label||type)}" decoding="async">`:'';
+  }
+  function gfxShipThumbnailHtml(key){
+    // A selected fleet paint belongs to the native renderer, including in the catalogue.
+    return GFX_SHIP_KEYS.includes(key)&&!activeFleetSkinFilter()?`<img data-gfx-ship-thumb="${key}" src="kepler-gfx-ship-${key}.png" alt="" decoding="async">`:'';
+  }
+  function gfxExpeditionSceneHtml(key){
+    const type=EXPEDITION_TYPES.find(t=>t.key===key);
+    return type?gfxAtlasTile(GFX_EXPEDITION_KEYS,key,3,'gfx-expedition-art',k7View(type).name):'';
+  }
+  // Catalogue headings reuse the game's milestone families. Each native definition
+  // appears once; new definitions fall into the final group until classified.
+  function gfxResearchCatalogue(){
+    const groups=[['wirtschaft','Wirtschaft','Economy','ti-building-factory-2'],['krieg','Kampf & Verteidigung','Combat & defence','ti-shield'],['logistik','Logistik & Expeditionen','Logistics & expeditions','ti-truck'],['diplomatie','Kolonien & Diplomatie','Colonies & diplomacy','ti-flag'],['werkstoffvoll','Werkstoffe','Materials','ti-atom'],['ausbau','Systemausbau','System upgrades','ti-adjustments'],['bergbau','Bergbau','Mining','ti-pick'],['revier','Bergbaurechte','Mining rights','ti-pick'],['bohrung','Tiefenbohrung','Deep drilling','ti-pick'],['tier3','Tier 3','Tier 3','ti-anchor'],['other','Weitere Technologien','Other technologies','ti-flask']];
+    const used=new Set();
+    return groups.flatMap(([key,de,en,icon])=>{
+      const defs=RESEARCH_DEFS.filter(r=>!used.has(r.key)&&(key==='other'||(MILESTONE_GROUPS[key]||[]).includes(r.key)));
+      defs.forEach(r=>used.add(r.key));
+      return defs.filter(r=>!state.uiHideMaxed||(state.research[r.key]||0)<r.maxLevel).map((def,i)=>({def,first:i===0,group:{key,label:k7Ui(de,en),icon}}));
+    });
+  }
+  function gfxAvatarLabel(key){
+    const labels={rocket:['Rakete','Rocket'],alien:['Alien','Alien'],shield:['Schild','Shield'],crown:['Krone','Crown'],skull:['Totenkopf','Skull'],star:['Stern','Star'],comet:['Komet','Comet'],planet:['Planet','Planet'],sword:['Schwert','Sword'],diamond:['Diamant','Diamond'],atom:['Atom','Atom'],flame:['Flamme','Flame'],nebel:['Nebel','Nebula'],satellit:['Satellit','Satellite'],mond:['Mond','Moon'],flagge:['Flagge','Flag'],auge:['Auge','Eye'],blitz:['Blitz','Lightning'],ring:['Ringplanet','Ringed planet'],kriegsorden:['Kriegsorden','War medal'],ligakrone:['Ligakrone','League crown'],nova:['Nova','Nova'],void:['Leere','Void'],phoenix:['Phönix','Phoenix']};
+    const label=labels[key]||[key,key];return k7Ui(label[0],label[1]);
+  }
+  function gfxFlagshipPortraitHtml(level){
+    const stage=level>=FLAGSHIP_MAX_LEVEL?2:level>=Math.ceil(FLAGSHIP_MAX_LEVEL/2)?1:0;
+    return gfxAtlasTile([0,1,2],stage,3,'gfx-flagship-art',k7t('Flaggschiff'));
+  }
   function gfxColonyStage(buildings){
     const levels = BUILDING_DEFS.filter(d=>d.category !== 'defense').reduce((sum,d)=>sum+Math.max(0,Number(buildings[d.key])||0),0);
     return levels < 35 ? 'outpost' : levels < 110 ? 'settlement' : 'developed';
@@ -75091,14 +75137,23 @@ document.addEventListener('keydown',event=>{
   function renderGraphicsShipyard(){
     const box = document.getElementById('shipyardVisual');
     if (!box || activeTab!=='flotte' || document.getElementById('fleetSubWerft').style.display==='none') return;
+    const oldRail=box.querySelector('.gfx-ship-list');
+    const railPosition=oldRail?{top:oldRail.scrollTop,left:oldRail.scrollLeft}:null;
+    const focused=document.activeElement,focusKey=box.contains(focused)&&focused.dataset.gfxShip;
+    const pickerFocused=box.contains(focused)&&focused.hasAttribute('data-gfx-ship-picker');
     if (!gfxShip) gfxShip = shipRequirementsMet(SHIP_DEFS.find(d=>d.key==='cruisers')) ? 'cruisers' : 'jaeger';
     const def = SHIP_DEFS.find(d=>d.key===gfxShip) || SHIP_DEFS.find(d=>d.key==='jaeger');
     const fleet = currentFleet(), role=shipRoleInfo(def);
     const html = `<section class="gfx-view" aria-label="${k7t('Orbitalwerft')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Schiffswerft')}</span><h2>${k7t('Orbitalwerft')}</h2></div><div class="gfx-location">${k7PreserveUserText(escapeHtml(planetDisplayName(state.activeBasePlanet)))}</div></header>
-      <div class="gfx-layout gfx-ship-layout"><div class="gfx-ship-list" aria-label="${k7t('Schiffsklassen')}">${GFX_SHIP_KEYS.map(key=>{ const d=SHIP_DEFS.find(s=>s.key===key); return `<button type="button" class="gfx-choice" data-gfx-ship="${key}" aria-pressed="${key===def.key}"><img src="kepler-gfx-ship-${key}.png" alt="" loading="lazy" decoding="async">${escapeHtml(k7View(d).name)}<small>${k7t('Bestand')}: ${fmt(fleet[key]||0)}</small></button>`; }).join('')}</div>
+      <div class="gfx-layout gfx-ship-layout"><div class="gfx-ship-list" aria-label="${k7t('Schiffsklassen')}">${SHIP_DEFS.map(d=>{ const key=d.key; return `<button type="button" class="gfx-choice" data-gfx-ship="${key}" aria-pressed="${key===def.key}">${gfxShipThumbnailHtml(key)||`<canvas data-ship-icon="${key}" width="78" height="58" aria-hidden="true"></canvas>`}${escapeHtml(k7View(d).name)}<small>${escapeHtml(k7View(shipRoleInfo(d)).label)} · ${k7t('Bestand')}: ${fmt(fleet[key]||0)}</small></button>`; }).join('')}</div>
       <div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-orbital-dock.png" alt="" decoding="async">${gfxShipModelHtml(def)}<div class="gfx-ship-caption">${escapeHtml(k7t(role.label))} · ${k7t('Bestand')}: ${fmt(fleet[def.key]||0)}</div></div>
       <aside class="gfx-inspector"><label class="gfx-picker">${k7t('Alle Schiffsklassen')}<select data-gfx-ship-picker>${SHIP_DEFS.map(d=>`<option value="${d.key}" ${d.key===def.key?'selected':''}>${escapeHtml(k7View(d).name)}</option>`).join('')}</select></label><span class="gfx-eyebrow">${k7t('Schiffsklasse')}</span><h3>${escapeHtml(k7View(def).name)}</h3>${shipStatBarsHtml(def.atk||0,def.shield||0,Math.round((def.atk||0)*.4)+(def.shield||0),def.speed||0,def.key)}${gfxActionHtml('ship',def.key)}<p>${k7t('Kosten und Menge entsprechen deiner aktuellen Bauauswahl.')}</p><button type="button" data-gfx-list="fleet">${k7t('Alle Schiffsklassen')} <i class="ti ti-list-details" aria-hidden="true"></i></button></aside></div></section>`;
-    if (setBoxHtml(box,'shipyardVisual',html)) { wireGraphics(box); refreshShipMiniIcons(box); }
+    if (setBoxHtml(box,'shipyardVisual',html)) {
+      wireGraphics(box); refreshShipMiniIcons(box);
+      if (railPosition) { const rail=box.querySelector('.gfx-ship-list');rail.scrollTop=railPosition.top;rail.scrollLeft=railPosition.left; }
+      const nextFocus=focusKey?[...box.querySelectorAll('[data-gfx-ship]')].find(b=>b.dataset.gfxShip===focusKey):pickerFocused?box.querySelector('[data-gfx-ship-picker]'):null;
+      if(nextFocus)nextFocus.focus({preventScroll:true});
+    }
     gfxSyncAction(box,'ship',def.key);
   }
   function renderGraphicsMap(){
@@ -75136,7 +75191,7 @@ document.addEventListener('keydown',event=>{
     box.querySelectorAll('[data-gfx-planet-menu]').forEach(b=>b.onclick=e=>{e.stopPropagation();planetMapMenu(e,b.dataset.gfxPlanetMenu);});
   }
     function gfxShipModelHtml(def){
-    return GFX_SHIP_KEYS.includes(def.key)
+    return GFX_SHIP_KEYS.includes(def.key)&&!activeFleetSkinFilter()
       ? `<img class="gfx-ship-model" src="kepler-gfx-ship-${def.key}.png" alt="${escapeHtml(k7View(def).name)}" decoding="async">`
       : `<div class="gfx-native-ship"><canvas data-ship-icon="${def.key}" width="360" height="270" role="img" aria-label="${escapeHtml(k7View(def).name)}"></canvas></div>`;
   }
@@ -75178,16 +75233,13 @@ document.addEventListener('keydown',event=>{
     gfxSyncAction(box,'research',def.key);gfxSyncAction(box,'researchqueue',def.key);
     setBoxText(document.getElementById('gfxResearchPoints'),fmt(state.resources.forschungspunkte||0));
   }
-  function gfxExpeditionArt(key){
-    return ({short:'kepler-gfx-nebula.png',standard:'kepler-gfx-expedition-wreck.png',deep:'kepler-gfx-expedition-wreck.png',salvage:'kepler-gfx-market-station.png',research:'kepler-gfx-research-lab.png',mining:'kepler-gfx-planet-crystal.png'})[key]||'kepler-gfx-expedition-wreck.png';
-  }
   function gfxExpeditionJourney(pct){
     return `<div class="gfx-journey" aria-hidden="true"><span class="gfx-journey-origin"><i class="ti ti-planet"></i></span><span class="gfx-journey-ship" style="left:${8+pct*.84}%"><i class="ti ti-rocket"></i></span><span class="gfx-journey-destination"><i class="ti ti-map-2"></i></span></div>`;
   }
   function renderGraphicsExpedition(){
     const box=document.getElementById('expeditionVisual');if(!box||activeTab!=='expedition')return;
     const type=EXPEDITION_TYPES.find(t=>t.key===selectedExpeditionType)||EXPEDITION_TYPES[1];
-    const html=`<section class="gfx-view gfx-banner" aria-label="${k7t('Expeditionszentrale')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Tiefenraum')}</span><h2>${k7t('Expeditionszentrale')}</h2></div><div class="gfx-location">${activeExpeditionCount()} / ${maxConcurrentExpeditions()} ${k7t('Expeditionen unterwegs')}</div></header><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-expedition-wreck.png" alt="${k7t('Erkundung eines verlassenen Orbitalwracks')}" decoding="async"><div class="gfx-scene-label"><strong>${escapeHtml(k7View(type).name)}</strong>${escapeHtml(k7View(type).desc)}</div></div><footer class="gfx-metrics"><span>${k7t('Dauer')}: <b>${Math.round(type.durationMult*100)}%</b></span><span>${k7t('Begegnungschance')}: <b>${Math.round(type.encounterChance*100)}%</b></span><span>${k7t('Beute')}: <b>${Math.round(type.rewardMult*100)}%</b></span></footer></section>`;
+    const html=`<section class="gfx-view gfx-banner gfx-mission-banner" aria-label="${k7t('Expeditionszentrale')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Tiefenraum')}</span><h2>${k7t('Expeditionszentrale')}</h2></div><div class="gfx-location">${activeExpeditionCount()} / ${maxConcurrentExpeditions()} ${k7t('Expeditionen unterwegs')}</div></header><div class="gfx-scene">${gfxExpeditionSceneHtml(type.key)}<div class="gfx-scene-label"><strong>${escapeHtml(k7View(type).name)}</strong>${escapeHtml(k7View(type).desc)}</div></div><footer class="gfx-metrics"><span>${k7t('Dauer')}: <b>${Math.round(type.durationMult*100)}%</b></span><span>${k7t('Begegnungschance')}: <b>${Math.round(type.encounterChance*100)}%</b></span><span>${k7t('Beute')}: <b>${Math.round(type.rewardMult*100)}%</b></span></footer></section>`;
     setBoxHtml(box,'expeditionVisual',html);
   }
   function renderGraphicsMarket(){
@@ -76157,7 +76209,8 @@ document.addEventListener('keydown',event=>{
                 waitHtml = `<div class="bmeta" style="color:#e0a548;"><i class="ti ti-clock" aria-hidden="true"></i> Wartet auf eine freie Baustelle.</div>`;
               }
             }
-            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; border-color:${jobWaiting?'rgba(125,129,153,0.4)':'#7f77dd'}; margin-bottom:1rem;">
+            html += `<div class="card-row gfx-orbital-current" style="flex-direction:column; align-items:stretch; border-color:${jobWaiting?'rgba(125,129,153,0.4)':'#7f77dd'}; margin-bottom:1rem;">
+              ${gfxOrbitalPortraitHtml(job.key)}
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span class="bname"><i class="ti ti-planet" aria-hidden="true"></i> ${k7View(job).label}</span>
                 <div style="display:flex; align-items:center; gap:6px;">
@@ -76170,9 +76223,10 @@ document.addEventListener('keydown',event=>{
             </div>`;
           } else if (!cur){
             html += `<div class="bmeta" style="margin-bottom:8px;">Baue eine Orbitalstation und wähle ihren Fokus (Stufe 1: ${costHtml(orbitalCost(1))}, ${fmtDuration(orbitalBuildTime(1))} Bauzeit; ausbaubar bis Stufe ${ORBITAL_MAX_LEVEL}).</div>
-            <div data-hscroll="orbitalfocus" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
+            <div class="gfx-orbital-choices" data-hscroll="orbitalfocus" style="display:flex; overflow-x:auto; padding:0 12px 4px 0; margin-bottom:1rem;">
               ${ORBITAL_FOCI.map(f => `
-                <div class="card-row" style="flex-direction:column; align-items:flex-start;">
+                <div class="card-row gfx-orbital-choice" style="flex-direction:column; align-items:flex-start;">
+                  ${gfxOrbitalPortraitHtml(f.key)}
                   <div style="display:flex; align-items:center; gap:6px;"><i class="ti ${f.icon}" aria-hidden="true" style="color:${f.color};"></i><span class="bname" style="font-size:12px;">${k7View(f).name}</span></div>
                   <div class="bmeta" style="margin:4px 0;">${k7View(f).desc}</div>
                   <button data-build-orbital="${f.key}" style="align-self:stretch; font-size:10.5px;">${k7h("Bauen")}</button>
@@ -76195,7 +76249,8 @@ document.addEventListener('keydown',event=>{
             const needT3 = ORBITAL_TIER3_LEVELS[nextLevel];
             const t3Short = needT3 && Object.entries(needT3).some(([k,v]) => (state.resources[k]||0) < v);
             const t3CostText = needT3 ? ` <span class="costitem"${t3Short?' style="color:#e2647a;"':''}><i class="ti ti-box" aria-hidden="true"></i> ${orbitalTier3Text(nextLevel)}</span>` : '';
-            html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${fdef.color};">
+            html += `<div class="card-row gfx-orbital-current" style="flex-direction:column; align-items:stretch; margin-bottom:1rem; border-color:${fdef.color};">
+              ${gfxOrbitalPortraitHtml(cur.focus)}
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <span class="bname"><i class="ti ${fdef.icon}" aria-hidden="true" style="color:${fdef.color};"></i> ${k7View(fdef).name} <span class="lvl-pill">${k7h("Stufe")} ${cur.level}/${ORBITAL_MAX_LEVEL}</span></span>
               </div>
@@ -76233,7 +76288,8 @@ document.addEventListener('keydown',event=>{
           const curType = effectivePlanetType(pk);
           const curInfo = PLANET_TYPE_INFO[curType] || {};
           let html = `<div class="section-title" style="margin-top:0.5rem; justify-content:space-between;"><span><i class="ti ti-plant" aria-hidden="true"></i>Terraforming: ${k7PreserveUserText(escapeHtml(planetDisplayName(pk)))}</span><button class="help-jump-btn" data-jump-help="kolonien"><i class="ti ti-info-circle" aria-hidden="true"></i>${k7h("Erklärung")}</button></div>`;
-          html += `<div class="card-row" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
+          html += `<div class="card-row gfx-terraform-panel" style="flex-direction:column; align-items:stretch; margin-bottom:1rem;">
+            <div class="gfx-world-comparison"><div><span class="gfx-eyebrow">${k7t('Aktueller Typ')}</span>${gfxTerraformWorldHtml(curType)}<strong>${escapeHtml(k7View(curInfo).label||curType)}</strong></div>${(job?job.targetType:targetType)?`<div><span class="gfx-eyebrow">${k7t('Zieltyp')}</span>${gfxTerraformWorldHtml(job?job.targetType:targetType)}<strong>${escapeHtml(k7View(PLANET_TYPE_INFO[job?job.targetType:targetType]||{}).label||'')}</strong></div>`:''}</div>
             <div class="bmeta" style="margin-bottom:8px;">Aktueller Typ: <i class="ti ${curInfo.icon||'ti-planet'}" aria-hidden="true" style="color:${curInfo.color||'#c7cbe0'};"></i> <strong>${k7View(curInfo).label||curType}</strong> <span style="color:${curInfo.bonusText?'#5dcaa5':'#7d8199'};">(${curInfo.bonusText||'kein spezieller Produktions-/Verteidigungsbonus'})</span></div>`;
 
           if (job){
@@ -76297,8 +76353,8 @@ document.addEventListener('keydown',event=>{
             // die reine Auswahl ist immer möglich, egal ob anderswo gerade eine Stufe läuft.
             const options = TERRAFORM_TARGET_TYPES.filter(t => t !== curType && (t !== 'leerenwelt' || (state.research.rleere||0) >= 5));
             html += `<div class="bmeta" style="margin:${(targetType&&lvl>0)?'10px':'0'} 0 8px;">${lvl>=TERRAFORM_MAX_LEVEL?'Erneut terraformen zu einem anderen Typ:':(targetType?'Anderes Ziel wählen:':'Zieltyp wählen, um mit dem Terraforming zu beginnen:')}</div>
-              <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button data-pick-terraform-target="${t}" style="font-size:10.5px; flex:1; min-width:120px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 6px;"><span><i class="ti ${ti.icon}" aria-hidden="true" style="margin-right:3px; color:${ti.color};"></i>${k7View(ti).label}</span>${ti.bonusText?`<span style="font-size:9px; color:#7d8199; font-weight:400;">${ti.bonusText}</span>`:''}</button>`; }).join('')}
+              <div class="gfx-world-options">
+                ${options.map(t => { const ti = PLANET_TYPE_INFO[t]; return `<button class="gfx-world-choice" data-pick-terraform-target="${t}" aria-pressed="${t===targetType}">${gfxTerraformWorldHtml(t)}<strong><i class="ti ${ti.icon}" aria-hidden="true" style="color:${ti.color};"></i> ${k7View(ti).label}</strong>${ti.bonusText?`<small>${ti.bonusText}</small>`:''}</button>`; }).join('')}
               </div>
               <div class="bmeta" style="margin-top:6px; font-size:11px;">10 Stufen à mehrere Stunden, insgesamt teuer - jede Stufe gewährt nur einen kleinen Anteil des vollen Bonus, erst bei Stufe 10 ist die Umwandlung (inkl. neuer Farbe auf der Sektorkarte) abgeschlossen. Die Zielwahl selbst ist immer möglich, auch während anderswo eine Stufe läuft - nur das tatsächliche Starten einer Stufe ist auf ein Vorhaben gleichzeitig begrenzt.</div>`;
           }
@@ -76452,7 +76508,7 @@ document.addEventListener('keydown',event=>{
     const forschungFertig = RESEARCH_DEFS.filter(r => (state.research[r.key]||0) >= r.maxLevel).length;
     setBoxHtml(document.getElementById('research'), 'research', leerlaufKarte('forschung') + researchProgressHtml
       + ((forschungFertig>0 || state.uiHideMaxed) ? `<div class="bmeta" data-toggle-hide-maxed style="cursor:pointer; margin-bottom:8px;"><i class="ti ${state.uiHideMaxed?'ti-check':'ti-x'}" aria-hidden="true" style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};"></i> Fertig Erforschtes ausblenden: <strong style="color:${state.uiHideMaxed?'#5dcaa5':'#7d8199'};">${state.uiHideMaxed?'AN':'AUS'}</strong>${state.uiHideMaxed&&forschungFertig>0?` <span style="color:#7d8199;">(${forschungFertig} fertige ausgeblendet)</span>`:''} <span style="color:#7d8199;">– antippen zum Umschalten</span></div>` : '')
-      + RESEARCH_DEFS.filter(r => !state.uiHideMaxed || (state.research[r.key]||0) < r.maxLevel).map(r => {
+      + gfxResearchCatalogue().map(({def:r,group,first}) => {
       const lvl = state.research[r.key]||0;
       const maxed = lvl >= r.maxLevel;
       const unlocked = techUnlocked(r);
@@ -76470,7 +76526,7 @@ document.addEventListener('keydown',event=>{
         : r.key==='rdiplomatie' ? (lvl>0?' · aktuell +'+(lvl*0.15).toFixed(2)+'% je aktivem Pakt':'')
         : r.key==='rkolonisation' ? ' · aktuelles Kolonie-Limit: '+(1+Math.floor(lvl/2))
         : (lvl>0?' · aktuell +'+totalBonus+'%':'');
-      return `
+      return `${first?`<h3 class="gfx-research-group" data-gfx-research-group="${group.key}"><i class="ti ${group.icon}" aria-hidden="true"></i> ${escapeHtml(group.label)}</h3>`:''}
         <div class="card-row ${maxed?'research-done':''}${(!unlocked&&lvl===0)?' research-locked':''}">
           <div class="left">
             <div class="bicon" style="background:${(lvl>0||unlocked)?'rgba(126,119,221,0.18)':'rgba(255,255,255,0.04)'};">${iconBox}</div>
@@ -77343,7 +77399,7 @@ document.addEventListener('keydown',event=>{
         <div class="card-row ship-card ${!unlocked?'research-locked':''}${t2ship?' tier2-card':''}" style="--ship-role:${shipRole.color};">
           <div class="left">
             <div class="ship-art">
-              <div class="frame${t2ship?' bicon-t2':''}"><canvas data-ship-icon="${def.key}" width="78" height="58" style="display:block;"></canvas></div>
+              <div class="frame${t2ship?' bicon-t2':''}">${gfxShipThumbnailHtml(def.key)}<canvas data-ship-icon="${def.key}" width="78" height="58" style="display:block;"></canvas></div>
               <span class="rolelbl"${shipRole.tip?` title="${shipRole.tip.replace(/"/g,'&quot;')}"`:''}>${k7View(shipRole).label}</span>
             </div>
             <div>
@@ -77542,7 +77598,7 @@ document.addEventListener('keydown',event=>{
           <div class="gfx-expedition-types" data-hscroll="exptype">
             ${EXPEDITION_TYPES.map(t => `
               <button class="gfx-expedition-type" data-expedition-type="${t.key}" aria-pressed="${selectedExpeditionType===t.key}" title="${k7View(t).desc}">
-                <img src="${gfxExpeditionArt(t.key)}" alt="" loading="lazy" decoding="async"><span><i class="ti ${t.icon}" aria-hidden="true"></i> ${k7View(t).name}</span><small>${k7View(t).desc}</small>
+                ${gfxExpeditionSceneHtml(t.key)}<span class="gfx-mission-name"><i class="ti ${t.icon}" aria-hidden="true"></i> ${k7View(t).name}</span><small>${k7View(t).desc}</small><small class="gfx-mission-facts">${k7t('Dauer')}: ${Math.round(t.durationMult*100)}% · ${k7t('Begegnungschance')}: ${Math.round(t.encounterChance*100)}% · ${k7t('Beute')}: ${Math.round(t.rewardMult*100)}%</small>
               </button>
             `).join('')}
           </div>
@@ -78227,7 +78283,7 @@ document.addEventListener('keydown',event=>{
                   </div>
                 </div>
               </div>
-              <div class="progress-outer" style="margin:8px 0 6px;"><div class="progress-inner" style="width:${lvl/OFFICER_MAX_LEVEL*100}%; background:${o.color};"></div></div>
+              ${lvl>0?`<div class="gfx-officer-level">${k7h("Stufe")} ${lvl} / ${OFFICER_MAX_LEVEL}<div class="progress-outer" role="progressbar" aria-label="${escapeHtml(k7View(o).name)}" aria-valuemin="0" aria-valuemax="${OFFICER_MAX_LEVEL}" aria-valuenow="${lvl}" style="margin:8px 0 6px;"><div class="progress-inner" style="width:${lvl/OFFICER_MAX_LEVEL*100}%; background:${o.color};"></div></div></div>`:''}
               ${talentPickable ? `
               <div class="bmeta" style="margin-bottom:6px;">Ab Stufe ${OFFICER_TALENT_LEVEL} einmalig wählbar (dauerhaft, kein Wechsel):</div>
               <div style="display:flex; gap:6px; margin-bottom:8px;">
@@ -78486,7 +78542,7 @@ document.addEventListener('keydown',event=>{
             const sel = r===fragRar;
             return `<button data-fragrar="${r}" style="font-size:10px; padding:4px 8px; border-color:${MODULE_RARITY[r].color}${sel?'':'44'}; ${sel?'color:'+MODULE_RARITY[r].color+'; background:'+MODULE_RARITY[r].color+'1a;':''}">${k7View(MODULE_RARITY[r]).label} (${MODULE_FRAGMENT_CRAFT_COST[r]})</button>`;
           }).join('') + `</div>`;
-          html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + fundPool(MODULE_DEFS).map(def => `<button data-fragcraft-loc="${def.key}" ${fragStock>=fragCost?'':'disabled'} style="font-size:10px; padding:5px 9px;" title="${k7View(def).desc}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${k7View(def).name}</button>`).join('') + `</div>`;
+          html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + fundPool(MODULE_DEFS).map(def => `<button class="gfx-craft-choice" data-fragcraft-loc="${def.key}" ${fragStock>=fragCost?'':'disabled'} title="${escapeHtml(k7View(def).desc)}">${moduleIconHtml(def,false,MODULE_RARITY[fragRar].color)}<span>${k7View(def).name}<small>${fragCost} ${k7Ui('Fragmente','fragments')} · ${k7View(MODULE_RARITY[fragRar]).label}</small></span></button>`).join('') + `</div>`;
         }
         // Signatur-Cache, gleiche Begründung wie bei der Schiffsmodul-Box weiter unten: derselbe
         // Haupt-Tick, dasselbe vollständige Neuschreiben samt allen Verdrahtungsläufen, kein
@@ -78751,7 +78807,7 @@ document.addEventListener('keydown',event=>{
             const fragStock = state.moduleFragments||0;
             html += `<div class="section-title" style="margin-top:1rem; font-size:13px;"><i class="ti ti-atom-2" aria-hidden="true"></i>Modul-Schmelze (${k7View(clsDef).name})</div>`;
             html += `<div class="bmeta" style="margin-bottom:6px;">Vorrat: <strong>${fragStock} Modulfragmente</strong> (gemeinsam mit den Standort-Modulen). Gewählte Seltenheit: <span style="color:${MODULE_RARITY[fragRar].color};">${k7View(MODULE_RARITY[fragRar]).label}</span> (${fragCost} Fragmente je Modul, umstellbar in der Standort-Schmelze).</div>`;
-            html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + classCraftable.map(def => `<button data-fragcraft-ship="${def.key}" ${fragStock>=fragCost?'':'disabled'} style="font-size:10px; padding:5px 9px;" title="${k7View(def).desc}"><i class="ti ${def.icon}" aria-hidden="true" style="margin-right:3px;"></i>${k7View(def).name}</button>`).join('') + `</div>`;
+            html += `<div style="display:flex; flex-wrap:wrap; gap:6px;">` + classCraftable.map(def => `<button class="gfx-craft-choice" data-fragcraft-ship="${def.key}" ${fragStock>=fragCost?'':'disabled'} title="${escapeHtml(k7View(def).desc)}">${moduleIconHtml(def,true,MODULE_RARITY[fragRar].color)}<span>${k7View(def).name}<small>${fragCost} ${k7Ui('Fragmente','fragments')} · ${k7View(MODULE_RARITY[fragRar]).label}</small></span></button>`).join('') + `</div>`;
           }
         }
         // Signatur-Cache (Hausmuster aus CLAUDE.md, 27.07.2026). Die Box hing bis hier ungefiltert
@@ -79048,7 +79104,7 @@ document.addEventListener('keydown',event=>{
                    13688/4960 hier. Die gegnerische Verteidigung zieht mit: Eine gerundete eigene
                    Angriffskraft neben einer rohen gegnerischen Verteidigung waere dieselbe
                    Fehlerklasse eine Ebene weiter, und die Zahlen sind genau zum Vergleichen da. -->
-              <div class="bmeta">Gegner-Verteidigungspunkte: ${fmt(effDefense)}${wins?' (skaliert)':''} · Deine Angriffskraft: ${fmt(power)}${totalSelected<1?(combatShipsN>0?' (keine Schiffe gewählt)':' ('+kampfflottenMangel(cf)+')'):''} · Erfolgschance ~${chance}%</div>
+              <div class="gfx-combat-facts"><span>${k7Ui('Gegner-Verteidigungspunkte','Enemy defence points')}<b>${fmt(effDefense)}${wins?' (skaliert)':''}</b></span><span>${k7Ui('Deine Angriffskraft','Your attack power')}<b>${fmt(power)}</b>${totalSelected<1?(combatShipsN>0?' (keine Schiffe gewählt)':' ('+kampfflottenMangel(cf)+')'):''}</span><span>${k7Ui('Erfolgschance','Success chance')}<b>~${chance}%</b></span></div>
               <div class="bmeta" style="display:flex; align-items:center; flex-wrap:wrap;"><i class="ti ti-rocket" aria-hidden="true" style="margin-right:4px;"></i>Gegnerische Flotte: ${fleetIconRowHtml(npcFleetPreview)}</div>
               ${kv && npcCounterPreview !== 1 ? `<div class="bmeta" style="color:${kv.farbe};"><i class="ti ${kv.icon}" aria-hidden="true"></i> ${k7View(kv).text} (${kv.pct>0?'+':''}${kv.pct}% Angriffskraft)</div>` : ''}
               ${n.weakness ? `<div class="bmeta" style="color:${schwaecheGenutzt?'#5dcaa5':'#7d8199'};"><i class="ti ti-target" aria-hidden="true"></i> Schwachstelle: ${weaknessName(n.weakness)}${schwaecheGenutzt?' – ausgenutzt (+25% Angriffskraft, bereits eingerechnet)':' – nicht mitgeführt'}</div>` : ''}
@@ -80066,7 +80122,7 @@ document.addEventListener('keydown',event=>{
         const achLocked = a.unlockAch && !((state.achievements||{})[a.unlockAch]);
         const locked = (a.exclusive && !((state.unlockedCosmetics||{})[a.key])) || achLocked;
         const title = achLocked ? ('Freischaltbar über den Erfolg „'+(ACHIEVEMENTS.find(x=>x.key===a.unlockAch)||{}).name+'"') : (locked ? 'Exklusiv - nur per seltenem Expeditionsfund freischaltbar' : '');
-        return `<button class="avatar-option ${state.player.avatarKey===a.key?'active':''}" data-avatar="${a.key}" ${locked?'data-locked="1" disabled':''} title="${title}" style="background:${a.bg}; ${locked?'opacity:0.35; cursor:not-allowed;':''}">${locked?'<i class="ti ti-lock" aria-hidden="true"></i>':a.svg}</button>`;
+        return `<button class="avatar-option ${state.player.avatarKey===a.key?'active':''}" data-avatar="${a.key}" aria-label="${escapeHtml(gfxAvatarLabel(a.key)+(title?' · '+title:''))}" aria-pressed="${state.player.avatarKey===a.key}" ${locked?'data-locked="1" disabled':''} title="${escapeHtml(title||gfxAvatarLabel(a.key))}" style="--avatar-color:${a.bg}; ${locked?'cursor:not-allowed;':''}"><span class="gfx-avatar-symbol" style="background:${a.bg};" aria-hidden="true">${a.svg}${locked?'<i class="ti ti-lock gfx-avatar-lock" aria-hidden="true"></i>':''}</span><span class="gfx-avatar-name">${escapeHtml(gfxAvatarLabel(a.key))}</span>${state.player.avatarKey===a.key?'<i class="ti ti-check" aria-hidden="true"></i>':''}</button>`;
       }).join('');
       // Handler NUR neu setzen, wenn wirklich geschrieben wurde. setBoxHtml() meldet das zurueck -
       // sauberer als sich darauf zu verlassen, dass die alten Knoten samt Handler stehenbleiben.
@@ -80123,6 +80179,7 @@ document.addEventListener('keydown',event=>{
     const allianceMetaEl = document.getElementById('allianceMetaLine');
     if (allianceNameEl && allianceMetaEl){
       const tag = myAllianceTag();
+      document.querySelector('#tab-allianz .alliance-hero-card')?.classList.toggle('gfx-alliance-entry',!tag);
       setBoxText(allianceMetaEl, tag ? 'Gemeinsame Technologien mit allen Mitgliedern des Tags' : 'Vergib einen Tag, um einer Allianz beizutreten oder eine neue zu gründen');
       setBoxText(allianceNameEl, tag ? '['+tag+']' : 'Keine Allianz');
       // Kriegsruhm (Feature C): die Zeile fuellt loadAllianceWars aus GET /api/allianzkrieg; ohne Allianz weg.
@@ -80194,9 +80251,9 @@ document.addEventListener('keydown',event=>{
     if (themePicker){
       // dito (v8.382.0): 4,8 kB/s fuer eine vollstaendig statische Liste.
       const themeHtml = THEME_PRESETS.map(t => `
-        <button data-theme-key="${t.key}" title="${k7View(t).name}" style="flex-shrink:0; width:56px; height:56px; padding:0; overflow:hidden; ${((state.themeKey||'standard')===t.key)?'border-color:#fff; box-shadow:0 0 0 2px #fff;':''}">
-          <div style="width:100%; height:50%; background:${t.primary};"></div>
-          <div style="width:100%; height:50%; background:${t.secondary};"></div>
+        <button class="gfx-theme-choice" data-theme-key="${t.key}" aria-pressed="${(state.themeKey||'standard')===t.key}" title="${escapeHtml(k7View(t).name)}">
+          <span class="gfx-theme-swatch" style="background:linear-gradient(100deg,${t.primary} 50%,${t.secondary} 50%);" aria-hidden="true"></span>
+          <span>${escapeHtml(k7View(t).name)}</span>${(state.themeKey||'standard')===t.key?'<i class="ti ti-check" aria-hidden="true"></i>':''}
         </button>
       `).join('');
       if (setBoxHtml(themePicker, 'themePicker', themeHtml)){
