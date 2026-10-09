@@ -13,7 +13,7 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261008-8';assert.equal(source.split(anchor).length,2);
+ const anchor='kepler-graphics.css?v=20261008-12';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
@@ -88,8 +88,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
       const defs=__gfxReview.facilityDefs().filter(d=>kind==='defense'?d.category==='defense':d.category!=='defense'),levels=__gfxReview.levels();
       const buttons=[...box.querySelectorAll('[data-gfx-facility="'+kind+'"]')];
       return {kind,expected:defs.length,actual:buttons.length,ok:buttons.length===defs.length&&defs.every((d,i)=>{
-        const b=buttons[i],r=b.getBoundingClientRect();
-        return b.dataset.gfxKey===d.key&&b.querySelector('.gfx-facility-name').textContent===d.name&&b.querySelector('.gfx-facility-level').textContent==='Stufe '+(levels[d.key]||0)&&r.width>0&&r.height>=44&&getComputedStyle(b).display!=='none';
+        const b=buttons.find(b=>b.dataset.gfxKey===d.key),r=b&&b.getBoundingClientRect();
+        return b&&b.querySelector('.gfx-facility-name').textContent.replace(/\u00ad/g,'')===d.name&&b.querySelector('.gfx-facility-level').textContent==='Stufe '+(levels[d.key]||0)&&r.width>0&&r.height>=44&&getComputedStyle(b).display!=='none';
       })};
     },kind));
     await page.locator('#'+root+' [data-gfx-facility="'+kind+'"][data-gfx-key="'+key+'"]').press('Enter');
@@ -193,11 +193,11 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
     await page.setViewportSize({width,height:844});
     for(const [tab,id] of [['basis','colonyVisual'],['verteidigung','defenseVisual']]){
       await page.evaluate(t=>__gfxReview.show(t),tab);
-      const fit=await page.locator('#'+id+' .gfx-facility-grid').evaluate(grid=>{
+      const fit=await page.locator('#'+id+' .gfx-facility-grid').evaluateAll(grids=>grids.length>0&&grids.every(grid=>{
         const r=grid.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&grid.scrollWidth<=grid.clientWidth+1&&[...grid.querySelectorAll('button')].every(b=>{
           const a=b.getBoundingClientRect();return a.left>=r.left-1&&a.right<=r.right+1&&a.width>=44&&a.height>=44&&b.scrollWidth<=b.clientWidth+1;
         });
-      });
+      }));
       check(tab+' complete catalogue fits '+width+'px with readable touch targets',fit);
       await page.locator('#'+id+' [data-gfx-facility]').last().press('Enter');
       // Observe the actual result; the bound also rejects a missing navigation step.

@@ -171,6 +171,8 @@ pruef('1f2: keine Beschreibung ist ein blosses Kuerzel', zuKurz.length === 0, zu
     await page.goto(SPIEL_URL); await page.waitForTimeout(2200);
     await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o=document.getElementById(id); if(o) o.style.display='none'; }); });
 
+    // The readable navigation now scrolls: bring its native last button into view before hit-testing it.
+    await page.locator('.tabs .tab-btn[data-tab="sammlung"]').scrollIntoViewIfNeeded();
     // --- 2: der Reiter ist da UND bedienbar (Sichtbarkeit ist nicht Bedienbarkeit, KB-11/Regel 49)
     const reiter = await page.evaluate(() => {
       const b = document.querySelector('[data-tab="sammlung"]');
@@ -183,8 +185,7 @@ pruef('1f2: keine Beschreibung ist ein blosses Kuerzel', zuKurz.length === 0, zu
     });
     pruef('2: der Reiter Sammlung existiert', reiter.da);
     pruef('2a: der Reiter ist antippbar (elementFromPoint auf seiner Mitte)', reiter.trifft, reiter);
-    // Die volle Rasterbreite ist die gemessene Entscheidung dieser Etappe: 348x36 statt 54x49.
-    pruef('2b: der Reiter nimmt am Handy die volle Rasterbreite', reiter.breite > 250, reiter);
+    pruef('2b: der sichtbare Reiter bleibt ein grosses Tippziel', reiter.breite >= 44 && reiter.hoehe >= 44, reiter);
 
     const geoeffnet = await versuche('3-klick: der Reiter laesst sich oeffnen',
       async () => { await page.click('[data-tab="sammlung"]', { timeout:3000 }); await page.waitForTimeout(900); return true; }, false);
@@ -197,15 +198,15 @@ pruef('1f2: keine Beschreibung ist ein blosses Kuerzel', zuKurz.length === 0, zu
       const ohneBeschreibung = zeilen.filter(z => /Ohne Beschreibung/.test(z.textContent)).map(z => (z.querySelector('.bname')||{}).textContent);
       const ohneFundort = zeilen.filter(z => !z.querySelector('.ti-map-pin')).length;
       return { da:true, panel: document.getElementById('tab-sammlung').classList.contains('active'),
-               zeilen: zeilen.length, svg: box.querySelectorAll('.bicon svg').length,
-               ikonen: box.querySelectorAll('.bicon i.ti').length,
+               zeilen: zeilen.length, svg: box.querySelectorAll('[data-item-art="reliquie"] .bicon svg').length,
+               ikonen: zeilen.filter(z=>z.dataset.itemArt!=='reliquie'&&z.querySelector('.bicon svg,.bicon i.ti,.bicon [data-gfx-material]')).length,
                ohneBeschreibung, ohneFundort,
                besitzPillen: zeilen.filter(z => /x$|geborgen/.test(((z.querySelector('.lvl-pill')||{}).textContent||'').trim())).length };
     });
     pruef('3-vorab: die Box ist gezeichnet und der Reiter offen', m.da && m.panel, m);
     pruef('3: die Ansicht zeigt JEDEN Eintrag der fuenf Listen', m.zeilen === erwartet, { gezeichnet:m.zeilen, erwartet, jeListe:zahl });
     pruef('3a: die Reliquien kommen als SVG durch (sie haben kein ti-Icon)', m.svg === zahl.ABGRUND_RELIKTE, { svg:m.svg, erwartet:zahl.ABGRUND_RELIKTE });
-    pruef('3b: alle uebrigen tragen ein ti-Icon', m.ikonen === erwartet - zahl.ABGRUND_RELIKTE, { ikonen:m.ikonen });
+    pruef('3b: alle uebrigen tragen ein gueltiges eigenes Bild oder natives Symbol', m.ikonen === erwartet - zahl.ABGRUND_RELIKTE, { ikonen:m.ikonen });
     // Hausregel 7: jeder Inhalt braucht eine vollstaendige Beschreibung. Diese Ansicht macht
     // jede Luecke sichtbar - deshalb ist sie hier die Pruefung, nicht nur die Anzeige.
     pruef('3c: KEIN Eintrag steht ohne Beschreibung da', m.ohneBeschreibung.length === 0, m.ohneBeschreibung);

@@ -71,12 +71,13 @@ const KOPFKNOEPFE = () => {
   }).filter(x => x.b > 0 && x.h > 0);
 };
 
-async function seite(browser, breite){
+async function seite(browser, breite, compactHead){
   const ctx = await browser.newContext({ viewport: { width: breite, height: 844 },
     deviceScaleFactor: breite < 700 ? 3 : 1, isMobile: breite < 700, hasTouch: breite < 700 });
   const page = await ctx.newPage();
   const fehler = []; page.on('pageerror', e => fehler.push(String(e)));
-  await page.route('**/api/**', backend({ 'kepler7-save-v3': SPIELSTAND }));
+  const save=compactHead===undefined?SPIELSTAND:JSON.stringify({...JSON.parse(SPIELSTAND),compactHead});
+  await page.route('**/api/**', backend({ 'kepler7-save-v3': save }));
   await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); });
   await page.goto(DATEI);
   await page.waitForTimeout(2400);
@@ -104,7 +105,8 @@ async function seite(browser, breite){
   // Geprueft wird die Ursache, nicht eine Zahl: am PC stehen die Beschriftungen, die Knoepfe sind
   // deshalb deutlich BREITER als das Handy-Mass. Waere die Regel global gezogen, waeren die
   // Knoepfe am PC exakt so hoch wie am Handy und die Breiten unveraendert - das faellt hier auf.
-  const pc = await seite(browser, 1200);
+  // Keep the labelled full-header contract explicit after the automatic compact limit moved to 1380px.
+  const pc = await seite(browser, 1200, false);
   const beschriftet = (pc.knoepfe || []).filter(x => x.b > MASS_BREIT + 20).length;
   check('2) am PC tragen die Knoepfe ihre Beschriftung und sind breiter',
     beschriftet >= 4, (pc.knoepfe || []).map(x => x.id + ' ' + x.b + 'x' + x.h));

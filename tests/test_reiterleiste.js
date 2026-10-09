@@ -47,7 +47,7 @@ function backend(store){ return async r => {
 
 const SPEICHER = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   seenTabHints:{ basis:1, verteidigung:1, forschung:1, flotte:1, expedition:1, karte:1,
-                 galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1 },
+                 galaxie:1, allianz:1, offiziere:1, markt:1, punkte:1, fortschritt:1, sammlung:1 },
   resources:{ energie:412000, erz:388000, kristalle:264000, deuterium:151000, antimaterie:19400, forschungspunkte:31200 },
   buildings:{ solar:20, mine:19, raffinerie:15, synth:13, labor:12, werft:12, hangar:8, lager:12 },
   research:{ rsolar:8, rerz:8, rkampf:7 }, fleet:{ jaeger:420, missions:[] },
@@ -108,6 +108,8 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
     // endete nach 133 ms ohne Fehler. Aus der Stabilitätsprüfung wäre also ein fester 250-ms-Schlaf
     // geworden - ein Test, der aussieht wie eine Wartung und keine ist.
     await warteBisRuhe(page);
+    if(process.env.K7_NAV_FAULT==='scroll')await page.evaluate(()=>Object.defineProperty(document.querySelector('.tabs'),'scrollLeft',{get:()=>0,set:()=>{}}));
+    if(process.env.K7_NAV_FAULT==='font')await page.addStyleTag({content:'@media(max-width:1380px){#game-root .tabs .tab-btn{font-size:8px!important}}'});
     return { ctx, page };
   }
 
@@ -193,6 +195,8 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
       const klappen = [...document.querySelectorAll('.edge-tab')].map(e => e.getBoundingClientRect());
       return {
         anzeige: getComputedStyle(bar).display,
+        schrift: Math.min(...btns.map(b=>parseFloat(getComputedStyle(b).fontSize))),
+        hinweis: document.querySelector('.gfx-nav-hint').getBoundingClientRect().height > 0,
         hoehe: Math.round(bb.height),
         ganz: btns.filter(drin).length,
         alle: btns.length,
@@ -217,8 +221,14 @@ const GROESSEN = [{ name:'iPhone 14  390x844', w:390, h:844 },
     // Nur was in BEIDEN Messungen verdeckt war, gilt als verdeckt.
     m.verdeckt = m.verdeckt.filter(t => m1.verdeckt.includes(t));
     const p = g.name + ': ';
-    check(p + 'die Leiste ist ein Raster, keine Wischleiste', m.anzeige === 'grid' && !m.wischbar, m);
-    check(p + 'ALLE Reiter sind gleichzeitig sichtbar', m.ganz === m.alle && m.alle >= 12, { ganz: m.ganz, alle: m.alle });
+    check(p + 'die lesbare Wischleiste spart Hoehe und zeigt ihren Hinweis', m.anzeige === 'flex' && m.wischbar && m.hinweis && m.hoehe <= 80 && m.schrift >= 12, m);
+    const keys=await page.locator('.tabs .tab-btn').evaluateAll(bs=>bs.map(b=>b.dataset.tab));
+    const erreichbar=[];
+    for(const key of keys){
+      const result=await page.evaluate(key=>{const b=document.querySelector('.tabs .tab-btn[data-tab="'+key+'"]');b.click();const r=b.getBoundingClientRect(),bar=b.closest('.tabs').getBoundingClientRect(),panel=document.getElementById('tab-'+key);return {key,aktiv:b.classList.contains('active')&&!!panel&&panel.classList.contains('active'),sichtbar:r.left>=bar.left-1&&r.right<=bar.right+1};},key);
+      erreichbar.push(result);
+    }
+    check(p + 'ALLE Reiter werden durch ihre native Auswahl sichtbar und aktiv', erreichbar.length >= 12 && erreichbar.every(e=>e.aktiv&&e.sichtbar),erreichbar.filter(e=>!e.aktiv||!e.sichtbar));
     check(p + 'keine Beschriftung wird abgeschnitten', m.abgeschnitten.length === 0, m.abgeschnitten);
     check(p + 'jeder Reiter bleibt ein treffbares Ziel (>=32px)', m.zuKlein.length === 0, m.zuKlein);
     check(p + 'die seitlichen Klappen verdecken keinen Reiter', m.verdeckt.length === 0, m.verdeckt);
