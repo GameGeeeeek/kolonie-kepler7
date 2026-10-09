@@ -12,6 +12,11 @@ on:
       - tests/test_expeditionsbox_cache.js
       - tests/test_visual_harmony.js
       - tests/test_graphic_polish.js
+      - tests/test_visual_details.js
+      - tools/check-visual-details-counterexamples.cjs
+      - tools/check-combat-graphics-counterexamples.cjs
+      - tests/test_kopfzeile_chips.js
+      - tests/test_gegnerlage.js
       - tools/check-graphic-polish-counterexamples.cjs
       - tools/check-mobile-polish-counterexamples.cjs
       - tests/test_reiterleiste.js
@@ -50,6 +55,10 @@ jobs:
           fi
       - name: Audit findings through real native game rendering
         run: node tests/test_graphic_polish.js
+      - name: Remaining illustrated systems and native actions
+        run: node tests/test_visual_details.js
+      - name: Remaining audit counterexamples must fail
+        run: node tools/check-visual-details-counterexamples.cjs
       - name: Readable navigation and explicit full and compact header contracts
         run: node tests/http-run.js test_reiterleiste.js test_reitergruppen.js test_verdichtung.js test_gegenstandskatalog.js test_kopfzeile_tippziele.js
       - name: Every controlled audit regression must fail
@@ -97,6 +106,11 @@ jobs:
           node tools/check-graphics-counterexamples.cjs
           node tools/check-graphics-expansion-counterexamples.cjs
           node tools/check-expedition-graphics-counterexamples.cjs
+          node tools/check-combat-graphics-counterexamples.cjs
+      - name: Native custom prices, module art and missing-fleet explanations
+        run: |
+          node tests/http-run.js test_abgrundbezug.js test_iconabdeckung.js test_sperrgrund_fortschritt_galaxie.js
+          node tools/check-visual-detail-regressions.cjs
       - name: Compare map findings with the release baseline
         if: failure()
         env:

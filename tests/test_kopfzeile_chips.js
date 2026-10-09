@@ -888,10 +888,17 @@ function aufraeumenVergleich(){
        mitgemessen - liegen alle Werte unter 1000, sind beide Schreibweisen gleich und die
        Pruefung waere blind. */
     const npc = await page.evaluate(() => {
-      const zeilen = [...document.querySelectorAll('.bmeta')]
-        .map(e => (e.textContent || '').replace(/\s+/g, ' ').trim())
-        .filter(t => /Gegner-Verteidigungspunkte:/.test(t) && /Deine Angriffskraft:/.test(t));
-      return zeilen.map(t => {
+      const karten = [...document.querySelectorAll('#npcList > .card-row')]
+        .filter(e => e.querySelector('[data-attack]'));
+      return karten.map(karte => {
+        const facts=karte.querySelector('.gfx-combat-facts');
+        if(facts){
+          const felder=[...facts.children];
+          const wert=label=>felder.find(e=>(e.textContent||'').startsWith(label))?.querySelector('b')?.textContent.trim()||null;
+          return {zeile:(facts.textContent||'').replace(/\s+/g,' ').trim(),def:wert('Gegner-Verteidigungspunkte'),atk:wert('Deine Angriffskraft')};
+        }
+        // Retain historical baseline/counterexample support for the previous text row.
+        const t=(karte.textContent||'').replace(/\s+/g,' ').trim();
         const d = t.match(/Gegner-Verteidigungspunkte: ([0-9][0-9.,]*[kM]?)/);
         const a = t.match(/Deine Angriffskraft: ([0-9][0-9.,]*[kM]?)/);
         return { zeile:t, def: d ? d[1] : null, atk: a ? a[1] : null };
