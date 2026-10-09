@@ -179,7 +179,7 @@ async function galaxieChance(page){
     if (!l) return null;
     const k = [...l.children].find(c => c.querySelector('[data-attack="' + id + '"]'));
     if (!k) return null;
-    const m = (k.textContent||'').match(/Erfolgschance ~(\d+)%/);
+    const m = (k.textContent||'').match(/Erfolgschance\s*~(\d+)%/);
     return m ? parseInt(m[1], 10) : null;
   }, NPC_ID);
 }
