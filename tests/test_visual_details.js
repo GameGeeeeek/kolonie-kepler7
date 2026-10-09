@@ -10,6 +10,7 @@ if(process.env.K7_DETAIL_FAULT==='missions')source=fault(source,"gfxAtlasTile(GF
 if(process.env.K7_DETAIL_FAULT==='catalogue')source=fault(source,'const defs=RESEARCH_DEFS.filter(r=>','const defs=RESEARCH_DEFS.slice(1).filter(r=>');
 if(process.env.K7_DETAIL_FAULT==='help-focus')source=fault(source,'if(keepFocus) box.querySelector(', 'if(false) box.querySelector(');
 if(process.env.K7_DETAIL_FAULT==='rail-scroll')source=fault(source,'if (railPosition) { const rail=', 'if (false) { const rail=');
+if(process.env.K7_DETAIL_FAULT==='english-roles')source=fault(source,'k7t(shipRoleInfo(d).label)','shipRoleInfo(d).label');
 const end='\n})();\n</script>\n</body>';assert.equal(source.split(end).length,2);
 const html=source.replace(end,`\nwindow.__details={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,research:RESEARCH_DEFS,ships:SHIP_DEFS,types:EXPEDITION_TYPES,worlds:TERRAFORM_TARGET_TYPES,orbital:orbitalStationOf,officers:OFFICERS,groups:gfxResearchCatalogue};\n`+end);
 let checks=0,failures=0;
@@ -114,6 +115,12 @@ function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FA
    }
   }
   check('new atlases load and have correct grid aspect ratios',await page.evaluate(async()=>{for(const [file,ratio] of [['orbital',1],['world',1],['expedition',1.5],['flagship',3]]){const im=new Image();im.src='kepler-gfx-'+file+'-atlas.png';await im.decode();if(Math.abs(im.naturalWidth/im.naturalHeight-ratio)>.01)return false;}return true;}));
+  await page.goto(origin+'/?lang=en');
+  await page.waitForFunction(()=>window.__details&&__details.ready());
+  await page.evaluate(()=>{for(const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay']){const e=document.getElementById(id);if(e)e.style.display='none';}__details.show('flotte');});
+  const roles=await page.locator('#shipyardVisual [data-gfx-ship] small').allTextContents();
+  const englishRoles=['Civilian','Interceptor','Bomber','Capital ship','Armored','Fast attack','Attack'];
+  check('all catalogue hull roles use their English labels after a language switch',roles.length===45&&roles.every(t=>englishRoles.some(role=>t.startsWith(role+' · Available:')))&&['Civilian','Interceptor','Capital ship'].every(role=>roles.some(t=>t.startsWith(role+' ·'))),roles);
   check('all exercised native actions finish without JavaScript errors',errors.length===0,errors);
  }catch(e){failures++;console.error(e.stack);}finally{if(browser)await browser.close();if(server)await new Promise(r=>server.close(r));}
  console.log('\n'+checks+' checks, '+failures+' failures');process.exitCode=failures?1:0;
