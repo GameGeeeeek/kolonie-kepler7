@@ -220,7 +220,7 @@ async function klickUndMiss(page, klick){
   const npc = await page.evaluate(() => {
     const alle = Array.from(document.querySelectorAll('#npcList [data-attack]'));
     return { gesamt: alle.length, gesperrt: alle.filter(b => b.disabled).length,
-             zeile: ((document.querySelector('#npcList .bmeta')||{}).textContent||'').trim() };
+             zeile: ((document.querySelector('#npcList .gfx-combat-facts') || document.querySelector('#npcList .bmeta') || {}).textContent||'').trim() };
   });
   check('8: NPC-Angriff - kein Knopf mehr gesperrt (und es gibt welche)',
         npc.gesamt >= 10 && npc.gesperrt === 0, { gesamt: npc.gesamt, gesperrt: npc.gesperrt });
@@ -268,7 +268,7 @@ async function klickUndMiss(page, klick){
     const b = document.querySelector('#npcList [data-attack]'); if (b) b.click();
   });
   const hangarZeile = await hangar.page.evaluate(() =>
-    ((document.querySelector('#npcList .bmeta')||{}).textContent||'').trim());
+    ((document.querySelector('#npcList .gfx-combat-facts') || document.querySelector('#npcList .bmeta') || {}).textContent||'').trim());
   check('13: mit Jaegern ohne Traegerschiff nennt die Meldung den HANGAR, nicht die Werft',
         hangarKlick.neu.some(z => /Trägerschiff/.test(z) && /Hangarplätze/.test(z))
           && !hangarKlick.neu.some(z => /bau in der Werft/.test(z))

@@ -287,14 +287,17 @@ for (const [klasse, liste] of Object.entries(proKlasse)){
 check('8: genau drei Wirkungspaare brauchen einen Sonderkern (Begründung der Sonderkerne)',
   nachWirkung.length === 3, nachWirkung);
 
-// Die schmalen Fertigungs-Knöpfe bleiben bewusst flach (font-size:10px, ein 24px-SVG sprengt die
-// Zeile) - und zwar fuer BEIDE Modulfamilien gleich. Festgehalten, damit die Ausnahme eine Regel
-// ist und nicht als vergessener Rest gelesen wird.
-check('8: die Ausnahme der Fertigungs-Knöpfe steht als Begründung im Code',
-  /WO DIESE FUNKTION BEWUSST NICHT AUFGERUFEN WIRD/.test(src));
-for (const knopf of ['data-craft-mythic-loc','data-craft-mythic-ship','data-fragcraft-loc','data-fragcraft-ship'])
+// Mythische Fertigung behaelt ihre schmalen Schrift-Icons. Die neue Fragment-Schmelze hat
+// groessere Karten und muss fuer BEIDE Familien deren eigenes gezeichnetes Modul zeigen.
+for (const knopf of ['data-craft-mythic-loc','data-craft-mythic-ship'])
   check('8: '+knopf.padEnd(24)+' benutzt weiterhin das Schrift-Icon',
     new RegExp(knopf+'="\\$\\{def\\.key\\}"[^`]*<i class="ti \\$\\{def\\.icon\\}"').test(src));
+for (const [knopf,schiff] of [['data-fragcraft-loc',false],['data-fragcraft-ship',true]]) {
+  const zeile = src.split('\n').find(z => z.includes(knopf+'="${def.key}"')) || '';
+  check('8: '+knopf+' zeigt sein eigenes gezeichnetes Modul',
+    zeile.includes('${moduleIconHtml(def,'+schiff+',MODULE_RARITY[fragRar].color)}')
+      && !zeile.includes('<i class="ti ${def.icon}"'));
+}
 
 // ------------------------------------------- 9: Rohstoffe (v8.307.1)
 // BEFUND: Von den sieben Tier-2-Rohstoffen hatten zwei keinen RES_ICONS-Eintrag - Metamaterial-

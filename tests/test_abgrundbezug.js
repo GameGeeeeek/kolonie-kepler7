@@ -251,7 +251,8 @@ function arrAus(name){
     /CREDIT_SHOP\.filter\(item => !item\.sichtbar \|\| item\.sichtbar\(\)\)/.test(render));
   check('10: dieselbe gefilterte Liste bildet Signatur UND Markup (keine zwei Filterlaeufe)',
     (render.match(/sichtbare\.map\(/g)||[]).length === 2 && !/CREDIT_SHOP\.map\(/.test(render));
-  check('10: der Knopf zeigt den eigenen Preistext statt "0 Kr."', /item\.preisText \? item\.preisText/.test(render));
+  check('10: der Knopf zeigt den eigenen Preistext statt "0 Kr."',
+    /item\.preisText \? (?:item\.preisText|k7Ui\('Einlösen','Redeem'\)\+' · '\+item\.preisText)/.test(render));
   const kauf = fnAus('buyShopItem');
   check('10: der Kauf prueft sichtbar() und kaufbar() erneut',
     /item\.sichtbar && !item\.sichtbar\(\)/.test(kauf) && /item\.kaufbar && !item\.kaufbar\(\)/.test(kauf));

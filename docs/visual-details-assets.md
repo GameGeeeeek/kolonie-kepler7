@@ -33,3 +33,5 @@ Die Atlanten ergänzen zusammen ungefähr 12 MB PNG-Daten. Sie verwenden die vor
 Die vorhandenen Zahlenformat- und Gegnerlageprüfungen lesen die neu getrennten Gegnerfelder, weiterhin mit Unterstützung für historische Vergleichsstände. Zusätzliche Gegenproben bestätigen, dass Rohzahlen statt Kurzschreibweise und eine vom Kartenweg abweichende Erfolgschance tatsächlich erkannt werden.
 
 Der englische Grafiktest fand unübersetzte Rollen im erweiterten Schiffskatalog: `shipRoleInfo` liefert temporäre Objekte, daher ist `k7View` dort nicht der passende Übersetzungsweg. Die Beschriftung verwendet nun `k7t` und den vorhandenen Wortschatz; alle Schiffsklassen werden nach einem echten Sprachwechsel geprüft.
+
+Die bestehenden Abgrund-, Icon- und Angriffshinweisprüfungen lesen auch die neue Gestaltung: Einlösen behält seinen tatsächlichen Splitterpreis, Fragmentkarten tragen eigene Modulbilder und die drei Gegnerfelder enthalten weiterhin den fehlenden Flotten- beziehungsweise Hangarhinweis. Vier kontrollierte Gegenproben entfernen diese Eigenschaften einzeln und müssen an den jeweiligen unveränderten Verhaltensregeln scheitern.
