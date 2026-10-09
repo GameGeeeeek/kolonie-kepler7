@@ -198,7 +198,7 @@ const spielstand = JSON.stringify({ tutorialSeen:true, newbieWelcomeSeen:true,
   player:{ id:'u', name:'A', avatarKey:null }, fleet:{ jaeger:100, missions:[] },
   battleStats:{ wins:1, losses:0 }, xp:20000, credits:50000, buffs:[], lastTick:Date.now(), colonyNames:{} });
 
-const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'];
+const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'];
 
 (async () => {
   const browser = await starteBrowser();
@@ -211,8 +211,18 @@ const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','up
     await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
     await page.goto(url);
     // Auf einen Reiter warten, den es als Knopf WIRKLICH gibt.
-    await page.waitForSelector('.tab-btn[data-tab="basis"]', { timeout: 60000 });
+    await page.waitForSelector('.tab-btn[data-tab="basis"]', { state:'attached', timeout: 60000 });
+    await page.waitForFunction(()=>document.getElementById('loadstate')?.textContent.startsWith('Spielstand automatisch geladen'), null, { timeout:60000 });
     await page.evaluate(ids => ids.forEach(id => { const o = document.getElementById(id); if (o) o.style.display = 'none'; }), OVERLAYS);
+    await page.locator('#welcomeBackDismissBtn').waitFor({ state:'visible', timeout:60000 });
+    await page.locator('#welcomeBackDismissBtn').click();
+    const menu = page.locator('#commandMenuToggle');
+    if (await menu.count()){
+      await menu.waitFor({ state:'visible', timeout:60000 }); await menu.click();
+      await page.locator('.tab-btn[data-tab="basis"]').waitFor({ state:'visible', timeout:60000 });
+      // Kein Basis-Klick: Das Startziel aus ?ziel= muss unverändert bleiben.
+      await page.locator('#commandNavClose').click();
+    } else await page.locator('.tab-btn[data-tab="basis"]').waitFor({ state:'visible', timeout:60000 });
     return { ctx, page, errs };
   };
   const offenerReiter = page => page.evaluate(() => { const p = document.querySelector('.tab-panel.active'); return p ? p.id : null; });

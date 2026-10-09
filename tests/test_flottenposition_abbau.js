@@ -157,6 +157,23 @@ function backend(store){ return async r => {
   await page.waitForTimeout(3500);
   await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o=document.getElementById(id); if(o) o.style.display='none'; }); });
 
+  // Neue Tafel nur bei ausdruecklich aktiver HUD-Oberflaeche oeffnen; ein fehlender
+  // neuer Knopf ist dort ein Fehler und kein Anlass, auf den Legacy-Weg auszuweichen.
+  if (await page.locator('body').evaluate(el => el.classList.contains('command-ui'))){
+    const statusKnopf = page.locator('#commandStatusBtn:visible');
+    await statusKnopf.click();
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    const statusOffen = { sichtbar:await statusPanel.isVisible(), erweitert:await statusKnopf.getAttribute('aria-expanded') };
+    check('2-status: der sichtbare Statusknopf oeffnet die Flottenposition mit aria-expanded=true',
+      statusOffen.sichtbar && statusOffen.erweitert === 'true', statusOffen);
+  } else {
+    // Historische Gegenkopien zeigen die urspruengliche Tafel fest am Desktoprand.
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    check('2-status-legacy: die urspruengliche Flottentafel ist sichtbar', await statusPanel.isVisible());
+  }
+
   const zeile = () => page.evaluate(() => {
     const box = document.getElementById('fleetPositionList');
     if (!box) return null;
@@ -186,11 +203,21 @@ function backend(store){ return async r => {
 
   // ---- 3) Der Klick fuehrt zum Asteroiden ----------------------------------------------------
   if (z && z.klickbar){
-    await page.evaluate(() => {
-      const el = document.querySelector('#fleetPositionList [data-fp-asteroid]');
-      if (el) el.click();
-    });
+    await page.locator('#fleetPositionList [data-fp-asteroid]:visible').click();
     await page.waitForTimeout(1500);
+    if (await page.locator('body').evaluate(el => el.classList.contains('command-ui'))){
+      const nachZielsprung = {
+        statusSichtbar:await page.locator('#fleetPositionPanel').isVisible(),
+        verdunklungSichtbar:await page.locator('#fpBackdrop').isVisible(),
+        erweitert:await page.locator('#commandStatusBtn').getAttribute('aria-expanded'),
+        karteAktiv:await page.locator('.tab-btn[data-tab="karte"]').evaluate(el => el.classList.contains('active')),
+        karteSichtbar:await page.locator('#tab-karte').isVisible()
+      };
+      check('3-status: Mission-Zielklick schliesst Statusfenster und Verdunklung und zeigt die native Karte',
+        !nachZielsprung.statusSichtbar && !nachZielsprung.verdunklungSichtbar
+        && nachZielsprung.erweitert === 'false' && nachZielsprung.karteAktiv && nachZielsprung.karteSichtbar,
+        nachZielsprung);
+    }
     const reiter = await page.evaluate(() => { const a = document.querySelector('.tab-btn.active'); return a ? a.getAttribute('data-tab') : null; });
     check('3a: der Klick oeffnet die Karte', reiter === 'karte', reiter);
     const mitschnitt = await page.evaluate(() => (window.__logZeilen||[]).join('\n'));

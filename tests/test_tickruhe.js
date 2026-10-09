@@ -75,13 +75,8 @@ const markeDa = (page, id) => page.evaluate(x => {
 
 async function spiel(browser, zustand, zaehler){
   const store={'kepler7-save-v3':save(zustand)};
-  /* 1240 statt 900 px BREIT (UI-7, 13.09.2026): Ab 1220 px steht die Statustafel fest am
-     rechten Rand, darunter ist sie display:none - und seit UI-7 wird sie dort auch nicht mehr
-     aufgebaut. Bei 900 px mass dieser Test #fleetPositionList also an einer Tafel, die gar
-     nicht im Bild war; die Abschnitte 1 und 2 kamen nach dem Riegel mit 0 Zeilen zurueck.
-     Die breitere Bildflaeche stellt genau den Fall wieder her, den die beiden Abschnitte
-     meinen (dauerhaft sichtbare Tafel, reiterunabhaengig geschrieben) - es geht keine
-     Pruefung verloren, sie misst nur wieder das, was sie beschreibt. */
+  // 1240 px erhält die ursprüngliche Desktop-Messfläche. Im Kommando-HUD wird die zuvor
+  // feste Flottenliste über den sichtbaren Statusknopf geöffnet (Abschnitte 1 und 2).
   const ctx = await browser.newContext(Object.assign({}, devices['Desktop Chrome'], { viewport:{width:1240,height:1200} }));
   const page = await ctx.newPage(); const errs=[];
   page.on('pageerror', e=>errs.push(String(e)));
@@ -91,6 +86,14 @@ async function spiel(browser, zustand, zaehler){
   await page.goto(SPIEL_URL); await page.waitForTimeout(2900);
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
   return { page, ctx, errs };
+}
+
+async function oeffneStatus(page){
+  const button = page.locator('#commandStatusBtn');
+  if (await button.count()){
+    await button.click();
+    await page.locator('#fleetPositionPanel').waitFor({ state:'visible' });
+  }
 }
 
 (async () => {
@@ -103,6 +106,7 @@ async function spiel(browser, zustand, zaehler){
     // Seitenmenue werden reiterunabhaengig geschrieben und sind hier ebenfalls sichtbar.
     await page.evaluate(() => { const b=document.querySelector('.tab-btn[data-tab="fortschritt"]'); if (b) b.click(); });
     await page.waitForTimeout(1500);
+    await oeffneStatus(page);
 
     // Boxen mit Kind-Elementen: Marke am ersten Kind stirbt bei jedem Neuaufbau.
     const BOXEN = ['kofiTopSupporterBox','inventoryBox','rareItemsBox','scoreLogBox',
@@ -240,6 +244,7 @@ async function spiel(browser, zustand, zaehler){
     });
     await page.evaluate(() => { const b=document.querySelector('.tab-btn[data-tab="flotte"]'); if (b) b.click(); });
     await page.waitForTimeout(1500);
+    await oeffneStatus(page);
     const posText = await page.evaluate(()=>{const b=document.getElementById('fleetPositionList'); return b?b.textContent:'';});
     check('2-vorab: die Mission steht in der Positionsliste (sonst misst 2 den leeren Fall)',
       posText.length > 0 && !/keine Missionen unterwegs/.test(posText), posText.slice(0,80));

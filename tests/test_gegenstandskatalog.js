@@ -171,6 +171,9 @@ pruef('1f2: keine Beschreibung ist ein blosses Kuerzel', zuKurz.length === 0, zu
     await page.goto(SPIEL_URL); await page.waitForTimeout(2200);
     await page.evaluate(() => { ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'].forEach(id => { const o=document.getElementById(id); if(o) o.style.display='none'; }); });
 
+    // Follow the same mobile menu entry a player uses before testing the native last section.
+    const commandEntry=page.locator('#commandMenuToggle');
+    if(await commandEntry.count() && await commandEntry.isVisible())await commandEntry.click();
     // The readable navigation now scrolls: bring its native last button into view before hit-testing it.
     await page.locator('.tabs .tab-btn[data-tab="sammlung"]').scrollIntoViewIfNeeded();
     // --- 2: der Reiter ist da UND bedienbar (Sichtbarkeit ist nicht Bedienbarkeit, KB-11/Regel 49)

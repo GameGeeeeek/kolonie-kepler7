@@ -64,7 +64,24 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       const s=getComputedStyle(document.documentElement);return s.getPropertyValue('--harmony-fixture-loaded').trim()==='yes'&&s.getPropertyValue('--harmony-fixture-fault').trim()===(f||'none');
     },fault));
     const headerTabs={berichte:'#headerReportsBtn',hilfe:'#headerHelpBtn',einstellungen:'#headerProfileBtn'};
-    const show=async tab=>{await page.locator(headerTabs[tab]||'.tab-btn[data-tab="'+tab+'"]').click();await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});};
+    const openMobileMenu=async()=>{
+      const toggle=page.locator('#commandMenuToggle');
+      if(await toggle.isVisible()){
+        if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
+        await page.locator('#commandNav.open').waitFor({state:'visible'});
+      }
+    };
+    const drawerHeaders={hilfe:'[data-command-header="headerHelpBtn"]',einstellungen:'#commandAccountBtn'};
+    const show=async tab=>{
+      let target=headerTabs[tab]||'.tab-btn[data-tab="'+tab+'"]';
+      if(!headerTabs[tab])await openMobileMenu();
+      else if(!await page.locator(target).isVisible()){
+        if(!drawerHeaders[tab])throw Error('No native drawer entry for '+tab);
+        await openMobileMenu();target=drawerHeaders[tab];
+      }
+      await page.locator(target).click();
+      await page.locator('#tab-'+tab+'.active').waitFor({state:'visible'});
+    };
     const focus=async (selector,settle=400)=>{
       const el=page.locator(selector).first();await el.evaluate(e=>e.blur());
       await el.press('Tab');await page.keyboard.press('Shift+Tab');if(settle)await page.waitForTimeout(settle);
@@ -77,8 +94,14 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       const oldSurface=await page.evaluate(()=>{
         const root=document.documentElement,old=root.style.getPropertyValue('--gfx-panel');root.style.setProperty('--gfx-panel','rgb(21, 40, 53)');return old;
       });
-      // Native card backgrounds transition for 150 ms; measure the settled surface.
-      await page.waitForTimeout(250);
+      // Flush the token change and measure after the actual native background transition.
+      // A fixed delay can end between animation frames under load; exact colors stay required.
+      await page.waitForFunction(()=>{
+        const card=document.querySelector('#buildings [data-build="mine"]')?.closest('.card-row');
+        if(!card)return false;
+        getComputedStyle(card).backgroundColor;
+        return card.getAnimations().every(a=>!(a instanceof CSSTransition&&a.transitionProperty==='background-color'&&a.playState!=='finished'));
+      });
       const surfaces=await page.evaluate(old=>{
         const root=document.documentElement;
         const native=getComputedStyle(document.querySelector('#buildings [data-build="mine"]').closest('.card-row')).backgroundColor,gfx=getComputedStyle(document.querySelector('#colonyVisual .gfx-inspector')).backgroundColor;
@@ -104,8 +127,13 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
     if(!probe||probe==='warning'){
       // raidPulse animates box-shadow even in power-save mode. It must not win over keyboard focus.
       await show('basis');await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.add('tab-btn-alert'));
+      await openMobileMenu();
       const warning=await focus('.tab-btn[data-tab="basis"]');check('animated warning tab retains a stable keyboard ring',warning.focused&&warning.ring,warning);
       await page.locator('.tab-btn[data-tab="basis"]').evaluate(e=>e.classList.remove('tab-btn-alert'));
+      if(await page.locator('#commandMenuToggle').isVisible()){
+        await page.locator('#commandNavClose').click();
+        await page.locator('#commandNav').waitFor({state:'hidden'});
+      }
     }
     if(!probe||probe==='subtab'){
       await show('flotte');

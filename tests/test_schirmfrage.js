@@ -54,6 +54,8 @@ const AUSNAHMEN = [
   { was: "role') !== 'button'", grund: 'folgt dem Fokus (e.target), nicht der Flaeche' },
   { was: "event.target.closest('[data-claim-quest],[data-quest-nav]')", grund: 'bedient ausschließlich die fokussierte Tagesaufgabe; Enter/Leertaste und Wiederholung werden geprüft' },
   { was: 'closeLoginModal', grund: 'gehoert dem Fenster selbst, gated durch dessen Offen-Zustand' },
+  { was: 'closeCommandMenu(true);event.preventDefault();event.stopImmediatePropagation()',
+    grund: 'Escape/Tab gehören dem Kommando-Menü selbst; Offen-Zustand UND fensterObenauf(menu) werden darunter separat ausgeführt und geprüft' },
 ];
 {
   const html = fs.readFileSync(SPIELDATEI, 'utf8');
@@ -69,6 +71,36 @@ const AUSNAHMEN = [
     unverbucht.push(html.slice(pos, pos + 120).replace(/\s+/g, ' '));
   }
   check('4: jeder keydown-Lauscher am document ist verbucht', unverbucht.length === 0, unverbucht);
+
+  const initVon = html.indexOf('  function initCommandShell(){');
+  const initBis = html.indexOf('\n  function ', initVon + 10);
+  const menuLauscherTreffer = initVon >= 0 && initBis > initVon
+    ? [...html.slice(initVon, initBis).matchAll(/document\.addEventListener\('keydown',event=>\{([\s\S]*?)\n    \},true\);/g)] : [];
+  const menuLauscher = menuLauscherTreffer.length===1 ? menuLauscherTreffer[0] : null;
+  check('4-Menü-anker: der eigene Kommando-Menü-Lauscher ist eindeutig eingegrenzt',
+    !!menuLauscher && menuLauscher[1].includes('menu.querySelectorAll') && menuLauscher[1].includes('closeCommandMenu(true)'));
+  if (menuLauscher){
+    let offen = false, obenauf = true, geschlossen = 0, verhindert = 0, gestoppt = 0;
+    const doc = { activeElement:null };
+    const first = { disabled:false, getClientRects:()=>[{}], focus(){ doc.activeElement = this; } };
+    const last = { disabled:false, getClientRects:()=>[{}], focus(){ doc.activeElement = this; } };
+    const menu = { classList:{ contains:token=>token==='open'&&offen }, querySelectorAll:()=>[first,last], contains:e=>e===first||e===last };
+    const lauscher = new Function('menu','fensterObenauf','closeCommandMenu','document',
+      'return event=>{' + menuLauscher[1] + '};')(menu, element=>element===menu&&obenauf, restore=>{if(restore===true)geschlossen++;}, doc);
+    const taste = (key, shiftKey=false) => lauscher({ key, shiftKey,
+      preventDefault(){ verhindert++; }, stopImmediatePropagation(){ gestoppt++; } });
+    taste('Escape');
+    check('4-Menü: geschlossenes Menü beansprucht Escape nicht', geschlossen===0 && verhindert===0 && gestoppt===0);
+    geschlossen=verhindert=gestoppt=0;
+    offen=true; obenauf=false; doc.activeElement=last; taste('Escape'); taste('Tab');
+    check('4-Menü: ein verdecktes Menü beansprucht weder Escape noch Tab',
+      geschlossen===0 && verhindert===0 && gestoppt===0 && doc.activeElement===last);
+    geschlossen=verhindert=gestoppt=0; doc.activeElement=last;
+    obenauf=true; taste('Escape');
+    check('4-Menü: das oberste offene Menü bedient seinen Escape-Ausgang', geschlossen===1 && verhindert===1 && gestoppt===1);
+    taste('Tab');
+    check('4-Menü: das oberste offene Menü hält Tab in seinen eigenen Bedienelementen', doc.activeElement===first && verhindert===2);
+  }
 }
 
 const PLANETEN = ['vesna', 'rhea', 'aion'];
@@ -91,7 +123,7 @@ const UEBERFALL = { id:'r1', time:Date.now(), ts:Date.now(), type:'raid', result
   fleet:{ destroyers:179 }, destroyedShips:{ destroyers:31 },
   stationedFleet:{ jaeger:152, destroyers:2418, schlachtschiff:7234 }, ownLostShips:{},
   defenseBefore:{ flak:55, turm:50, laser:45 } };
-const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay',
+const OVERLAYS = ['tutorialOverlay','welcomeNewOverlay','updateNoticeOverlay',
                   'kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay'];
 function backendEinfach(store, berichte){
   return async r => {
@@ -115,6 +147,97 @@ function backendEinfach(store, berichte){
 }
 const VIEWBOX = () => { const s = document.getElementById('galaxyMapSvg'); return s ? s.getAttribute('viewBox') : null; };
 const REITER  = () => { const b = document.querySelector('.tab-btn.active'); return b ? b.getAttribute('data-tab') : null; };
+const HINWEISLAGE = () => {
+  const bar=document.getElementById('tabHintBar'),svg=document.getElementById('galaxyMapSvg');
+  return {display:bar?getComputedStyle(bar).display:null,height:bar?.getBoundingClientRect().height||0,
+    scroll:scrollY,svgTop:svg?.getBoundingClientRect().top,
+    focus:{tag:document.activeElement?.tagName,id:document.activeElement?.id||'',hint:document.activeElement?.getAttribute('data-tab-hint-dismiss')}};
+};
+
+async function oeffneKartenreiter(page){
+  const menu = page.locator('#commandMenuToggle');
+  if (await menu.isVisible() && await menu.getAttribute('aria-expanded') !== 'true') await menu.click();
+  await page.locator('.tab-btn[data-tab="karte"]').click();
+}
+
+async function warteAufRuhigeKarte(page){
+  await page.evaluate(()=>{ delete window.__schirmKartenruhe; });
+  try{
+    const handle = await page.waitForFunction(()=>{
+      const svg=document.getElementById('galaxyMapSvg');
+      if(!svg)return false;
+      const r=svg.getBoundingClientRect(),text=svg.getAttribute('viewBox');
+      const viewBox=(text||'').trim().split(/\s+/).map(Number);
+      const aktuell={viewBox,text,scroll:scrollY,bounds:[r.left,r.top,r.width,r.height]};
+      const messung=window.__schirmKartenruhe||(window.__schirmKartenruhe={anker:null,seit:0,frames:0});
+      messung.letzte=aktuell;
+      if(viewBox.length!==4||viewBox.some(n=>!Number.isFinite(n))||!r.width||!r.height)return false;
+      const gleich=messung.anker&&viewBox.every((n,i)=>Math.abs(n-messung.anker.viewBox[i])<=0.01)
+        &&Math.abs(aktuell.scroll-messung.anker.scroll)<=0.1
+        &&aktuell.bounds.every((n,i)=>Math.abs(n-messung.anker.bounds[i])<=0.1);
+      if(!gleich){messung.anker=aktuell;messung.seit=performance.now();messung.frames=1;return false;}
+      messung.frames++;
+      const ruhigMs=performance.now()-messung.seit;
+      return ruhigMs>=200&&messung.frames>=3?{...aktuell,ruhigMs,frames:messung.frames}:false;
+    },null,{polling:'raf',timeout:6000});
+    const result=await handle.jsonValue();await handle.dispose();return result;
+  }catch(error){
+    const letzte=await page.evaluate(()=>window.__schirmKartenruhe?.letzte||null);
+    throw new Error('Native ViewBox, Scrollposition und SVG-Bounds wurden binnen 6s nicht für 200ms ruhig: '+JSON.stringify(letzte),{cause:error});
+  }
+}
+
+const kartenKlicklage = (page, punkt) => page.evaluate(p=>{
+  const hit=p.hit?document.elementFromPoint(p.x,p.y):null,menu=document.querySelector('.kmenu');
+  const svg=document.getElementById('galaxyMapSvg'),hint=document.getElementById('tabHintBar');
+  return {hitTarget:hit?{tag:hit.tagName,id:hit.id,planet:hit.closest('[data-planet]')?.getAttribute('data-planet')||null}:null,
+    menu:menu?{visible:!!menu.getClientRects().length,bounds:menu.getBoundingClientRect().toJSON()}:null,
+    viewBox:svg?.getAttribute('viewBox'),scroll:scrollY,svg:svg?.getBoundingClientRect().toJSON(),
+    hint:hint?{display:getComputedStyle(hint).display,height:hint.getBoundingClientRect().height}:null,
+    focus:{tag:document.activeElement?.tagName,id:document.activeElement?.id||'',hint:document.activeElement?.getAttribute('data-tab-hint-dismiss')}};
+},punkt);
+
+async function beginneNativeRenderMessung(page){
+  await page.evaluate(()=>{
+    const button=document.querySelector('[data-build="mine"]');
+    if(!button||typeof button.onclick!=='function'||!button.onclick.toString().includes("btn.getAttribute('data-build')"))
+      throw new Error('Der tatsächlich zugewiesene native Bau-Handler als Render-Anker fehlt');
+    // render() weist diesen nativen Handler am Ende jedes Durchlaufs neu zu, auch wenn seine
+    // Texte/Styles unverändert bleiben. Nur die Funktionsidentität lesen: keine Ersetzung
+    // von Renderer, Timer, Handler oder Scroll-/Kartenmechanismus.
+    window.__schirmRenderMessung={handler:button.onclick,seit:performance.now()};
+  });
+}
+
+async function warteAufNativenRender(page){
+  const handle=await page.waitForFunction(()=>{
+    const messung=window.__schirmRenderMessung,button=document.querySelector('[data-build="mine"]');
+    if(!messung||!button||typeof button.onclick!=='function'||button.onclick===messung.handler)return false;
+    if(!button.onclick.toString().includes("btn.getAttribute('data-build')"))return false;
+    return{seit:messung.seit,beobachtet:performance.now(),scroll:scrollY,
+      hinweisHoehe:document.getElementById('tabHintBar')?.getBoundingClientRect().height||0,echterHandlerGewechselt:true};
+  },null,{polling:'raf',timeout:6000});
+  const messung=await handle.jsonValue();await handle.dispose();
+  return messung;
+}
+
+const nativerPlanetentreffer = page => page.evaluate(() => {
+  const svg=document.getElementById('galaxyMapSvg'),sr=svg.getBoundingClientRect();
+  const knoten=[...svg.querySelectorAll('.planet-node[data-planet]')]
+    .filter(n=>n.getAttribute('data-planet')!=='__home__');
+  const proben=[];
+  for(const node of knoten){
+    for(const teil of [...node.querySelectorAll('image,circle,ellipse,path,text'),node]){
+      const r=teil.getBoundingClientRect();if(!r.width||!r.height)continue;
+      const x=r.left+r.width/2,y=r.top+r.height/2;
+      if(x<Math.max(0,sr.left)||x>Math.min(innerWidth,sr.right)||y<Math.max(0,sr.top)||y>Math.min(innerHeight,sr.bottom))continue;
+      const hit=document.elementFromPoint(x,y);
+      if(hit&&node.contains(hit))return{planet:node.getAttribute('data-planet'),x,y,hit:true};
+      if(proben.length<8)proben.push({planet:node.getAttribute('data-planet'),x,y,hit:hit?.id||hit?.tagName||null});
+    }
+  }
+  return{hit:false,knoten:knoten.length,karte:sr.toJSON(),proben};
+});
 
 (async () => {
   const browser = await starteBrowser();
@@ -125,23 +248,30 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
     await versionAbfangen(page);
     await page.route('**/api/**', backendEinfach({ 'kepler7-save-v3': stand() }, [UEBERFALL]));
     await page.addInitScript(() => localStorage.setItem('kepler7_token', 'tok'));
-    await page.goto(SPIEL_URL); await page.waitForTimeout(3000);
+    await page.goto(SPIEL_URL);
+    await page.waitForFunction(()=>document.getElementById('loadstate')?.textContent.startsWith('Spielstand automatisch geladen'),null,{timeout:60000});
     await page.evaluate(ids => ids.forEach(i => { const o = document.getElementById(i); if (o) o.style.display = 'none'; }), OVERLAYS);
+    // Der gespeicherte Stand hat noch keinen Tageslogin: dessen natives Fenster echt schließen.
+    await page.locator('#welcomeBackDismissBtn').waitFor({state:'visible',timeout:60000});
+    await page.locator('#welcomeBackDismissBtn').click();
+    if(await page.locator('#commandMenuToggle').count())await page.locator('#commandMenuToggle').waitFor({state:'visible',timeout:60000});
     await page.waitForTimeout(500);
     const P = (t) => b + ': ' + t;
 
-    await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
+    await oeffneKartenreiter(page);
     await page.waitForTimeout(1300);
     const sysDa = await oeffneSystemUeberSektoren(page, 'vega');
     check(P('V-anker: das System steht wirklich aufgeklappt (sonst misst nichts)'), sysDa === true);
 
     // ======================= B) OHNE Fenster muessen die Tasten WIRKEN =======================
     // Diese Richtung zuerst: Ohne sie waere „alles abschalten" eine erlaubte Antwort auf A.
+    const ruhe0=await warteAufRuhigeKarte(page);
+    check(P('Kamera-anker: die native Karte ist vor den Tastenmessungen mindestens 200ms ruhig'),ruhe0.ruhigMs>=200&&ruhe0.frames>=3,ruhe0);
     const vb0 = await page.evaluate(VIEWBOX);
-    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(600);
+    await page.keyboard.press('ArrowRight'); await warteAufRuhigeKarte(page);
     const vb1 = await page.evaluate(VIEWBOX);
     check(P('3a: ohne Fenster bewegt ArrowRight die Karte weiterhin'), vb1 !== vb0 && !!vb1, { vb0, vb1 });
-    await page.keyboard.press('+'); await page.waitForTimeout(600);
+    await page.keyboard.press('+'); await warteAufRuhigeKarte(page);
     const vb2 = await page.evaluate(VIEWBOX);
     check(P('3b: ohne Fenster zoomt + weiterhin'), vb2 !== vb1, { vb1, vb2 });
 
@@ -151,7 +281,7 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
     check(P('3c: ohne Fenster wechselt die Ziffer weiterhin den Reiter'), !!r1 && r1 !== r0, { r0, r1 });
 
     // zurueck auf die Karte fuer die Sperr-Messungen
-    await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
+    await oeffneKartenreiter(page);
     await page.waitForTimeout(1200);
 
     // ======================= A) MIT Fenster duerfen sie NICHTS tun ==========================
@@ -173,7 +303,7 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
     // Ziffer unter dem Tutorial-Fenster - das Fenster hat gar keinen Tastenausgang.
     /* Erst einen echten Reiter aktiv machen: headerReportsBtn laesst gemessen KEINEN .tab-btn
        aktiv zurueck, und eine Pruefung, die null gegen null vergleicht, misst zu wenig. */
-    await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
+    await oeffneKartenreiter(page);
     await page.waitForTimeout(900);
     await page.evaluate(() => { const o = document.getElementById('tutorialOverlay'); if (o) o.style.display = 'flex'; });
     await page.waitForTimeout(400);
@@ -182,7 +312,19 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
     await page.keyboard.press('2'); await page.waitForTimeout(600);
     const t1 = await page.evaluate(REITER);
     check(P('2: mit Fenster wechselt die Ziffer den Reiter NICHT'), t1 === t0, { t0, t1 });
-    await page.evaluate(() => { const o = document.getElementById('tutorialOverlay'); if (o) o.style.display = 'none'; });
+    // Den sichtbaren Ersthinweis unmittelbar nach einem echten nativen Render nachreichen.
+    // So erfasst dieser Fall auch die nächste Renderphase, ohne die Spieluhr zu manipulieren.
+    await beginneNativeRenderMessung(page);
+    console.log('INFO - '+P('nativer Render vor Tutorial-Ausgang')+' | '+JSON.stringify(await warteAufNativenRender(page)));
+    const hinweisVor=await page.evaluate(HINWEISLAGE);
+    // Der native Ausgang reicht den während des Tutorials unterdrückten Ersthinweis sofort
+    // nach. Bloßes Verstecken verschöbe dessen Layoutwirkung bis zum nächsten Spieltick.
+    await page.locator('#tutorialSkipBtn').click();
+    await page.locator('#tutorialOverlay').waitFor({state:'hidden'});
+    console.log('INFO - '+P('nativer Tutorial-Ausgang')+' | '+JSON.stringify({vor:hinweisVor,nach:await page.evaluate(HINWEISLAGE)}));
+    // Dieser echte Ersthinweis bleibt sichtbar, während das native Kartenmenü geöffnet wird.
+    // Verstanden hier wegzuklicken würde den gemessenen verzögerten Scrollfehler verdecken.
+    await page.locator('#tabHintBar [data-tab-hint-dismiss="karte"]').waitFor({state:'visible',timeout:6000});
     await page.waitForTimeout(300);
 
     /* DER SONDERFALL, vorher gemessen: Das Kartenmenue deckt die Bildmitte NICHT (390x844 wie
@@ -192,31 +334,43 @@ const REITER  = () => { const b = document.querySelector('.tab-btn.active'); ret
        `__home__` ist ausgenommen - es oeffnet kein Menue. Der erste Entwurf riet auf
        `[data-sys]`/`circle` und traf gar nichts; der Anker darunter hat das gemeldet, statt die
        Pruefung still durchzuwinken. */
-    const menuDa = await page.evaluate(() => {
-      const knoten = [...document.querySelectorAll('#galaxyMapSvg [data-planet]')]
-        .find(n => n.getAttribute('data-planet') !== '__home__');
-      if (!knoten) return 'kein Planetenknoten';
-      const r = knoten.getBoundingClientRect();
-      knoten.dispatchEvent(new MouseEvent('click', { bubbles:true, clientX:r.left + r.width/2, clientY:r.top + r.height/2 }));
-      return null;
-    });
+    await page.locator('#galaxyMapSvg').scrollIntoViewIfNeeded();
+    const klickruhe=await warteAufRuhigeKarte(page);
+    check(P('Kamera-anker: der native Planetentreffer wird auf mindestens 200ms ruhiger Geometrie gemessen'),klickruhe.ruhigMs>=200&&klickruhe.frames>=3,klickruhe);
+    // Ein Gruppenzentrum kann zwischen Planet und Beschriftung liegen oder außerhalb der
+    // sichtbaren Karte. Nach der Overlayfolge ausschließlich einen wirklich gemalten Treffer
+    // wählen und den nativen Pointerweg benutzen, damit Drag-/Close-Handler ebenfalls wirken.
+    const menuDa=await nativerPlanetentreffer(page);
+    if (menuDa.hit) await page.mouse.click(menuDa.x,menuDa.y);
+    const sofort=await kartenKlicklage(page,menuDa);
+    await beginneNativeRenderMessung(page);
     await page.waitForTimeout(800);
-    const kmenuOffen = await page.evaluate(() => !!document.querySelector('.kmenu'));
-    if (kmenuOffen){
-      const k0 = await page.evaluate(VIEWBOX);
-      await page.keyboard.press('ArrowRight'); await page.waitForTimeout(600);
-      check(P('1c: bei offenem Kartenmenue bewegt ArrowRight die Karte NICHT'),
-        (await page.evaluate(VIEWBOX)) === k0, { k0, menuDa });
-      await page.keyboard.press('Escape'); await page.waitForTimeout(400);
-    } else {
-      check(P('1c-anker: das Kartenmenue liess sich oeffnen (sonst ist 1c ungeprueft)'), false, { menuDa });
+    const nativerRender=await warteAufNativenRender(page);
+    const nach800ms=await kartenKlicklage(page,menuDa);
+    const kmenuOffen = await page.locator('.kmenu').isVisible();
+    check(P('1c-anker: das Kartenmenue liess sich oeffnen (sonst ist 1c ungeprueft)'),menuDa.hit&&kmenuOffen,{menuDa,sofort,nach800ms,nativerRender});
+    if(!kmenuOffen){
+      // Der ursprüngliche Wächter ist bereits streng rot. Nur zur vollständigen Gegenprobe
+      // das echte Menü erneut öffnen, damit auch der unveränderte Tastenwächter ausgeführt
+      // wird. Koordinate/Hit/Stabilität werden erneut gemessen; kein force-/Script-Klick.
+      await page.locator('#galaxyMapSvg').scrollIntoViewIfNeeded();
+      await warteAufRuhigeKarte(page);
+      const wiederaufnahme=await nativerPlanetentreffer(page);
+      if(!wiederaufnahme.hit)throw new Error('Kein echter Planetentreffer zur Fortsetzung: '+JSON.stringify(wiederaufnahme));
+      await page.mouse.click(wiederaufnahme.x,wiederaufnahme.y);
+      await page.locator('.kmenu').waitFor({state:'visible'});
+      console.log('INFO - '+P('native Menü-Wiederaufnahme nach rotem Anker')+' | '+JSON.stringify(await kartenKlicklage(page,wiederaufnahme)));
     }
+    const k0=await page.evaluate(VIEWBOX);
+    await page.keyboard.press('ArrowRight');await page.waitForTimeout(600);
+    check(P('1c: bei offenem Kartenmenue bewegt ArrowRight die Karte NICHT'),(await page.evaluate(VIEWBOX))===k0,{k0,menuDa});
+    await page.keyboard.press('Escape');await page.waitForTimeout(400);
 
     /* M4 als Dauerwaechter: Eine Deckschicht mit pointer-events:none darf die Schirmfrage nicht
        stoeren - sonst sperrten Klick-Funken, Konfetti und Erfolgs-Abzeichen die Tasten. Die
        Gegenprobe steht daneben: Dieselbe Schicht OHNE pointer-events:none MUSS sperren, sonst
        misst die Pruefung nur, dass mein Messmittel nicht ankommt. */
-    await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="karte"]'); if (x) x.click(); });
+    await oeffneKartenreiter(page);
     await page.waitForTimeout(1200);
     await oeffneSystemUeberSektoren(page, 'vega');
     await page.evaluate(() => {

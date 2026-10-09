@@ -135,7 +135,45 @@ async function lauf(browser, opt){
   await page.addInitScript(() => { localStorage.setItem('kepler7_token', 'tok'); window.__xss = 0; });
   await page.goto(SPIEL_URL); await page.waitForTimeout(6000);
   await page.evaluate(() => ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id => { const o = document.getElementById(id); if (o) o.style.display='none'; }));
+  // Alle vier Szenarien lesen native FP-Zeilen. Historische Gegenkopien behalten
+  // ihre sichtbare Desktoptafel; die neue Oberflaeche wird nur an body.command-ui erkannt.
+  if (await page.locator('body').evaluate(el => el.classList.contains('command-ui'))){
+    const statusKnopf = page.locator('#commandStatusBtn:visible');
+    await statusKnopf.click();
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    const statusOffen = { sichtbar:await statusPanel.isVisible(), erweitert:await statusKnopf.getAttribute('aria-expanded') };
+    check('0-status: der sichtbare Statusknopf oeffnet die Flottenposition mit aria-expanded=true',
+      statusOffen.sichtbar && statusOffen.erweitert === 'true', statusOffen);
+  } else {
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    check('0-status-legacy: die urspruengliche Flottentafel ist sichtbar', await statusPanel.isVisible());
+  }
   return { ctx, page, errs };
+}
+
+async function klickeVerbandsziel(page){
+  // Wie bisher die erste native Verbandszeile, jetzt mit einem wirklichen sichtbaren Klick.
+  const zeile = page.locator('#fleetPositionList .fleet-position-item:visible')
+    .filter({ hasText:/Koordinierter Angriff/ });
+  if (await zeile.count()) await zeile.first().click();
+}
+
+async function pruefeStatusNachZielsprung(page, nummer){
+  // Historische Desktoptafeln bleiben feste Seitenspalten. Die neue HUD-Schublade muss zugehen.
+  if (!await page.locator('body').evaluate(el => el.classList.contains('command-ui'))) return;
+  const nachZielsprung = {
+    statusSichtbar:await page.locator('#fleetPositionPanel').isVisible(),
+    verdunklungSichtbar:await page.locator('#fpBackdrop').isVisible(),
+    erweitert:await page.locator('#commandStatusBtn').getAttribute('aria-expanded'),
+    karteAktiv:await page.locator('.tab-btn[data-tab="karte"]').evaluate(el => el.classList.contains('active')),
+    karteSichtbar:await page.locator('#tab-karte').isVisible()
+  };
+  merke(nummer + ': Mission-Zielklick schliesst Statusfenster und Verdunklung und zeigt die native Karte',
+    !nachZielsprung.statusSichtbar && !nachZielsprung.verdunklungSichtbar
+    && nachZielsprung.erweitert === 'false' && nachZielsprung.karteAktiv && nachZielsprung.karteSichtbar,
+    nachZielsprung);
 }
 
 (async () => {
@@ -171,12 +209,9 @@ async function lauf(browser, opt){
     { ziel: zeile && zeile.ziel, zeit: zeile && zeile.zeit });
 
   // ---- 2) Der Klick fuehrt zum Ziel, das Fadenkreuz liegt darauf --------------------------------
-  await page.evaluate(() => {
-    const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
-    if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  await klickeVerbandsziel(page);
   await page.waitForTimeout(1600);
+  await pruefeStatusNachZielsprung(page, '2-status');
   const karte = await page.evaluate(() => {
     const tab = document.querySelector('.tab-btn[data-tab="karte"]');
     const kreuz = document.querySelector('[data-karte-fadenkreuz]');
@@ -241,12 +276,9 @@ async function lauf(browser, opt){
 
   // 4b: Zwei Nester im System - das Fadenkreuz muss auf dem GEMEINTEN liegen, nicht auf dem ersten.
   const b2 = await lauf(browser, { zweiNester: true });
-  await b2.page.evaluate(() => {
-    const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
-    if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
+  await klickeVerbandsziel(b2.page);
   await b2.page.waitForTimeout(1600);
+  await pruefeStatusNachZielsprung(b2.page, '4b-status');
   const zwei = await b2.page.evaluate((zielId) => {
     const kreuz = document.querySelector('[data-karte-fadenkreuz]');
     const mitte = el => { try { const b = el.getBBox(); return { x: b.x + b.width/2, y: b.y + b.height/2 }; } catch(e){ return null; } };
@@ -272,11 +304,10 @@ async function lauf(browser, opt){
       const t = (l.textContent||'').replace(/\s+/g,' ').trim();
       if (t && t !== window.__log[window.__log.length-1]) window.__log.push(t);
     }).observe(l, { subtree:true, childList:true, characterData:true });
-    const liste = document.getElementById('fleetPositionList');
-    const el = liste && [...liste.querySelectorAll('.fleet-position-item')].find(x => /Koordinierter Angriff/.test(x.textContent||''));
-    if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
+  await klickeVerbandsziel(b3.page);
   await b3.page.waitForTimeout(1800);
+  await pruefeStatusNachZielsprung(b3.page, '4c-status');
   const aus = await b3.page.evaluate(() => ({
     kreuzDa: !!document.querySelector('[data-karte-fadenkreuz]'),
     nestDa: !!document.querySelector('[data-map-nest]'),

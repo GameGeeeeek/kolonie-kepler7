@@ -128,6 +128,7 @@ async function seite(browser, z){
   await logMitschnitt(page);
   await page.goto(SPIEL_URL); await page.waitForTimeout(4200);
   await page.evaluate(overlaysWeg);
+  await page.evaluate(()=>{const stats=document.getElementById('commandStats');if(stats)stats.open=true;});
   return { ctx, page, errs, z };
 }
 /* Sichtbar heisst: im Baum UND nicht ausgeblendet. `textContent` allein waere gruen, sobald das

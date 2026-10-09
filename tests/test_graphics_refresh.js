@@ -50,8 +50,20 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#welcomeBackDismissBtn').click();
   await page.evaluate(()=>{for(const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay','prestigePerkOverlay']){const e=document.getElementById(id);if(e)e.style.display='none';}__gfxReview.show('basis');});
   check('game boots without JavaScript errors',errors.length===0,errors);
-  const frame=await page.evaluate(()=>{const a=document.getElementById('game-root').getBoundingClientRect(),b=document.getElementById('kanzelrahmen').getBoundingClientRect();return {content:[a.x,a.width],frame:[b.x,b.width]};});
-  check('wide desktop frame stays aligned with the expanded game column',Math.abs(frame.content[0]-frame.frame[0])<1&&Math.abs(frame.content[1]-frame.frame[1])<1,frame);
+  await page.waitForFunction(()=>{const img=document.querySelector('#colonyVisual .gfx-landscape');return img&&img.complete&&img.naturalWidth>0;});
+  const surface=await page.evaluate(()=>{
+   const root=document.getElementById('game-root'),shell=root?.querySelector('.shell'),hero=root?.querySelector('.hero'),rail=document.getElementById('commandNav'),frame=document.getElementById('kanzelrahmen'),scene=document.querySelector('#colonyVisual .gfx-scene'),img=scene?.querySelector('.gfx-landscape');
+   if(!root||!shell||!hero||!rail||!frame||!scene||!img)return {ready:false};
+   const bounds=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height};};
+   const visible=e=>{for(let p=e;p;p=p.parentElement){const cs=getComputedStyle(p);if(cs.display==='none'||cs.visibility!=='visible'||+cs.opacity<=0)return false;}return true;};
+   return {ready:document.body.classList.contains('command-ui')&&[root,shell,hero,rail,scene,img].every(visible)&&img.complete&&img.naturalWidth>0&&img.naturalHeight>0,
+    viewport:document.documentElement.clientWidth,root:bounds(root),shell:bounds(shell),hero:bounds(hero),rail:bounds(rail),scene:bounds(scene),image:bounds(img),frameHidden:getComputedStyle(frame).display==='none'&&bounds(frame).width===0&&bounds(frame).height===0};
+  });
+  check('wide desktop command surface stays aligned with the native game column',surface.ready&&surface.frameHidden&&surface.root.width>0&&surface.shell.width>0&&surface.scene.width>0&&surface.scene.height>0&&surface.image.width>0&&surface.image.height>0
+   &&Math.abs(surface.root.left-surface.rail.right)<1&&Math.abs(surface.root.right-surface.viewport)<1
+   &&Math.abs(surface.shell.left-surface.root.left)<1&&Math.abs(surface.shell.width-surface.root.width)<1
+   &&Math.abs(surface.hero.left-surface.root.left)<1&&Math.abs(surface.hero.width-surface.root.width)<1
+   &&surface.scene.left>=surface.root.left-1&&surface.scene.right<=surface.root.right+1,surface);
   const stages=await page.evaluate(()=>[__gfxReview.stage({mine:1}),__gfxReview.stage({mine:20,solar:20}),__gfxReview.stage({mine:25,solar:40,lager:40,labor:20}),__gfxReview.stage({mine:1,turm:200})]);
   check('colony art follows economic development, not defense levels',JSON.stringify(stages)===JSON.stringify(['outpost','settlement','developed','outpost']),stages);
   await page.locator('#colonyVisual [data-gfx-building="mine"]').click();
@@ -81,10 +93,50 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   const camera=await page.evaluate(()=>{const r=document.querySelector('#tab-karte .map-wrap').getBoundingClientRect(),v=document.getElementById('galaxyMapSvg').viewBox.baseVal;return {height:r.height,mapRatio:r.height/r.width,cameraRatio:v.height/v.width};});
   check('desktop map height remains stable when a system opens',Math.abs(sectorHeight-camera.height)<=2,{sectorHeight,...camera});
   check('initial system camera matches the actual map aspect ratio',Math.abs(camera.mapRatio-camera.cameraRatio)<0.01,camera);
-  await page.locator('#mapPlanetVisual [data-gfx-planet-menu]').click();
+  // Dismiss the actual first-use hint and finish the browser's native scroll before opening
+  // a menu that intentionally closes on window scroll. Keep the real pointer action and guards.
+  const mapHint=page.locator('#tabHintBar [data-tab-hint-dismiss="karte"]');
+  if(await mapHint.isVisible()){await mapHint.click();await page.locator('#tabHintBar').waitFor({state:'hidden'});}
+  const planetAction=page.locator('#mapPlanetVisual [data-gfx-planet-menu]');
+  // Viewport-only scrolling can leave a tall inspector behind the fixed bottom status bar.
+  await planetAction.evaluate(e=>e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
+  // Native focus can also scroll horizontally when the controlled shell offset overflows.
+  // Finish that real focus scroll before the pointer opens a menu that closes on any page scroll.
+  await planetAction.focus();
+  // Use the same browser scroll preparation as locator.click() before measuring stability.
+  await planetAction.scrollIntoViewIfNeeded();
+  await planetAction.evaluate(e=>new Promise((resolve,reject)=>{
+   let previous,stable=0;const start=performance.now();
+   const frame=()=>{const r=e.getBoundingClientRect(),pose=[scrollX,scrollY,r.x,r.y,r.width,r.height];
+    stable=previous&&pose.every((v,i)=>v===previous[i])?stable+1:0;previous=pose;
+    if(stable>=4)return resolve();if(performance.now()-start>5000)return reject(Error('Native planet action never reaches stable scroll geometry'));requestAnimationFrame(frame);
+   };requestAnimationFrame(frame);
+  }));
+  const planetHit=await planetAction.evaluate(e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {hit:hit===e||e.contains(hit),point:[r.x+r.width/2,r.y+r.height/2],target:hit?.outerHTML.slice(0,350)};});
+  assert.equal(planetHit.hit,true,'actual planet inspector action is the native pointer hit: '+JSON.stringify(planetHit));
+  await planetAction.click();
   check('planet inspector opens the existing actions menu',await page.locator('.kmenu').isVisible());
+  // Read the actual menu/scroll/focus state without changing the native Escape handler.
+  // The clipped centre matches fensterLage(), including menus partly outside the viewport.
+  const escapeWitness=()=>page.evaluate(()=>{
+   const menus=[...document.querySelectorAll('.kmenu')],menu=menus[0],system=document.getElementById('mapPlanetVisual');
+   const describe=element=>element?{tag:element.tagName,id:element.id,class:String(element.className),html:element.outerHTML.slice(0,350)}:null;
+   const rect=element=>element?element.getBoundingClientRect().toJSON():null;
+   const menuRect=rect(menu),systemRect=rect(system);
+   let centre=null,hit=null;
+   if(menuRect){
+    const left=Math.max(menuRect.left,0),top=Math.max(menuRect.top,0),right=Math.min(menuRect.right,innerWidth),bottom=Math.min(menuRect.bottom,innerHeight);
+    if(right>left&&bottom>top){centre=[(left+right)/2,(top+bottom)/2];hit=document.elementFromPoint(...centre);}
+   }
+   return {menuCount:menus.length,systemVisible:!!systemRect&&systemRect.width>0&&systemRect.height>0&&getComputedStyle(system).visibility==='visible',
+    menuRect,systemRect,centre,centerHit:describe(hit),centerBelongsToMenu:!!menu&&!!hit&&(hit===menu||menu.contains(hit)),
+    scroll:{x:scrollX,y:scrollY},focus:describe(document.activeElement),viewBox:document.getElementById('galaxyMapSvg')?.getAttribute('viewBox')};
+  });
+  const escapeBefore=await escapeWitness();
   await page.keyboard.press('Escape');
-  check('escape closes only the actions menu and retains the system',await page.locator('.kmenu').count()===0&&await page.locator('#mapPlanetVisual').isVisible());
+  const escapeAfter=await escapeWitness(),escapeTrace={before:escapeBefore,after:escapeAfter};
+  console.log('MEASURE - native map-menu Escape '+JSON.stringify(escapeTrace));
+  check('escape closes only the actions menu and retains the system',await page.locator('.kmenu').count()===0&&await page.locator('#mapPlanetVisual').isVisible(),escapeTrace);
   // Recover after a failed navigation check so controlled faults cannot hide later checks.
   if(!await page.locator('#mapPlanetVisual').isVisible()){await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());}
   await page.locator('#mapPlanetVisual [data-gfx-colony="rhea"]').click();
@@ -96,8 +148,11 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    const fit=await page.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&el.scrollWidth<=el.clientWidth+1;});
    check(tab+' graphic view fits a 390px viewport',fit);
    if(tab==='basis'){
-    const spots=await page.locator('#colonyVisual .gfx-hotspot').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};}));
-    check('mobile building controls have 44px targets without overlaps',spots.length===4&&spots.every(a=>a.h>=44)&&spots.every((a,i)=>spots.slice(i+1).every(b=>a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y)),spots);
+    // Translation at large viewport coordinates can subtract Float32 edges to 43.999939
+    // for a native 44px layout box. Normalize only the target-height witness to Blink's
+    // 1/64 CSS-pixel layout resolution; retain the original DOMRect overlap geometry.
+    const spots=await page.locator('#colonyVisual .gfx-hotspot').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,targetH:Math.round(r.height*64)/64};}));
+    check('mobile building controls have 44px targets without overlaps',spots.length===4&&spots.every(a=>a.targetH>=44)&&spots.every((a,i)=>spots.slice(i+1).every(b=>a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y)),spots);
    }
   }
   const assets=['colony-outpost','colony-settlement','colony-developed','ship-jaeger','ship-cruisers','ship-destroyers','planet-ocean','planet-crystal','planet-gas','orbital-dock','nebula'];

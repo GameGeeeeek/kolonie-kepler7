@@ -362,7 +362,7 @@ async function seite(browser, breite, hoehe, berichte){
 const TAFEL = () => {
   const p = document.getElementById('fleetPositionPanel');
   const b = document.getElementById('fpBackdrop');
-  const t = document.getElementById('fpToggleBtn');
+  const t = document.getElementById('commandStatusBtn');
   const spende = document.getElementById('fpAllianceDonationBox');
   const beste = document.getElementById('fpLeaderboard');
   return {
@@ -402,7 +402,7 @@ const lage = page => page.evaluate(() => {
   };
 });
 const knopfMitte = page => page.evaluate(() => {
-  const b = document.getElementById('fpToggleBtn'); const r = b.getBoundingClientRect();
+  const b = document.getElementById('commandStatusBtn'); const r = b.getBoundingClientRect();
   return { x: r.left + r.width/2, y: r.top + r.height/2, breite: Math.round(r.width), hoehe: Math.round(r.height) };
 });
 
@@ -412,6 +412,7 @@ const knopfMitte = page => page.evaluate(() => {
   // ===== A: unsichtbar heisst gar nicht erst rechnen ==============================================
   {
     const { ctx, page } = await seite(browser, 1400, 900);
+    await page.locator("#commandStatusBtn").click();
     const breit = await tafel(page);
     merke('V1: Vorbedingung - der schwere Spielstand fuellt die Tafel ueberhaupt (sonst waere 1a trivial)',
       breit.zeilen > 50 && breit.spendeLaenge > 0, breit);
@@ -438,7 +439,7 @@ const knopfMitte = page => page.evaluate(() => {
     await page.evaluate(() => { const t0 = Date.now(); Date.now = () => t0; });
     await page.waitForTimeout(1200);
     const sofort = await page.evaluate(() => {
-      document.getElementById('fpToggleBtn').click();
+      document.getElementById('commandStatusBtn').click();
       const p = document.getElementById('fleetPositionPanel');
       return { display: getComputedStyle(p).display,
                zeilen: document.querySelectorAll('#fleetPositionList .fleet-position-item').length,
@@ -468,8 +469,9 @@ const knopfMitte = page => page.evaluate(() => {
       const z = await page.evaluate(() => document.querySelectorAll('#fleetPositionList .fleet-position-item').length);
       return z > 50 ? z : 0;
     }, 900, 60);
-    merke('1e: ueber die Schwelle vergroessert steht die Tafel gefuellt da statt leer (entprellter Nachzug)',
-      gefuellt > 50, { zeilen: gefuellt || 0 });
+    const geschlossenAmDesktop = await tafel(page);
+    merke('1e: eine geschlossene Tafel bleibt auch am Desktop geschlossen und wird nicht unnoetig aufgebaut',
+      gefuellt === 0 && geschlossenAmDesktop.display==='none' && geschlossenAmDesktop.zeilen===0, geschlossenAmDesktop);
     await ctx.close();
   }
 
@@ -532,7 +534,7 @@ const knopfMitte = page => page.evaluate(() => {
       { mitte, auf });
 
     const treffer = await page.evaluate(() => {
-      const b = document.getElementById('fpToggleBtn'); const r = b.getBoundingClientRect();
+      const b = document.getElementById('commandStatusBtn'); const r = b.getBoundingClientRect();
       const el = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
       return { getroffen: el ? (el.id || el.className || el.tagName) : null,
                istKnopf: !!(el && (el === b || b.contains(el))),
@@ -576,11 +578,11 @@ const knopfMitte = page => page.evaluate(() => {
       await page.waitForTimeout(1300);
       await page.evaluate(() => {
         const p = document.getElementById('fleetPositionPanel');
-        if (!p.classList.contains('fp-mobile-open')) document.getElementById('fpToggleBtn').click();
+        if (!p.classList.contains('fp-mobile-open')) document.getElementById('commandStatusBtn').click();
       });
       await page.waitForTimeout(400);
       gemessen.push(await page.evaluate(w => {
-        const knopf = document.getElementById('fpToggleBtn'), panel = document.getElementById('fleetPositionPanel');
+        const knopf = document.getElementById('commandStatusBtn'), panel = document.getElementById('fleetPositionPanel');
         const k = knopf.getBoundingClientRect(), p = panel.getBoundingClientRect();
         const ox = Math.max(0, Math.min(k.right, p.right) - Math.max(k.left, p.left));
         const oy = Math.max(0, Math.min(k.bottom, p.bottom) - Math.max(k.top, p.top));
@@ -616,12 +618,12 @@ const knopfMitte = page => page.evaluate(() => {
     const { ctx, page } = await seite(browser, 390, 844, [UEBERFALL]);
     await page.evaluate(() => { const x = document.getElementById('headerReportsBtn'); if (x) x.click(); });
     await page.waitForTimeout(1600);
-    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.evaluate(() => document.getElementById('commandStatusBtn').click());
     await page.waitForTimeout(400);
     await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
     await page.waitForTimeout(1500);
     const amKnopf = await page.evaluate(() => {
-      const b = document.getElementById('fpToggleBtn');
+      const b = document.getElementById('commandStatusBtn');
       const p = document.getElementById('fleetPositionPanel');
       const ov = document.getElementById('battleModalOverlay');
       const r = b.getBoundingClientRect(), o = ov.getBoundingClientRect();
@@ -658,7 +660,7 @@ const knopfMitte = page => page.evaluate(() => {
   // ===== C: Escape gehoert der Tafel - und nur ihr ================================================
   {
     const { ctx, page } = await seite(browser, 390, 844);
-    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.evaluate(() => document.getElementById('commandStatusBtn').click());
     await page.waitForTimeout(400);
     const vor = await tafel(page);
     await page.keyboard.press('Escape');
@@ -717,7 +719,7 @@ const knopfMitte = page => page.evaluate(() => {
     await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
     await page.waitForTimeout(1800);
     const sektorDa = await oeffneSystemUeberSektoren(page, 'vega');
-    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.evaluate(() => document.getElementById('commandStatusBtn').click());
     await page.waitForTimeout(400);
     const tafelVor = await tafel(page), sysVor = await systemOffen(page);
     merke('V9: Vorbedingung - Tafel aufgeklappt UEBER einem offenen System',
@@ -744,7 +746,7 @@ const knopfMitte = page => page.evaluate(() => {
     await page.evaluate(() => { const b = document.querySelector('.tab-btn[data-tab="karte"]'); if (b) b.click(); });
     await page.waitForTimeout(1800);
     const sektorDa = await oeffneSystemUeberSektoren(page, 'vega');
-    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.evaluate(() => document.getElementById('commandStatusBtn').click());
     await page.waitForTimeout(400);
     const vor = await tafel(page), sysVor = await systemOffen(page);
     merke('V12: Vorbedingung - Tafel aufgeklappt unterhalb der Schwelle, das System darunter offen',
@@ -758,6 +760,8 @@ const knopfMitte = page => page.evaluate(() => {
        Frage „ist der Reiter wieder erreichbar" nicht, er beantwortet gar keine. */
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(300);
+    merke("3f-Ausgang: nach dem Groessenwechsel bleiben Tafel und Schliessknopf sichtbar", await page.locator("#fleetPositionPanel").isVisible() && await page.locator("#fpCloseBtn").isVisible());
+    await page.keyboard.press("Escape");
     const nach = await page.evaluate(() => {
       const p = document.getElementById('fleetPositionPanel');
       const reiter = document.querySelector('.tab-btn[data-tab="basis"]');
@@ -766,7 +770,7 @@ const knopfMitte = page => page.evaluate(() => {
       const mitte = document.elementFromPoint(window.innerWidth/2, window.innerHeight/2);
       return { offen: p.classList.contains('fp-mobile-open'),
                verdunklung: getComputedStyle(document.getElementById('fpBackdrop')).display,
-               knopf: getComputedStyle(document.getElementById('fpToggleBtn')).display,
+               knopf: getComputedStyle(document.getElementById('commandStatusBtn')).display,
                x: getComputedStyle(document.getElementById('fpCloseBtn')).display,
                reiterErreichbar: !!(auf && (auf === reiter || reiter.contains(auf))),
                mitte: mitte ? (mitte.id || mitte.tagName) : null };
@@ -796,7 +800,7 @@ const knopfMitte = page => page.evaluate(() => {
     await page.evaluate(() => { const x = document.getElementById('headerReportsBtn'); if (x) x.click(); });
     await page.waitForTimeout(1600);
     const knoepfe = await page.evaluate(() => document.querySelectorAll('[data-watch-battle]').length);
-    await page.evaluate(() => document.getElementById('fpToggleBtn').click());
+    await page.evaluate(() => document.getElementById('commandStatusBtn').click());
     await page.waitForTimeout(400);
     await page.evaluate(() => { const x = document.querySelector('[data-watch-battle]'); if (x) x.click(); });
     await page.waitForTimeout(1500);

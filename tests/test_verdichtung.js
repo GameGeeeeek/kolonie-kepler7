@@ -1,3 +1,8 @@
+// Command-centre geometry: original sections, responsive reachability, focus and readable HUD.
+// Historical horizontal-layout checks below remain available for a historical fixture.
+if(require("fs").readFileSync(require("./lib/umgebung").SPIELDATEI,"utf8").includes('id="commandNav"')){
+ require("./lib/command-shell").run('hud').then(code=>{process.exitCode=code;});return;
+}
 // Die verdichtete Kopfzone: Rohstoffleiste und Kolonienzeile einzeilig (14.09.2026).
 //
 //   node tests/test_verdichtung.js

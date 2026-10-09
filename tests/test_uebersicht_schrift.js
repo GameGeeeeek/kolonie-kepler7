@@ -26,8 +26,10 @@
 //
 // GEZAEHLT WERDEN ALLE TEXTPAARE, auch die innerhalb einer Region - dort liegt der Gewinn.
 //
-// DIE VERBLEIBENDE UEBERLAPPUNG ist NAMENTLICH als bekannte Ausnahme hinterlegt und keine
-// Nachlaessigkeit: "Solmark-Reichweite" (322 Sektor-Einheiten breit) und "Obsidian-Saum" (244)
+// DIE VERBLEIBENDE UEBERLAPPUNG ist mit BEIDEN Sektor-IDs als bekannte Ausnahme hinterlegt:
+// ausschliesslich solmark/obsidian, nie eine Kollision innerhalb derselben Region. Die Kontrolle
+// gilt fuer beide Handybreiten. "Solmark-Reichweite" (322 Sektor-Einheiten breit) und
+// "Obsidian-Saum" (244)
 // liegen rund 200 Einheiten auseinander - zwei Beschriftungen, die zusammen breiter sind als ihr
 // Abstand, ueberlappen in JEDER Position. Ein probeweise gebauter Block-Schieber brachte
 // gemessen 3 auf 2 an genau einer Fensterbreite; er ist deshalb bewusst nicht eingebaut.
@@ -86,6 +88,8 @@ function backend(){
 async function messe(browser, vp){
   const ctx = await browser.newContext({ viewport: vp });
   const page = await ctx.newPage();
+  const jsFehler = [];
+  page.on('pageerror', error => jsFehler.push(String(error)));
   await page.route('**/api/**', backend());
   await page.addInitScript(([k, v]) => { localStorage.setItem('kepler7_token','tok'); localStorage.setItem('kepler7_'+k, v); }, [SAVE_KEY, save()]);
   await page.goto(SPIEL_URL);
@@ -129,13 +133,23 @@ async function messe(browser, vp){
     // Messartefakt.
     const alleTexte = [];
     for (const g of gruppen) for (const t of g.querySelectorAll('text')){
+      // Die Kollisionsmetrik bleibt getBoundingClientRect. Das sind SVG-Textrechtecke,
+      // keine Glyphen-Inkboxen; nur die Diagnose erhaelt eindeutige IDs und Rollen.
       const b = t.getBoundingClientRect();
-      alleTexte.push({ txt:(t.textContent||'').slice(0,24), l:b.left, tp:b.top, w:b.width, h:b.height });
+      // <title> enthaelt den Tooltip (unter anderem NPC-Namen), wird aber nicht als
+      // Textzeile gezeichnet. Nur die abgetrennte Kopie bereinigen, nie den Live-DOM.
+      const kopie = t.cloneNode(true);
+      for (const titel of kopie.querySelectorAll('title')) titel.remove();
+      const rolle = t.hasAttribute('data-sektor-hinweise') ? 'Hinweis'
+        : /system-ui/.test(getComputedStyle(t).fontFamily) ? 'Name' : 'Meta';
+      alleTexte.push({ sektorId:g.getAttribute('data-sektor'), rolle,
+        txt:(kopie.textContent||'').trim(), l:b.left, tp:b.top, w:b.width, h:b.height });
     }
     const koll = [];
     for (let i = 0; i < alleTexte.length; i++) for (let j = i+1; j < alleTexte.length; j++){
       const a = alleTexte[i], b = alleTexte[j];
-      if (a.l < b.l+b.w && b.l < a.l+a.w && a.tp < b.tp+b.h && b.tp < a.tp+a.h) koll.push(a.txt + ' / ' + b.txt);
+      // Die vier strikten Vergleiche bleiben unveraendert, ebenso die gezahlten Paare.
+      if (a.l < b.l+b.w && b.l < a.l+a.w && a.tp < b.tp+b.h && b.tp < a.tp+a.h) koll.push({ a, b });
     }
     const erste = gruppen[0];
     // Die Abzeichenzeile wandert mit der Schrift - ihr Trefferfeld muss den Tap weiterhin
@@ -180,7 +194,7 @@ async function messe(browser, vp){
       tipp, tippDiagnose };
   });
   await ctx.close();
-  return r;
+  return { ...r, jsFehler };
 }
 
 (async () => {
@@ -215,14 +229,29 @@ async function messe(browser, vp){
     handy.koll.length <= 4, { anzahl: handy.koll.length, bsp: handy.koll.slice(0,3) });
   check('4b: auch am engen Handy (360x640)',
     eng.koll.length <= 4, { anzahl: eng.koll.length, bsp: eng.koll.slice(0,3) });
-  // Bekannte Ausnahme, NAMENTLICH statt pauschal ausgeblendet: Solmark-Reichweite und
-  // Obsidian-Saum sind zusammen breiter als der Abstand ihrer Regionen.
-  check('4c: und die verbleibenden sind die bekannte Solmark/Obsidian-Paarung',
-    handy.koll.every(k => /Solmark|Obsidian/.test(k)), { rest: handy.koll });
+  // Die einzige Cross-Ausnahme ist das ungeordnete ID-Paar aus SEKTOR_DEFS:
+  // solmark (Solmark-Reichweite) / obsidian (Obsidian-Saum). Ein Textinhalt oder
+  // nur einer der beiden Sektoren genuegt nicht. Intra-Sektor-Paare bleiben Fehler.
+  const mobileKollisionen = [
+    ...handy.koll.map(k => ({ viewport:'390x844', ...k })),
+    ...eng.koll.map(k => ({ viewport:'360x640', ...k }))
+  ];
+  const bekanntesSektorpaar = k => k.a.sektorId !== k.b.sektorId && (
+    (k.a.sektorId === 'solmark' && k.b.sektorId === 'obsidian') ||
+    (k.a.sektorId === 'obsidian' && k.b.sektorId === 'solmark')
+  );
+  check('4c: beide Handybreiten ohne Intra-Sektor-Kollision und nur mit dem Solmark/Obsidian-Sektorpaar',
+    mobileKollisionen.every(bekanntesSektorpaar), { rest: mobileKollisionen });
 
   // null hiesse: elementFromPoint hat gar nichts getroffen (Zeile ausserhalb des Fensters) -
   // das ist KEIN Bestehen, sondern eine Messung, die nicht stattgefunden hat (Arbeitsregel 28).
   check('5: die Abzeichenzeile bekommt den Tap weiterhin (sie ist mitgewandert)',
     handy.tipp === 'zeile', { getroffen: handy.tipp, diagnose: handy.tippDiagnose });
+  const jsFehler = [
+    ...handy.jsFehler.map(fehler => ({ viewport:'390x844', fehler })),
+    ...eng.jsFehler.map(fehler => ({ viewport:'360x640', fehler })),
+    ...pc.jsFehler.map(fehler => ({ viewport:'1600x1040', fehler }))
+  ];
+  check('6: keine JS-Fehler in allen drei Uebersichtskontexten', jsFehler.length === 0, jsFehler);
   ende();
 })();

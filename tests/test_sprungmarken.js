@@ -176,7 +176,7 @@ async function oeffneReiter(page, tab){
   // Ohne klebende Reiterleiste gibt es nichts, wovor ein Sprungziel Abstand halten muesste - A
   // waere dann trivial gruen.
   const kopf = await page.evaluate(() => {
-    const t = document.querySelector('.tabs');
+    const t = document.body.classList.contains('command-ui') ? document.querySelector('.hero') : document.querySelector('.tabs');
     return { kompakt: document.body.classList.contains('compact-head'),
              klebt: !!t && getComputedStyle(t).position === 'sticky',
              leisteUnten: t ? Math.round(t.getBoundingClientRect().bottom) : null };
@@ -273,7 +273,7 @@ async function oeffneReiter(page, tab){
         const e = zielEl();
         if (!e) return { key, keinZiel:true };
         const rr = e.getBoundingClientRect();
-        const leiste = document.querySelector('.tabs');
+        const leiste = document.body.classList.contains('command-ui') ? document.querySelector('.hero') : document.querySelector('.tabs');
         const lb = leiste.getBoundingClientRect();
         const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
         const sy = Math.round(window.scrollY);

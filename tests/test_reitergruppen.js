@@ -1,3 +1,8 @@
+// Command-centre geometry: original sections, responsive reachability, focus and readable HUD.
+// Historical horizontal-layout checks below remain available for a historical fixture.
+if(require("fs").readFileSync(require("./lib/umgebung").SPIELDATEI,"utf8").includes('id="commandNav"')){
+ require("./lib/command-shell").run('nav').then(code=>{process.exitCode=code;});return;
+}
 // Die vier Reiter-Gruppen als benannte Flächen (Gleichmaß Etappe 3a, 11.09.2026).
 //
 // WAS HIER ABGESICHERT WIRD

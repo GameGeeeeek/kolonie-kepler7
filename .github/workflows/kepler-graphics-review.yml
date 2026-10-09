@@ -5,6 +5,34 @@ on:
     paths:
       - weltraum_kolonie.html
       - kepler-graphics.css
+      - tests/test_command_shell.js
+      - tests/test_command_quest_closed_layout.js
+      - tools/check-command-quest-closed-counterexample.cjs
+      - tests/lib/command-shell.js
+      - tools/check-command-shell-counterexamples.cjs
+      - tools/check-command-secondary-counterexample.cjs
+      - tests/test_zweite_ebene.js
+      - tests/test_formensprache.js
+      - tests/test_resource_animation_frames.js
+      - tools/check-resource-animation-counterexample.cjs
+      - tools/check-overview-hint-spacing-counterexample.cjs
+      - tools/check-mission-status-close-counterexample.cjs
+      - tools/check-map-focus-counterexamples.cjs
+      - tools/check-command-menu-gating-counterexample.cjs
+      - tests/test_kartenfokus.js
+      - tests/test_schirmfrage.js
+      - tests/test_uebersicht_schrift.js
+      - tests/test_flottenposition_abbau.js
+      - tests/test_musterziel.js
+      - tests/test_abgrund_ui.js
+      - tests/test_allianzraid_anzeige.js
+      - tests/test_k7_mobile_flows.js
+      - tests/test_kanzelrahmen.js
+      - tests/test_meilenstein_nachtrag.js
+      - tests/test_pushziele.js
+      - tests/test_raid_vorschau.js
+      - tests/test_recycler_sammelauftrag.js
+      - tests/test_tickruhe.js
       - kepler-gfx-*.png
       - tests/test_graphics_refresh.js
       - tests/test_graphics_expansion.js
@@ -39,7 +67,7 @@ concurrency:
 jobs:
   polish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,6 +83,18 @@ jobs:
           fi
       - name: Audit findings through real native game rendering
         run: node tests/test_graphic_polish.js
+      - name: Selected command-centre HUD and controlled regressions
+        run: |
+          node tests/test_command_shell.js
+          node tools/check-command-shell-counterexamples.cjs
+          node tests/http-run.js test_command_quest_closed_layout.js
+          node tools/check-command-quest-closed-counterexample.cjs
+          node tests/http-run.js test_zweite_ebene.js
+          node tools/check-command-secondary-counterexample.cjs
+          node tests/test_resource_animation_frames.js
+          node tools/check-resource-animation-counterexample.cjs
+          node tests/http-run.js test_schirmfrage.js
+          node tools/check-command-menu-gating-counterexample.cjs
       - name: Remaining illustrated systems and native actions
         run: node tests/test_visual_details.js
       - name: Remaining audit counterexamples must fail
@@ -67,7 +107,7 @@ jobs:
           node tools/check-mobile-polish-counterexamples.cjs
   graphics:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -107,6 +147,9 @@ jobs:
           node tools/check-graphics-expansion-counterexamples.cjs
           node tools/check-expedition-graphics-counterexamples.cjs
           node tools/check-combat-graphics-counterexamples.cjs
+          node tools/check-overview-hint-spacing-counterexample.cjs
+          node tools/check-mission-status-close-counterexample.cjs
+          node tools/check-map-focus-counterexamples.cjs
       - name: Native custom prices, module art and missing-fleet explanations
         run: |
           node tests/http-run.js test_abgrundbezug.js test_iconabdeckung.js test_sperrgrund_fortschritt_galaxie.js
@@ -121,7 +164,7 @@ jobs:
           KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
   harmony:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

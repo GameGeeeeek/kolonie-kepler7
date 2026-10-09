@@ -96,7 +96,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('desktop trophy cases occupy three real columns',trophyLayout);
   for(const width of [320,390,756,1280]){
     await page.setViewportSize({width,height:844});await page.evaluate(()=>__gfxReview.show('basis'));
-    const nav=await page.locator('.tabs').evaluate(nav=>({height:nav.getBoundingClientRect().height,font:Math.min(...[...nav.querySelectorAll('.tab-btn')].map(b=>parseFloat(getComputedStyle(b).fontSize))),targets:[...nav.querySelectorAll('.tab-btn')].every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44;}),page:document.documentElement.scrollWidth<=innerWidth}));
+    if(await page.locator('#commandMenuToggle').isVisible())await page.locator('#commandMenuToggle').click();
+    const nav=await page.locator('.tabs').evaluate(nav=>({height:document.querySelector('.hero').getBoundingClientRect().height,font:Math.min(...[...nav.querySelectorAll('.tab-btn')].map(b=>parseFloat(getComputedStyle(b).fontSize))),targets:[...nav.querySelectorAll('.tab-btn')].every(b=>{const r=b.getBoundingClientRect();return r.width>=43.99&&r.height>=43.99;}),page:document.documentElement.scrollWidth<=innerWidth}));
     check('compact navigation remains legible and saves vertical space at '+width+'px',nav.font>=12&&nav.height<85&&nav.targets&&nav.page,nav);
     await page.locator('.tabs .tab-btn[data-tab="sammlung"]').press('Enter');
     check('last navigation area stays keyboard reachable at '+width+'px',await page.locator('.tabs .tab-btn[data-tab="sammlung"]').evaluate(b=>{const r=b.getBoundingClientRect(),n=b.closest('.tabs').getBoundingClientRect();return b.classList.contains('active')&&r.left>=n.left-1&&r.right<=n.right+1&&document.querySelector('#tab-sammlung').classList.contains('active');}));

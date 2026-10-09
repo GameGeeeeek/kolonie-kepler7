@@ -101,6 +101,8 @@ const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcome
   await page.addInitScript(()=>localStorage.setItem('kepler7_token','tok'));
   await page.goto(SPIEL_URL); await page.waitForTimeout(2800);
   await page.evaluate(()=>{['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay'].forEach(id=>{const o=document.getElementById(id);if(o)o.style.display='none';});});
+  if(process.env.K7_FORM_COMMAND_FAULT==='round')await page.addStyleTag({content:'.command-planet select{border-radius:12px!important}'});
+  if(process.env.K7_FORM_COMMAND_FAULT==='asymmetric')await page.addStyleTag({content:'.command-planet select{border-bottom-right-radius:12px!important}'});
 
   const tabs=['basis','forschung','flotte','verteidigung','galaxie','karte','expedition','markt','allianz','offiziere','fortschritt','punkte'];
   const gesamt={};
@@ -119,6 +121,11 @@ const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcome
         if(roh.includes('%')) return;
         const br=parseFloat(roh)||0;
         if(br<3) return;
+        // The chosen command-centre design gives only these controls a shared 3px corner.
+        // Other components and larger radii keep the existing strict guard.
+        if(document.body.classList.contains('command-ui') &&
+          [c.borderTopLeftRadius,c.borderTopRightRadius,c.borderBottomRightRadius,c.borderBottomLeftRadius].every(radius=>radius==='3px') &&
+          e.matches('.command-rail .tab-btn,.hero-actions button,.command-planet select,.command-stats > summary,.command-quests > summary,#tier2ResBadges .rescard,.gfx-hotspot')) return;
         // Echter Kreis/Pille in px: Radius >= halbe Breite und rundum gleich. Ebenfalls gewollt.
         const w=e.getBoundingClientRect().width;
         if(c.borderTopLeftRadius===c.borderTopRightRadius && br>=w/2-1) return;
@@ -130,7 +137,7 @@ const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcome
     for(const [k,v] of Object.entries(r)) gesamt[k]=(gesamt[k]||0)+v;
   }
   const rest=Object.entries(gesamt).sort((a,b)=>b[1]-a[1]);
-  check('3: über alle 12 Tabs hat kein Element eine px-Rundung', rest.length === 0, rest.slice(0,8));
+  check('3: über alle 12 Tabs gibt es nur die einheitliche 3px-Kommandoecke oder native Kreise', rest.length === 0, rest.slice(0,8));
 
   // Gegenprobe zur Messung selbst: Kreise MÜSSEN gefunden werden, sonst prüft der Durchgang oben
   // in Wahrheit nichts (z.B. weil der Selektor nichts trifft oder die Seite leer geblieben ist).
@@ -149,7 +156,8 @@ const SAVE = JSON.stringify({ ...ruhigeUhren(), tutorialSeen:true, newbieWelcome
   await page.waitForTimeout(900);
   const geschnitten = await page.evaluate(()=>{
     const q=s=>{const e=document.querySelector(s); return e ? (getComputedStyle(e).clipPath||'').startsWith('polygon') : null;};
-    return { kaufButton:q('button.buy'), tab:q('.tab-btn'), karte:q('.card-row'), eingabe:q('input[type=text]'), kachel:q('.bicon') };
+    const tab=document.querySelector('.tab-btn');
+    return { kaufButton:q('button.buy'), tab:document.body.classList.contains('command-ui') ? getComputedStyle(tab).clipPath==='none'&&getComputedStyle(tab).borderTopLeftRadius==='3px' : q('.tab-btn'), karte:q('.card-row'), eingabe:q('input[type=text]'), kachel:q('.bicon') };
   });
   check('3: Kauf-Button, Reiter, Karte, Eingabefeld und Icon-Kachel tragen die Schnittecke',
     Object.values(geschnitten).every(v=>v===true), geschnitten);

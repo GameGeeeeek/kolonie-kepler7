@@ -11,6 +11,14 @@ await p.evaluate(()=>__ideas.welcome({minutes:400,gained:{erz:120,kristalle:60},
 const card=p.locator('#welcomeBackOverlay > .login-card');assert.equal(await card.evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&el.scrollHeight>el.clientHeight;}),true,'long return dialog fits and scrolls '+width);
 await p.locator('#welcomeBackDismissBtn').scrollIntoViewIfNeeded();await p.locator('#welcomeBackDismissBtn').click();assert.equal(await p.locator('#welcomeBackOverlay').isVisible(),false,'dialog bottom action reachable '+width);
 await p.evaluate(()=>{const s=__ideas.state();s.shopPurchases=1;s.dailyQuests={date:new Date().toDateString(),activeKeys:['shop','research'],startShopPurchases:0,researchCount:0,claimed:{}};__ideas.show('expedition');});
+// Nur die ausdruecklich aktive HUD-Oberflaeche hat einklappbare Tagesaufgaben.
+if(await p.locator('body').evaluate(el=>el.classList.contains('command-ui'))){
+const aufgaben=p.locator('#commandQuests'),aufgabenKopf=p.locator('#commandQuests > summary:visible');
+assert.equal(await aufgabenKopf.isVisible(),true,'daily quests summary is visible '+width);
+if(!await aufgaben.evaluate(el=>el.open))await aufgabenKopf.click();
+assert.equal(await aufgaben.evaluate(el=>el.open),true,'daily quests are open before the real claim '+width);
+}
+// In der Legacy-Oberflaeche bleibt der originale sichtbare Inline-Claim unveraendert.
 const quest=p.locator('[data-claim-quest="shop"]');await quest.scrollIntoViewIfNeeded();assert.equal(await quest.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.height>=44||innerWidth>480?el.contains(hit):false;}),true,'claim target receives touch '+width);
 const credits=await p.evaluate(()=>__ideas.state().credits);await quest.focus();await p.keyboard.press('Enter');assert.equal(await p.evaluate(()=>__ideas.state().credits),credits+60,'keyboard claim grants the actual reward once '+width);assert.equal(await p.evaluate(()=>__ideas.state().dailyQuests.claimed.shop),true);
 await p.evaluate(()=>__ideas.profile({id:'other',name:'Warteschlange',allianceTag:'Jäger',title:'Grundlagen',score:100,lastSeen:Date.now()}));assert.equal(await p.locator('#playerProfileOverlay > .profile-hero-card').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;}),true,'player dialog fits '+width);await p.locator('#profileCloseBtn').click();

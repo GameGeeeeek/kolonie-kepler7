@@ -2,7 +2,7 @@ name: Kepler graphics full review
 on:
   workflow_dispatch:
   push:
-    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details]
+    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud]
     paths:
       - .github/workflows/kepler-graphics-full-review.yml
       - tests/http-run.js
@@ -23,6 +23,37 @@ on:
       - tools/check-mobile-polish-counterexamples.cjs
       - tools/check-visual-harmony-counterexamples.cjs
       - kepler-graphics.css
+      - weltraum_kolonie.html
+      - tests/test_command_shell.js
+      - tests/test_command_quest_closed_layout.js
+      - tools/check-command-quest-closed-counterexample.cjs
+      - tests/test_resource_animation_frames.js
+      - tools/check-resource-animation-counterexample.cjs
+      - tests/lib/command-shell.js
+      - tools/check-command-shell-counterexamples.cjs
+      - tools/check-overview-hint-spacing-counterexample.cjs
+      - tools/check-mission-status-close-counterexample.cjs
+      - tools/check-map-focus-counterexamples.cjs
+      - tools/check-command-menu-gating-counterexample.cjs
+      - tests/test_schirmfrage.js
+      - tests/test_flottenposition_abbau.js
+      - tests/test_musterziel.js
+      - tests/test_kartenfokus.js
+      - tests/test_abgrund_ui.js
+      - tests/test_allianzraid_anzeige.js
+      - tests/test_k7_mobile_flows.js
+      - tests/test_kanzelrahmen.js
+      - tests/test_meilenstein_nachtrag.js
+      - tests/test_pushziele.js
+      - tests/test_raid_vorschau.js
+      - tests/test_recycler_sammelauftrag.js
+      - tests/test_tickruhe.js
+      - tests/test_graphics_refresh.js
+      - tools/check-graphics-counterexamples.cjs
+      - tools/check-graphics-expansion-counterexamples.cjs
+      - tools/check-command-secondary-counterexample.cjs
+      - tests/test_zweite_ebene.js
+      - tests/test_formensprache.js
       - kepler-gfx-*.png
 permissions:
   contents: read
@@ -70,12 +101,26 @@ jobs:
           set -euo pipefail
           set +e
           node tests/http-run.js --part=${{ matrix.part }}/8 2>&1 | tee /tmp/kepler-full-${{ matrix.part }}.log
-          result=${PIPESTATUS[0]}
+          partition_status=("${PIPESTATUS[@]}")
+          result=${partition_status[0]}
           set -e
-          # Same final judgment as pruflauf.js: retry only red files individually.
+          if [ "${partition_status[1]}" -ne 0 ]; then exit "${partition_status[1]}"; fi
+          # Retry only completed partitions whose failures are all named test files.
+          # Mandatory/global failures in the original log remain final even if a later check passes.
           if [ "$result" -ne 0 ]; then
-            mapfile -t failed < <(sed -nE 's/^  FAIL (test_[^ ]+\.js|sweep\.js) .*/\1/p' /tmp/kepler-full-${{ matrix.part }}.log | sort -u)
+            if ! grep -Eq '^[0-9]+ Prüfungen, [0-9]+ fehlgeschlagen$' /tmp/kepler-full-${{ matrix.part }}.log; then
+              exit "$result"
+            fi
+            non_file_failures=$(grep '^  FAIL ' /tmp/kepler-full-${{ matrix.part }}.log | grep -vE '^  FAIL (test_[a-zA-Z0-9_]+\.js|sweep\.js) +[0-9]+s(  \[übersprungen\])?$' || true)
+            if [ -n "$non_file_failures" ]; then
+              printf '%s\n' 'Non-file failures cannot be replaced by a successful file retry:' "$non_file_failures"
+              exit "$result"
+            fi
+            mapfile -t failed < <(sed -nE 's/^  FAIL (test_[a-zA-Z0-9_]+\.js|sweep\.js) +[0-9]+s(  \[übersprungen\])?$/\1/p' /tmp/kepler-full-${{ matrix.part }}.log | sort -u)
             if [ "${#failed[@]}" -eq 0 ]; then exit "$result"; fi
+            # Direct test-file retries do not run the mandatory repository checks themselves.
+            node tests/run.js --nur-pflicht 2>&1 | tee /tmp/kepler-required-${{ matrix.part }}.log
+            sha256sum -c /tmp/kepler-tested-source.txt
             node tests/http-run.js "${failed[@]}" 2>&1 | tee /tmp/kepler-recheck-${{ matrix.part }}.log
           fi
           sha256sum -c /tmp/kepler-tested-source.txt
@@ -87,6 +132,7 @@ jobs:
             /tmp/kepler-tested-commit.txt
             /tmp/kepler-tested-source.txt
             /tmp/kepler-full-${{ matrix.part }}.log
+            /tmp/kepler-required-${{ matrix.part }}.log
             /tmp/kepler-recheck-${{ matrix.part }}.log
             /tmp/kepler7-fehlschlaege/*.log
           retention-days: 7

@@ -82,6 +82,24 @@ const seiten = page => page.evaluate(() => {
   return l ? (l.textContent||'').replace(/\s+/g,' ').trim() : '';
 });
 
+async function oeffneStatus(page, weg){
+  // Nur die Wege mit FP-Zeilen brauchen die Tafel. Kein Fallback anhand eines
+  // fehlenden Buttons: Die ausdrueckliche body.command-ui-Klasse bestimmt den Weg.
+  if (await page.locator('body').evaluate(el => el.classList.contains('command-ui'))){
+    const statusKnopf = page.locator('#commandStatusBtn:visible');
+    await statusKnopf.click();
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    const statusOffen = { sichtbar:await statusPanel.isVisible(), erweitert:await statusKnopf.getAttribute('aria-expanded') };
+    check('Status (' + weg + '): sichtbarer Knopf oeffnet die Flottenposition mit aria-expanded=true',
+      statusOffen.sichtbar && statusOffen.erweitert === 'true', statusOffen);
+  } else {
+    const statusPanel = page.locator('#fleetPositionPanel:visible');
+    await statusPanel.waitFor({ state:'visible' });
+    check('Status (' + weg + ', Legacy): die urspruengliche Flottentafel ist sichtbar', await statusPanel.isVisible());
+  }
+}
+
 async function starteSpiel(browser, spielstand, berichte){
   /* 1240 statt 1100 px BREIT (UI-7, 13.09.2026): Ab 1220 px steht die Statustafel fest am
      rechten Rand, darunter ist sie display:none - und seit UI-7 wird sie dort auch nicht mehr
@@ -182,6 +200,7 @@ async function starteSpiel(browser, spielstand, berichte){
       save(mitKolonie(30, null, { [ZIEL]: { heimat:'home', anzahl:30, gestartet: Date.now()-120000, groupId:null, treibstoffGemeldet:false } })), []);
     await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="flotte"]'); if (x) x.click(); });
     await page.waitForTimeout(3000);   // mehrere Sekunden-Takte
+    await oeffneStatus(page, 'Weg 2');
     const z = await page.evaluate(() => {
       const l = document.getElementById('fleetPositionList');
       return { seite: l ? (l.textContent||'').replace(/\s+/g,' ') : '',
@@ -203,6 +222,7 @@ async function starteSpiel(browser, spielstand, berichte){
         { [ZIEL]: { heimat:'home', anzahl:30, gestartet: Date.now()-120000, groupId:null, treibstoffGemeldet:false } })), []);
     await page.evaluate(() => { const x = document.querySelector('.tab-btn[data-tab="flotte"]'); if (x) x.click(); });
     await page.waitForTimeout(1600);
+    await oeffneStatus(page, 'Weg 3+4');
 
     const vor = await page.evaluate(() => ({
       badge: (document.getElementById('fleetLimitBadge')||{}).textContent||'',

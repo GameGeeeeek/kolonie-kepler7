@@ -13,8 +13,17 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='prerequisites'){
  source=source.replace(anchor,'done=true');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='cache'){
- const anchor='kepler-graphics.css?v=20261009-13';assert.equal(source.split(anchor).length,2);
- source=source.replace(anchor,'kepler-graphics.css?v=20261007-6');
+ // Sabotage the one actual native stylesheet URL, including later cache-version bumps.
+ const links=[...source.matchAll(/<link\b[^>]*>/g)]
+  .filter(([tag])=>/\brel\s*=\s*(["'])stylesheet\1/.test(tag))
+  .map(([tag])=>/\bhref\s*=\s*(["'])(kepler-graphics\.css\?[^"']+)\1/.exec(tag)).filter(Boolean);
+ assert.equal(links.length,1,'exactly one native graphics stylesheet link');
+ const anchor=links[0][2],url=new URL(anchor,'http://local-fixture/');
+ assert.equal(url.searchParams.size,1,'native graphics URL has exactly its cache query');
+ assert(/^[A-Za-z0-9-]+$/.test(url.searchParams.get('v')||''),'native graphics cache version is explicit');
+ assert.notEqual(url.search,'?v=20261007-6','current stylesheet differs from the cached old release');
+ assert.equal(source.split(anchor).length,2,'native graphics stylesheet URL is unique');
+ source=source.replace(anchor,anchor.slice(0,anchor.indexOf('?'))+'?v=20261007-6');
 }
 if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue'){
  const anchor="defs.map(d=>{\n      const status=gfxFacilityState";assert.equal(source.split(anchor).length,2);
@@ -124,7 +133,14 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('colony switch updates catalogue levels from the selected colony rather than the home base',await page.locator('#colonyVisual [data-gfx-facility][data-gfx-key="solar"] .gfx-facility-level').textContent()==='Stufe 3');
   await page.evaluate(()=>{const st=__gfxReview.state();st.activeBasePlanet='home';st.buildings.solar=8;__gfxReview.render();__gfxReview.show('verteidigung');__gfxReview.selectDefense('turm');});
   await page.evaluate(()=>__gfxReview.show('verteidigung'));
-  check('a browser retaining the previous CSS receives the new usable controls',await page.locator('#defenseVisual select').evaluate(e=>e.getBoundingClientRect().height>=44));
+  const pickerGeometry=await page.locator('#defenseVisual select').evaluate(e=>{
+    const r=e.getBoundingClientRect(),s=getComputedStyle(e);
+    // Subtracting Float32 viewport edges can report 43.999969 for a native 44px box.
+    // Normalize only this height to Blink's 1/64px layout units; retain the 44px boundary.
+    return {height:r.height,targetH:Math.round(r.height*64)/64,offsetHeight:e.offsetHeight,top:r.top,bottom:r.bottom,cssHeight:s.height,minHeight:s.minHeight,boxSizing:s.boxSizing,transform:s.transform,scrollY,cssHref:document.querySelector('link[href^="kepler-graphics.css"]')?.getAttribute('href')};
+  });
+  console.log('MEASURE - native graphics picker '+JSON.stringify(pickerGeometry));
+  check('a browser retaining the previous CSS receives the new usable controls',pickerGeometry.targetH>=44,pickerGeometry);
   const defenseMirror=await page.evaluate(()=>{const a=document.querySelector('#defenseVisual [data-gfx-build="defense"]'),b=document.querySelector('#defenseBuildings [data-build="turm"]');return !!a&&!!b&&a.disabled===b.disabled&&a.textContent===b.textContent;});
   check('fortress action uses the current real defense order',defenseMirror);
   const before=await page.evaluate(()=>{const s=__gfxReview.state();return (s.buildings.turm||0)+s.constructionQueue.filter(j=>j.kind==='building'&&j.key==='turm'&&j.planet==='home').reduce((n,j)=>n+j.qty,0);});
