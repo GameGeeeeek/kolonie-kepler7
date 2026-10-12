@@ -33,7 +33,13 @@ const catalogue = JSON.parse(fs.readFileSync(path.join(root, 'locales/en.json'),
 Object.assign(catalogue, JSON.parse(fs.readFileSync(path.join(__dirname, 'en.json'), 'utf8')));
 const translation = /const K7_TRANSLATIONS = [^\r\n]+;/g;
 if ((html.match(translation) || []).length !== 1) throw new Error('Expected one translation catalogue');
-html = html.replace(translation, () => 'const K7_TRANSLATIONS = ' + JSON.stringify(catalogue).replace(/</g, '\\u003c') + ';');
+if (html.includes('await k7LoadEnglishCatalogue(')) {
+  const {CATALOG_FILE,catalogueBytes,catalogueUrl}=require('../i18n/catalog.cjs');
+  html=html.replace(translation,()=> 'const K7_TRANSLATIONS = K7_LANGUAGE === "en" ? await k7LoadEnglishCatalogue('+JSON.stringify(catalogueUrl(catalogue))+') : {};');
+  fs.writeFileSync(path.join(root,CATALOG_FILE),catalogueBytes(catalogue));
+} else {
+  html = html.replace(translation, () => 'const K7_TRANSLATIONS = ' + JSON.stringify(catalogue).replace(/</g, '\\u003c') + ';');
+}
 fs.writeFileSync(file, html);
 fs.writeFileSync(path.join(root, 'locales/en.json'), JSON.stringify(catalogue, null, 2) + '\n');
 console.log('Ideas runtime, styles and translation catalogue synchronized.');

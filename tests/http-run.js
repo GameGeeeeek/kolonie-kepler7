@@ -28,7 +28,7 @@ async function main() {
   }
   const game = fs.readFileSync(SPIELDATEI);
   const assets = new Map();
-  const assetNames = ['tabler-icons-full.woff2', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'kepler-graphics.css', 'service-worker.js', 'manifest.json',
+  const assetNames = ['tabler-icons-full.woff2', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'kepler-graphics.css', 'service-worker.js', 'manifest.json', 'kepler-english.json',
     ...fs.readdirSync(WURZEL).filter(name => /^kepler-gfx-[a-z-]+\.png$/.test(name))];
   for (const name of assetNames) {
     const file = path.join(WURZEL, name);

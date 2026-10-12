@@ -13,19 +13,24 @@ assert.equal(source.split(startAnchor).length,2,'One native overview renderer an
 const start = source.indexOf(startAnchor), end = source.indexOf('\n  function ',start+startAnchor.length);
 assert(end > start,'The next function bounds the native overview renderer');
 const body = source.slice(start,end);
-const goodLine = 'const uZeileHinweis = uSchmal ? 40 : 44;';
-const badLine = 'const uZeileHinweis = uSchmal ? 33 : 44;';
-assert.equal(body.split(goodLine).length,2,'Exactly one native 40/44 hint offset inside the renderer');
+assert.equal(body.split('const uZeileHinweis = uSchmal ? 40 : 44;').length,2,
+  'Exactly one native 40/44 hint offset inside the renderer');
+// Move only Kepler's narrow-screen hint text into its own metadata row. Moving
+// all hints also breaks the original absolute pair-count guard on Linux fonts;
+// the other seven sectors, desktop offsets and native hit rectangles stay intact.
+const goodLine = '(labelY + uZeileHinweis*uF)';
+const badLine = "(labelY + (uSchmal && sk.key === 'kepler' ? 33 : uZeileHinweis)*uF)";
+assert.equal(body.split(goodLine).length,2,'Exactly one native hint-text coordinate inside the renderer');
 const brokenBody = body.replace(goodLine,badLine);
 const broken = source.slice(0,start) + brokenBody + source.slice(end);
-assert.equal(broken.replace(badLine,goodLine),source,'Only the controlled 40 to 33 value changes');
+assert.equal(broken.replace(badLine,goodLine),source,'Only the controlled Kepler hint-text coordinate changes');
 const tracked = [gamePath,path.join(root,'kepler-graphics.css'),path.join(root,'tests/test_uebersicht_schrift.js'),
   path.join(root,'tests/http-run.js'),path.join(root,'tests/lib/umgebung.js'),
   path.join(root,'tests/lib/spieldatei.js'),path.join(root,'tests/lib/http-test-origin.js')];
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const before = Object.fromEntries(tracked.map(file => [file,hash(file)]));
 const evidenceDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(),'overview-hint-spacing-'));
-const goodPath = path.join(evidenceDir,'positive.html'),badPath = path.join(evidenceDir,'only-40-to-33.html');
+const goodPath = path.join(evidenceDir,'positive.html'),badPath = path.join(evidenceDir,'only-kepler-hint-text-33.html');
 fs.writeFileSync(goodPath,source);fs.writeFileSync(badPath,broken);
 const parse = output => output.split(/\r?\n/).flatMap(line => {
   const match = /^(OK|FAIL)\s+- (.*)$/.exec(line);
@@ -50,7 +55,7 @@ for (const id of originals) assert(positive.records.some(record => record.name.s
 const jsGuard = '6: keine JS-Fehler in allen drei Uebersichtskontexten';
 assert(positive.records.some(record => record.name === jsGuard),'The context-specific JavaScript guard must execute');
 const negative = run('negative',badPath);
-assert.equal(negative.status,1,'The isolated 40 to 33 regression must be red: '+negative.output);
+assert.equal(negative.status,1,'The isolated Kepler hint-text regression must be red: '+negative.output);
 assert.deepEqual(negative.records.map(record => record.name),positive.records.map(record => record.name),'Precisely the same 15 guard names and order must execute');
 const failed = negative.records.filter(record => record.status === 'FAIL');
 assert.equal(failed.length,1,'Only 4c may fail: '+negative.output);
@@ -58,8 +63,8 @@ assert(failed[0].name.startsWith('4c:'),'The sole failure must be the strict sec
 assert(negative.records.some(record => record.name === jsGuard && record.status === 'OK'),'JavaScript must remain green');
 for (const file of tracked) assert.equal(hash(file),before[file],'Source changed after the probe: '+file);
 fs.writeFileSync(path.join(evidenceDir,'result.json'),JSON.stringify({sourceSha256:before[gamePath],
-  mutation:'Only uZeileHinweis narrow offset 40 to 33',positiveSha256:hash(goodPath),negativeSha256:hash(badPath),
+  mutation:'Only narrow Kepler hint text offset 40 to 33; other sectors, desktop and hit rectangles unchanged',positiveSha256:hash(goodPath),negativeSha256:hash(badPath),
   positiveExit:positive.status,negativeExit:negative.status,checks:15,failed:failed.map(record => record.name),
   everyOtherGuardGreen:true,javascriptGreen:true},null,2)+'\n');
-console.log('OK - only the strict 4c guard rejects native hint spacing 40 to 33; all other original guards and JavaScript remain green');
+console.log('OK - only the strict 4c guard rejects narrow Kepler hint text offset 40 to 33; all other original guards and JavaScript remain green');
 console.log('Evidence: '+evidenceDir);

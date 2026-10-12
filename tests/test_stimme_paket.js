@@ -40,6 +40,8 @@ async function fixture(browser, {language='de',reward=null,preview=PREVIEW,mobil
     const req = route.request(), url = new URL(req.url());
     const json = (body,status=200) => route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
     if (url.origin !== ORIGIN) return route.fulfill({status:204,body:''});
+    if (url.pathname === '/kepler-english.json') return route.fulfill({status:200,contentType:'application/json',
+      body:fs.readFileSync(path.join(ROOT,'kepler-english.json'),'utf8')});
     if (url.pathname.startsWith('/api/')){
       const p = url.pathname.slice(5);
       if (p === 'health') return json({ok:true});

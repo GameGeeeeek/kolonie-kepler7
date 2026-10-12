@@ -1,4 +1,34 @@
 /* English mode: presentation only. No remote translation service. */
+const K7_LANGUAGE_KEY = 'kepler7-ui-language';
+let K7_LANGUAGE = (() => {
+  let language;
+  try { language = new URLSearchParams(location.search).get('lang'); } catch (_) {}
+  if (language !== 'de' && language !== 'en') {
+    try { language = localStorage.getItem(K7_LANGUAGE_KEY); } catch (_) {}
+  }
+  return language === 'en' ? 'en' : 'de';
+})();
+let k7CatalogueUnavailable = false;
+async function k7LoadEnglishCatalogue(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    // A same-origin, content-versioned data file; no scripts, credentials or translation service.
+    const response = await fetch(url, {headers:{Accept:'application/json'}, credentials:'omit', signal:controller.signal});
+    if (!response.ok) throw new Error('English catalogue unavailable');
+    const catalogue = await response.json();
+    if (!catalogue || Array.isArray(catalogue) || typeof catalogue !== 'object' || !Object.keys(catalogue).length ||
+        Object.entries(catalogue).some(([key,value]) => !key || typeof value !== 'string' || !value.trim())) {
+      throw new Error('Invalid English catalogue');
+    }
+    return catalogue;
+  } catch (_) {
+    // An optional language must never prevent authentication or loading the actual save.
+    K7_LANGUAGE = 'de';
+    k7CatalogueUnavailable = true;
+    return {};
+  } finally { clearTimeout(timer); }
+}
 const K7_TRANSLATIONS = /* K7_CATALOG */{};
 const K7_TRANSLATION_PATTERNS = [
   [/^Benötigt (.+)$/, requirement => 'Requires ' + k7InlineTranslation(requirement)],
@@ -49,7 +79,6 @@ const K7_TRANSLATION_PATTERNS = [
   [/^· (\d+) Lager voll$/, count => '- ' + count + ' storage full'],
   [/^· (\d+) gedrosselt$/, count => '- ' + count + ' throttled']
 ];
-const K7_LANGUAGE_KEY = 'kepler7-ui-language';
 const K7_TRANSLATION_CACHE = new Map();
 let k7DynamicCatalogue = null;
 function k7DynamicTranslation(source) {
@@ -88,14 +117,6 @@ function k7DynamicTranslation(source) {
   }
   return null;
 }
-const K7_LANGUAGE = (() => {
-  let language;
-  try { language = new URLSearchParams(location.search).get('lang'); } catch (_) {}
-  if (language !== 'de' && language !== 'en') {
-    try { language = localStorage.getItem(K7_LANGUAGE_KEY); } catch (_) {}
-  }
-  return language === 'en' ? 'en' : 'de';
-})();
 const K7_DEFINITION_OBJECTS = new WeakSet();
 function k7t(text) {
   if (K7_LANGUAGE !== 'en') return text;
@@ -303,6 +324,17 @@ function k7InitialStaticText() {
     select.addEventListener('change', () => k7SwitchLanguage(select.value));
     label.append(select); host.append(label);
   });
+  if (k7CatalogueUnavailable) {
+    ['.ll-actions','.resetrow'].forEach((selector,index) => {
+      const host = document.querySelector(selector);
+      if (!host) return;
+      const note = document.createElement('p');
+      note.id = index ? 'k7LanguageSettingsNotice' : 'k7LanguageLoadNotice';
+      note.setAttribute('role','status');
+      note.textContent = 'English could not be loaded. You can continue in German or select English to retry. / Englisch konnte nicht geladen werden. Du kannst auf Deutsch weiterspielen oder Englisch erneut auswählen.';
+      host.append(note);
+    });
+  }
   if (K7_LANGUAGE === 'en') {
     const host = document.querySelector('.resetrow');
     if (host) {

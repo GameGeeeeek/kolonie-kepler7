@@ -1,11 +1,17 @@
 'use strict';
-const fs=require('fs'),http=require('http'),assert=require('node:assert/strict');
-const {SPIELDATEI,starteBrowser,ruhigeUhren}=require('./umgebung');
+const fs=require('fs'),http=require('http'),path=require('node:path'),assert=require('node:assert/strict');
+const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./umgebung');
 module.exports=async function fixture(api,language='de',options={}){
   const source=fs.readFileSync(SPIELDATEI,'utf8').replace(/\r\n/g,'\n'),end='\n})();\n</script>\n</body>';
   assert.equal(source.split(end).length,2,'checked game export anchor');
   const html=source.replace(end,'\nwindow.__ideas={ready:()=>bootDataReady,state:()=>state,show:switchTab,'+api+'};\n'+end);
-  const store={},errors=[],server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Type':'text/html'});res.end(html);});
+  const catalogue=fs.readFileSync(path.join(WURZEL,'kepler-english.json'));
+  const store={},errors=[],server=http.createServer((req,res)=>{
+    if(new URL(req.url,'http://127.0.0.1').pathname==='/kepler-english.json'){
+      res.writeHead(200,{'Content-Type':'application/json'});return res.end(catalogue);
+    }
+    res.writeHead(200,{'Content-Type':'text/html'});res.end(html);
+  });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   let browser;
   try{

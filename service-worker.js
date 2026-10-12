@@ -18,6 +18,16 @@
 const SHELL_CACHE = 'kepler7-shell-v1';
 const SHELL_KEY = '/__app-shell__';
 
+async function validEnglishCatalogue(response) {
+  if (!response || !response.ok || !(response.headers.get('content-type') || '').toLowerCase().includes('application/json')) return false;
+  try {
+    const catalogue = await response.clone().json();
+    return catalogue !== null && typeof catalogue === 'object' && !Array.isArray(catalogue) &&
+      Object.keys(catalogue).length > 0 && Object.entries(catalogue).every(([key, value]) =>
+        key.trim() && typeof value === 'string' && value.trim());
+  } catch (_) { return false; }
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -69,9 +79,17 @@ self.addEventListener('fetch', (event) => {
   // Statische Begleitdateien (Icons, Manifest): cache-first, im Hintergrund aktualisieren.
   event.respondWith(
     caches.open(SHELL_CACHE).then((cache) =>
-      cache.match(req).then((cached) => {
-        const networkFetch = fetch(req).then((res) => {
-          if (res && res.ok) cache.put(req, res.clone());
+      cache.match(req).then(async (cached) => {
+        // The English catalogue is requested only in English mode. Its URL contains
+        // the content hash, so a cached copy needs no repeated background download.
+        const versionedCatalogue = url.pathname === '/kepler-english.json' && /^[a-f0-9]{16}$/.test(url.searchParams.get('v') || '');
+        if (cached && versionedCatalogue) {
+          if (await validEnglishCatalogue(cached)) return cached;
+          await cache.delete(req).catch(() => {});
+          cached = undefined;
+        }
+        const networkFetch = fetch(req).then(async (res) => {
+          if (res && res.ok && (!versionedCatalogue || await validEnglishCatalogue(res))) event.waitUntil(cache.put(req, res.clone()).catch(() => {}));
           return res;
         }).catch(() => cached);
         return cached || networkFetch;

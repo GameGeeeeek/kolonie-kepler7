@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const acorn = require('acorn');
 const walk = require('acorn-walk');
+const {CATALOG_FILE,catalogueBytes,renderRuntime} = require('./catalog.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const FILE = path.join(ROOT, 'weltraum_kolonie.html');
 const DISPLAY_FIELDS = new Set(['name', 'label', 'title', 'desc', 'effectDesc', 'nicheDesc', 'text', 'hint', 'body']);
@@ -102,7 +103,7 @@ function directDisplay(node, ancestors, templatePositions) {
   }
   return false;
 }
-function compile(original, catalog) {
+function compile(original, catalog, {externalCatalog=false}={}) {
   if (original.includes(BEGIN)) throw new Error('Already localized. Restore the unchanged base before rebuilding; never stack transforms.');
   const start = original.indexOf('<script>') + '<script>'.length;
   const end = original.lastIndexOf('</script>');
@@ -181,11 +182,12 @@ function compile(original, catalog) {
   for (let i = 1; i < edits.length; i++) if (edits[i].start < edits[i-1].end) throw new Error('Overlapping translation edits at ' + edits[i].start);
   let output = original;
   for (const edit of edits.slice().reverse()) output = output.slice(0, edit.start) + edit.replacement + output.slice(edit.end);
-  const runtime = fs.readFileSync(path.join(__dirname, 'runtime.js'), 'utf8').replace('/* K7_CATALOG */{}', q(catalog).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029'));
+  const runtime = renderRuntime(catalog,{external:externalCatalog});
   const anchor = '(function(){';
   const at = output.indexOf(anchor, start);
   if (at < start) throw new Error('Missing main IIFE.');
   output = output.slice(0, at + anchor.length) + '\n  ' + BEGIN + '\n' + runtime + '\n  ' + END + '\n' + output.slice(at + anchor.length);
+  if (externalCatalog) output = output.slice(0,at)+'(async function(){'+output.slice(at+anchor.length);
   const finalStart = output.indexOf('<script>') + 8;
   new Function(output.slice(finalStart, output.lastIndexOf('</script>')));
   return {output, report:{edits:edits.length, catalogEntries:Object.keys(catalog).length, matchedLiteralKeys:used.size, candidates:[...candidates].sort()}};
@@ -194,11 +196,14 @@ function main() {
   const source = fs.readFileSync(FILE, 'utf8');
   const catalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'locales/en.json'), 'utf8'));
   for (const [key,value] of Object.entries(catalog)) if (!key || typeof value !== 'string' || !value.trim()) throw new Error('Invalid translation: ' + key);
-  const built = compile(source, catalog);
+  const built = compile(source, catalog,{externalCatalog:true});
   const report = {...built.report, baseSha256:crypto.createHash('sha256').update(source).digest('hex'), outputSha256:crypto.createHash('sha256').update(built.output).digest('hex')};
   const reportPath = process.env.K7_I18N_REPORT || path.join(require('node:os').tmpdir(), 'kepler-i18n-report.json');
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
-  if (!process.argv.includes('--check')) fs.writeFileSync(FILE, built.output);
+  if (!process.argv.includes('--check')) {
+    fs.writeFileSync(path.join(ROOT,CATALOG_FILE),catalogueBytes(catalog));
+    fs.writeFileSync(FILE, built.output);
+  }
   console.log(JSON.stringify({edits:report.edits,catalogEntries:report.catalogEntries,matchedLiteralKeys:report.matchedLiteralKeys,report:reportPath}));
 }
 if (require.main === module) main();
