@@ -31,11 +31,11 @@ function i18nFunction(source, ...args) {
   return new Function(...Object.keys(context), ...args).bind(null, ...Object.values(context));
 }
 
-// Fuer Quelltext-Scans nach Live-Anzeigestellen: das Woerterbuch ist keine Anzeigestelle.
+// Fuer Quelltext-Scans nach Live-Anzeigestellen: Woerterbuch und Muster sind Katalogdaten.
 function ohneI18nWoerterbuch(source) {
   const start = source.indexOf('const K7_TRANSLATIONS = ');
   const oldEnd = source.indexOf('const K7_LANGUAGE_KEY = ', start);
-  const end = oldEnd >= 0 ? oldEnd : source.indexOf('const K7_TRANSLATION_PATTERNS = ',start);
+  const end = oldEnd >= 0 ? oldEnd : source.indexOf('const K7_TRANSLATION_CACHE = ',start);
   if (start < 0 || end <= start) throw new Error('i18n-Woerterbuchanker fehlen');
   return source.slice(0, start) + source.slice(end);
 }
