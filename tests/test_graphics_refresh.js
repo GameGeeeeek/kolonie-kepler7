@@ -4,6 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 const {oeffneSektorMitSystem,oeffneSystemUeberSektoren}=require('./lib/karte');
 const source=fs.readFileSync(SPIELDATEI,'utf8');
+const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
 const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,
@@ -18,7 +19,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    if(req.url.split('?')[0]==='/'){res.writeHead(200,{'Content-Type':'text/html'});return res.end(html);}
    const p=path.resolve(WURZEL,req.url.split('?')[0].slice(1));
    if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
-   res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
+   res.writeHead(200,{'Content-Type':p.endsWith('.webp')?'image/webp':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const origin='http://127.0.0.1:'+server.address().port,store={};
@@ -86,8 +87,11 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   assert.equal(await oeffneSektorMitSystem(page,'kepler'),true,'actual sector containing Kepler is open');
   const sectorHeight=await page.locator('#tab-karte .map-wrap').evaluate(el=>el.getBoundingClientRect().height);
   await oeffneSystemUeberSektoren(page,'kepler');await page.evaluate(()=>__gfxReview.map());
+  // The native observer activates deferred artwork when its actual surface is reached.
+  await page.locator('#mapPlanetVisual img').scrollIntoViewIfNeeded();
+  await page.waitForFunction(()=>{const image=document.querySelector('#mapPlanetVisual img');return image&&image.complete&&image.naturalWidth>0;});
   const map=await page.evaluate(()=>{const root=document.getElementById('mapPlanetVisual');return {shown:!root.hidden,art:root.querySelector('img')?.getAttribute('src'),rockArt:document.querySelector('[data-planet="vesna"] [data-gfx-planet]')?.getAttribute('href'),unknown:root.textContent.includes('Nicht erkundet'),height:document.getElementById('graphicsMapLayout').getBoundingClientRect().height};});
-  check('known colony gets its correct planet illustration',map.shown&&map.art==='kepler-gfx-planet-ocean.png'&&!map.unknown,map);
+  check('known colony gets its correct planet illustration',map.shown&&map.art==='kepler-gfx-planet-ocean.'+graphicFormat&&!map.unknown,map);
   check('asteroid is never replaced by an ocean illustration',!map.rockArt,map);
   check('desktop system overview avoids intrinsic SVG height growth',map.height>300&&map.height<600,map);
   const camera=await page.evaluate(()=>{const r=document.querySelector('#tab-karte .map-wrap').getBoundingClientRect(),v=document.getElementById('galaxyMapSvg').viewBox.baseVal;return {height:r.height,mapRatio:r.height/r.width,cameraRatio:v.height/v.width};});
@@ -156,7 +160,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    }
   }
   const assets=['colony-outpost','colony-settlement','colony-developed','ship-jaeger','ship-cruisers','ship-destroyers','planet-ocean','planet-crystal','planet-gas','orbital-dock','nebula'];
-  check('all required local image assets exist and are nonempty',assets.every(a=>{const p=path.join(WURZEL,'kepler-gfx-'+a+'.png');return fs.existsSync(p)&&fs.statSync(p).size>1000;}));
+  check('all required local image assets exist and are nonempty',assets.every(a=>(graphicFormat==='webp'?['png','webp']:['png']).every(format=>{const p=path.join(WURZEL,'kepler-gfx-'+a+'.'+format);return fs.existsSync(p)&&fs.statSync(p).size>1000;})));
   const saved=JSON.parse(store['kepler7-save-v3']);saved.lastTick=Date.now()-60000;store['kepler7-save-v3']=JSON.stringify(saved);
   await page.goto(origin+'/?lang=en');await page.waitForFunction(()=>window.__gfxReview&&__gfxReview.ready());
   await page.evaluate(()=>__gfxReview.show('flotte'));

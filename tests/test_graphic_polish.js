@@ -3,6 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 let source=fs.readFileSync(SPIELDATEI,'utf8');
+const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
 const fault=process.env.K7_POLISH_FAULT;
 if(fault==='icons')source=source.replace("if (g.art === 'standortmodul' || g.art === 'schiffsmodul') return moduleIconHtml","if (false) return moduleIconHtml");
 if(fault==='emphasis')source=source.replace('sammlungBeschreibungHtml(k7View(g).desc)','escapeHtml(k7View(g).desc)');
@@ -26,7 +27,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    const p=path.resolve(WURZEL,req.url.split('?')[0].slice(1));
    if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
    const faults={navigation:'\n#game-root .tabs .tab-btn{font-size:8.5px!important}',readability:'\n#sammlungBox#sammlungBox .gfx-collection-item[data-item-owned="false"]{opacity:.55!important}',trophies:'\n.gfx-trophy-hall{display:block!important}'};
-   res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(p.endsWith('.css')&&faults[fault]?fs.readFileSync(p,'utf8')+faults[fault]:fs.readFileSync(p));
+   res.writeHead(200,{'Content-Type':p.endsWith('.webp')?'image/webp':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(p.endsWith('.css')&&faults[fault]?fs.readFileSync(p,'utf8')+faults[fault]:fs.readFileSync(p));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const origin='http://127.0.0.1:'+server.address().port,store={};
@@ -76,8 +77,8 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   }
   const portraits=await page.evaluate(()=>__gfxReview.npcDefs().map(n=>{const el=document.createElement('div');el.innerHTML=__gfxReview.portrait(n);const p=el.querySelector('[data-gfx-enemy]');return {key:n.id,actual:p&&p.dataset.gfxEnemy,style:p&&p.getAttribute('style')};}));
   check('each native NPC has its own identity-keyed fleet illustration',portraits.length===26&&portraits.every(p=>p.actual===p.key)&&new Set(portraits.map(p=>p.style)).size===portraits.length,portraits);
-  const atlas=await page.evaluate(()=>new Promise(r=>{const i=new Image();i.onload=()=>r({w:i.naturalWidth,h:i.naturalHeight});i.onerror=()=>r({w:0,h:0});i.src='kepler-gfx-enemy-atlas.png';}));
-  check('enemy atlas loads with the six by five tile proportions',atlas.w>600&&Math.abs(atlas.w/atlas.h-6/5)<.01,atlas);
+  const atlas=await page.evaluate(async primary=>{const result=[];for(const format of primary==='webp'?['png','webp']:['png'])result.push(await new Promise(r=>{const i=new Image();i.onload=()=>r({format,w:i.naturalWidth,h:i.naturalHeight});i.onerror=()=>r({format,w:0,h:0});i.src='kepler-gfx-enemy-atlas.'+format;}));return result;},graphicFormat);
+  check('enemy atlas loads with the six by five tile proportions',atlas.every(a=>a.w>600&&Math.abs(a.w/a.h-6/5)<.01),atlas);
   await page.evaluate(()=>{const t=Date.now()-3600000;__gfxReview.state().scoreHistory=[{ts:t,score:100,credits:400,prodErz:2},{ts:t+900000,score:120,credits:600,prodErz:3},{ts:t+3600000,score:200,credits:800,prodErz:5}];__gfxReview.show('punkte');__gfxReview.render();});
   for(const id of ['scoreHistorySvg','creditsHistorySvg','prodHistorySvg']){
     const chart=await page.locator('#'+id).evaluate(svg=>{const meta=document.getElementById(svg.id+'Meta'),p=[...svg.querySelectorAll('circle')];return {times:meta.querySelectorAll('.gfx-chart-times span').length,rows:meta.querySelectorAll('tbody tr').length,label:svg.getAttribute('aria-label'),fraction:p.length===3?(Number(p[1].getAttribute('cx'))-Number(p[0].getAttribute('cx')))/(Number(p[2].getAttribute('cx'))-Number(p[0].getAttribute('cx'))):0,titles:p.every(p=>p.querySelector('title').textContent.includes(' · '))};});

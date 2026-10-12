@@ -32,7 +32,7 @@ const tabs=['basis','verteidigung','forschung','flotte','expedition','karte','ga
       if(pathname==='/kepler-graphics.css'){res.writeHead(200,{'Content-Type':'text/css'});return res.end(css+'\n:root{--harmony-fixture-loaded:yes;--harmony-fixture-fault:'+ (fault||'none')+';}\n'+(faults[fault]||''));}
       const p=path.resolve(WURZEL,pathname.slice(1));
       if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
-      res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
+      res.writeHead(200,{'Content-Type':p.endsWith('.webp')?'image/webp':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
     });
     await new Promise(r=>server.listen(0,'127.0.0.1',r));
     const origin='http://127.0.0.1:'+server.address().port,store={};

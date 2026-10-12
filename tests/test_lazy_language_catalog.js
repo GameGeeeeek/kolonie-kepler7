@@ -33,7 +33,7 @@ const version=source.match(/\bconst VERSION\s*=\s*['"]([^'"]+)['"]/);
 assert(version,'native VERSION fixture anchor');
 const assets=new Map([['/service-worker.js',workerBytes]]);
 for(const name of ['kepler-graphics.css','tabler-icons-full.woff2','manifest.json','icon-192.png','icon-512.png','apple-touch-icon.png',
- ...fs.readdirSync(WURZEL).filter(name=>/^kepler-gfx-[a-z-]+\.png$/.test(name))]){
+ ...fs.readdirSync(WURZEL).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name))]){
  const file=path.join(WURZEL,name);if(fs.existsSync(file))assets.set('/'+name,fs.readFileSync(file));
 }
 let checks=0,failures=0,browser;const records=[],allErrors=[];
@@ -88,7 +88,7 @@ async function fixtureServer(mode){
    if(url.pathname==='/'||url.pathname==='/weltraum_kolonie.html')return send(res,200,source,'text/html; charset=utf-8');
    if(url.pathname==='/version.txt')return send(res,200,version[1]+'\n','text/plain');
    if(assets.has(url.pathname))return send(res,200,assets.get(url.pathname),url.pathname.endsWith('.js')?'application/javascript':
-    url.pathname.endsWith('.css')?'text/css':url.pathname.endsWith('.json')?'application/json':url.pathname.endsWith('.woff2')?'font/woff2':'image/png');
+    url.pathname.endsWith('.css')?'text/css':url.pathname.endsWith('.json')?'application/json':url.pathname.endsWith('.woff2')?'font/woff2':url.pathname.endsWith('.webp')?'image/webp':'image/png');
    return send(res,404,'Fixture asset unavailable','text/plain');
   }catch(error){if(!res.headersSent)json(res,{error:'fixture HTTP failure'},500);else res.end();allErrors.push('HTTP fixture: '+error.message);}
  });

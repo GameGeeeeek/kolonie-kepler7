@@ -3279,7 +3279,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-<link rel="stylesheet" href="kepler-graphics.css?v=20261012-menu-load-1">
+<link rel="stylesheet" href="kepler-graphics.css?v=20261012-graphics-load-1">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -49220,6 +49220,7 @@ async function claimPendingRewards(){
     if (heroBanner){
       const b = BANNER_DEFS.find(x=>x.key===currentAllianceBanner);
       heroBanner.style.background = b ? b.css : 'linear-gradient(160deg,#20263f,#0d1020)';
+      gfxRefreshAllianceArtwork(heroBanner,!tag);
       heroBanner.querySelectorAll('.alliance-hero-star').forEach(s=>s.remove());
       if (tag){
         const starCount = Math.max(3, Math.min(18, 3 + Math.round(baseLvl*1.5)));
@@ -70475,7 +70476,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
           ${(() => { const durl = getPlanetTextureDataUrl(effType); return durl
             ? `<clipPath id="pclip-${p.id}"><circle cx="${px}" cy="${py}" r="${r}"/></clipPath><image href="${durl}" x="${(pos.x-r).toFixed(1)}" y="${(pos.y-r).toFixed(1)}" width="${r*2}" height="${r*2}" clip-path="url(#pclip-${p.id})" opacity="${disc?1:0.7}"/>`
             : `<circle class="body" cx="${px}" cy="${py}" r="${r}" fill="${bodyColor}" opacity="${disc?1:0.7}"/>`; })()}
-          ${(() => { const art = disc && GFX_PLANET_ART[effType]; const size=r*2/0.82; return art ? `<image data-gfx-planet="${p.id}" href="kepler-gfx-planet-${art}.png" x="${(pos.x-size/2).toFixed(1)}" y="${(pos.y-size/2).toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" clip-path="url(#pclip-${p.id})" pointer-events="none"/>` : ''; })()}
+          ${(() => { const art = disc && GFX_PLANET_ART[effType]; const size=r*2/0.82; return art ? `<image data-gfx-planet="${p.id}" href="${gfxAssetUrl('planet-'+art)}" data-gfx-fallback="${gfxAssetUrl('planet-'+art,'png')}" x="${(pos.x-size/2).toFixed(1)}" y="${(pos.y-size/2).toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" clip-path="url(#pclip-${p.id})" pointer-events="none"/>` : ''; })()}
           ${sysSchatten(p.id, pos.x, pos.y, r, disc ? 0.78 : 0.5)}
           ${disc ? '' : `<circle cx="${px}" cy="${py}" r="${r}" fill="#0a0d1a" opacity="0.32"/>`}
           ${effType === 'gasriese' ? sysGasring(p.id, pos.x, pos.y, r, true) : ''}
@@ -75183,6 +75184,122 @@ document.addEventListener('keydown',event=>{
     {key:'habitat',x:43,y:57}, {key:'raffinerie',x:28,y:70}
   ]);
   const GFX_SHIP_KEYS = ['jaeger','cruisers','destroyers','ships','frachter','carrier'];
+  const GFX_ASSET_STEMS = Object.freeze(['colony-developed','colony-outpost','colony-settlement','defense-fortress','enemy-atlas','expedition-atlas','expedition-wreck','flagship-atlas','market-station','material-atlas','nebula','officer-atlas','orbital-atlas','orbital-dock','planet-crystal','planet-desert','planet-gas','planet-ice','planet-moon','planet-ocean','planet-volcano','research-lab','ship-carrier','ship-cruisers','ship-destroyers','ship-frachter','ship-jaeger','ship-ships','world-atlas']);
+  function gfxAssetUrl(stem,format='webp'){
+    return GFX_ASSET_STEMS.includes(stem)&&['webp','png'].includes(format)?'kepler-gfx-'+stem+'.'+format:'';
+  }
+  function gfxImageHtml(stem,attributes,eager=false){
+    const src=gfxAssetUrl(stem),fallback=gfxAssetUrl(stem,'png');
+    if(!src)return '';
+    return `<img ${attributes} ${eager?'src="'+src+'" loading="eager" fetchpriority="high"':'data-gfx-src="'+src+'" loading="lazy"'} data-gfx-fallback="${fallback}" decoding="async">`;
+  }
+  const GFX_CSS_ASSETS = Object.freeze([
+    ['.gfx-orbital-art','orbital-atlas'],['.gfx-world-art','world-atlas'],['.gfx-expedition-art','expedition-atlas'],['.gfx-flagship-art','flagship-atlas'],
+    ['.gfx-officer-portrait','officer-atlas'],['.gfx-material-icon','material-atlas'],['.gfx-enemy-portrait','enemy-atlas'],['.gfx-journey','nebula'],['#tab-karte .map-wrap','nebula'],
+    ['.gfx-empty-state','nebula','linear-gradient(100deg,#101529e8,#101529cc)'],['#allianceHeroBanner','orbital-dock','linear-gradient(90deg,#0c1225ee,#0c122599)']
+  ]);
+  const gfxBackgroundLoads=new Map();
+  function gfxBackgroundFormat(stem){
+    if(gfxBackgroundLoads.has(stem))return gfxBackgroundLoads.get(stem).promise;
+    const image=new Image();
+    const promise=new Promise(resolve=>{
+      image.onload=()=>{image.onload=image.onerror=null;resolve('webp');};
+      image.onerror=()=>{image.onload=image.onerror=null;resolve('png');};
+      image.src=gfxAssetUrl(stem);
+    });
+    // Share one decoded asset and failure decision across all tiles using the same atlas.
+    gfxBackgroundLoads.set(stem,{image,promise});return promise;
+  }
+  let gfxAssetIntersectionObserver=null, gfxAssetLoadingInstalled=false;
+  function gfxAssetActivate(element){
+    if(!element.isConnected||element.dataset.gfxReady==='true'||element.dataset.gfxPending==='true')return;
+    if(element.hasAttribute('data-gfx-src')){
+      const src=element.dataset.gfxSrc;
+      if(!GFX_ASSET_STEMS.some(stem=>gfxAssetUrl(stem)===src))return;
+      element.dataset.gfxReady='true';element.src=src;
+    }else{
+      const asset=GFX_CSS_ASSETS.find(([selector])=>element.matches(selector));
+      if(!asset||(asset[0]==='#allianceHeroBanner'&&myAllianceTag()))return;
+      element.dataset.gfxPending='true';
+      gfxBackgroundFormat(asset[1]).then(format=>{
+        delete element.dataset.gfxPending;
+        if(element.isConnected&&!(asset[0]==='#allianceHeroBanner'&&myAllianceTag())){
+          if(format==='png'){
+            element.style.setProperty('background-image',(asset[2]?asset[2]+',':'')+'url("'+gfxAssetUrl(asset[1],'png')+'")','important');
+            element.dataset.gfxFallbackBackground=element.style.getPropertyValue('background-image');
+          }
+          element.dataset.gfxReady='true';element.dataset.gfxFormat=format;
+        }
+        if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.unobserve(element);
+      });
+    }
+    if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.unobserve(element);
+  }
+  function gfxAssetVisible(element){
+    const rect=element.getBoundingClientRect();
+    return rect.width>0&&rect.height>0&&element.getClientRects().length>0&&getComputedStyle(element).visibility!=='hidden';
+  }
+  function gfxRefreshAllianceArtwork(banner,entry){
+    if(!entry){
+      if(banner.dataset.gfxFallbackBackground===banner.style.getPropertyValue('background-image'))banner.style.removeProperty('background-image');
+      delete banner.dataset.gfxReady;delete banner.dataset.gfxFormat;
+      if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.unobserve(banner);
+      return;
+    }
+    // Native banner updates replace the background shorthand on every tab visit.
+    if(banner.dataset.gfxReady==='true'&&banner.dataset.gfxFormat==='png'){
+      banner.style.setProperty('background-image','linear-gradient(90deg,#0c1225ee,#0c122599),url("'+gfxAssetUrl('orbital-dock','png')+'")','important');
+      banner.dataset.gfxFallbackBackground=banner.style.getPropertyValue('background-image');
+    }
+    if(banner.dataset.gfxReady!=='true'&&banner.dataset.gfxPending!=='true'){
+      if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.unobserve(banner);
+      gfxObserveAssets(banner);
+    }
+  }
+  function gfxAssetNearViewport(element){
+    const rect=element.getBoundingClientRect();
+    return gfxAssetVisible(element)&&rect.bottom>=-200&&rect.top<=window.innerHeight+200&&rect.right>=-200&&rect.left<=window.innerWidth+200;
+  }
+  function gfxObserveAssets(root){
+    const selector='img[data-gfx-src]:not([data-gfx-ready]),'+GFX_CSS_ASSETS.map(([selector])=>selector+':not([data-gfx-ready])').join(',');
+    const elements=[...(root.matches&&root.matches(selector)?[root]:[]),...root.querySelectorAll(selector)];
+    for(const element of elements){
+      if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.observe(element);
+      else if(gfxAssetNearViewport(element))gfxAssetActivate(element);
+    }
+  }
+  function gfxInstallAssetLoading(){
+    if(gfxAssetLoadingInstalled)return;gfxAssetLoadingInstalled=true;
+    if(typeof IntersectionObserver==='function')gfxAssetIntersectionObserver=new IntersectionObserver(entries=>{
+      for(const entry of entries)if(entry.isIntersecting&&gfxAssetVisible(entry.target))gfxAssetActivate(entry.target);
+    },{rootMargin:'200px 0px'});
+    document.addEventListener('error',event=>{
+      const element=event.target;
+      if(!element.matches||!element.matches('img[data-gfx-fallback],image[data-gfx-fallback]')||element.dataset.gfxFallbackTried==='true')return;
+      const fallback=element.dataset.gfxFallback;
+      if(!GFX_ASSET_STEMS.some(stem=>gfxAssetUrl(stem,'png')===fallback))return;
+      element.dataset.gfxFallbackTried='true';
+      if(element.tagName.toLowerCase()==='image')element.setAttribute('href',fallback);else element.src=fallback;
+    },true);
+    new MutationObserver(records=>{
+      for(const record of records){
+        for(const node of record.addedNodes)if(node.nodeType===1)gfxObserveAssets(node);
+        if(gfxAssetIntersectionObserver)for(const node of record.removedNodes)if(node.nodeType===1&&!node.isConnected){
+          const selector='img[data-gfx-src],'+GFX_CSS_ASSETS.map(([selector])=>selector).join(',');
+          if(node.matches(selector))gfxAssetIntersectionObserver.unobserve(node);
+          for(const element of node.querySelectorAll(selector))gfxAssetIntersectionObserver.unobserve(element);
+        }
+      }
+      if(!gfxAssetIntersectionObserver)gfxObserveAssets(document);
+    }).observe(document.body,{childList:true,subtree:true,...(!gfxAssetIntersectionObserver?{attributes:true,attributeFilter:['class','style','hidden']}:{})});
+    if(!gfxAssetIntersectionObserver){
+      const loadVisible=()=>gfxObserveAssets(document);
+      document.addEventListener('scroll',loadVisible,{capture:true,passive:true});window.addEventListener('resize',loadVisible,{passive:true});
+      window.addEventListener('load',loadVisible,{once:true});
+    }
+    gfxObserveAssets(document);
+  }
+  gfxInstallAssetLoading();
   // Shared artwork reads native keys; selection, prices and unlocks stay in their native renderers.
   const GFX_ORBITAL_KEYS = ['def','prod','dock','signal'];
   const GFX_EXPEDITION_KEYS = ['short','standard','deep','salvage','research','mining'];
@@ -75190,7 +75307,7 @@ document.addEventListener('keydown',event=>{
     const i=keys.indexOf(key);
     if(i<0)return '';
     const rows=Math.ceil(keys.length/columns);
-    return `<span class="gfx-atlas-tile ${css}" role="img" aria-label="${escapeHtml(label)}" style="--tile-x:${columns>1?(i%columns)*100/(columns-1):0}%;--tile-y:${rows>1?Math.floor(i/columns)*100/(rows-1):0}%"></span>`;
+    return `<span class="gfx-atlas-tile gfx-asset-deferred ${css}" role="img" aria-label="${escapeHtml(label)}" style="--tile-x:${columns>1?(i%columns)*100/(columns-1):0}%;--tile-y:${rows>1?Math.floor(i/columns)*100/(rows-1):0}%"></span>`;
   }
   function gfxOrbitalPortraitHtml(key){
     const def=ORBITAL_FOCI.find(f=>f.key===key);
@@ -75199,11 +75316,11 @@ document.addEventListener('keydown',event=>{
   function gfxTerraformWorldHtml(type){
     const info=PLANET_TYPE_INFO[type]||{},art=GFX_PLANET_ART[type];
     if(['todeswelt','leerenwelt','erdwelt','wasserwelt'].includes(type))return gfxAtlasTile(['todeswelt','leerenwelt','erdwelt','wasserwelt'],type,2,'gfx-world-art',k7View(info).label||type);
-    return art?`<img class="gfx-world-image" src="kepler-gfx-planet-${art}.png" alt="${escapeHtml(k7View(info).label||type)}" decoding="async">`:'';
+    return art?gfxImageHtml('planet-'+art,`class="gfx-world-image" alt="${escapeHtml(k7View(info).label||type)}"`):'';
   }
   function gfxShipThumbnailHtml(key){
     // A selected fleet paint belongs to the native renderer, including in the catalogue.
-    return GFX_SHIP_KEYS.includes(key)&&!activeFleetSkinFilter()?`<img data-gfx-ship-thumb="${key}" src="kepler-gfx-ship-${key}.png" alt="" decoding="async">`:'';
+    return activeTab==='flotte'&&GFX_SHIP_KEYS.includes(key)&&!activeFleetSkinFilter()?gfxImageHtml('ship-'+key,`data-gfx-ship-thumb="${key}" alt=""`):'';
   }
   function gfxExpeditionSceneHtml(key){
     const type=EXPEDITION_TYPES.find(t=>t.key===key);
@@ -75322,7 +75439,7 @@ document.addEventListener('keydown',event=>{
     const production = card && card.querySelector('.prodline');
     const html = `<section class="gfx-view gfx-colony" aria-label="${k7t('Kolonieübersicht')}">
       <header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Kolonieübersicht')}</span><h2>${location}</h2></div><div class="gfx-location">${stageLabel}</div></header>
-      <div class="gfx-layout"><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-colony-${stage}.png" alt="${k7t('Illustration deiner Kolonie')}" decoding="async">
+      <div class="gfx-layout"><div class="gfx-scene">${gfxImageHtml('colony-'+stage,`class="gfx-landscape" alt="${k7t('Illustration deiner Kolonie')}"`,true)}
         ${spots.map(s=>{ const d=BUILDING_DEFS.find(b=>b.key===s.key); return `<button type="button" class="gfx-hotspot" style="left:${s.x}%;top:${s.y}%" data-gfx-building="${d.key}" aria-pressed="${d.key===def.key}"><i class="ti ${d.icon}" aria-hidden="true"></i>${escapeHtml(k7View(d).name)} · ${buildings[d.key]||0}</button>`; }).join('')}
       </div><aside class="gfx-inspector"><div class="command-building-model">${isoBausatz(def.key)?'<canvas data-bicon="'+def.key+'" width="96" height="96" aria-hidden="true"></canvas>':iconHtmlFor(def.key,def.icon,def.fg)}</div><span class="gfx-eyebrow">${k7t('Gebäude')}</span><h3>${escapeHtml(k7View(def).name)}</h3><span class="gfx-level">${k7t('Stufe')} ${level}</span>
         ${production ? '<p>'+production.innerHTML+'</p>' : '<p>'+escapeHtml(k7t(def.effectDesc||''))+'</p>'}${gfxFacilityNotice(def,buildings)}${gfxActionHtml('building',def.key)}
@@ -75344,7 +75461,7 @@ document.addEventListener('keydown',event=>{
     const fleet = currentFleet(), role=shipRoleInfo(def);
     const html = `<section class="gfx-view" aria-label="${k7t('Orbitalwerft')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Schiffswerft')}</span><h2>${k7t('Orbitalwerft')}</h2></div><div class="gfx-location">${k7PreserveUserText(escapeHtml(planetDisplayName(state.activeBasePlanet)))}</div></header>
       <div class="gfx-layout gfx-ship-layout"><div class="gfx-ship-list" aria-label="${k7t('Schiffsklassen')}">${SHIP_DEFS.map(d=>{ const key=d.key; return `<button type="button" class="gfx-choice" data-gfx-ship="${key}" aria-pressed="${key===def.key}">${gfxShipThumbnailHtml(key)||`<canvas data-ship-icon="${key}" width="78" height="58" aria-hidden="true"></canvas>`}${escapeHtml(k7View(d).name)}<small>${escapeHtml(k7t(shipRoleInfo(d).label))} · ${k7t('Bestand')}: ${fmt(fleet[key]||0)}</small></button>`; }).join('')}</div>
-      <div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-orbital-dock.png" alt="" decoding="async">${gfxShipModelHtml(def)}<div class="gfx-ship-caption">${escapeHtml(k7t(role.label))} · ${k7t('Bestand')}: ${fmt(fleet[def.key]||0)}</div></div>
+      <div class="gfx-scene">${gfxImageHtml('orbital-dock','class="gfx-landscape" alt=""',true)}${gfxShipModelHtml(def)}<div class="gfx-ship-caption">${escapeHtml(k7t(role.label))} · ${k7t('Bestand')}: ${fmt(fleet[def.key]||0)}</div></div>
       <aside class="gfx-inspector"><label class="gfx-picker">${k7t('Alle Schiffsklassen')}<select data-gfx-ship-picker>${SHIP_DEFS.map(d=>`<option value="${d.key}" ${d.key===def.key?'selected':''}>${escapeHtml(k7View(d).name)}</option>`).join('')}</select></label><span class="gfx-eyebrow">${k7t('Schiffsklasse')}</span><h3>${escapeHtml(k7View(def).name)}</h3>${shipStatBarsHtml(def.atk||0,def.shield||0,Math.round((def.atk||0)*.4)+(def.shield||0),def.speed||0,def.key)}${gfxActionHtml('ship',def.key)}<p>${k7t('Kosten und Menge entsprechen deiner aktuellen Bauauswahl.')}</p><button type="button" data-gfx-list="fleet">${k7t('Alle Schiffsklassen')} <i class="ti ti-list-details" aria-hidden="true"></i></button></aside></div></section>`;
     if (setBoxHtml(box,'shipyardVisual',html)) {
       wireGraphics(box); refreshShipMiniIcons(box);
@@ -75367,7 +75484,7 @@ document.addEventListener('keydown',event=>{
     const discovered = !!state.discovered[p.id], owned=!!state.colonies[p.id];
     const type=effectivePlanetType(p.id)||p.type, info=planetTypeInfoFor(p);
     const art=discovered && GFX_PLANET_ART[type];
-    const image = art ? `<img src="kepler-gfx-planet-${art}.png" alt="${escapeHtml(k7t(info.label||''))}" decoding="async">` : discovered ? `<canvas data-planet-icon="${type}" width="135" height="135"></canvas>` : '<div class="gfx-unknown"><i class="ti ti-lock" aria-hidden="true"></i></div>';
+    const image = art ? gfxImageHtml('planet-'+art,`alt="${escapeHtml(k7t(info.label||''))}"`) : discovered ? `<canvas data-planet-icon="${type}" width="135" height="135"></canvas>` : '<div class="gfx-unknown"><i class="ti ti-lock" aria-hidden="true"></i></div>';
     const html = `<section class="gfx-map-inspector" aria-label="${k7t('Planetendetails')}">${image}<div><span class="gfx-eyebrow">${discovered?k7t('Erkundet'):k7t('Nicht erkundet')}</span><h3>${k7PreserveUserText(escapeHtml(planetDisplayName(p.id)))}</h3><p>${discovered?escapeHtml(k7t(info.label||'')):k7t('Erkunde diesen Planeten, um seine Eigenschaften zu erfahren.')}</p>${discovered && info.bonusText ? `<p class="gfx-map-facts">${escapeHtml(k7t(info.bonusText))}</p>` : ''}<div class="gfx-map-facts">${owned?k7t('Eigene Kolonie'):k7t('Orbit')} ${owned?'':p.orbit||3}</div></div><div class="gfx-map-actions">${owned?`<button type="button" class="affordable" data-gfx-colony="${p.id}">${k7t('Zur Kolonie')} <i class="ti ti-chevron-right" aria-hidden="true"></i></button>`:''}<button type="button" data-gfx-planet-menu="${p.id}">${k7t('Aktionen')} <i class="ti ti-list-details" aria-hidden="true"></i></button></div></section>`;
     if (setBoxHtml(box,'mapPlanetVisual',html)) { wireGraphics(box); refreshPlanetMiniIcons(box); }
   }
@@ -75391,7 +75508,7 @@ document.addEventListener('keydown',event=>{
   }
     function gfxShipModelHtml(def){
     return GFX_SHIP_KEYS.includes(def.key)&&!activeFleetSkinFilter()
-      ? `<img class="gfx-ship-model" src="kepler-gfx-ship-${def.key}.png" alt="${escapeHtml(k7View(def).name)}" decoding="async">`
+      ? gfxImageHtml('ship-'+def.key,`class="gfx-ship-model" alt="${escapeHtml(k7View(def).name)}"`,true)
       : `<div class="gfx-native-ship"><canvas data-ship-icon="${def.key}" width="360" height="270" role="img" aria-label="${escapeHtml(k7View(def).name)}"></canvas></div>`;
   }
   function gfxPicker(defs,selected,attr,label){
@@ -75404,7 +75521,7 @@ document.addEventListener('keydown',event=>{
     const spots=[{key:'turm',x:22,y:65},{key:'flak',x:77,y:78},{key:'schild',x:35,y:30},{key:'laser',x:67,y:48}];
     const original=gfxOriginalButton('defense',def.key),card=original&&original.closest('.card-row'),production=card&&card.querySelector('.prodline');
     const html=`<section class="gfx-view gfx-defense" aria-label="${k7t('Planetare Festung')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Verteidigung')}</span><h2>${k7t('Planetare Festung')}</h2></div><div class="gfx-location">${k7PreserveUserText(escapeHtml(planetDisplayName(state.activeBasePlanet)))}</div></header>
-      <div class="gfx-layout"><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-defense-fortress.png" alt="${k7t('Illustration der Verteidigungsanlagen')}" decoding="async">
+      <div class="gfx-layout"><div class="gfx-scene">${gfxImageHtml('defense-fortress',`class="gfx-landscape" alt="${k7t('Illustration der Verteidigungsanlagen')}"`,true)}
       ${spots.map(p=>{const d=defs.find(d=>d.key===p.key);return `<button class="gfx-hotspot" type="button" data-gfx-defense="${d.key}" aria-pressed="${d.key===def.key}" style="left:${p.x}%;top:${p.y}%">${escapeHtml(k7View(d).name)} · ${buildings[d.key]||0}</button>`;}).join('')}</div>
       <aside class="gfx-inspector">${gfxPicker(defs,def.key,'data-gfx-defense-picker','Alle Verteidigungsanlagen')}<h3>${escapeHtml(k7View(def).name)}</h3><div class="gfx-defense-model"><canvas data-bicon="${def.key}" width="160" height="120" aria-hidden="true"></canvas><span class="gfx-level">${k7t('Stufe')} ${buildings[def.key]||0}</span></div>
       ${production?'<p>'+production.innerHTML+'</p>':'<p>'+escapeHtml(k7t(def.effectDesc||''))+'</p>'}${gfxFacilityNotice(def,buildings)}${gfxActionHtml('defense',def.key)}<button type="button" data-gfx-list="defenseBuildings">${k7t('Zur Anlagenliste')}</button></aside></div>
@@ -75422,7 +75539,7 @@ document.addEventListener('keydown',event=>{
     const requires=def.requires||[],next=RESEARCH_DEFS.filter(d=>(d.requires||[]).some(r=>r.key===def.key));
     const reqHtml=requires.map(r=>{const d=RESEARCH_DEFS.find(d=>d.key===r.key),done=(state.research[r.key]||0)>=r.level;return `<button type="button" class="gfx-tech-link ${done?'gfx-tech-ready':''}" data-gfx-research="${r.key}"><i class="ti ${done?'ti-check':'ti-lock'}" aria-hidden="true"></i> ${escapeHtml(k7View(d).name)}<small>${k7t('Stufe')} ${state.research[r.key]||0} / ${r.level}</small></button>`;}).join('');
     const html=`<section class="gfx-view gfx-research" aria-label="${k7t('Forschungszentrum')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Technologien')}</span><h2>${k7t('Forschungszentrum')}</h2></div><div class="gfx-location">${k7t('Forschungspunkte')}: <span id="gfxResearchPoints"></span></div></header>
-      <div class="gfx-layout"><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-research-lab.png" alt="${k7t('Forschungslabor mit Planetenhologramm')}" decoding="async"><div class="gfx-tech-preview">${iconHtmlFor(def.key,'ti-flask','#c3bef5')}<span>${escapeHtml(k7View(def).name)}</span></div></div>
+      <div class="gfx-layout"><div class="gfx-scene">${gfxImageHtml('research-lab',`class="gfx-landscape" alt="${k7t('Forschungslabor mit Planetenhologramm')}"`,true)}<div class="gfx-tech-preview">${iconHtmlFor(def.key,'ti-flask','#c3bef5')}<span>${escapeHtml(k7View(def).name)}</span></div></div>
       <aside class="gfx-inspector">${gfxPicker(RESEARCH_DEFS,def.key,'data-gfx-research-picker','Technologie auswählen')}<h3>${escapeHtml(k7View(def).name)}</h3><span class="gfx-level">${k7t('Stufe')} ${lvl} / ${def.maxLevel}</span><p>${escapeHtml(k7View(def).desc)}</p>${gfxActionHtml('research',def.key)}${gfxActionHtml('researchqueue',def.key)}<button type="button" data-gfx-list="research">${k7t('Zur Forschungsliste')}</button></aside></div>
       <div class="gfx-tech-path"><div><h3>${k7t('Voraussetzungen')}</h3>${reqHtml||'<p>'+k7t('Keine Forschungsvoraussetzungen.')+'</p>'}</div><div><h3>${k7t('Weiterführende Technologien')}</h3>${next.map(d=>`<button type="button" class="gfx-tech-link" data-gfx-research="${d.key}">${escapeHtml(k7View(d).name)}<small>${k7t('Benötigt diese Technologie ab Stufe')} ${d.requires.find(r=>r.key===def.key).level}</small></button>`).join('')||'<p>'+k7t('Keine direkten Folge-Technologien.')+'</p>'}</div></div></section>`;
     if(setBoxHtml(box,'researchVisual',html)){
@@ -75444,7 +75561,7 @@ document.addEventListener('keydown',event=>{
   function renderGraphicsMarket(){
     const box=document.getElementById('marketVisual');if(!box||activeTab!=='markt')return;
     // Separate from marketBox: a credit tick must never replace a focused trade input.
-    setBoxHtml(box,'marketVisual',`<section class="gfx-view gfx-banner" aria-label="${k7t('Orbitaler Handelsplatz')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Galaktischer Markt')}</span><h2>${k7t('Orbitaler Handelsplatz')}</h2></div><div class="gfx-location">${k7t('Kredite')}: <span id="gfxMarketCredits"></span></div></header><div class="gfx-scene"><img class="gfx-landscape" src="kepler-gfx-market-station.png" alt="${k7t('Frachthafen der Handelsstation')}" decoding="async"></div></section>`);
+    setBoxHtml(box,'marketVisual',`<section class="gfx-view gfx-banner" aria-label="${k7t('Orbitaler Handelsplatz')}"><header class="gfx-heading"><div><span class="gfx-eyebrow">${k7t('Galaktischer Markt')}</span><h2>${k7t('Orbitaler Handelsplatz')}</h2></div><div class="gfx-location">${k7t('Kredite')}: <span id="gfxMarketCredits"></span></div></header><div class="gfx-scene">${gfxImageHtml('market-station',`class="gfx-landscape" alt="${k7t('Frachthafen der Handelsstation')}"`,true)}</div></section>`);
     setBoxText(document.getElementById('gfxMarketCredits'),fmt(state.credits||0));
   }
   function gfxOfficerPortrait(o,index){

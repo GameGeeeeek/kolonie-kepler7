@@ -72,7 +72,7 @@ const cases=[
 const requested=process.argv.slice(2);assert(requested.every(name=>cases.some(item=>item.name===name)),'unknown native lazy-language counterexample');
 const frozen=[game,worker,path.join(root,'kepler-english.json'),path.join(root,'kepler-graphics.css'),path.join(root,'tests/test_lazy_language_catalog.js'),__filename,
  path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),
- ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.png$/.test(name)).sort().map(name=>path.join(root,name))];
+ ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name)).sort().map(name=>path.join(root,name))];
 const backend=path.resolve(root,'../kolonie-kepler7-backend/server.js');if(fs.existsSync(backend))frozen.push(backend);
 const hashes=()=>frozen.map(file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'));
 const before=hashes(),directory=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-lazy-native-')),results=[];

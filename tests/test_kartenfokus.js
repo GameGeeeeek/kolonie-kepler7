@@ -102,6 +102,12 @@ const sichtbareRingStile = new Set(['solid', 'dotted', 'dashed', 'double', 'groo
   // none/hidden als unsichtbare Ringstile abgelehnt und wirklich örtliche Ringpixel gemessen;
   // die native Tab- und Mausbedienung bleibt unabhängig vom Hintergrundvertrag geprüft.
   const HELL_MIN = 90;
+  // The new native loader validates the background bitmap before revealing it.
+  // Wait for that actual load only when the delivered source contains this loader;
+  // historical source copies retain their original background/focus prerequisites.
+  if (await page.evaluate(() => [...document.scripts].some(script => /^  function gfxAssetUrl\(/m.test(script.textContent)))) {
+    await page.waitForFunction(() => document.querySelector('#tab-karte .map-wrap')?.dataset.gfxReady === 'true');
+  }
   if (gegenprobe) await page.addStyleTag({ content: fehlerCss[gegenprobe] });
   const hintergrund = await page.evaluate(() => {
     let el = document.querySelector('#tab-karte .map-wrap');
@@ -121,12 +127,22 @@ const sichtbareRingStile = new Set(['solid', 'dotted', 'dashed', 'double', 'groo
     const shell = kette[shellIndex], map = kette[0];
     const bildMatch = map && map.bild.match(/^url\(["']?([^"')]+)["']?\)$/);
     const bildUrl = bildMatch ? new URL(bildMatch[1], location.href) : null;
+    const bildSetUrls = map ? [...map.bild.matchAll(/\burl\(["']?([^"')]+)["']?\)/g)].map(m => new URL(m[1], location.href)) : [];
+    // The same local nebula is now offered as WebP plus its original PNG fallback.
+    // Preserve the single-PNG contract for historical stylesheets; reject any other image.
+    const einzelNebel = !!bildUrl && bildUrl.origin === location.origin
+      && bildUrl.pathname.endsWith('/kepler-gfx-nebula.png');
+    const nebelSet = map && /^image-set\(/.test(map.bild) && bildSetUrls.length === 2
+      && bildSetUrls.every(u => u.origin === location.origin)
+      && bildSetUrls[0].pathname.endsWith('/kepler-gfx-nebula.webp')
+      && bildSetUrls[1].pathname.endsWith('/kepler-gfx-nebula.png')
+      && /type\(["']image\/webp["']\)/.test(map.bild)
+      && /type\(["']image\/png["']\)/.test(map.bild);
     const shellDunkel = shell && shell.rgba && shell.rgba.r === 8 && shell.rgba.g === 14
       && shell.rgba.b === 28 && shell.rgba.a >= 0.92;
     const farbVertrag = shellIndex > 0 && kette.filter(e => e.shell).length === 1
       && kette.every((e, i) => e.rgba && (i === shellIndex ? shellDunkel : e.rgba.a === 0));
-    const bildVertrag = !!bildUrl && bildUrl.origin === location.origin
-      && bildUrl.pathname.endsWith('/kepler-gfx-nebula.png')
+    const bildVertrag = (einzelNebel || nebelSet)
       // HTML-/Body-Verläufe liegen unter der mindestens 92% deckenden dunklen .shell.
       // Zwischen .shell und Bitmap darf keine weitere gemalte Hintergrundbildfläche liegen.
       && kette.slice(1, shellIndex + 1).every(e => e.bild === 'none');

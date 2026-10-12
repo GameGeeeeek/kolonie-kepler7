@@ -3,6 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 let source=fs.readFileSync(SPIELDATEI,'utf8'),css=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
+const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
 function fault(text,old,next){assert.equal(text.split(old).length,2,'unique fault anchor');return text.replace(old,next);}
 if(process.env.K7_DETAIL_FAULT==='touch')css=fault(css,'#creditShopBox button { min-width:44px; min-height:44px;','#creditShopBox button { min-width:28px; min-height:28px;');
 if(process.env.K7_DETAIL_FAULT==='orbital-width')css=fault(css,'.gfx-orbital-choice { min-width:0!important; max-width:none!important;','.gfx-orbital-choice { min-width:0!important; max-width:190px!important;');
@@ -24,7 +25,7 @@ function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FA
    if(url.pathname==='/kepler-graphics.css'){res.writeHead(200,{'Content-Type':'text/css'});return res.end(css);}
    const file=path.resolve(WURZEL,url.pathname.slice(1));
    if(!file.startsWith(WURZEL+path.sep)||!fs.existsSync(file)){res.writeHead(404);return res.end();}
-   res.writeHead(200,{'Content-Type':file.endsWith('.png')?'image/png':file.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(file));
+   res.writeHead(200,{'Content-Type':file.endsWith('.webp')?'image/webp':file.endsWith('.png')?'image/png':file.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(file));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const origin='http://127.0.0.1:'+server.address().port,store={};
@@ -114,7 +115,7 @@ function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FA
     }
    }
   }
-  check('new atlases load and have correct grid aspect ratios',await page.evaluate(async()=>{for(const [file,ratio] of [['orbital',1],['world',1],['expedition',1.5],['flagship',3]]){const im=new Image();im.src='kepler-gfx-'+file+'-atlas.png';await im.decode();if(Math.abs(im.naturalWidth/im.naturalHeight-ratio)>.01)return false;}return true;}));
+  check('new atlases load and have correct grid aspect ratios',await page.evaluate(async primary=>{for(const format of primary==='webp'?['png','webp']:['png'])for(const [file,ratio] of [['orbital',1],['world',1],['expedition',1.5],['flagship',3]]){const im=new Image();im.src='kepler-gfx-'+file+'-atlas.'+format;await im.decode();if(Math.abs(im.naturalWidth/im.naturalHeight-ratio)>.01)return false;}return true;},graphicFormat));
   await page.goto(origin+'/?lang=en');
   await page.waitForFunction(()=>window.__details&&__details.ready());
   await page.evaluate(()=>{for(const id of ['tutorialOverlay','welcomeNewOverlay','welcomeBackOverlay','updateNoticeOverlay','kofiEmailPromptOverlay','conflictOverlay']){const e=document.getElementById(id);if(e)e.style.display='none';}__details.show('flotte');});
