@@ -54,7 +54,7 @@ async function run(surface='all'){
    const u=new URL(req.url,'http://localhost');let data,mime;
    if(u.pathname==='/'){data=html;mime='text/html';}
    else if(u.pathname==='/kepler-graphics.css'){data=css;mime='text/css';}
-   else{const f=path.resolve(WURZEL,u.pathname.slice(1));if(!f.startsWith(WURZEL+path.sep)||!fs.existsSync(f)){res.writeHead(404);return res.end();}data=fs.readFileSync(f);mime=f.endsWith('.png')?'image/png':f.endsWith('.woff2')?'font/woff2':f.endsWith('.css')?'text/css':'application/javascript';}
+   else{const f=path.resolve(WURZEL,u.pathname.slice(1));if(!f.startsWith(WURZEL+path.sep)||!fs.existsSync(f)){res.writeHead(404);return res.end();}data=fs.readFileSync(f);mime=f.endsWith('.webp')?'image/webp':f.endsWith('.png')?'image/png':f.endsWith('.woff2')?'font/woff2':f.endsWith('.css')?'text/css':'application/javascript';}
    res.writeHead(200,{'Content-Type':mime,'Cache-Control':'no-store'});res.end(data);
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;

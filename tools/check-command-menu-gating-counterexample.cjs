@@ -6,7 +6,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('nod
 const {spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),game=path.join(root,'weltraum_kolonie.html');
 const frozenFiles=[game,path.join(root,'kepler-graphics.css'),path.join(root,'tests/test_schirmfrage.js'),__filename,
- ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.png$/.test(name)).sort().map(name=>path.join(root,name))];
+ ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name)).sort().map(name=>path.join(root,name))];
 // The PR polish job supplies mocked API data and checks out only the frontend. Include a
 // real sibling backend when present; every file actually present remains strictly frozen.
 const backend=path.resolve(root,'../kolonie-kepler7-backend/server.js');

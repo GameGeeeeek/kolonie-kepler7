@@ -29,7 +29,7 @@ async function main() {
   const game = fs.readFileSync(SPIELDATEI);
   const assets = new Map();
   const assetNames = ['tabler-icons-full.woff2', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'kepler-graphics.css', 'service-worker.js', 'manifest.json', 'kepler-english.json',
-    ...fs.readdirSync(WURZEL).filter(name => /^kepler-gfx-[a-z-]+\.png$/.test(name))];
+    ...fs.readdirSync(WURZEL).filter(name => /^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name))];
   for (const name of assetNames) {
     const file = path.join(WURZEL, name);
     if (fs.existsSync(file)) assets.set('/' + name, fs.readFileSync(file));
@@ -47,7 +47,7 @@ async function main() {
     } else if (target === '/version.txt' && version) {
       data = Buffer.from(version[1]); mime = 'text/plain; charset=utf-8';
     } else if (assets.has(target)) {
-      data = assets.get(target); mime = target.endsWith('.woff2') ? 'font/woff2' : target.endsWith('.css') ? 'text/css; charset=utf-8' : target.endsWith('.js') ? 'application/javascript' : target.endsWith('.json') ? 'application/json' : 'image/png';
+      data = assets.get(target); mime = target.endsWith('.woff2') ? 'font/woff2' : target.endsWith('.css') ? 'text/css; charset=utf-8' : target.endsWith('.js') ? 'application/javascript' : target.endsWith('.json') ? 'application/json' : target.endsWith('.webp') ? 'image/webp' : 'image/png';
     } else {
       // No API, repository, credential or arbitrary filesystem access. The tests own API mocks.
       res.writeHead(404); res.end(); return;

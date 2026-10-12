@@ -42,7 +42,7 @@ assert.equal(manifest.length,108,'complete native menu manifest count');
 const frozen=[game,path.join(root,'kepler-graphics.css'),path.join(root,'kepler-english.json'),path.join(root,'service-worker.js'),
  path.join(root,'tests/http-run.js'),path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),
  path.join(root,'tests/test_command_menu_position.js'),__filename,
- ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.png$/.test(name)).sort().map(name=>path.join(root,name))];
+ ...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name)).sort().map(name=>path.join(root,name))];
 const backend=path.resolve(root,'../kolonie-kepler7-backend/server.js');if(fs.existsSync(backend))frozen.push(backend);
 const hashes=()=>frozen.map(file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'));
 const before=hashes(),source=fs.readFileSync(game,'utf8'),css=fs.readFileSync(path.join(root,'kepler-graphics.css'),'utf8');

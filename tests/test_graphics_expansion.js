@@ -4,6 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 const {oeffneSektorMitSystem,oeffneSystemUeberSektoren}=require('./lib/karte');
 let source=fs.readFileSync(SPIELDATEI,'utf8');
+const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
 if(process.env.K7_GFX_EXPANSION_FAULT==='forwarding'){
  const anchor='if (button && !button.disabled) button.click();';assert.equal(source.split(anchor).length,2);
  source=source.replace(anchor,"if (kind!=='defense' && button && !button.disabled) button.click();");
@@ -57,7 +58,7 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
    if(req.url.split('?')[0]==='/'){res.writeHead(200,{'Content-Type':'text/html'});return res.end(html);}
    const p=path.resolve(WURZEL,req.url.split('?')[0].slice(1));
    if(!p.startsWith(WURZEL+path.sep)||!fs.existsSync(p)){res.writeHead(404);return res.end();}
-   res.writeHead(200,{'Content-Type':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
+   res.writeHead(200,{'Content-Type':p.endsWith('.webp')?'image/webp':p.endsWith('.png')?'image/png':p.endsWith('.css')?'text/css':'application/javascript'});res.end(fs.readFileSync(p));
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
   const origin='http://127.0.0.1:'+server.address().port,store={};
@@ -187,11 +188,13 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('portrait card still promotes the actual officer',await page.evaluate(()=>__gfxReview.state().officers.ingenieur===1));
   await page.evaluate(()=>__gfxReview.show('flotte'));
   await page.locator('#shipyardVisual [data-gfx-ship="frachter"]').click();
-  check('new freight ship image is tied to the real freight ship action',await page.locator('#shipyardVisual .gfx-ship-model').getAttribute('src')==='kepler-gfx-ship-frachter.png'&&await page.locator('#shipyardVisual [data-gfx-build]').getAttribute('data-gfx-key')==='frachter');
+  await page.locator('#shipyardVisual .gfx-ship-model').scrollIntoViewIfNeeded();
+  await page.waitForFunction(()=>{const image=document.querySelector('#shipyardVisual .gfx-ship-model');return image&&image.complete&&image.naturalWidth>0;});
+  check('new freight ship image is tied to the real freight ship action',await page.locator('#shipyardVisual .gfx-ship-model').getAttribute('src')==='kepler-gfx-ship-frachter.'+graphicFormat&&await page.locator('#shipyardVisual [data-gfx-build]').getAttribute('data-gfx-key')==='frachter');
   await page.locator('#shipyardVisual [data-gfx-ship-picker]').selectOption('bomber');
   check('other ship classes use their own detailed native hull rather than a wrong illustration',await page.locator('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]').count()===1&&await page.locator('#shipyardVisual .gfx-ship-model').count()===0);
   check('class picker contains every native ship class',await page.locator('#shipyardVisual [data-gfx-ship-picker] option').count()===await page.evaluate(()=>__gfxReview.shipKeys.length));
-  const alpha=await page.evaluate(async()=>{const result=[];for(const key of ['ice','volcano','desert','moon']){const i=new Image();i.src='kepler-gfx-planet-'+key+'.png';await i.decode();const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;const x=c.getContext('2d');x.drawImage(i,0,0);result.push({key,corner:x.getImageData(0,0,1,1).data[3],center:x.getImageData(c.width/2,c.height/2,1,1).data[3]});}return result;});
+  const alpha=await page.evaluate(async primary=>{const result=[];for(const format of primary==='webp'?['png','webp']:['png'])for(const key of ['ice','volcano','desert','moon']){const i=new Image();i.src='kepler-gfx-planet-'+key+'.'+format;await i.decode();const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;const x=c.getContext('2d');x.drawImage(i,0,0);result.push({key,format,corner:x.getImageData(0,0,1,1).data[3],center:x.getImageData(c.width/2,c.height/2,1,1).data[3]});}return result;},graphicFormat);
   check('new planet surfaces load with genuinely transparent backgrounds',alpha.every(a=>a.corner===0&&a.center>=250),alpha);
   for(const width of [390,320]){
     await page.setViewportSize({width,height:844});

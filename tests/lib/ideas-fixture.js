@@ -6,10 +6,22 @@ module.exports=async function fixture(api,language='de',options={}){
   assert.equal(source.split(end).length,2,'checked game export anchor');
   const html=source.replace(end,'\nwindow.__ideas={ready:()=>bootDataReady,state:()=>state,show:switchTab,'+api+'};\n'+end);
   const catalogue=fs.readFileSync(path.join(WURZEL,'kepler-english.json'));
+  const assets=new Map();
+  for(const name of ['kepler-graphics.css','service-worker.js','manifest.json','tabler-icons-full.woff2','icon-192.png','icon-512.png','apple-touch-icon.png',
+    ...fs.readdirSync(WURZEL).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name))]){
+    const file=path.join(WURZEL,name);if(fs.existsSync(file))assets.set('/'+name,fs.readFileSync(file));
+  }
   const store={},errors=[],server=http.createServer((req,res)=>{
-    if(new URL(req.url,'http://127.0.0.1').pathname==='/kepler-english.json'){
+    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
+    if(pathname==='/kepler-english.json'){
       res.writeHead(200,{'Content-Type':'application/json'});return res.end(catalogue);
     }
+    if(assets.has(pathname)){
+      const mime=pathname.endsWith('.webp')?'image/webp':pathname.endsWith('.png')?'image/png':pathname.endsWith('.css')?'text/css':
+        pathname.endsWith('.woff2')?'font/woff2':pathname.endsWith('.json')?'application/json':'application/javascript';
+      res.writeHead(200,{'Content-Type':mime});return res.end(assets.get(pathname));
+    }
+    if(pathname!=='/'&&pathname!=='/weltraum_kolonie.html'){res.writeHead(404);return res.end();}
     res.writeHead(200,{'Content-Type':'text/html'});res.end(html);
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));

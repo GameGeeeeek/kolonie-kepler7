@@ -50,6 +50,9 @@ on:
       - tests/test_recycler_sammelauftrag.js
       - tests/test_tickruhe.js
       - kepler-gfx-*.png
+      - kepler-gfx-*.webp
+      - tests/test_graphics_loading.js
+      - tools/check-graphics-loading-counterexamples.cjs
       - tests/test_graphics_refresh.js
       - tests/test_graphics_expansion.js
       - tests/test_hscroll.js
@@ -70,6 +73,7 @@ on:
       - tests/test_kopfzeile_tippziele.js
       - tests/test_bewertungskarte.js
       - tests/http-run.js
+      - tests/lib/http-test-origin.js
       - tools/check-graphics-counterexamples.cjs
       - tools/check-graphics-expansion-counterexamples.cjs
       - tools/check-expedition-graphics-counterexamples.cjs
@@ -133,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GameGeeeeek/kolonie-kepler7-backend
-          ref: 894da23d81a6c2499a7d4dd3375fbb97bce261e2
+          ref: 63b1ec73cb8797b110b67847f33e605fce69ee80
           path: .review-backend
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -161,6 +165,10 @@ jobs:
           node tests/test_graphics_expansion.js
           node tests/http-run.js test_hscroll.js test_expeditionsbox_cache.js
           node tests/http-run.js test_planeten_texturen.js test_kartenbeschriftung.js test_asteroid_trefferflaeche.js test_karte_handy_bedienung.js test_kartenfokus.js test_kartenresize.js test_kartengroesse.js
+      - name: Native deferred WebP graphics and retained PNG fallback
+        run: |
+          node tests/test_graphics_loading.js
+          node tools/check-graphics-loading-counterexamples.cjs
       - name: Behavioral and layout counterexamples must fail
         run: |
           node tools/check-graphics-counterexamples.cjs

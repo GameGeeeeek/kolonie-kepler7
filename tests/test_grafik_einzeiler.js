@@ -44,6 +44,7 @@ const { oeffneSektorMitSystem, oeffneSystemUeberSektoren } = require('./lib/kart
 const { check, ende } = pruefer();
 const DATEI = process.env.KEPLER_TESTDATEI || SPIEL_URL;
 const S = fs.readFileSync(SPIELDATEI, 'utf8');
+const graphicFormat=/^  function gfxAssetUrl\(/m.test(S)?'webp':'png';
 
 /* ---- Quelltext: die Kapsel der Wiedergabe --------------------------------------------------- */
 const wrackVon = S.indexOf('wracks.push({');
@@ -311,7 +312,7 @@ async function boot(browser, viewport, geraet, saveZusatz) {
         const image=e.querySelector('.gfx-landscape'),s=e.getBoundingClientRect(),r=image.getBoundingClientRect();
         return {loaded:image.complete&&image.naturalWidth>0,src:image.getAttribute('src'),height:s.height,left:s.left,right:s.right,width:s.width,imageWidth:r.width,imageCentre:r.left+r.width/2};
       });
-      check('3a: die native Kolonieszene ersetzt sichtbar das Banner und ihr Bild ist geladen',scene.loaded&&scene.height>80&&/^kepler-gfx-colony-[a-z]+\.png$/.test(scene.src),scene);
+      check('3a: die native Kolonieszene ersetzt sichtbar das Banner und ihr Bild ist geladen',scene.loaded&&scene.height>80&&new RegExp('^kepler-gfx-colony-[a-z]+\\.'+graphicFormat+'$').test(scene.src),scene);
       check('3b: das Zentrum des Koloniebildes bleibt innerhalb der sichtbaren Szene am schmalen Fenster',scene.width>0&&scene.imageWidth>=scene.width-2&&scene.imageCentre>scene.left&&scene.imageCentre<scene.right&&scene.left>=0&&scene.right<=480,scene);
     }else{
     const banner = await page.evaluate(() => {

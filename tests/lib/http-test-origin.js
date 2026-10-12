@@ -18,7 +18,7 @@ const sameFile = value => {
     return process.platform === 'win32' ? target.toLowerCase() === gameFile.toLowerCase() : target === gameFile;
   } catch { return false; }
 };
-const companionAsset = /^(?:tabler-icons-full\.woff2|kepler-graphics\.css|kepler-gfx-[a-z-]+\.png)$/;
+const companionAsset = /^(?:tabler-icons-full\.woff2|kepler-graphics\.css|kepler-gfx-[a-z-]+\.(?:png|webp))$/;
 const wrapPage = async page => {
   // Some regressions navigate to their own modified HTML copy in a temp folder.
   // Keep that document intact, but give it the same stylesheet, font and graphics
