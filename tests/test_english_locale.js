@@ -75,6 +75,7 @@ async function makePage(browser, {language='de',authenticated=false,mobile=false
       return json({});
     }
     if(url.pathname==='/' || url.pathname==='/weltraum_kolonie.html')return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:source});
+    if(url.pathname==='/kepler-english.json')return route.fulfill({status:200,contentType:'application/json',body:fs.readFileSync(path.join(__dirname,'../kepler-english.json'),'utf8')});
     if(url.pathname==='/version.txt')return route.fulfill({status:200,contentType:'text/plain',body:version+'\n'});
     if(url.pathname==='/manifest.json')return json({name:'Kepler-7',start_url:'/',display:'standalone',icons:[]});
     return route.fulfill({status:204,body:''});
