@@ -26,6 +26,8 @@ Some dynamically assembled sentences, server-origin messages and secondary HTML 
 
 For the current localized game, update `locales/en.json` and run `node tools/i18n/sync.cjs`. Commit the generated HTML and `kepler-english.json` together. `tools/ideas/sync.cjs` also preserves this external-catalogue format when refreshing idea translations. The original compiler retains an inline mode for isolated transformation fixtures.
 
+Worker registration and cache readiness tests poll the actual Boolean result of `await page.evaluate(...)`. Do not treat a fulfilled `waitForFunction(async ...)` handle as proof that its resolved result was true: the installed Playwright polling implementation initially considers the returned Promise truthy. The load-only registration counterexample must fail with no actual registration/controller after the held language response is released.
+
 ### Initial reproducible build
 
 This initial preview was compiled from game blob `db881c88728b38dd4ddc005f17caa12dc8eefe0d` (SHA-256 `d2e1a3525a0b657b36022725fc2c7175f90a94281575a52cbda419040bafb24e`). The compiler refuses to stack transformations onto already localized source.
