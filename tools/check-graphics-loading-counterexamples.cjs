@@ -18,8 +18,17 @@ const actualMemberGate="if(!asset||(asset[0]==='#allianceHeroBanner'&&myAlliance
 const actualMemberFinal="if(element.isConnected&&!(asset[0]==='#allianceHeroBanner'&&myAllianceTag())){";
 const actualMemberRefresh='if(!entry){';
 function eagerCanvases(input){const a=input.indexOf('    function shipRasterVisible(canvas){'),b=input.indexOf('\n    // A cached Canvas',a);assert(a>=0&&b>a,'the actual bounded native ship viewport gate');return input.slice(0,a)+'    function shipRasterVisible(canvas){return true;}'+input.slice(b);}
+function eagerGameCanvases(input){
+ const a=input.indexOf('    function gameRasterVisible(node){'),b=input.indexOf('\n    function gameRasterSetData(',a);
+ assert(a>=0&&b>a&&input.split('    function gameRasterVisible(node){').length===2,'one actual bounded canonical viewport gate');
+ const eager=input.slice(0,a)+'    function gameRasterVisible(node){return !!node&&node.isConnected;}'+input.slice(b);
+ return replace(eager,'if(gameRasterObserver)gameRasterObserver.observe(node);','if(gameRasterObserver)gameRasterObserver.observe(node);gameRasterRequestConsumer(node);');
+}
 const cases=[
- {name:'eager-offscreen',source:()=>eagerCanvases(replace(source,'if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.observe(element);','if(gfxAssetIntersectionObserver)gfxAssetActivate(element);')),failed:[labels.startup,labels.dormantImages,labels.dormantAtlases,labels.orbitalScroll,labels.orbitalRequest,labels.worldScroll,labels.hiddenFleetNetwork,labels.alliance,labels.fleet,labels.railDormant,labels.railScroll,labels.allianceFallback,labels.allianceMember]},
+ // The visible home sphere legitimately shares CelestialA with offscreen
+ // Terraform tiles. Their no-extra-fetch and real wheel/pixel guards stay green;
+ // unrelated eager legacy/canonical demands must still reject these 11 guards.
+ {name:'eager-offscreen',source:()=>eagerGameCanvases(eagerCanvases(replace(source,'if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.observe(element);','if(gfxAssetIntersectionObserver)gfxAssetActivate(element);'))),failed:[labels.startup,labels.dormantAtlases,labels.orbitalScroll,labels.orbitalRequest,labels.hiddenFleetNetwork,labels.alliance,labels.fleet,labels.railDormant,labels.railScroll,labels.allianceFallback,labels.allianceMember]},
  // The old six-image factory requests hidden PNGs and loses the canonical
  // canvases. The independently deferred shared-atlas rail remains checked.
  {name:'hidden-fleet',source:()=>replace(source,hiddenGood,hiddenOld),failed:[labels.hiddenFleetMarkup,labels.hiddenFleetNetwork,labels.fleetThumbnails]},
@@ -35,13 +44,15 @@ const cases=[
 const requested=process.argv.slice(2),normalOnly=requested.includes('--normal-only');
 assert(!normalOnly||requested.length===1,'normal-only cannot be combined with faults');
 assert(normalOnly||new Set(requested).size===requested.length&&requested.every(name=>cases.some(c=>c.name===name)),'unknown/duplicate controlled graphics loading case');
-const tracked=[game,path.join(root,'kepler-graphics.css'),path.join(root,'service-worker.js'),path.join(root,'kepler-english.json'),path.join(root,'marketing-screenshots.js'),path.join(root,'tests/test_graphics_loading.js'),__filename,path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),...assetNames.flatMap(name=>['png','webp'].map(ext=>path.join(root,name+'.'+ext)))];
+const deliveredAssets=fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name)).sort();
+assert(deliveredAssets.length===108,'all original and canonical delivered raster assets are frozen');
+const tracked=[game,path.join(root,'kepler-graphics.css'),path.join(root,'service-worker.js'),path.join(root,'kepler-english.json'),path.join(root,'marketing-screenshots.js'),path.join(root,'tests/test_graphics_loading.js'),__filename,path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),path.join(root,'docs/remaining-art-package.json'),...deliveredAssets.map(name=>path.join(root,name))];
 tracked.push(path.join(root,'tests/lib/graphics-loading-manifest.json'));
 const backend=require(path.join(root,'tests/lib/spieldatei')).SERVER_JS;if(backend)tracked.push(backend);
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const hashes=()=>Object.fromEntries(tracked.map(file=>[path.relative(root,file),hash(file)]));
 const before=hashes(),temp=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-graphics-loading-'));
-const evidence=path.resolve(root,'../ship-menu-harmony-2026-10-13','graphics-loading-counter-'+new Date().toISOString().replace(/[:.]/g,''));fs.mkdirSync(evidence,{recursive:true});
+const evidence=path.resolve(root,'../remaining-graphics-2026-10-13','graphics-loading-counter-'+new Date().toISOString().replace(/[:.]/g,''));fs.mkdirSync(evidence,{recursive:true});
 function run(name,file,assetDirectory){
  const child=spawnSync(process.execPath,['tests/test_graphics_loading.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:file,KEPLER_GFX_ASSET_OVERRIDE_DIR:assetDirectory||''},encoding:'utf8',timeout:300000,maxBuffer:16*1024*1024});
  const output=(child.stdout||'')+(child.stderr||'');fs.writeFileSync(path.join(evidence,name+'.log'),output);

@@ -21,7 +21,7 @@ const labels={
  composition:'the actual mission arrival retains only its positive finite composition in the map snapshot',
  map:'the actual map battle paints canonical hull and FX pixels without SMIL under reduced motion',
  mapLife:'map artwork readiness preserves native controls and the original eight-second battle lifetime',
- hashes:'all seventy-five original runtime and backend hashes remain frozen through every combat action',
+ hashes:'all 113 original runtime and backend hashes remain frozen through every combat action',
  script:'every native combat artwork action finishes without JavaScript errors',
  http:'every actual combat HTTP save and asset request finishes without unexpected fixture errors'
 };
@@ -91,7 +91,7 @@ async function main(){
   check(labels.map,mapReady&&mapLayout?.reduced==='true'&&mapLayout.animations===0&&mapLayout.pointerless&&mapPixelResults.length===5&&mapPixelResults.every(r=>r.pixels.count>20&&r.pixels.diff<18&&r.pixels.maxMeanRGBDiff<=3),{layout:mapLayout,results:mapPixelResults});
   const expired=await boolean(map.page,()=>!document.querySelector('#galaxyMapSvg [data-map-kampf]'),null,12000),expiredAt=Date.now(),mapIdentity=mapControls.length===13&&(await Promise.all(mapControls.map((h,i)=>h.evaluate((e,i)=>e.isConnected&&e===document.querySelectorAll('#commandNav .tab-btn')[i],i)))).every(Boolean);
   check(labels.mapLife,battle&&expired&&expiredAt-seenAt>=5000&&expiredAt-seenAt<=10500&&expiredAt<arrival+300000&&mapIdentity,{seenAt,expiredAt,lifetime:expiredAt-seenAt,returnedAt:arrival+300000,mapIdentity});await map.close();
-  check(labels.hashes,runtime.length===75&&JSON.stringify(hashes())===JSON.stringify(before),{count:runtime.length,hashes:hashes()});
+  check(labels.hashes,runtime.length===113&&JSON.stringify(hashes())===JSON.stringify(before),{count:runtime.length,hashes:hashes()});
   check(labels.script,runs.every(r=>r.errors.length===0),runs.flatMap(r=>r.errors));check(labels.http,runs.every(r=>r.httpErrors.length===0),runs.flatMap(r=>r.httpErrors));
   if(JSON.stringify(records.map(r=>r.name))!==JSON.stringify(manifest))throw Error('Complete native combat manifest or order changed');const failures=records.filter(r=>!r.ok).length;console.log(records.length+' checks, '+failures+' failures');console.log((failures?'FAIL':'OK')+' - Native combat raster art');process.exitCode=failures?1:0;
  }finally{for(const run of runs)await run.close();if(browser)await browser.close();}
