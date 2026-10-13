@@ -5,6 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),
 const {SPIELDATEI,WURZEL}=require('./lib/spieldatei');
 const {starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 const assetNames=['colony-developed','colony-outpost','colony-settlement','defense-fortress','enemy-atlas','expedition-atlas','expedition-wreck','flagship-atlas','market-station','material-atlas','nebula','officer-atlas','orbital-atlas','orbital-dock','planet-crystal','planet-desert','planet-gas','planet-ice','planet-moon','planet-ocean','planet-volcano','research-lab','ship-carrier','ship-cruisers','ship-destroyers','ship-frachter','ship-jaeger','ship-ships','world-atlas'].map(stem=>'kepler-gfx-'+stem);
+assetNames.push(...['regular','utility','advanced'].map(group=>'kepler-gfx-ship-atlas-'+group));
 const TABS=['basis','verteidigung','forschung','flotte','expedition','karte','galaxie','allianz','offiziere','markt','punkte','fortschritt','sammlung'];
 const labels={
  boot:'the authenticated native save and all thirteen original tabs load',
@@ -20,10 +21,10 @@ const labels={
  hiddenFleetMarkup:'Expedition creates no image previews inside the hidden fleet panel',
  hiddenFleetNetwork:'Expedition starts no hidden fleet ship-image requests',
  expeditionAtlas:'the displayed original expedition tile loads its real WebP atlas',
- fleet:'the native Fleet pointer makes an original decoded WebP ship preview available',
- fleetThumbnails:'the active fleet retains its six original native ship-thumbnail nodes',
- railDormant:'a genuinely offscreen shipyard-rail image still has no eager src',
- railScroll:'a real viewport wheel activates and decodes the original shipyard-rail image',
+ fleet:'the native Fleet pointer displays its decoded canonical WebP ship canvas',
+ fleetThumbnails:'every displayed native fleet card retains its canonical ship-thumbnail canvas',
+ railDormant:'a genuinely offscreen shipyard canvas remains unpainted even when its shared atlas is cached',
+ railScroll:'a real viewport wheel activates and decodes the original canonical shipyard canvas',
  identity:'scrolling and native tab actions retain all thirteen original control identities',
  fallbackRequest:'an actual missing main WebP requests its native PNG fallback once',
  fallbackDecode:'the native PNG fallback decodes at the original colony dimensions',
@@ -108,7 +109,7 @@ async function main(){
    check(labels.worldScroll,worldBefore.ready!=='true'&&worldReady&&/\.webp$/.test(worldAfter.currentSrc||'')&&run.requests.some(r=>r.phase==='world-scroll'&&r.path.endsWith('planet-ocean.webp')&&r.status===200),{before:worldBefore,after:worldAfter});
    const visibleOK=await nativeBoolean(run.page,()=>{const es=[...document.querySelectorAll('img[data-gfx-fallback]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;});return es.length>0&&es.every(e=>e.complete&&e.naturalWidth>0&&e.naturalHeight>0);});check(labels.visible,visibleOK);
    phase='expedition-before-fleet';check(labels.expedition,await tab(run,'expedition'));
-   await delay(250);check(labels.hiddenFleetMarkup,await run.page.locator('#fleet img[data-gfx-ship-thumb]').count()===0);
+   await delay(250);check(labels.hiddenFleetMarkup,await run.page.locator('#fleet [data-gfx-ship-thumb]').count()===0);
    check(labels.hiddenFleetNetwork,!run.requests.some(r=>r.phase==='expedition-before-fleet'&&/^\/kepler-gfx-ship-/.test(r.path)),graphicRequests(run).filter(r=>r.phase==='expedition-before-fleet'));
    const expTile=run.page.locator('#expeditionVisual .gfx-expedition-art').first();if(await expTile.count())await wheelTo(run,'#expeditionVisual .gfx-expedition-art');
    const expeditionReady=await nativeBoolean(run.page,()=>{const e=document.querySelector('#expeditionVisual .gfx-expedition-art');return !!e&&e.dataset.gfxReady==='true';});
@@ -119,18 +120,22 @@ async function main(){
    phase='notag-alliance-second-before-fleet';await tab(run,'basis');await tab(run,'allianz');await wheelTo(run,'#allianceHeroBanner');
    const allianceSecond=await nativeBoolean(run.page,()=>{const e=document.getElementById('allianceHeroBanner'),r=e?.getBoundingClientRect();return !!e&&!!e.closest('.gfx-alliance-entry')&&e.dataset.gfxReady==='true'&&getComputedStyle(e).backgroundImage.includes('kepler-gfx-orbital-dock.webp')&&r.width>0&&r.height>0&&r.top<innerHeight&&r.bottom>0;});
    check(labels.allianceSecond,allianceSecond,{element:await run.page.locator('#allianceHeroBanner').evaluate(e=>({computed:getComputedStyle(e).backgroundImage,ready:e.dataset.gfxReady,entry:!!e.closest('.gfx-alliance-entry')}))});
-   phase='fleet';await tab(run,'flotte');await wheelTo(run,'#shipyardVisual .gfx-ship-model');const fleetReady=await imageReady(run.page,'#shipyardVisual .gfx-ship-model');const ship=await geometry(run.page,'#shipyardVisual .gfx-ship-model');
-   check(labels.fleet,fleetReady&&/\.webp$/.test(ship.currentSrc||'')&&run.requests.some(r=>r.phase==='fleet'&&/^\/kepler-gfx-ship-.*\.webp$/.test(r.path)&&r.status===200),ship);
-   check(labels.fleetThumbnails,await run.page.locator('#fleet img[data-gfx-ship-thumb]').count()===6);
-   const rail=await run.page.locator('#shipyardVisual .gfx-ship-list img').evaluateAll(es=>es.map((e,index)=>{const r=e.getBoundingClientRect();return {index,src:e.getAttribute('src'),deferred:e.dataset.gfxSrc,ready:e.dataset.gfxReady,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
-   const distant=rail.find(e=>e.width>0&&e.height>0&&e.top>e.viewport+200);
-   check(labels.railDormant,!!distant&&!!distant.deferred&&!distant.src&&distant.ready!=='true',rail);
-   let railOK=false,railWitness=null;if(distant){phase='rail-scroll';const locator=run.page.locator('#shipyardVisual .gfx-ship-list img').nth(distant.index);
+   phase='fleet';await tab(run,'flotte');await wheelTo(run,'#shipyardVisual .gfx-native-ship canvas');
+   const fleetReady=await nativeBoolean(run.page,()=>{const e=document.querySelector('#shipyardVisual .gfx-native-ship canvas');if(!e||e.dataset.shipArt!=='raster'||e.dataset.shipArtReady!=='true'||e.dataset.shipFormat!=='webp')return false;const r=e.getBoundingClientRect(),d=e.getContext('2d').getImageData(0,0,e.width,e.height).data;return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&d.some((v,i)=>i%4===3&&v>8);});
+   const ship=await run.page.locator('#shipyardVisual .gfx-native-ship canvas').evaluate(e=>({key:e.dataset.shipIcon,art:e.dataset.shipArt,ready:e.dataset.shipArtReady,atlas:e.dataset.shipAtlas,crop:e.dataset.shipCrop,format:e.dataset.shipFormat}));
+   check(labels.fleet,fleetReady&&run.requests.some(r=>r.phase==='fleet'&&r.path==='/'+ship.atlas+'.webp'&&r.status===200),ship);
+   const fleetThumbs=await run.page.locator('#fleet [data-gfx-ship-thumb]').evaluateAll(es=>es.map(e=>({tag:e.tagName,key:e.dataset.gfxShipThumb,icon:e.dataset.shipIcon})));
+   check(labels.fleetThumbnails,fleetThumbs.length===38&&new Set(fleetThumbs.map(e=>e.key)).size===38&&fleetThumbs.every(e=>e.tag==='CANVAS'&&e.icon===e.key)&&['ships','jaeger','cruisers','destroyers','carrier','frachter'].every(key=>fleetThumbs.some(e=>e.key===key))&&await run.page.locator('#fleet canvas[data-ship-icon="superschlachtschiff"]').count()===1,fleetThumbs);
+   const atlasFor=key=>['ships','jaeger','cruisers','destroyers','schlachtschiff','superschlachtschiff','waechter','bomber','carrier','frachter','frachtergross','bergungsfrachter','colonyShips','recycler','spaeher','spionageschiff'].includes(key)?'regular':['paktkorvette','bundeskreuzer','sternenbanner','lotsenboot','kessel','bergungskran','presslufthai','ankerwerfer','echoschnitter','bannschiff','nullkiel','grundgaenger','forscher','gesandtenschiff','schuerfschiff','enterschiff'].includes(key)?'utility':'advanced';
+   const rail=await run.page.locator('#shipyardVisual .gfx-ship-list canvas').evaluateAll(es=>es.map((e,index)=>{const r=e.getBoundingClientRect();return {index,key:e.dataset.shipIcon,ready:e.dataset.shipArtReady,art:e.dataset.shipArt,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
+   const distant=rail.find(e=>e.width>0&&e.height>0&&e.top>e.viewport+200&&e.ready!=='true');
+   check(labels.railDormant,!!distant&&distant.art==='fallback'&&distant.ready!=='true',rail);
+   let railOK=false,railWitness=null;if(distant){phase='rail-scroll';const locator=run.page.locator('#shipyardVisual .gfx-ship-list canvas').nth(distant.index);
     const wheel=await locator.evaluate(e=>{let container=e.parentElement;while(container){const s=getComputedStyle(container);if(/auto|scroll/.test(s.overflowY)&&container.scrollHeight>container.clientHeight+1)break;container=container.parentElement;}if(!container)return null;const r=container.getBoundingClientRect(),item=e.getBoundingClientRect(),top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);return {x:r.x+r.width/2,y:(top+bottom)/2,delta:item.top-(top+bottom)/2+item.height/2,container:{top:r.top,bottom:r.bottom,width:r.width,height:r.height,scrollTop:container.scrollTop}};});
     if(wheel){await run.page.mouse.move(wheel.x,wheel.y);await run.page.mouse.wheel(0,Math.round(wheel.delta));}else{await run.page.mouse.move(1420,550);await run.page.mouse.wheel(0,Math.round(distant.top-300));}
-    const end=Date.now()+15000;do{railOK=await locator.evaluate(e=>{const r=e.getBoundingClientRect();return e.complete&&e.naturalWidth>0&&e.naturalHeight>0&&e.dataset.gfxReady==='true'&&e.currentSrc.endsWith('.webp')&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;});if(railOK)break;await delay(50);}while(Date.now()<end);
-    railOK=railOK&&distant.ready!=='true'&&run.requests.some(r=>r.phase==='rail-scroll'&&r.path==='/'+distant.deferred&&r.status===200);
-    railWitness={before:distant,wheel,after:await locator.evaluate(e=>{const r=e.getBoundingClientRect();return {src:e.currentSrc,ready:e.dataset.gfxReady,complete:e.complete,naturalWidth:e.naturalWidth,top:r.top,bottom:r.bottom};}),requests:run.requests.filter(r=>r.phase==='rail-scroll'&&/^\/kepler-gfx-ship-/.test(r.path))};
+    const end=Date.now()+15000;do{railOK=await locator.evaluate(e=>{const r=e.getBoundingClientRect(),d=e.getContext('2d').getImageData(0,0,e.width,e.height).data;return e.dataset.shipArt==='raster'&&e.dataset.shipArtReady==='true'&&e.dataset.shipFormat==='webp'&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&d.some((v,i)=>i%4===3&&v>8);});if(railOK)break;await delay(50);}while(Date.now()<end);
+    railOK=railOK&&distant.ready!=='true'&&run.requests.filter(r=>r.path==='/kepler-gfx-ship-atlas-'+atlasFor(distant.key)+'.webp'&&r.status===200).length===1;
+    railWitness={before:distant,wheel,after:await locator.evaluate(e=>{const r=e.getBoundingClientRect();return {key:e.dataset.shipIcon,ready:e.dataset.shipArtReady,art:e.dataset.shipArt,atlas:e.dataset.shipAtlas,format:e.dataset.shipFormat,top:r.top,bottom:r.bottom};}),requests:run.requests.filter(r=>r.phase==='rail-scroll'&&/^\/kepler-gfx-ship-/.test(r.path))};
    }
    check(labels.railScroll,railOK,railWitness);
    check(labels.identity,await run.page.evaluate(()=>window.__graphicsLoadingOriginalControls.length===13&&window.__graphicsLoadingOriginalControls.every((e,i)=>e===document.querySelectorAll('#commandNav .tab-btn')[i])&&document.querySelectorAll('.tab-btn').length===13));

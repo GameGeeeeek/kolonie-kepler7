@@ -5,6 +5,8 @@ const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 const {oeffneSektorMitSystem,oeffneSystemUeberSektoren}=require('./lib/karte');
 const source=fs.readFileSync(SPIELDATEI,'utf8');
 const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
+const shipPackage=JSON.parse(fs.readFileSync(path.join(WURZEL,'docs/ship-art-package.json'),'utf8'));
+const shipArt=Object.fromEntries(shipPackage.groups.flatMap(group=>group.tiles.map(tile=>[tile.key,{atlas:group.stem,crop:tile.rect.join(',')}])));
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
 const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,
@@ -79,7 +81,19 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#shipyardVisual [data-gfx-build="ship"]').click();
   const queued=await page.evaluate(()=>__gfxReview.state().constructionQueue.filter(j=>j.kind==='ship'&&j.key==='jaeger'&&j.planet==='home').reduce((n,j)=>n+j.qty,0));
   check('illustrated ship action creates exactly one real local build order',queued===1,{queued});
-  const identity=await page.evaluate(()=>{const image=document.querySelector('#shipyardVisual .gfx-ship-model');__gfxReview.render();return image===document.querySelector('#shipyardVisual .gfx-ship-model');});
+   const heroSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="jaeger"]';
+   if(await page.locator(heroSelector).count()===1){
+    await page.locator(heroSelector).scrollIntoViewIfNeeded();
+    await page.waitForFunction(selector=>document.querySelector(selector)?.dataset.shipArtReady==='true',heroSelector);
+   }
+   const identity=await page.evaluate(({selector,art,format})=>{
+    const image=document.querySelector(selector);
+    const ready=canvas=>canvas instanceof HTMLCanvasElement&&canvas.isConnected&&canvas.width>0&&canvas.height>0
+     &&canvas.dataset.shipArt==='raster'&&canvas.dataset.shipArtReady==='true'
+     &&canvas.dataset.shipAtlas===art.atlas&&canvas.dataset.shipCrop===art.crop&&canvas.dataset.shipFormat===format;
+    const wasReady=ready(image);__gfxReview.render();const next=document.querySelector(selector);
+    return wasReady&&ready(next)&&image===next;
+   },{selector:heroSelector,art:shipArt.jaeger,format:graphicFormat});
   check('unchanged render retains the large ship image node',identity);
   await page.evaluate(()=>__gfxReview.show('karte'));
   if(await page.locator('#galaxyBackBtn').isVisible())await page.locator('#galaxyBackBtn').click();
