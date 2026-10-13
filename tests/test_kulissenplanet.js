@@ -61,7 +61,9 @@ check('0c-mond: nur der Vorgabe-Stand bleibt ohne Textur, der Mond nicht',
   /const tex = key === 'vorgabe' \? null : standortTextur\(key\);/.test(JS)
   && /mond: \(\(\) => \{/.test(JS));
 check('0c: der Zwischenspeicher merkt sich, ob die Textur da war',
-  /const merk = key \+ \(tex \? '\|textur' : '\|flach'\);/.test(JS)
+  // The additional native decoded-raster suffix does not replace the original
+  // texture-ready flag; both states still participate in the actual cache key.
+  /const merk = key \+ \(tex \? '\|textur' : '\|flach'\)(?: \+ \(key!=='vorgabe'&&gameRasterCanvas\('planet-uv:'\+key,false\)\?'\|raster':'\|fallback'\))?;/.test(JS)
   && /if \(planetSprite && planetSpriteKey === merk\) return planetSprite;/.test(JS)
   && /planetSpriteKey = merk;/.test(JS));
 

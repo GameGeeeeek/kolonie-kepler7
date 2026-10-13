@@ -1,10 +1,15 @@
 'use strict';
 // Real game, isolated local API. The counterexample removes only forwarding of build actions.
-const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
 const {oeffneSektorMitSystem,oeffneSystemUeberSektoren}=require('./lib/karte');
 const source=fs.readFileSync(SPIELDATEI,'utf8');
 const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
+const shipPackage=JSON.parse(fs.readFileSync(path.join(WURZEL,'docs/ship-art-package.json'),'utf8'));
+const shipArt=Object.fromEntries(shipPackage.groups.flatMap(group=>group.tiles.map(tile=>[tile.key,{atlas:group.stem,crop:tile.rect.join(',')}])));
+const remainingPackage=JSON.parse(fs.readFileSync(path.join(WURZEL,'docs/remaining-art-package.json'),'utf8'));
+const planetArt=Object.fromEntries(remainingPackage.atlases.flatMap(atlas=>atlas.tiles.filter(tile=>['planet:wasserwelt','planet:asteroid'].includes(tile.key)).map(tile=>[tile.key,{stem:atlas.stem,rect:tile.rect,pngSha256:atlas.pngSha256}])));
+for(const key of ['planet:wasserwelt','planet:asteroid']){assert(planetArt[key]);assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(WURZEL,planetArt[key].stem+'.png'))).digest('hex'),planetArt[key].pngSha256,'Independent original PNG provenance');}
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
 const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,
@@ -12,6 +17,42 @@ const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,sta
   selectShip:k=>{gfxShip=k;renderGraphicsShipyard();},map:renderGraphicsMap};\n`+end);
 let checks=0,failed=0;
 const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL')+' - '+name+(ok||!data?'':' '+JSON.stringify(data)));};
+async function canonicalPlanetPixels(page,selector,key){
+ try{
+  if(await page.locator(selector).count()!==1)return {exists:false};
+  await page.locator(selector).scrollIntoViewIfNeeded();
+  let ready=false;
+  try{await page.waitForFunction(({selector,key})=>{
+   const e=document.querySelector(selector);if(!e||e.dataset.gameRasterKey!==key||e.dataset.gameArt!=='raster'||e.dataset.gameArtReady!=='true')return false;
+   const r=e.getBoundingClientRect();if(!(r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<document.documentElement.clientWidth))return false;
+   for(let p=e;p&&p.nodeType===1;p=p.parentElement){const s=getComputedStyle(p);if(p.hidden||s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;}
+   return true;
+  },{selector,key},{timeout:15000});ready=true;}catch(error){if(error.name!=='TimeoutError')throw error;}
+  return await page.evaluate(async({selector,key,art,water,ready})=>{
+   const e=document.querySelector(selector);if(!e)return {exists:false,ready};
+   const src=e.localName==='img'?e.getAttribute('src'):e.getAttribute('href'),r=e.getBoundingClientRect();
+   const load=async url=>{const image=new Image();image.src=url;await image.decode();if(!image.complete||image.naturalWidth===0||image.naturalHeight===0)throw Error('Actual image did not decode');return image;};
+   const actual=await load(src),atlases=new Map();
+   const crop=async meta=>{if(!atlases.has(meta.stem))atlases.set(meta.stem,await load('/'+meta.stem+'.png?oracle=graphics-refresh'));const [x,y,w,h]=meta.rect,c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(atlases.get(meta.stem),x,y,w,h,0,0,w,h);return c;};
+   // Chromium's48px minification differs between an IMG and a scratch Canvas.
+   // Compare the actual decoded image with its independent crop at native
+   // resolution. The other planet is projected only for the distinctness check.
+   const originalCrop=await crop(art);let expected=originalCrop;
+   if(e.localName==='image'){
+    expected=document.createElement('canvas');expected.width=expected.height=64;
+    const scale=Math.min(64/originalCrop.width,64/originalCrop.height);
+    expected.getContext('2d').drawImage(originalCrop,(64-originalCrop.width*scale)/2,(64-originalCrop.height*scale)/2,originalCrop.width*scale,originalCrop.height*scale);
+   }
+   const w=actual.naturalWidth,h=actual.naturalHeight,sameDimensions=w===expected.width&&h===expected.height;
+   if(!sameDimensions)return {exists:true,ready,key:e.dataset.gameRasterKey,art:e.dataset.gameArt,tag:e.localName,sameDimensions,natural:[w,h],expected:[expected.width,expected.height]};
+   const pixels=image=>{const c=document.createElement('canvas');c.width=w;c.height=h;if(image.width===w&&image.height===h)c.getContext('2d').drawImage(image,0,0);else c.getContext('2d').drawImage(image,0,0,w,h);return c.getContext('2d').getImageData(0,0,w,h).data;};
+   const a=pixels(actual),b=expected.getContext('2d').getImageData(0,0,w,h).data,o=pixels(await crop(water));
+   const diff=other=>{let sum=0;for(let i=0;i<a.length;i+=4){for(let k=0;k<3;k++)sum+=Math.abs(a[i+k]*a[i+3]/255-other[i+k]*other[i+3]/255);sum+=Math.abs(a[i+3]-other[i+3]);}return sum/a.length;};
+   let occupied=0;for(let i=3;i<a.length;i+=4)if(a[i]>8)occupied++;
+   return {exists:true,ready,key:e.dataset.gameRasterKey,art:e.dataset.gameArt,width:r.width,height:r.height,tag:e.localName,dataURL:/^data:image\/png;base64,/.test(src||''),sameDimensions,natural:[w,h],occupied,ownDifference:diff(b),oceanDifference:diff(o)};
+  },{selector,key,art:planetArt[key],water:planetArt['planet:wasserwelt'],ready});
+ }catch(error){return {exists:false,error:String(error)};}
+}
 (async()=>{
  let server,browser;
  try {
@@ -79,7 +120,19 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#shipyardVisual [data-gfx-build="ship"]').click();
   const queued=await page.evaluate(()=>__gfxReview.state().constructionQueue.filter(j=>j.kind==='ship'&&j.key==='jaeger'&&j.planet==='home').reduce((n,j)=>n+j.qty,0));
   check('illustrated ship action creates exactly one real local build order',queued===1,{queued});
-  const identity=await page.evaluate(()=>{const image=document.querySelector('#shipyardVisual .gfx-ship-model');__gfxReview.render();return image===document.querySelector('#shipyardVisual .gfx-ship-model');});
+   const heroSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="jaeger"]';
+   if(await page.locator(heroSelector).count()===1){
+    await page.locator(heroSelector).scrollIntoViewIfNeeded();
+    await page.waitForFunction(selector=>document.querySelector(selector)?.dataset.shipArtReady==='true',heroSelector);
+   }
+   const identity=await page.evaluate(({selector,art,format})=>{
+    const image=document.querySelector(selector);
+    const ready=canvas=>canvas instanceof HTMLCanvasElement&&canvas.isConnected&&canvas.width>0&&canvas.height>0
+     &&canvas.dataset.shipArt==='raster'&&canvas.dataset.shipArtReady==='true'
+     &&canvas.dataset.shipAtlas===art.atlas&&canvas.dataset.shipCrop===art.crop&&canvas.dataset.shipFormat===format;
+    const wasReady=ready(image);__gfxReview.render();const next=document.querySelector(selector);
+    return wasReady&&ready(next)&&image===next;
+   },{selector:heroSelector,art:shipArt.jaeger,format:graphicFormat});
   check('unchanged render retains the large ship image node',identity);
   await page.evaluate(()=>__gfxReview.show('karte'));
   if(await page.locator('#galaxyBackBtn').isVisible())await page.locator('#galaxyBackBtn').click();
@@ -91,8 +144,10 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   await page.locator('#mapPlanetVisual img').scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>{const image=document.querySelector('#mapPlanetVisual img');return image&&image.complete&&image.naturalWidth>0;});
   const map=await page.evaluate(()=>{const root=document.getElementById('mapPlanetVisual');return {shown:!root.hidden,art:root.querySelector('img')?.getAttribute('src'),rockArt:document.querySelector('[data-planet="vesna"] [data-gfx-planet]')?.getAttribute('href'),unknown:root.textContent.includes('Nicht erkundet'),height:document.getElementById('graphicsMapLayout').getBoundingClientRect().height};});
-  check('known colony gets its correct planet illustration',map.shown&&map.art==='kepler-gfx-planet-ocean.'+graphicFormat&&!map.unknown,map);
-  check('asteroid is never replaced by an ocean illustration',!map.rockArt,map);
+  const waterPixels=await canonicalPlanetPixels(page,'#mapPlanetVisual img','planet:wasserwelt');
+  check('known colony gets its correct planet illustration',map.shown&&!map.unknown&&waterPixels.exists&&waterPixels.ready&&waterPixels.tag==='img'&&waterPixels.key==='planet:wasserwelt'&&waterPixels.art==='raster'&&waterPixels.dataURL&&waterPixels.sameDimensions&&waterPixels.occupied>100&&waterPixels.ownDifference<=1,waterPixels);
+  const rockPixels=await canonicalPlanetPixels(page,'[data-planet="vesna"] image[data-game-raster-key]','planet:asteroid');
+  check('asteroid is never replaced by an ocean illustration',rockPixels.exists&&rockPixels.ready&&rockPixels.tag==='image'&&rockPixels.key==='planet:asteroid'&&rockPixels.art==='raster'&&rockPixels.dataURL&&rockPixels.sameDimensions&&rockPixels.occupied>100&&rockPixels.ownDifference<=1&&rockPixels.oceanDifference>rockPixels.ownDifference+1,rockPixels);
   check('desktop system overview avoids intrinsic SVG height growth',map.height>300&&map.height<600,map);
   const camera=await page.evaluate(()=>{const r=document.querySelector('#tab-karte .map-wrap').getBoundingClientRect(),v=document.getElementById('galaxyMapSvg').viewBox.baseVal;return {height:r.height,mapRatio:r.height/r.width,cameraRatio:v.height/v.width};});
   check('desktop map height remains stable when a system opens',Math.abs(sectorHeight-camera.height)<=2,{sectorHeight,...camera});

@@ -2,7 +2,7 @@ name: Kepler graphics full review
 on:
   workflow_dispatch:
   push:
-    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock]
+    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock, codex/ship-menu-harmony, codex/combat-raster-harmony, codex/remaining-raster-harmony]
     paths:
       - .gitattributes
       - .github/workflows/kepler-graphics-full-review.yml
@@ -29,6 +29,30 @@ on:
       - tools/check-graphics-loading-counterexamples.cjs
       - tests/test_graphics_unlock.js
       - tools/check-graphics-unlock-counterexamples.cjs
+      - tests/test_ship_raster_art.js
+      - tools/check-ship-raster-art-counterexamples.cjs
+      - tools/check-ship-raster-fixture-counterexample.cjs
+      - tests/test_kartenmenue_scrollen.js
+      - tools/check-map-menu-scroll-scope-counterexample.cjs
+      - tests/test_combat_raster_art.js
+      - tests/test_remaining_raster_art.js
+      - tools/check-remaining-raster-art-counterexamples.cjs
+      - tools/check-kulissenplanet-cache-counterexample.cjs
+      - tools/check-vorposten-raster-layout-counterexamples.cjs
+      - tests/lib/remaining-raster-manifest.json
+      - tests/lib/remaining-raster-fixture.js
+      - docs/remaining-art-package.json
+      - tools/check-combat-raster-art-counterexamples.cjs
+      - tests/lib/combat-raster-manifest.json
+      - tests/lib/combat-raster-fixture.js
+      - docs/combat-art-package.json
+      - docs/combat-art-prompts.json
+      - tests/lib/ship-raster-fixture.js
+      - tests/lib/ship-raster-manifest.json
+      - tests/lib/graphics-loading-manifest.json
+      - docs/ship-art-package.json
+      - docs/ship-art-prompts.json
+      - docs/ship-raster-assets.md
       - tests/test_uebersicht_schrift.js
       - tests/test_beschriftung_ausweichen.js
       - tests/test_graphics_expansion.js
@@ -147,6 +171,9 @@ jobs:
             node tests/http-run.js "${failed[@]}" 2>&1 | tee /tmp/kepler-recheck-${{ matrix.part }}.log
           fi
           sha256sum -c /tmp/kepler-tested-source.txt
+      - name: Native map menu scrolling and original scanner counterexample
+        if: matrix.part == 0
+        run: node tools/check-map-menu-scroll-scope-counterexample.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -60,12 +60,16 @@ check('0e: die Tuerme werden aus SHIP_HULL_DEFS gelesen, nicht geraten',
 
   /* Der ganze Zeichner-Abschnitt der Wiedergabe wird geschnitten und isoliert ausgefuehrt.
      Anker: von der Rumpf-Geometrie bis zum Ende von backeSpielAtlas. */
-  const von = JS.indexOf('    /* DAS LICHT DER KAMPF-WIEDERGABE');
-  /* Ab `von` suchen: dieselbe Rueckgabezeile steht auch im Polygon-Zeichner weiter oben, und ein
-     Endanker VOR dem Anfang schneidet eine leere Zeichenkette (Hausregel: Anker pruefen). */
-  const bisRoh = von < 0 ? -1 : JS.indexOf('      return { bild: nc, kante: kante };\n    }\n', von);
-  const bis = bisRoh < 0 ? -1 : bisRoh + '      return { bild: nc, kante: kante };\n    }\n'.length;
-  check('1-anker: der Zeichner-Abschnitt ist im Quelltext auffindbar', von > 0 && bis > von, { von, bis });
+  const anfang = '    /* DAS LICHT DER KAMPF-WIEDERGABE';
+  const endeAbschnitt = '    function atlasSchluessel(rumpfId, seite){';
+  const von = JS.indexOf(anfang);
+  /* Die folgende native Funktion begrenzt den vollstaendigen Painter. Zusaetzliche
+     Raster-Metadaten in seiner Rueckgabe veraendern diesen Legacy-Abschnitt nicht. */
+  const bis = von < 0 ? -1 : JS.indexOf(endeAbschnitt, von + anfang.length);
+  check('1-anker: der Zeichner-Abschnitt ist im Quelltext auffindbar',
+    von > 0 && bis > von && JS.indexOf(anfang, von + anfang.length) < 0
+    && JS.indexOf(endeAbschnitt) === bis && JS.indexOf(endeAbschnitt, bis + endeAbschnitt.length) < 0,
+    { von, bis });
 
   let m = null;
   if (von > 0 && bis > von) {

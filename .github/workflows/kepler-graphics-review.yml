@@ -55,6 +55,30 @@ on:
       - tools/check-graphics-loading-counterexamples.cjs
       - tests/test_graphics_unlock.js
       - tools/check-graphics-unlock-counterexamples.cjs
+      - tests/test_ship_raster_art.js
+      - tools/check-ship-raster-art-counterexamples.cjs
+      - tools/check-ship-raster-fixture-counterexample.cjs
+      - tests/test_kartenmenue_scrollen.js
+      - tools/check-map-menu-scroll-scope-counterexample.cjs
+      - tests/test_combat_raster_art.js
+      - tests/test_remaining_raster_art.js
+      - tools/check-remaining-raster-art-counterexamples.cjs
+      - tools/check-kulissenplanet-cache-counterexample.cjs
+      - tools/check-vorposten-raster-layout-counterexamples.cjs
+      - tests/lib/remaining-raster-manifest.json
+      - tests/lib/remaining-raster-fixture.js
+      - docs/remaining-art-package.json
+      - tools/check-combat-raster-art-counterexamples.cjs
+      - tests/lib/combat-raster-manifest.json
+      - tests/lib/combat-raster-fixture.js
+      - docs/combat-art-package.json
+      - docs/combat-art-prompts.json
+      - tests/lib/ship-raster-fixture.js
+      - tests/lib/ship-raster-manifest.json
+      - tests/lib/graphics-loading-manifest.json
+      - docs/ship-art-package.json
+      - docs/ship-art-prompts.json
+      - docs/ship-raster-assets.md
       - tests/test_graphics_refresh.js
       - tests/test_graphics_expansion.js
       - tests/test_hscroll.js
@@ -177,6 +201,24 @@ jobs:
         run: |
           node tests/test_graphics_unlock.js
           node tools/check-graphics-unlock-counterexamples.cjs
+      - name: Canonical ship atlases and every controlled renderer fault
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          node tests/test_ship_raster_art.js
+          node tools/check-ship-raster-art-counterexamples.cjs
+      - name: Native fixture initialization failure closes its HTTP server
+        run: node tools/check-ship-raster-fixture-counterexample.cjs
+      - name: Native map menu scrolling and original scanner counterexample
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: node tools/check-map-menu-scroll-scope-counterexample.cjs
+      - name: Native combat FX, boss and rift rasters with controlled regressions
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          node tests/test_combat_raster_art.js
+          node tools/check-combat-raster-art-counterexamples.cjs
       - name: Behavioral and layout counterexamples must fail
         run: |
           node tools/check-graphics-counterexamples.cjs
@@ -238,3 +280,93 @@ jobs:
         run: |
           node tests/http-run.js test_english_complete.js test_english_locale.js test_i18n_testkontext.js
           node tools/i18n/check-counterexamples.cjs
+  remaining-raster:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: f5d26daecce85d6a85fde3baa8a4d4c8d81ada52
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated test dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Required checks against actual source and pinned backend
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: node tests/run.js --nur-pflicht
+      - name: Record actual frontend backend and all 113 runtime source hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD | tee /tmp/kepler-remaining-tested-fe-commit.txt
+          git -C .review-backend rev-parse HEAD | tee /tmp/kepler-remaining-tested-be-commit.txt
+          test "$(cat /tmp/kepler-remaining-tested-be-commit.txt)" = f5d26daecce85d6a85fde3baa8a4d4c8d81ada52
+          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp .review-backend/server.js > /tmp/kepler-remaining-tested-source.txt
+          test "$(wc -l < /tmp/kepler-remaining-tested-source.txt)" -eq 113
+      - name: Native remaining motifs and all controlled consumer regressions
+        shell: bash
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          sha256sum -c /tmp/kepler-remaining-tested-source.txt
+          node tests/test_remaining_raster_art.js 2>&1 | tee /tmp/kepler-remaining-native.log
+          node tools/check-remaining-raster-art-counterexamples.cjs 2>&1 | tee /tmp/kepler-remaining-counter.log
+          sha256sum -c /tmp/kepler-remaining-tested-source.txt
+      - name: Original background cache and real texture readiness regression
+        shell: bash
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tools/check-kulissenplanet-cache-counterexample.cjs 2>&1 | tee /tmp/kepler-remaining-background-counter.log
+      - name: Original station facts and canonical raster layout regressions
+        shell: bash
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tools/check-vorposten-raster-layout-counterexamples.cjs 2>&1 | tee /tmp/kepler-remaining-outpost-counter.log
+      - name: Frozen source must survive every native and controlled fault
+        if: always()
+        run: sha256sum -c /tmp/kepler-remaining-tested-source.txt
+      - name: Preserve original native evidence inside the workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$GITHUB_WORKSPACE/.remaining-raster-evidence"
+          mkdir -p "$destination"
+          shopt -s nullglob
+          for evidence in "$GITHUB_WORKSPACE"/../remaining-graphics-2026-10-13/remaining-raster-counter-* "$GITHUB_WORKSPACE"/../graphics-complete-2026-10-13/kulissen-cache-counter-* "$GITHUB_WORKSPACE"/../graphics-complete-2026-10-13/vorposten-raster-layout-counter-*; do
+            if [ -d "$evidence" ]; then
+              cp -a -- "$evidence" "$destination/"
+              diff -qr -- "$evidence" "$destination/$(basename "$evidence")"
+            fi
+          done
+          for log in /tmp/kepler-remaining-tested-fe-commit.txt /tmp/kepler-remaining-tested-be-commit.txt /tmp/kepler-remaining-tested-source.txt /tmp/kepler-remaining-native.log /tmp/kepler-remaining-counter.log /tmp/kepler-remaining-background-counter.log /tmp/kepler-remaining-outpost-counter.log; do
+            if [ -f "$log" ]; then
+              cp -a -- "$log" "$destination/"
+              cmp -- "$log" "$destination/$(basename "$log")"
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-remaining-raster-review
+          path: .remaining-raster-evidence/
+          include-hidden-files: true
+          retention-days: 7

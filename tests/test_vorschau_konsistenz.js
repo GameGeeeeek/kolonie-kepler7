@@ -78,12 +78,21 @@ for (const modern of ['leerenjaeger', 'nanoklinge', 'fusionsdreadnought', 'singu
 }
 
 // ---- D: fremde Flotte ohne eigene Marken --------------------------------------------------------
-// Der Maler hat seit v8.394.0 einen vierten Parameter (ohneAnstrich, fuer die Gegenseite in der
-// Kampf-Wiedergabe). Geprueft wird die Stellung von markOverride, nicht die Zahl der Parameter.
+// Die Profil-ID entscheidet beide Kanaele: fremd bekommt Marke1 und neutralen
+// Anstrich; das eigene Profil behaelt seine echten Marken und seinen Anstrich.
 check('drawShipMiniIcon nimmt eine Marken-Uebersteuerung', /function drawShipMiniIcon\(key, canvas, markOverride(, \w+)*\)\{/.test(src));
 check('und wertet sie vor der eigenen Stufe aus', /\(typeof markOverride === 'number'\) \? markOverride/.test(src));
+const profilAnfang = '  function showPlayerProfile(entry){';
+const profilEnde = '  function closePlayerProfile(){';
+const profilVon = src.indexOf(profilAnfang);
+const profilBis = profilVon < 0 ? -1 : src.indexOf(profilEnde, profilVon + profilAnfang.length);
+const profilCode = profilVon >= 0 && profilBis > profilVon ? src.slice(profilVon, profilBis) : '';
 check('das Profil eines fremden Spielers nutzt sie',
-  /profileModalStats[\s\S]{0,160}drawShipMiniIcon\(cv\.getAttribute\('data-ship'\), cv, 1\)/.test(src));
+  profilVon >= 0 && profilBis > profilVon
+  && src.indexOf(profilAnfang, profilVon + profilAnfang.length) < 0
+  && src.indexOf(profilEnde) === profilBis && src.indexOf(profilEnde, profilBis + profilEnde.length) < 0
+  && /const isMeForCompare = entry\.id === state\.player\.id;/.test(profilCode)
+  && /profileModalStats[\s\S]{0,160}drawShipMiniIcon\(cv\.getAttribute\('data-ship'\), cv, isMeForCompare\s*\?\s*undefined\s*:\s*1,\s*!isMeForCompare\)/.test(profilCode));
 // Die eigene Flottenliste soll die Marken WEITERHIN zeigen - der Fix darf nicht ueberschiessen.
 check('die eigene Flottenliste zeigt weiter die eigenen Marken',
   /drawShipMiniIcon\(c\.getAttribute\('data-ship-icon'\), c\)/.test(src));

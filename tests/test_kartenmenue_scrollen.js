@@ -50,12 +50,17 @@ check('1a: der Hoehendeckel steht weiterhin (ohne ihn gibt es nichts zu scrollen
 // Menue dann voellig zu Recht. Der Spieler saehe wieder "geht nicht", nur eine Zeile spaeter.
 check('1b: die Liste haengt am Ende nicht in die Seite durch',
   /overscroll-behavior:\s*contain/.test(KMENU_CSS));
-// Gescopt auf den Lauscher selbst (Arbeitsregel 39), Kommentare vorher entfernt (Regel 33) -
-// dieser Erklaerblock hier zitiert seine eigenen Bezeichner.
+// Nur der echte Kartenmenue-Lauscher bis zum benachbarten resize-Aufraeumen:
+// Bildlader koennen vorher ebenfalls auf scroll lauschen. Beide eindeutigen
+// Anker werden vor dem Slice geprueft; Kommentare enthalten eigene Zitate.
 const OHNE_KOMMENTARE = ROH.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const LAUSCHER = (() => {
-  const i = OHNE_KOMMENTARE.indexOf("window.addEventListener('scroll'");
-  return i < 0 ? '' : OHNE_KOMMENTARE.slice(i, i + 320);
+  const start = "window.addEventListener('scroll', (e) => {";
+  const ende = "window.addEventListener('resize', closeKarteMenu);";
+  if (OHNE_KOMMENTARE.split(start).length !== 2 || OHNE_KOMMENTARE.split(ende).length !== 2) return '';
+  const i = OHNE_KOMMENTARE.indexOf(start);
+  const j = OHNE_KOMMENTARE.indexOf(ende, i + start.length);
+  return i < 0 || j <= i ? '' : OHNE_KOMMENTARE.slice(i, j);
 })();
 check('1c-anker: der Scroll-Lauscher des Kartenmenues ist auffindbar', LAUSCHER.length > 0);
 check('1c: er fragt, WESSEN Scrollen es war, statt jedes zu schliessen',

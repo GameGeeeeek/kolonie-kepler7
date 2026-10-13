@@ -4,7 +4,12 @@
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),vm=require('node:vm');
 const {SPIELDATEI,WURZEL}=require('./lib/spieldatei');
 const {starteBrowser,ruhigeUhren}=require('./lib/umgebung');
+const remainingPackage=JSON.parse(fs.readFileSync(path.join(WURZEL,'docs/remaining-art-package.json'),'utf8'));
+const remainingArt=Object.fromEntries(remainingPackage.atlases.flatMap(atlas=>atlas.tiles.map(tile=>[tile.key,{stem:atlas.stem,crop:tile.rect.join(',')}])));
+const commonWorldSelector=['erdaehnlich','wueste','eis','vulkan','kristall'].map(key=>'#tab-basis canvas.gfx-world-image[data-planet-icon="'+key+'"]').join(',');
+const specialWorldSelector=['todeswelt','wasserwelt','erdwelt','leerenwelt'].map(key=>'#tab-basis canvas.gfx-world-image[data-planet-icon="'+key+'"]').join(',');
 const assetNames=['colony-developed','colony-outpost','colony-settlement','defense-fortress','enemy-atlas','expedition-atlas','expedition-wreck','flagship-atlas','market-station','material-atlas','nebula','officer-atlas','orbital-atlas','orbital-dock','planet-crystal','planet-desert','planet-gas','planet-ice','planet-moon','planet-ocean','planet-volcano','research-lab','ship-carrier','ship-cruisers','ship-destroyers','ship-frachter','ship-jaeger','ship-ships','world-atlas'].map(stem=>'kepler-gfx-'+stem);
+assetNames.push(...['regular','utility','advanced'].map(group=>'kepler-gfx-ship-atlas-'+group));
 const TABS=['basis','verteidigung','forschung','flotte','expedition','karte','galaxie','allianz','offiziere','markt','punkte','fortschritt','sammlung'];
 const labels={
  boot:'the authenticated native save and all thirteen original tabs load',
@@ -20,10 +25,10 @@ const labels={
  hiddenFleetMarkup:'Expedition creates no image previews inside the hidden fleet panel',
  hiddenFleetNetwork:'Expedition starts no hidden fleet ship-image requests',
  expeditionAtlas:'the displayed original expedition tile loads its real WebP atlas',
- fleet:'the native Fleet pointer makes an original decoded WebP ship preview available',
- fleetThumbnails:'the active fleet retains its six original native ship-thumbnail nodes',
- railDormant:'a genuinely offscreen shipyard-rail image still has no eager src',
- railScroll:'a real viewport wheel activates and decodes the original shipyard-rail image',
+ fleet:'the native Fleet pointer displays its decoded canonical WebP ship canvas',
+ fleetThumbnails:'every displayed native fleet card retains its canonical ship-thumbnail canvas',
+ railDormant:'a genuinely offscreen shipyard canvas remains unpainted even when its shared atlas is cached',
+ railScroll:'a real viewport wheel activates and decodes the original canonical shipyard canvas',
  identity:'scrolling and native tab actions retain all thirteen original control identities',
  fallbackRequest:'an actual missing main WebP requests its native PNG fallback once',
  fallbackDecode:'the native PNG fallback decodes at the original colony dimensions',
@@ -77,6 +82,24 @@ async function main(){
   const context=await browser.newContext({viewport:{width:1487,height:1058},deviceScaleFactor:1,serviceWorkers:'block'});
   await context.addCookies([{url:origin,name:'kepler7_graphics_fixture',value:'isolated',httpOnly:true,sameSite:'Lax'}]);
   await context.addInitScript(()=>localStorage.setItem('kepler7-ui-language','de'));
+  // Observe actual native image assignment and painting, forwarding every
+  // original call. Geometry is captured at demand time, before later reflow.
+  await context.addInitScript(({art})=>{
+   const tape={requests:[],visibility:[],backgroundPaint:[],errors:[]},painted=new WeakMap();window.__graphicsLoadingDemand=tape;
+   const rect=Element.prototype.getBoundingClientRect;
+   const visible=(e,r)=>{if(!e)return null;r=r||rect.call(e);let shown=e.isConnected&&r.width>0&&r.height>0&&r.bottom>=-200&&r.top<=innerHeight+200&&r.right>=-200&&r.left<=innerWidth+200;for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(p.hidden||s.display==='none'||s.visibility==='hidden'||s.visibility==='collapse'||Number(s.opacity)===0)shown=false;}return {visible:shown,x:r.x,y:r.y,width:r.width,height:r.height,viewport:innerHeight};};
+   // Native demand can enter the bounded download queue before Image.src is
+   // assigned. Preserve the actual viewport decision, with its native caller.
+   Element.prototype.getBoundingClientRect=function(){const r=rect.call(this);try{if(this.dataset?.gameRasterKey){const stack=new Error().stack;if(/\bat gameRasterVisible\b/.test(stack))tape.visibility.push({key:this.dataset.gameRasterKey,atlas:this.dataset.gameAtlas,at:Date.now(),caller:stack.split('\n').slice(1,5),...visible(this,r)});}}catch(error){tape.errors.push(error.message);}return r;};
+   const src=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'),draw=CanvasRenderingContext2D.prototype.drawImage;
+   Object.defineProperty(HTMLImageElement.prototype,'src',{...src,set(value){try{const u=new URL(String(value),document.baseURI);if(/^\/kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(u.pathname)){tape.requests.push({path:u.pathname,at:Date.now(),consumers:[...document.querySelectorAll('[data-game-raster-key]')].map(e=>({key:e.dataset.gameRasterKey,atlas:e.dataset.gameAtlas,...visible(e)})),background:visible(document.getElementById('bgstars'))});}}catch(error){tape.errors.push(error.message);}return src.set.call(this,value);}});
+   CanvasRenderingContext2D.prototype.drawImage=function(...args){
+    const result=draw.apply(this,args);
+    try{let keys=painted.get(args[0]);if(args[0] instanceof HTMLImageElement&&args.length===9){const p=new URL(args[0].currentSrc||args[0].src,document.baseURI).pathname,crop=args.slice(1,5).join(',');keys=new Set(Object.entries(art).filter(([,item])=>p==='/'+item.stem+'.webp'||p==='/'+item.stem+'.png').filter(([,item])=>item.crop===crop).map(([key])=>key));}
+     if(keys?.size){painted.set(this.canvas,new Set([...(painted.get(this.canvas)||[]),...keys]));if(this.canvas.id==='bgstars')for(const key of keys)if(key.startsWith('planet-uv:')){tape.backgroundPaint.push({key,at:Date.now(),standort:this.canvas.dataset.standort,...visible(this.canvas)});if(tape.backgroundPaint.length>512)tape.backgroundPaint.shift();}}
+    }catch(error){tape.errors.push(error.message);}return result;
+   };
+  },{art:remainingArt});
   const page=await context.newPage();page.on('pageerror',error=>allErrors.push(error.message));
   await page.goto(origin+'/?lang=de',{waitUntil:'commit',timeout:60000});
   await page.waitForFunction(()=>document.body?.classList.contains('command-ui')&&document.getElementById('commandPlayerName')?.textContent==='Kommandant'&&/automatisch geladen/i.test(document.getElementById('loadstate')?.textContent||''),null,{timeout:30000});
@@ -84,7 +107,9 @@ async function main(){
   return {context,page,origin,requests,failSet,store};
  }
  const graphicRequests=run=>run.requests.filter(r=>/^\/kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(r.path));
- const geometry=(page,selector)=>page.locator(selector).first().evaluate(e=>{const r=e.getBoundingClientRect();return {exists:!!e,src:e.getAttribute('src'),currentSrc:e.currentSrc||null,deferred:e.getAttribute('data-gfx-src'),ready:e.dataset.gfxReady||null,fallback:e.dataset.gfxFallback||null,loading:e.loading||null,priority:e.fetchPriority||null,complete:e.complete??null,naturalWidth:e.naturalWidth??null,naturalHeight:e.naturalHeight??null,top:r.top,bottom:r.bottom,width:r.width,height:r.height,viewport:innerHeight};});
+ async function closeFixture(run){try{const observed=await run.page.evaluate(()=>window.__graphicsLoadingDemand?.errors||[]);allErrors.push(...observed.map(error=>'native demand observation: '+error));}finally{await run.context.close();}}
+ const demandAllowed=(request,tape)=>{const snapshots=tape.requests.filter(s=>s.path===request.path&&s.at<=request.at&&request.at-s.at<=2000);if(!snapshots.length)return false;const snapshot=snapshots.at(-1),matches=c=>c.visible&&remainingArt[c.key]?.stem===c.atlas&&request.path==='/'+c.atlas+'.webp';return snapshot.consumers.some(matches)||tape.visibility.some(c=>c.at<=snapshot.at&&matches(c))||snapshot.background?.visible&&tape.backgroundPaint.some(p=>p.visible&&p.key==='planet-uv:erdaehnlich'&&p.standort?.startsWith('erdaehnlich|')&&remainingArt[p.key]&&request.path==='/'+remainingArt[p.key].stem+'.webp');};
+ const geometry=(page,selector)=>page.locator(selector).first().evaluate(e=>{const r=e.getBoundingClientRect();return {exists:!!e,src:e.getAttribute('src'),currentSrc:e.currentSrc||null,deferred:e.getAttribute('data-gfx-src'),ready:e.dataset.gfxReady||e.dataset.gameArtReady||null,art:e.dataset.gameArt||null,key:e.dataset.gameRasterKey||null,atlas:e.dataset.gameAtlas||null,crop:e.dataset.gameCrop||null,format:e.dataset.gameFormat||null,fallback:e.dataset.gfxFallback||null,loading:e.loading||null,priority:e.fetchPriority||null,complete:e.complete??null,naturalWidth:e.naturalWidth??null,naturalHeight:e.naturalHeight??null,top:r.top,bottom:r.bottom,width:r.width,height:r.height,viewport:innerHeight};});
  const imageReady=(page,selector,timeout=15000)=>nativeBoolean(page,selector=>{const e=document.querySelector(selector);if(!e?.complete||!(e.naturalWidth>0&&e.naturalHeight>0))return false;for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0)return false;}const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;},selector,timeout);
  async function wheelTo(run,selector){const before=await geometry(run.page,selector);await run.page.mouse.move(1420,550);await run.page.mouse.wheel(0,Math.round(before.top-300));return before;}
  async function tab(run,key){const button=run.page.locator('#commandNav .tab-btn[data-tab='+key+']');await button.scrollIntoViewIfNeeded();const hit=await button.evaluate(e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});if(!hit)throw Error('Native '+key+' tab not physically reachable');await button.click();await run.page.locator('#tab-'+key).waitFor({state:'visible'});return hit;}
@@ -96,19 +121,27 @@ async function main(){
    await run.page.evaluate(()=>{window.__graphicsLoadingOriginalControls=[...document.querySelectorAll('#commandNav .tab-btn')];});
    check(labels.boot,loaded&&JSON.stringify(tabs)===JSON.stringify(TABS)&&run.requests.some(r=>r.path==='/api/me'&&r.status===200)&&run.requests.some(r=>r.path==='/api/storage/kepler7-save-v3'&&r.status===200));
    const mainImage=await geometry(run.page,'#colonyVisual .gfx-landscape');check(labels.main,loaded&&mainImage.src==='kepler-gfx-colony-developed.webp'&&mainImage.loading==='eager'&&mainImage.priority==='high',mainImage);
-   const initial=graphicRequests(run).map(r=>r.path);check(labels.startup,initial.length===1&&initial[0]==='/kepler-gfx-colony-developed.webp',initial);
-   const planets=await run.page.locator('#tab-basis .gfx-world-image').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {deferred:e.dataset.gfxSrc,src:e.getAttribute('src'),ready:e.dataset.gfxReady,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
-   check(labels.dormantImages,planets.length===5&&planets.every(e=>e.width>0&&e.height>0&&e.top>e.viewport+200&&/\.webp$/.test(e.deferred||'')&&!e.src&&e.ready!=='true'),planets);
-   const atlasDormancy=await run.page.locator('#tab-basis .gfx-orbital-art,#tab-basis .gfx-world-art').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {ready:e.dataset.gfxReady,deferred:e.classList.contains('gfx-asset-deferred'),top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
-   check(labels.dormantAtlases,atlasDormancy.length>=3&&atlasDormancy.every(e=>e.deferred&&e.width>0&&e.height>0&&e.top>e.viewport+200&&e.ready!=='true'),atlasDormancy);
+   // Original demand contains only the primary colony. A new canonical motive
+   // may demand a sheet only for a real visible consumer whose exact native key
+   // maps to that sheet in the independent package; no sheet whitelist is used.
+   const initial=graphicRequests(run),legacy=initial.filter(request=>assetNames.some(name=>request.path==='/'+name+'.webp'||request.path==='/'+name+'.png'));
+   const bootConsumers=await run.page.evaluate(()=>window.__graphicsLoadingDemand);
+   const additional=initial.filter(request=>!legacy.includes(request));
+   const bootSheets=new Set(additional.filter(request=>demandAllowed(request,bootConsumers)).map(request=>request.path.replace(/^\/|\.(?:png|webp)$/g,'')));
+   check(labels.startup,legacy.length===1&&legacy[0].path==='/kepler-gfx-colony-developed.webp'&&additional.every(request=>request.status===200&&demandAllowed(request,bootConsumers)),{requests:initial,consumers:bootConsumers});
+   const planets=await run.page.locator(commonWorldSelector).evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {key:e.dataset.gameRasterKey,type:e.dataset.planetIcon,atlas:e.dataset.gameAtlas,crop:e.dataset.gameCrop,ready:e.dataset.gameArtReady,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
+   check(labels.dormantImages,planets.length===5&&new Set(planets.map(e=>e.type)).size===5&&planets.every(e=>e.key==='planet:'+e.type&&remainingArt[e.key]?.stem===e.atlas&&remainingArt[e.key]?.crop===e.crop&&e.width>0&&e.height>0&&e.top>e.viewport+200&&(e.ready!=='true'||bootSheets.has(e.atlas))&&initial.filter(request=>request.path==='/'+e.atlas+'.webp'||request.path==='/'+e.atlas+'.png').every(request=>demandAllowed(request,bootConsumers))),planets);
+   const atlasDormancy=await run.page.locator('#tab-basis .gfx-orbital-art,'+specialWorldSelector).evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),canvas=e.tagName==='CANVAS';return {canvas,type:e.dataset.planetIcon,key:e.dataset.gameRasterKey,atlas:e.dataset.gameAtlas,crop:e.dataset.gameCrop,ready:canvas?e.dataset.gameArtReady:e.dataset.gfxReady,deferred:e.classList.contains('gfx-asset-deferred'),top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
+   const orbitalDormant=atlasDormancy.filter(e=>!e.canvas),worldDormant=atlasDormancy.filter(e=>e.canvas);
+   check(labels.dormantAtlases,orbitalDormant.length===4&&worldDormant.length>=3&&['todeswelt','wasserwelt','erdwelt'].every(type=>worldDormant.some(e=>e.type===type))&&atlasDormancy.every(e=>e.width>0&&e.height>0&&e.top>e.viewport+200&&(e.canvas?e.key==='planet:'+e.type&&remainingArt[e.key]?.stem===e.atlas&&remainingArt[e.key]?.crop===e.crop&&(e.ready!=='true'||bootSheets.has(e.atlas))&&initial.filter(request=>request.path==='/'+e.atlas+'.webp'||request.path==='/'+e.atlas+'.png').every(request=>demandAllowed(request,bootConsumers)):e.deferred&&e.ready!=='true')),atlasDormancy);
    phase='orbital-scroll';const orbitalBefore=await wheelTo(run,'#tab-basis .gfx-orbital-art');const orbitalReady=await nativeBoolean(run.page,()=>{const e=document.querySelector('#tab-basis .gfx-orbital-art'),r=e?.getBoundingClientRect();return !!e&&e.dataset.gfxReady==='true'&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;});
    check(labels.orbitalScroll,orbitalBefore.ready!=='true'&&orbitalReady,{before:orbitalBefore,after:await geometry(run.page,'#tab-basis .gfx-orbital-art')});
    await delay(250);check(labels.orbitalRequest,run.requests.some(r=>r.phase==='orbital-scroll'&&r.path==='/kepler-gfx-orbital-atlas.webp'&&r.status===200)&&!run.requests.some(r=>r.path==='/kepler-gfx-orbital-atlas.png'),graphicRequests(run).filter(r=>r.path.includes('orbital-atlas')));
-   phase='world-scroll';const worldBefore=await wheelTo(run,'#tab-basis .gfx-world-image');const worldReady=await imageReady(run.page,'#tab-basis .gfx-world-image');const worldAfter=await geometry(run.page,'#tab-basis .gfx-world-image');
-   check(labels.worldScroll,worldBefore.ready!=='true'&&worldReady&&/\.webp$/.test(worldAfter.currentSrc||'')&&run.requests.some(r=>r.phase==='world-scroll'&&r.path.endsWith('planet-ocean.webp')&&r.status===200),{before:worldBefore,after:worldAfter});
-   const visibleOK=await nativeBoolean(run.page,()=>{const es=[...document.querySelectorAll('img[data-gfx-fallback]')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;});return es.length>0&&es.every(e=>e.complete&&e.naturalWidth>0&&e.naturalHeight>0);});check(labels.visible,visibleOK);
+   phase='world-scroll';const worldBefore=await wheelTo(run,commonWorldSelector);const worldReady=await nativeBoolean(run.page,selector=>{const e=document.querySelector(selector);if(!e||e.dataset.gameArt!=='raster'||e.dataset.gameArtReady!=='true'||e.dataset.gameFormat!=='webp')return false;const r=e.getBoundingClientRect(),d=e.getContext('2d').getImageData(0,0,e.width,e.height).data;return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&d.some((value,index)=>index%4===3&&value>8);},commonWorldSelector,15000,()=>run.requests.some(r=>r.path==='/'+worldBefore.atlas+'.webp'&&r.status===200));const worldAfter=await geometry(run.page,commonWorldSelector),worldTape=await run.page.evaluate(()=>window.__graphicsLoadingDemand),worldRequests=run.requests.filter(r=>r.path==='/'+worldAfter.atlas+'.webp'&&r.status===200);
+   check(labels.worldScroll,worldBefore.top>worldBefore.viewport+200&&worldReady&&worldAfter.art==='raster'&&worldAfter.format==='webp'&&worldAfter.key===worldBefore.key&&remainingArt[worldAfter.key]?.stem===worldAfter.atlas&&remainingArt[worldAfter.key]?.crop===worldAfter.crop&&worldRequests.length===1&&worldRequests.every(request=>demandAllowed(request,worldTape))&&!run.requests.some(r=>r.path==='/'+worldAfter.atlas+'.png'),{before:worldBefore,after:worldAfter,requests:worldRequests});
+   const visibleOK=await nativeBoolean(run.page,()=>{const visible=e=>{const r=e.getBoundingClientRect();for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility==='hidden'||Number(s.opacity)===0)return false;}return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;},images=[...document.querySelectorAll('img[data-gfx-fallback]')].filter(visible),worlds=[...document.querySelectorAll('#tab-basis canvas.gfx-world-image[data-planet-icon]')].filter(visible);return images.length+worlds.length>0&&images.every(e=>e.complete&&e.naturalWidth>0&&e.naturalHeight>0)&&worlds.length>0&&worlds.every(e=>e.dataset.gameArt==='raster'&&e.dataset.gameArtReady==='true'&&['webp','png'].includes(e.dataset.gameFormat)&&e.getContext('2d').getImageData(0,0,e.width,e.height).data.some((value,index)=>index%4===3&&value>8));});check(labels.visible,visibleOK);
    phase='expedition-before-fleet';check(labels.expedition,await tab(run,'expedition'));
-   await delay(250);check(labels.hiddenFleetMarkup,await run.page.locator('#fleet img[data-gfx-ship-thumb]').count()===0);
+   await delay(250);check(labels.hiddenFleetMarkup,await run.page.locator('#fleet [data-gfx-ship-thumb]').count()===0);
    check(labels.hiddenFleetNetwork,!run.requests.some(r=>r.phase==='expedition-before-fleet'&&/^\/kepler-gfx-ship-/.test(r.path)),graphicRequests(run).filter(r=>r.phase==='expedition-before-fleet'));
    const expTile=run.page.locator('#expeditionVisual .gfx-expedition-art').first();if(await expTile.count())await wheelTo(run,'#expeditionVisual .gfx-expedition-art');
    const expeditionReady=await nativeBoolean(run.page,()=>{const e=document.querySelector('#expeditionVisual .gfx-expedition-art');return !!e&&e.dataset.gfxReady==='true';});
@@ -119,22 +152,26 @@ async function main(){
    phase='notag-alliance-second-before-fleet';await tab(run,'basis');await tab(run,'allianz');await wheelTo(run,'#allianceHeroBanner');
    const allianceSecond=await nativeBoolean(run.page,()=>{const e=document.getElementById('allianceHeroBanner'),r=e?.getBoundingClientRect();return !!e&&!!e.closest('.gfx-alliance-entry')&&e.dataset.gfxReady==='true'&&getComputedStyle(e).backgroundImage.includes('kepler-gfx-orbital-dock.webp')&&r.width>0&&r.height>0&&r.top<innerHeight&&r.bottom>0;});
    check(labels.allianceSecond,allianceSecond,{element:await run.page.locator('#allianceHeroBanner').evaluate(e=>({computed:getComputedStyle(e).backgroundImage,ready:e.dataset.gfxReady,entry:!!e.closest('.gfx-alliance-entry')}))});
-   phase='fleet';await tab(run,'flotte');await wheelTo(run,'#shipyardVisual .gfx-ship-model');const fleetReady=await imageReady(run.page,'#shipyardVisual .gfx-ship-model');const ship=await geometry(run.page,'#shipyardVisual .gfx-ship-model');
-   check(labels.fleet,fleetReady&&/\.webp$/.test(ship.currentSrc||'')&&run.requests.some(r=>r.phase==='fleet'&&/^\/kepler-gfx-ship-.*\.webp$/.test(r.path)&&r.status===200),ship);
-   check(labels.fleetThumbnails,await run.page.locator('#fleet img[data-gfx-ship-thumb]').count()===6);
-   const rail=await run.page.locator('#shipyardVisual .gfx-ship-list img').evaluateAll(es=>es.map((e,index)=>{const r=e.getBoundingClientRect();return {index,src:e.getAttribute('src'),deferred:e.dataset.gfxSrc,ready:e.dataset.gfxReady,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
-   const distant=rail.find(e=>e.width>0&&e.height>0&&e.top>e.viewport+200);
-   check(labels.railDormant,!!distant&&!!distant.deferred&&!distant.src&&distant.ready!=='true',rail);
-   let railOK=false,railWitness=null;if(distant){phase='rail-scroll';const locator=run.page.locator('#shipyardVisual .gfx-ship-list img').nth(distant.index);
+   phase='fleet';await tab(run,'flotte');await wheelTo(run,'#shipyardVisual .gfx-native-ship canvas');
+   const fleetReady=await nativeBoolean(run.page,()=>{const e=document.querySelector('#shipyardVisual .gfx-native-ship canvas');if(!e||e.dataset.shipArt!=='raster'||e.dataset.shipArtReady!=='true'||e.dataset.shipFormat!=='webp')return false;const r=e.getBoundingClientRect(),d=e.getContext('2d').getImageData(0,0,e.width,e.height).data;return r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&d.some((v,i)=>i%4===3&&v>8);});
+   const ship=await run.page.locator('#shipyardVisual .gfx-native-ship canvas').evaluate(e=>({key:e.dataset.shipIcon,art:e.dataset.shipArt,ready:e.dataset.shipArtReady,atlas:e.dataset.shipAtlas,crop:e.dataset.shipCrop,format:e.dataset.shipFormat}));
+   check(labels.fleet,fleetReady&&run.requests.some(r=>r.phase==='fleet'&&r.path==='/'+ship.atlas+'.webp'&&r.status===200),ship);
+   const fleetThumbs=await run.page.locator('#fleet [data-gfx-ship-thumb]').evaluateAll(es=>es.map(e=>({tag:e.tagName,key:e.dataset.gfxShipThumb,icon:e.dataset.shipIcon})));
+   check(labels.fleetThumbnails,fleetThumbs.length===38&&new Set(fleetThumbs.map(e=>e.key)).size===38&&fleetThumbs.every(e=>e.tag==='CANVAS'&&e.icon===e.key)&&['ships','jaeger','cruisers','destroyers','carrier','frachter'].every(key=>fleetThumbs.some(e=>e.key===key))&&await run.page.locator('#fleet canvas[data-ship-icon="superschlachtschiff"]').count()===1,fleetThumbs);
+   const atlasFor=key=>['ships','jaeger','cruisers','destroyers','schlachtschiff','superschlachtschiff','waechter','bomber','carrier','frachter','frachtergross','bergungsfrachter','colonyShips','recycler','spaeher','spionageschiff'].includes(key)?'regular':['paktkorvette','bundeskreuzer','sternenbanner','lotsenboot','kessel','bergungskran','presslufthai','ankerwerfer','echoschnitter','bannschiff','nullkiel','grundgaenger','forscher','gesandtenschiff','schuerfschiff','enterschiff'].includes(key)?'utility':'advanced';
+   const rail=await run.page.locator('#shipyardVisual .gfx-ship-list canvas').evaluateAll(es=>es.map((e,index)=>{const r=e.getBoundingClientRect();return {index,key:e.dataset.shipIcon,ready:e.dataset.shipArtReady,art:e.dataset.shipArt,top:r.top,width:r.width,height:r.height,viewport:innerHeight};}));
+   const distant=rail.find(e=>e.width>0&&e.height>0&&e.top>e.viewport+200&&e.ready!=='true');
+   check(labels.railDormant,!!distant&&distant.art==='fallback'&&distant.ready!=='true',rail);
+   let railOK=false,railWitness=null;if(distant){phase='rail-scroll';const locator=run.page.locator('#shipyardVisual .gfx-ship-list canvas').nth(distant.index);
     const wheel=await locator.evaluate(e=>{let container=e.parentElement;while(container){const s=getComputedStyle(container);if(/auto|scroll/.test(s.overflowY)&&container.scrollHeight>container.clientHeight+1)break;container=container.parentElement;}if(!container)return null;const r=container.getBoundingClientRect(),item=e.getBoundingClientRect(),top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);return {x:r.x+r.width/2,y:(top+bottom)/2,delta:item.top-(top+bottom)/2+item.height/2,container:{top:r.top,bottom:r.bottom,width:r.width,height:r.height,scrollTop:container.scrollTop}};});
     if(wheel){await run.page.mouse.move(wheel.x,wheel.y);await run.page.mouse.wheel(0,Math.round(wheel.delta));}else{await run.page.mouse.move(1420,550);await run.page.mouse.wheel(0,Math.round(distant.top-300));}
-    const end=Date.now()+15000;do{railOK=await locator.evaluate(e=>{const r=e.getBoundingClientRect();return e.complete&&e.naturalWidth>0&&e.naturalHeight>0&&e.dataset.gfxReady==='true'&&e.currentSrc.endsWith('.webp')&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;});if(railOK)break;await delay(50);}while(Date.now()<end);
-    railOK=railOK&&distant.ready!=='true'&&run.requests.some(r=>r.phase==='rail-scroll'&&r.path==='/'+distant.deferred&&r.status===200);
-    railWitness={before:distant,wheel,after:await locator.evaluate(e=>{const r=e.getBoundingClientRect();return {src:e.currentSrc,ready:e.dataset.gfxReady,complete:e.complete,naturalWidth:e.naturalWidth,top:r.top,bottom:r.bottom};}),requests:run.requests.filter(r=>r.phase==='rail-scroll'&&/^\/kepler-gfx-ship-/.test(r.path))};
+    const end=Date.now()+15000;do{railOK=await locator.evaluate(e=>{const r=e.getBoundingClientRect(),d=e.getContext('2d').getImageData(0,0,e.width,e.height).data;return e.dataset.shipArt==='raster'&&e.dataset.shipArtReady==='true'&&e.dataset.shipFormat==='webp'&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight&&d.some((v,i)=>i%4===3&&v>8);});if(railOK)break;await delay(50);}while(Date.now()<end);
+    railOK=railOK&&distant.ready!=='true'&&run.requests.filter(r=>r.path==='/kepler-gfx-ship-atlas-'+atlasFor(distant.key)+'.webp'&&r.status===200).length===1;
+    railWitness={before:distant,wheel,after:await locator.evaluate(e=>{const r=e.getBoundingClientRect();return {key:e.dataset.shipIcon,ready:e.dataset.shipArtReady,art:e.dataset.shipArt,atlas:e.dataset.shipAtlas,format:e.dataset.shipFormat,top:r.top,bottom:r.bottom};}),requests:run.requests.filter(r=>r.phase==='rail-scroll'&&/^\/kepler-gfx-ship-/.test(r.path))};
    }
    check(labels.railScroll,railOK,railWitness);
    check(labels.identity,await run.page.evaluate(()=>window.__graphicsLoadingOriginalControls.length===13&&window.__graphicsLoadingOriginalControls.every((e,i)=>e===document.querySelectorAll('#commandNav .tab-btn')[i])&&document.querySelectorAll('.tab-btn').length===13));
-  }finally{await run.context.close();}
+  }finally{await closeFixture(run);}
   phase='native-fallback';const fallback=await fixture(['kepler-gfx-colony-developed.webp','kepler-gfx-orbital-atlas.webp','kepler-gfx-orbital-dock.webp']);try{
    const restored=await imageReady(fallback.page,'#colonyVisual .gfx-landscape',10000),data=await geometry(fallback.page,'#colonyVisual .gfx-landscape');
    check(labels.fallbackRequest,fallback.requests.filter(r=>r.path==='/kepler-gfx-colony-developed.webp'&&r.expectedFailure&&r.status===404).length===1&&fallback.requests.filter(r=>r.path==='/kepler-gfx-colony-developed.png'&&r.status===200).length===1);
@@ -155,11 +192,11 @@ async function main(){
      const canvas=document.createElement('canvas');canvas.width=p.bitmap.width;canvas.height=p.bitmap.height;const c=canvas.getContext('2d',{willReadFrequently:true});c.drawImage(p.bitmap,0,0);const pa=c.getImageData(0,0,canvas.width,canvas.height).data;c.clearRect(0,0,canvas.width,canvas.height);c.drawImage(w.bitmap,0,0);const wa=c.getImageData(0,0,canvas.width,canvas.height).data;let alpha=true;for(let i=3;i<pa.length;i+=4)if(pa[i]!==wa[i]){alpha=false;break;}return {ok:p.response.status===200&&w.response.status===200&&w.response.headers.get('content-type')?.startsWith('image/webp')&&signature&&p.bitmap.width>0&&p.bitmap.width===w.bitmap.width&&p.bitmap.height===w.bitmap.height&&alpha,width:p.bitmap.width,height:p.bitmap.height,webpBytes:w.bytes.byteLength,pngBytes:p.bytes.byteLength,alphaIdentical:alpha,validHeader:signature};}finally{p?.bitmap.close();w?.bitmap.close();}},name);}catch(error){result={ok:false,error:error.message};}
     check(assetLabel(name),result.ok,result);
    }
-  }finally{await fallback.context.close();}
+  }finally{await closeFixture(fallback);}
   phase='native-member-before-fleet';const member=await fixture([],'TST');try{await tab(member,'allianz');await wheelTo(member,'#allianceHeroBanner');
    const memberReady=await nativeBoolean(member.page,()=>document.getElementById('allianceNameDisplay')?.textContent==='[TST]'&&!document.getElementById('allianceHeroBanner')?.closest('.gfx-alliance-entry'));
    await delay(250);check(labels.allianceMember,memberReady&&JSON.parse(member.store.get('kepler7-save-v3')).player.allianceTag==='TST'&&!member.requests.some(r=>/^\/kepler-gfx-orbital-dock\.(?:png|webp)$/.test(r.path)),{name:await member.page.locator('#allianceNameDisplay').innerText(),entry:await member.page.locator('#allianceHeroBanner').evaluate(e=>!!e.closest('.gfx-alliance-entry')),requests:member.requests.filter(r=>r.path.includes('orbital-dock'))});
-  }finally{await member.context.close();}
+  }finally{await closeFixture(member);}
   check(labels.script,allErrors.length===0,allErrors);check(labels.http,fixtureErrors.length===0,fixtureErrors);
   const actual=records.map(r=>r.name);if(JSON.stringify(actual)!==JSON.stringify(manifest))throw Error('Native loading guard manifest/order changed');
   const failures=records.filter(r=>!r.ok).length;console.log(records.length+' checks, '+failures+' failures');console.log((failures?'FAIL':'OK')+' - Native graphics loading');process.exitCode=failures?1:0;

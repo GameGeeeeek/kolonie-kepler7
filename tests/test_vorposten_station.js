@@ -132,6 +132,17 @@ async function lauf(browser, vp){
     const r = n.getBoundingClientRect(), svg = n.ownerSVGElement;
     const sr = svg ? svg.getBoundingClientRect() : null;
     const hof = (n.innerHTML.match(/<circle[^>]*r="([\d.]+)"[^>]*stroke-opacity="0\.4"/) || [])[1];
+    const hofKreis = n.querySelector('circle[stroke-opacity="0.4"]');
+    const bild = n.querySelector('image[data-vp-bild]');
+    const bildBox = bild && bild.getBBox ? bild.getBBox() : null;
+    const cx = hofKreis ? Number(hofKreis.getAttribute('cx')) : NaN;
+    const cy = hofKreis ? Number(hofKreis.getAttribute('cy')) : NaN;
+    // The native SVG frame measures displayed size. PNG byte length and alpha
+    // edge counts describe compression/framing, not a station's map footprint.
+    const bildRahmen = bildBox && Number.isFinite(cx) && Number.isFinite(cy)
+      ? { width:bildBox.width, height:bildBox.height,
+          left:bildBox.x-cx, top:bildBox.y-cy,
+          right:bildBox.x+bildBox.width-cx, bottom:bildBox.y+bildBox.height-cy } : null;
     /* JEDES Teil der Station traegt ein data-vp-Merkmal (Bild, Modul, Projekt, Garnison, Schaden,
        Bau, Abbau). Das alte BODENLAGER trug keines - es war nur eine Ansammlung von Polygonen und
        Linien. Gezaehlt wird deshalb, was OHNE solches Merkmal gezeichnet wird; das ist die Regel,
@@ -142,7 +153,7 @@ async function lauf(browser, vp){
        1b-Zaehlung zu verfaelschen. */
     const MARKEN = '[data-vp-bild],[data-vp-modul],[data-vp-projekt],[data-vp-garnison],[data-vp-schaden],[data-vp-bau],[data-vp-abbau],[data-vp-verlauf]';
     const ohneMarke = [...n.querySelectorAll('polygon')].filter(el => !el.closest(MARKEN)).length;
-    return { da:true, html: n.innerHTML, ohneMarke, hofR: hof ? Number(hof) : 0, breite: b ? b.width : 0, hoehe: b ? b.height : 0,
+    return { da:true, html: n.innerHTML, ohneMarke, bildRahmen, hofR: hof ? Number(hof) : 0, breite: b ? b.width : 0, hoehe: b ? b.height : 0,
       links: r.left, oben: r.top, rechts: r.right, unten: r.bottom,
       svgL: sr ? sr.left : 0, svgT: sr ? sr.top : 0, svgR: sr ? sr.right : 0, svgB: sr ? sr.bottom : 0 };
   });
@@ -320,21 +331,26 @@ async function lauf(browser, vp){
     buntAbstand <= SCHWELLE_FARBE, { felderUnterschied: buntAbstand, schwelle: SCHWELLE_FARBE });
   check('2e: die drei Zweige unterscheiden sich im AUFBAU, nicht nur im Farbton',
     minZweig >= SCHWELLE_FORM, { schwaechstesPaar: schwaechstes, felderUnterschied: minZweig, schwelle: SCHWELLE_FORM });
-  /* 2f) DER ANBAU BLEIBT IN DER KACHEL (Befund der adversarischen Durchsicht, 06.09.2026).
-     Der Ladeausleger des Handelszweigs war waagerecht ungedeckelt - maxLaenge begrenzte ihn nur
-     nach unten. GEMESSEN lief er auf Stufe 8 rechts aus der 256er-Kachel: 27 deckende
-     Randzeilen gegen 4 beim Rumpf ohne Zweig, auf Stufe 7 zwei.
-     Gemessen wird gegen den Rumpf OHNE Zweig, nicht gegen eine eingetippte Zahl: Die 4 stammen
-     vom Ring selbst und sind aelter als dieses Buendel; die REGEL ist, dass ein Anbau nichts
-     hinzufuegt, was vorher nicht schon da war. */
-  const rand = zweigMass.bilder.ohne
-    ? { li: zweigMass.bilder.ohne.li, re: zweigMass.bilder.ohne.re } : null;
-  const ueber = rand ? zPaar.filter(z => zweigMass.bilder[z]
-      && (zweigMass.bilder[z].li > rand.li || zweigMass.bilder[z].re > rand.re))
-      .map(z => z + ' li=' + zweigMass.bilder[z].li + ' re=' + zweigMass.bilder[z].re) : ['kein Massstab'];
+  /* 2f) DER ANBAU BLEIBT IN DER KACHEL. Die urspruenglichen Alpha-Randzaehlungen
+     erkannten einen prozedural ueberstehenden Ausleger. Bei canonical PNG-Crops
+     koennen Alpha-Raender zwischen Motiven verschieden sein, obwohl die reale
+     SVG-Kachel gleich gross ist. Verglichen werden deshalb die vier echten
+     Bildrahmen relativ zu ihrem jeweiligen Hof-Mittelpunkt, unabhaengig von
+     Markerposition, Bildkompression und neutralem Motiv. */
+  const rahmenGueltig = r => !!r && r.width > 0 && r.height > 0
+    && ['width','height','left','top','right','bottom'].every(k => Number.isFinite(r[k]));
+  const rand = o.mark.bildRahmen;
+  const zweigRahmen = { werft:w.mark.bildRahmen, handel:h.mark.bildRahmen, festung:f.mark.bildRahmen };
+  // SVG attributes are encoded to0.1 units; this only absorbs Float32 BBox noise.
+  const rahmenRundung = 0.001;
+  const ueber = rahmenGueltig(rand) ? zPaar.filter(z => {
+    const r = zweigRahmen[z];
+    return !rahmenGueltig(r) || r.left < rand.left-rahmenRundung || r.top < rand.top-rahmenRundung
+      || r.right > rand.right+rahmenRundung || r.bottom > rand.bottom+rahmenRundung;
+  }) : ['kein Massstab'];
   check('2f: kein Zweiganbau fuellt die Kachel weiter als der Rumpf ohne Zweig',
     ueber.length === 0, { ueberstehend: ueber, ohneZweig: rand,
-      gemessen: zPaar.map(z => z + ':' + (zweigMass.bilder[z] ? zweigMass.bilder[z].li + '/' + zweigMass.bilder[z].re : '-')) });
+      gemessen: zweigRahmen });
 
   // ---- 3) Wachstum und Landmarke -----------------------------------------------------------------
   check('3a: der Marker der Stufe 8 ist SICHTBAR groesser als der der Stufe 2 (der Ausbau ist zu sehen)',
@@ -360,22 +376,21 @@ async function lauf(browser, vp){
   for (let stufe = 1; stufe <= 8; stufe++){
     const l = await lauf(browser, doc(stufe, stufe >= 4 ? 'festung' : null, 'Stufe ' + stufe));
     // Zahlen raus: verglichen wird die FORM (welche Teile), nicht die Position im Bild.
-    formen.push({ stufe, sig: String(l.mark.html || '').replace(/[-\d.]+/g, '#'), da: !!l.mark.da,
+    formen.push({ stufe, sig: String(l.mark.html || '').replace(/[-\d.]+/g, '#'), da: !!l.mark.da, bildRahmen:l.mark.bildRahmen,
                   bild: (String(l.mark.html||'').match(/data-vp-bild="1"[^>]*href="(data:image\/png;base64,[^"]+)"/) || [])[1] || null });
     await l.ctx.close();
   }
   check('5-vorab: alle acht Stufen wurden gezeichnet', formen.every(f => f.da && f.sig.length > 200), formen.map(f => f.sig.length));
   const eindeutig = new Set(formen.map(f => f.sig)).size;
   check('5a: acht Stufen ergeben acht verschiedene Bilder', eindeutig === 8, { verschiedene: eindeutig, laengen: formen.map(f => f.sig.length) });
-  /* Und die Reihe waechst. Teile zaehlen geht seit GR-5 nicht mehr - die Station ist EIN <image>,
-     egal wie viel darauf zu sehen ist. Gemessen wird deshalb der Bildinhalt selbst: Das PNG der
-     Stufe 8 traegt mehr Zeichnung als das der Stufe 4 und wird dadurch messbar groesser. Das ist
-     kein Stellvertreter, sondern die Sache selbst - mehr Panelnaehte, mehr Fensterbaender und ein
-     laengerer Koerper sind genau das, was ein PNG waechsen laesst. */
-  const bildLaengen = formen.map(f => f.bild ? f.bild.length : 0);
+  /* Und die Reihe waechst. PNG-Kompressionslaenge ist kein Groessenmass: ein
+     detailliertes Stufe6-Bild kann weniger Bytes als Stufe5 brauchen. Die
+     tatsaechliche native SVG-Bildbreite muss sichtbar wachsen; die Motive und
+     ihre Unterschiede werden weiterhin separat in2d/2e/5a/5d geprueft. */
+  const bildBreiten = formen.map(f => rahmenGueltig(f.bildRahmen) ? f.bildRahmen.width : 0);
   check('5b: der Ausbau LEGT ZU - das Bild der Stufe 8 traegt mehr als das der Stufe 4',
-    bildLaengen[7] > bildLaengen[3] * 1.15,
-    { stufe4: bildLaengen[3], stufe8: bildLaengen[7], reihe: bildLaengen.slice(3) });
+    bildBreiten[3] > 0 && bildBreiten[7] > bildBreiten[3] * 1.15,
+    { stufe4: bildBreiten[3], stufe8: bildBreiten[7], reihe: bildBreiten.slice(3) });
   /* DER VERGLEICH, den 1c behauptete und nicht leistete: Die Stufe unter der Zweigwahl und die
      Wahlstufe selbst muessen unterschiedliche Bilder tragen. Genau an diesem Uebergang kommt der
      Habitatring dazu - waere er unsichtbar, waere die Leiter fuer den Spieler nicht ablesbar,
@@ -386,7 +401,7 @@ async function lauf(browser, vp){
     !!bildUnter && !!bildWahl && bildUnter !== bildWahl,
     { unter: bildUnter ? bildUnter.length : 0, wahl: bildWahl ? bildWahl.length : 0 });
   check('5c: und zwar durchgehend - keine Stufe faellt gegen die vorige zurueck',
-    bildLaengen.slice(4).every((v, i) => v >= bildLaengen[3 + i]), bildLaengen.slice(3));
+    bildBreiten.slice(3).every(v => v > 0) && bildBreiten.slice(4).every((v, i) => v >= bildBreiten[3 + i]), bildBreiten.slice(3));
 
   check('4b: keine Skriptfehler', f.errs.length === 0, f.errs.slice(0,2));
   await f.ctx.close();
