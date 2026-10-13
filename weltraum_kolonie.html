@@ -9171,10 +9171,11 @@ k7InitialStaticText();
       if (!art || typeof Image!=='function') return null;
       let entry=shipRasterImages.get(art.stem);
       if (!entry && load){
-        const image=new Image();entry={image,ready:false,failed:false,png:false};
+        const image=new Image();let finish;
+        entry={image,ready:false,failed:false,png:false,done:new Promise(resolve=>{finish=resolve;})};
         shipRasterImages.set(art.stem,entry);image.decoding='async';image.fetchPriority='low';
         const fallback=()=>{
-          if(entry.png){entry.failed=true;return;}
+          if(entry.png){entry.failed=true;finish(false);return;}
           entry.png=true;image.src=art.stem+'.png?v='+art.pngSha256.slice(0,12);
         };
         image.onerror=fallback;
@@ -9183,7 +9184,7 @@ k7InitialStaticText();
           try{await image.decode();}catch(error){if(png===entry.png)fallback();return;}
           if(png!==entry.png)return;
           if(image.naturalWidth!==art.width||image.naturalHeight!==art.height){fallback();return;}
-          entry.ready=true;
+          entry.ready=true;finish(true);
           for(const [canvas,args] of shipRasterCanvases){
             if(!canvas.isConnected){shipRasterCanvases.delete(canvas);if(shipRasterObserver)shipRasterObserver.unobserve(canvas);continue;}
             if(SHIP_RASTER_ART[args.key]?.stem===art.stem&&shipRasterVisible(canvas))drawShipMiniIcon(args.key,canvas,args.markOverride,args.ohneAnstrich,args.stopsOverride);
@@ -38761,7 +38762,7 @@ async function claimPendingRewards(){
       // (cmpH/barH), damit man auf einen Blick sieht, wer tiefer war.
       (entry.abgrundBest ? prow('ti-infinity','#a89ef0','Abgrund', `Rekordtiefe ${fmt(entry.abgrundBest)}${cmpH(ensureAbgrund().best||0, entry.abgrundBest)}`, barH(ensureAbgrund().best||0, entry.abgrundBest, '#a89ef0')) : '');
     // Echte Schiffs-Sprites in die Flotten-Chips zeichnen (Canvas, nach dem innerHTML-Setzen).
-    document.getElementById('profileModalStats').querySelectorAll('.pfleet-canvas').forEach(cv => drawShipMiniIcon(cv.getAttribute('data-ship'), cv, 1));
+    document.getElementById('profileModalStats').querySelectorAll('.pfleet-canvas').forEach(cv => drawShipMiniIcon(cv.getAttribute('data-ship'), cv, isMeForCompare?undefined:1, !isMeForCompare));
     // Bedrohungs-Banner (Idee 1): farbcodiertes Verdikt aus eigener Angriffskraft vs. gegnerischer Verteidigung.
     const threatEl = document.getElementById('profileThreatBanner');
     if (threatEl){
@@ -41917,6 +41918,466 @@ async function claimPendingRewards(){
      Die Bezeichner der Buehne tragen alle das Praefix „os", das CSS liegt
      vollstaendig unter #osWrap.
      ========================================================================== */
+  // Canonical transparent crops, generated originals unchanged; private to the main IIFE.
+  const COMBAT_RASTER_ART=Object.freeze({
+  "engine-cyan": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      52,
+      107,
+      230,
+      154
+    ]
+  },
+  "engine-amber": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      358,
+      120,
+      221,
+      128
+    ]
+  },
+  "engine-violet": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      671,
+      107,
+      228,
+      157
+    ]
+  },
+  "plasma-amber": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      969,
+      132,
+      234,
+      109
+    ]
+  },
+  "pulse-cyan": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      48,
+      433,
+      250,
+      78
+    ]
+  },
+  "pulse-red": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      346,
+      432,
+      254,
+      75
+    ]
+  },
+  "lance-blue": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      659,
+      428,
+      250,
+      86
+    ]
+  },
+  "torpedo": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      978,
+      429,
+      226,
+      83
+    ]
+  },
+  "impact-cyan": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      62,
+      683,
+      210,
+      203
+    ]
+  },
+  "impact-amber": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      373,
+      671,
+      202,
+      218
+    ]
+  },
+  "shield-hit": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      679,
+      674,
+      222,
+      214
+    ]
+  },
+  "shield-break": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      988,
+      669,
+      217,
+      228
+    ]
+  },
+  "explosion-early": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      71,
+      967,
+      196,
+      202
+    ]
+  },
+  "explosion-mid": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      364,
+      960,
+      216,
+      217
+    ]
+  },
+  "explosion-late": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      677,
+      966,
+      212,
+      210
+    ]
+  },
+  "smoke": {
+    "stem": "kepler-gfx-combat-fx-atlas",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "593a050872e265a9cdf2feae7e8968d0ec473df0cb4e2562ba6838bc91fd8a69",
+    "webpSha256": "55e4cc14c7c86cba687aa54bfbb789834ccf9f5b909429126c1f9ff72c115d61",
+    "rect": [
+      990,
+      958,
+      211,
+      215
+    ]
+  },
+  "sternenfresser": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      61,
+      85,
+      194,
+      181
+    ]
+  },
+  "panzerhuelle": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      369,
+      61,
+      199,
+      221
+    ]
+  },
+  "schwarmmutter": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      664,
+      92,
+      245,
+      162
+    ]
+  },
+  "phasenwandler": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      1030,
+      61,
+      150,
+      217
+    ]
+  },
+  "gluthorn": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      83,
+      357,
+      156,
+      233
+    ]
+  },
+  "abgrund": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      403,
+      361,
+      133,
+      232
+    ]
+  },
+  "wb0": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      638,
+      400,
+      293,
+      169
+    ]
+  },
+  "wb1": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      998,
+      364,
+      197,
+      222
+    ]
+  },
+  "wb2": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      38,
+      709,
+      247,
+      151
+    ]
+  },
+  "wb3": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      347,
+      709,
+      248,
+      151
+    ]
+  },
+  "wb4": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      669,
+      659,
+      234,
+      234
+    ]
+  },
+  "generisch": {
+    "stem": "kepler-gfx-creatures-atlas-a",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "a1689df4073be0e0215631b686812d84e29b717269c35d6344d543d6433b91c5",
+    "webpSha256": "839126665a4105275fde767594efb8549bbf34950e089ab3b4801e96929dc1f3",
+    "rect": [
+      1006,
+      668,
+      187,
+      218
+    ]
+  },
+  "riss": {
+    "stem": "kepler-gfx-celestial-atlas-b",
+    "width": 1254,
+    "height": 1254,
+    "pngSha256": "c8f7c5e0b3f2af9b77a2866cfcb13569bbf1485e96a9375c6f1f14e1306981b7",
+    "webpSha256": "cd8e5bda0f602a063c9ad40ce6f7b7aaee735e2ede91b14120b6d74e03e1e8c1",
+    "rect": [
+      781,
+      639,
+      333,
+      553
+    ]
+  }
+});
+  const COMBAT_RASTER_FX_KEYS=Object.freeze(["engine-cyan","engine-amber","engine-violet","plasma-amber","pulse-cyan","pulse-red","lance-blue","torpedo","impact-cyan","impact-amber","shield-hit","shield-break","explosion-early","explosion-mid","explosion-late","smoke"]);
+  const COMBAT_RASTER_BOSS_KEYS=Object.freeze(["sternenfresser","panzerhuelle","schwarmmutter","phasenwandler","gluthorn","abgrund","wb0","wb1","wb2","wb3","wb4","generisch"]);
+    // Shared, private picture cache. A closed replay/idle map cannot demand assets.
+    const combatRasterImages = new Map(), combatRasterCrops = new Map();
+    const combatRasterMasks = new Map(), combatRasterURLs = new Map();
+    const combatRasterReadyCallbacks = new Set();
+    function onCombatRasterReady(callback){
+      combatRasterReadyCallbacks.add(callback);
+      return () => combatRasterReadyCallbacks.delete(callback);
+    }
+    function combatRasterImage(key, demand=false){
+      const art=Object.prototype.hasOwnProperty.call(COMBAT_RASTER_ART,key)?COMBAT_RASTER_ART[key]:null;
+      if(!art)return null;
+      let entry=combatRasterImages.get(art.stem);
+      if(!entry&&demand){
+        const image=new Image();
+        entry={image,ready:false,failed:false,format:'webp',fallback:false,attempt:0};
+        combatRasterImages.set(art.stem,entry);
+        image.decoding='async';image.fetchPriority='low';
+        const announce=()=>{for(const callback of combatRasterReadyCallbacks)callback(art.stem);};
+        const load=format=>{
+          const attempt=++entry.attempt;
+          entry.format=format;
+          const failed=()=>{
+            if(attempt!==entry.attempt||entry.ready||entry.failed)return;
+            if(format==='webp'){entry.fallback=true;load('png');}
+            else{entry.failed=true;image.onload=image.onerror=null;announce();}
+          };
+          image.onerror=failed;
+          image.onload=()=>{
+            const decoded=()=>{
+              if(attempt!==entry.attempt||entry.ready||entry.failed)return;
+              if(!image.complete||image.naturalWidth!==art.width||image.naturalHeight!==art.height){failed();return;}
+              entry.ready=true;image.onload=image.onerror=null;announce();
+            };
+            if(typeof image.decode==='function')image.decode().then(decoded,failed);
+            else decoded();
+          };
+          image.src=art.stem+'.'+format+'?v='+art[format+'Sha256'].slice(0,12);
+        };
+        load('webp');
+      }
+      return entry&&entry.ready?{image:entry.image,art,format:entry.format}:null;
+    }
+    function combatRasterCanvas(key, demand=false){
+      const ready=combatRasterImage(key,demand);if(!ready)return null;
+      if(combatRasterCrops.has(key))return combatRasterCrops.get(key);
+      const [x,y,w,h]=ready.art.rect,canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(ready.image,x,y,w,h,0,0,w,h);
+      combatRasterCrops.set(key,canvas);return canvas;
+    }
+    function combatRasterDataUrl(key, demand=false){
+      const canvas=combatRasterCanvas(key,demand);if(!canvas)return null;
+      if(!combatRasterURLs.has(key))combatRasterURLs.set(key,canvas.toDataURL('image/png'));
+      return combatRasterURLs.get(key);
+    }
+    function combatRasterMask(key, color, demand=false){
+      const canvas=combatRasterCanvas(key,demand);if(!canvas)return null;
+      const id=key+'|'+color;
+      if(combatRasterMasks.has(id))return combatRasterMasks.get(id);
+      const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;
+      const g=mask.getContext('2d');g.drawImage(canvas,0,0);
+      g.globalCompositeOperation='source-in';g.fillStyle=color;g.fillRect(0,0,mask.width,mask.height);
+      if(combatRasterMasks.size>=64)combatRasterMasks.delete(combatRasterMasks.keys().next().value);
+      combatRasterMasks.set(id,mask);return mask;
+    }
+    function combatRasterPaint(g,key,x,y,w,h,angle=0,alpha=1,color=null,edge=0){
+      if(!(w>0&&h>0&&alpha>0))return false;
+      const canvas=combatRasterCanvas(key,true);if(!canvas)return false;
+      g.save();g.translate(x,y);g.rotate(angle);g.globalAlpha*=Math.min(1,alpha);
+      if(color&&edge>0){
+        const mask=combatRasterMask(key,color);
+        for(const [dx,dy] of [[edge,0],[-edge,0],[0,edge],[0,-edge]])g.drawImage(mask,-w/2+dx,-h/2+dy,w,h);
+      }
+      g.drawImage(canvas,-w/2,-h/2,w,h);
+      // A narrow party-colored rim preserves friend/foe without painting the body.
+      g.restore();return true;
+    }
+
   const Wiedergabe = (function(){
   'use strict';
 
@@ -42345,6 +42806,71 @@ async function claimPendingRewards(){
 
     'use strict';
     var TAU = Math.PI * 2;
+
+    var rasterGemalt={}, rasterAngefordert={}, rasterFragmente=0, rasterFragmentKeys={};
+    function rasterEffekt(g,key,x,y,w,h,angle,alpha,color,edge){
+      if(!offen||x+w<0||x-w>W||y+h<0||y-h>H)return false;
+      rasterAngefordert[key]=true;
+      if(!combatRasterPaint(g,key,x,y,w,h,angle||0,alpha===undefined?1:alpha,color||null,edge||0))return false;
+      rasterGemalt[key]=(rasterGemalt[key]||0)+1;return true;
+    }
+    function rasterAuskunft(){
+      var assets={};
+      for(var key of Object.keys(rasterAngefordert)){
+        var art=COMBAT_RASTER_ART[key],entry=art&&combatRasterImages.get(art.stem);
+        if(entry)assets[key]={ready:entry.ready,failed:entry.failed,format:entry.format,fallback:entry.fallback};
+      }
+      return { drawn:Object.keys(rasterGemalt), drawCounts:{...rasterGemalt}, assets:assets,
+               boss:BOSS?BOSS.key:null, riss:!!RISS,
+               hullFragments:rasterFragmente, fragmentKeys:Object.keys(rasterFragmentKeys) };
+    }
+    function rasterSplitter(g,s,alpha){
+      if(!s.modell)return false;
+      var atlas=atlanten[atlasSchluessel(s.modell,s.atlasSeite)];
+      if(!atlas||!atlas.raster)return false;
+      if(!atlas.fragmentRects){
+        // Split the actual alpha-bounded hull in its first existing orientation.
+        // Cached per atlas, so the pixel scan happens once, not for each frame.
+        var k=Math.round(atlas.kante*dpr),data=atlas.bild.getContext('2d').getImageData(0,0,k,k).data;
+        var minY=k,maxY=-1;
+        for(var y=0;y<k;y++)for(var x=0;x<k;x++)if(data[(y*k+x)*4+3]>=8){minY=Math.min(minY,y);maxY=Math.max(maxY,y);}
+        atlas.fragmentRects=[];
+        if(maxY>=minY)for(var band=0;band<3;band++){
+          var y0=minY+Math.floor((maxY-minY+1)*band/3),y1=minY+Math.floor((maxY-minY+1)*(band+1)/3);
+          var minX=k,maxX=-1;
+          for(var by=y0;by<y1;by++)for(var bx=0;bx<k;bx++)if(data[(by*k+bx)*4+3]>=8){minX=Math.min(minX,bx);maxX=Math.max(maxX,bx);}
+          if(maxX>=minX&&y1>y0)atlas.fragmentRects.push([minX,y0,maxX-minX+1,y1-y0]);
+        }
+      }
+      var rect=atlas.fragmentRects[s.fragment%Math.max(1,atlas.fragmentRects.length)];if(!rect)return false;
+      var width=s.gr*2,height=width*rect[3]/rect[2];
+      g.save();g.globalAlpha*=alpha;
+      // Ragged cut edges are masks over real hull pixels, not polygon hull art.
+      g.beginPath();g.moveTo(-width/2,-height/2);g.lineTo(width/2,-height/2);
+      g.lineTo(width*.40,0);g.lineTo(width/2,height/2);g.lineTo(-width/2,height/2);g.lineTo(-width*.42,0);g.closePath();g.clip();
+      g.drawImage(atlas.bild,...rect,-width/2,-height/2,width,height);g.restore();
+      rasterFragmente++;rasterFragmentKeys[atlas.schiff]=true;return true;
+    }
+    function rasterWrack(g,atlas,x,y,w,age){
+      if(!atlas.raster)return false;
+      var frame=Math.round(w/TAU*LAGEN)%LAGEN;if(frame<0)frame+=LAGEN;
+      var angle=frame/LAGEN*TAU,k=atlas.kante,split=Math.min(k*.10,age*k*.015);
+      var sourceX=(frame%SPALTEN)*k*dpr,sourceY=((frame/SPALTEN)|0)*k*dpr;
+      g.save();g.translate(x,y);g.rotate(angle);
+      // Both pieces retain the real neutral/own-mark hull and its party border.
+      // Fragment separation is a drawing transform; the one native wreck is untouched.
+      for(var half=0;half<2;half++){
+        var sign=half?1:-1;
+        g.save();g.translate(sign*split*.45,sign*split);
+        g.beginPath();g.moveTo(-k/2,0);g.lineTo(-k*.22,-k*.035);g.lineTo(k*.04,k*.03);g.lineTo(k*.25,-k*.025);g.lineTo(k/2,0);
+        g.lineTo(k/2,sign*k/2);g.lineTo(-k/2,sign*k/2);g.closePath();g.clip();
+        g.save();g.rotate(-angle);
+        g.drawImage(atlas.bild,sourceX,sourceY,k*dpr,k*dpr,-k/2,-k/2,k,k);
+        g.restore();g.restore();
+      }
+      g.restore();rasterFragmente+=2;rasterFragmentKeys[atlas.schiff]=true;return true;
+    }
+
 
     /* =====================================================================
        1  FARBEN, DATEN DER SCHLACHT, ABLAUFPLAN
@@ -42951,7 +43477,7 @@ async function claimPendingRewards(){
         g.restore();
         g.restore();
       }
-      return { bild: nc, kante: kante };
+      return { bild: nc, kante: kante, raster: raster, schiff: r.schiff };
     }
 
     function atlasSchluessel(rumpfId, seite){ return rumpfId + '|' + seite; }
@@ -43915,7 +44441,8 @@ async function claimPendingRewards(){
             vu: s.vu * 0.5 + Math.cos(swk) * ssp * 0.55,
             va: s.va * 0.4 + Math.sin(swk) * ssp * 0.5,
             w: Math.random()*TAU, dreh: (Math.random()-0.5)*5,
-            gr: (2.5 + Math.random()*4) * schiffSkala, t: 0, gluehen: 0
+            gr: (2.5 + Math.random()*4) * schiffSkala, t: 0, gluehen: 0,
+            modell: s.modell || s.k, atlasSeite: s.atlasSeite, fragment: sc % 3
           });
         }
       }
@@ -44691,6 +45218,8 @@ async function claimPendingRewards(){
         g.beginPath();
         g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.lineTo(pc.x, pc.y); g.lineTo(pd.x, pd.y);
         g.closePath();
+
+        if(f>.02&&rasterEffekt(g,'shield-hit',(pa.x+pc.x)/2,(pa.y+pc.y)/2,Math.max(6,Math.abs(pb.x-pa.x)*1.6),Math.max(6,hoch*2.4),((u0+u1)/2)*THMAX,Math.min(.85,f*.8)))continue;
         if (f > 0.02){
           g.fillStyle = rgba(F.flieder, Math.min(0.34, f * 0.3));
           g.fill();
@@ -44719,6 +45248,16 @@ async function claimPendingRewards(){
         var p = px(s.u, s.a);
         var alt = klemme(1 - s.t/7, 0, 1);
         g.save(); g.translate(p.x, p.y); g.rotate(s.w);
+
+        if(rasterSplitter(g,s,alt) || (!s.modell&&rasterEffekt(g,'shield-break',0,0,s.gr*1.8,s.gr*1.8,0,alt))){
+          g.restore();
+          if(s.gluehen>0.05){
+            g.save();g.globalCompositeOperation='lighter';
+            if(!rasterEffekt(g,'impact-amber',p.x,p.y,s.gr*1.8,s.gr*1.8,0,.5*s.gluehen*alt))glut(g,p.x,p.y,s.gr*.9*s.gluehen,F.warn,.5*s.gluehen*alt);
+            g.restore();
+          }
+          continue;
+        }
         g.strokeStyle = rgba(F.flieder, 0.5 * alt); g.lineWidth = 1;
         g.fillStyle = rgba(F.vio, 0.13 * alt);
         g.beginPath();
@@ -44752,14 +45291,18 @@ async function claimPendingRewards(){
           var lg = g.createLinearGradient(p.x, p.y, p.x - dx/d*lang, p.y - dy/d*lang);
           lg.addColorStop(0, rgba(F.warn, 0.6 * wk.brennt));
           lg.addColorStop(1, rgba(F.ver, 0));
-          g.strokeStyle = lg; g.lineWidth = (wk.gross ? 4 : 2.2) * (0.5 + wk.brennt);
-          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x - dx/d*lang, p.y - dy/d*lang); g.stroke();
+
+          if(!rasterEffekt(g,'engine-amber',p.x-dx/d*lang*.45,p.y-dy/d*lang*.45,lang,Math.max(5,lang*.32),Math.atan2(dy,dx),.6*wk.brennt)){
+            g.strokeStyle = lg; g.lineWidth = (wk.gross ? 4 : 2.2) * (0.5 + wk.brennt);
+            g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x - dx/d*lang, p.y - dy/d*lang); g.stroke();
+          }
+          rasterEffekt(g,'smoke',p.x-dx/d*lang*.75,p.y-dy/d*lang*.75,lang*.9,lang*.9,wk.w,.32*wk.brennt*klemme(1-wk.t/14,0,1));
         }
         g.globalAlpha = klemme(1 - wk.t/13, 0.15, 1);
-        zeichneSchiff(g, atlas, p.x, p.y, wk.w);
+        if(!rasterWrack(g,atlas,p.x,p.y,wk.w,wk.t))zeichneSchiff(g, atlas, p.x, p.y, wk.w);
         g.globalAlpha = 1;
         g.globalCompositeOperation = 'lighter';
-        glut(g, p.x, p.y, (wk.gross ? 9 : 5) * bodenSkala * (0.5 + wk.brennt), F.warn, 0.35 + 0.5*wk.brennt);
+        if(!rasterEffekt(g,'impact-amber',p.x,p.y,(wk.gross?18:10)*bodenSkala,(wk.gross?18:10)*bodenSkala,0,.35+.5*wk.brennt))glut(g, p.x, p.y, (wk.gross ? 9 : 5) * bodenSkala * (0.5 + wk.brennt), F.warn, 0.35 + 0.5*wk.brennt);
         g.globalCompositeOperation = 'source-over';
       }
     }
@@ -44809,8 +45352,11 @@ async function claimPendingRewards(){
           if (x < -60 || x > W + 60 || y < -70 || y > H + 40) continue;
           var af = ast.flack ? (1 - ast.flack + ast.flack * Math.abs(Math.sin(tSim * 17 + s.ph * 4))) : 1;
           var ah = basis * ast.laenge;
-          glut(g, x - Math.sin(s.w) * ah, y + Math.cos(s.w) * ah,
-               kern * ast.laenge * af, ast.farbe, 0.42 * af);
+
+          var key=s.antrieb==='verbrennung'?'engine-amber':s.antrieb==='hyperraum'?'engine-violet':'engine-cyan';
+          if(!rasterEffekt(g,key,x-Math.sin(s.w)*ah,y+Math.cos(s.w)*ah,ah*2,Math.max(4,kern*3*af),s.w-Math.PI/2,.42*af))
+            glut(g, x - Math.sin(s.w) * ah, y + Math.cos(s.w) * ah,
+                 kern * ast.laenge * af, ast.farbe, 0.42 * af);
         }
       }
       g.globalCompositeOperation = 'source-over';
@@ -44847,8 +45393,11 @@ async function claimPendingRewards(){
           if (s.muendung > 0.02){
             var mf = s.muendung, mn = (d0.gr * 6 + 3) * schiffSkala;
             g.globalCompositeOperation = 'lighter';
-            glut(g, x + Math.sin(s.w) * mn, y - Math.cos(s.w) * mn,
-                 (1.8 + d0.gr * 3.2) * schiffSkala * (0.6 + mf), F.gold, Math.min(1, 0.75 * mf));
+
+            var muzzle=(1.8+d0.gr*3.2)*schiffSkala*(.6+mf);
+            if(!rasterEffekt(g,'impact-amber',x+Math.sin(s.w)*mn,y-Math.cos(s.w)*mn,muzzle*2,muzzle*2,0,Math.min(1,.75*mf)))
+              glut(g, x + Math.sin(s.w) * mn, y - Math.cos(s.w) * mn,
+                   (1.8 + d0.gr * 3.2) * schiffSkala * (0.6 + mf), F.gold, Math.min(1, 0.75 * mf));
             g.globalCompositeOperation = 'source-over';
           }
           zeichneSchiff(g, atlas, x, y, s.w);
@@ -44860,15 +45409,18 @@ async function claimPendingRewards(){
             g.globalCompositeOperation = 'lighter';
             g.strokeStyle = rgba(F.vio, Math.min(0.85, 0.75 * pf));
             g.lineWidth = Math.max(0.8, 1.5 * schiffSkala * pf);
-            g.beginPath(); g.arc(x, y, pr, 0, TAU); g.stroke();
-            glut(g, x, y, pr * 0.7, F.flieder, 0.30 * pf);
+
+            if(!rasterEffekt(g,'shield-hit',x,y,pr*2,pr*2,0,Math.min(.85,.75*pf))){
+              g.beginPath(); g.arc(x, y, pr, 0, TAU); g.stroke();
+              glut(g, x, y, pr * 0.7, F.flieder, 0.30 * pf);
+            }
             g.globalCompositeOperation = 'source-over';
           }
           if (s.schaden){
             var fl = 0.45 + 0.55 * Math.sin(tSim * 13 + s.ph * 3);
             if (fl > 0.35){
               g.globalCompositeOperation = 'lighter';
-              glut(g, x, y, 4.6 * bodenSkala * fl, F.gold, 0.55 * fl);
+              if(!rasterEffekt(g,'impact-amber',x,y,9.2*bodenSkala*fl,9.2*bodenSkala*fl,0,.55*fl))glut(g, x, y, 4.6 * bodenSkala * fl, F.gold, 0.55 * fl);
               g.globalCompositeOperation = 'source-over';
             }
           }
@@ -44909,7 +45461,16 @@ async function claimPendingRewards(){
       }
     }
 
+
     function zeichneGeschosse(g){
+      // Original projectile positions/lifetimes are read, never advanced here.
+      var salvenRaster=!!combatRasterImage('pulse-cyan',offen);
+      if(salvenRaster)for(var sp=0;sp<geschosse.length;sp++){
+        var shot=geschosse[sp];if(shot.typ!=='spur'||shot.t<0)continue;
+        var sx=pxX(shot.u,shot.a),sy=pxY(shot.u,shot.a),svx=shot.vu*kU,svy=-shot.va*kA,sd=Math.sqrt(svx*svx+svy*svy)||1;
+        rasterEffekt(g,shot.farbe===F_VER0?'pulse-red':'pulse-cyan',sx-svx/sd*shot.len*.4,sy-svy/sd*shot.len*.4,Math.max(8,shot.len),Math.max(2.4,shot.len*.24),Math.atan2(svy,svx),.8,shot.farbe,.6);
+      }
+
       /* Leichte Spuren gebuendelt: zwei Pfade statt hunderter Einzelzuege. */
       var seiten = [[F.an, 0], [F.ver, 1]];
       for (var s = 0; s < 2; s++){
@@ -44920,7 +45481,7 @@ async function claimPendingRewards(){
         var gab = false;
         for (var i = 0; i < geschosse.length; i++){
           var gg = geschosse[i];
-          if (gg.typ !== 'spur' || gg.farbe !== farbe || gg.t < 0) continue;
+          if (salvenRaster || gg.typ !== 'spur' || gg.farbe !== farbe || gg.t < 0) continue;
           var x = pxX(gg.u, gg.a), y = pxY(gg.u, gg.a);
           var vx = gg.vu * kU, vy = -gg.va * kA;
           var m = Math.sqrt(vx*vx + vy*vy) || 1;
@@ -44934,7 +45495,11 @@ async function claimPendingRewards(){
         var q = geschosse[j];
         if (q.t < 0) continue;
         if (q.typ === 'spur') continue;
+
         if (q.typ === 'strahl'){
+          var beamDx=q.x1-q.x0,beamDy=q.y1-q.y0,beamLength=Math.sqrt(beamDx*beamDx+beamDy*beamDy);
+          if(rasterEffekt(g,'lance-blue',(q.x0+q.x1)/2,(q.y0+q.y1)/2,Math.max(2,beamLength),Math.max(3,bodenSkala*3),Math.atan2(beamDy,beamDx),1-q.t/q.dauer,F.ver,.7))continue;
+
           var rest = 1 - q.t / q.dauer;
           g.strokeStyle = rgba(F.ver, 0.5 * rest); g.lineWidth = 2.4;
           g.beginPath(); g.moveTo(q.x0, q.y0); g.lineTo(q.x1, q.y1); g.stroke();
@@ -44948,6 +45513,11 @@ async function claimPendingRewards(){
         var x2 = pxX(q.u, q.a), y2 = pxY(q.u, q.a);
         var vx2 = q.vu * kU, vy2 = -q.va * kA;
         var m2 = Math.sqrt(vx2*vx2 + vy2*vy2) || 1;
+
+        var angle=Math.atan2(vy2,vx2),key=q.typ==='plasma'?'plasma-amber':q.typ==='gauss'||q.typ==='lanze'?'lance-blue':q.typ==='rakete'||q.typ==='schifftorpedo'||q.typ==='torpedo'?'torpedo':null;
+        var length=q.typ==='lanze'?22*schiffSkala:q.typ==='gauss'?q.len:q.typ==='plasma'?q.dick*bodenSkala*3:q.typ==='schifftorpedo'?12*schiffSkala:q.typ==='rakete'?q.len*bodenSkala*1.8:Math.max(9,q.dick*bodenSkala*2.6);
+        var thickness=q.typ==='plasma'?Math.max(5,q.dick*bodenSkala*1.6):q.typ==='lanze'?Math.max(3,3.4*schiffSkala):Math.max(3,length*.32);
+        if(key&&rasterEffekt(g,key,x2-vx2/m2*length*.35,y2-vy2/m2*length*.35,length,thickness,angle,.95,q.farbe||F.ver,.7))continue;
         if (q.typ === 'plasma'){
           g.globalCompositeOperation = 'lighter';
           glut(g, x2, y2, q.dick * bodenSkala * (1.1 + 0.15*Math.sin(tSim*20)), F.warn, 0.95);
@@ -45014,6 +45584,8 @@ async function claimPendingRewards(){
         var f = funken[i];
         var rest = 1 - f.t / f.dauer;
         var x = pxX(f.u, f.a), y = pxY(f.u, f.a);
+
+        if(rasterEffekt(g,f.farbe===F.gold||f.farbe===F.warn?'impact-amber':'impact-cyan',x,y,f.gr*3,f.gr*3,0,.75*rest))continue;
         g.fillStyle = rgba(f.farbe, 0.75 * rest);
         g.fillRect(x - f.gr/2, y - f.gr/2, f.gr, f.gr);
       }
@@ -45029,6 +45601,8 @@ async function claimPendingRewards(){
         var p = t.t / t.dauer, rest = 1 - p;
         var x = pxX(t.u, t.a), y = pxY(t.u, t.a);
         var r = (2.6 + 7.5 * t.st) * schiffSkala * (0.55 + p * 0.9);
+
+        if(rasterEffekt(g,t.farbe===F.warn||t.farbe===F.gold?'impact-amber':'impact-cyan',x,y,r*2,r*2,0,rest*(.5+.45*t.st),t.farbe,.7))continue;
         glut(g, x, y, r, t.farbe, rest * (0.5 + 0.45 * t.st));
         if (t.st >= 0.8){
           g.fillStyle = 'rgba(255,255,255,' + (rest * 0.85).toFixed(3) + ')';
@@ -45042,7 +45616,14 @@ async function claimPendingRewards(){
         var p2 = b.t / b.dauer;
         var x = pxX(b.u, b.a), y = pxY(b.u, b.a);
         var r = (5 + 34 * b.st) * bodenSkala * (0.3 + p2 * 1.5);
-        glut(g, x, y, r, b.farbe, (1 - p2) * (0.55 + 0.45*b.st));
+
+        var frame=b.farbe===F.vio&&b.ring?'shield-break':p2<.25?'explosion-early':p2<.60?'explosion-mid':'explosion-late';
+        var raster=rasterEffekt(g,frame,x,y,r*2,r*2,0,(1-p2)*(.55+.45*b.st));
+        if(raster&&p2>.45){
+          g.save();g.globalCompositeOperation='source-over';
+          rasterEffekt(g,'smoke',x,y-r*.15,r*2.2,r*2.2,0,(1-p2)*.45);g.restore();
+        }
+        if(!raster)glut(g, x, y, r, b.farbe, (1 - p2) * (0.55 + 0.45*b.st));
         /* Blendkern: nur im ersten Drittel, dafuer rein weiss und deutlich kleiner als der
            Feuerball. Das Auge liest die Reihenfolge weiss -> gold -> aus als Hitze, die
            abkuehlt; ein Feuerball, der von Anfang an golden ist, wirkt wie eine Lampe. */
@@ -45674,7 +46255,12 @@ async function claimPendingRewards(){
       var puls = 0.8 + 0.2 * Math.sin(tSim * 2.4);
       var hoehe = H * 0.30 * (0.30 + 0.70 * st);
       var breite = Math.max(3, hoehe * 0.15 * (0.35 + 0.65 * st));
+
       g.save();
+      if(rasterEffekt(g,'riss',x,y,hoehe*.60,hoehe,0,klemme(.45+.55*st*puls,0,1),F.ver,1.5)){
+        if(RISS.prall>.03)rasterEffekt(g,'shield-hit',x,y,hoehe*.55,hoehe*.55,0,Math.min(.85,.8*RISS.prall));
+        g.restore();return;
+      }
       g.globalCompositeOperation = 'lighter';
       glut(g, x, y, hoehe * 0.5 * puls, F.vio, (0.16 + 0.20 * st) * puls);
       g.globalCompositeOperation = 'source-over';
@@ -45749,7 +46335,17 @@ async function claimPendingRewards(){
       var s = H * 0.085 * (0.6 + 0.4 * anteil);
       var puls = 0.8 + 0.2 * Math.sin(tSim * 1.9);
       var kante = klemme(0.45 + 0.5 * anteil * puls, 0, 1);
+
       g.save();
+      var bossArt=Object.prototype.hasOwnProperty.call(COMBAT_RASTER_ART,BOSS.key)?BOSS.key:'generisch';
+      var crop=COMBAT_RASTER_ART[bossArt].rect,longest=s*3.1;
+      var bw=crop[2]>=crop[3]?longest:longest*crop[2]/crop[3],bh=crop[3]>=crop[2]?longest:longest*crop[3]/crop[2];
+      if(rasterEffekt(g,bossArt,x,y,bw,bh,0,klemme(.65+.35*anteil*puls,0,1),F.ver,Math.max(1,.6+1.6*anteil))){
+        if(anteil<.7)rasterEffekt(g,'impact-amber',x-s*.15,y+s*.10,s*.7,s*.7,0,(1-anteil)*.45);
+        if(anteil<.4){g.globalCompositeOperation='source-over';rasterEffekt(g,'smoke',x+s*.2,y-s*.2,s*1.2,s*1.2,0,(1-anteil)*.45);}
+        if(BOSS.prall>.03)rasterEffekt(g,'shield-hit',x,y,s*2.6,s*2.6,0,Math.min(.85,.8*BOSS.prall));
+        g.restore();return;
+      }
       g.globalCompositeOperation = 'lighter';
       glut(g, x, y, s * 1.8 * puls, F.ver, (0.10 + 0.14 * anteil) * puls);
       g.globalCompositeOperation = 'source-over';
@@ -46792,6 +47388,7 @@ async function claimPendingRewards(){
       if (!d || !d.abspielbar || !d.angreifer || !d.verteidiger) return false;
 
       offen = true;
+      rasterGemalt={};rasterAngefordert={};rasterFragmente=0;rasterFragmentKeys={};
       berichtUebernehmen(d);
 
       /* REIHENFOLGE - und der Grund, warum sie sich am 03.08.2026 geaendert hat:
@@ -46937,7 +47534,7 @@ async function claimPendingRewards(){
           if (!flotte[k][fq].tot && ANTRIEB_STIL[flotte[k][fq].antrieb]) fahnen++;
         }
       }
-      return { massstab: MASSSTAB, massA: SEITEN_MASS.A, massD: SEITEN_MASS.D,
+      return { artRaster: rasterAuskunft(), massstab: MASSSTAB, massA: SEITEN_MASS.A, massD: SEITEN_MASS.D,
                t: Math.round(tSim * 10) / 10,
                geschossArten: arten, antriebsfahnen: fahnen, plakettePunkte: plakettePunkte(),
                vorraete: { geschosse: geschosse.length, funken: funken.length,
@@ -47166,6 +47763,10 @@ async function claimPendingRewards(){
       });
     }
 
+    onCombatRasterReady(()=>{
+      if(!offen)return;
+      zeichne();zustandSchreiben();
+    });
     onShipRasterReady(()=>{
       if(!offen)return;
       spielSprites={};plaketteMass=undefined;atlantenBauen();zeichne();zustandSchreiben();
@@ -65799,16 +66400,21 @@ async function claimPendingRewards(){
     const present = order.filter(k => totals[k] > 0);
     const perRow = 4, cell = 225, iconS = 118;
     let y = 265+oy;
+    // Export is an explicit demand: wait for the shared native decoder before
+    // taking an immutable PNG, so a first export cannot capture loading hulls.
+    const visibleKeys=present.slice(0,16);
+    await Promise.all([...new Set(visibleKeys.map(k=>SHIP_RASTER_ART[k]?.stem).filter(Boolean))].map(stem=>{
+      const key=visibleKeys.find(k=>SHIP_RASTER_ART[k]?.stem===stem);
+      shipRasterImage(key,true);return shipRasterImages.get(stem)?.done;
+    }));
     for (let i=0; i<present.length && i<16; i+=perRow){
       const row = present.slice(i, i+perRow);
       let x = (W - row.length*cell)/2 + cell/2;
       for (const k of row){
-        const iconKey = (shipDefOrSuper(k)||{}).icon;
         try {
-          if (iconKey && ICONS[iconKey]){
-            const img = await loadSvgAsImage(ICONS[iconKey]);
-            ctx.drawImage(img, x-iconS/2, y, iconS, iconS);
-          }
+          const hull=document.createElement('canvas');hull.width=hull.height=236;
+          drawShipMiniIcon(k,hull);
+          ctx.drawImage(hull, x-iconS/2, y, iconS, iconS);
         } catch(e){}
         ctx.fillStyle = '#e8e9f0';
         ctx.font = '600 34px '+SHARE_FONT_MONO;
@@ -69093,7 +69699,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
       saveShipRasterBake('map|'+merk,[bake.key],cv);
     }
   });
-  function flottenBildUrl(key){
+  function flottenBildUrl(key,fremd=false){
     /* DER ANSTRICH GEHOERT IN DEN SCHLUESSEL (Durchsicht 07.09.2026). drawShipMiniIcon liest
        activeShipSkinStops() - der Lack ist ins Bild eingebrannt. Mit `key` allein bliebe eine
        fliegende Flotte nach einem Lackwechsel bis zum Neuladen grau. Dieselbe Regel steht schon
@@ -69107,15 +69713,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
        vorhandenen Aufrufer pruefen das; dieser tut es jetzt auch. Wichtig fuer KA-3: Die
        Zusammensetzung kommt dort aus dem Spielstand eines FREMDEN Clients und ist ungeprueft. */
     if (!SHIP_HULL_DEFS[key] || typeof drawShipMiniIcon !== 'function') return null;
-    const merk = ((state && state.shipSkin) || 'standard') + '|' + key;
+    const merk = (fremd?'neutral':((state && state.shipSkin) || 'standard')) + '|' + key;
     if (!(merk in FLOTTE_BILD_CACHE)){
       try {
         const cv = document.createElement('canvas'); cv.width = FLOTTE_BILD; cv.height = FLOTTE_BILD;
         if (!cv.getContext('2d')) throw new Error('kein 2D-Context');
         cv.dataset.shipRasterLoad='defer';
-        drawShipMiniIcon(key, cv, 1);
+        drawShipMiniIcon(key, cv, 1, fremd);
         FLOTTE_BILD_CACHE[merk] = cv.toDataURL();
-        flottenRasterBakes.set(merk,{key,stops:activeShipSkinStops()||undefined});
+        flottenRasterBakes.set(merk,{key,stops:fremd?undefined:(activeShipSkinStops()||undefined)});
         saveShipRasterBake('map|'+merk,[key],cv);
       } catch(e){ FLOTTE_BILD_CACHE[merk] = null; }
     }
@@ -69210,8 +69816,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const bergbau = !!bergbauArt && istBergbauflotte(comp);
     const anzahl = flottenSchiffe(comp);
     const key = flottenFlaggschiff(comp);
-    const url = key ? flottenBildUrl(key) : null;
-    const rasterAttrs=key?shipRasterBakeAttributes('map|'+((state&&state.shipSkin)||'standard')+'|'+key):'';
+    const fremd=!!m.fremd;
+    const url = key ? flottenBildUrl(key,fremd) : null;
+    const rasterAttrs=key?shipRasterBakeAttributes('map|'+(fremd?'neutral':((state&&state.shipSkin)||'standard'))+'|'+key):'';
     const px = x.toFixed(1), py = y.toFixed(1);
     if (!url){
       return `<circle cx="${px}" cy="${py}" r="9" fill="${farbe}" opacity="0.18" pointer-events="none"/>`
@@ -69299,7 +69906,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const art = MISSION_KAMPF[m.type];
     kampfAnimationen.push({
       nr: ++kampfZaehler, farbe: art.farbe, was: art.was, bis: Date.now() + KAMPF_DAUER_MS,
-      m: { type: m.type, targetId: m.targetId, system: m.system, nestId: m.nestId, zielId: m.zielId, platz: m.platz }
+      m: { type: m.type, targetId: m.targetId, system: m.system, nestId: m.nestId, zielId: m.zielId, platz: m.platz },
+      composition:Object.fromEntries(Object.entries(m.composition||(m.shipKey?{[m.shipKey]:m.qty}:{}))
+        .map(([key,qty])=>[key,Number(qty)]).filter(([key,qty])=>Object.prototype.hasOwnProperty.call(SHIP_HULL_DEFS,key)&&Number.isFinite(qty)&&qty>0))
     });
     // Deckel gegen einen Verband, der mit vielen Missionen gleichzeitig eintrifft.
     if (kampfAnimationen.length > 8) kampfAnimationen = kampfAnimationen.slice(-8);
@@ -69309,6 +69918,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
     if (kampfAnimationen.some(k => k.bis <= jetzt)) kampfAnimationen = kampfAnimationen.filter(k => k.bis > jetzt);
     return kampfAnimationen;
   }
+  function mapCombatFx(key,x,y,width,height,angle,reduziert,phase,delay){
+    const svg=document.getElementById('galaxyMapSvg');
+    const url=combatRasterDataUrl(key,!!svg&&shipRasterVisible(svg));
+    const pulse=reduziert?'':`<animate attributeName="opacity" values="0;1;0;0;0;0" dur="1.4s" begin="${(-phase+delay).toFixed(2)}s" repeatCount="indefinite"/>`;
+    const fallback=key==='lance-blue'
+      ? `<line data-map-combat-fallback="1" x1="${(-width/2).toFixed(1)}" y1="0" x2="${(width/2).toFixed(1)}" y2="0" stroke="#ffd08a" stroke-width="1.1" stroke-linecap="round" opacity="${reduziert?'0.6':'0'}" pointer-events="none">${pulse}</line>`
+      : `<circle data-map-combat-fallback="1" cx="0" cy="0" r="${(width/3).toFixed(1)}" fill="#ffd08a" opacity="${reduziert?'0.35':'0'}" pointer-events="none">${pulse}</circle>`;
+    return `<g data-map-combat-fx="${key}" data-fx-ready="${!!url}" transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${angle.toFixed(1)})" pointer-events="none">`
+      + `<image data-map-combat-art="${key}" ${url?`href="${url}"`:''} x="${(-width/2).toFixed(1)}" y="${(-height/2).toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" opacity="${reduziert?'0.65':'0'}" ${url?'':'style="display:none"'} pointer-events="none">${pulse}</image>`
+      + (url?'':fallback) + '</g>';
+  }
+  onCombatRasterReady(()=>{
+    for(const image of document.querySelectorAll('svg image[data-map-combat-art]')){
+      const url=combatRasterDataUrl(image.dataset.mapCombatArt);
+      if(!url)continue;
+      image.setAttribute('href',url);image.style.removeProperty('display');
+      image.parentElement.dataset.fxReady='true';
+      image.parentElement.querySelector('[data-map-combat-fallback]')?.remove();
+    }
+  });
   const MISSION_LINIEN = {
     /* `sprungtor:true` heisst: DIESE Art fliegt wirklich durch ein Sprungtor im Zielsystem - ihre
        Flugzeit traegt den Vorposten-Faktor. SEIT DEM 15.09.2026 IST DAS EINE ABLEITBARE FRAGE
@@ -71077,7 +71706,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         ? (f.type === 'attack' ? 'Angriff (NPC)' : ((MISSION_LINIEN[f.type] || {}).was || f.type))
         : 'unbekannt';
       const marke = f.detectLevel >= 4
-        ? flottenMarke({ composition: f.composition }, fx, fy, winkel, '#c3bef5')
+        ? flottenMarke({ composition: f.composition,fremd:true }, fx, fy, winkel, '#c3bef5')
         : `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="4.5" fill="#c3bef5" fill-opacity="0.75" pointer-events="none"/>`;
       inner += `
         <line x1="${vonX.toFixed(1)}" y1="${vonY.toFixed(1)}" x2="${nachX.toFixed(1)}" y2="${nachY.toFixed(1)}" stroke="#c3bef5" stroke-opacity="0.32" stroke-width="1.3" stroke-dasharray="4,4" pointer-events="none"/>
@@ -71105,23 +71734,25 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const ax = zx + (wx/wl) * 26, ay = zy + (wy/wl) * 26;
       const winkel = Math.atan2(zy - ay, zx - ax) * 180/Math.PI + 90;
       const quer = { x: -(zy - ay)/26, y: (zx - ax)/26 };
-      let g = '';
-      for (let i = 0; i < 3; i++){
-        const v = (i - 1) * 9;
+      const keys=Object.keys(k.composition).sort((a,b)=>(SHIP_SCORE_WEIGHTS[b]||0)-(SHIP_SCORE_WEIGHTS[a]||0));
+      const models=keys.slice(0,3);
+      for(const key of keys){const count=Math.min(3-models.length,Math.max(0,Math.ceil(k.composition[key])-1));for(let i=0;i<count;i++)models.push(key);if(models.length===3)break;}
+      const reduziert=kbBewegungAus(),phase=(KAMPF_DAUER_MS-(k.bis-now))/1000;
+      let g = `<g data-map-kampf="${k.nr}" data-map-kampf-modelle="${models.join(',')}" data-map-kampf-reduziert="${reduziert}" pointer-events="none">`;
+      for (let i = 0; i < models.length; i++){
+        const key=models[i],v = (i - (models.length-1)/2) * 11;
         const sx = ax + quer.x * v, sy = ay + quer.y * v;
+        const url=flottenBildUrl(key),merk=((state&&state.shipSkin)||'standard')+'|'+key;
         g += `<g transform="translate(${sx.toFixed(1)},${sy.toFixed(1)}) rotate(${winkel.toFixed(1)})" pointer-events="none">`
-           + `<polygon points="0,-5 3.5,4 0,1.5 -3.5,4" fill="${k.farbe}"/></g>`;
-        // Die Salve: ein kurzer Strich vom Schiff zum Ziel, im Wechsel, damit es ein Schlagabtausch
-        // wird und kein Dauerfeuer.
-        g += `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${zx.toFixed(1)}" y2="${zy.toFixed(1)}"`
-           + ` stroke="#ffd08a" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0" pointer-events="none">`
-           + `<animate attributeName="stroke-opacity" values="0;1;0;0;0;0" dur="1.4s" begin="${(i*0.35).toFixed(2)}s" repeatCount="indefinite"/></line>`;
+           + (url?`<image data-map-kampf-schiff="${key}" href="${url}" ${shipRasterBakeAttributes('map|'+merk)} x="-10" y="-10" width="20" height="20" transform="rotate(-90)" pointer-events="none"/>`
+             : `<polygon points="0,-5 3.5,4 0,1.5 -3.5,4" fill="${k.farbe}"/>`)+'</g>';
+        const laenge=Math.hypot(zx-sx,zy-sy),richtung=Math.atan2(zy-sy,zx-sx)*180/Math.PI;
+        g+=mapCombatFx('lance-blue',(sx+zx)/2,(sy+zy)/2,laenge,5,richtung,reduziert,phase,i*.35);
       }
-      // Der Einschlag am Ziel.
-      g += `<circle cx="${zx.toFixed(1)}" cy="${zy.toFixed(1)}" r="0" fill="${k.farbe}" fill-opacity="0.55" pointer-events="none">`
-         + `<animate attributeName="r" values="0;10;0" dur="1.4s" repeatCount="indefinite"/></circle>`;
+      // An old mission without composition reveals no invented ship class.
+      g+=mapCombatFx('impact-amber',zx,zy,20,20,0,reduziert,phase,.3);
       g += `<text class="planet-label" pointer-events="none" x="${zx.toFixed(1)}" y="${(zy - 20).toFixed(1)}" text-anchor="middle" style="fill:${k.farbe}; font-size:7.5px; font-weight:600;">GEFECHT</text>`;
-      inner += g;
+      inner += g+'</g>';
     }
     // Allianzbasis: unübersehbare Groß-Struktur in ihrem gewählten System (nur für Mitglieder der
     // eigenen Allianz sichtbar). Das SVG-Modell wächst mit jeder Ausbaustufe (siehe
