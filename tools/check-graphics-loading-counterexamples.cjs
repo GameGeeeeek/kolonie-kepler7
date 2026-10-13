@@ -19,7 +19,7 @@ const actualMemberFinal="if(element.isConnected&&!(asset[0]==='#allianceHeroBann
 const actualMemberRefresh='if(!entry){';
 function eagerCanvases(input){const a=input.indexOf('    function shipRasterVisible(canvas){'),b=input.indexOf('\n    // A cached Canvas',a);assert(a>=0&&b>a,'the actual bounded native ship viewport gate');return input.slice(0,a)+'    function shipRasterVisible(canvas){return true;}'+input.slice(b);}
 const cases=[
- {name:'eager-offscreen',source:()=>eagerCanvases(replace(source,'if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.observe(element);','if(gfxAssetIntersectionObserver)gfxAssetActivate(element);')),failed:[labels.startup,labels.dormantImages,labels.dormantAtlases,labels.orbitalScroll,labels.orbitalRequest,labels.worldScroll,labels.alliance,labels.railDormant,labels.railScroll,labels.allianceFallback,labels.allianceMember]},
+ {name:'eager-offscreen',source:()=>eagerCanvases(replace(source,'if(gfxAssetIntersectionObserver)gfxAssetIntersectionObserver.observe(element);','if(gfxAssetIntersectionObserver)gfxAssetActivate(element);')),failed:[labels.startup,labels.dormantImages,labels.dormantAtlases,labels.orbitalScroll,labels.orbitalRequest,labels.worldScroll,labels.hiddenFleetNetwork,labels.alliance,labels.fleet,labels.railDormant,labels.railScroll,labels.allianceFallback,labels.allianceMember]},
  // The old six-image factory requests hidden PNGs and loses the canonical
  // canvases. The independently deferred shared-atlas rail remains checked.
  {name:'hidden-fleet',source:()=>replace(source,hiddenGood,hiddenOld),failed:[labels.hiddenFleetMarkup,labels.hiddenFleetNetwork,labels.fleetThumbnails]},
