@@ -12596,17 +12596,21 @@ k7InitialStaticText();
     function shipRasterBakeAttributes(id){
       const bake=shipRasterBakedArt.get(id);if(!bake)return '';
       observeShipRasterBakes();
-      const art=bake.art;
-      return `data-ship-baked="${escapeHtml(id)}" data-ship-key="${bake.keys.join(',')}" data-ship-art="${art.shipArt||'fallback'}" data-ship-art-ready="${art.shipArtReady||'false'}"`
-        +(art.shipAtlas?` data-ship-atlas="${art.shipAtlas}" data-ship-crop="${art.shipCrop}" data-ship-format="${art.shipFormat}"`:'');
+      // Image readiness updates the existing consumer, never a cached list's
+      // authored HTML signature. The identity and class remain stable while loading.
+      return `data-ship-baked="${escapeHtml(id)}" data-ship-key="${bake.keys.join(',')}"`;
+    }
+    function syncShipRasterBakeArt(node,art){
+      for(const name of ['shipArt','shipArtReady','shipAtlas','shipCrop','shipFormat']){
+        const value=art[name];if(value===undefined)delete node.dataset[name];else if(node.dataset[name]!==value)node.dataset[name]=value;
+      }
+      if(art.shipArtReady==='true'&&shipRasterBakeObserver){shipRasterBakeObserver.unobserve(node);shipRasterBakeTargets.delete(node);}
     }
     function saveShipRasterBake(id,keys,canvas){
-      shipRasterBakedArt.set(id,{keys,art:{...canvas.dataset}});
+      const art={...canvas.dataset};
+      shipRasterBakedArt.set(id,{keys,art});
       for(const node of document.querySelectorAll('[data-ship-baked]'))if(node.dataset.shipBaked===id){
-        for(const name of ['shipArt','shipArtReady','shipAtlas','shipCrop','shipFormat']){
-          const value=canvas.dataset[name];if(value===undefined)delete node.dataset[name];else if(node.dataset[name]!==value)node.dataset[name]=value;
-        }
-        if(canvas.dataset.shipArtReady==='true'&&shipRasterBakeObserver){shipRasterBakeObserver.unobserve(node);shipRasterBakeTargets.delete(node);}
+        syncShipRasterBakeArt(node,art);
       }
     }
     function watchShipRasterBakeNode(node,id,onVisible){
@@ -12623,7 +12627,7 @@ k7InitialStaticText();
       if(shipRasterBakeMutations)return;
       const request=node=>{const bake=shipRasterBakedArt.get(node.dataset.shipBaked);if(bake&&shipRasterVisible(node)){for(const key of bake.keys)shipRasterImage(key,true);if(bake.onVisible)bake.onVisible();}};
       if(typeof IntersectionObserver==='function')shipRasterBakeObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)request(entry.target);},{rootMargin:'200px'});
-      const scan=root=>{if(root.nodeType!==1)return;const nodes=root.matches('[data-ship-baked]')?[root]:[];nodes.push(...root.querySelectorAll('[data-ship-baked]'));for(const node of nodes)if(node.dataset.shipArtReady!=='true'){if(shipRasterBakeObserver){shipRasterBakeTargets.add(node);shipRasterBakeObserver.observe(node);}else request(node);}};
+      const scan=root=>{if(root.nodeType!==1)return;const nodes=root.matches('[data-ship-baked]')?[root]:[];nodes.push(...root.querySelectorAll('[data-ship-baked]'));for(const node of nodes){const bake=shipRasterBakedArt.get(node.dataset.shipBaked);if(bake)syncShipRasterBakeArt(node,bake.art);if(node.dataset.shipArtReady!=='true'){if(shipRasterBakeObserver){shipRasterBakeTargets.add(node);shipRasterBakeObserver.observe(node);}else request(node);}}};
       if(typeof MutationObserver==='function'){
         shipRasterBakeMutations=new MutationObserver(records=>{for(const node of shipRasterBakeTargets)if(!node.isConnected){shipRasterBakeObserver.unobserve(node);shipRasterBakeTargets.delete(node);}for(const record of records){if(record.type==='attributes')scan(record.target);else for(const node of record.addedNodes)scan(node);}});
         shipRasterBakeMutations.observe(document.body,{childList:true,subtree:true,...(!shipRasterBakeObserver?{attributes:true,attributeFilter:['class','style','hidden']}: {})});
