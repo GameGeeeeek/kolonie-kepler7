@@ -75352,7 +75352,9 @@ document.addEventListener('keydown',event=>{
     const spec={building:['buildings','data-build'],ship:['fleet','data-buyship'],defense:['defenseBuildings','data-build'],research:['research','data-research'],researchqueue:['research','data-research-queue']}[kind];
     if (!spec) return null;
     const root = document.getElementById(spec[0]);
-    return root && root.querySelector('['+spec[1]+'="'+key+'"]');
+    // A locked facility has a native unlock action instead of its build action.
+    // Keep the primary action first, including when it is disabled.
+    return root && (root.querySelector('['+spec[1]+'="'+key+'"]') || (['building','defense','ship'].includes(kind) ? root.querySelector('[data-unlock="'+key+'"]') : null));
   }
   function gfxForwardBuild(kind,key){
     // Resolve again on activation: a location, quantity, unlock or queue may have changed.
