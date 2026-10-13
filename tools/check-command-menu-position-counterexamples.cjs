@@ -64,7 +64,10 @@ const cases=[
   'max-height:calc(100dvh - var(--command-header-height,64px) - var(--command-status-height));'),
   failed:[[844,390],[390,360]].map(([width,height])=>'top '+width+'x'+height+' native basis build remains physically reachable on a short display')},
  {name:'nested-sticky',css:()=>replaceCss('position:static; top:auto; z-index:auto;',''),
-  failed:['top account entry remains physically reachable after short and 320px resizes']}
+  failed:['top account entry remains physically reachable after short and 320px resizes']},
+ {name:'font-floor',css:()=>replaceCss('font-size:12px; letter-spacing:-.01em; overflow-wrap:normal; word-break:normal; hyphens:auto;',
+  'font-size:11px; letter-spacing:-.01em; overflow-wrap:normal; word-break:normal; hyphens:auto;'),
+  failed:[756,390,320].flatMap(width=>TABS.map(key=>'top '+width+' native pointer opens '+key))}
 ];
 const requested=process.argv.slice(2);
 assert(requested.every(name=>cases.some(item=>item.name===name)),'unknown menu-position counterexample');
