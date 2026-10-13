@@ -37,7 +37,13 @@ async function canonicalPlanetPixels(page,selector,key){
    // Chromium's48px minification differs between an IMG and a scratch Canvas.
    // Compare the actual decoded image with its independent crop at native
    // resolution. The other planet is projected only for the distinctness check.
-   const expected=await crop(art),w=actual.naturalWidth,h=actual.naturalHeight,sameDimensions=w===expected.width&&h===expected.height;
+   const originalCrop=await crop(art);let expected=originalCrop;
+   if(e.localName==='image'){
+    expected=document.createElement('canvas');expected.width=expected.height=64;
+    const scale=Math.min(64/originalCrop.width,64/originalCrop.height);
+    expected.getContext('2d').drawImage(originalCrop,(64-originalCrop.width*scale)/2,(64-originalCrop.height*scale)/2,originalCrop.width*scale,originalCrop.height*scale);
+   }
+   const w=actual.naturalWidth,h=actual.naturalHeight,sameDimensions=w===expected.width&&h===expected.height;
    if(!sameDimensions)return {exists:true,ready,key:e.dataset.gameRasterKey,art:e.dataset.gameArt,tag:e.localName,sameDimensions,natural:[w,h],expected:[expected.width,expected.height]};
    const pixels=image=>{const c=document.createElement('canvas');c.width=w;c.height=h;if(image.width===w&&image.height===h)c.getContext('2d').drawImage(image,0,0);else c.getContext('2d').drawImage(image,0,0,w,h);return c.getContext('2d').getImageData(0,0,w,h).data;};
    const a=pixels(actual),b=expected.getContext('2d').getImageData(0,0,w,h).data,o=pixels(await crop(water));

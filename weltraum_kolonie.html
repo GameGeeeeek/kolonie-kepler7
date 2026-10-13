@@ -10837,6 +10837,7 @@ k7InitialStaticText();
       while(gameRasterTiles.size>GAME_RASTER_TILE_LIMIT){
         const victim=[...gameRasterTiles.keys()].find(k=>!k.startsWith('architecture:'))||gameRasterTiles.keys().next().value;
         gameRasterTiles.delete(victim);gameRasterURLs.delete(victim);
+        gameRasterURLs.delete(victim+'|64');
       }
     }
     function gameRasterBakeSheet(stem,image,format){
@@ -10906,19 +10907,21 @@ k7InitialStaticText();
       if(demand)gameRasterDemand(art);
       return gameRasterTiles.get(key)?.canvas||null;
     }
-    function gameRasterDataUrl(key,demand=false){
+    function gameRasterDataUrl(key,demand=false,pictureSize=0){
       const canvas=gameRasterCanvas(key,demand);if(!canvas)return null;
-      if(!gameRasterURLs.has(key)){
+      const size=key.startsWith('star:')?128:(key.startsWith('planet:')&&pictureSize===64?64:0);
+      const urlKey=size===64?key+'|64':key;
+      if(!gameRasterURLs.has(urlKey)){
         let picture=canvas;
-        if(key.startsWith('star:')){
-          picture=document.createElement('canvas');picture.width=picture.height=128;
+        if(size){
+          picture=document.createElement('canvas');picture.width=picture.height=size;
           const c=picture.getContext('2d');if(!c)return null;
-          const scale=Math.min(128/canvas.width,128/canvas.height);
-          c.drawImage(canvas,(128-canvas.width*scale)/2,(128-canvas.height*scale)/2,canvas.width*scale,canvas.height*scale);
+          const scale=Math.min(size/canvas.width,size/canvas.height);
+          c.drawImage(canvas,(size-canvas.width*scale)/2,(size-canvas.height*scale)/2,canvas.width*scale,canvas.height*scale);
         }
-        gameRasterURLs.set(key,picture.toDataURL('image/png'));
+        gameRasterURLs.set(urlKey,picture.toDataURL('image/png'));
       }
-      return gameRasterURLs.get(key);
+      return gameRasterURLs.get(urlKey);
     }
     function gameArchitectureKey(key,stand){return 'architecture:'+key+':'+((stand|0)+1);}
     function gameRasterDrawArchitecture(c,S,key,stand){
@@ -10951,14 +10954,16 @@ k7InitialStaticText();
       const key=node.dataset.gameRasterKey;
       if(!Object.prototype.hasOwnProperty.call(GAME_RASTER_ART,key))return;
       gameRasterConsumers.set(node,{keys:[key],redraw:()=>{
-        const url=gameRasterDataUrl(key,false);if(!url)return;
+        const size=node.localName==='image'&&key.startsWith('planet:')?64:0;
+        const url=gameRasterDataUrl(key,false,size);if(!url)return;
         const attribute=node.localName==='img'?'src':'href';
         if(node.getAttribute(attribute)!==url)node.setAttribute(attribute,url);
         gameRasterSetData(node,key);
       }});
     }
     function gameRasterHtmlImage(key,attributes,fallbackUrl){
-      return '<img '+gameRasterSvgAttributes(key)+(fallbackUrl?' src="'+escapeHtml(fallbackUrl)+'"':'')+' '+attributes+'>';
+      const url=gameRasterDataUrl(key,false)||fallbackUrl;
+      return '<img '+gameRasterSvgAttributes(key)+(url?' src="'+escapeHtml(url)+'"':'')+' '+attributes+'>';
     }
     function gameRasterDrawMotif(c,key,x,y,w,h,demand=false,alpha=1){
       const tile=gameRasterCanvas(key,demand);if(!tile)return false;
@@ -13540,7 +13545,7 @@ k7InitialStaticText();
     // genau wie PLANET_TEXTURE_CACHE nur einmal pro Typ berechnet, nicht pro Planet.
     const PLANET_TEXTURE_DATAURL_CACHE = {};
     function getPlanetTextureDataUrl(typeKey){
-      const raster=gameRasterDataUrl('planet:'+typeKey,false);if(raster)return raster;
+      const raster=gameRasterDataUrl('planet:'+typeKey,false,64);if(raster)return raster;
       if (!(typeKey in PLANET_TEXTURE_DATAURL_CACHE)){
         try {
           const tex = getPlanetTexture(typeKey);
@@ -13549,11 +13554,11 @@ k7InitialStaticText();
           // quadratischen Mittelausschnitt zuschneiden statt sie später beim Einbetten per <image
           // width/height> verzerren zu lassen - sonst dasselbe "strahlenförmige" Artefakt wie im
           // Bugreport 16.07.2026.
-          const size = tex.height;
+          const sourceSize = tex.height, size = 64;
           const off = document.createElement('canvas'); off.width = size; off.height = size;
           const octx = off.getContext('2d');
           if (!octx) throw new Error('kein 2D-Context');
-          octx.drawImage(tex, (tex.width-size)/2, 0, size, size, 0, 0, size, size);
+          octx.drawImage(tex, (tex.width-sourceSize)/2, 0, sourceSize, sourceSize, 0, 0, size, size);
           PLANET_TEXTURE_DATAURL_CACHE[typeKey] = off.toDataURL();
         }
         catch(e){ PLANET_TEXTURE_DATAURL_CACHE[typeKey] = null; }

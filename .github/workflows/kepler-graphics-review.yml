@@ -63,6 +63,8 @@ on:
       - tests/test_combat_raster_art.js
       - tests/test_remaining_raster_art.js
       - tools/check-remaining-raster-art-counterexamples.cjs
+      - tools/check-kulissenplanet-cache-counterexample.cjs
+      - tools/check-vorposten-raster-layout-counterexamples.cjs
       - tests/lib/remaining-raster-manifest.json
       - tests/lib/remaining-raster-fixture.js
       - docs/remaining-art-package.json
@@ -324,19 +326,47 @@ jobs:
           node tests/test_remaining_raster_art.js 2>&1 | tee /tmp/kepler-remaining-native.log
           node tools/check-remaining-raster-art-counterexamples.cjs 2>&1 | tee /tmp/kepler-remaining-counter.log
           sha256sum -c /tmp/kepler-remaining-tested-source.txt
+      - name: Original background cache and real texture readiness regression
+        shell: bash
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tools/check-kulissenplanet-cache-counterexample.cjs 2>&1 | tee /tmp/kepler-remaining-background-counter.log
+      - name: Original station facts and canonical raster layout regressions
+        shell: bash
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+        run: |
+          set -euo pipefail
+          node tools/check-vorposten-raster-layout-counterexamples.cjs 2>&1 | tee /tmp/kepler-remaining-outpost-counter.log
       - name: Frozen source must survive every native and controlled fault
         if: always()
         run: sha256sum -c /tmp/kepler-remaining-tested-source.txt
+      - name: Preserve original native evidence inside the workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$GITHUB_WORKSPACE/.remaining-raster-evidence"
+          mkdir -p "$destination"
+          shopt -s nullglob
+          for evidence in "$GITHUB_WORKSPACE"/../remaining-graphics-2026-10-13/remaining-raster-counter-* "$GITHUB_WORKSPACE"/../graphics-complete-2026-10-13/kulissen-cache-counter-* "$GITHUB_WORKSPACE"/../graphics-complete-2026-10-13/vorposten-raster-layout-counter-*; do
+            if [ -d "$evidence" ]; then
+              cp -a -- "$evidence" "$destination/"
+              diff -qr -- "$evidence" "$destination/$(basename "$evidence")"
+            fi
+          done
+          for log in /tmp/kepler-remaining-tested-fe-commit.txt /tmp/kepler-remaining-tested-be-commit.txt /tmp/kepler-remaining-tested-source.txt /tmp/kepler-remaining-native.log /tmp/kepler-remaining-counter.log /tmp/kepler-remaining-background-counter.log /tmp/kepler-remaining-outpost-counter.log; do
+            if [ -f "$log" ]; then
+              cp -a -- "$log" "$destination/"
+              cmp -- "$log" "$destination/$(basename "$log")"
+            fi
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: kepler-remaining-raster-review
-          path: |
-            /tmp/kepler-remaining-tested-fe-commit.txt
-            /tmp/kepler-remaining-tested-be-commit.txt
-            /tmp/kepler-remaining-tested-source.txt
-            /tmp/kepler-remaining-native.log
-            /tmp/kepler-remaining-counter.log
-            ../remaining-graphics-2026-10-13/remaining-raster-counter-*/result.json
-            ../remaining-graphics-2026-10-13/remaining-raster-counter-*/*.log
+          path: .remaining-raster-evidence/
+          include-hidden-files: true
           retention-days: 7
