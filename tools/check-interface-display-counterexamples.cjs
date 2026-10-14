@@ -28,6 +28,13 @@ const before=snapshot(),stamp=new Date().toISOString().replace(/[:.]/g,''),evide
 fs.mkdirSync(evidence,{recursive:true});
 const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-display-'));
 function replace(bytes,old,next){assert.equal(bytes.split(old).length,2,'Unique actual implementation anchor: '+old);return bytes.replace(old,next);}
+// The genuine omitted scroll repair has complete measured manifests on both hosts.
+// Ubuntu's native sticky geometry also covers the 1280px left-menu select.
+const preferenceVisibilityByPlatform={
+ win32:[[390,'left'],[390,'top'],[768,'top'],[1280,'top']],
+ linux:[[390,'left'],[390,'top'],[768,'top'],[1280,'left'],[1280,'top']]
+};
+assert(Object.prototype.hasOwnProperty.call(preferenceVisibilityByPlatform,process.platform),'Preference visibility fault has not been measured on this platform');
 function run(file,style,label){
  const started=Date.now(),result=spawnSync(process.execPath,['tests/http-run.js','test_interface_display.js'],{
   cwd:root,env:{...process.env,KEPLER_SPIELDATEI:file,KEPLER_SHIP_CSS:style||''},encoding:'utf8',timeout:180000,maxBuffer:12*1024*1024});
@@ -67,7 +74,7 @@ const cases=[
  ,{name:'preference-visibility',html:()=>replace(source,
   "if(control.isConnected&&document.activeElement===control)control.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});",
   'void control;'),
-  failed:[[390,'left'],[390,'top'],[768,'top'],[1280,'top']].map(([width,position])=>'display sizes keep native navigation and every building accessible at '+width+' '+position)}
+  failed:preferenceVisibilityByPlatform[process.platform].map(([width,position])=>'display sizes keep native navigation and every building accessible at '+width+' '+position)}
 ];
 const selected=process.argv.slice(2);assert(selected.every(name=>cases.some(c=>c.name===name)),'Unknown genuine display fault');
 const results=[];

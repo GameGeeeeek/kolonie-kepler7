@@ -28,7 +28,7 @@ async function main(){
  const records=[],errors=[],httpErrors=[];
  const check=(name,ok,data)=>{records.push({name,ok:!!ok});console.log((ok?'OK':'FAIL')+' - '+name+(data===undefined?'':' | '+JSON.stringify(data)));};
  async function pointer(locator){
-  await locator.scrollIntoViewIfNeeded();
+  await locator.evaluate(node=>node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
   const point=await locator.evaluate(node=>{const r=node.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;return {x,y,width:r.width,height:r.height,hit:node.contains(document.elementFromPoint(x,y))};});
   assert(point.width>0&&point.height>0&&point.hit,'comparison pointer must hit its real native target: '+JSON.stringify(point));
   await locator.page().mouse.click(point.x,point.y);
