@@ -55,7 +55,8 @@ function stableSkinSave(){
   +slice('  const SHIP_DEFS = [','  k7RegisterDefinitions(SHIP_DEFS);')
   +slice('  const TIER2_DEFS = [','  k7RegisterDefinitions(TIER2_DEFS);')
   +'\n({ships:SHIP_DEFS.map(d=>({key:d.key,requires:d.requires,tiefe:d.tiefe,allianzSchiff:d.allianzSchiff,unlockItems:d.unlockItems,unlockEventParts:d.unlockEventParts,cost:d.costFn(0)})).concat([{key:"superschlachtschiff",cost:superschlachtschiffCost(0)}]),tiers:TIER2_DEFS});',{}, {timeout:1000});
- const s=save({shipSkin:'gold',battleStats:{wins:200,losses:0},shipMarks:{jaeger:8},
+ // The native player filter omits unrelated locked-event countdown rows.
+ const s=save({uiHideLockedShips:true,shipSkin:'gold',battleStats:{wins:200,losses:0},shipMarks:{jaeger:8},
   buildQueue:[],constructionQueue:[],researchQueue:[],activeResearch:null,shipMarkJob:null});
  const tierKeys=new Set(data.tiers.map(d=>d.key));
  const baseCosts=data.ships.flatMap(d=>Object.entries(d.cost).filter(([r])=>!tierKeys.has(r)&&r!=='bergung'&&r!=='protomaterie').map(([,n])=>n));

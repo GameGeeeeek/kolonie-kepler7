@@ -65,7 +65,7 @@ async function run(surface='all'){
    colonyNames:{rhea:'Forschung & <Heimatbasis>'},discovered:{rhea:true},activeBasePlanet:'home',player:{id:'u',name:'Forschung'},
    battlePoints:1234567,xp:64000,lastTick:Date.now()-60000,lastLoginDate:new Date().toDateString(),lastSeenVersion:source.match(/const VERSION\s*=\s*['"]([^'"]+)/)[1],
    // Safe-area geometry requires real quest actions; an unseeded native draw can legitimately contain only tasks without nav.
-   ...(selected.includes('safe')?{dailyQuests:{date:new Date().toDateString(),activeKeys:['research','trade','npc','expedition','battle'],claimed:{},researchCount:0,tradeCount:0,startNpcKills:0,startExpeditions:0,startBattlePoints:1234567}}:{}),
+   ...((selected.includes('safe')||selected.includes('hud'))?{dailyQuests:{date:new Date().toDateString(),activeKeys:['research','trade','npc','expedition','battle'],claimed:{},researchCount:0,tradeCount:0,startNpcKills:0,startExpeditions:0,startBattlePoints:1234567}}:{}),
    ...ruhigeUhren()};
   const store={'kepler7-save-v3':JSON.stringify(fixture)};
   browser=await starteBrowser();const ctx=await browser.newContext({viewport:{width:1487,height:1058},serviceWorkers:'block'});
