@@ -199,7 +199,7 @@ async function main(){
   check(labels.assets,assets.length===1&&assets.every((x,i)=>x.width===pkg.groups[i].width&&x.height===pkg.groups[i].height&&x.webpWidth===x.width&&x.webpHeight===x.height&&x.hashes.every(h=>h.sha256===pkg.groups[i][h.ext+'Sha256'])),assets);
   check(labels.rgba,assets.every(x=>x.alphaDiff===0&&x.opaqueDiff===0&&x.premultMax<=2),assets);
   check(labels.dormant,dormant.length===0,dormant);
-  await openMap(run);await readyMap(run);const normal=[];
+  await prepareDelayedMap(run);await readyMap(run);const normal=[];
   for(const [index,key]of sorts.entries()){const witness=await illustration(run.page,mapNode(index),oracle[key]);normal.push(witness);check(pixelLabel(key),canonical(witness,key,oracle[key]),witness);}
   const geometry=await run.page.locator('#galaxyMapSvg [data-map-asteroid]').evaluateAll(nodes=>nodes.filter(n=>/^\d+$/.test(n.dataset.mapAsteroid)).map(node=>{
    const hit=node.querySelector('rect.kb-treffer'),image=node.querySelector('[data-asteroid-image]'),polygon=node.querySelector('polygon');
