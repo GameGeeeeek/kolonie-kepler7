@@ -88,7 +88,7 @@ function run(name,html=game,serviceWorker=worker){
  const failed=records.filter(r=>!r.ok).map(r=>r.name),summary=output.split(/\r?\n/).filter(line=>/^\d+ checks, \d+ failures$/.test(line));
  assert.deepEqual(summary,[manifest.length+' checks, '+failed.length+' failures'],name+' complete final native summary');
  assert.equal(output.trim().split(/\r?\n/).at(-1),(p.status===0?'OK':'FAIL')+' - Lazy language catalogue',name+' final native result');
- assert(records.filter(r=>/JavaScript|HTTP fixture errors/.test(r.name)).every(r=>r.ok),name+' native JavaScript/HTTP guards must remain green');
+ assert(records.filter(r=>/JavaScript|HTTP fixture errors/.test(r.name)).every(r=>r.ok),name+' native JavaScript/HTTP guards must remain green:\n'+output);
  assert.deepEqual(hashes(),before,name+' frozen game/assets/backend/guards changed');return {name,status:p.status,guards:records.length,failed,log};
 }
 try{

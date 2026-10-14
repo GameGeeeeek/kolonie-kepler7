@@ -1,6 +1,9 @@
 name: Kepler graphics full review
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [ready_for_review, synchronize]
   push:
     branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock, codex/ship-menu-harmony, codex/combat-raster-harmony, codex/remaining-raster-harmony]
     paths:
@@ -109,6 +112,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   complete-suite:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.head_ref == 'codex/interface-clarity')
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +127,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GameGeeeeek/kolonie-kepler7-backend
-          ref: f5d26daecce85d6a85fde3baa8a4d4c8d81ada52
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
           path: .review-backend
           persist-credentials: false
       - uses: actions/setup-node@v4
