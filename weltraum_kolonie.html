@@ -11224,9 +11224,8 @@ k7InitialStaticText();
         document.addEventListener('load',event=>asteroidRasterImageState(event.target,true),true);
         document.addEventListener('error',event=>asteroidRasterImageState(event.target,false),true);
       }
-      const url=gameRasterDataUrl(key,false);
       return `<g data-asteroid-raster="${escapeHtml(key)}" data-asteroid-art-ready="false"><g data-asteroid-fallback="1">${fallback}</g>`
-        + `<image data-asteroid-image="1" ${gameRasterSvgAttributes(key)}${url?' href="'+escapeHtml(url)+'"':''} x="${(cx-r).toFixed(1)}" y="${(cy-r).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*2).toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/></g>`;
+        + `<image data-asteroid-image="1" ${gameRasterSvgAttributes(key)} x="${(cx-r).toFixed(1)}" y="${(cy-r).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*2).toFixed(1)}" preserveAspectRatio="xMidYMid meet" pointer-events="none"/></g>`;
     }
     function asteroidRasterIconHtml(sorte,fallback){
       return '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" style="vertical-align:middle;">'
@@ -74183,6 +74182,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
   // Scheibe und wandern nach unten, Marker-Namen stehen darüber und wandern nach oben) - so bleibt
   // die Zuordnung Label->Objekt erhalten. Die eigene Scheibe ist ausgenommen, sonst schöbe sich
   // jedes Label endlos von sich selbst weg.
+  const kbLabelAusgang = new WeakMap();
   function kbLabelsEntflechten(svg){
     if (!svg) return;
     let texte;
@@ -74261,6 +74261,22 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
     const gesetzt = [];   // schon platzierte Labels - damit das Ausweichen keine Text-Text-Kollision erzeugt
     for (const t of texte){
+      // Dieselben SVG-Knoten bleiben beim Rendern erhalten. Jeden Durchgang an der
+      // gezeichneten Ausgangsstelle und Schrift beginnen, auch nach einem Resize.
+      let ursprung = kbLabelAusgang.get(t);
+      if (!ursprung){
+        ursprung = { x: t.getAttribute('x'), y: t.getAttribute('y'),
+          schrift: t.style.getPropertyValue('font-size'), prioritaet: t.style.getPropertyPriority('font-size') };
+        kbLabelAusgang.set(t, ursprung);
+      }
+      for (const achse of ['x', 'y']){
+        if (ursprung[achse] === null) t.removeAttribute(achse); else t.setAttribute(achse, ursprung[achse]);
+      }
+      const originalSchrift = () => {
+        if (ursprung.schrift) t.style.setProperty('font-size', ursprung.schrift, ursprung.prioritaet);
+        else t.style.removeProperty('font-size');
+      };
+      originalSchrift();
       let b; try { b = t.getBBox(); } catch (e) { continue; }
       if (!b || !b.width) continue;
       const eigen = t.closest(OBJEKTE);
@@ -74299,16 +74315,69 @@ function sekSternUse(key, x, y, k, unentdeckt){
          Nach oben, also über den eigenen Planeten hinweg, war der erste Schritt frei. Ein Label
          über seinem Planeten ist genauso eindeutig zugeordnet wie eines darunter; die Regel
          "höchstens 14" gilt unverändert, nur eben in beide Richtungen. */
-      const plaetze = [{ dy: 0, dx: 0 }];
-      for (let v = 1; v <= 2; v++) plaetze.push({ dy: richtung * 7 * v, dx: 0 });
-      for (let v = 1; v <= 2; v++) plaetze.push({ dy: -richtung * 7 * v, dx: 0 });
-      for (const s of [8, -8, 12, -12]) plaetze.push({ dy: 0, dx: s });
+      const bevorzugt = [{ dy: 0, dx: 0 }];
+      for (let v = 1; v <= 2; v++) bevorzugt.push({ dy: richtung * 7 * v, dx: 0 });
+      for (let v = 1; v <= 2; v++) bevorzugt.push({ dy: -richtung * 7 * v, dx: 0 });
+      for (const s of [8, -8, 12, -12]) bevorzugt.push({ dy: 0, dx: s });
+      const plaetzeFuer = () => {
+        const xs = new Set([0, 8, -8, 12, -12]), ys = new Set([0, richtung*7, -richtung*7, richtung*14, -richtung*14]);
+        // Die Bitmap-Huelle kann eine freie Luecke ZWISCHEN den 7er-Schritten lassen.
+        // Ihre echten Kanten liefern weitere Plaetze, ohne den 14/12-Deckel zu erweitern.
+        // Nach aussen auf Zehntel runden: Genau dieses Raster schreibt der Code unten.
+        const kante = (menge, wert, positiv, grenze) => {
+          const v = (positiv ? Math.ceil((wert + 0.1)*10) : Math.floor((wert - 0.1)*10))/10;
+          if (Math.abs(v) <= grenze) menge.add(v);
+        };
+        for (const f of [...flaechen, ...gesetzt]){
+          kante(xs, f.x - b.x - b.width, false, 12);
+          kante(xs, f.x + f.w - b.x, true, 12);
+          kante(ys, f.y - b.y - b.height, false, 14);
+          kante(ys, f.y + f.h - b.y, true, 14);
+        }
+        const neu = [];
+        for (const dy of ys) for (const dx of xs) neu.push({ dy, dx });
+        neu.sort((a, c) => (a.dy*a.dy + a.dx*a.dx) - (c.dy*c.dy + c.dx*c.dx));
+        const liste = [], bekannt = new Set();
+        for (const p of [...bevorzugt, ...neu]){
+          const rund = achse => {
+            if (!p[achse]) return 0;
+            const start = parseFloat(ursprung[achse === 'dx' ? 'x' : 'y']);
+            return Number.isFinite(start) ? Math.round((+(start + p[achse]).toFixed(1) - start)*1e6)/1e6 : 0;
+          };
+          const q = { dy: rund('dy'), dx: rund('dx') }, key = q.dy + ':' + q.dx;
+          if (Math.abs(q.dy) > 14 || Math.abs(q.dx) > 12 || bekannt.has(key)) continue;
+          bekannt.add(key); liste.push(q);
+        }
+        return liste;
+      };
+      let plaetze = plaetzeFuer();
       const kastenAn = p => ({ x: b.x + p.dx, y: b.y + p.dy, w: b.width, h: b.height });
       const versetzt = p => !!(p.dy || p.dx);
       let wahl = null;
-      for (const p of plaetze){
-        const k = kastenAn(p);
-        if (!belegt(k, versetzt(p))) { wahl = p; kasten = k; break; }
+      const freierPlatz = () => {
+        for (const p of plaetze){
+          const k = kastenAn(p);
+          if (!belegt(k, versetzt(p))) { wahl = p; kasten = k; return true; }
+        }
+        return false;
+      };
+      if (!freierPlatz()){
+        // In der Heimatbasis misst die freie Luecke nur 9,9 Einheiten, die normale
+        // Textbox aber 12,5. Nur im voll belegten Fall die echte Schrift verkleinern,
+        // hoechstens bis zur vorhandenen 7px-Marker-Schrift, und die neue Box messen.
+        const vorher = b, schrift = parseFloat(getComputedStyle(t).fontSize);
+        if (Number.isFinite(schrift) && schrift > 7){
+          for (let groesse = Math.max(7, schrift - 0.5); groesse >= 7; groesse = Math.max(7, groesse - 0.5)){
+            t.style.setProperty('font-size', groesse + 'px');
+            try { b = t.getBBox(); } catch (e) { break; }
+            if (b && b.width){ plaetze = plaetzeFuer(); if (freierPlatz()) break; }
+            if (groesse === 7) break;
+          }
+        }
+        if (!wahl){
+          originalSchrift(); b = vorher; plaetze = plaetzeFuer();
+          kasten = { x: b.x, y: b.y, w: b.width, h: b.height };
+        }
       }
       /* Ist KEIN Platz frei, wird der mit der KLEINSTEN Überdeckung genommen - nicht mehr stur der
          Ausgangsplatz. Bis zum 07.09.2026 fiel der Entflechter hier auf die Ausgangsstelle zurück,

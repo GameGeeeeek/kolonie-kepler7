@@ -23,7 +23,7 @@ const labels={package:'ten native mining sorts match the independent asteroid pa
  frozen:'asteroid native actions preserve every original runtime asset package and backend byte',errors:'asteroid native actions finish without JavaScript or fixture HTTP errors'};
 const manifest=[labels.package,labels.assets,labels.rgba,labels.dormant,...sorts.map(pixelLabel),labels.geometry,labels.rights,labels.peil,labels.menu,labels.hidden,labels.gold,
  labels.actions,labels.pending,labels.late,labels.png,labels.failed,labels.once,labels.banners,labels.bannerControls,labels.heroPixels,labels.controls,labels.frozen,labels.errors];
-const counterFailures={visibleFallback:[labels.hidden],wrongGold:[pixelLabel('urmaterie'),labels.peil,labels.menu,labels.gold,labels.banners,labels.heroPixels],drawnBanner:[labels.banners,labels.heroPixels],bannerHref:[labels.banners,labels.heroPixels],staleHero:[labels.heroPixels],bannerTransform:[labels.banners,labels.heroPixels],delayedBackground:[labels.banners],coveredBanner:[labels.banners,labels.heroPixels]};
+const counterFailures={visibleFallback:[labels.hidden],wrongGold:[pixelLabel('urmaterie'),labels.peil,labels.menu,labels.gold,labels.banners,labels.heroPixels],drawnBanner:[labels.banners,labels.heroPixels],bannerHref:[labels.banners,labels.heroPixels],staleHero:[labels.heroPixels],bannerTransform:[labels.banners,labels.heroPixels],delayedBackground:[labels.banners],coveredBanner:[labels.banners,labels.heroPixels],warmHref:[labels.late]};
 module.exports={manifest,labels,sorts,pixelLabel,counterFailures};
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const mapNode=place=>'#galaxyMapSvg [data-map-asteroid="'+place+'"]';
@@ -146,6 +146,31 @@ async function readyBanner(page,selector,key,timeout=10000){return boolean(page,
  return true;
  },{selector,key},timeout);}
 async function readyMap(run){return boolean(run.page,()=>[...document.querySelectorAll('#galaxyMapSvg [data-asteroid-image]')].length===12&&[...document.querySelectorAll('#galaxyMapSvg [data-asteroid-image]')].every(n=>n.dataset.asteroidArtReady==='true'),undefined,8000);}
+async function prepareDelayedMap(run){
+ // Complete unrelated world artwork through its real visible Home consumer
+ // before the held mining sheet can occupy the native serial atlas queue.
+ await tab(run.page,'basis');
+ const heading=run.page.locator('#terraformBox [data-acc-key="tab-basis:terraformBox:0"]');
+ if(await heading.evaluate(n=>n.classList.contains('sec-collapsed')))await pointer(run.page,'#terraformBox [data-acc-key="tab-basis:terraformBox:0"] > span');
+ const world=run.page.locator('#terraformBox .gfx-world-comparison canvas[data-planet-icon]').first();
+ await world.scrollIntoViewIfNeeded();
+ if(!await boolean(run.page,()=>{
+  const c=document.querySelector('#terraformBox .gfx-world-comparison canvas[data-planet-icon]');if(!c)return false;
+  const r=c.getBoundingClientRect();if(!(r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight))return false;
+  for(let n=c;n;n=n.parentElement){const s=getComputedStyle(n);if(n.hidden||s.display==='none'||s.visibility!=='visible'||Number(s.opacity)<=0)return false;}
+  return c.dataset.gameArtReady==='true'&&c.dataset.gameAtlas==='kepler-gfx-celestial-atlas-a'&&c.getContext('2d').getImageData(0,0,c.width,c.height).data.some((v,i)=>i%4===3&&v>0);
+ },undefined,8000))throw Error('The real visible Home world did not finish its canonical atlas before delayed mining demand');
+ if(!run.requests.some(r=>/^\/kepler-gfx-celestial-atlas-a\.(?:webp|png)$/.test(r.path)&&r.destination==='image'))throw Error('Home world readiness must include its actual image request');
+ await openMap(run);
+ // Kepler's white star uses the independent combat atlas. Its initial warm
+ // URL also changes existing map markup, so finish that native render first.
+ if(!await boolean(run.page,()=>{
+  const images=[...document.querySelectorAll('#galaxyMapSvg image[data-game-raster-key]')].filter(n=>/^(?:star|planet):/.test(n.dataset.gameRasterKey));
+  return images.some(n=>n.dataset.gameRasterKey==='star:weiss')&&images.every(n=>n.dataset.gameArtReady==='true'&&!!n.getAttribute('href'));
+ },undefined,8000))throw Error('Unrelated native system world/star artwork did not finish before the retained mining window');
+ await tab(run.page,'karte');
+ console.log('MEASURE - delayed mining native preparation | '+JSON.stringify(await run.page.locator('#galaxyMapSvg image[data-game-raster-key]').evaluateAll(nodes=>nodes.filter(n=>/^(?:star|planet):/.test(n.dataset.gameRasterKey)).map(n=>({key:n.dataset.gameRasterKey,ready:n.dataset.gameArtReady,atlas:n.dataset.gameAtlas,href:!!n.getAttribute('href')})))));
+}
 const assetRequests=(run,pkg)=>run.requests.filter(r=>pkg.groups.some(g=>r.path==='/'+g.stem+'.webp'||r.path==='/'+g.stem+'.png')&&r.destination==='image'&&!r.query.includes('oracle'));
 async function main(){
  const records=[],runs=[],check=(name,ok,data)=>{records.push({name,ok:!!ok});console.log((ok?'OK':'FAIL')+' - '+name+(data===undefined?'':' | '+JSON.stringify(data,(key,value)=>typeof value==='string'&&value.startsWith('data:image')?'inline image '+sha(Buffer.from(value)):value)));};
@@ -189,7 +214,7 @@ async function main(){
   const peil=await Promise.all([illustration(run.page,mapNode('p1'),oracle.urmaterie),illustration(run.page,mapNode('p2'),oracle.prisma)]);
   const peilRing=await run.page.locator(mapNode('p1')+' > circle').first().evaluate(n=>({color:n.getAttribute('stroke'),dash:n.getAttribute('stroke-dasharray')}));
   check(labels.peil,canonical(peil[0],'urmaterie',oracle.urmaterie)&&canonical(peil[1],'prisma',oracle.prisma)&&peilRing.color==='#5dcaa5'&&peilRing.dash==='3,3',{peil,peilRing});
-  await pointer(run.page,mapNode(9)+' .kb-treffer');await run.page.locator('.kmenu').waitFor({state:'visible'});
+  await pointer(run.page,mapNode(9));await run.page.locator('.kmenu').waitFor({state:'visible'});
   await boolean(run.page,()=>document.querySelector('.kmenu [data-asteroid-image]')?.dataset.asteroidArtReady==='true');
   const menu=await illustration(run.page,'.kmenu .kmenu-kopf',oracle.urmaterie),menuText=await run.page.locator('.kmenu').innerText();
   check(labels.menu,canonical(menu,'urmaterie',oracle.urmaterie)&&menuText.includes('Abbaumission')&&menuText.includes('Vorrat:')&&menuText.includes('35%')&&menuText.includes('30%'),{menu,text:menuText});
@@ -203,13 +228,17 @@ async function main(){
   check(labels.actions,preview.includes('Abbaumission starten')&&preview.includes('Protomaterie')&&await run.page.locator('#fwahlOverlay [data-fwahl-start]').isVisible()&&missionsAfter===missionsBefore&&!run.requests.some(r=>/^\/api\/asteroid\/(?:mine|release|contest)/.test(r.path)&&r.method!=='GET'),{preview,missionsBefore,missionsAfter,requests:run.requests.filter(r=>r.path.startsWith('/api/asteroid/'))});
   await pointer(run.page,'#fwahlOverlay [data-fwahl-zu]');
   const files=pkg.groups.flatMap(g=>[g.stem+'.webp',g.stem+'.png']);
-  const pending=await create({hold:files});await openMap(pending);
+  const pending=await create({hold:files});await prepareDelayedMap(pending);
   const retained=await pending.page.locator('#galaxyMapSvg [data-map-asteroid]').elementHandles();
   const pendingWitness=await pending.page.locator('#galaxyMapSvg [data-map-asteroid]').evaluateAll(nodes=>nodes.map(n=>({polygons:n.querySelectorAll('polygon').length,visibility:getComputedStyle(n.querySelector('[data-asteroid-fallback]')).visibility,ready:n.querySelector('[data-asteroid-image]')?.dataset.asteroidArtReady,href:!!n.querySelector('[data-asteroid-image]')?.getAttribute('href')})));
   check(labels.pending,pendingWitness.length===12&&pendingWitness.every(w=>w.polygons>0&&w.visibility==='visible'&&w.ready!=='true'&&!w.href)&&assetRequests(pending,pkg).length===1,pendingWitness);
   pending.release();await readyMap(pending);
+  // The real active-tab action runs its native cached render again. A loaded
+  // inline href must not change that markup signature or replace these nodes.
+  await tab(pending.page,'karte');await readyMap(pending);
+  const retainedNodes=await Promise.all(retained.map(h=>h.evaluate(n=>({place:n.dataset.mapAsteroid,connected:n.isConnected,same:n===document.querySelector('#galaxyMapSvg [data-map-asteroid="'+n.dataset.mapAsteroid+'"]')}))));
   const late=await illustration(pending.page,mapNode(0),oracle.eisen);
-  check(labels.late,canonical(late,'eisen',oracle.eisen)&&(await Promise.all(retained.map(h=>h.evaluate(n=>n.isConnected)))).every(Boolean),late);
+  check(labels.late,canonical(late,'eisen',oracle.eisen)&&retainedNodes.length===12&&retainedNodes.every(n=>n.connected&&n.same),{late,retainedNodes});
   const png=await create({fail:pkg.groups.map(g=>g.stem+'.webp')});await openMap(png);await readyMap(png);
   const pngWitness=await illustration(png.page,mapNode(0),oracle.eisen),pngRequests=assetRequests(png,pkg);
   check(labels.png,canonical(pngWitness,'eisen',oracle.eisen)&&pngWitness.format==='png'&&pngRequests.length===2&&pngRequests[0].path.endsWith('.webp')&&pngRequests[1].path.endsWith('.png'),{pngWitness,pngRequests});

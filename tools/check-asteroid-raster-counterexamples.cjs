@@ -44,11 +44,17 @@ const independentFailureSets={
  staleHero:[expectedManifest[28]],
  bannerTransform:[expectedManifest[26],expectedManifest[28]],
  delayedBackground:[expectedManifest[26]],
- coveredBanner:[expectedManifest[26],expectedManifest[28]]
+ coveredBanner:[expectedManifest[26],expectedManifest[28]],
+ warmHref:[expectedManifest[22]]
 };
 assert.deepEqual(counterFailures,independentFailureSets,'Genuine fault expectations must match the independently fixed failure sets');
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function replaceOnce(text,before,after){assert.equal(text.split(before).length,2,'Unique actual native source anchor: '+before);return text.replace(before,after);}
+function restoreWarmHref(text){
+ text=replaceOnce(text,'      return `<g data-asteroid-raster="${escapeHtml(key)}"','      const url=gameRasterDataUrl(key,false);\n      return `<g data-asteroid-raster="${escapeHtml(key)}"');
+ return replaceOnce(text,'+ `<image data-asteroid-image="1" ${gameRasterSvgAttributes(key)} x=',
+  '+ `<image data-asteroid-image="1" ${gameRasterSvgAttributes(key)}${url?\' href="\'+escapeHtml(url)+\'"\':\'\'} x=');
+}
 const faults=[
  {label:'visible-fallback',failed:counterFailures.visibleFallback,source:replaceOnce(source,"if(fallback)fallback.style.visibility=ready?'hidden':'visible';","if(fallback)fallback.style.visibility='visible';")},
  {label:'wrong-gold-crop',failed:counterFailures.wrongGold,source:replaceOnce(source,"const key='asteroid:'+sorte;","const key='asteroid:'+(sorte==='urmaterie'?'eisen':sorte);")},
@@ -63,7 +69,8 @@ const faults=[
  {label:'banner-delayed-background',failed:counterFailures.delayedBackground,source:replaceOnce(source,'.banner-option[data-game-raster-baked^="asteroid-banner:"] { transition:border-color 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease; }','.banner-option[data-game-raster-baked^="asteroid-banner:"] { transition:background 2s ease, transform 0.1s ease, box-shadow 0.2s ease; }')},
  // This keeps all canonical inputs and their geometry intact. Only the new
  // actual-versus-blank scene contribution can detect the opaque later overlay.
- {label:'banner-covered-images',failed:counterFailures.coveredBanner,source:replaceOnce(source,'const svg=new XMLSerializer().serializeToString(doc.documentElement);',"const cover=doc.createElementNS('http://www.w3.org/2000/svg','rect');cover.setAttribute('width','400');cover.setAttribute('height','140');cover.setAttribute('fill','#010203');doc.documentElement.appendChild(cover);\n          const svg=new XMLSerializer().serializeToString(doc.documentElement);")}
+ {label:'banner-covered-images',failed:counterFailures.coveredBanner,source:replaceOnce(source,'const svg=new XMLSerializer().serializeToString(doc.documentElement);',"const cover=doc.createElementNS('http://www.w3.org/2000/svg','rect');cover.setAttribute('width','400');cover.setAttribute('height','140');cover.setAttribute('fill','#010203');doc.documentElement.appendChild(cover);\n          const svg=new XMLSerializer().serializeToString(doc.documentElement);")},
+ {label:'warm-inline-href',failed:counterFailures.warmHref,source:restoreWarmHref(source)}
 ];
 for(const fault of faults)assert.notEqual(sha(Buffer.from(fault.source)),sha(Buffer.from(source)),'Every fault must really change source bytes');
 const frozen=[game,nativeTest,__filename,path.join(root,'tests/http-run.js'),
@@ -97,6 +104,6 @@ try{
  }
  assert.deepEqual(snapshot(),before,'Frozen final checkout');
  fs.writeFileSync(path.join(evidence,'result.json'),JSON.stringify({complete:true,checksPerRun:manifest.length,before,after:snapshot(),results},null,2)+'\n');
- console.log('OK - asteroid baseline and all eight genuine source faults complete every original native guard | '+evidence);
+ console.log('OK - asteroid baseline and all nine genuine source faults complete every original native guard | '+evidence);
 }catch(error){fs.writeFileSync(path.join(evidence,'result.json'),JSON.stringify({complete:false,error:error.message,before,after:snapshot(),results},null,2)+'\n');throw error;}
 finally{for(const name of fs.readdirSync(scratch))fs.unlinkSync(path.join(scratch,name));fs.rmdirSync(scratch);}

@@ -110,7 +110,15 @@ async function pixels(page,selector){return page.locator(selector).first().evalu
 async function witness(run,oracles){
  const result=[];
  for(const [index,selector] of [hero,thumb].entries()){
-  await run.page.locator(selector).first().scrollIntoViewIfNeeded();
+  // A real fleet ETA update may replace a card while Playwright is waiting for
+  // scroll geometry. Reacquire only a genuinely detached target, within the
+  // same bounded native action; blocked/timeout and other failures stay fatal.
+  const scrollDeadline=Date.now()+5000;let detachedScroll;
+  do{
+   try{await run.page.locator(selector).first().scrollIntoViewIfNeeded({timeout:Math.max(1,scrollDeadline-Date.now())});detachedScroll=null;break;}
+   catch(error){if(!/Element is not attached to the DOM|Element is not connected|element was detached/i.test(error.message))throw error;detachedScroll=error;}
+  }while(Date.now()<scrollDeadline);
+  if(detachedScroll)throw detachedScroll;
   await boolean(run.page,sel=>{const c=document.querySelector(sel);return !!c&&c.dataset.shipArtReady==='true';},selector,5000);
   // A stale backing store must be observed, not repaired by test code. Wait for
   // consecutive equal native layout/backing samples, then read the actual state.
