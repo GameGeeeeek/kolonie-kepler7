@@ -190,19 +190,19 @@ const check=(name,ok,data)=>{checks++;if(!ok)failed++;console.log((ok?'OK':'FAIL
   check('portrait card still promotes the actual officer',await page.evaluate(()=>__gfxReview.state().officers.ingenieur===1));
   await page.evaluate(()=>__gfxReview.show('flotte'));
   await page.locator('#shipyardVisual [data-gfx-ship="frachter"]').click();
-   const freightSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="frachter"]';
+   const freightSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="frachter"]:not([data-ship-detail])';
    await page.locator(freightSelector).scrollIntoViewIfNeeded();
    await page.waitForFunction(selector=>document.querySelector(selector)?.dataset.shipArtReady==='true',freightSelector);
    const canonicalShip=key=>page.evaluate(({key,art,format})=>{
-    const nodes=document.querySelectorAll('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="'+key+'"]'),canvas=nodes[0];
+    const nodes=document.querySelectorAll('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="'+key+'"]:not([data-ship-detail])'),canvas=nodes[0];
     return nodes.length===1&&canvas instanceof HTMLCanvasElement&&canvas.isConnected&&canvas.width>0&&canvas.height>0
      &&canvas.dataset.shipArt==='raster'&&canvas.dataset.shipArtReady==='true'
      &&canvas.dataset.shipAtlas===art.atlas&&canvas.dataset.shipCrop===art.crop&&canvas.dataset.shipFormat===format;
    },{key,art:shipArt[key],format:graphicFormat});
    check('new freight ship image is tied to the real freight ship action',await canonicalShip('frachter')&&await page.locator('#shipyardVisual [data-gfx-build]').getAttribute('data-gfx-key')==='frachter');
   await page.locator('#shipyardVisual [data-gfx-ship-picker]').selectOption('bomber');
-   await page.locator('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]').scrollIntoViewIfNeeded();
-   await page.waitForFunction(()=>document.querySelector('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]')?.dataset.shipArtReady==='true');
+   await page.locator('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]:not([data-ship-detail])').scrollIntoViewIfNeeded();
+   await page.waitForFunction(()=>document.querySelector('#shipyardVisual .gfx-native-ship canvas[data-ship-icon="bomber"]:not([data-ship-detail])')?.dataset.shipArtReady==='true');
    check('other ship classes use their own detailed native hull rather than a wrong illustration',await canonicalShip('bomber')&&await page.locator('#shipyardVisual .gfx-ship-model').count()===0);
   check('class picker contains every native ship class',await page.locator('#shipyardVisual [data-gfx-ship-picker] option').count()===await page.evaluate(()=>__gfxReview.shipKeys.length));
   const alpha=await page.evaluate(async primary=>{const result=[];for(const format of primary==='webp'?['png','webp']:['png'])for(const key of ['ice','volcano','desert','moon']){const i=new Image();i.src='kepler-gfx-planet-'+key+'.'+format;await i.decode();const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;const x=c.getContext('2d');x.drawImage(i,0,0);result.push({key,format,corner:x.getImageData(0,0,1,1).data[3],center:x.getImageData(c.width/2,c.height/2,1,1).data[3]});}return result;},graphicFormat);

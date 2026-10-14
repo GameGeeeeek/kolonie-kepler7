@@ -56,14 +56,15 @@ const cases = [
 assert.equal(process.argv.length, 2, 'run the complete normal and both controlled faults');
 const { SERVER_JS } = require(path.join(root, 'tests/lib/spieldatei.js'));
 if (process.env.KEPLER_BACKEND_SERVER) assert(fs.existsSync(process.env.KEPLER_BACKEND_SERVER), 'configured backend must exist');
-assert(SERVER_JS && fs.existsSync(SERVER_JS), 'the active backend source is required for the 113-file freeze');
-const assets = fs.readdirSync(root).filter(n => /^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(n)).sort();
-assert.equal(assets.filter(n => n.endsWith('.png')).length, 54);
-assert.equal(assets.filter(n => n.endsWith('.webp')).length, 54);
-const runtime = [game, path.join(root, 'kepler-graphics.css'), path.join(root, 'service-worker.js'),
-  path.join(root, 'kepler-english.json'), ...assets.map(n => path.join(root, n)), SERVER_JS];
-assert.equal(runtime.length, 113);
-const frozen = [...runtime, test, __filename,
+assert(SERVER_JS && fs.existsSync(SERVER_JS), 'the active backend source is required for the additive 139-file freeze');
+const {deliveredRasterInventory,rasterRuntimeFiles}=require(path.join(root,'tests/test_ship_raster_art.js'));
+
+const inventory=deliveredRasterInventory(root),assets=inventory.assetFiles;
+assert.equal(assets.filter(n => n.endsWith('.png')).length, 67);
+assert.equal(assets.filter(n => n.endsWith('.webp')).length, 67);
+const runtime=rasterRuntimeFiles(root,game,SERVER_JS,inventory);
+assert.equal(runtime.length,139);
+const frozen = [...runtime,...inventory.inputFiles,path.join(root,'tests/test_ship_raster_art.js'),test,__filename,
   ...['http-run.js','lib/http-test-origin.js','lib/spieldatei.js','lib/umgebung.js','lib/i18n.js','lib/karte.js']
     .map(n => path.join(root, 'tests', n))];
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

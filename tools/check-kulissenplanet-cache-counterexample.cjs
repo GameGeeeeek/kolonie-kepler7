@@ -20,15 +20,15 @@ const manifest=[
  '1a: der Kulissenplanet meldet, dass er die Textur seines Typs gezeichnet hat',
  '1b: und zwar mit einem echten Weltentyp, nicht mit dem Vorgabe-Blau'
 ];
-const runtime=['weltraum_kolonie.html','kepler-graphics.css','service-worker.js','kepler-english.json',...fs.readdirSync(root).filter(n=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(n)).sort()];
-const be=process.env.KEPLER_BACKEND_SERVER||path.resolve(root,'../kolonie-kepler7-backend/server.js');assert(fs.existsSync(be),'Real pinned backend source must exist');runtime.push(be);
-assert.equal(runtime.length,113,'All delivered runtime sources and pinned backend must be frozen');
-const tracked=[...runtime,'tests/test_kulissenplanet.js','tools/check-kulissenplanet-cache-counterexample.cjs','tests/http-run.js','tests/lib/umgebung.js','tests/lib/spieldatei.js','tests/lib/http-test-origin.js'].map(n=>path.isAbsolute(n)?n:path.join(root,n));
+const {deliveredRasterInventory,rasterRuntimeFiles}=require(path.join(root,'tests/test_ship_raster_art.js'));
+const inventory=deliveredRasterInventory(root);
+const be=process.env.KEPLER_BACKEND_SERVER||path.resolve(root,'../kolonie-kepler7-backend/server.js');assert(fs.existsSync(be),'Real pinned backend source must exist');const runtime=rasterRuntimeFiles(root,game,be,inventory);
+const tracked=[...runtime,...inventory.inputFiles,'tests/test_ship_raster_art.js','tests/test_kulissenplanet.js','tools/check-kulissenplanet-cache-counterexample.cjs','tests/http-run.js','tests/lib/umgebung.js','tests/lib/spieldatei.js','tests/lib/http-test-origin.js'].map(n=>path.isAbsolute(n)?n:path.join(root,n));
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),frozen=Object.fromEntries(tracked.map(file=>[file,hash(file)])),checkFrozen=()=>assert.deepEqual(Object.fromEntries(tracked.map(file=>[file,hash(file)])),frozen);
 const evidence=path.resolve(root,'../graphics-complete-2026-10-13/kulissen-cache-counter-'+new Date().toISOString().replace(/[-:.]/g,''));fs.mkdirSync(evidence,{recursive:true});
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-background-cache-'));assert(path.dirname(temp)===path.resolve(os.tmpdir()));assert(path.basename(temp).startsWith('kepler-background-cache-'));
 const good=path.join(temp,'positive.html'),bad=path.join(temp,'constant-texture-state.html');fs.writeFileSync(good,source);fs.writeFileSync(bad,broken);
-const proof={createdUTC:new Date().toISOString(),runtimeRows:113,frozenBefore:frozen,mutation:"Only actual planetHolen key texture-ready conditional replaced by constant '|textur'; native drawing/metadata/JS remain untouched",manifest,success:false};
+const proof={createdUTC:new Date().toISOString(),runtimeRows:139,originalRuntimeRows:113,frozenBefore:frozen,mutation:"Only actual planetHolen key texture-ready conditional replaced by constant '|textur'; native drawing/metadata/JS remain untouched",manifest,success:false};
 function run(name,file,expectedExit,expectedFailed){
  const child=spawnSync(process.execPath,['tests/http-run.js','test_kulissenplanet.js'],{cwd:root,env:{...process.env,KEPLER_SPIELDATEI:file,KEPLER_BACKEND_SERVER:be,KEPLER_HTTP_TEST_ORIGIN:''},encoding:'utf8',timeout:210000,maxBuffer:6*1024*1024});
  const stdout=child.stdout||'',stderr=child.stderr||'';fs.writeFileSync(path.join(evidence,name+'.log'),stdout+stderr);

@@ -33,13 +33,23 @@ const r=await page.evaluate(()=>{
   const bars=first?[...first.querySelectorAll('.sstat')].map(s=>({k:s.querySelector('.k').textContent,
      w:s.querySelector('.tr i').style.width, v:s.querySelector('.v').textContent})):[];
   const canv=first?first.querySelector('canvas[data-ship-icon]'):null;
+  let canvasCoverage=null;
+  if(canv){const s=getComputedStyle(canv),rect=canv.getBoundingClientRect(),num=key=>parseFloat(s[key])||0;
+    const contentWidth=num('width')-(s.boxSizing==='border-box'?num('borderLeftWidth')+num('borderRightWidth')+num('paddingLeft')+num('paddingRight'):0);
+    const contentHeight=num('height')-(s.boxSizing==='border-box'?num('borderTopWidth')+num('borderBottomWidth')+num('paddingTop')+num('paddingBottom'):0);
+    // The original card is authored 78x58; contain paints that ratio inside the actual CSS content box.
+    const contain=s.objectFit==='contain'||s.objectFit==='scale-down',paintedWidth=contain?Math.min(contentWidth,contentHeight*78/58):contentWidth;
+    canvasCoverage={width:canv.width,height:canv.height,dpr:window.devicePixelRatio,
+      effectiveDpr:Math.max(1,Math.min(3,Number(window.devicePixelRatio)||1)),contentWidth,contentHeight,
+      paintedWidth,paintedHeight:contain?paintedWidth*58/78:contentHeight,objectFit:s.objectFit,rectWidth:rect.width,rectHeight:rect.height};
+  }
   // Ist auf das Canvas wirklich gezeichnet worden (nicht nur leer)?
   let painted=false;
   if(canv){ try{ const d=canv.getContext('2d').getImageData(0,0,canv.width,canv.height).data;
      for(let i=3;i<d.length;i+=4){ if(d[i]>8){painted=true;break;} } }catch(e){} }
   const locked=[...document.querySelectorAll('details.event-locked')];
   return { cardCount:cards.length, bars, roleLabels:cards.slice(0,6).map(c=>(c.querySelector('.rolelbl')||{}).textContent),
-    canvasW:canv?canv.width:0, painted, lockedCount:locked.length,
+    canvasW:canv?canv.width:0, canvasCoverage, painted, lockedCount:locked.length,
     lockedOpenByDefault:locked.filter(d=>d.open).length,
     firstHeight:first?Math.round(first.getBoundingClientRect().height):0,
     lockedHeight:locked[0]?Math.round(locked[0].closest('.card-row').getBoundingClientRect().height):0,
@@ -51,7 +61,10 @@ check('Balken haben Breite + Wert', r.bars.every(b=>/%$/.test(b.w) && b.v.length
 check('Balken normiert (nicht alle 100%)', r.bars.some(b=>parseFloat(b.w)<100), r.bars.map(b=>b.w));
 check('Rollen-Streifen gesetzt', /^#|rgb/.test(r.stripe), r.stripe);
 check('Rollen-Kuerzel gerendert', r.roleLabels.filter(Boolean).length>=2, r.roleLabels);
-check('Canvas auf 78px vergroessert', r.canvasW===78, r.canvasW);
+check('Canvas auf 78px vergroessert', !!r.canvasCoverage&&r.canvasW>=78&&r.canvasCoverage.height>=58
+  &&r.canvasCoverage.contentWidth>0&&r.canvasCoverage.contentHeight>0&&r.canvasCoverage.effectiveDpr>=1&&r.canvasCoverage.effectiveDpr<=3
+  &&r.canvasCoverage.width>=Math.ceil(r.canvasCoverage.paintedWidth*r.canvasCoverage.effectiveDpr)
+  &&r.canvasCoverage.height>=Math.ceil(r.canvasCoverage.paintedHeight*r.canvasCoverage.effectiveDpr), r.canvasCoverage);
 check('Schiff wurde tatsaechlich gezeichnet', r.painted===true);
 check('Gesperrte Event-Schiffe aufklappbar', r.lockedCount>=3, {n:r.lockedCount});
 check('...standardmaessig eingeklappt', r.lockedOpenByDefault===0, r.lockedOpenByDefault);

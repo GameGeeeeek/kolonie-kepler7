@@ -148,7 +148,9 @@ const save = (art, extra) => JSON.stringify(Object.assign({ ...ruhigeUhren(), tu
     ? { energie: 200000, erz: 200000, kristalle: 200000, deuterium: 200000, antimaterie: 5000, forschungspunkte: 3e4,
         nanolegierungen: 100, hochenergiekristalle: 100, fusionskerne: 50, quantenchips: 100, metamaterial: 50, protomaterie: 50 }
     : { energie: 10, erz: 10, kristalle: 10, deuterium: 10, antimaterie: 0, forschungspunkte: 0 },
-  buildings: Object.assign({}, GEBAEUDE),
+  // Only the poor queue-action save has no ore mine: real ticks must not make
+  // its Solar Lv. 19 affordable between the removal click and the chip read.
+  buildings: Object.assign({}, GEBAEUDE, art === 'schlange' ? { mine: 0 } : {}),
   research: Object.assign({}, FORSCHUNG),
   fleet: { jaeger: 100, frachter: 1000, ships: 3, missions: [] },
   discovered: { rhea: true, aion: true },

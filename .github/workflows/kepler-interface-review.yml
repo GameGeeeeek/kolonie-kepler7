@@ -20,6 +20,15 @@ on:
       - service-worker.js
       - marketing-screenshots.js
       - docs/ship-art-package.json
+      - docs/ship-detail-art-package.json
+      - docs/asteroid-mining-art-package.json
+      - docs/ship-detail-art-prompts.json
+      - docs/asteroid-mining-art-prompts.json
+      - tests/test_ship_raster_sharpness.js
+      - tools/check-ship-raster-sharpness-counterexamples.cjs
+      - tests/test_asteroid_raster_art.js
+      - tests/test_asteroid_banner_cache.js
+      - tools/check-asteroid-raster-counterexamples.cjs
       - tabler-icons-full.woff2
       - kepler-gfx-*.png
       - kepler-gfx-*.webp
@@ -63,6 +72,9 @@ jobs:
           git rev-parse HEAD > .interface-evidence/frontend-commit.txt
           git -C .review-backend rev-parse HEAD > .interface-evidence/backend-commit.txt
           sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp .review-backend/server.js > .interface-evidence/source.sha256
+          test "$(wc -l < .interface-evidence/source.sha256)" -eq 139
+          test "$(grep -Ec '  kepler-gfx-.*\.png$' .interface-evidence/source.sha256)" -eq 67
+          test "$(grep -Ec '  kepler-gfx-.*\.webp$' .interface-evidence/source.sha256)" -eq 67
       - name: Required repository checks
         run: |
           set -euo pipefail

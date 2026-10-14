@@ -77,6 +77,15 @@ on:
       - tests/lib/ship-raster-manifest.json
       - tests/lib/graphics-loading-manifest.json
       - docs/ship-art-package.json
+      - docs/ship-detail-art-package.json
+      - docs/asteroid-mining-art-package.json
+      - docs/ship-detail-art-prompts.json
+      - docs/asteroid-mining-art-prompts.json
+      - tests/test_ship_raster_sharpness.js
+      - tools/check-ship-raster-sharpness-counterexamples.cjs
+      - tests/test_asteroid_raster_art.js
+      - tests/test_asteroid_banner_cache.js
+      - tools/check-asteroid-raster-counterexamples.cjs
       - docs/ship-art-prompts.json
       - docs/ship-raster-assets.md
       - tests/test_graphics_refresh.js
@@ -192,6 +201,8 @@ jobs:
           node tests/http-run.js test_hscroll.js test_expeditionsbox_cache.js
           node tests/http-run.js test_planeten_texturen.js test_kartenbeschriftung.js test_asteroid_trefferflaeche.js test_karte_handy_bedienung.js test_kartenfokus.js test_kartenresize.js test_kartengroesse.js
       - name: Native deferred WebP graphics and retained PNG fallback
+        env:
+          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
         run: |
           node tests/test_graphics_loading.js
           node tools/check-graphics-loading-counterexamples.cjs
@@ -280,6 +291,85 @@ jobs:
         run: |
           node tests/http-run.js test_english_complete.js test_english_locale.js test_i18n_testkontext.js
           node tools/i18n/check-counterexamples.cjs
+  ship-detail-mining:
+    runs-on: ubuntu-latest
+    # Bound, not a timing claim: 10 asteroid + 3 sharpness controller children
+    # and 2 direct positives each retain their 180s native limit (45min total).
+    # The remaining 10min cover browser setup, required checks and raw artifacts.
+    timeout-minutes: 55
+    env:
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated native detail browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Record all 139 runtime files and independent test package inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ship-detail-evidence
+          git rev-parse HEAD > .ship-detail-evidence/frontend-commit.txt
+          git -C .review-backend rev-parse HEAD > .ship-detail-evidence/backend-commit.txt
+          test "$(cat .ship-detail-evidence/backend-commit.txt)" = 00fe250194f419e1b0063f24da146bbb5c7041c7
+          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp .review-backend/server.js > .ship-detail-evidence/source.sha256
+          test "$(wc -l < .ship-detail-evidence/source.sha256)" -eq 139
+          test "$(grep -Ec '  kepler-gfx-.*\.png$' .ship-detail-evidence/source.sha256)" -eq 67
+          test "$(grep -Ec '  kepler-gfx-.*\.webp$' .ship-detail-evidence/source.sha256)" -eq 67
+          sha256sum docs/ship-art-package.json docs/combat-art-package.json docs/remaining-art-package.json docs/ship-detail-art-package.json docs/asteroid-mining-art-package.json docs/ship-detail-art-prompts.json docs/asteroid-mining-art-prompts.json tests/test_ship_raster_art.js tests/test_ship_raster_sharpness.js tests/test_asteroid_raster_art.js tools/check-ship-raster-sharpness-counterexamples.cjs tools/check-asteroid-raster-counterexamples.cjs tests/http-run.js tests/lib/*.js .github/workflows/kepler-graphics-review.yml > .ship-detail-evidence/inputs.sha256
+      - name: Required checks and real sharpness and asteroid controllers
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .ship-detail-evidence/source.sha256
+          sha256sum -c .ship-detail-evidence/inputs.sha256
+          node tests/run.js --nur-pflicht 2>&1 | tee .ship-detail-evidence/required.log
+          node tests/http-run.js test_ship_raster_sharpness.js 2>&1 | tee .ship-detail-evidence/sharpness-native.log
+          node tools/check-ship-raster-sharpness-counterexamples.cjs 2>&1 | tee .ship-detail-evidence/sharpness-controller.log
+          node tests/http-run.js test_asteroid_raster_art.js 2>&1 | tee .ship-detail-evidence/asteroid-native.log
+          node tools/check-asteroid-raster-counterexamples.cjs 2>&1 | tee .ship-detail-evidence/asteroid-controller.log
+      - name: Frozen runtime and test packages must survive every native fault
+        if: always()
+        run: |
+          sha256sum -c .ship-detail-evidence/source.sha256
+          sha256sum -c .ship-detail-evidence/inputs.sha256
+      - name: Preserve original detail and asteroid child evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ship-detail-evidence
+          shopt -s nullglob
+          for evidence in "$GITHUB_WORKSPACE"/../ship-sharpness-2026-10-14/counter-* "$GITHUB_WORKSPACE"/../ship-sharpness-2026-10-14/asteroid-counter-*; do
+            if [ -d "$evidence" ]; then
+              cp -a -- "$evidence" .ship-detail-evidence/
+              diff -qr -- "$evidence" ".ship-detail-evidence/$(basename "$evidence")"
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-ship-detail-mining-review
+          path: .ship-detail-evidence/
+          include-hidden-files: true
+          retention-days: 7
   remaining-raster:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -307,7 +397,7 @@ jobs:
         env:
           KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
         run: node tests/run.js --nur-pflicht
-      - name: Record actual frontend backend and all 113 runtime source hashes
+      - name: Record actual frontend backend and all 139 additive runtime source hashes
         shell: bash
         run: |
           set -euo pipefail
@@ -315,7 +405,9 @@ jobs:
           git -C .review-backend rev-parse HEAD | tee /tmp/kepler-remaining-tested-be-commit.txt
           test "$(cat /tmp/kepler-remaining-tested-be-commit.txt)" = 00fe250194f419e1b0063f24da146bbb5c7041c7
           sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp .review-backend/server.js > /tmp/kepler-remaining-tested-source.txt
-          test "$(wc -l < /tmp/kepler-remaining-tested-source.txt)" -eq 113
+          test "$(wc -l < /tmp/kepler-remaining-tested-source.txt)" -eq 139
+          test "$(grep -Ec '  kepler-gfx-.*\.png$' /tmp/kepler-remaining-tested-source.txt)" -eq 67
+          test "$(grep -Ec '  kepler-gfx-.*\.webp$' /tmp/kepler-remaining-tested-source.txt)" -eq 67
       - name: Native remaining motifs and all controlled consumer regressions
         shell: bash
         env:
