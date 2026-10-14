@@ -34,9 +34,24 @@ async function metrics(page){return page.evaluate(()=>{
  const select=document.getElementById('commandDisplaySize'),r=select.getBoundingClientRect();
  const nav=[...document.querySelectorAll('#commandNav .tab-btn')],style=getComputedStyle(select);
  const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2),client=document.documentElement.clientWidth;
+ // Chromium projects translated boxes through float32 coordinates. Retain the
+ // exact 44px layout contract, and independently verify the physical projection
+ // within one coordinate-derived ULP; neither scaling nor a smaller layout passes.
+ const ancestors=[];let translationOnly=true;
+ for(let node=select;node;node=node.parentElement){
+  const css=getComputedStyle(node),box=node.getBoundingClientRect();let pureTranslation=css.transform==='none';
+  if(!pureTranslation){const matrix=new DOMMatrixReadOnly(css.transform);pureTranslation=matrix.is2D&&matrix.a===1&&matrix.b===0&&matrix.c===0&&matrix.d===1;}
+  pureTranslation=pureTranslation&&css.perspective==='none'&&(!css.zoom||css.zoom==='1')&&(!css.scale||css.scale==='none'||css.scale==='1'||css.scale==='1 1')&&(!css.rotate||css.rotate==='none'||css.rotate==='0deg');
+  translationOnly=translationOnly&&pureTranslation;
+  ancestors.push({id:node.id,tag:node.tagName,transform:css.transform,zoom:css.zoom,scale:css.scale,rotate:css.rotate,perspective:css.perspective,pureTranslation,top:box.top,bottom:box.bottom,documentTop:box.top+scrollY,documentBottom:box.bottom+scrollY});
+ }
+ const computedHeight=parseFloat(style.height),layoutHeight=select.offsetHeight;
+ const magnitude=Math.max(1,...ancestors.flatMap(a=>[Math.abs(a.top),Math.abs(a.bottom),Math.abs(a.documentTop),Math.abs(a.documentBottom)]));
+ const projectionUlp=2**(Math.floor(Math.log2(magnitude))-23),projectionError=Math.abs(r.height-computedHeight);
+ const projectionValid=translationOnly&&style.boxSizing==='border-box'&&Number.isFinite(computedHeight)&&r.width>0&&r.height>0&&projectionUlp>0&&projectionUlp<1&&projectionError<=projectionUlp;
  const overflowNodes=[...document.querySelectorAll('#tab-einstellungen *,#game-root .hero *,#resbar *,#commandStatus *')].flatMap(node=>{const b=node.getBoundingClientRect();return b.width>0&&b.height>0&&(b.right>client+1||b.left<-1)?[{id:node.id,tag:node.tagName,class:typeof node.className==='string'?node.className:'',left:b.left,right:b.right,width:b.width,client:node.clientWidth,scroll:node.scrollWidth,text:node.textContent.trim().slice(0,90)}]:[];}).slice(0,24);
  return {font:parseFloat(getComputedStyle(document.getElementById('commandMenuPositionHint')).fontSize),
-  target:r.height,focus:document.activeElement===select,scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,
+  target:Math.min(layoutHeight,computedHeight),rawTarget:r.height,layoutHeight,computedHeight,boxSizing:style.boxSizing,projectionUlp,projectionError,projectionValid,ancestors,focus:document.activeElement===select,scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,
   selectRect:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},hitTarget:hit?{id:hit.id,tag:hit.tagName,class:typeof hit.className==='string'?hit.className:''}:null,overflowNodes,
   transform:getComputedStyle(document.getElementById('game-root')).transform,zoom:getComputedStyle(document.body).zoom,
   optionFont:parseFloat(style.fontSize),tabs:nav.map(e=>e.dataset.tab),nodes:nav.every(e=>e===window.__displayOriginalTabs[e.dataset.tab])};
@@ -92,7 +107,7 @@ function contentMatches(rows){
    for(const key of f.TABS){await f.tab(page,key);complete=complete&&await page.locator('#tab-'+key).isVisible();}
    await settings(page);
    check('display sizes keep native navigation and every building accessible at '+width+' '+position,
-    complete&&rows.every(r=>r.focus&&r.hit&&r.nodes&&r.target>=44&&r.scroll<=r.client+1&&r.transform==='none'&&(!r.zoom||r.zoom==='1')&&JSON.stringify(r.tabs)===JSON.stringify(f.TABS))&&rows[0].font<=rows[1].font&&rows[2].font>rows[1].font&&rows[2].target>rows[0].target&&(width!==1280||contentMatches(rows)),rows);
+    complete&&rows.every(r=>r.focus&&r.hit&&r.nodes&&r.target>=44&&r.projectionValid&&r.scroll<=r.client+1&&r.transform==='none'&&(!r.zoom||r.zoom==='1')&&JSON.stringify(r.tabs)===JSON.stringify(f.TABS))&&rows[0].font<=rows[1].font&&rows[2].font>rows[1].font&&rows[2].target>rows[0].target&&(width!==1280||contentMatches(rows)),rows);
   }
   await page.setViewportSize({width:1280,height:1000});await choose(page,'commandMenuPosition','top');
   const paints={};
