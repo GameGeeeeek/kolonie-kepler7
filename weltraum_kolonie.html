@@ -3281,7 +3281,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-<link rel="stylesheet" href="kepler-graphics.css?v=20261014-interface-clarity-1">
+<link rel="stylesheet" href="kepler-graphics.css?v=20261014-ship-detail-mining-1">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -74188,6 +74188,24 @@ function sekSternUse(key, x, y, k, unentdeckt){
     let texte;
     try { texte = [...svg.querySelectorAll('text.planet-label')]; } catch (e) { return; }
     if (!texte.length) return;
+    const schriftZurueck = (t, ursprung) => {
+      if (ursprung.schrift) t.style.setProperty('font-size', ursprung.schrift, ursprung.prioritaet);
+      else t.style.removeProperty('font-size');
+    };
+    // Alle erhaltenen Knoten zuruecksetzen, bevor eine Gruppenmitte gemessen wird.
+    // Sonst hinge sie beim zweiten Durchgang von den alten Versatzwerten ab.
+    for (const t of texte){
+      let ursprung = kbLabelAusgang.get(t);
+      if (!ursprung){
+        ursprung = { x: t.getAttribute('x'), y: t.getAttribute('y'),
+          schrift: t.style.getPropertyValue('font-size'), prioritaet: t.style.getPropertyPriority('font-size') };
+        kbLabelAusgang.set(t, ursprung);
+      }
+      for (const achse of ['x', 'y']){
+        if (ursprung[achse] === null) t.removeAttribute(achse); else t.setAttribute(achse, ursprung[achse]);
+      }
+      schriftZurueck(t, ursprung);
+    }
     // Belegte Flächen: alles, was als Objekt auf der Karte steht. Die Scheibe wird über ihre
     // BENANNTE Rolle gegriffen, nie über den Radius - die clipPath-Maske texturierter Planeten
     // trägt denselben Radius und liefert eine leere Box (Regel 51).
@@ -74261,22 +74279,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
     const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
     const gesetzt = [];   // schon platzierte Labels - damit das Ausweichen keine Text-Text-Kollision erzeugt
     for (const t of texte){
-      // Dieselben SVG-Knoten bleiben beim Rendern erhalten. Jeden Durchgang an der
-      // gezeichneten Ausgangsstelle und Schrift beginnen, auch nach einem Resize.
-      let ursprung = kbLabelAusgang.get(t);
-      if (!ursprung){
-        ursprung = { x: t.getAttribute('x'), y: t.getAttribute('y'),
-          schrift: t.style.getPropertyValue('font-size'), prioritaet: t.style.getPropertyPriority('font-size') };
-        kbLabelAusgang.set(t, ursprung);
-      }
-      for (const achse of ['x', 'y']){
-        if (ursprung[achse] === null) t.removeAttribute(achse); else t.setAttribute(achse, ursprung[achse]);
-      }
-      const originalSchrift = () => {
-        if (ursprung.schrift) t.style.setProperty('font-size', ursprung.schrift, ursprung.prioritaet);
-        else t.style.removeProperty('font-size');
-      };
-      originalSchrift();
+      const ursprung = kbLabelAusgang.get(t);
+      const originalSchrift = () => schriftZurueck(t, ursprung);
       let b; try { b = t.getBBox(); } catch (e) { continue; }
       if (!b || !b.width) continue;
       const eigen = t.closest(OBJEKTE);
@@ -74285,6 +74289,26 @@ function sekSternUse(key, x, y, k, unentdeckt){
       const richtung = eigenF ? (b.y + b.height/2 >= eigenF.my ? 1 : -1) : 1;
       let kasten = { x: b.x, y: b.y, w: b.width, h: b.height };
       let versatz = 0, seitlich = 0;
+      // getBBox misst die Schrift ohne Kontur; die Kontur faengt aber ebenfalls
+      // native SVG-Tipps ab. Auch sie darf keine Markermitte verdecken.
+      const textStil = getComputedStyle(t);
+      const strichRand = textStil.stroke === 'none' ? 0 : Math.max(0, (parseFloat(textStil.strokeWidth) || 0)/2);
+      for (const f of flaechen){
+        let x1 = f.x, y1 = f.y, x2 = f.x + f.w, y2 = f.y + f.h;
+        for (const name of f.g.querySelectorAll('text.planet-label')){
+          let n; try { n = name.getBBox(); } catch (e) { continue; }
+          if (!n || !n.width) continue;
+          x1 = Math.min(x1, n.x); y1 = Math.min(y1, n.y);
+          x2 = Math.max(x2, n.x + n.width); y2 = Math.max(y2, n.y + n.height);
+        }
+        // Ein drehender Peilring laesst die native Gruppen-BBox schwanken. Ihre
+        // Mitte wandert zwischen Koerpermitte und Mitte von Koerper plus Name.
+        // Diesen kleinen Bereich schuetzen, statt eine zufaellige Drehphase.
+        f.ml = Math.min(f.mx, (x1 + x2)/2); f.mr = Math.max(f.mx, (x1 + x2)/2);
+        f.mt = Math.min(f.my, (y1 + y2)/2); f.mb = Math.max(f.my, (y1 + y2)/2);
+      }
+      const mitteUeberdeckt = (k, f) => f.mr >= k.x - strichRand && f.ml <= k.x + k.w + strichRand
+                                   && f.mb >= k.y - strichRand && f.mt <= k.y + k.h + strichRand;
       // ENGER RAHMEN, mit Absicht. Der erste Entwurf erlaubte 42 Einheiten - damit fand zwar jedes
       // Label einen freien Platz, aber "Deine Basis" landete unter dem NACHBARPLANETEN Rhea und
       // gehörte optisch zu ihm. Die Kollision war weg, die Zuordnung Label->Planet kaputt; gesehen
@@ -74299,7 +74323,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
          den eigenen Planeten - und damit MITTEN AUF dessen Scheibe. test_kartenbeschriftung hat das
          an drei Stellen gemeldet (Handy, PC, PC flach); mein eigener neuer Wächter nicht, weil auch
          er das eigene Objekt ausklammert. Der Bestandstest war hier der klügere von beiden. */
-      const belegt = (k, versetzt) => flaechen.some(f => (versetzt || f.g !== eigen) && schneidet(k, f))
+      const belegt = (k, versetzt) => flaechen.some(f => (versetzt || f.g !== eigen) && (schneidet(k, f) || mitteUeberdeckt(k, f)))
                                    || gesetzt.some(g => schneidet(k, g));
       /* Die Plätze in VORZUGSREIHENFOLGE - der erste freie gewinnt, deshalb steht der Verbleib an
          Ort und Stelle vorn und der weiteste Versatz hinten:
@@ -74333,6 +74357,14 @@ function sekSternUse(key, x, y, k, unentdeckt){
           kante(xs, f.x + f.w - b.x, true, 12);
           kante(ys, f.y - b.y - b.height, false, 14);
           kante(ys, f.y + f.h - b.y, true, 14);
+        }
+        // Im unvermeidbar ueberlappenden Fall auch knapp NEBEN der gemalten
+        // Markermitte Platz suchen, statt nur ganze 7er-Schritte anzubieten.
+        for (const f of flaechen){
+          kante(xs, f.ml - b.x - b.width - strichRand, false, 12);
+          kante(xs, f.mr - b.x + strichRand, true, 12);
+          kante(ys, f.mt - b.y - b.height - strichRand, false, 14);
+          kante(ys, f.mb - b.y + strichRand, true, 14);
         }
         const neu = [];
         for (const dy of ys) for (const dx of xs) neu.push({ dy, dx });
@@ -74412,13 +74444,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
           };
           for (const f of flaechen){
             if (!mitEigenem && f.g === eigen) continue;
+            // Die gemalte MITTE ist der teure Teil: Dort verdeckt Text den Marker
+            // UND faengt seinen Tipp ab (test_konvoi_wrackfeld 5a misst genau das).
+            if (mitteUeberdeckt(k, f)) mitten++;
             const a = flaeche(f);
             if (!a) continue;
             if (f.g.getAttribute('data-planet')) scheibe += a; else objekt += a;
-            // Die MITTE ist der teure Teil: Dort ist der Marker nicht nur verdeckt, dort fängt
-            // die Beschriftung auch seinen Tipp ab (test_konvoi_wrackfeld 5a misst genau das).
-            const mx = f.x + f.w/2, my2 = f.y + f.h/2;
-            if (mx >= k.x && mx <= k.x + k.w && my2 >= k.y && my2 <= k.y + k.h) mitten++;
           }
           for (const g of gesetzt) label += flaeche(g);
           return { mitten, scheibe, objekt, label };

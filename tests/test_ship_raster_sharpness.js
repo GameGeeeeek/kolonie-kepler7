@@ -60,7 +60,11 @@ function stableSkinSave(){
  const tierKeys=new Set(data.tiers.map(d=>d.key));
  const baseCosts=data.ships.flatMap(d=>Object.entries(d.cost).filter(([r])=>!tierKeys.has(r)&&r!=='bergung'&&r!=='protomaterie').map(([,n])=>n));
  const budget=Math.ceil(Math.max(...baseCosts))*2;
- s.buildings={...s.buildings,lager:Math.max(s.buildings.lager||0,Math.ceil(budget/400))};
+ // A Mk II destroyer costs 56k ore although its construction costs only 250.
+ // Keep this saved idle empire's ore stock stable across the skin actions:
+ // every actual ore mine is 0; full existing T2 stores already pause inputs.
+ s.buildings={...s.buildings,mine:0,lager:Math.max(s.buildings.lager||0,Math.ceil(budget/400))};
+ s.colonies=Object.fromEntries(Object.entries(s.colonies||{}).map(([key,c])=>[key,{...c,buildings:{...c.buildings,mine:0}}]));
  s.resources={...s.resources};
  for(const key of Object.keys(s.resources))if(!tierKeys.has(key))s.resources[key]=Math.max(s.resources[key]||0,budget);
  const buildingSets=[s.buildings,...Object.values(s.colonies||{}).map(c=>c.buildings||{})];
@@ -73,7 +77,7 @@ function stableSkinSave(){
   &&d.requires.every(r=>(s.research[typeof r==='string'?r:r.key]||0)>=(typeof r==='string'?1:r.level)));
  if(!physical.length||physical.some(d=>Object.entries(d.cost).some(([r,n])=>(s.resources[r]||0)<n)))throw Error('Actual buildable skin-fixture ships must all be affordable');
  return {save:s,proof:{nativeClasses:data.ships.length,budget,baseStorageLowerBound:800+s.buildings.lager*400,
-  warehouseLevel:s.buildings.lager,tierCaps,affordablePhysicalClasses:physical.map(d=>d.key),
+  warehouseLevel:s.buildings.lager,tierCaps,affordablePhysicalClasses:physical.map(d=>d.key),oreMines:buildingSets.map(b=>b.mine||0),
   emptyQueues:s.buildQueue.length===0&&s.constructionQueue.length===0&&s.researchQueue.length===0&&!s.activeResearch&&!s.shipMarkJob}};
 }
 async function geometry(page,selector){return page.locator(selector).first().evaluate(c=>{

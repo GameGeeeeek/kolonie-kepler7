@@ -62,7 +62,10 @@ const faults=[
  // Change only the actually consumed href; native keys, labels and selection
  // retain their correct Urmaterie identity and cannot satisfy the pixel oracle.
  {label:'banner-wrong-href',failed:counterFailures.bannerHref,source:replaceOnce(source,"image.setAttribute('href',gameRasterDataUrl(group.getAttribute('data-asteroid-raster'),false));","image.setAttribute('href',gameRasterDataUrl('asteroid:eisen',false));")},
- {label:'stale-hero-binding',failed:counterFailures.staleHero,source:replaceOnce(source,'if(node.dataset.gameRasterBaked!==template.id)gameRasterConsumers.delete(node);','/* Genuine previous behavior: retain the hero consumer when its template changes. */')},
+ // Keep the first same-node binding, including its actual template identity.
+ // Removing only the weak-map delete leaves the picker-template apply path
+ // correctly painting the new identity and is therefore not a failing fault.
+ {label:'stale-hero-binding',failed:counterFailures.staleHero,source:replaceOnce(source,'if(node.dataset.gameRasterBaked!==template.id)gameRasterConsumers.delete(node);','if(node.dataset.gameRasterBaked&&node.dataset.gameRasterBaked!==template.id)return;')},
  {label:'banner-hidden-transform',failed:counterFailures.bannerTransform,source:replaceOnce(source,'const svg=new XMLSerializer().serializeToString(doc.documentElement);',"for(const group of doc.querySelectorAll('[data-asteroid-raster]'))group.setAttribute('transform','translate(1000 0)');\n          const svg=new XMLSerializer().serializeToString(doc.documentElement);")},
  // Restore the real previous background-transition mechanism, with a bounded
  // two-second duration that exposes asset-ready versus consumed-CSS readiness.
