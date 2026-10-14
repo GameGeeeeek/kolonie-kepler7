@@ -7,7 +7,28 @@ const {ruhigeUhren}=require('./umgebung');
 const TABS=['basis','verteidigung','forschung','flotte','expedition','karte','galaxie','allianz','offiziere','markt','punkte','fortschritt','sammlung'];
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function boolean(page,fn,arg,timeout=10000){const until=Date.now()+timeout;do{if(await page.evaluate(fn,arg)===true)return true;await delay(40);}while(Date.now()<until);return false;}
-async function pointer(page,selector){const end=Date.now()+10000;let detached;do{const target=page.locator(selector).first();try{await target.scrollIntoViewIfNeeded({timeout:Math.max(1,end-Date.now())});const hit=await target.evaluate(e=>{if(!e.isConnected)return null;const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));});if(hit===null)continue;if(!hit)throw Error('Native pointer target blocked: '+selector);await target.click({timeout:Math.max(1,end-Date.now())});return true;}catch(error){if(!/Element is not attached to the DOM|Element is not connected|element was detached/i.test(error.message))throw error;detached=error;}}while(Date.now()<end);throw detached||Error('Native pointer target never stayed connected: '+selector);}
+// Native resize observers can render after 150ms. Measure actual layout quietness
+// before scrolling and clicking, without replacing clocks, handlers or hit guards.
+async function stablePointerGeometry(page,selector){
+ const witness=await page.evaluate(selector=>new Promise(resolve=>{
+  const started=performance.now();let previous=null,stableSince=null,samples=0,frameId=0,last=null,finished=false;
+  const finish=stable=>{if(finished)return;finished=true;clearTimeout(deadline);cancelAnimationFrame(frameId);resolve({stable,samples,elapsedMs:performance.now()-started,last});};
+  const deadline=setTimeout(()=>finish(false),3000);
+  const sample=now=>{
+   const node=document.querySelector(selector),r=node?.getBoundingClientRect();let visible=!!node?.isConnected&&!!r&&r.width>0&&r.height>0,opacity=1;
+   for(let p=node;p;p=p.parentElement){const c=getComputedStyle(p);visible=visible&&c.display!=='none'&&c.visibility!=='hidden'&&c.visibility!=='collapse';opacity*=Number(c.opacity);}
+   visible=visible&&opacity>0;
+   const values=r?[r.x,r.y,r.width,r.height,node.clientWidth,node.clientHeight,node.scrollWidth,node.scrollHeight,node.scrollLeft,node.scrollTop,window.scrollX,window.scrollY,document.documentElement.clientWidth,document.documentElement.clientHeight,document.documentElement.scrollWidth,document.documentElement.scrollHeight,opacity]:[];
+   samples++;last={connected:!!node?.isConnected,visible,opacity,values};
+   if(visible&&previous?.visible&&values.length===previous.values.length&&values.every((value,i)=>Math.abs(value-previous.values[i])<=0.1)){if(stableSince===null)stableSince=now;}else stableSince=visible?now:null;
+   previous=last;
+   if(visible&&stableSince!==null&&now-stableSince>=200)finish(true);else frameId=requestAnimationFrame(sample);
+  };
+  frameId=requestAnimationFrame(sample);
+ }),selector);
+ if(!witness.stable||witness.samples<2)throw Error('Native pointer geometry did not settle: '+selector+' '+JSON.stringify(witness));
+}
+async function pointer(page,selector){const end=Date.now()+10000;let detached;do{const target=page.locator(selector).first();try{await stablePointerGeometry(page,selector);await target.evaluate(e=>e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));await stablePointerGeometry(page,selector);const point=await target.evaluate(e=>{if(!e.isConnected)return null;const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {hit:r.width>0&&r.height>0&&e.contains(hit),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},target:hit?{id:hit.id,tag:hit.tagName,class:typeof hit.className==='string'?hit.className:''}:null};});if(point===null)continue;if(!point.hit)throw Error('Native pointer target blocked: '+selector+' '+JSON.stringify(point));await target.click({timeout:Math.max(1,end-Date.now())});return true;}catch(error){if(!/Element is not attached to the DOM|Element is not connected|element was detached/i.test(error.message))throw error;detached=error;}}while(Date.now()<end);throw detached||Error('Native pointer target never stayed connected: '+selector);}
 async function tab(page,key){if(await page.locator('#commandMenuToggle').isVisible()&&!(await page.locator('#commandNav').evaluate(e=>e.classList.contains('open'))))await pointer(page,'#commandMenuToggle');await pointer(page,'#commandNav .tab-btn[data-tab="'+key+'"]');await page.locator('#tab-'+key).waitFor({state:'visible'});}
 function save(overrides={}){const marketing=fs.readFileSync(path.join(WURZEL,'marketing-screenshots.js'),'utf8'),a=marketing.indexOf('function spielstand()'),b=marketing.indexOf('// Demo-Bestenliste',a);if(a<0||b<=a)throw Error('Native marketing save anchors missing');const original=JSON.parse(vm.runInNewContext(marketing.slice(a,b)+'\nspielstand();',{Date},{timeout:1000})),source=fs.readFileSync(SPIELDATEI,'utf8'),version=source.match(/\bconst VERSION\s*=\s*['"]([^'"]+)['"]/);if(!version)throw Error('Native VERSION missing');return {...original,...ruhigeUhren(),shipSkin:'standard',shipMarks:{},soundOn:false,lastTick:Date.now()-60000,lastSeenVersion:version[1],lastLoginDate:new Date().toDateString(),seenTabHints:Object.fromEntries([...TABS,'einstellungen','hilfe','berichte'].map(key=>[key,true])),...overrides};}
 async function fixture(browser,options={}){

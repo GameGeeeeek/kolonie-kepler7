@@ -36,10 +36,10 @@ const expected=[
 const {manifest,labels}=require(test);assert.deepEqual(manifest,expected);assert.equal(new Set(expected).size,30);
 const source=fs.readFileSync(game,'utf8'),replace=(input,old,next)=>{assert.equal(input.split(old).length,2,'unique native report anchor: '+old);return input.replace(old,next);};
 const cases=[
- {name:'overview-omitted',copy:()=>replace(source,'$'+'{overviewByReport.get(r)}',''),failed:expected.filter(name=>![labels.actions,labels.replay,labels.logbook,labels.hashes,labels.script,labels.http].includes(name))},
+ {name:'overview-omitted',copy:()=>replace(source,'$'+'{overviewByReport.get(r)}',''),failed:expected.filter(name=>![labels.noncombat,labels.actions,labels.replay,labels.hashes,labels.script,labels.http].includes(name))},
  {name:'zero-unknown',copy:()=>replace(source,'const entries = Object.entries(value);','const entries = Object.entries(value); if (!entries.length) return null;'),failed:[labels.zero]},
- {name:'attacker-perspective',copy:()=>replace(source,"const incoming = ['attack-received','raid'].includes(r.type);",'const incoming = false;'),failed:[labels.incomingPhase]},
- {name:'summary-signature',copy:()=>replace(source,"+'|'+racheSig+'|'+overviewSig;","+'|'+racheSig;"),failed:[labels.refresh]},
+ {name:'attacker-perspective',copy:()=>replace(source,"const incoming = ['attack-received','raid'].includes(r.type);",'const incoming = false;'),failed:[labels.incomingPhase,labels.english]},
+ {name:'summary-signature',copy:()=>replace(source,"+'|'+overviewSig+'|'+racheSig;","+'|'+racheSig;"),failed:[labels.refresh]},
  {name:'resource-escape',copy:()=>replace(source,'escapeHtml(k7View(def).label||key)','(k7View(def).label||key)'),failed:[labels.escape,labels.logbook]},
  {name:'unpaid-salvage',copy:()=>replace(source,'&& (r.gefallen || r.schwarmGefallen) && typeof r.anteil','&& typeof r.anteil'),failed:[labels.unpaid]},
  {name:'colony-name-escape',copy:()=>replace(source,"'<br>Ausgangspunkt: '+escapeHtml(r.fromPlanet||'unbekannt')+' · <i class=\"ti ti-clock\" aria-hidden=\"true\"></i> Flugzeit: '","'<br>Ausgangspunkt: '+(r.fromPlanet||'unbekannt')+' · <i class=\"ti ti-clock\" aria-hidden=\"true\"></i> Flugzeit: '"),failed:[labels.logbook]}

@@ -72,8 +72,10 @@ async function main(){
   check('actions',!!npc&&npc.actions.some(s=>s==='data-watch-battle=overview-npc')&&npc.actions.some(s=>s==='data-share-battle=overview-npc')&&npc.actions.some(s=>s==='data-rebuild-losses=overview-npc')&&salvage?.actions.some(s=>s==='data-zeig-fundort=overview-salvage'),{npc:npc?.actions,salvage:salvage?.actions});
   await pointer(run.page,selector('overview-npc')+' [data-watch-battle]');await run.page.locator('#battleModalOverlay').waitFor({state:'visible'});
   const replayControls=await run.page.locator('#osBtnNeustart,#osBtnPause,#osBtnTempo,#osBtnEnde').count();
-  await pointer(run.page,'#osBtnEnde');await run.page.locator('#battleModalOverlay').waitFor({state:'hidden'});
-  check('replay',replayControls===4&&await run.page.locator('#reportsBox').isVisible(),{replayControls});
+  await pointer(run.page,'#osBtnEnde');await run.page.locator('#osBilanz.an').waitFor({state:'visible'});
+  const nativeEndVisible=await run.page.locator('#battleModalOverlay').isVisible()&&await run.page.locator('#osBilanz.an').isVisible();
+  await pointer(run.page,'#battleModalCloseBtn');await run.page.locator('#battleModalOverlay').waitFor({state:'hidden'});
+  check('replay',replayControls===4&&nativeEndVisible&&await run.page.locator('#reportsBox').isVisible(),{replayControls,nativeEndVisible});
   const dynamic=await read(run.page,'overview-dynamic');
   check('logbook',npc?.logbook.includes(literal)&&npc?.text.includes(colonyLiteral)&&dynamic?.text.includes(literal)&&await run.page.locator('#reportsBox [data-report-injected],#reportsBox [data-rp]').count()===0,{logbook:npc?.logbook,colonyText:npc?.text,dynamicText:dynamic?.text});
   check('escape',dynamic?.loot?.text.includes(literal)&&await run.page.locator('#reportsBox .report-overview [data-report-injected]').count()===0,dynamic?.loot);
