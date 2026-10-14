@@ -1,0 +1,98 @@
+name: Kepler interface review
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - weltraum_kolonie.html
+      - kepler-graphics.css
+      - kepler-english.json
+      - locales/en.json
+      - tests/test_interface_*.js
+      - tests/test_building_comparison.js
+      - tests/test_report_overview.js
+      - tests/lib/report-overview-*
+      - tests/lib/ship-raster-fixture.js
+      - tests/lib/ideas-fixture.js
+      - tests/lib/umgebung.js
+      - tests/lib/spieldatei.js
+      - tests/lib/http-test-origin.js
+      - tests/http-run.js
+      - service-worker.js
+      - marketing-screenshots.js
+      - docs/ship-art-package.json
+      - tabler-icons-full.woff2
+      - kepler-gfx-*.png
+      - kepler-gfx-*.webp
+      - tools/check-interface-*.cjs
+      - tools/check-building-comparison-counterexamples.cjs
+      - tools/check-report-overview-counterexamples.cjs
+      - .github/workflows/kepler-interface-review.yml
+permissions:
+  contents: read
+concurrency:
+  group: interface-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  native-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare native browser environment
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+          mkdir -p .interface-evidence
+          git rev-parse HEAD > .interface-evidence/frontend-commit.txt
+          git -C .review-backend rev-parse HEAD > .interface-evidence/backend-commit.txt
+          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp .review-backend/server.js > .interface-evidence/source.sha256
+      - name: Required repository checks
+        run: |
+          set -euo pipefail
+          node tests/run.js --nur-pflicht 2>&1 | tee .interface-evidence/required.log
+      - name: Original native guards and genuine source counterexamples
+        run: |
+          set -euo pipefail
+          node tools/check-interface-entry-counterexamples.cjs 2>&1 | tee .interface-evidence/entry-controller.log
+          node tools/check-interface-display-counterexamples.cjs 2>&1 | tee .interface-evidence/display-controller.log
+          node tools/check-building-comparison-counterexamples.cjs 2>&1 | tee .interface-evidence/building-controller.log
+          node tools/check-report-overview-counterexamples.cjs 2>&1 | tee .interface-evidence/report-controller.log
+          sha256sum -c .interface-evidence/source.sha256
+      - name: Preserve original native evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .interface-evidence
+          shopt -s nullglob
+          for evidence in "$GITHUB_WORKSPACE"/../interface-clarity-2026-10-14/*counter-*; do
+            if [ -d "$evidence" ]; then
+              cp -a -- "$evidence" .interface-evidence/
+              diff -qr -- "$evidence" ".interface-evidence/$(basename "$evidence")"
+            fi
+          done
+          if [ -f .interface-evidence/source.sha256 ]; then sha256sum -c .interface-evidence/source.sha256; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-interface-native-review
+          path: .interface-evidence/
+          include-hidden-files: true
+          retention-days: 7
