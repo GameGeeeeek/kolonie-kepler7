@@ -34,6 +34,12 @@ async function tab(page,key){if(await page.locator('#commandMenuToggle').isVisib
 function save(overrides={}){const marketing=fs.readFileSync(path.join(WURZEL,'marketing-screenshots.js'),'utf8'),a=marketing.indexOf('function spielstand()'),b=marketing.indexOf('// Demo-Bestenliste',a);if(a<0||b<=a)throw Error('Native marketing save anchors missing');const original=JSON.parse(vm.runInNewContext(marketing.slice(a,b)+'\nspielstand();',{Date},{timeout:1000})),source=fs.readFileSync(SPIELDATEI,'utf8'),version=source.match(/\bconst VERSION\s*=\s*['"]([^'"]+)['"]/);if(!version)throw Error('Native VERSION missing');return {...original,...ruhigeUhren(),shipSkin:'standard',shipMarks:{},soundOn:false,lastTick:Date.now()-60000,lastSeenVersion:version[1],lastLoginDate:new Date().toDateString(),seenTabHints:Object.fromEntries([...TABS,'einstellungen','hilfe','berichte'].map(key=>[key,true])),...overrides};}
 async function fixture(browser,options={}){
  const source=fs.readFileSync(SPIELDATEI,'utf8'),requests=[],errors=[],httpErrors=[],store=new Map([['kepler7-save-v3',JSON.stringify(save(options.save))]]),waiting=[];
+ // Optional real storage wire values, installed before the first HTTP request.
+ // No option preserves the original single-save store exactly.
+ for(const [key,value] of Object.entries(options.sharedStorage||{})){
+  if(typeof value!=='string')throw Error('Shared fixture storage must contain actual serialized wire values: '+key);
+  store.set(key,value);
+ }
  let phase='boot',released=!options.hold,closed=false;const releasedNames=new Set();
  const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://127.0.0.1'),entry={path:u.pathname,query:u.search,method:req.method,phase,destination:req.headers['sec-fetch-dest']||'',at:Date.now()};requests.push(entry);
   const send=(status,body,mime='application/json')=>{entry.status=status;res.writeHead(status,{'Content-Type':mime,'Content-Length':Buffer.byteLength(body),'Cache-Control':'no-store'});res.end(body);};const json=(value,status=200)=>send(status,JSON.stringify(value));

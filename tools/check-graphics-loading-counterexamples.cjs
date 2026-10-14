@@ -44,11 +44,13 @@ const cases=[
 const requested=process.argv.slice(2),normalOnly=requested.includes('--normal-only');
 assert(!normalOnly||requested.length===1,'normal-only cannot be combined with faults');
 assert(normalOnly||new Set(requested).size===requested.length&&requested.every(name=>cases.some(c=>c.name===name)),'unknown/duplicate controlled graphics loading case');
-const deliveredAssets=fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(?:png|webp)$/.test(name)).sort();
-assert(deliveredAssets.length===108,'all original and canonical delivered raster assets are frozen');
+const {deliveredRasterInventory,rasterRuntimeFiles}=require(path.join(root,'tests/test_ship_raster_art.js'));
+const inventory=deliveredRasterInventory(root),deliveredAssets=inventory.assetFiles;
 const tracked=[game,path.join(root,'kepler-graphics.css'),path.join(root,'service-worker.js'),path.join(root,'kepler-english.json'),path.join(root,'marketing-screenshots.js'),path.join(root,'tests/test_graphics_loading.js'),__filename,path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),path.join(root,'docs/remaining-art-package.json'),...deliveredAssets.map(name=>path.join(root,name))];
 tracked.push(path.join(root,'tests/lib/graphics-loading-manifest.json'));
 const backend=require(path.join(root,'tests/lib/spieldatei')).SERVER_JS;if(backend)tracked.push(backend);
+rasterRuntimeFiles(root,game,backend,inventory);
+tracked.push(path.join(root,'tests/test_ship_raster_art.js'),...inventory.inputFiles.filter(file=>!tracked.includes(file)));
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const hashes=()=>Object.fromEntries(tracked.map(file=>[path.relative(root,file),hash(file)]));
 const before=hashes(),temp=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-graphics-loading-'));

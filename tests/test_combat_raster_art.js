@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),vm=require('node:vm');
 const {SPIELDATEI,WURZEL,SERVER_JS}=require('./lib/spieldatei'),{starteBrowser}=require('./lib/umgebung');
 const {fixture,save,pointer,tab,boolean,delay,reports,openReplay,closeReplay,state,observeDraws,observation,resetObservation}=require('./lib/combat-raster-fixture');
-const {canvasData}=require('./test_ship_raster_art');
+const {canvasData,deliveredRasterInventory,rasterRuntimeFiles}=require('./test_ship_raster_art');
 const labels={
  package:'all twenty-nine active combat crops match the independent art package',
  assets:'all six delivered combat atlas bytes match the independent SHA256 package',
@@ -40,8 +40,8 @@ async function collect(run,until){const samples=[],end=Date.now()+30000;do{const
 async function main(){
  const source=fs.readFileSync(SPIELDATEI,'utf8'),pkg=JSON.parse(fs.readFileSync(path.join(WURZEL,'docs/combat-art-package.json'),'utf8'));
  const families=pkg.activeFamilies,active=[...families.effects,...families.bosses,...families.rift],oracle=Object.fromEntries(pkg.groups.flatMap(group=>group.tiles.filter(t=>active.includes(t.key)).map(t=>[t.key,{...group,rect:t.rect}]))),records=[],runs=[];
- const runtime=[SPIELDATEI,...['kepler-graphics.css','service-worker.js','kepler-english.json',...fs.readdirSync(WURZEL).filter(name=>/^kepler-gfx-.*\.(png|webp)$/.test(name)).sort()].map(name=>path.join(WURZEL,name)),...(SERVER_JS?[SERVER_JS]:[])];
- const hashes=()=>runtime.map(file=>({file:path.basename(file),sha256:sha(fs.readFileSync(file))})),before=hashes();let browser;
+ const inventory=deliveredRasterInventory(WURZEL),runtime=rasterRuntimeFiles(WURZEL,SPIELDATEI,SERVER_JS,inventory);
+ const hashes=()=>runtime.map(file=>({file:path.basename(file),sha256:sha(fs.readFileSync(file))})),before=hashes(),packageBefore=inventory.inputFiles.map(file=>sha(fs.readFileSync(file)));let browser;
  const check=(name,ok,data)=>{records.push({name,ok:!!ok});console.log((ok?'OK':'FAIL')+' - '+name+(data===undefined?'':' | '+JSON.stringify(data)));};
  const create=async options=>{const run=await fixture(browser,options);runs.push(run);return run;};
  try{
@@ -91,7 +91,7 @@ async function main(){
   check(labels.map,mapReady&&mapLayout?.reduced==='true'&&mapLayout.animations===0&&mapLayout.pointerless&&mapPixelResults.length===5&&mapPixelResults.every(r=>r.pixels.count>20&&r.pixels.diff<18&&r.pixels.maxMeanRGBDiff<=3),{layout:mapLayout,results:mapPixelResults});
   const expired=await boolean(map.page,()=>!document.querySelector('#galaxyMapSvg [data-map-kampf]'),null,12000),expiredAt=Date.now(),mapIdentity=mapControls.length===13&&(await Promise.all(mapControls.map((h,i)=>h.evaluate((e,i)=>e.isConnected&&e===document.querySelectorAll('#commandNav .tab-btn')[i],i)))).every(Boolean);
   check(labels.mapLife,battle&&expired&&expiredAt-seenAt>=5000&&expiredAt-seenAt<=10500&&expiredAt<arrival+300000&&mapIdentity,{seenAt,expiredAt,lifetime:expiredAt-seenAt,returnedAt:arrival+300000,mapIdentity});await map.close();
-  check(labels.hashes,runtime.length===113&&JSON.stringify(hashes())===JSON.stringify(before),{count:runtime.length,hashes:hashes()});
+  check(labels.hashes,inventory.originalAssetFiles.length===108&&runtime.length===139&&JSON.stringify(hashes())===JSON.stringify(before)&&JSON.stringify(inventory.inputFiles.map(file=>sha(fs.readFileSync(file))))===JSON.stringify(packageBefore),{originalAssetCount:108,originalRuntimeCount:113,count:runtime.length,hashes:hashes()});
   check(labels.script,runs.every(r=>r.errors.length===0),runs.flatMap(r=>r.errors));check(labels.http,runs.every(r=>r.httpErrors.length===0),runs.flatMap(r=>r.httpErrors));
   if(JSON.stringify(records.map(r=>r.name))!==JSON.stringify(manifest))throw Error('Complete native combat manifest or order changed');const failures=records.filter(r=>!r.ok).length;console.log(records.length+' checks, '+failures+' failures');console.log((failures?'FAIL':'OK')+' - Native combat raster art');process.exitCode=failures?1:0;
  }finally{for(const run of runs)await run.close();if(browser)await browser.close();}

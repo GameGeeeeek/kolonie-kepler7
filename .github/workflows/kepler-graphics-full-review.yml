@@ -5,7 +5,7 @@ on:
     branches: [main]
     types: [ready_for_review, synchronize]
   push:
-    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock, codex/ship-menu-harmony, codex/combat-raster-harmony, codex/remaining-raster-harmony]
+    branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock, codex/ship-menu-harmony, codex/combat-raster-harmony, codex/remaining-raster-harmony, codex/ship-sharpness]
     paths:
       - .gitattributes
       - .github/workflows/kepler-graphics-full-review.yml
@@ -54,6 +54,15 @@ on:
       - tests/lib/ship-raster-manifest.json
       - tests/lib/graphics-loading-manifest.json
       - docs/ship-art-package.json
+      - docs/ship-detail-art-package.json
+      - docs/asteroid-mining-art-package.json
+      - docs/ship-detail-art-prompts.json
+      - docs/asteroid-mining-art-prompts.json
+      - tests/test_ship_raster_sharpness.js
+      - tools/check-ship-raster-sharpness-counterexamples.cjs
+      - tests/test_asteroid_raster_art.js
+      - tests/test_asteroid_banner_cache.js
+      - tools/check-asteroid-raster-counterexamples.cjs
       - docs/ship-art-prompts.json
       - docs/ship-raster-assets.md
       - tests/test_uebersicht_schrift.js
@@ -112,7 +121,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   complete-suite:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.head_ref == 'codex/interface-clarity')
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && (github.head_ref == 'codex/interface-clarity' || github.head_ref == 'codex/ship-sharpness'))
     strategy:
       fail-fast: false
       matrix:
@@ -146,6 +155,9 @@ jobs:
           fi
           git rev-parse HEAD > /tmp/kepler-tested-commit.txt
           sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
+          test "$(wc -l < /tmp/kepler-tested-source.txt)" -eq 139
+          test "$(grep -Ec '  kepler-gfx-.*\.png$' /tmp/kepler-tested-source.txt)" -eq 67
+          test "$(grep -Ec '  kepler-gfx-.*\.webp$' /tmp/kepler-tested-source.txt)" -eq 67
       - name: Full suite partition through actual HTTP origins
         shell: bash
         run: |

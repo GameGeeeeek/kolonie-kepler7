@@ -30,6 +30,12 @@
 .gfx-picker select:focus-visible { outline:3px solid var(--gfx-focus); outline-offset:2px; }
 .gfx-native-ship { position:absolute; inset:0; display:grid; place-items:center; }
 .gfx-native-ship canvas { max-width:94%; height:auto!important; aspect-ratio:4/3; }
+/* Both hero surfaces occupy the original cell. Only a successfully painted
+   detail bank may replace its canonical fallback; loading never changes layout. */
+.gfx-native-ship > canvas { grid-area:1 / 1; pointer-events:none; }
+.gfx-native-ship > .gfx-ship-detail { opacity:0; }
+.gfx-native-ship[data-ship-detail-ready="true"] > canvas:not([data-ship-detail]) { opacity:0; }
+.gfx-native-ship[data-ship-detail-ready="true"] > .gfx-ship-detail { opacity:1; }
 .gfx-defense-model { display:flex; flex-direction:column; align-items:center; gap:8px; margin:14px 0; background:#0c1224; border:var(--bw-1) solid var(--gfx-line); padding:12px; }
 .gfx-defense .gfx-landscape { object-position:center; }
 .gfx-tech-preview { position:absolute; bottom:20px; left:20px; right:20px; display:flex; gap:16px; align-items:center; padding:15px; background:rgba(8,12,25,.92); border:var(--bw-1) solid #69769c; font-size:16px; color:var(--gfx-text); }
@@ -1076,6 +1082,11 @@ body.command-ui .kmenu button { box-sizing:border-box; min-width:0; white-space:
    sizes. The inspector allocates columns to labels and full numerical values. */
 #fleet .ship-art canvas[data-gfx-ship-thumb] { width:100%!important; height:100%!important; object-fit:contain; }
 .gfx-native-ship canvas { width:min(94%,680px)!important; max-height:calc(100% - 68px); object-fit:contain; }
+@supports (width:1cqh) {
+ .gfx-native-ship { container-type:size; }
+ /* Restrict both axes to the same 4:3 paint rectangle, retaining the caption gap. */
+ .gfx-native-ship canvas { width:min(94cqw,680px,calc((100cqh - 68px) * 4 / 3))!important; }
+}
 :is(#shipyardVisual .gfx-inspector,#fleet .ship-card) .sstat {
  display:grid; grid-template-columns:60px minmax(8px,1fr) minmax(56px,1fr); gap:6px;
 }

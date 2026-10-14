@@ -15,9 +15,12 @@ const cases=[
  {name:'map-composition',source:()=>replace(source,"composition:Object.fromEntries(Object.entries(m.composition||(m.shipKey?{[m.shipKey]:m.qty}:{}))\n        .map(([key,qty])=>[key,Number(qty)]).filter(([key,qty])=>Object.prototype.hasOwnProperty.call(SHIP_HULL_DEFS,key)&&Number.isFinite(qty)&&qty>0))",'composition:{}'),failed:[labels.composition,labels.map]}
 ];
 const requested=process.argv.slice(2);assert(new Set(requested).size===requested.length&&requested.every(name=>cases.some(c=>c.name===name)),'unknown or duplicate genuine combat fault');
-const assetFiles=fs.readdirSync(root).filter(name=>/^kepler-gfx-.*\.(png|webp)$/.test(name)).sort();assert.equal(assetFiles.length,108,'all54 PNG and54 WebP delivered assets remain frozen');
+const {deliveredRasterInventory,rasterRuntimeFiles}=require(path.join(root,'tests/test_ship_raster_art.js'));
+const inventory=deliveredRasterInventory(root),assetFiles=inventory.assetFiles;
 const tracked=[game,...['kepler-graphics.css','service-worker.js','kepler-english.json','marketing-screenshots.js','docs/combat-art-package.json','docs/combat-art-prompts.json','docs/ship-art-package.json','tests/test_combat_raster_art.js','tests/test_ship_raster_art.js','tests/lib/combat-raster-fixture.js','tests/lib/combat-raster-manifest.json','tests/lib/ship-raster-fixture.js','tests/lib/umgebung.js','tests/lib/spieldatei.js','.github/workflows/kepler-graphics-full-review.yml','.github/workflows/kepler-graphics-review.yml','.github/workflows/kepler-ideas-review.yml'].map(name=>path.join(root,name)),__filename,...assetFiles.map(name=>path.join(root,name))];
 const backend=require(path.join(root,'tests/lib/spieldatei')).SERVER_JS;if(backend)tracked.push(backend);
+rasterRuntimeFiles(root,game,backend,inventory);
+tracked.push(...inventory.inputFiles.filter(file=>!tracked.includes(file)));
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),hashes=()=>Object.fromEntries(tracked.map(file=>[path.relative(root,file),hash(file)])),before=hashes();
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-combat-raster-')),evidence=path.resolve(root,'../combat-raster-harmony-2026-10-13','combat-raster-counter-'+new Date().toISOString().replace(/[:.]/g,''));fs.mkdirSync(evidence,{recursive:true});
 function run(name,file){

@@ -120,7 +120,7 @@ async function canonicalPlanetPixels(page,selector,key){
   await page.locator('#shipyardVisual [data-gfx-build="ship"]').click();
   const queued=await page.evaluate(()=>__gfxReview.state().constructionQueue.filter(j=>j.kind==='ship'&&j.key==='jaeger'&&j.planet==='home').reduce((n,j)=>n+j.qty,0));
   check('illustrated ship action creates exactly one real local build order',queued===1,{queued});
-   const heroSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="jaeger"]';
+   const heroSelector='#shipyardVisual .gfx-native-ship canvas[data-ship-icon="jaeger"]:not([data-ship-detail])';
    if(await page.locator(heroSelector).count()===1){
     await page.locator(heroSelector).scrollIntoViewIfNeeded();
     await page.waitForFunction(selector=>document.querySelector(selector)?.dataset.shipArtReady==='true',heroSelector);
