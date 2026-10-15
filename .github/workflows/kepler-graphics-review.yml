@@ -495,10 +495,33 @@ jobs:
         run: node tests/http-run.js test_mobile_settings_compact.js
       - name: Complete genuine mobile source counterexamples
         run: node tools/check-mobile-settings-compact-counterexamples.cjs
+      - name: Preserve complete native mobile evidence
+        if: always()
+        shell: python
+        run: |
+          import hashlib, os, shutil
+          from pathlib import Path
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          source = workspace.parent / 'mobile-settings-compact-2026-10-15'
+          target = workspace / '.mobile-settings-evidence'
+          cases = sorted(source.glob('counter-*'))
+          assert cases, 'No native mobile counterexample receipts exist'
+          assert not target.exists(), 'Never overwrite native mobile evidence'
+          expected = {}
+          for case in cases:
+              assert case.is_dir(), 'Expected a native counterexample directory'
+              for file in case.rglob('*'):
+                  if file.is_file():
+                      expected[str(file.relative_to(source))] = hashlib.sha256(file.read_bytes()).hexdigest()
+              shutil.copytree(case, target / case.name)
+          actual = {str(file.relative_to(target)): hashlib.sha256(file.read_bytes()).hexdigest()
+                    for file in target.rglob('*') if file.is_file()}
+          assert expected and actual == expected, 'Native mobile evidence copy changed bytes'
+          print(f'Preserved {len(actual)} native mobile evidence files with identical SHA-256 hashes')
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: kepler-mobile-settings-review
-          path: ../mobile-settings-compact-2026-10-15/counter-*/**
+          path: .mobile-settings-evidence/
           include-hidden-files: true
           retention-days: 7

@@ -75,6 +75,28 @@ async function escapeReturn(page){
  if(!await page.locator('#commandMenuToggle').isVisible())return {drawer:false,valid:!await page.locator('#commandNav').evaluate(e=>e.classList.contains('open'))};
  await drawer(page);await page.keyboard.press('Escape');return page.evaluate(()=>({drawer:true,valid:!document.getElementById('commandNav').classList.contains('open')&&document.getElementById('commandNavBackdrop').hidden&&document.getElementById('commandMenuToggle').getAttribute('aria-expanded')==='false'&&document.activeElement===document.getElementById('commandMenuToggle')}));
 }
+async function menuScrollAccess(page){
+ // A nearest-edge automation scroll can leave the action just below an
+ // incorrectly sticky inner tab grid. Exercise the real user scroll to the end
+ // first and capture both native action hits before any pointer recovery.
+ const nav=page.locator('#commandNav'),samples=[];
+ const measure=async()=>({nav:await nav.evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height,scroll:e.scrollTop,client:e.clientHeight,total:e.scrollHeight};}),
+  settings:await page.locator('#commandNav .command-tools > [data-command-header="headerProfileBtn"]').count()?await probe(page,'#commandNav .command-tools > [data-command-header="headerProfileBtn"]'):null,
+  account:await probe(page,'#commandAccountBtn')});
+ samples.push(await measure());
+ for(let index=0;index<6;index++){
+  const before=samples.at(-1);if(before.nav.scroll+before.nav.client>=before.nav.total-1)break;
+  const point={x:before.nav.left+before.nav.width/2,y:Math.max(1,Math.min((await page.viewportSize()).height-1,before.nav.top+before.nav.height/2))};
+  await page.mouse.move(point.x,point.y);await page.mouse.wheel(0,600);
+  const quiet=await nav.evaluate(e=>new Promise(resolve=>{const started=performance.now();let previous=null,since=started,frame;
+   const deadline=setTimeout(()=>{cancelAnimationFrame(frame);resolve({stable:false});},3000);
+   function sample(now){const r=e.getBoundingClientRect(),values=[r.x,r.y,r.width,r.height,e.scrollTop,scrollY];if(!previous||values.some((v,i)=>Math.abs(v-previous[i])>.1))since=now;previous=values;if(now-since>=200){clearTimeout(deadline);resolve({stable:true});}else frame=requestAnimationFrame(sample);}
+   frame=requestAnimationFrame(sample);
+  }));
+  samples.push({...await measure(),point,quiet});
+ }
+ const last=samples.at(-1);return {valid:last.nav.client>0&&last.nav.scroll+last.nav.client>=last.nav.total-1&&touch(last.settings)&&touch(last.account),samples};
+}
 async function boot(page){
  if(!await f.boolean(page,()=>document.body.classList.contains('command-ui')&&document.getElementById('commandPlayerName')?.textContent==='Kommandant',null,15000))throw Error('Actual authenticated reload did not finish');
  await page.locator('#loginOverlay').waitFor({state:'hidden'});
@@ -162,16 +184,17 @@ async function main(){
    if(width===1487){await f.pointer(page,'#commandStats > summary');popup=await page.locator('#commandStats').evaluate(e=>e.open);}
    const direct=await newEntry(page,'#commandSettingsBtn');
    check(labels.route(width),direct.clicked&&arrived(direct.actual)&&(popup===null||popup===true),{...direct,popup});
-   await collapseDisplay(page);await drawer(page);
+   await collapseDisplay(page);await drawer(page);const scrollAccess=await menuScrollAccess(page);
    const menu=page.locator('#commandNav .command-tools > [data-command-header="headerProfileBtn"]'),upfront=await menu.count()===1&&await menu.evaluate(e=>!e.closest('details'));
    const viaMenu=await newEntry(page,'#commandNav .command-tools > [data-command-header="headerProfileBtn"]'),returned=await escapeReturn(page);
-   check(labels.menu(width),upfront&&viaMenu.clicked&&touch(viaMenu.physical)&&arrived(viaMenu.actual)&&returned.valid,{upfront,...viaMenu,returned});
+   check(labels.menu(width),upfront&&scrollAccess.valid&&viaMenu.clicked&&touch(viaMenu.physical)&&arrived(viaMenu.actual)&&returned.valid,{upfront,scrollAccess,...viaMenu,returned});
    const artwork=await graphics(page,width,900,false,researchKeys),identity=await Promise.all(originals.map((node,i)=>node.evaluate((e,i)=>e.isConnected&&e===document.querySelectorAll('#commandNav .tab-btn')[i],i)));
    const membership=await page.locator('.tab-btn').evaluateAll(es=>es.map(e=>e.dataset.tab));
    check(labels.graphics(width),artwork.pass&&identity.length===13&&identity.every(Boolean)&&JSON.stringify(membership)===JSON.stringify(f.TABS),{...artwork,identity,membership});
   }
   await page.setViewportSize({width:844,height:390});await choose(page,'commandMenuPosition','left');
-  const landscape=await graphics(page,844,390,false,researchKeys);check(labels.landscape,landscape.pass,landscape);
+  await drawer(page);const landscapeAccess=await menuScrollAccess(page),landscapeReturn=await escapeReturn(page);
+  const landscape=await graphics(page,844,390,false,researchKeys);check(labels.landscape,landscape.pass&&landscapeAccess.valid&&landscapeReturn.valid,{...landscape,access:landscapeAccess,returned:landscapeReturn});
   await page.setViewportSize({width:1280,height:900});await accountSettings(page);
   const options=await page.locator('#commandMenuPosition option,#commandDisplaySize option,#commandGraphicsQuality option').evaluateAll(es=>es.map(e=>({value:e.value,text:e.textContent.trim()})));
   for(const size of ['compact','standard','large'])await choose(page,'commandDisplaySize',size);

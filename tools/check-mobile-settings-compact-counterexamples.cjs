@@ -36,9 +36,9 @@ const footerHidden=widths.flatMap((w,i)=>[names[i*4],names[i*4+1]]).concat(names
 const routeOnly=widths.flatMap((w,i)=>[names[i*4+1],names[i*4+2]]).concat(names[26]);
 const cases=[
  {name:'hidden-footer',style:()=>css+'\n/* genuine absent persistent entry */\nbody.command-ui #commandSettingsBtn { display:none!important; }\n',failed:footerHidden},
- {name:'missing-upfront-menu',html:()=>unique(source,'<button type="button" data-command-header="headerProfileBtn" aria-controls="tab-einstellungen"><i class="ti ti-adjustments" aria-hidden="true"></i>Einstellungen</button>',''),failed:widths.map((w,i)=>names[i*4+2])},
+ {name:'missing-upfront-menu',html:()=>unique(source,'<button type="button" data-command-header="headerProfileBtn" aria-controls="tab-einstellungen"><i class="ti ti-adjustments" aria-hidden="true"></i>Einstellungen</button>',''),failed:widths.map((w,i)=>names[i*4+2]).concat(names[24])},
  {name:'panel-only-settings-route',html:()=>unique(source,"    navToQuestTarget({tab:'einstellungen',section:'anzeige'});","    switchTab('einstellungen');"),failed:routeOnly},
- {name:'drawer-sticky-tabs',style:()=>unique(css,'body.command-ui #game-root .command-rail .tabs { position:static; top:auto; z-index:auto; }',''),failed:[320,390,760].map(w=>names[widths.indexOf(w)*4+2])},
+ {name:'drawer-sticky-tabs',style:()=>unique(css,'body.command-ui #game-root .command-rail .tabs { position:static; top:auto; z-index:auto; }',''),failed:[320,390,760].map(w=>names[widths.indexOf(w)*4+2]).concat(names[24])},
  {name:'old-illustration-sizes',style:()=>{
   // Omit only the three real scene-size overrides. The independent footer,
   // drawer, typography and image-fitting repairs stay present, so this genuine

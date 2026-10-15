@@ -28,12 +28,13 @@ const before=snapshot(),stamp=new Date().toISOString().replace(/[:.]/g,''),evide
 fs.mkdirSync(evidence,{recursive:true});
 const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'kepler-display-'));
 function replace(bytes,old,next){assert.equal(bytes.split(old).length,2,'Unique actual implementation anchor: '+old);return bytes.replace(old,next);}
-// The genuine omitted scroll repair has four physical hit failures on both hosts.
-// The historical fifth Linux failure was the raw 44px bbox rounding remainder;
-// both preserved runs had a genuine positive 1280px left-menu hit.
+// Omitting the native post-change focus repair exposes four physical hit
+// failures on Windows. The compact mobile footer adds a measured fifth Linux
+// failure at 768px/left: its large select hits commandSettingsBtn. Windows keeps
+// that select uncovered; 1280px/left remains a real positive on both hosts.
 const preferenceVisibilityByPlatform={
  win32:[[390,'left'],[390,'top'],[768,'top'],[1280,'top']],
- linux:[[390,'left'],[390,'top'],[768,'top'],[1280,'top']]
+ linux:[[390,'left'],[390,'top'],[768,'left'],[768,'top'],[1280,'top']]
 };
 assert(Object.prototype.hasOwnProperty.call(preferenceVisibilityByPlatform,process.platform),'Preference visibility fault has not been measured on this platform');
 function run(file,style,label){

@@ -85,6 +85,23 @@ async function layout(page){
    headerHeight:h.height,stickyHeight:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--leisten-hoehe'))};
  });
 }
+async function centerSettled(control){
+ // Short displays have a fixed status footer. Complete native centered scrolling
+ // before the original physical hit guard; no handler or layout is changed.
+ await control.evaluate(e=>e.scrollIntoView({block:'center',inline:'center',behavior:'instant'}));
+ await control.evaluate(e=>new Promise((resolve,reject)=>{
+  const start=performance.now();let previous='',since=start;
+  const frame=()=>{
+   if(!e.isConnected)return reject(Error('Native short-display control detached while settling'));
+   const r=e.getBoundingClientRect(),status=document.querySelector('.command-status')?.getBoundingClientRect();
+   const value=JSON.stringify([r.x,r.y,r.width,r.height,scrollX,scrollY,status?.top]);
+   const now=performance.now();if(value!==previous){previous=value;since=now;}
+   if(now-since>=200)return resolve();
+   if(now-start>=3000)return reject(Error('Native short-display geometry did not settle'));
+   requestAnimationFrame(frame);
+  };requestAnimationFrame(frame);
+ }));
+}
 async function tabActions(page,label,drawer){
  const membership=await page.locator('#commandNav .tab-btn').evaluateAll(es=>es.map(e=>e.dataset.tab));
  const all=await page.locator('.tab-btn').evaluateAll(es=>es.map(e=>e.dataset.tab));
@@ -203,10 +220,10 @@ async function logout(page){
   }
   for(const [width,height] of [[844,390],[390,360]]){
    await page.setViewportSize({width,height});
-   const tab=page.locator('#commandNav .tab-btn[data-tab=basis]');await tab.scrollIntoViewIfNeeded();await tab.click();
+   const tab=page.locator('#commandNav .tab-btn[data-tab=basis]');await centerSettled(tab);await tab.click();
    await page.locator('#tab-basis').waitFor({state:'visible'});
    const control=page.locator('#colonyVisual [data-gfx-build=building][data-gfx-key=mine]');
-   await control.scrollIntoViewIfNeeded();
+   await centerSettled(control);
    const hit=await control.evaluate(e=>{const r=e.getBoundingClientRect(),p=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2),
     nav=document.getElementById('commandNav').getBoundingClientRect(),hero=document.querySelector('.hero').getBoundingClientRect();
     return {exists:!!e,enabled:!e.disabled,w:r.width,h:r.height,x:r.x+r.width/2,y:r.y+r.height/2,
