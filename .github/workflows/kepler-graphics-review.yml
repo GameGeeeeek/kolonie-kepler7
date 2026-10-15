@@ -7,6 +7,10 @@ on:
       - .gitattributes
       - service-worker.js
       - kepler-english.json
+      - void-sector-invitation.png
+      - docs/void-sector-invitation-art.json
+      - tests/test_void_sector_invitation.js
+      - tools/check-void-sector-invitation-counterexamples.cjs
       - locales/en.json
       - tools/i18n/**
       - tools/ideas/sync.cjs
@@ -466,8 +470,85 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  void-invitation:
+    runs-on: ubuntu-latest
+    # Five bounded native runs (direct20 + controller baseline/three faults).
+    timeout-minutes: 30
+    env:
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare native invitation browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Record all original runtime files and the independently named invitation image
+        run: |
+          set -euo pipefail
+          mkdir .void-invitation-evidence
+          git rev-parse HEAD > .void-invitation-evidence/frontend-commit.txt
+          git -C .review-backend rev-parse HEAD > .void-invitation-evidence/backend-commit.txt
+          test "$(cat .void-invitation-evidence/backend-commit.txt)" = 00fe250194f419e1b0063f24da146bbb5c7041c7
+          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp void-sector-invitation.png .review-backend/server.js > .void-invitation-evidence/source.sha256
+          test "$(wc -l < .void-invitation-evidence/source.sha256)" -eq 140
+          test "$(grep -Ec '  kepler-gfx-.*\.png$' .void-invitation-evidence/source.sha256)" -eq 67
+          test "$(grep -Ec '  kepler-gfx-.*\.webp$' .void-invitation-evidence/source.sha256)" -eq 67
+          sha256sum tests/test_void_sector_invitation.js tools/check-void-sector-invitation-counterexamples.cjs tests/lib/ship-raster-fixture.js locales/en.json docs/void-sector-invitation-art.json .github/workflows/kepler-graphics-review.yml > .void-invitation-evidence/inputs.sha256
+      - name: Native optional invitation and all genuine regressions
+        run: |
+          set -euo pipefail
+          node tests/run.js --nur-pflicht 2>&1 | tee .void-invitation-evidence/required.log
+          node tests/test_void_sector_invitation.js 2>&1 | tee .void-invitation-evidence/native.log
+          node tools/check-void-sector-invitation-counterexamples.cjs 2>&1 | tee .void-invitation-evidence/controller.log
+          sha256sum -c .void-invitation-evidence/source.sha256
+          sha256sum -c .void-invitation-evidence/inputs.sha256
+      - name: Preserve complete invitation children inside the workspace
+        if: always()
+        shell: python
+        run: |
+          import hashlib, os, pathlib, shutil
+          workspace = pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          source = workspace.parent / 'void-sector-invitation-2026-10-15'
+          target = workspace / '.void-invitation-evidence' / 'children'
+          assert not target.exists(), 'Never overwrite invitation evidence'
+          paths = sorted(source.glob('counter-*'))
+          assert paths, 'Native invitation controller evidence is absent'
+          expected = {}
+          for folder in paths:
+              assert folder.is_dir() and not folder.is_symlink()
+              for file in folder.rglob('*'):
+                  assert not file.is_symlink()
+                  if file.is_file(): expected[str(file.relative_to(source))] = hashlib.sha256(file.read_bytes()).hexdigest()
+              shutil.copytree(folder, target / folder.name)
+          actual = {str(file.relative_to(target)): hashlib.sha256(file.read_bytes()).hexdigest() for file in target.rglob('*') if file.is_file()}
+          assert expected and actual == expected, 'Invitation evidence copy changed bytes'
+          print(f'Preserved {len(actual)} invitation evidence files byte-exactly')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-void-invitation-review
+          path: .void-invitation-evidence/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
   mobile-settings:
-    if: github.head_ref == 'codex/mobile-settings-compact' && !github.event.pull_request.draft
+    if: (github.head_ref == 'codex/mobile-settings-compact' || github.head_ref == 'codex/void-sector-invitation') && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
