@@ -1,0 +1,66 @@
+name: Merge readiness
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  workflow_run:
+    workflows:
+      - Kepler graphics review
+      - Kepler graphics full review
+      - Kepler ideas regression checks
+      - Kepler interface review
+    types: [requested, in_progress, completed]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'pc wartet auf diesen Rechner; github ist die manuelle Alternative'
+        type: choice
+        required: true
+        default: pc
+        options: [pc, github]
+      pr_number:
+        description: 'PR-Nummer, leer fuer alle offenen PRs nach main'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: merge-readiness-${{ github.event_name == 'workflow_dispatch' && inputs.runner || 'pc' }}
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    name: Evaluate required CI and documented review
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Metadata only. Never check out a PR head or run its code here.
+          ref: main
+          persist-credentials: false
+          sparse-checkout: .github
+      - name: Ensure the safe YAML reader is available
+        run: |
+          if ! python3 -c 'import yaml' 2>/dev/null; then
+            python3 -m pip install --disable-pip-version-check --no-deps --target "$RUNNER_TEMP/merge-python" PyYAML==6.0.3
+          fi
+      - name: Verify the merge guard and its counterexamples
+        env:
+          PYTHONPATH: ${{ runner.temp }}/merge-python
+        run: python3 -m unittest discover -s .github/merge -p 'test_*.py' -v
+      - name: Publish exact-head readiness for applicable CI and reviews
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PYTHONPATH: ${{ runner.temp }}/merge-python
+        run: python3 .github/merge/merge_readiness.py

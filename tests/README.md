@@ -57,6 +57,32 @@ zusammengesetzte Beschreibungen nach Möglichkeit auswerten statt nur `desc:'…
 Nach einer Harness-Reparatur müssen die bestehenden Prüfungen erhalten bleiben und eine gezielt
 beschädigte Spielkopie weiterhin an der fachlichen Assertion scheitern.
 
+## GPU-Grafiktests auf dem PC
+
+Die beiden Grafik-Workflows setzen auf dem PC `PC_CHROMIUM_GPU=1`. Der gemeinsame
+Browserstart nutzt dann Chromium mit der privaten virtuellen Xvfb-Anzeige des
+Runners. Es erscheint kein Fenster auf dem Windows-Desktop. Vor jedem Testbrowser
+werden der tatsächliche Renderer und Hardware-WebGL, Canvas2D, Compositing und
+Rasterisierung geprüft; ein Software-Fallback lässt den GPU-Lauf fehlschlagen.
+Die manuell wählbare GitHub-Alternative bleibt im bisherigen Headless-Modus.
+Manuelle PC-Läufe bieten zusätzlich `graphics=software`; `graphics=gpu` ist die
+Standardeinstellung für die PC-Grafik-Workflows.
+
+Für eine lokale Gegenüberstellung denselben Chromium-Build und denselben
+Quellstand verwenden. `PC_CHROMIUM_GPU=0` nutzt die bisherigen Startoptionen;
+`PC_CHROMIUM_GPU=1 xvfb-run -a node tests/test_graphic_polish.js` nutzt die GPU
+(in der GPU-fähigen Runner-WSL). `KEPLER_CHROMIUM` kann beide Messungen auf genau
+dieselbe ausführbare Browserdatei festlegen. Läufe abwechselnd und mehrfach
+ausführen, jeweils ohne weitere CI- oder Browser-Tests daneben. Reine
+Quelltext-/Rechentests werden durch diese Einstellung nicht beschleunigt.
+
+Die Vergleichsmessung auf der RTX 5080 mit Chromium 151 ergab bei jeweils drei
+wechselnden Durchläufen: Graphic Polish 3,46/4,98 s, Graphics Expansion
+11,33/11,87 s und Graphics Refresh 10,18/10,66 s (Software/GPU, Mediane).
+Die drei Tests zusammen lagen bei 25,14/27,51 s. Der GPU-Modus verbessert dort
+die Hardware-Abdeckung, liefert aber keinen gemessenen Geschwindigkeitsgewinn.
+Das ist eine gezielte Auswahl, kein Ergebnis des vollständigen Prüflaufs.
+
 ## Einen neuen Test schreiben
 
 ```js

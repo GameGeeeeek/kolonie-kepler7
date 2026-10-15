@@ -10,12 +10,22 @@ on:
         options:
           - pc
           - github
+      graphics:
+        description: 'Grafiktests: GPU auf dem PC oder Software-Vergleich (GitHub nutzt Software)'
+        type: choice
+        required: true
+        default: gpu
+        options:
+          - gpu
+          - software
   pull_request:
     branches: [main]
     types: [ready_for_review, synchronize]
   push:
     branches: [codex/kepler-graphics-refresh, codex/kepler-graphics-expansion, codex/kepler-visual-harmony, codex/kepler-graphic-polish, codex/kepler-visual-details, codex/kepler-command-hud, codex/loading-menu-position, codex/graphics-loading, codex/graphics-unlock, codex/ship-menu-harmony, codex/combat-raster-harmony, codex/remaining-raster-harmony, codex/ship-sharpness]
     paths:
+      - tests/lib/chromium-gpu.js
+      - tests/lib/umgebung.js
       - .gitattributes
       - .github/workflows/kepler-graphics-full-review.yml
       - .github/workflows/kepler-graphics-review.yml
@@ -142,6 +152,8 @@ jobs:
       matrix:
         part: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
     timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
