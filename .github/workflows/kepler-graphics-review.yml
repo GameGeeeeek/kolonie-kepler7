@@ -1,5 +1,15 @@
 name: Kepler graphics review
 on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Ausfuehrung: pc wartet auf diesen Rechner; github nutzt GitHub-Minuten'
+        type: choice
+        required: true
+        default: pc
+        options:
+          - pc
+          - github
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -120,11 +130,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: graphics-${{ github.event.pull_request.number }}
+  group: graphics-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   polish:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +178,7 @@ jobs:
           node tools/check-graphic-polish-counterexamples.cjs
           node tools/check-mobile-polish-counterexamples.cjs
   graphics:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -255,7 +265,7 @@ jobs:
           git show 6550cb2fdd25f5d5012c61cf06c09d42f6f3b229:weltraum_kolonie.html > /tmp/kepler-release-baseline.html
           KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
   harmony:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -295,7 +305,7 @@ jobs:
           node tests/http-run.js test_english_complete.js test_english_locale.js test_i18n_testkontext.js
           node tools/i18n/check-counterexamples.cjs
   ship-detail-mining:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     # Bound, not a timing claim: 10 asteroid + 3 sharpness controller children
     # and 2 direct positives each retain their 180s native limit (45min total).
     # The remaining 10min cover browser setup, required checks and raw artifacts.
@@ -374,7 +384,7 @@ jobs:
           include-hidden-files: true
           retention-days: 7
   remaining-raster:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -467,8 +477,8 @@ jobs:
           retention-days: 7
 
   mobile-settings:
-    if: github.head_ref == 'codex/mobile-settings-compact' && !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    if: (github.head_ref == 'codex/mobile-settings-compact' || github.ref == 'refs/heads/codex/mobile-settings-compact') && !github.event.pull_request.draft
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 25
     env:
       KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
