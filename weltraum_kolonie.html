@@ -3281,7 +3281,7 @@
       clip-path:none; border-radius:50%;
     }
   </style>
-<link rel="stylesheet" href="kepler-graphics.css?v=20261015-mobile-settings-1">
+<link rel="stylesheet" href="kepler-graphics.css?v=20261015-void-invitation-1">
 
   <!-- Hier stand bis v8.317.0 ein zweites, per sr-only unsichtbares <h1> mit einer 30-Wörter-Kette
        aus Suchbegriffen. Beides entfernt, und zwar aus zwei Gründen: (1) Zwei h1 auf einer Seite sind
@@ -3372,6 +3372,16 @@
       </div>
       <div id="welcomeBackBody" style="margin:1rem 0; display:flex; flex-direction:column; gap:10px;"></div>
       <button id="welcomeBackDismissBtn" class="login-submit" style="width:100%;"><i class="ti ti-check" aria-hidden="true" style="margin-right:4px;"></i>Weiter geht's</button>
+      <aside id="voidSectorInvitation" class="void-sector-invitation" aria-labelledby="voidSectorInvitationTitle" hidden>
+        <div class="void-sector-invitation-head">
+          <img data-void-invitation-image="void-sector-invitation.png" width="384" height="256" loading="lazy" decoding="async" alt="Raumschiff vor einem leuchtenden Sprungtor in Void Sector">
+          <div><span class="void-sector-invitation-eyebrow">Probier mal</span><h3 id="voidSectorInvitationTitle">Void Sector</h3></div>
+          <button id="voidSectorInvitationDismiss" type="button" aria-label="Void-Sector-Hinweis nicht mehr anzeigen"><i class="ti ti-x" aria-hidden="true"></i></button>
+        </div>
+        <p>Erkunde eine gemeinsame Galaxie, baue Rohstoffe ab und rüste dein Raumschiff aus.</p>
+        <p class="void-sector-invitation-bonus"><strong>Kepler-Startbonus: +250 Credits und +5 Hunter-Raketen</strong><span>Einmalig für ein neues Void-Sector-Konto über diesen Einstieg.</span></p>
+        <a id="voidSectorInvitationLink" class="buy affordable" href="https://void.gamegeeeeek.de/?ref=kepler7" target="_blank" rel="noopener noreferrer">Void Sector starten <i class="ti ti-world" aria-hidden="true"></i></a>
+      </aside>
     </div>
   </div>
 
@@ -5302,7 +5312,7 @@ async function k7LoadEnglishCatalogue(url) {
     return {};
   } finally { clearTimeout(timer); }
 }
-const K7_TRANSLATIONS = K7_LANGUAGE === "en" ? await k7LoadEnglishCatalogue("kepler-english.json?v=03dc845ae2c6e41c") : {};
+const K7_TRANSLATIONS = K7_LANGUAGE === "en" ? await k7LoadEnglishCatalogue("kepler-english.json?v=ed502f26672ca7a0") : {};
 const K7_TRANSLATION_PATTERNS = [
   [/^Benötigt (.+)$/, requirement => 'Requires ' + k7InlineTranslation(requirement)],
   [/^Benötigt: (.+)$/, requirement => 'Requires: ' + k7InlineTranslation(requirement)],
@@ -61178,6 +61188,17 @@ async function claimPendingRewards(){
       ${msRow}
     `;
   }
+  function refreshVoidSectorInvitation(){
+    const invitation = document.getElementById('voidSectorInvitation');
+    if (!invitation) return;
+    let dismissed = invitation.dataset.dismissed === 'true';
+    try { dismissed = dismissed || localStorage.getItem('kepler7-void-sector-invitation-hidden') === '1'; } catch (_) {}
+    invitation.hidden = dismissed;
+    if (!dismissed){
+      const image = invitation.querySelector('[data-void-invitation-image]');
+      if (image && !image.hasAttribute('src')) image.src = image.getAttribute('data-void-invitation-image');
+    }
+  }
   function showWelcomeBackModal(offlineSummary, loginBonus){
     if (!offlineSummary && !loginBonus) return;
     const sub = document.getElementById('welcomeBackSub');
@@ -61266,6 +61287,7 @@ async function claimPendingRewards(){
         if (ziel) ziel.click();
       };
     });
+    refreshVoidSectorInvitation();
     document.getElementById('welcomeBackOverlay').style.display = 'flex';
     k7RefreshProgress(true);
   }
@@ -89945,6 +89967,15 @@ document.addEventListener('keydown',event=>{
   if (welcomeBackCloseBtn) welcomeBackCloseBtn.addEventListener('click', closeWelcomeBack);
   const welcomeBackDismissBtn = document.getElementById('welcomeBackDismissBtn');
   if (welcomeBackDismissBtn) welcomeBackDismissBtn.addEventListener('click', closeWelcomeBack);
+  const voidSectorInvitationDismiss = document.getElementById('voidSectorInvitationDismiss');
+  if (voidSectorInvitationDismiss) voidSectorInvitationDismiss.addEventListener('click', () => {
+    const invitation = document.getElementById('voidSectorInvitation');
+    if (!invitation) return;
+    invitation.dataset.dismissed = 'true';
+    invitation.hidden = true;
+    try { localStorage.setItem('kepler7-void-sector-invitation-hidden', '1'); } catch (_) {}
+    if (welcomeBackDismissBtn) welcomeBackDismissBtn.focus();
+  });
   const updateReloadBtn = document.getElementById('updateReloadBtn');
   if (updateReloadBtn) updateReloadBtn.addEventListener('click', saveThenReload);
   const updateNoticeOverlayEl = document.getElementById('updateNoticeOverlay');
