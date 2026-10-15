@@ -10,10 +10,21 @@ on:
         options:
           - pc
           - github
+      graphics:
+        description: 'Grafiktests: GPU auf dem PC oder Software-Vergleich (GitHub nutzt Software)'
+        type: choice
+        required: true
+        default: gpu
+        options:
+          - gpu
+          - software
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      - tests/chromium-gpu-contract.cjs
+      - tests/lib/chromium-gpu.js
+      - tests/lib/umgebung.js
       - .gitattributes
       - service-worker.js
       - kepler-english.json
@@ -135,6 +146,8 @@ concurrency:
 jobs:
   polish:
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -149,6 +162,8 @@ jobs:
           else
             npx playwright install --with-deps chromium
           fi
+      - name: Verify hardware selection and reject a software fallback
+        run: node tests/chromium-gpu-contract.cjs
       - name: Audit findings through real native game rendering
         run: node tests/test_graphic_polish.js
       - name: Selected command-centre HUD and controlled regressions
@@ -179,6 +194,8 @@ jobs:
           node tools/check-mobile-polish-counterexamples.cjs
   graphics:
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -266,6 +283,8 @@ jobs:
           KEPLER_SPIELDATEI=/tmp/kepler-release-baseline.html node tests/http-run.js test_uebersicht_schrift.js test_beschriftung_ausweichen.js
   harmony:
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -311,6 +330,7 @@ jobs:
     # The remaining 10min cover browser setup, required checks and raw artifacts.
     timeout-minutes: 55
     env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
       KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
     steps:
       - uses: actions/checkout@v4
@@ -385,6 +405,8 @@ jobs:
           retention-days: 7
   remaining-raster:
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -481,6 +503,7 @@ jobs:
     runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 25
     env:
+      PC_CHROMIUM_GPU: ${{ !((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && inputs.graphics != 'software' && '1' || '0' }}
       KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
     steps:
       - uses: actions/checkout@v4
