@@ -2,6 +2,7 @@ name: Kepler graphics review
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - .gitattributes
       - service-worker.js
@@ -22,6 +23,8 @@ on:
       - weltraum_kolonie.html
       - kepler-graphics.css
       - tests/test_command_shell.js
+      - tests/test_mobile_settings_compact.js
+      - tools/check-mobile-settings-compact-counterexamples.cjs
       - tests/test_command_quest_closed_layout.js
       - tools/check-command-quest-closed-counterexample.cjs
       - tests/lib/command-shell.js
@@ -460,5 +463,42 @@ jobs:
         with:
           name: kepler-remaining-raster-review
           path: .remaining-raster-evidence/
+          include-hidden-files: true
+          retention-days: 7
+
+  mobile-settings:
+    if: github.head_ref == 'codex/mobile-settings-compact' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare native mobile regression environment
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Native mobile settings and compact graphics
+        run: node tests/http-run.js test_mobile_settings_compact.js
+      - name: Complete genuine mobile source counterexamples
+        run: node tools/check-mobile-settings-compact-counterexamples.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kepler-mobile-settings-review
+          path: ../mobile-settings-compact-2026-10-15/counter-*/**
           include-hidden-files: true
           retention-days: 7
