@@ -43,9 +43,9 @@ const manifest=[labels.boot,...[1,2,3].flatMap(d=>[dprLabel(d),aspectLabel(d),pi
 module.exports={manifest,labels,hdLabels,dprLabel,aspectLabel,pixelsLabel,resizeLabel,resizePixelsLabel,stableSkinSave};
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 function stableSkinSave(){
- // Only the additional skin-action case needs a static, affordable fleet list.
- // Native production and clocks continue normally; the original paint/DPR save
- // remains separate. Real empty queues and full factory stores avoid unrelated
+ // Resize identity and skin actions need a static, affordable fleet list.
+ // Native production and clocks continue normally; the separate gold-paint
+ // fixture remains unchanged. Real empty queues and full factory stores avoid unrelated
  // construction/ETA changes replacing an otherwise correctly repainted card.
  const source=fs.readFileSync(SPIELDATEI,'utf8'),slice=(start,end)=>{
   const a=source.indexOf(start),b=source.indexOf(end,a);
@@ -156,7 +156,8 @@ async function main(){
  let browser;
  try{
   browser=await starteBrowser({args:['--no-sandbox','--disable-dev-shm-usage','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']});
-  const run=await fixture(browser);runs.push(run);const dormantRequests=detailRequests(run).slice();await tab(run.page,'flotte');await pointer(run.page,'#shipyardVisual [data-gfx-ship="jaeger"]');
+  // Keep real order controls idle across resize; locked-event clocks and affordable ETAs are unrelated to backing-store identity.
+  const run=await fixture(browser,{save:{...stableSkinSave().save,shipSkin:'standard',shipMarks:{}}});runs.push(run);const dormantRequests=detailRequests(run).slice();await tab(run.page,'flotte');await pointer(run.page,'#shipyardVisual [data-gfx-ship="jaeger"]');
   check(labels.boot,await run.page.locator('#shipyardVisual [data-gfx-ship-picker]').inputValue()==='jaeger'&&await run.page.locator(thumb).count()===1&&run.requests.some(r=>r.path==='/api/storage/kepler7-save-v3'&&r.status===200));
   const cdp=await run.context.newCDPSession(run.page);
   const metrics=async(width,dpr)=>{await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:1058,deviceScaleFactor:dpr,mobile:false});await boolean(run.page,([w,d])=>innerWidth===w&&devicePixelRatio===d,[width,dpr]);};
