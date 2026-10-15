@@ -49,7 +49,8 @@ const BROWSER = ersterVorhandener([
 // Startoptionen: --no-sandbox ist nötig, weil die Tests in Containern oft als root laufen.
 const STARTOPTIONEN = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (BROWSER) STARTOPTIONEN.executablePath = BROWSER;
-const starteBrowser = (extra) => chromium.launch(Object.assign({}, STARTOPTIONEN, extra || {}));
+const { launchBrowser } = require('./chromium-gpu');
+const starteBrowser = (extra) => launchBrowser(chromium, Object.assign({}, STARTOPTIONEN, extra || {}));
 
 // --- Spieldatei
 // KEPLER_SPIELDATEI zeigt auf eine KOPIE unter anderem Pfad. Gebraucht wird das für Gegenproben
