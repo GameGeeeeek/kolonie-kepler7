@@ -61,7 +61,8 @@ check('Balken haben Breite + Wert', r.bars.every(b=>/%$/.test(b.w) && b.v.length
 check('Balken normiert (nicht alle 100%)', r.bars.some(b=>parseFloat(b.w)<100), r.bars.map(b=>b.w));
 check('Rollen-Streifen gesetzt', /^#|rgb/.test(r.stripe), r.stripe);
 check('Rollen-Kuerzel gerendert', r.roleLabels.filter(Boolean).length>=2, r.roleLabels);
-check('Canvas auf 78px vergroessert', !!r.canvasCoverage&&r.canvasW>=78&&r.canvasCoverage.height>=58
+check('Kompakte mobile Schiffsgrafik mit voller Renderaufloesung', !!r.canvasCoverage&&r.canvasW>=64&&r.canvasCoverage.height>=48
+  &&r.canvasCoverage.contentWidth===64&&r.canvasCoverage.contentHeight===48
   &&r.canvasCoverage.contentWidth>0&&r.canvasCoverage.contentHeight>0&&r.canvasCoverage.effectiveDpr>=1&&r.canvasCoverage.effectiveDpr<=3
   &&r.canvasCoverage.width>=Math.ceil(r.canvasCoverage.paintedWidth*r.canvasCoverage.effectiveDpr)
   &&r.canvasCoverage.height>=Math.ceil(r.canvasCoverage.paintedHeight*r.canvasCoverage.effectiveDpr), r.canvasCoverage);

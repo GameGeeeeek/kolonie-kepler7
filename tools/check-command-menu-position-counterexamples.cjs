@@ -63,7 +63,19 @@ const cases=[
  {name:'short-content',css:()=>replaceCss('max-height:max(44px,min(calc((100dvh - var(--command-header-height,64px) - var(--command-status-height)) / 2),calc(50dvh - var(--command-header-height,64px) - 24px)));',
   'max-height:calc(100dvh - var(--command-header-height,64px) - var(--command-status-height));'),
   failed:[[844,390],[390,360]].map(([width,height])=>'top '+width+'x'+height+' native basis build remains physically reachable on a short display')},
- {name:'nested-sticky',css:()=>replaceCss('position:static; top:auto; z-index:auto;',''),
+ {name:'nested-sticky',css:()=>{
+  // Both the top-menu rule and the mobile rule prevent the inner grid from
+  // covering native actions. Omit both protections in this genuine fault copy.
+  let faulty=css;const declarations='position:static; top:auto; z-index:auto;';
+  for(const selector of ['body.command-ui.command-menu-top #game-root #commandNav .tabs','body.command-ui #game-root .command-rail .tabs']){
+   const escaped=selector.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),rules=[...faulty.matchAll(new RegExp(escaped+' \\{[^}]*\\}','g'))].filter(match=>match[0].includes(declarations));
+   assert.equal(rules.length,1,'one actual nested-grid protection: '+selector);
+   const rule=rules[0][0];
+   assert.equal(rule.split(declarations).length,2,'one scoped static declaration: '+selector);
+   faulty=faulty.replace(rule,rule.replace(declarations,''));
+  }
+  return faulty;
+ },
   failed:['top account entry remains physically reachable after short and 320px resizes']},
  {name:'font-floor',css:()=>replaceCss('font-size:12px; letter-spacing:-.01em; overflow-wrap:normal; word-break:normal; hyphens:auto;',
   'font-size:11px; letter-spacing:-.01em; overflow-wrap:normal; word-break:normal; hyphens:auto;'),
