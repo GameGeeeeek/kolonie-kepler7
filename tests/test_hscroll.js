@@ -142,16 +142,33 @@ async function swipeLeft(page, cdp, box, dist){
         const btns = Array.from(bar.querySelectorAll(':scope > button'));
         if (!btns.length) return null;
         const last = btns[btns.length-1];
-        last.scrollIntoView({block:'nearest', inline:'center'});
+        last.scrollIntoView({block:'center', inline:'center', behavior:'instant'});
         const attr = last.getAttributeNames().find(a=>a.startsWith('data-'));
         return { attr, val: last.getAttribute(attr), text:last.textContent.trim() };
       }, name);
       if (tapInfo){
-        await page.waitForTimeout(400);
+        // Finish the real scroll/layout before measuring the touch point. Nearest-edge
+        // scrolling can leave a tall card behind the fixed status footer.
+        await page.locator(`[${tapInfo.attr}="${tapInfo.val}"]`).evaluate(b=>new Promise((resolve,reject)=>{
+          const start=performance.now();let previous='',since=start;
+          const frame=()=>{
+            if(!b.isConnected)return reject(Error('Touch target detached while settling'));
+            const r=b.getBoundingClientRect(),status=document.querySelector('.command-status')?.getBoundingClientRect();
+            const value=JSON.stringify([r.x,r.y,r.width,r.height,scrollX,scrollY,status?.top]);
+            const now=performance.now();if(value!==previous){previous=value;since=now;}
+            if(now-since>=200)return resolve();
+            if(now-start>=3000)return reject(Error('Touch target geometry did not settle'));
+            requestAnimationFrame(frame);
+          };requestAnimationFrame(frame);
+        }));
         const vis = await page.evaluate(t=>{
           const b=document.querySelector(`[${t.attr}="${t.val}"]`); const r=b.getBoundingClientRect();
-          return { x:Math.round(r.x+r.width/2), y:Math.round(r.y+r.height/2),
-                   inView: r.left >= 0 && r.right <= window.innerWidth };
+          const x=Math.round(r.x+r.width/2),y=Math.round(r.y+r.height/2),hit=document.elementFromPoint(x,y);
+          const status=document.querySelector('.command-status'),sr=status?.getBoundingClientRect();
+          const bottom=sr&&sr.width>0&&sr.height>0?Math.min(innerHeight,sr.top):innerHeight;
+          return {x,y,rect:{left:r.left,right:r.right,top:r.top,bottom:r.bottom},usableBottom:bottom,
+            hit:b.contains(hit),cover:hit?.id||hit?.className,
+            inView:r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=bottom&&b.contains(hit)};
         }, tapInfo);
         check(label+': hinterster Eintrag ("'+tapInfo.text.slice(0,24)+'") wird sichtbar', vis.inView, vis);
         await page.touchscreen.tap(vis.x, vis.y);
