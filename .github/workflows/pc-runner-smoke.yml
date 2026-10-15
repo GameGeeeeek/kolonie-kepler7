@@ -1,0 +1,52 @@
+name: PC runner smoke
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Ausfuehrung: pc wartet auf diesen Rechner; github nutzt GitHub-Minuten'
+        type: choice
+        required: true
+        default: pc
+        options:
+          - pc
+          - github
+permissions:
+  contents: read
+jobs:
+  smoke:
+    name: PC runner smoke
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Check Linux, Node, pnpm, Python and Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          test "$(uname -m)" = x86_64
+          node --version
+          corepack enable
+          corepack prepare pnpm@11.19.0 --activate
+          pnpm --version
+          python3 --version
+          git --version
+          docker version
+          docker compose version
+          docker run --rm hello-world
+      - name: Check native Chromium fixtures
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser-smoke" --no-audit --no-fund playwright@1.62.1
+          "$RUNNER_TEMP/browser-smoke/node_modules/.bin/playwright" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/browser-smoke/node_modules" node - <<'JS'
+          const {chromium} = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({headless:true});
+            const page = await browser.newPage();
+            await page.setContent('<h1>PC runner ready</h1>');
+            if (await page.locator('h1').innerText() !== 'PC runner ready') throw new Error('Chromium check failed');
+            await browser.close();
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          JS
