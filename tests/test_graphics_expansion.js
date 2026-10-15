@@ -41,9 +41,15 @@ if(process.env.K7_GFX_EXPANSION_FAULT==='catalogue-scroll'){
  source=source.replace(anchor,'if(false&&detail)detail.scrollIntoView(');
 }
 const currentCss=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
-const cssStart=currentCss.indexOf('.gfx-picker {'),cssEnd=currentCss.indexOf('.gfx-heading {');
-assert(cssStart>=0&&cssEnd>cssStart,'verified previous stylesheet reconstruction');
-const cachedCss=currentCss.slice(0,cssStart)+currentCss.slice(cssEnd);
+// Isolated stale-picker CSS witness: omit only the three native picker rules,
+// rather than reconstructing a complete historical sheet or removing later layout rules.
+const pickerRules=[/^\.gfx-picker \{[^{}]*\}/gm,/^\.gfx-picker select \{[^{}]*\}/gm,/^\.gfx-picker select:focus-visible \{[^{}]*\}/gm];
+let cachedCss=currentCss;
+for(const rule of pickerRules){
+ const matches=[...currentCss.matchAll(rule)];
+ assert.equal(matches.length,1,'exactly one native picker rule: '+rule.source);
+ cachedCss=cachedCss.replace(matches[0][0],'');
+}
 const end='\n})();\n</script>\n</body>';
 assert.equal(source.split(end).length-1,1,'verified game export anchor');
 const html=source.replace(end,`\nwindow.__gfxReview={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,
