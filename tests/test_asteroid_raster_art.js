@@ -146,6 +146,19 @@ async function readyBanner(page,selector,key,timeout=10000){return boolean(page,
  return true;
  },{selector,key},timeout);}
 async function readyMap(run){return boolean(run.page,()=>[...document.querySelectorAll('#galaxyMapSvg [data-asteroid-image]')].length===12&&[...document.querySelectorAll('#galaxyMapSvg [data-asteroid-image]')].every(n=>n.dataset.asteroidArtReady==='true'),undefined,8000);}
+async function nativeMapTab(run){
+ // The existing real tab click starts loadPlayersInSystem asynchronously. An
+ // already-visible panel and already-ready image do not witness that response.
+ const [request]=await Promise.all([
+  run.page.waitForRequest(request=>{const url=new URL(request.url());return request.method()==='GET'&&url.origin===new URL(run.page.url()).origin&&url.pathname==='/api/players-map'&&url.searchParams.get('system')==='kepler';},{timeout:8000}),
+  tab(run.page,'karte')
+ ]);
+ const response=await request.response();
+ if(!response||!response.ok())throw Error('The native map-tab player response must succeed');
+ const failure=await response.finished();if(failure)throw failure;
+ const frames=await run.page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(first=>requestAnimationFrame(second=>resolve({first,second})))));
+ console.log('MEASURE - native mining map response | '+JSON.stringify({url:request.url(),status:response.status(),frames}));
+}
 async function prepareDelayedMap(run){
  // Complete unrelated world artwork through its real visible Home consumer
  // before the held mining sheet can occupy the native serial atlas queue.
@@ -168,7 +181,7 @@ async function prepareDelayedMap(run){
   const images=[...document.querySelectorAll('#galaxyMapSvg image[data-game-raster-key]')].filter(n=>/^(?:star|planet):/.test(n.dataset.gameRasterKey));
   return images.some(n=>n.dataset.gameRasterKey==='star:weiss')&&images.every(n=>n.dataset.gameArtReady==='true'&&!!n.getAttribute('href'));
  },undefined,8000))throw Error('Unrelated native system world/star artwork did not finish before the retained mining window');
- await tab(run.page,'karte');
+ await nativeMapTab(run);
  console.log('MEASURE - delayed mining native preparation | '+JSON.stringify(await run.page.locator('#galaxyMapSvg image[data-game-raster-key]').evaluateAll(nodes=>nodes.filter(n=>/^(?:star|planet):/.test(n.dataset.gameRasterKey)).map(n=>({key:n.dataset.gameRasterKey,ready:n.dataset.gameArtReady,atlas:n.dataset.gameAtlas,href:!!n.getAttribute('href')})))));
 }
 const assetRequests=(run,pkg)=>run.requests.filter(r=>pkg.groups.some(g=>r.path==='/'+g.stem+'.webp'||r.path==='/'+g.stem+'.png')&&r.destination==='image'&&!r.query.includes('oracle'));
@@ -235,7 +248,7 @@ async function main(){
   pending.release();await readyMap(pending);
   // The real active-tab action runs its native cached render again. A loaded
   // inline href must not change that markup signature or replace these nodes.
-  await tab(pending.page,'karte');await readyMap(pending);
+  await nativeMapTab(pending);await readyMap(pending);
   const retainedNodes=await Promise.all(retained.map(h=>h.evaluate(n=>({place:n.dataset.mapAsteroid,connected:n.isConnected,same:n===document.querySelector('#galaxyMapSvg [data-map-asteroid="'+n.dataset.mapAsteroid+'"]')}))));
   const late=await illustration(pending.page,mapNode(0),oracle.eisen);
   check(labels.late,canonical(late,'eisen',oracle.eisen)&&retainedNodes.length===12&&retainedNodes.every(n=>n.connected&&n.same),{late,retainedNodes});
