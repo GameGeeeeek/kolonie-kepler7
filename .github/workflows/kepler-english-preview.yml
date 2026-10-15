@@ -1,6 +1,16 @@
 name: Kepler English preview
 
 on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Ausfuehrung: pc wartet auf diesen Rechner; github nutzt GitHub-Minuten'
+        type: choice
+        required: true
+        default: pc
+        options:
+          - pc
+          - github
   push:
     branches: [codex/kepler-english-2026-09-22]
     paths:
@@ -18,7 +28,7 @@ concurrency:
 jobs:
   preview:
     if: github.ref == 'refs/heads/codex/kepler-english-2026-09-22'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 20
     env:
       NODE_PATH: /tmp/kepler-i18n-tools/node_modules

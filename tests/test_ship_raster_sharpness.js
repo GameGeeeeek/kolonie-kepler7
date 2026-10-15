@@ -162,7 +162,9 @@ async function main(){
   const cdp=await run.context.newCDPSession(run.page);
   const metrics=async(width,dpr)=>{await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:1058,deviceScaleFactor:dpr,mobile:false});await boolean(run.page,([w,d])=>innerWidth===w&&devicePixelRatio===d,[width,dpr]);};
   for(const dpr of [1,2,3]){
-   await metrics(1487,dpr);const gs=await witness(run,oracle);
+   // Native cold/resize DPR coverage: pair emulated density with a viewport
+   // change; the density property alone is not a native paint notification.
+   await metrics(1486+dpr,dpr);const gs=await witness(run,oracle);
    check(dprLabel(dpr),gs.every((g,i)=>g.dpr===dpr&&sharp(g,i)),gs);
    // Visible proportions are independent of backing-store density. Neither a
    // larger bitmap nor a responsive update may enlarge/distort the CSS layout.

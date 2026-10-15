@@ -1,5 +1,15 @@
 name: Kepler interface review
 on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Ausfuehrung: pc wartet auf diesen Rechner; github nutzt GitHub-Minuten'
+        type: choice
+        required: true
+        default: pc
+        options:
+          - pc
+          - github
   pull_request:
     branches: [main]
     paths:
@@ -43,11 +53,11 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: interface-${{ github.event.pull_request.number }}
+  group: interface-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   native-interface:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
     timeout-minutes: 35
     env:
       KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
