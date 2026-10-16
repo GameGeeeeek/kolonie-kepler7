@@ -82,7 +82,14 @@ function preserveFailure(name,before,after){
   fs.writeFileSync(path.join(folder,name+'-'+side+'-'+index+'.png'),Buffer.from(item.diagnosticPNG.split(',')[1],'base64'),{flag:'wx'});
  }
 }
-async function visit(run,key){
+async function visitCard(run,key){
+ if(key!=='superschlachtschiff')await run.page.locator(picker).selectOption(key);
+ // Read all ordinary construction cards in their own observation phase. The
+ // native card-only control accounts agree; this keeps prior hero readbacks
+ // out of every card sample without selecting or replacing a failed sample.
+ return readPixels(run.page,'#fleet canvas[data-ship-icon="'+key+'"]',key);
+}
+async function visit(run,key,card){
  const result=[];
  if(key!=='superschlachtschiff'){
   await run.page.locator(picker).selectOption(key);
@@ -91,7 +98,7 @@ async function visit(run,key){
  }
  // All ordinary classes are saved as unlocked, so this is the actual original
  // construction card, including the event/item classes, not the inspector rail.
- result.push(await readPixels(run.page,'#fleet canvas[data-ship-icon="'+key+'"]',key));
+ result.push(card);
  return result;
 }
 function sameHull(before,after,key,art){
@@ -132,13 +139,19 @@ async function main(){
    &&[plain,marked].every(run=>run.requests.some(request=>request.path==='/api/storage/kepler7-save-v3'&&request.status===200)),loaded.map(state=>({shipSkin:state.shipSkin,shipMarks:state.shipMarks})));
   const options=await Promise.all([plain,marked].map(run=>run.page.locator(picker+' option').evaluateAll(nodes=>nodes.map(node=>node.value))));
   check(labels.picker,options.every(list=>list.length===45&&new Set(list).size===45&&keys.filter(key=>key!=='superschlachtschiff').every(key=>list.includes(key))),options);
+  const middle=await fixture(browser,{viewport,save:saved(intermediate)});runs.push(middle);
+  await tab(middle.page,'flotte');await pointer(middle.page,'#shipyardVisual [data-gfx-ship="jaeger"]');
+  const cards={plain:{},marked:{},middle:{}};
+  for(const key of keys){
+   cards.plain[key]=await visitCard(plain,key);
+   cards.marked[key]=await visitCard(marked,key);
+   if(Object.hasOwn(intermediate,key))cards.middle[key]=await visitCard(middle,key);
+  }
   const neutral={};
   // Only one context performs native actions at a time. No parallel browser
   // stress or call to an internal renderer is needed for this regression.
-  for(const key of keys){neutral[key]=await visit(plain,key);const actual=await visit(marked,key),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key,neutral[key],actual);check(classLabel(key),ok,{plain:neutral[key],marked:actual});}
-  const middle=await fixture(browser,{viewport,save:saved(intermediate)});runs.push(middle);
-  await tab(middle.page,'flotte');await pointer(middle.page,'#shipyardVisual [data-gfx-ship="jaeger"]');
-  for(const [key,mk]of Object.entries(intermediate)){const actual=await visit(middle,key),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key+'-mk'+mk,neutral[key],actual);check(stageLabel(key,mk),ok,{plain:neutral[key],marked:actual});}
+  for(const key of keys){neutral[key]=await visit(plain,key,cards.plain[key]);const actual=await visit(marked,key,cards.marked[key]),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key,neutral[key],actual);check(classLabel(key),ok,{plain:neutral[key],marked:actual});}
+  for(const [key,mk]of Object.entries(intermediate)){const actual=await visit(middle,key,cards.middle[key]),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key+'-mk'+mk,neutral[key],actual);check(stageLabel(key,mk),ok,{plain:neutral[key],marked:actual});}
   const after=hashes();check(labels.frozen,JSON.stringify(before)===JSON.stringify(after),{count:frozen.length,originalTests:originalTests.length,hashes:after});
   check(labels.errors,runs.every(run=>!run.errors.length&&!run.httpErrors.length),{javascript:runs.flatMap(run=>run.errors),http:runs.flatMap(run=>run.httpErrors)});
   if(JSON.stringify(records.map(record=>record.name))!==JSON.stringify(manifest))throw Error('Native mark-detail guard manifest or order changed');
