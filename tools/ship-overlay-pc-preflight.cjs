@@ -39,6 +39,7 @@ try{
  frozen=freeze();report.before=frozen;
  const required=run('required',['tests/run.js','--nur-pflicht']);required.item.passed=required.item.status===0;
  native('mark-details','test_ship_raster_mark_details.js');
+ if(!report.cases.at(-1).passed){run('sampling-diagnostics',['tools/ship-overlay-sampling-diagnostics.cjs']);report.diagnostics=report.cases.pop();}
  native('raster-art','test_ship_raster_art.js');
  native('sharpness','test_ship_raster_sharpness.js');
  const forge=run('forge-marks',['tests/test_werftmarken.js']);forge.item.passed=forge.item.status===0&&/\nPASS\s*$/.test(forge.log);
