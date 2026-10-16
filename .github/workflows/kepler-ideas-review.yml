@@ -1,147 +1,60 @@
-name: Kepler ideas regression checks
-on:
-  push:
-    branches: ["feat/kepler-ideas-20261005", "codex/loading-menu-position", "codex/graphics-loading", "codex/graphics-unlock", "codex/ship-menu-harmony", "codex/combat-raster-harmony", "codex/remaining-raster-harmony", "codex/ship-sharpness"]
-  pull_request:
-    branches: [main]
-    paths:
-      - .gitattributes
-      - weltraum_kolonie.html
-      - service-worker.js
-      - kepler-graphics.css
-      - kepler-gfx-*.png
-      - kepler-gfx-*.webp
-      - kepler-english.json
-      - locales/en.json
-      - tools/i18n/**
-      - tools/ideas/sync.cjs
-      - tools/check-lazy-language-counterexamples.cjs
-      - tools/check-lazy-language-unit-counterexamples.cjs
-      - tools/check-command-menu-position-counterexamples.cjs
-      - tests/test_graphics_unlock.js
-      - tools/check-graphics-unlock-counterexamples.cjs
-      - tests/test_ship_raster_art.js
-      - tools/check-ship-raster-art-counterexamples.cjs
-      - tools/check-ship-raster-fixture-counterexample.cjs
-      - tests/test_kartenmenue_scrollen.js
-      - tools/check-map-menu-scroll-scope-counterexample.cjs
-      - tests/test_combat_raster_art.js
-      - tests/test_remaining_raster_art.js
-      - tools/check-remaining-raster-art-counterexamples.cjs
-      - tools/check-kulissenplanet-cache-counterexample.cjs
-      - tools/check-vorposten-raster-layout-counterexamples.cjs
-      - tests/lib/remaining-raster-manifest.json
-      - tests/lib/remaining-raster-fixture.js
-      - docs/remaining-art-package.json
-      - tools/check-combat-raster-art-counterexamples.cjs
-      - tests/lib/combat-raster-manifest.json
-      - tests/lib/combat-raster-fixture.js
-      - docs/combat-art-package.json
-      - docs/combat-art-prompts.json
-      - tests/lib/ship-raster-fixture.js
-      - tests/lib/ship-raster-manifest.json
-      - tests/lib/graphics-loading-manifest.json
-      - docs/ship-art-package.json
-      - docs/ship-detail-art-package.json
-      - docs/asteroid-mining-art-package.json
-      - docs/ship-detail-art-prompts.json
-      - docs/asteroid-mining-art-prompts.json
-      - tests/test_ship_raster_sharpness.js
-      - tools/check-ship-raster-sharpness-counterexamples.cjs
-      - tests/test_asteroid_raster_art.js
-      - tests/test_asteroid_banner_cache.js
-      - tools/check-asteroid-raster-counterexamples.cjs
-      - docs/ship-art-prompts.json
-      - docs/ship-raster-assets.md
-      - tests/**
-      - .github/workflows/kepler-ideas-review.yml
+name: Kepler CPU process benchmark
+permissions:
+  contents: read
+concurrency:
+  group: cpu-process-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  cpu-process-benchmark:
+    runs-on:
+    - self-hosted
+    - Linux
+    - X64
+    - pc-saschaneu
+    timeout-minutes: 60
+    env:
+      PC_CHROMIUM_GPU: '0'
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+      CPU_BENCHMARK_SOURCE_SHA: 4668ad50754bce55e559b43b0c94ba89ba68a368
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: GameGeeeeek/kolonie-kepler7-backend
+        ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+        path: .review-backend
+        persist-credentials: false
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+      with:
+        node-version: '22'
+    - name: Install CPU helper dependency without browsers
+      run: 'set -euo pipefail
+
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-save --package-lock=false
+        --no-audit --no-fund playwright@1.62.1
+
+        git rev-parse HEAD
+
+        test "$(git -C .review-backend rev-parse HEAD)" = 00fe250194f419e1b0063f24da146bbb5c7041c7
+
+        '
+    - name: Verify CPU pool isolation and failure counterexamples
+      run: node --test tools/cpu-pool/cpu-pool.test.cjs
+      env:
+        TMPDIR: ${{ runner.temp }}
+    - name: Compare identical CPU assertions with one, two and four processes
+      run: node tools/cpu-pool/benchmark.cjs
+      env:
+        TMPDIR: ${{ runner.temp }}
+'on':
   workflow_dispatch:
     inputs:
       runner:
-        description: 'Ausfuehrung: pc wartet auf diesen Rechner; github nutzt GitHub-Minuten'
+        description: CPU benchmark runs only on the PC
         type: choice
         required: true
         default: pc
         options:
-          - pc
-          - github
-permissions:
-  contents: read
-concurrency:
-  group: kepler-ideas-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
-jobs:
-  targeted-regressions:
-    runs-on: ${{ fromJSON(((github.event_name == 'workflow_dispatch' && inputs.runner == 'github') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","pc-saschaneu"]') }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          repository: GameGeeeeek/kolonie-kepler7-backend
-          ref: '00fe250194f419e1b0063f24da146bbb5c7041c7'
-          path: .review-backend
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install isolated browser test dependencies
-        run: |
-          npm install --no-save --package-lock=false playwright@1.62.1
-          npx playwright install --with-deps chromium
-      - name: Required checks and feature behaviour
-        env:
-          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
-        run: |
-          set -euo pipefail
-          mkdir -p .review-logs
-          node tests/run.js --nur-pflicht 2>&1 | tee .review-logs/required.log
-          node tests/test_tactical_trial.js 2>&1 | tee .review-logs/trial.log
-          node tests/test_map_favorites.js 2>&1 | tee .review-logs/favorites.log
-      - name: Counterexamples must fail the same assertions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os, subprocess
-          source = Path('weltraum_kolonie.html').read_text()
-          mutations = [
-            ('trial','tests/test_tactical_trial.js','const battle=resolveBattlePhases(base*run.integrity/100,base*0.8,wave.counters[tactic],undefined,undefined,()=>draws[roll++]);','const battle={siege:3,phasen:[]};','result comes from all three actual combat phases'),
-            ('favorites','tests/test_map_favorites.js','const sys = visibleSystems().find(s => s.id === id);','const sys = STAR_SYSTEMS.find(s => s.id === id);','hiddenRejected')
-          ]
-          for name, test, old, new, expected in mutations:
-              assert source.count(old) == 1, (name,'mutation anchor is not unique')
-              target = Path(os.environ['RUNNER_TEMP']) / ('k7-broken-'+name+'.html')
-              target.write_text(source.replace(old,new,1))
-              try:
-                  env = dict(os.environ,KEPLER_SPIELDATEI=str(target))
-                  result = subprocess.run(['node',test],env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=180)
-                  Path('.review-logs/'+name+'-counterexample.log').write_text(result.stdout)
-                  print(result.stdout)
-                  assert result.returncode == 1, (name,'broken copy did not fail correctly')
-                  assert 'FAIL - '+expected in result.stdout, (name,'failed for an unrelated reason')
-                  green = Path('.review-logs/'+name+'.log').read_text()
-                  names = lambda text: [line.split(' - ',1)[1] for line in text.splitlines() if line.startswith(('OK - ','FAIL - '))]
-                  assert names(green) == names(result.stdout), (name,'different assertions in the counterexample')
-              finally:
-                  target.unlink(missing_ok=True)
-          PY
-      - name: Existing map and tab regressions over HTTP
-        env:
-          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
-        run: |
-          set -euo pipefail
-          node tests/http-run.js test_karte_handy_bedienung.js test_kartenfokus.js sweep.js 2>&1 | tee .review-logs/existing-http.log
-      - name: Native map menu scrolling and original scanner counterexample
-        env:
-          KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
-        run: node tools/check-map-menu-scroll-scope-counterexample.cjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: kepler-ideas-review-logs
-          path: .review-logs/
-          include-hidden-files: true
-          retention-days: 5
-          if-no-files-found: ignore
+        - pc
