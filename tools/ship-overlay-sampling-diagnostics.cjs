@@ -17,9 +17,9 @@ async function measure(run,key,name){
  await delay(350);
  const data=await run.page.locator(selector).first().evaluate(async c=>{
   const ctx=c.getContext('2d',{willReadFrequently:true}),w=c.width,h=c.height,y=Math.ceil(h*.22+10),bytes=ctx.getImageData(0,0,w,h).data,body=bytes.slice(y*w*4),png=c.toDataURL('image/png');
-  window.__shipSamplingIDs??={map:new WeakMap(),next:1};const ids=window.__shipSamplingIDs;if(!ids.map.has(c))ids.map.set(c,ids.next++);
+  window.__shipSamplingIDs??={map:new WeakMap(),next:1,reads:new WeakMap()};const ids=window.__shipSamplingIDs;if(!ids.map.has(c))ids.map.set(c,ids.next++);ids.reads.set(c,(ids.reads.get(c)||0)+1);
   const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
-  const t=ctx.getTransform(),css=getComputedStyle(c);return {id:ids.map.get(c),connected:c.isConnected,key:c.dataset.shipIcon,atlas:c.dataset.shipAtlas,crop:c.dataset.shipCrop,format:c.dataset.shipFormat,dataset:{...c.dataset},width:w,height:h,bodyY:y,
+  const t=ctx.getTransform(),css=getComputedStyle(c);return {id:ids.map.get(c),testReadOrdinal:ids.reads.get(c),connected:c.isConnected,key:c.dataset.shipIcon,atlas:c.dataset.shipAtlas,crop:c.dataset.shipCrop,format:c.dataset.shipFormat,dataset:{...c.dataset},width:w,height:h,bodyY:y,
    viewport:[innerWidth,innerHeight,devicePixelRatio],rect:rect(c),scene:rect(document.querySelector('#shipyardVisual .gfx-scene')),
    css:{width:css.width,height:css.height,boxSizing:css.boxSizing,padding:[css.paddingTop,css.paddingRight,css.paddingBottom,css.paddingLeft],border:[css.borderTopWidth,css.borderRightWidth,css.borderBottomWidth,css.borderLeftWidth]},
    context:{attributes:ctx.getContextAttributes?.(),transform:[t.a,t.b,t.c,t.d,t.e,t.f],globalAlpha:ctx.globalAlpha,composite:ctx.globalCompositeOperation,filter:ctx.filter,shadowBlur:ctx.shadowBlur,shadowColor:ctx.shadowColor,smoothing:ctx.imageSmoothingEnabled,quality:ctx.imageSmoothingQuality},

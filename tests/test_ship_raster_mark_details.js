@@ -40,27 +40,40 @@ async function scroll(page,selector){
 async function readPixels(page,selector,key){
  await scroll(page,selector);
  if(!await boolean(page,([sel,k])=>{const c=document.querySelector(sel);return !!c&&c.dataset.shipIcon===k&&c.dataset.shipArt==='raster'&&c.dataset.shipArtReady==='true';},[selector,key],10000))throw Error('Native ship raster never became ready: '+key+' '+selector);
- // Consecutive identical samples witness a settled backing store. Waiting
- // does not change or repair its pixels, dimensions, layout or game state.
- let previous=null,last,stable=0;const deadline=Date.now()+3000;
+ const surface=await page.locator(selector).first().elementHandle();
+ if(!surface)throw Error('Native marked ship surface disappeared: '+key);
+ try{
+ // Observe native geometry/readiness before one pixel read. Repeated canvas
+ // readbacks can themselves change Chromium's rendering backend, so they must
+ // not be the way this observer decides whether the original image settled.
+ let previous=null,settled=null,stableSince=0;const deadline=Date.now()+3000;
  do{
-  last=await page.locator(selector).first().evaluate(async c=>{
-   const w=c.width,h=c.height,bodyY=Math.ceil(h*.22+10),ctx=c.getContext('2d',{willReadFrequently:true});
+  const metadata=await surface.evaluate(c=>{const r=c.getBoundingClientRect();return {
+   key:c.dataset.shipIcon,art:c.dataset.shipArt,ready:c.dataset.shipArtReady,atlas:c.dataset.shipAtlas,
+   crop:c.dataset.shipCrop,format:c.dataset.shipFormat,detail:c.dataset.shipDetail==='true',
+   width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,connected:c.isConnected};});
+  const signature=JSON.stringify(metadata),now=Date.now();
+  if(signature!==previous)stableSince=now;
+  else if(metadata.connected&&metadata.key===key&&metadata.art==='raster'&&metadata.ready==='true'&&now-stableSince>=200){settled=metadata;break;}
+  previous=signature;await delay(40);
+ }while(Date.now()<deadline);
+ if(!settled)throw Error('Native marked ship geometry/readiness never settled: '+key+' '+previous);
+ const last=await surface.evaluate(async(c,{expected,diagnostic})=>{
+   const r=c.getBoundingClientRect(),metadata={key:c.dataset.shipIcon,art:c.dataset.shipArt,ready:c.dataset.shipArtReady,atlas:c.dataset.shipAtlas,
+    crop:c.dataset.shipCrop,format:c.dataset.shipFormat,detail:c.dataset.shipDetail==='true',width:c.width,height:c.height,cssWidth:r.width,cssHeight:r.height,connected:c.isConnected};
+   if(!metadata.connected||Object.keys(expected).some(field=>metadata[field]!==expected[field]))throw Error('The exact native ship node changed before its single pixel read');
+   const w=c.width,h=c.height,bodyY=Math.ceil(h*.22+10),ctx=c.getContext('2d');
    if(w<1||h<=bodyY||!ctx)throw Error('Native marked ship canvas has no measurable body');
-   const bytes=ctx.getImageData(0,0,w,h).data,body=bytes.slice(bodyY*w*4),badge=bytes.slice(0,bodyY*w*4),png=w<=200?c.toDataURL('image/png'):null;
+   const bytes=ctx.getImageData(0,0,w,h).data,body=bytes.slice(bodyY*w*4),badge=bytes.slice(0,bodyY*w*4),png=diagnostic&&w<=200?c.toDataURL('image/png'):null;
    const digest=async data=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',data))].map(n=>n.toString(16).padStart(2,'0')).join('');
    let count=0;for(let i=3;i<body.length;i+=4)if(body[i]>8)count++;
-   return {key:c.dataset.shipIcon,art:c.dataset.shipArt,ready:c.dataset.shipArtReady,atlas:c.dataset.shipAtlas,
-    crop:c.dataset.shipCrop,format:c.dataset.shipFormat,detail:c.dataset.shipDetail==='true',
-    width:w,height:h,bodyY,bodyBytes:body.length,count,bodySha256:await digest(body),badgeSha256:await digest(badge),
+   return {...metadata,bodyY,bodyBytes:body.length,count,bodySha256:await digest(body),badgeSha256:await digest(badge),
     diagnosticPNG:png};
-  });
-  const png=last.diagnosticPNG;delete last.diagnosticPNG;
-  Object.defineProperty(last,'diagnosticPNG',{value:png});
-  const signature=JSON.stringify(last);stable=signature===previous?stable+1:0;previous=signature;
-  if(stable>=2)return last;await delay(60);
- }while(Date.now()<deadline);
- throw Error('Native marked ship pixels never settled: '+key+' '+JSON.stringify(last));
+  },{expected:settled,diagnostic:!!process.env.KEPLER_SHIP_MARK_EVIDENCE});
+ if(Object.keys(settled).some(field=>last[field]!==settled[field]))throw Error('Native marked ship surface changed before its single pixel read: '+key);
+ const png=last.diagnosticPNG;delete last.diagnosticPNG;
+ Object.defineProperty(last,'diagnosticPNG',{value:png});return last;
+ }finally{await surface.dispose();}
 }
 function preserveFailure(name,before,after){
  const folder=process.env.KEPLER_SHIP_MARK_EVIDENCE;if(!folder)return;

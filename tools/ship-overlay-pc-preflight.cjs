@@ -39,7 +39,7 @@ try{
  frozen=freeze();report.before=frozen;
  const required=run('required',['tests/run.js','--nur-pflicht']);required.item.passed=required.item.status===0;
  native('mark-details','test_ship_raster_mark_details.js');
- if(!report.cases.at(-1).passed){run('sampling-diagnostics',['tools/ship-overlay-sampling-diagnostics.cjs']);report.diagnostics=report.cases.pop();}
+ run('sampling-diagnostics',['tools/ship-overlay-sampling-diagnostics.cjs']);report.diagnostics=report.cases.pop();
  native('raster-art','test_ship_raster_art.js');
  native('sharpness','test_ship_raster_sharpness.js');
  const forge=run('forge-marks',['tests/test_werftmarken.js']);forge.item.passed=forge.item.status===0&&/\nPASS\s*$/.test(forge.log);
@@ -56,6 +56,6 @@ try{
 }catch(error){report.error=error.stack||String(error);console.error(report.error);}
 finally{
  if(frozen){report.after=freeze();report.frozen=JSON.stringify(frozen)===JSON.stringify(report.after);}
- report.endedUTC=new Date().toISOString();report.passed=!report.error&&report.cases.length===6&&report.cases.every(item=>item.passed===true)&&report.frozen===true;
+ report.endedUTC=new Date().toISOString();report.passed=!report.error&&report.cases.length===6&&report.cases.every(item=>item.passed===true)&&report.diagnostics?.status===0&&report.frozen===true;
  fs.writeFileSync(path.join(out,'admission.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'});console.log('PC ship overlay admission: '+(report.passed?'PASS':'FAIL'));process.exitCode=report.passed?0:1;
 }
