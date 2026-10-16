@@ -70,9 +70,17 @@ function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FA
   check('native hull selection updates the actual construction control',await page.locator('#shipyardVisual [data-gfx-build="ship"]').getAttribute('data-gfx-key')==='bomber');
   const lastHull=page.locator('#shipyardVisual [data-gfx-ship]').last();
   await lastHull.focus();
-  const railTop=await page.locator('#shipyardVisual .gfx-ship-list').evaluate(e=>e.scrollTop);
+  const railSnapshot=e=>{
+   const rect=n=>{if(!n)return null;const r=n.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+   const active=document.activeElement,target=e.querySelector('[data-gfx-ship]:last-child');
+   return {scrollTop:e.scrollTop,scrollHeight:e.scrollHeight,clientHeight:e.clientHeight,rect:rect(e),
+    active:{key:active?.dataset?.gfxShip||null,inRail:!!active&&e.contains(active),rect:rect(active)},
+    target:{key:target?.dataset.gfxShip||null,rect:rect(target)}};
+  };
+  const railBefore=await page.locator('#shipyardVisual .gfx-ship-list').evaluate(railSnapshot);
+  const railTop=railBefore.scrollTop;
   await lastHull.press('Enter');
-  check('ship rail preserves its scroll position when selecting a distant hull',railTop>100&&await page.locator('#shipyardVisual .gfx-ship-list').evaluate((e,y)=>Math.abs(e.scrollTop-y)<1,railTop));
+  check('ship rail preserves its scroll position when selecting a distant hull',railTop>100&&await page.locator('#shipyardVisual .gfx-ship-list').evaluate((e,y)=>Math.abs(e.scrollTop-y)<1,railTop),{before:railBefore,afterMeasurement:'immediately after the unchanged guard condition',after:await page.locator('#shipyardVisual .gfx-ship-list').evaluate(railSnapshot)});
   check('ship rail preserves keyboard focus after selection and native fleet updates',await page.evaluate(()=>{const key=__details.ships.at(-1).key;const selected=()=>document.activeElement?.dataset.gfxShip===key;const first=selected();__details.state().fleet[key]=1;__details.render();return first&&selected();}));
   await page.evaluate(()=>__details.show('expedition'));
   const scenes=await page.locator('#expeditionBox [data-expedition-type] .gfx-expedition-art').evaluateAll(es=>es.map(e=>getComputedStyle(e).backgroundPosition));

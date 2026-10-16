@@ -155,7 +155,7 @@ function assetModeMatches(evidence, fixture, measured){
   if (!network.length || network.some(r => r.type !== 'image' || r.method !== 'GET' || !r.intercepted || r.failure)) return false;
   const bodies = measured.asteroids.every(a => {
     const selected = measured.flaechen.find(f => f.platz === a.place);
-    if (!selected || a.labels.length !== 1 || a.labels[0] !== '[RIV]' || !a.fallback || !a.image) return false;
+    if (!selected || !selected.koerper.sichtbar || a.labels.length !== 1 || a.labels[0] !== '[RIV]' || !a.fallback || !a.image) return false;
     const image = a.image;
     if (image.key !== 'asteroid:eisen') return false;
     if (ASSET_MODE === 'available') return selected.koerper.tag === 'image' && image.ready === 'true'
@@ -164,7 +164,7 @@ function assetModeMatches(evidence, fixture, measured){
       && a.fallback.visibility === 'hidden' && ['webp', 'png'].includes(image.format);
     return selected.koerper.tag === 'circle' && selected.koerperInk.quelle === 'Körper und Kontur'
       && selected.koerperInk.kontur > 0 && selected.b.w > 0 && selected.b.h > 0
-      && image.ready !== 'true' && !image.href && !image.box && a.fallback.visibility === 'visible' && a.fallback.polygons > 0;
+      && image.ready !== 'true' && !image.href && a.fallback.visibility === 'visible' && a.fallback.polygons > 0;
   });
   return bodies && (ASSET_MODE === 'available'
     ? network.every(r => r.status === 200)
@@ -260,11 +260,20 @@ async function lage(page){
           w: box.w + 2 * kontur, h: box.h + 2 * kontur }, quelle: 'Körper und Kontur', kontur };
       } catch (e) { return fallback(String(e.message || e)); }
     };
+    const koerperSichtbar = el => {
+      for (let node = el; node; node = node.parentElement){
+        const style = getComputedStyle(node);
+        if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) <= 0) return false;
+      }
+      return true;
+    };
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
-      // A failed/pending native SVG image can have an empty box. The renderer
-      // skips those images before its circle fallback; measure the same body.
-      let el = [...g.querySelectorAll('image')].find(image => kasten(image)) || g.querySelector('circle.body');
+      // Native Chromium retains a 12x12 SVG image box even with no decoded href.
+      // That placeholder paints no asteroid. Measure the visible native body;
+      // keep the placeholder's actual box in the evidence instead of erasing it.
+      let el = [...g.querySelectorAll('image')].find(image =>
+        !(image.hasAttribute('data-asteroid-image') && image.dataset.asteroidArtReady !== 'true') && kasten(image)) || g.querySelector('circle.body');
       if (!el){
         const kreise = [...g.querySelectorAll('circle')];
         if (kreise.length) el = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
@@ -273,7 +282,7 @@ async function lage(page){
       const b = kasten(el), ganz = kasten(g);
       if (!b || !ganz) return;
       flaechen.push({ nr: flaechen.length, b, ganz, platz: g.getAttribute('data-map-asteroid'), koerperInk: koerperInkMessen(el, g, b),
-        koerper: { tag: el.tagName, klasse: el.getAttribute('class'),
+        koerper: { tag: el.tagName, sichtbar: koerperSichtbar(el), klasse: el.getAttribute('class'),
           cy: el.getAttribute('cy'), r: el.getAttribute('r') },
         polygone: [...g.querySelectorAll('polygon')].map(kasten).filter(Boolean),
         art: [...g.attributes].map(a => a.name).filter(n => n.startsWith('data-')).join(',') });

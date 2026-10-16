@@ -15,7 +15,7 @@ const gitAt=(cwd,...args)=>cp.execFileSync('git',['-C',cwd,...args],{encoding:'u
 const report={startedUTC:new Date().toISOString(),endedUTC:null,passed:false,head:gitAt(root,'rev-parse','HEAD'),
   tree:gitAt(root,'rev-parse','HEAD^{tree}'),backend:gitAt(backendRoot,'rev-parse','HEAD'),
   runner:process.env.RUNNER_NAME,os:process.env.RUNNER_OS,run:process.env.GITHUB_RUN_ID,
-  attempt:process.env.GITHUB_RUN_ATTEMPT,job:process.env.GITHUB_JOB,cases:[]};
+  attempt:process.env.GITHUB_RUN_ATTEMPT,job:process.env.GITHUB_JOB,cases:[],controlledSources:[]};
 const saveReport=()=>{
   const file=path.join(out,'admission.json'),temp=path.join(out,'admission.json.tmp');
   fs.writeFileSync(temp,JSON.stringify(report,null,2)+'\n');fs.renameSync(temp,file);
@@ -63,6 +63,37 @@ function evidenceFiles(directory){
   return files;
 }
 let frozen;
+function controlledCopy(name,sourceFile,filename,anchor,replacement){
+  const sourcePath=path.join(root,sourceFile),before=fs.readFileSync(sourcePath),text=before.toString('utf8');
+  assert(before.equals(Buffer.from(text)),'Controlled source must round-trip byte-for-byte as UTF-8');
+  assert.equal(sha(before),frozen.frontend.files[sourceFile].sha256,'Controlled source must match the frozen candidate');
+  assert.equal(text.split(anchor).length,2,'Exactly one controlled source anchor: '+name);
+  const offset=text.indexOf(anchor),changed=text.slice(0,offset)+replacement+text.slice(offset+anchor.length);
+  const restored=changed.slice(0,offset)+anchor+changed.slice(offset+replacement.length);
+  assert.equal(restored,text,'Controlled mutation must be exactly reversible: '+name);
+  const copy=path.join(out,filename);assert.equal(path.dirname(copy),out);
+  fs.writeFileSync(copy,changed,{flag:'wx'});
+  const written=fs.readFileSync(copy),after=fs.readFileSync(sourcePath);
+  assert(written.equals(Buffer.from(changed)),'Controlled copy must contain exactly the single mutation');
+  assert(after.equals(before),'Creating a counterexample must never change its original source');
+  report.controlledSources.push({name,sourceFile,copy:path.relative(root,copy),anchor,replacement,
+    sourceCharacterOffset:offset,reversibleSingleMutation:true,sourceBytes:before.length,copyBytes:written.length,
+    sourceSha256Before:sha(before),copySha256After:sha(written),sourceSha256AfterCreation:sha(after),reversedSha256:sha(restored)});
+  return copy;
+}
+function verifyControlledSources(){
+  let equal=true;
+  const files=report.controlledSources.map(entry=>{
+    try{
+      const source=sha(fs.readFileSync(path.join(root,entry.sourceFile))),copy=sha(fs.readFileSync(path.join(root,entry.copy)));
+      entry.sourceSha256AfterRun=source;entry.copySha256AfterRun=copy;
+      const unchanged=source===entry.sourceSha256Before&&copy===entry.copySha256After;
+      if(!unchanged)equal=false;
+      return {name:entry.name,sourceSha256:source,copySha256:copy,unchanged};
+    }catch(error){equal=false;return {name:entry.name,error:error.code||error.message,unchanged:false};}
+  });
+  return {equal,files};
+}
 function verifyFrozen(){
   const after=freeze();report.after=after;
   const equal=JSON.stringify(frozen)===JSON.stringify(after);
@@ -78,10 +109,11 @@ function run(spec){
     const env={...process.env};
     // Reset test-specific state before each independent run, including original-source controls.
     for(const key of ['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
-      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR'])delete env[key];
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS'])delete env[key];
     Object.assign(env,spec.env||{});
     // A historical sabotage mode must never reinterpret a genuine old-source counter's exit.
     delete env.KEPLER_ENTFLECHTER_GEGENPROBE;
+    delete env.KEPLER_ESCAPE_GEGENPROBE;
     if(spec.game)env.KEPLER_SPIELDATEI=spec.game;
     if(spec.generate){
       const generated=path.join(out,'generated');fs.mkdirSync(generated);
@@ -91,7 +123,7 @@ function run(spec){
       env.KEPLER_WURZEL=generated;item.generatedRoot=path.relative(root,generated);
     }
     item.testEnv=Object.fromEntries(['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
-      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR'].filter(key=>env[key]!==undefined).map(key=>[key,env[key]]));
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS'].filter(key=>env[key]!==undefined).map(key=>[key,env[key]]));
     if(spec.assetEvidence){
       assert(['available','unavailable'].includes(env.KEPLER_ASTEROID_ASSET_MODE),'Explicit native asset mode required');
       assert.equal(env.KEPLER_ASTEROID_EVIDENCE_DIR,spec.assetEvidence);
@@ -165,13 +197,20 @@ function run(spec){
       const failed=item.records.filter(record=>!record.ok);
       const ids=failed.map(record=>record.name.split(':')[0]);
       item.expectedFailedIds=spec.failedIds;
+      if(spec.failureFooter!==undefined){
+        assert.equal(spec.name,'research-word-negative','Only the actual research counter has a numeric negative footer');
+        assert.equal(spec.failureFooter,'16 checks, 2 failures');
+      }
+      item.expectedFooter=spec.failureFooter??'FAIL';
       item.passed=item.passed&&JSON.stringify(ids.slice().sort())===JSON.stringify(spec.failedIds.slice().sort())
-        &&item.footers.at(-1)==='FAIL';
+        &&item.footers.at(-1)===item.expectedFooter;
     }
   }catch(error){item.controllerError=error.stack||String(error);item.passed=false;}
   finally{
     item.endedUTC=new Date().toISOString();
     try{item.freeze=verifyFrozen();if(!item.freeze.equal)item.passed=false;}catch(error){item.freezeError=error.stack||String(error);item.passed=false;report.freezeEverChanged=true;}
+    item.controlledFreeze=verifyControlledSources();
+    if(!item.controlledFreeze.equal){item.passed=false;report.freezeEverChanged=true;}
     saveReport();
     console.log(spec.name+': '+JSON.stringify({status:item.status,passed:item.passed,checks:item.records?.length,
       failed:item.records?.filter(record=>!record.ok).map(record=>record.name),gpu:item.gpu?.map(entry=>entry.renderer),error:item.controllerError||item.error}));
@@ -193,6 +232,20 @@ try{
   assert.equal(originalBlob,expectedOriginal,'Pinned HTML must be the exact unchanged e703/5eaf original');
   const originalPath=path.join(out,'genuine-parent-original.html');fs.writeFileSync(originalPath,original,{flag:'wx'});
   report.original={ref:originalRef,commit:originalCommit,blob:originalBlob,bytes:original.length,sha256:sha(original)};
+  const questCounterFile='tools/check-command-quest-closed-counterexample.cjs';
+  const questCounter=fs.readFileSync(path.join(root,questCounterFile),'utf8');
+  const researchRules=Array.from(questCounter.matchAll(/\['research-word','([^']+)',\[\s*'([^']+)',\s*'([^']+)'\s*\]\]/g));
+  assert.equal(researchRules.length,1,'Existing unchanged quest counter must define exactly one genuine research-word case');
+  const [,researchAnchor,...researchFailures]=researchRules[0];
+  assert.equal(researchAnchor,'  body.command-ui #research .bname { overflow-wrap:anywhere; }');
+  assert.equal(sha(questCounter),frozen.frontend.files[questCounterFile].sha256);
+  const researchCss=controlledCopy('research-word-negative','kepler-graphics.css','research-word-without-wrap.css',researchAnchor,'');
+  const overlayAnchor='.fwahl-overlay { position:fixed; inset:0;';
+  const escapeGap=controlledCopy('escape-gap-negative','weltraum_kolonie.html','escape-overlay-gap.html',overlayAnchor,
+    '.fwahl-overlay { position:fixed; inset:0 20px 0 0;');
+  const escapeOffset=controlledCopy('escape-offset-negative','weltraum_kolonie.html','escape-overlay-offset.html',overlayAnchor,
+    '.fwahl-overlay { position:fixed; inset:20px -20px -20px 20px;');
+  report.researchCounterReference={file:questCounterFile,sha256:sha(questCounter),anchor:researchAnchor,expectedFailedNames:researchFailures};
   const cases=[{name:'required',args:['tests/run.js','--nur-pflicht'],required:true}];
   const positives=[
     ['overview','test_uebersicht_schrift.js',15],['labels','test_beschriftung_ausweichen.js',8],
@@ -212,6 +265,12 @@ try{
   cases.push({name:'spacing-counter',args:['tools/check-overview-hint-spacing-counterexample.cjs'],spacing:true,timeoutMs:600000});
   for(const [name,file,guardCount]of [['research-quest','test_command_quest_closed_layout.js',16],['escape-windows','test_escape_fenster.js',35],['visual-details','test_visual_details.js',67]])
     cases.push({name,args:['tests/http-run.js',file],native:true,guardCount,timeoutMs:name==='escape-windows'?600000:180000});
+  cases.push({name:'research-word-negative',args:['tests/http-run.js','test_command_quest_closed_layout.js'],native:true,
+    negative:true,guardCount:16,positive:'research-quest',failedIds:researchFailures,failureFooter:'16 checks, 2 failures',
+    env:{K7_QUEST_CLOSED_CSS:researchCss}});
+  for(const [name,game]of [['escape-gap-negative',escapeGap],['escape-offset-negative',escapeOffset]])
+    cases.push({name,args:['tests/http-run.js','test_escape_fenster.js'],native:true,negative:true,guardCount:35,
+      positive:'escape-windows',game,failedIds:['V4-2a','V4-2b','V5','V9'],timeoutMs:600000});
   cases.push({name:'original-overview',args:['tests/http-run.js','test_uebersicht_schrift.js'],native:true,negative:true,
     game:originalPath,positive:'overview',guardCount:15,failedIds:['4b','4c']});
   cases.push({name:'original-labels',args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,
@@ -222,14 +281,17 @@ try{
   report.expectedCases=cases.map(entry=>entry.name);
   report.expectedCaseMetadata=cases.map(entry=>({name:entry.name,guardCount:entry.guardCount,
     expectedExit:entry.negative?1:0,assetMode:entry.env?.KEPLER_ASTEROID_ASSET_MODE,
-    comparedWith:entry.positive,expectedFailedIds:entry.failedIds}));saveReport();
+    comparedWith:entry.positive,expectedFailedIds:entry.failedIds,failureFooter:entry.failureFooter}));saveReport();
   for(const spec of cases)run(spec); // Intentionally continue through every independent case after failures.
 }catch(error){report.error=error.stack||String(error);console.error(report.error);}
 finally{
   if(frozen){try{report.finalFreeze=verifyFrozen();}catch(error){report.freezeError=error.stack||String(error);report.freezeEverChanged=true;}}
+  report.finalControlledFreeze=verifyControlledSources();
+  if(!report.finalControlledFreeze.equal)report.freezeEverChanged=true;
   report.endedUTC=new Date().toISOString();
   report.passed=!report.error&&!report.freezeError&&!report.freezeEverChanged&&report.finalFreeze?.equal===true
-    &&report.cases.length===21&&report.expectedCases?.length===21
+    &&report.cases.length===24&&report.expectedCases?.length===24
+    &&report.controlledSources.length===3&&report.finalControlledFreeze.equal===true
     &&report.cases.every((item,index)=>item.name===report.expectedCases[index]&&item.passed===true);
   saveReport();console.log('PC map release admission: '+(report.passed?'PASS':'FAIL'));process.exitCode=report.passed?0:1;
 }

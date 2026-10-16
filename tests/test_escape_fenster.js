@@ -415,6 +415,38 @@ const WO = (id) => {
            punkt:[Math.round((l + re) / 2), Math.round((o + u) / 2)],
            getroffen: oben ? (oben.id || oben.getAttribute('class') || oben.tagName) : null };
 };
+// Native scrollbars are outside the document client area. Cover that entire
+// area without a size tolerance, and independently hit-test all four corners
+// and its centre so an equally large but shifted/covered overlay cannot pass.
+const CLIENT_FENSTER = id => {
+  const o = document.getElementById(id), back = document.getElementById('galaxyBackBtn');
+  const viewport = { innerWidth:window.innerWidth, innerHeight:window.innerHeight,
+    clientWidth:document.documentElement.clientWidth, clientHeight:document.documentElement.clientHeight };
+  if (!o) return { da:false, offen:false, system:!!(back && back.style.display !== 'none'), deckt:false,
+    mitteMeins:false, layout:{ rect:null, viewport, treffer:[], sichtbarkeit:null } };
+  const r = o.getBoundingClientRect(), w = viewport.clientWidth, h = viewport.clientHeight;
+  let sichtbar = getComputedStyle(o).visibility === 'visible', deckkraft = 1;
+  const vorfahren = [];
+  for (let el = o; el; el = el.parentElement){
+    const s = getComputedStyle(el);
+    sichtbar = sichtbar && s.display !== 'none' && s.contentVisibility !== 'hidden';
+    deckkraft *= Number(s.opacity);
+    vorfahren.push({ element:el.id || el.tagName, display:s.display, visibility:s.visibility,
+      opacity:s.opacity, contentVisibility:s.contentVisibility });
+  }
+  const treffer = [[1,1], [w-1,1], [1,h-1], [w-1,h-1], [w/2,h/2]].map(([x,y]) => {
+    const oben = document.elementFromPoint(x,y);
+    return { x, y, meins:!!(oben && (oben === o || o.contains(oben))),
+      getroffen:oben ? (oben.id || oben.getAttribute('class') || oben.tagName) : null };
+  });
+  const grenzen = w > 0 && h > 0 && r.left <= 0 && r.top <= 0 && r.right >= w && r.bottom >= h;
+  const mitte = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
+  return { da:true, offen:o.classList.contains('open'), system:!!(back && back.style.display !== 'none'),
+    deckt:grenzen && sichtbar && deckkraft > 0 && treffer.every(p => p.meins),
+    mitteMeins:!!(mitte && (mitte === o || o.contains(mitte))),
+    layout:{ rect:{ left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height },
+      viewport, grenzen, treffer, sichtbarkeit:{ sichtbar, deckkraft, vorfahren } } };
+};
 const zahlOffen = l => (l.tafel ? 1 : 0) + (l.system ? 1 : 0) + (l.wiedergabe ? 1 : 0) + (l.kmenu ? 1 : 0);
 
 (async () => {
@@ -727,19 +759,7 @@ async function vorpostenFenster(browser, merke){
     await page.waitForTimeout(600);
     await page.evaluate(r => { const b = [...document.querySelectorAll('.kmenu button')].find(x => new RegExp(r).test(x.textContent.trim())); if (b) b.click(); }, rx);
     await page.waitForTimeout(700);
-    const vor = await page.evaluate(i => {
-      const o = document.getElementById(i), back = document.getElementById('galaxyBackBtn');
-      if (!o) return { da:false };
-      const r = o.getBoundingClientRect();
-      const mitte = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2);
-      return { da:true, offen:o.classList.contains('open'),
-               system: !!(back && back.style.display !== 'none'),
-               deckt: Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
-               mitteMeins: !!(mitte && (mitte === o || o.contains(mitte))),
-               layout:{rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
-                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
-                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
-    }, id);
+    const vor = await page.evaluate(CLIENT_FENSTER, id);
     merke('V4-' + nr + ': Vorbedingung - ' + name + ' offen und bildschirmfuellend, System darunter offen',
       vor.da === true && vor.offen === true && vor.system === true && vor.deckt === true, vor);
     await page.keyboard.press('Escape'); await page.waitForTimeout(500);
@@ -795,16 +815,7 @@ async function flottenwahlFenster(browser, merke){
   await page.waitForTimeout(1500);
   const gabKnopf = await page.evaluate(() => { const b = document.getElementById('pendingAttackBtn'); if (!b || b.disabled) return false; b.click(); return true; });
   await page.waitForTimeout(900);
-  const vor = await page.evaluate(() => {
-    const o = document.getElementById('fwahlOverlay');
-    if (!o) return { da:false };
-    const r = o.getBoundingClientRect();
-    return { da:true, offen:o.classList.contains('open'),
-             deckt: Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
-             layout:{rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
-                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
-                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
-  });
+  const vor = await page.evaluate(CLIENT_FENSTER, 'fwahlOverlay');
   merke('V5: Vorbedingung - die Flottenwahl steht offen und deckt den Bildschirm',
     gabKnopf === true && vor.da === true && vor.offen === true && vor.deckt === true, vor);
   await page.keyboard.press('Escape'); await page.waitForTimeout(500);
@@ -869,16 +880,7 @@ async function flottenwahlUeberSystem(browser, merke){
     b.click(); return true;
   });
   await page.waitForTimeout(900);
-  const vor = await page.evaluate(() => {
-    const o = document.getElementById('fwahlOverlay'), back = document.getElementById('galaxyBackBtn');
-    const r = o ? o.getBoundingClientRect() : null;
-    return { da:!!o, offen: !!(o && o.classList.contains('open')),
-             system: !!(back && back.style.display !== 'none'),
-             deckt: !!r && Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
-             layout:{rect:r?{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null,
-                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
-                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
-  });
+  const vor = await page.evaluate(CLIENT_FENSTER, 'fwahlOverlay');
   merke('V9: Vorbedingung - die Flottenwahl steht bildschirmfuellend UEBER dem aufgeklappten System',
     sysDa === true && geklickt === true && vor.offen === true && vor.system === true && vor.deckt === true,
     { geklickt, vor });

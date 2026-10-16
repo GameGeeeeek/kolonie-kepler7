@@ -72,6 +72,14 @@ const store={'kepler7-save-v3':JSON.stringify(fixture)};
   });
   const zero=r=>r.rects===0&&['width','height','left','top','right','bottom'].every(k=>r[k]===0);
   check('closed native daily quest popup has no retained layout boxes at 320',closedLayout.closed&&closedLayout.notes.length>0&&zero(closedLayout.popup)&&closedLayout.notes.every(zero),closedLayout);
+  // Native menu navigation starts tabIn at opacity zero; measure after that panel finishes fading in.
+  await page.waitForFunction(()=>{
+   const tab=document.getElementById('tab-forschung');
+   if(!tab||!tab.classList.contains('active'))return false;
+   const style=getComputedStyle(tab);
+   return style.display!=='none'&&style.visibility==='visible'&&Number(style.opacity)===1
+    &&tab.getAnimations().every(animation=>animation.animationName!=='tabIn'||animation.playState==='finished');
+  },null,{timeout:5000});
   const nameSnapshot=await page.locator('#research .bname').evaluateAll(es=>{
    const visible=es.filter(e=>{
     for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible'||+s.opacity<=0)return false;}
