@@ -93,11 +93,12 @@ async function main(){
  let browser;
  try{
   browser=await starteBrowser({args:['--no-sandbox','--disable-dev-shm-usage','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']});
-  const plain=await fixture(browser,{save:saved(Object.fromEntries(keys.map(key=>[key,1])))});runs.push(plain);
+  // The native save stores Mk I as an absent key, including after autosave.
+  const plain=await fixture(browser,{save:saved({})});runs.push(plain);
   const marked=await fixture(browser,{save:saved(Object.fromEntries(keys.map(key=>[key,7])))});runs.push(marked);
   for(const run of [plain,marked]){await tab(run.page,'flotte');await pointer(run.page,'#shipyardVisual [data-gfx-ship="jaeger"]');}
   const loaded=[plain,marked].map(run=>JSON.parse(run.store.get('kepler7-save-v3')));
-  check(labels.auth,plain.context!==marked.context&&plain.store!==marked.store&&loaded.every((state,index)=>state.shipSkin==='standard'&&keys.every(key=>state.shipMarks[key]===(index?7:1)))
+  check(labels.auth,plain.context!==marked.context&&plain.store!==marked.store&&loaded.every((state,index)=>state.shipSkin==='standard'&&keys.every(key=>index?state.shipMarks[key]===7:!Object.hasOwn(state.shipMarks,key)))
    &&[plain,marked].every(run=>run.requests.some(request=>request.path==='/api/storage/kepler7-save-v3'&&request.status===200)),loaded.map(state=>({shipSkin:state.shipSkin,shipMarks:state.shipMarks})));
   const options=await Promise.all([plain,marked].map(run=>run.page.locator(picker+' option').evaluateAll(nodes=>nodes.map(node=>node.value))));
   check(labels.picker,options.every(list=>list.length===45&&new Set(list).size===45&&keys.filter(key=>key!=='superschlachtschiff').every(key=>list.includes(key))),options);
