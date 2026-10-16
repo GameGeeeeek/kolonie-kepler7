@@ -14246,7 +14246,9 @@ k7InitialStaticText();
   const PATCHNOTES = [
     { version:'8.758.0', date:'15.10.2026', changes:[
       "Im Willkommensdialog gibt es eine ausblendbare Einladung zu Void Sector. Neue Konten über den Kepler-Link erhalten zusätzlich 250 Credits und 5 Hunter-Raketen.",
-      "Die Marktgrafik nutzt auf schmalen Bildschirmen wieder die volle Bannerbreite."
+      "Die Marktgrafik nutzt auf schmalen Bildschirmen wieder die volle Bannerbreite.",
+      "Detaillierte Schiffsbilder werden nicht mehr von zusätzlichen weißen Geschützpunkten und Linien überlagert. Die Stufenplaketten bleiben sichtbar.",
+      "In der schmalen Regionsübersicht weichen Beschriftungen samt Hinweisflächen einander aus. Asteroidenkürzel halten auch nach dem automatischen Textversatz Abstand zum eigenen sichtbaren Rand."
     ] },
     { version:'8.757.0', date:'15.10.2026', changes:[
       "Die Einstellungen sind über die beschriftete Schaltfläche in der unteren Leiste und direkt im Menü erreichbar. Der Einstieg führt zur Anzeige und zur Wahl der Menüposition.",
@@ -71505,9 +71507,7 @@ async function claimPendingRewards(){
       gesamt += mg.length;
       const schwerX = mg.reduce((a,p) => a+p.gx, 0) / mg.length;
       const schwerY = mg.reduce((a,p) => a+p.gy, 0) / mg.length;
-      // Six visible pixels separate Pulsar labels from the core labels on narrow screens.
-      // Move the complete label block, including its existing hint hit area; geometry stays fixed.
-      const labelY = schwerY + (uSchmal && sk.key === 'pulsar' ? 10*uF : 0);
+      const labelY = schwerY;
       const huelle = konvexeHuelle(mg.map(p => [p.gx, p.gy]));
       const auf = huelle.map(function(q){
         const dx = q[0]-schwerX, dy = q[1]-schwerY, l = Math.hypot(dx,dy) || 1;
@@ -71583,14 +71583,17 @@ async function claimPendingRewards(){
             // die reine Farbe bei 2,4 px Radius von der Regionsfarbe kaum zu unterscheiden. Der
             // Saum hebt ihn vom Untergrund ab, ohne dass der Punkt viel groesser werden muss.
             return '<circle data-sys-dominanz="' + (pd ? pd.art : '') + '" cx="' + p.gx + '" cy="' + p.gy + '" r="' + (pd ? 3.6 : 2.4) + '" fill="' + (pd ? pd.farbe : sk.tint) + '"' + (pd ? ' stroke="#0b0e1a" stroke-width="1.1"' : '') + ' opacity="' + (pd ? 1 : 0.85) + '"><title>' + escapeHtml(p.name.replace(/-System$/, '') + (pd ? ' – ' + pd.titel : '')) + '</title></circle>'; }).join('')
+        + '<g data-sektor-beschriftung="' + sk.key + '">'
         + '<text x="' + schwerX.toFixed(0) + '" y="' + labelY.toFixed(0) + '" text-anchor="middle" style="font:600 ' + (15*uF).toFixed(1) + 'px system-ui,sans-serif; fill:#e8eaf6; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (4*uF).toFixed(1) + 'px;">' + (heimDrin ? '🏠 ' : '') + sk.name + '</text>'
         + (uSchmal ? '' : '<text x="' + schwerX.toFixed(0) + '" y="' + (labelY+16*uF).toFixed(0) + '" text-anchor="middle" style="font:' + (10.5*uF).toFixed(1) + 'px ui-monospace,monospace; fill:#9ba0bc; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (3*uF).toFixed(1) + 'px;">' + mg.length + ' Systeme</text>')
         + '<text x="' + schwerX.toFixed(0) + '" y="' + (labelY+uZeileMeta*uF).toFixed(0) + '" text-anchor="middle" style="font:600 ' + (10*uF).toFixed(1) + 'px ui-monospace,monospace; fill:' + (sk.mod ? '#7de3b5' : '#8d92ae') + '; paint-order:stroke; stroke:#0b0e1a; stroke-width:' + (3*uF).toFixed(1) + 'px;">' + escapeHtml(eigenKurz) + '</text>'
         + hinweisMarkup
+        + '</g>'
         + '</g>';
     }
     svg.dataset.sektorSumme = gesamt;
     svg.innerHTML = inner;
+    if (uSchmal) kbUebersichtBeschriftungenPlatzieren(svg, uF);
     // Der Freiflug-Zwischenspeicher gilt fuer dieses Markup nicht - beim naechsten Freiflug-Aufbau
     // MUSS neu gezeichnet werden.
     lastGalaxyMapMarkup = null;
@@ -71611,6 +71614,67 @@ async function claimPendingRewards(){
       g.onclick = function(){ if (galaxyMapDidDrag) return; sektorOeffnenKB(g.getAttribute('data-sektor')); };
       g.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sektorOeffnenKB(g.getAttribute('data-sektor')); } };
     });
+  }
+  function kbUebersichtBeschriftungenPlatzieren(svg, faktor){
+    // Echte Glyphen und Tippflaechen messen: ein Rechteck um den GANZEN Block wuerde auch
+    // seine leeren Zwischenzeilen sperren. Huelle und Systempunkte bleiben an ihrem Ort.
+    const vb = svg.viewBox.baseVal, abstand = 2*faktor, kante = abstand+0.01*faktor;
+    const bloecke = Array.from(svg.querySelectorAll('[data-sektor-beschriftung]')).map(function(g){
+      const flaechen = Array.from(g.querySelectorAll('text, rect')).map(function(el){
+        const r = el.getBBox();
+        const stil = getComputedStyle(el);
+        const rand = el.tagName.toLowerCase() === 'text' && stil.stroke !== 'none' ? (parseFloat(stil.strokeWidth) || 0)/2 : 0;
+        return { l:r.x-rand, r:r.x+r.width+rand, o:r.y-rand, u:r.y+r.height+rand };
+      }).filter(function(r){ return r.r > r.l && r.u > r.o; });
+      return { g, flaechen, dx:0, dy:0 };
+    }).filter(function(b){ return b.flaechen.length; });
+    for (const block of bloecke){
+      const fremd = bloecke.filter(function(b){ return b !== block; }).flatMap(function(b){
+        return b.flaechen.map(function(r){ return { l:r.l+b.dx, r:r.r+b.dx, o:r.o+b.dy, u:r.u+b.dy }; });
+      });
+      const l = Math.min(...block.flaechen.map(r => r.l)), r = Math.max(...block.flaechen.map(r => r.r));
+      const o = Math.min(...block.flaechen.map(r => r.o)), u = Math.max(...block.flaechen.map(r => r.u));
+      const xMin = vb.x+abstand-l, xMax = vb.x+vb.width-abstand-r;
+      const yMin = vb.y+abstand-o, yMax = vb.y+vb.height-abstand-u;
+      const frei = function(dx, dy){
+        return dx >= xMin && dx <= xMax && dy >= yMin && dy <= yMax
+          && !block.flaechen.some(function(a){ return fremd.some(function(b){
+            return a.l+dx < b.r+abstand && b.l < a.r+dx+abstand
+              && a.o+dy < b.u+abstand && b.o < a.u+dy+abstand;
+          }); });
+      };
+      if (frei(0, 0)) continue;
+      // Kandidaten liegen direkt an gemessenen Nachbarkanten oder am sichtbaren Kartenrand.
+      // Auch noch unverschobene Nachbarn sind Hindernisse; ein spaeterer Schritt darf einen
+      // schon freien Block deshalb nicht wieder verdecken. Die kuerzeste freie Translation
+      // haelt Beschriftung und Hinweisfeld moeglichst nah an ihrer urspruenglichen Region.
+      const x = new Set([0, xMin, xMax]), y = new Set([0, yMin, yMax]);
+      for (const a of block.flaechen) for (const b of fremd){
+        x.add(b.l-a.r-kante); x.add(b.r-a.l+kante);
+        y.add(b.o-a.u-kante); y.add(b.u-a.o+kante);
+      }
+      const xs = Array.from(x).filter(v => v >= xMin && v <= xMax).sort((a,b) => Math.abs(a)-Math.abs(b));
+      const ys = Array.from(y).filter(v => v >= yMin && v <= yMax).sort((a,b) => Math.abs(a)-Math.abs(b));
+      let beste = null, distanz = Infinity;
+      const pruefen = function(dx, dy){
+        const d = dx*dx+dy*dy;
+        if (d < distanz && frei(dx, dy)){ beste = { dx, dy }; distanz = d; }
+      };
+      // Meist reicht eine Achse. Ihr Abstand begrenzt auch die zweidimensionale Suche.
+      for (const dx of xs) pruefen(dx, 0);
+      for (const dy of ys) pruefen(0, dy);
+      for (const dx of xs){
+        if (dx*dx >= distanz) break;
+        for (const dy of ys){
+          if (dx*dx+dy*dy >= distanz) break;
+          pruefen(dx, dy);
+        }
+      }
+      if (beste){
+        block.dx = beste.dx; block.dy = beste.dy;
+        block.g.setAttribute('transform', 'translate(' + block.dx + ' ' + block.dy + ')');
+      }
+    }
   }
   // Kuratierte Sektoransicht (Etappe KB-2): 15 feste, gestreute Plätze im 400x560-Raum -
   // genug für den größten Cluster (Kepler-Kern, 15 Systeme). Die Reihenfolge der Mitglieder ist
@@ -74265,7 +74329,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
        Der Rueckfall auf den groessten Kreis bleibt fuer die Arten ohne Bild unveraendert. */
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
-      let b = null;
+      let b = null, koerperRand = 0;
       const bilder = [...g.querySelectorAll('image')];
       for (const bild of bilder){
         let k; try { k = bild.getBBox(); } catch (e) { continue; }
@@ -74285,8 +74349,10 @@ function sekSternUse(key, x, y, k, unentdeckt){
         let k; try { k = el.getBBox(); } catch (e) { return; }
         if (!k || !k.width) return;
         b = { x: k.x, y: k.y, w: k.width, h: k.height };
+        const koerperStil = getComputedStyle(el);
+        koerperRand = koerperStil.stroke === 'none' ? 0 : Math.max(0, (parseFloat(koerperStil.strokeWidth) || 0)/2);
       }
-      flaechen.push({ g, x: b.x, y: b.y, w: b.w, h: b.h, mx: b.x + b.w/2, my: b.y + b.h/2 });
+      flaechen.push({ g, x: b.x, y: b.y, w: b.w, h: b.h, mx: b.x + b.w/2, my: b.y + b.h/2, koerperRand });
     });
     if (!flaechen.length) return;
     const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -74306,6 +74372,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // native SVG-Tipps ab. Auch sie darf keine Markermitte verdecken.
       const textStil = getComputedStyle(t);
       const strichRand = textStil.stroke === 'none' ? 0 : Math.max(0, (parseFloat(textStil.strokeWidth) || 0)/2);
+      // getBBox omits both contours. The own body must stay clear even when
+      // the fallback accepts a partial overlap with a different marker.
+      const eigenInk = eigenF ? { x: eigenF.x - eigenF.koerperRand, y: eigenF.y - eigenF.koerperRand,
+        w: eigenF.w + 2*eigenF.koerperRand, h: eigenF.h + 2*eigenF.koerperRand } : null;
+      const eigenerKoerperBeruehrt = k => !!eigenInk && schneidet({ x: k.x - strichRand, y: k.y - strichRand,
+        w: k.w + 2*strichRand, h: k.h + 2*strichRand }, eigenInk);
       for (const f of flaechen){
         let x1 = f.x, y1 = f.y, x2 = f.x + f.w, y2 = f.y + f.h;
         for (const name of f.g.querySelectorAll('text.planet-label')){
@@ -74327,16 +74399,15 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // gehörte optisch zu ihm. Die Kollision war weg, die Zuordnung Label->Planet kaputt; gesehen
       // nur am Screenshot, nicht an der Zahl (Regel 42/53). Jeder Platz unten bleibt deshalb dicht
       // am eigenen Objekt: höchstens 14 Einheiten senkrecht, höchstens 12 seitlich.
-      /* Das EIGENE Objekt zählt bei jedem VERSCHOBENEN Platz als belegt, nur an der unverschobenen
-         Ausgangsstelle nicht. Dort steht die Beschriftung, wo der Zeichencode sie hingesetzt hat -
-         neben ihrem Objekt, nicht darauf. Verschiebt man sie dagegen, darf sie ihrem eigenen Körper
-         genauso wenig ins Gesicht rutschen wie einem fremden.
+      /* Die gemalten Konturen des eigenen Koerpers bleiben an JEDEM Platz frei.
+         Die weitergehende rohe Objekt-/Mittepruefung gilt wie bisher fuer verschobene Plaetze.
          GEMESSEN am 07.09.2026, und zwar an einem Fehlschlag: Der erste Entwurf von KB-22 ließ das
          eigene Objekt immer aussen vor. Die neue Gegenrichtung schob "Draconis" dann prompt ÜBER
          den eigenen Planeten - und damit MITTEN AUF dessen Scheibe. test_kartenbeschriftung hat das
          an drei Stellen gemeldet (Handy, PC, PC flach); mein eigener neuer Wächter nicht, weil auch
          er das eigene Objekt ausklammert. Der Bestandstest war hier der klügere von beiden. */
-      const belegt = (k, versetzt) => flaechen.some(f => (versetzt || f.g !== eigen) && (schneidet(k, f) || mitteUeberdeckt(k, f)))
+      const belegt = (k, versetzt) => eigenerKoerperBeruehrt(k)
+                                   || flaechen.some(f => (versetzt || f.g !== eigen) && (schneidet(k, f) || mitteUeberdeckt(k, f)))
                                    || gesetzt.some(g => schneidet(k, g));
       /* Die Plätze in VORZUGSREIHENFOLGE - der erste freie gewinnt, deshalb steht der Verbleib an
          Ort und Stelle vorn und der weiteste Versatz hinten:
@@ -74370,6 +74441,12 @@ function sekSternUse(key, x, y, k, unentdeckt){
           kante(xs, f.x + f.w - b.x, true, 12);
           kante(ys, f.y - b.y - b.height, false, 14);
           kante(ys, f.y + f.h - b.y, true, 14);
+        }
+        if (eigenInk){
+          kante(xs, eigenInk.x - b.x - b.width - strichRand, false, 12);
+          kante(xs, eigenInk.x + eigenInk.w - b.x + strichRand, true, 12);
+          kante(ys, eigenInk.y - b.y - b.height - strichRand, false, 14);
+          kante(ys, eigenInk.y + eigenInk.h - b.y + strichRand, true, 14);
         }
         // Im unvermeidbar ueberlappenden Fall auch knapp NEBEN der gemalten
         // Markermitte Platz suchen, statt nur ganze 7er-Schritte anzubieten.
@@ -74481,7 +74558,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const zumutbar = f => f.mitten <= start.mitten && f.scheibe <= start.scheibe && f.label <= start.label;
         let beste = null;
         for (const p of plaetze){
-          const k = kastenAn(p), f = bewerte(k, versetzt(p));
+          const k = kastenAn(p);
+          if (eigenerKoerperBeruehrt(k)) continue;
+          const f = bewerte(k, versetzt(p));
           if (!zumutbar(f)) continue;
           const rang = [f.mitten, f.scheibe, f.objekt + f.label];
           if (!beste || rang[0] < beste[0]
@@ -74490,7 +74569,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
             beste = rang; wahl = p; kasten = k;
           }
         }
-        // plaetze[0] ist die Ausgangsstelle und erfüllt `zumutbar` immer - `wahl` ist also gesetzt.
+        // Gibt es innerhalb der festen Grenzen keinen zulaessigen Platz, bleibt die
+        // urspruengliche Rendererposition erhalten statt die Zuordnung zu verlieren.
         if (!wahl){ wahl = plaetze[0]; kasten = kastenAn(plaetze[0]); }
       }
       versatz = wahl.dy; seitlich = wahl.dx;

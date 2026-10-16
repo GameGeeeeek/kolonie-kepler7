@@ -1,0 +1,50 @@
+name: Release map PC preflight
+on:
+  push:
+    branches: [codex/ship-overlay-pc-check-20261016]
+permissions:
+  contents: read
+concurrency:
+  group: release-map-pc-preflight
+  cancel-in-progress: true
+jobs:
+  native-map-fixes:
+    runs-on: [self-hosted, Linux, X64, pc-saschaneu]
+    timeout-minutes: 45
+    env:
+      PC_CHROMIUM_GPU: '1'
+      KEPLER_BACKEND_SERVER: ${{ github.workspace }}/.review-backend/server.js
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: GameGeeeeek/kolonie-kepler7-backend
+          ref: 00fe250194f419e1b0063f24da146bbb5c7041c7
+          path: .review-backend
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare the existing PC GPU browser and pinned backend dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npm ci --prefix .review-backend --omit=dev
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "KEPLER_CHROMIUM=$(command -v google-chrome)" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            npx playwright install --with-deps chromium
+          fi
+      - name: Native map regressions, historical diagnostics and genuine parent counterexamples
+        run: node tools/release-map-pc-preflight.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-map-pc-preflight
+          path: .release-map-evidence/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
