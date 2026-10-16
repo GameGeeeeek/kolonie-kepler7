@@ -8,6 +8,7 @@ const {SPIELDATEI,WURZEL,SERVER_JS}=require('./lib/spieldatei');
 const {starteBrowser}=require('./lib/umgebung');
 const {fixture,tab,pointer,boolean,delay}=require('./lib/ship-raster-fixture');
 const {keys,deliveredRasterInventory,rasterRuntimeFiles}=require('./test_ship_raster_art');
+const {stableSkinSave}=require('./test_ship_raster_sharpness');
 
 const picker='#shipyardVisual [data-gfx-ship-picker]';
 const intermediate={jaeger:2,cruisers:3,destroyers:4,carrier:5,frachter:6};
@@ -22,6 +23,9 @@ const manifest=[labels.classes,labels.auth,labels.picker,...keys.map(classLabel)
  ...Object.entries(intermediate).map(([key,mk])=>stageLabel(key,mk)),labels.frozen,labels.errors];
 module.exports={manifest,labels,classLabel,stageLabel};
 const sha=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+// At this native desktop width the scene width, rather than the mark-dependent
+// inspector height, bounds both heroes. Compare equal physical raster sizes.
+const viewport={width:1280,height:1058};
 
 // A native ETA update can replace a card during scrolling. Reacquire only that
 // actually detached target; visibility/timeouts and other failures stay fatal.
@@ -43,17 +47,27 @@ async function readPixels(page,selector,key){
   last=await page.locator(selector).first().evaluate(async c=>{
    const w=c.width,h=c.height,bodyY=Math.ceil(h*.22+10),ctx=c.getContext('2d',{willReadFrequently:true});
    if(w<1||h<=bodyY||!ctx)throw Error('Native marked ship canvas has no measurable body');
-   const bytes=ctx.getImageData(0,0,w,h).data,body=bytes.slice(bodyY*w*4),badge=bytes.slice(0,bodyY*w*4);
+   const bytes=ctx.getImageData(0,0,w,h).data,body=bytes.slice(bodyY*w*4),badge=bytes.slice(0,bodyY*w*4),png=w<=200?c.toDataURL('image/png'):null;
    const digest=async data=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',data))].map(n=>n.toString(16).padStart(2,'0')).join('');
    let count=0;for(let i=3;i<body.length;i+=4)if(body[i]>8)count++;
    return {key:c.dataset.shipIcon,art:c.dataset.shipArt,ready:c.dataset.shipArtReady,atlas:c.dataset.shipAtlas,
     crop:c.dataset.shipCrop,format:c.dataset.shipFormat,detail:c.dataset.shipDetail==='true',
-    width:w,height:h,bodyY,bodyBytes:body.length,count,bodySha256:await digest(body),badgeSha256:await digest(badge)};
+    width:w,height:h,bodyY,bodyBytes:body.length,count,bodySha256:await digest(body),badgeSha256:await digest(badge),
+    diagnosticPNG:png};
   });
+  const png=last.diagnosticPNG;delete last.diagnosticPNG;
+  Object.defineProperty(last,'diagnosticPNG',{value:png});
   const signature=JSON.stringify(last);stable=signature===previous?stable+1:0;previous=signature;
   if(stable>=2)return last;await delay(60);
  }while(Date.now()<deadline);
  throw Error('Native marked ship pixels never settled: '+key+' '+JSON.stringify(last));
+}
+function preserveFailure(name,before,after){
+ const folder=process.env.KEPLER_SHIP_MARK_EVIDENCE;if(!folder)return;
+ fs.mkdirSync(folder,{recursive:true});
+ for(const [side,items]of [['plain',before],['marked',after]])for(const [index,item]of items.entries())if(item.diagnosticPNG){
+  fs.writeFileSync(path.join(folder,name+'-'+side+'-'+index+'.png'),Buffer.from(item.diagnosticPNG.split(',')[1],'base64'),{flag:'wx'});
+ }
 }
 async function visit(run,key){
  const result=[];
@@ -88,14 +102,17 @@ async function main(){
  const packageArt=name=>Object.fromEntries(JSON.parse(fs.readFileSync(path.join(WURZEL,'docs',name),'utf8')).groups.flatMap(group=>group.tiles.map(tile=>[tile.key,{stem:group.stem,rect:tile.rect}])));
  const art={base:packageArt('ship-art-package.json'),detail:packageArt('ship-detail-art-package.json')};
  check(labels.classes,keys.length===46&&new Set(keys).size===46&&['base','detail'].every(kind=>Object.keys(art[kind]).length===46&&keys.every(key=>art[kind][key])),{keys});
- const saved=marks=>({shipSkin:'standard',shipMarks:marks,uiHideLockedShips:false,
+ // Both accounts have the same legitimate idle empire and affordable stores;
+ // native ETA replacements must not become an unrelated raster comparison.
+ const idle=stableSkinSave().save;
+ const saved=marks=>({...idle,shipSkin:'standard',shipMarks:marks,uiHideLockedShips:false,
   unlocked:Object.fromEntries(keys.map(key=>[key,true])),constructionQueue:[],buildQueue:[],researchQueue:[],activeResearch:null,shipMarkJob:null});
  let browser;
  try{
   browser=await starteBrowser({args:['--no-sandbox','--disable-dev-shm-usage','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']});
   // The native save stores Mk I as an absent key, including after autosave.
-  const plain=await fixture(browser,{save:saved({})});runs.push(plain);
-  const marked=await fixture(browser,{save:saved(Object.fromEntries(keys.map(key=>[key,7])))});runs.push(marked);
+  const plain=await fixture(browser,{viewport,save:saved({})});runs.push(plain);
+  const marked=await fixture(browser,{viewport,save:saved(Object.fromEntries(keys.map(key=>[key,7])))});runs.push(marked);
   for(const run of [plain,marked]){await tab(run.page,'flotte');await pointer(run.page,'#shipyardVisual [data-gfx-ship="jaeger"]');}
   const loaded=[plain,marked].map(run=>JSON.parse(run.store.get('kepler7-save-v3')));
   check(labels.auth,plain.context!==marked.context&&plain.store!==marked.store&&loaded.every((state,index)=>state.shipSkin==='standard'&&keys.every(key=>index?state.shipMarks[key]===7:!Object.hasOwn(state.shipMarks,key)))
@@ -105,10 +122,10 @@ async function main(){
   const neutral={};
   // Only one context performs native actions at a time. No parallel browser
   // stress or call to an internal renderer is needed for this regression.
-  for(const key of keys){neutral[key]=await visit(plain,key);const actual=await visit(marked,key);check(classLabel(key),sameHull(neutral[key],actual,key,art),{plain:neutral[key],marked:actual});}
-  const middle=await fixture(browser,{save:saved(intermediate)});runs.push(middle);
+  for(const key of keys){neutral[key]=await visit(plain,key);const actual=await visit(marked,key),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key,neutral[key],actual);check(classLabel(key),ok,{plain:neutral[key],marked:actual});}
+  const middle=await fixture(browser,{viewport,save:saved(intermediate)});runs.push(middle);
   await tab(middle.page,'flotte');await pointer(middle.page,'#shipyardVisual [data-gfx-ship="jaeger"]');
-  for(const [key,mk]of Object.entries(intermediate)){const actual=await visit(middle,key);check(stageLabel(key,mk),sameHull(neutral[key],actual,key,art),{plain:neutral[key],marked:actual});}
+  for(const [key,mk]of Object.entries(intermediate)){const actual=await visit(middle,key),ok=sameHull(neutral[key],actual,key,art);if(!ok)preserveFailure(key+'-mk'+mk,neutral[key],actual);check(stageLabel(key,mk),ok,{plain:neutral[key],marked:actual});}
   const after=hashes();check(labels.frozen,JSON.stringify(before)===JSON.stringify(after),{count:frozen.length,originalTests:originalTests.length,hashes:after});
   check(labels.errors,runs.every(run=>!run.errors.length&&!run.httpErrors.length),{javascript:runs.flatMap(run=>run.errors),http:runs.flatMap(run=>run.httpErrors)});
   if(JSON.stringify(records.map(record=>record.name))!==JSON.stringify(manifest))throw Error('Native mark-detail guard manifest or order changed');

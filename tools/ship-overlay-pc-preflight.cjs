@@ -10,17 +10,28 @@ const freeze=()=>Object.fromEntries([...tracked,...['.review-backend/server.js']
 const report={startedUTC:new Date().toISOString(),head:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}'),backend:git('-C',path.join(root,'.review-backend'),'rev-parse','HEAD'),runner:process.env.RUNNER_NAME,os:process.env.RUNNER_OS,run:process.env.GITHUB_RUN_ID,cases:[],passed:false};
 let frozen;
 function run(name,args,env={}){
- const startedUTC=new Date().toISOString(),result=cp.spawnSync(process.execPath,args,{cwd:root,env:{...process.env,...env},encoding:'utf8',timeout:600000,maxBuffer:64*1024*1024});
+ const startedUTC=new Date().toISOString(),result=cp.spawnSync(process.execPath,args,{cwd:root,env:{...process.env,KEPLER_SHIP_MARK_EVIDENCE:path.join(out,name+'-pixels'),...env},encoding:'utf8',timeout:600000,maxBuffer:64*1024*1024});
  const log=(result.stdout||'')+(result.stderr||'');fs.writeFileSync(path.join(out,name+'.log'),log,{flag:'wx'});
  const gpu=log.split('\n').filter(line=>line.startsWith('[chromium-gpu] ')).map(line=>JSON.parse(line.slice('[chromium-gpu] '.length)));
  const records=log.split(/\r?\n/).filter(line=>/^(OK|FAIL) - /.test(line)).map(line=>({name:line.slice(line.indexOf(' - ')+3).split(' | ')[0],ok:line.startsWith('OK - ')}));
  const item={name,args,startedUTC,endedUTC:new Date().toISOString(),status:result.status,signal:result.signal,error:result.error?.message,bytes:Buffer.byteLength(log),sha256:sha(log),records,gpu};
  report.cases.push(item);console.log(name+': '+JSON.stringify({status:item.status,records:records.length,failures:records.filter(r=>!r.ok).length,gpu:gpu.map(g=>g.renderer)}));return {item,log};
 }
+function nativeGuards(result,manifest,summaryName){
+ // The original test prints one separately named summary after every guard.
+ // Retain and validate that line; never count it as a 57th/87th/38th assertion.
+ const {item,log}=result;item.guardRecords=item.records.slice(0,-1);item.summary=item.records.at(-1);
+ const failures=item.guardRecords.filter(record=>!record.ok).length;
+ const footers=log.split(/\r?\n/).filter(line=>/^\d+ checks, \d+ failures$/.test(line));
+ return item.records.length===manifest.length+1&&item.guardRecords.every((record,index)=>record.name===manifest[index])
+  &&item.summary?.name===summaryName&&item.summary.ok===(failures===0)
+  &&footers.length===1&&footers[0]===manifest.length+' checks, '+failures+' failures';
+}
 function native(name,file){
  const manifest=require(path.join(root,'tests',file)).manifest;
  const result=run(name,['tests/http-run.js',file]);
- result.item.passed=result.item.status===0&&result.item.gpu.length>0&&result.item.records.length===manifest.length&&result.item.records.every((record,index)=>record.ok&&record.name===manifest[index])&&result.log.includes(manifest.length+' checks, 0 failures');
+ const summary={'test_ship_raster_mark_details.js':'Native ship raster mark details','test_ship_raster_art.js':'Native ship raster art','test_ship_raster_sharpness.js':'Native ship raster sharpness'}[file];
+ result.item.passed=nativeGuards(result,manifest,summary)&&result.item.status===0&&result.item.gpu.length>0&&result.item.guardRecords.every(record=>record.ok);
  return result;
 }
 try{
@@ -39,8 +50,8 @@ try{
  const counterPath=path.join(out,'original-overlay.html');fs.writeFileSync(counterPath,broken,{flag:'wx'});report.counterSource={originalBlob:blob,sha256:sha(broken),onlyOverlayRestored:true};
  const guards=require(path.join(root,'tests/test_ship_raster_mark_details.js')),negative=run('original-overlay-counterexample',['tests/http-run.js','test_ship_raster_mark_details.js'],{KEPLER_SPIELDATEI:counterPath});
  const allowed=new Set([...require(path.join(root,'tests/test_ship_raster_art.js')).keys.map(guards.classLabel),...Object.entries({jaeger:2,cruisers:3,destroyers:4,carrier:5,frachter:6}).map(([key,mk])=>guards.stageLabel(key,mk))]);
- const failures=negative.item.records.filter(record=>!record.ok);
- negative.item.passed=negative.item.status===1&&negative.item.gpu.length>0&&negative.item.records.length===guards.manifest.length&&negative.item.records.every((record,index)=>record.name===guards.manifest[index])&&failures.length>0&&failures.every(record=>allowed.has(record.name))&&failures.some(record=>record.name===guards.classLabel('carrier'))&&negative.log.includes(guards.manifest.length+' checks, '+failures.length+' failures');
+ const complete=nativeGuards(negative,guards.manifest,'Native ship raster mark details'),failures=negative.item.guardRecords.filter(record=>!record.ok);
+ negative.item.passed=complete&&negative.item.status===1&&negative.item.gpu.length>0&&failures.length>0&&failures.every(record=>allowed.has(record.name))&&failures.some(record=>record.name===guards.classLabel('carrier'));
 }catch(error){report.error=error.stack||String(error);console.error(report.error);}
 finally{
  if(frozen){report.after=freeze();report.frozen=JSON.stringify(frozen)===JSON.stringify(report.after);}
