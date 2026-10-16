@@ -264,7 +264,8 @@ async function main(){
   await tab(run.page,'allianz');await run.page.locator('#bannerPickerWrap').waitFor({state:'visible'});
   const banners=[];
   for(const key of ['asche','bronze']){
-   await run.page.locator('[data-banner="'+key+'"]').scrollIntoViewIfNeeded();
+   // Parallel native alliance loads can replace picker nodes; hover re-resolves without selecting.
+   await run.page.locator('[data-banner="'+key+'"]').hover({timeout:10000});
    await readyBanner(run.page,'[data-banner="'+key+'"]',key);
    banners.push(await bannerPixels(run.page,'[data-banner="'+key+'"]',key,oracle[key==='bronze'?'urmaterie':'eisen']));
   }

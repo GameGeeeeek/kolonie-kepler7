@@ -33,7 +33,7 @@ const original=[
 const replace=(text,anchor,next)=>{assert.equal(text.split(anchor).length,2,'one actual test source anchor: '+anchor);return text.replace(anchor,next);};
 const normalized=test.replace(/\r\n/g,'\n'),negative=replace(normalized,scoped,original);
 const relocate=text=>replace(text,"require('./lib/umgebung')",'require('+JSON.stringify(path.join(root,'tests/lib/umgebung.js'))+')');
-const assetNames=['tabler-icons-full.woff2','icon-192.png','icon-512.png','apple-touch-icon.png','kepler-graphics.css','service-worker.js','manifest.json','kepler-english.json',...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(png|webp)$/.test(name)).sort()],assets=new Map();
+const assetNames=['tabler-icons-full.woff2','icon-192.png','icon-512.png','apple-touch-icon.png','kepler-graphics.css','service-worker.js','manifest.json','kepler-english.json','void-sector-invitation.png',...fs.readdirSync(root).filter(name=>/^kepler-gfx-[a-z-]+\.(png|webp)$/.test(name)).sort()],assets=new Map();
 for(const name of assetNames){const file=path.join(root,name);if(fs.existsSync(file))assets.set('/'+name,fs.readFileSync(file));}
 const files=[game,testFile,__filename,path.join(root,'tests/lib/umgebung.js'),path.join(root,'tests/lib/spieldatei.js'),path.join(root,'tests/lib/http-test-origin.js'),...assetNames.filter(name=>fs.existsSync(path.join(root,name))).map(name=>path.join(root,name)),...['kepler-graphics-full-review.yml','kepler-graphics-review.yml','kepler-ideas-review.yml'].map(name=>path.join(root,'.github/workflows',name)),...(SERVER_JS?[SERVER_JS]:[])];
 const hash=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),hashes=()=>Object.fromEntries(files.map(file=>[path.relative(root,file),hash(file)]));

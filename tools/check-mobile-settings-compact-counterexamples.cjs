@@ -49,7 +49,14 @@ const cases=[
    assert.equal(matches.length,1,'Unique actual compact scene rule '+selector);result=unique(result,matches[0][0],'');
   }
   return result;
- },failed:widths.flatMap((w,i)=>w<=900?[names[i*4+3]]:[]).concat(names[24],names[27])}
+ },failed:widths.flatMap((w,i)=>w<=900?[names[i*4+3]]:[]).concat(names[24],names[27])},
+ // Restore only the actual image-only market layout. The shared expedition
+ // artwork-plus-copy strip and every previous compact illustration rule remain.
+ {name:'old-market-thumbnail',style:()=>{
+  const start='/* mobile-settings:market-image — this banner contains artwork without copy. */',end='/* mobile-settings:market-image end */';
+  assert.equal(css.split(start).length,2,'One actual market-only mobile block');assert.equal(css.split(end).length,2,'One actual market-only mobile block end');
+  const from=css.indexOf(start),to=css.indexOf(end,from)+end.length;return css.slice(0,from)+css.slice(to);
+ },failed:[names[widths.indexOf(390)*4+3]]}
 ];
 const selected=process.argv.slice(2);assert(selected.every(name=>cases.some(c=>c.name===name)),'Unknown genuine settings fault');
 const results=[];

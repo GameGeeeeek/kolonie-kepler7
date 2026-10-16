@@ -151,6 +151,23 @@ function sceneFits(r,kind,mobile,large,researchKeys){
   r.count>0&&new Set(r.keys).size===r.count&&(count===null||r.count===count)&&r.itemsVisible&&hotspotsFit&&(kind!=='research'||researchKeys.length>0&&JSON.stringify(r.keys)===JSON.stringify(researchKeys))&&
   (kind!=='ship'||r.hero?.pixels&&r.hero.width>0&&r.hero.height>0&&Math.abs(r.hero.width/r.hero.height-4/3)<.01&&r.hero.width<=r.width&&r.hero.height<=r.height);
 }
+async function marketBanner(page,mobile){
+ await f.tab(page,'markt');
+ const selector='#marketVisual .gfx-scene';
+ await page.locator(selector).evaluate(e=>e.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
+ const decoded=await f.boolean(page,selector=>{const e=document.querySelector(selector),image=e?.querySelector('img.gfx-landscape');if(!image||!image.isConnected||!image.complete||!image.naturalWidth)return false;let opacity=1;for(let p=image;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible')return false;opacity*=Number(s.opacity);}const r=image.getBoundingClientRect();return opacity>0&&r.width>0&&r.height>0&&r.bottom>0&&r.top<innerHeight;},selector,5000);
+ const measured=await page.locator(selector).evaluate(e=>{
+  const r=e.getBoundingClientRect(),image=e.querySelector('img.gfx-landscape'),b=image.getBoundingClientRect(),css=getComputedStyle(image);let visible=true,opacity=1;
+  for(let p=image;p;p=p.parentElement){const s=getComputedStyle(p);visible=visible&&s.display!=='none'&&s.visibility==='visible';opacity*=Number(s.opacity);}
+  return {width:r.width,height:r.height,left:r.left,right:r.right,top:r.top,bottom:r.bottom,client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,
+   image:{visible:visible&&opacity>0&&b.bottom>0&&b.top<innerHeight,width:b.width,height:b.height,left:b.left,right:b.right,top:b.top,bottom:b.bottom,fit:css.objectFit,complete:image.complete,naturalWidth:image.naturalWidth,naturalHeight:image.naturalHeight,alt:image.alt},copy:e.querySelectorAll('.gfx-scene-label').length};
+ });
+ const image=measured.image;
+ measured.decoded=decoded;measured.pass=decoded&&image.visible&&image.complete&&image.naturalWidth>0&&image.naturalHeight>0&&image.alt.length>0&&image.fit==='cover'&&measured.copy===0&&
+  measured.width>0&&measured.left>=0&&measured.right<=measured.client+1&&measured.scroll<=measured.client+1&&(mobile?measured.height>=104&&measured.height<=120:measured.height>260)&&
+  image.left<=measured.left+1&&image.right>=measured.right-1&&image.top<=measured.top+1&&image.bottom>=measured.bottom-1;
+ await f.tab(page,'forschung');return measured;
+}
 async function graphics(page,width,height=900,large=false,researchKeys=[]){
  const short=height<=500,mobile=width<=900,caps=large?(short?[220,220,200,180]:[260,260,220,200]):(short?[200,200,180,160]:[240,240,200,180]);
  const results=[];
@@ -162,7 +179,8 @@ async function graphics(page,width,height=900,large=false,researchKeys=[]){
   if(measured.scroll>measured.client+1)console.log('WITNESS - actual document overflow | '+JSON.stringify({width,height,large,kind,scroll:measured.scroll,client:measured.client,offenders:measured.overflowNodes}));
   measured.pass=sceneFits(measured,kind,mobile,large,researchKeys);results.push(measured);
  }
- return {pass:results.length===4&&results.every(r=>r.pass),results};
+ const market=width===390||width===1487?await marketBanner(page,mobile):null;
+ return {pass:results.length===4&&results.every(r=>r.pass)&&(!market||market.pass),results,market};
 }
 async function main(){
  const records=[],runs=[];let browser,error;

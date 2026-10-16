@@ -32,6 +32,10 @@ on:
       - .github/workflows/kepler-ideas-review.yml
       - service-worker.js
       - kepler-english.json
+      - void-sector-invitation.png
+      - docs/void-sector-invitation-art.json
+      - tests/test_void_sector_invitation.js
+      - tools/check-void-sector-invitation-counterexamples.cjs
       - locales/en.json
       - tools/i18n/**
       - tools/ideas/sync.cjs
@@ -142,7 +146,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   complete-suite:
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && (github.head_ref == 'codex/interface-clarity' || github.head_ref == 'codex/ship-sharpness' || github.head_ref == 'codex/mobile-settings-compact'))
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && (github.head_ref == 'codex/interface-clarity' || github.head_ref == 'codex/ship-sharpness' || github.head_ref == 'codex/mobile-settings-compact' || github.head_ref == 'codex/void-sector-invitation'))
     strategy:
       fail-fast: false
       matrix:
@@ -177,8 +181,8 @@ jobs:
             npx playwright install --with-deps chromium
           fi
           git rev-parse HEAD > /tmp/kepler-tested-commit.txt
-          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
-          test "$(wc -l < /tmp/kepler-tested-source.txt)" -eq 139
+          sha256sum weltraum_kolonie.html kepler-graphics.css service-worker.js kepler-english.json kepler-gfx-*.png kepler-gfx-*.webp void-sector-invitation.png ../kolonie-kepler7-backend/server.js > /tmp/kepler-tested-source.txt
+          test "$(wc -l < /tmp/kepler-tested-source.txt)" -eq 140
           test "$(grep -Ec '  kepler-gfx-.*\.png$' /tmp/kepler-tested-source.txt)" -eq 67
           test "$(grep -Ec '  kepler-gfx-.*\.webp$' /tmp/kepler-tested-source.txt)" -eq 67
       - name: Full suite partition through actual HTTP origins
