@@ -2,7 +2,7 @@
 // Native actions and real responsive rendering for the remaining graphics audit.
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {SPIELDATEI,WURZEL,starteBrowser,ruhigeUhren}=require('./lib/umgebung');
-let source=fs.readFileSync(SPIELDATEI,'utf8'),css=fs.readFileSync(path.join(WURZEL,'kepler-graphics.css'),'utf8');
+let source=fs.readFileSync(SPIELDATEI,'utf8'),css=fs.readFileSync(process.env.K7_DETAIL_CSS||path.join(WURZEL,'kepler-graphics.css'),'utf8');
 const graphicFormat=/^  function gfxAssetUrl\(/m.test(source)?'webp':'png';
 function fault(text,old,next){assert.equal(text.split(old).length,2,'unique fault anchor');return text.replace(old,next);}
 if(process.env.K7_DETAIL_FAULT==='touch')css=fault(css,'#creditShopBox button { min-width:44px; min-height:44px;','#creditShopBox button { min-width:28px; min-height:28px;');
@@ -15,7 +15,7 @@ if(process.env.K7_DETAIL_FAULT==='english-roles')source=fault(source,'k7t(shipRo
 const end='\n})();\n</script>\n</body>';assert.equal(source.split(end).length,2);
 const html=source.replace(end,`\nwindow.__details={ready:()=>bootDataReady,state:()=>state,show:s=>switchTab(s),render,research:RESEARCH_DEFS,ships:SHIP_DEFS,types:EXPEDITION_TYPES,worlds:TERRAFORM_TARGET_TYPES,orbital:orbitalStationOf,officers:OFFICERS,groups:gfxResearchCatalogue};\n`+end);
 let checks=0,failures=0;
-function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FAIL')+' - '+name+(ok||!data?'':' '+JSON.stringify(data)));}
+function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FAIL')+' - '+name+(ok||!data?'':' | '+JSON.stringify(data)));}
 (async()=>{
  let server,browser;
  try {
@@ -75,12 +75,29 @@ function check(name,ok,data){checks++;if(!ok)failures++;console.log((ok?'OK':'FA
    const active=document.activeElement,target=e.querySelector('[data-gfx-ship]:last-child');
    return {scrollTop:e.scrollTop,scrollHeight:e.scrollHeight,clientHeight:e.clientHeight,rect:rect(e),
     active:{key:active?.dataset?.gfxShip||null,inRail:!!active&&e.contains(active),rect:rect(active)},
-    target:{key:target?.dataset.gfxShip||null,rect:rect(target)}};
+    target:{key:target?.dataset.gfxShip||null,rect:rect(target)},
+    thumbnails:[...e.querySelectorAll('[data-gfx-ship]')].map(button=>{
+     const canvas=button.querySelector('canvas'),style=getComputedStyle(button),number=k=>parseFloat(style[k])||0;
+     const available=rect(button).width-number('paddingLeft')-number('paddingRight')-number('borderLeftWidth')-number('borderRightWidth');
+     return {key:button.dataset.gfxShip,expectedWidth:Math.min(78,Math.max(0,available)),rect:rect(canvas),
+      attributes:canvas?{width:canvas.getAttribute('width'),height:canvas.getAttribute('height')}:null};
+    })};
+  };
+  // Allow one 1/64 CSS-pixel layout unit; backing-store pixel rounding must
+  // never change the authored 78x58 thumbnail's CSS box or the rail position.
+  const stableThumbnails=(before,after)=>{
+   const unit=1/64,valid=t=>t.rect&&t.expectedWidth>0&&Math.abs(t.rect.width-t.expectedWidth)<=unit&&Math.abs(t.rect.height-t.expectedWidth*58/78)<=unit;
+   return before.thumbnails.length>0&&before.thumbnails.length===after.thumbnails.length&&before.thumbnails.every((t,i)=>{
+    const next=after.thumbnails[i];
+    return t.key===next.key&&valid(t)&&valid(next)&&Math.abs(t.rect.width-next.rect.width)<=unit&&Math.abs(t.rect.height-next.rect.height)<=unit;
+   });
   };
   const railBefore=await page.locator('#shipyardVisual .gfx-ship-list').evaluate(railSnapshot);
   const railTop=railBefore.scrollTop;
   await lastHull.press('Enter');
-  check('ship rail preserves its scroll position when selecting a distant hull',railTop>100&&await page.locator('#shipyardVisual .gfx-ship-list').evaluate((e,y)=>Math.abs(e.scrollTop-y)<1,railTop),{before:railBefore,afterMeasurement:'immediately after the unchanged guard condition',after:await page.locator('#shipyardVisual .gfx-ship-list').evaluate(railSnapshot)});
+  const railScrollStable=railTop>100&&await page.locator('#shipyardVisual .gfx-ship-list').evaluate((e,y)=>Math.abs(e.scrollTop-y)<1,railTop);
+  const railAfter=await page.locator('#shipyardVisual .gfx-ship-list').evaluate(railSnapshot);
+  check('ship rail preserves its scroll position when selecting a distant hull',railScrollStable&&stableThumbnails(railBefore,railAfter),{before:railBefore,afterMeasurement:'immediately after the unchanged scroll condition',after:railAfter});
   check('ship rail preserves keyboard focus after selection and native fleet updates',await page.evaluate(()=>{const key=__details.ships.at(-1).key;const selected=()=>document.activeElement?.dataset.gfxShip===key;const first=selected();__details.state().fleet[key]=1;__details.render();return first&&selected();}));
   await page.evaluate(()=>__details.show('expedition'));
   const scenes=await page.locator('#expeditionBox [data-expedition-type] .gfx-expedition-art').evaluateAll(es=>es.map(e=>getComputedStyle(e).backgroundPosition));

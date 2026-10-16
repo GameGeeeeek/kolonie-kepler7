@@ -224,10 +224,11 @@ const SPIELSTAND = JSON.stringify(Object.assign({}, ruhigeUhren(), {
   activeBasePlanet: 'home', player: { id:'u', name:'AdmiralX' }, xp:152000, credits:384000
 }));
 
-/* Misst am GERENDERTEN Bild. Die Flächenwahl (image -> circle.body -> größter Kreis) ist bewusst
-   dieselbe wie in kbLabelsEntflechten: Gemessen wird gegen das, was der Entflechter als belegt
-   ansieht - sonst prüfte der Test eine andere Karte als die, die er beurteilt. Für die MITTE (1b)
-   und die Zuordnung (1e) zählt dagegen die Gruppe als GANZES, denn das ist, was der Spieler sieht. */
+/* Misst am GERENDERTEN Bild. Die Objektrollen entsprechen kbLabelsEntflechten. Bei einem
+   undekodierten Asteroiden reserviert dessen leeres Bild weiterhin eine Layoutbox; der eigene
+   sichtbare Körper ist jedoch der native Fallback samt Rand. Dieser unabhängige Wächter misst
+   dessen wirkliche Kontur und behält die leere Bildbox als Diagnose. Für die MITTE (1b) und die
+   Zuordnung (1e) zählt die Gruppe als GANZES, denn das ist, was der Spieler sieht. */
 async function lage(page){
   return page.evaluate(() => {
     const svg = [...document.querySelectorAll('svg')].find(s => s.querySelector('.planet-node'));

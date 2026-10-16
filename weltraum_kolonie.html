@@ -14247,8 +14247,8 @@ k7InitialStaticText();
     { version:'8.758.0', date:'15.10.2026', changes:[
       "Im Willkommensdialog gibt es eine ausblendbare Einladung zu Void Sector. Neue Konten über den Kepler-Link erhalten zusätzlich 250 Credits und 5 Hunter-Raketen.",
       "Die Marktgrafik nutzt auf schmalen Bildschirmen wieder die volle Bannerbreite.",
-      "Detaillierte Schiffsbilder werden nicht mehr von zusätzlichen weißen Geschützpunkten und Linien überlagert. Die Stufenplaketten bleiben sichtbar.",
-      "In der schmalen Regionsübersicht weichen Beschriftungen samt Hinweisflächen einander aus. Asteroidenkürzel halten auch nach dem automatischen Textversatz Abstand zum eigenen sichtbaren Rand."
+      "Detaillierte Schiffsbilder werden nicht mehr von zusätzlichen weißen Geschützpunkten und Linien überlagert. Die Stufenplaketten bleiben sichtbar. Die Schiffsliste behält beim Auswählen ihre Position.",
+      "In der schmalen Regionsübersicht weichen Beschriftungen samt Hinweisflächen einander aus."
     ] },
     { version:'8.757.0', date:'15.10.2026', changes:[
       "Die Einstellungen sind über die beschriftete Schaltfläche in der unteren Leiste und direkt im Menü erreichbar. Der Einstieg führt zur Anzeige und zur Wahl der Menüposition.",
@@ -74329,12 +74329,9 @@ function sekSternUse(key, x, y, k, unentdeckt){
        Der Rueckfall auf den groessten Kreis bleibt fuer die Arten ohne Bild unveraendert. */
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
-      let b = null, koerperRand = 0;
+      let b = null;
       const bilder = [...g.querySelectorAll('image')];
       for (const bild of bilder){
-        // An undecoded asteroid image keeps its SVG rectangle but paints no body.
-        // While its native fallback is visible, measure the real circle and rim.
-        if (bild.hasAttribute('data-asteroid-image') && bild.dataset.asteroidArtReady !== 'true') continue;
         let k; try { k = bild.getBBox(); } catch (e) { continue; }
         if (!k || !k.width) continue;
         if (!b){ b = { x: k.x, y: k.y, w: k.width, h: k.height }; continue; }
@@ -74352,10 +74349,8 @@ function sekSternUse(key, x, y, k, unentdeckt){
         let k; try { k = el.getBBox(); } catch (e) { return; }
         if (!k || !k.width) return;
         b = { x: k.x, y: k.y, w: k.width, h: k.height };
-        const koerperStil = getComputedStyle(el);
-        koerperRand = koerperStil.stroke === 'none' ? 0 : Math.max(0, (parseFloat(koerperStil.strokeWidth) || 0)/2);
       }
-      flaechen.push({ g, x: b.x, y: b.y, w: b.w, h: b.h, mx: b.x + b.w/2, my: b.y + b.h/2, koerperRand });
+      flaechen.push({ g, x: b.x, y: b.y, w: b.w, h: b.h, mx: b.x + b.w/2, my: b.y + b.h/2 });
     });
     if (!flaechen.length) return;
     const schneidet = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -74375,12 +74370,6 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // native SVG-Tipps ab. Auch sie darf keine Markermitte verdecken.
       const textStil = getComputedStyle(t);
       const strichRand = textStil.stroke === 'none' ? 0 : Math.max(0, (parseFloat(textStil.strokeWidth) || 0)/2);
-      // getBBox omits both contours. The own body must stay clear even when
-      // the fallback accepts a partial overlap with a different marker.
-      const eigenInk = eigenF ? { x: eigenF.x - eigenF.koerperRand, y: eigenF.y - eigenF.koerperRand,
-        w: eigenF.w + 2*eigenF.koerperRand, h: eigenF.h + 2*eigenF.koerperRand } : null;
-      const eigenerKoerperBeruehrt = k => !!eigenInk && schneidet({ x: k.x - strichRand, y: k.y - strichRand,
-        w: k.w + 2*strichRand, h: k.h + 2*strichRand }, eigenInk);
       for (const f of flaechen){
         let x1 = f.x, y1 = f.y, x2 = f.x + f.w, y2 = f.y + f.h;
         for (const name of f.g.querySelectorAll('text.planet-label')){
@@ -74402,15 +74391,16 @@ function sekSternUse(key, x, y, k, unentdeckt){
       // gehörte optisch zu ihm. Die Kollision war weg, die Zuordnung Label->Planet kaputt; gesehen
       // nur am Screenshot, nicht an der Zahl (Regel 42/53). Jeder Platz unten bleibt deshalb dicht
       // am eigenen Objekt: höchstens 14 Einheiten senkrecht, höchstens 12 seitlich.
-      /* Die gemalten Konturen des eigenen Koerpers bleiben an JEDEM Platz frei.
-         Die weitergehende rohe Objekt-/Mittepruefung gilt wie bisher fuer verschobene Plaetze.
+      /* Das EIGENE Objekt zählt bei jedem VERSCHOBENEN Platz als belegt, nur an der unverschobenen
+         Ausgangsstelle nicht. Dort steht die Beschriftung, wo der Zeichencode sie hingesetzt hat -
+         neben ihrem Objekt, nicht darauf. Verschiebt man sie dagegen, darf sie ihrem eigenen Körper
+         genauso wenig ins Gesicht rutschen wie einem fremden.
          GEMESSEN am 07.09.2026, und zwar an einem Fehlschlag: Der erste Entwurf von KB-22 ließ das
          eigene Objekt immer aussen vor. Die neue Gegenrichtung schob "Draconis" dann prompt ÜBER
          den eigenen Planeten - und damit MITTEN AUF dessen Scheibe. test_kartenbeschriftung hat das
          an drei Stellen gemeldet (Handy, PC, PC flach); mein eigener neuer Wächter nicht, weil auch
          er das eigene Objekt ausklammert. Der Bestandstest war hier der klügere von beiden. */
-      const belegt = (k, versetzt) => eigenerKoerperBeruehrt(k)
-                                   || flaechen.some(f => (versetzt || f.g !== eigen) && (schneidet(k, f) || mitteUeberdeckt(k, f)))
+      const belegt = (k, versetzt) => flaechen.some(f => (versetzt || f.g !== eigen) && (schneidet(k, f) || mitteUeberdeckt(k, f)))
                                    || gesetzt.some(g => schneidet(k, g));
       /* Die Plätze in VORZUGSREIHENFOLGE - der erste freie gewinnt, deshalb steht der Verbleib an
          Ort und Stelle vorn und der weiteste Versatz hinten:
@@ -74444,12 +74434,6 @@ function sekSternUse(key, x, y, k, unentdeckt){
           kante(xs, f.x + f.w - b.x, true, 12);
           kante(ys, f.y - b.y - b.height, false, 14);
           kante(ys, f.y + f.h - b.y, true, 14);
-        }
-        if (eigenInk){
-          kante(xs, eigenInk.x - b.x - b.width - strichRand, false, 12);
-          kante(xs, eigenInk.x + eigenInk.w - b.x + strichRand, true, 12);
-          kante(ys, eigenInk.y - b.y - b.height - strichRand, false, 14);
-          kante(ys, eigenInk.y + eigenInk.h - b.y + strichRand, true, 14);
         }
         // Im unvermeidbar ueberlappenden Fall auch knapp NEBEN der gemalten
         // Markermitte Platz suchen, statt nur ganze 7er-Schritte anzubieten.
@@ -74561,9 +74545,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
         const zumutbar = f => f.mitten <= start.mitten && f.scheibe <= start.scheibe && f.label <= start.label;
         let beste = null;
         for (const p of plaetze){
-          const k = kastenAn(p);
-          if (eigenerKoerperBeruehrt(k)) continue;
-          const f = bewerte(k, versetzt(p));
+          const k = kastenAn(p), f = bewerte(k, versetzt(p));
           if (!zumutbar(f)) continue;
           const rang = [f.mitten, f.scheibe, f.objekt + f.label];
           if (!beste || rang[0] < beste[0]
@@ -74572,8 +74554,7 @@ function sekSternUse(key, x, y, k, unentdeckt){
             beste = rang; wahl = p; kasten = k;
           }
         }
-        // Gibt es innerhalb der festen Grenzen keinen zulaessigen Platz, bleibt die
-        // urspruengliche Rendererposition erhalten statt die Zuordnung zu verlieren.
+        // plaetze[0] ist die Ausgangsstelle und erfüllt `zumutbar` immer - `wahl` ist also gesetzt.
         if (!wahl){ wahl = plaetze[0]; kasten = kastenAn(plaetze[0]); }
       }
       versatz = wahl.dy; seitlich = wahl.dx;

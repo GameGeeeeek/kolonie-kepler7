@@ -8,6 +8,10 @@ const expectedBackend='00fe250194f419e1b0063f24da146bbb5c7041c7';
 const expectedOriginal='212a406c7b32626efff31daf5d7319419ee8d1eb';
 const originalCommit='5eaf11c1c9c3083c10adb61d788f3a6a90c02861';
 const originalRef=originalCommit+':weltraum_kolonie.html';
+const historicalCommit='6550cb2fdd25f5d5012c61cf06c09d42f6f3b229';
+const historicalRef=historicalCommit+':weltraum_kolonie.html';
+const expectedHistoricalBlob='4877d6d5071273eeca7d2da84e2c6aa085561fc2';
+const expectedHistoricalSha256='afae11774bb2d1b279414f1791619f3e3d60fdaea45fbd0efeb9fc3ac8a979c1';
 const spacingOriginal='only-kepler-metadata-on-hint-baseline.html';
 fs.mkdirSync(out,{recursive:false});
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
@@ -62,6 +66,46 @@ function evidenceFiles(directory){
   visit(directory);assert(Object.keys(files).length>0,'Each explicit asset mode must retain native evidence');
   return files;
 }
+function historicalCircleEvidence(spec,item){
+  const directory=spec.historicalEvidence,files=evidenceFiles(directory);
+  assert(files['native.png']?.bytes>24&&files['network-body.json']?.bytes>0,'Historical control requires both native PNG and body/network JSON');
+  const png=fs.readFileSync(path.join(directory,'native.png'));
+  assert(png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),'Historical screenshot must be an actual PNG');
+  assert(png.readUInt32BE(16)>0&&png.readUInt32BE(20)>0,'Historical screenshot dimensions must be positive');
+  const proof=JSON.parse(fs.readFileSync(path.join(directory,'network-body.json'),'utf8'));
+  assert.equal(proof.mode,'legacy','Historical renderer must use the unchanged eight-guard default mode');
+  assert(!proof.setupError&&!proof.waitError&&!proof.screenshotError,'Historical native evidence must finish without setup/capture errors');
+  assert.equal(proof.screenshot?.file,'native.png');
+  assert.equal(proof.screenshot?.sha256,files['native.png'].sha256);
+  assert.equal(proof.screenshot?.bytes,files['native.png'].bytes);
+  assert.equal(proof.sources?.[path.relative(root,spec.game)],expectedHistoricalSha256,'The browser must receive the exact immutable 6550 HTML');
+  for(const file of ['tests/test_beschriftung_ausweichen.js','docs/asteroid-mining-art-package.json'])
+    assert.equal(proof.sources?.[file],frozen.frontend.files[file].sha256,'Historical witness must use the frozen current test input: '+file);
+  assert.equal(sha(fs.readFileSync(spec.game)),expectedHistoricalSha256,'Historical HTML must stay unchanged after its native run');
+  const expectedIds=item.records.map(record=>record.name.split(':')[0]);
+  assert.deepEqual(Object.keys(proof.results||{}).sort(),expectedIds.slice().sort(),'Body evidence must account for all eight original guards');
+  for(const record of item.records)assert.equal(proof.results[record.name.split(':')[0]],record.ok);
+  const body=proof.body;
+  assert(body&&Array.isArray(body.flaechen)&&Array.isArray(body.labels)&&Array.isArray(body.asteroids),'Historical control requires the actual native body measurements');
+  const places=['1','2','3','4','5'],circles=body.flaechen.filter(f=>f.platz!==null);
+  assert.deepEqual(circles.map(f=>f.platz).sort(),places,'All five actual asteroid bodies must be measured exactly once');
+  assert.deepEqual(body.asteroids.map(a=>a.place).sort(),places,'All five native asteroid nodes must be present');
+  for(const circle of circles){
+    assert.equal(circle.koerper?.tag,'circle');assert.equal(circle.koerper?.sichtbar,true,'A hidden/fictitious circle is not a native fallback witness');
+    const box=circle.b,ink=circle.koerperInk;
+    assert(box&&Object.values(box).every(Number.isFinite)&&box.w>0&&box.h>0,'Every native circle must have a real positive box');
+    assert.equal(ink?.quelle,'Körper und Kontur');assert(Number.isFinite(ink.kontur)&&ink.kontur>0,'Every native circle must retain its measured stroke');
+    assert(ink.box&&Object.values(ink.box).every(Number.isFinite)&&ink.box.x<box.x&&ink.box.y<box.y
+      &&ink.box.w>box.w&&ink.box.h>box.h,'Measured circle ink must include the actual expanded contour');
+    const labels=body.labels.filter(label=>label.eigenNr===circle.nr);
+    assert.equal(labels.length,1);assert.equal(labels[0].text,'[RIV]');
+    const asteroid=body.asteroids.find(a=>a.place===circle.platz);
+    assert.equal(asteroid.image,null,'Genuine 6550 predates the raster-image pipeline');
+  }
+  return {directory:path.relative(out,directory),files,commit:historicalCommit,blob:expectedHistoricalBlob,
+    sourceSha256:expectedHistoricalSha256,fiveVisibleNativeCirclesWithContours:true,
+    circles:circles.map(f=>({place:f.platz,body:f.koerper,box:f.b,ink:f.koerperInk}))};
+}
 let frozen;
 function controlledCopy(name,sourceFile,filename,anchor,replacement){
   const sourcePath=path.join(root,sourceFile),before=fs.readFileSync(sourcePath),text=before.toString('utf8');
@@ -109,7 +153,7 @@ function run(spec){
     const env={...process.env};
     // Reset test-specific state before each independent run, including original-source controls.
     for(const key of ['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
-      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS'])delete env[key];
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS','K7_DETAIL_CSS','K7_DETAIL_FAULT'])delete env[key];
     Object.assign(env,spec.env||{});
     // A historical sabotage mode must never reinterpret a genuine old-source counter's exit.
     delete env.KEPLER_ENTFLECHTER_GEGENPROBE;
@@ -123,12 +167,19 @@ function run(spec){
       env.KEPLER_WURZEL=generated;item.generatedRoot=path.relative(root,generated);
     }
     item.testEnv=Object.fromEntries(['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
-      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS'].filter(key=>env[key]!==undefined).map(key=>[key,env[key]]));
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR','K7_QUEST_CLOSED_CSS','K7_DETAIL_CSS','K7_DETAIL_FAULT'].filter(key=>env[key]!==undefined).map(key=>[key,env[key]]));
     if(spec.assetEvidence){
       assert(['available','unavailable'].includes(env.KEPLER_ASTEROID_ASSET_MODE),'Explicit native asset mode required');
       assert.equal(env.KEPLER_ASTEROID_EVIDENCE_DIR,spec.assetEvidence);
       assert.equal(path.dirname(spec.assetEvidence),out,'Each asset witness must stay in the exclusive evidence directory');
       assert(!fs.existsSync(spec.assetEvidence),'Each asset witness path must start unused');
+    }
+    if(spec.historicalEvidence){
+      assert.equal(env.KEPLER_ASTEROID_ASSET_MODE,undefined,'Historical native circles are not an artificial raster network-failure mode');
+      assert.equal(env.KEPLER_ASTEROID_EVIDENCE_DIR,spec.historicalEvidence);
+      assert.equal(path.dirname(spec.historicalEvidence),out);
+      assert(!fs.existsSync(spec.historicalEvidence),'Historical native evidence must start unused');
+      assert.equal(sha(fs.readFileSync(spec.game)),expectedHistoricalSha256);
     }
     result=cp.spawnSync(process.execPath,spec.args,{cwd:root,env,encoding:'utf8',
       detached:true,timeout:item.timeoutMs,killSignal:'SIGKILL',maxBuffer:64*1024*1024});
@@ -147,6 +198,7 @@ function run(spec){
     if(spec.required)item.passed=item.passed&&item.footers.some(line=>/^\d+ Prüfungen, 0 fehlgeschlagen$/.test(line));
     if(spec.native&&!spec.negative)item.passed=item.passed&&item.footers.some(line=>line==='PASS'||/^\d+ checks, 0 failures$/.test(line));
     if(spec.assetEvidence)item.assetEvidence={directory:path.relative(out,spec.assetEvidence),files:evidenceFiles(spec.assetEvidence)};
+    if(spec.historicalEvidence)item.historicalEvidence=historicalCircleEvidence(spec,item);
     if(spec.generate){
       const generated=path.join(out,'generated'),files={};
       for(const file of ['weltraum_kolonie.html','patchnotes-archiv.json','patchnotes.html','patchnotes.xml','version.txt']){
@@ -198,8 +250,9 @@ function run(spec){
       const ids=failed.map(record=>record.name.split(':')[0]);
       item.expectedFailedIds=spec.failedIds;
       if(spec.failureFooter!==undefined){
-        assert.equal(spec.name,'research-word-negative','Only the actual research counter has a numeric negative footer');
-        assert.equal(spec.failureFooter,'16 checks, 2 failures');
+        const footers={'research-word-negative':'16 checks, 2 failures','ship-rail-geometry-negative':'67 checks, 1 failures'};
+        assert(Object.hasOwn(footers,spec.name),'Only the individually bound research/rail counters have numeric negative footers');
+        assert.equal(spec.failureFooter,footers[spec.name]);
       }
       item.expectedFooter=spec.failureFooter??'FAIL';
       item.passed=item.passed&&JSON.stringify(ids.slice().sort())===JSON.stringify(spec.failedIds.slice().sort())
@@ -232,6 +285,14 @@ try{
   assert.equal(originalBlob,expectedOriginal,'Pinned HTML must be the exact unchanged e703/5eaf original');
   const originalPath=path.join(out,'genuine-parent-original.html');fs.writeFileSync(originalPath,original,{flag:'wx'});
   report.original={ref:originalRef,commit:originalCommit,blob:originalBlob,bytes:original.length,sha256:sha(original)};
+  // 212a already contains rr+8. The authentic rr+7 counter is the separate 6550 source.
+  assert.equal(gitAt(root,'rev-parse',historicalRef),expectedHistoricalBlob);
+  const historical=cp.execFileSync('git',['-C',root,'show',historicalRef],{maxBuffer:16*1024*1024});
+  const historicalBlob=crypto.createHash('sha1').update(Buffer.from('blob '+historical.length+'\0')).update(historical).digest('hex');
+  assert.equal(historicalBlob,expectedHistoricalBlob);assert.equal(sha(historical),expectedHistoricalSha256);
+  const historicalPath=path.join(out,'genuine-historical-6550.html');fs.writeFileSync(historicalPath,historical,{flag:'wx'});
+  report.historical={ref:historicalRef,commit:historicalCommit,blob:historicalBlob,bytes:historical.length,
+    sha256:sha(historical),copy:path.relative(root,historicalPath),purpose:'Authentic pre-raster rr+7 native-circle negative control'};
   const questCounterFile='tools/check-command-quest-closed-counterexample.cjs';
   const questCounter=fs.readFileSync(path.join(root,questCounterFile),'utf8');
   const researchRules=Array.from(questCounter.matchAll(/\['research-word','([^']+)',\[\s*'([^']+)',\s*'([^']+)'\s*\]\]/g));
@@ -245,6 +306,9 @@ try{
     '.fwahl-overlay { position:fixed; inset:0 20px 0 0;');
   const escapeOffset=controlledCopy('escape-offset-negative','weltraum_kolonie.html','escape-overlay-offset.html',overlayAnchor,
     '.fwahl-overlay { position:fixed; inset:20px -20px -20px 20px;');
+  const railAnchor='.gfx-ship-list .gfx-choice canvas { width:78px; aspect-ratio:78 / 58; max-width:100%; height:auto!important; display:block; margin:auto; }';
+  const railReplacement=railAnchor.replace('width:78px; aspect-ratio:78 / 58; ','');
+  const railCss=controlledCopy('ship-rail-geometry-negative','kepler-graphics.css','ship-rail-without-thumbnail-geometry.css',railAnchor,railReplacement);
   report.researchCounterReference={file:questCounterFile,sha256:sha(questCounter),anchor:researchAnchor,expectedFailedNames:researchFailures};
   const cases=[{name:'required',args:['tests/run.js','--nur-pflicht'],required:true}];
   const positives=[
@@ -268,6 +332,9 @@ try{
   cases.push({name:'research-word-negative',args:['tests/http-run.js','test_command_quest_closed_layout.js'],native:true,
     negative:true,guardCount:16,positive:'research-quest',failedIds:researchFailures,failureFooter:'16 checks, 2 failures',
     env:{K7_QUEST_CLOSED_CSS:researchCss}});
+  cases.push({name:'ship-rail-geometry-negative',args:['tests/http-run.js','test_visual_details.js'],native:true,
+    negative:true,guardCount:67,positive:'visual-details',failedIds:['ship rail preserves its scroll position when selecting a distant hull'],
+    failureFooter:'67 checks, 1 failures',env:{K7_DETAIL_CSS:railCss}});
   for(const [name,game]of [['escape-gap-negative',escapeGap],['escape-offset-negative',escapeOffset]])
     cases.push({name,args:['tests/http-run.js','test_escape_fenster.js'],native:true,negative:true,guardCount:35,
       positive:'escape-windows',game,failedIds:['V4-2a','V4-2b','V5','V9'],timeoutMs:600000});
@@ -275,8 +342,12 @@ try{
     game:originalPath,positive:'overview',guardCount:15,failedIds:['4b','4c']});
   cases.push({name:'original-labels',args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,
     game:originalPath,positive:'labels',guardCount:8});
-  cases.push(assetCase('original-labels-unavailable','unavailable',{
-    negative:true,game:originalPath,positive:'labels-assets-unavailable',failedIds:['1h']}));
+  cases.push(assetCase('original-labels-unavailable-positive','unavailable',{
+    game:originalPath,positive:'labels-assets-unavailable'}));
+  const historicalEvidence=path.join(out,'historical-labels-6550-negative-evidence');
+  cases.push({name:'historical-labels-6550-negative',args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,
+    negative:true,game:historicalPath,positive:'labels',guardCount:8,failedIds:['1h'],historicalEvidence,
+    env:{KEPLER_ASTEROID_EVIDENCE_DIR:historicalEvidence}});
   cases.push({name:'release-metadata-build',args:['build-patchnotes.js'],generate:true});
   report.expectedCases=cases.map(entry=>entry.name);
   report.expectedCaseMetadata=cases.map(entry=>({name:entry.name,guardCount:entry.guardCount,
@@ -290,8 +361,8 @@ finally{
   if(!report.finalControlledFreeze.equal)report.freezeEverChanged=true;
   report.endedUTC=new Date().toISOString();
   report.passed=!report.error&&!report.freezeError&&!report.freezeEverChanged&&report.finalFreeze?.equal===true
-    &&report.cases.length===24&&report.expectedCases?.length===24
-    &&report.controlledSources.length===3&&report.finalControlledFreeze.equal===true
+    &&report.cases.length===26&&report.expectedCases?.length===26
+    &&report.controlledSources.length===4&&report.finalControlledFreeze.equal===true
     &&report.cases.every((item,index)=>item.name===report.expectedCases[index]&&item.passed===true);
   saveReport();console.log('PC map release admission: '+(report.passed?'PASS':'FAIL'));process.exitCode=report.passed?0:1;
 }
