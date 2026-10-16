@@ -13167,23 +13167,9 @@ k7InitialStaticText();
       const x=(w-100*s)/2+(x0+x1)*s/2-bw/2,y=(h-100*s)/2+(y0+y1)*s/2-bh/2;
       const layer=document.createElement('canvas');layer.width=w;layer.height=h;const g=layer.getContext('2d');if(!g)return false;
       g.imageSmoothingQuality='high';g.drawImage(source.image,sx,sy,sw,sh,x,y,bw,bh);ctx.imageSmoothingQuality='high';ctx.drawImage(layer,0,0);
-      // Paid forge details remain on the real alpha silhouette, not a polygon
-      // which would cut the new wings or paste a flat hull over its panel work.
-      if(mk>=2){
-        const detail=document.createElement('canvas');detail.width=w;detail.height=h;const d=detail.getContext('2d');
-        if(d){
-          d.lineWidth=Math.max(.6,stil.kielDicke*s);d.strokeStyle='rgba(5,10,18,.55)';d.beginPath();d.moveTo(x,y+bh*stil.kielY);d.lineTo(x+bw,y+bh*stil.kielY);d.stroke();
-          if(mk>=3){d.lineWidth=Math.max(.6,s);d.strokeStyle='rgba(225,239,255,.6)';d.beginPath();d.moveTo(x,y+bh*stil.kanteY);d.lineTo(x+bw,y+bh*stil.kanteY-stil.kanteFall*s);d.stroke();}
-          if(mk>=4){
-            const turrets=(cfg.turrets||[]).slice();if(mk>=5)turrets.push([50-stil.turmAbstand,50,2.4,2]);
-            for(const [tx,ty,r,n]of turrets){const px=x+bw*(tx-x0)/(x1-x0),py=y+bh*(ty-y0)/Math.max(1,y1-y0),rr=Math.max(.7,r*s);
-              d.fillStyle='#273342';for(const off of n===1?[0]:[-rr*.4,rr*.4])d.fillRect(px,py+off,rr*stil.rohrLang,Math.max(.6,rr*.35));d.fillStyle='#abbccc';d.beginPath();d.ellipse(px,py,rr,rr*.8,0,0,Math.PI*2);d.fill();}
-          }
-          if(mk>=6){const px=x+bw*(stil.mastX-x0)/(x1-x0),py=y+bh*.32;d.strokeStyle='#c1e7ff';d.lineWidth=Math.max(.6,s*.65);d.beginPath();d.moveTo(px,py);d.lineTo(px,py-stil.mastHoch*s);d.stroke();}
-          if(mk>=7){d.fillStyle='#d3f1ff';for(let i=0;i<stil.lichtZahl;i++){const px=x+bw*(stil.lichtVon+(stil.lichtBis-stil.lichtVon)*i/Math.max(1,stil.lichtZahl-1)),py=y+bh*stil.lichtY;d.beginPath();d.arc(px,py,Math.max(.65,s),0,Math.PI*2);d.fill();}}
-          d.globalCompositeOperation='destination-in';d.drawImage(layer,0,0);ctx.drawImage(detail,0,0);
-        }
-      }
+      // The authored hull already contains its panels, weapons and lights.
+      // Legacy polygon details do not follow these image features; keep the
+      // upgrade level on its plaque instead of painting dots across the hull.
       if(mk>=8){const len=bw*.12*stil.strahlLang,pl=ctx.createLinearGradient(x,y+bh/2,x-len,y+bh/2);pl.addColorStop(0,'rgba(190,234,255,.6)');pl.addColorStop(1,'rgba(75,166,230,0)');ctx.fillStyle=pl;ctx.beginPath();ctx.moveTo(x,y+bh*.46);ctx.lineTo(Math.max(1,x-len),y+bh/2);ctx.lineTo(x,y+bh*.54);ctx.fill();}
       if(mk>=9){const edge=document.createElement('canvas');edge.width=w;edge.height=h;const d=edge.getContext('2d');if(d){const off=Math.max(.6,s*.7);for(const [dx,dy]of [[off,0],[-off,0],[0,off],[0,-off]])d.drawImage(layer,dx,dy);d.globalCompositeOperation='source-in';d.fillStyle=mk>=10?'rgba(246,206,124,.9)':'rgba(226,243,255,.85)';d.fillRect(0,0,w,h);d.globalCompositeOperation='destination-out';d.drawImage(layer,0,0);ctx.drawImage(edge,0,0);}}
       if(mk>=10){const r=Math.max(1.1,s*2),gl=ctx.createRadialGradient(x+bw-r,y+bh/2,0,x+bw-r,y+bh/2,r*2);gl.addColorStop(0,'rgba(255,242,201,.9)');gl.addColorStop(1,'rgba(255,226,151,0)');ctx.fillStyle=gl;ctx.beginPath();ctx.arc(x+bw-r,y+bh/2,r*2,0,Math.PI*2);ctx.fill();}
