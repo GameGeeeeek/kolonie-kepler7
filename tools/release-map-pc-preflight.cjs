@@ -6,6 +6,9 @@ const root=path.resolve(__dirname,'..'),backendRoot=path.join(root,'.review-back
 const out=path.join(root,'.release-map-evidence');
 const expectedBackend='00fe250194f419e1b0063f24da146bbb5c7041c7';
 const expectedOriginal='212a406c7b32626efff31daf5d7319419ee8d1eb';
+const originalCommit='5eaf11c1c9c3083c10adb61d788f3a6a90c02861';
+const originalRef=originalCommit+':weltraum_kolonie.html';
+const spacingOriginal='only-kepler-metadata-on-hint-baseline.html';
 fs.mkdirSync(out,{recursive:false});
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const gitAt=(cwd,...args)=>cp.execFileSync('git',['-C',cwd,...args],{encoding:'utf8',maxBuffer:16*1024*1024}).trim();
@@ -43,6 +46,22 @@ function gpuRecords(log){
   }
   return {gpu,errors};
 }
+function evidenceFiles(directory){
+  const files={};
+  const visit=function(folder){
+    for(const entry of fs.readdirSync(folder,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
+      const file=path.join(folder,entry.name);
+      if(entry.isDirectory())visit(file);
+      else{
+        assert(entry.isFile(),'Only actual files may be retained as asset evidence');
+        const data=fs.readFileSync(file);
+        files[path.relative(directory,file)]={bytes:data.length,sha256:sha(data)};
+      }
+    }
+  };
+  visit(directory);assert(Object.keys(files).length>0,'Each explicit asset mode must retain native evidence');
+  return files;
+}
 let frozen;
 function verifyFrozen(){
   const after=freeze();report.after=after;
@@ -52,13 +71,17 @@ function verifyFrozen(){
 }
 function run(spec){
   const item={name:spec.name,args:spec.args,timeoutMs:spec.timeoutMs||180000,
-    expectedExit:spec.negative?1:0,startedUTC:new Date().toISOString(),passed:false};
+    expectedExit:spec.negative?1:0,expectedGuardCount:spec.guardCount,startedUTC:new Date().toISOString(),passed:false};
   report.cases.push(item);saveReport();
   let result;
   try{
     const env={...process.env};
-    // Every positive uses the actual checkout. Only genuine original counterexamples select a copy.
-    delete env.KEPLER_SPIELDATEI;delete env.KEPLER_HTTP_TEST_ORIGIN;
+    // Reset test-specific state before each independent run, including original-source controls.
+    for(const key of ['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR'])delete env[key];
+    Object.assign(env,spec.env||{});
+    // A historical sabotage mode must never reinterpret a genuine old-source counter's exit.
+    delete env.KEPLER_ENTFLECHTER_GEGENPROBE;
     if(spec.game)env.KEPLER_SPIELDATEI=spec.game;
     if(spec.generate){
       const generated=path.join(out,'generated');fs.mkdirSync(generated);
@@ -66,6 +89,14 @@ function run(spec){
       for(const file of ['weltraum_kolonie.html','patchnotes-archiv.json'])
         fs.copyFileSync(path.join(root,file),path.join(generated,file),fs.constants.COPYFILE_EXCL);
       env.KEPLER_WURZEL=generated;item.generatedRoot=path.relative(root,generated);
+    }
+    item.testEnv=Object.fromEntries(['KEPLER_SPIELDATEI','KEPLER_HTTP_TEST_ORIGIN','KEPLER_WURZEL',
+      'KEPLER_ASTEROID_ASSET_MODE','KEPLER_ASTEROID_EVIDENCE_DIR'].filter(key=>env[key]!==undefined).map(key=>[key,env[key]]));
+    if(spec.assetEvidence){
+      assert(['available','unavailable'].includes(env.KEPLER_ASTEROID_ASSET_MODE),'Explicit native asset mode required');
+      assert.equal(env.KEPLER_ASTEROID_EVIDENCE_DIR,spec.assetEvidence);
+      assert.equal(path.dirname(spec.assetEvidence),out,'Each asset witness must stay in the exclusive evidence directory');
+      assert(!fs.existsSync(spec.assetEvidence),'Each asset witness path must start unused');
     }
     result=cp.spawnSync(process.execPath,spec.args,{cwd:root,env,encoding:'utf8',
       detached:true,timeout:item.timeoutMs,killSignal:'SIGKILL',maxBuffer:64*1024*1024});
@@ -78,10 +109,12 @@ function run(spec){
       bytes:Buffer.byteLength(log),sha256:sha(log),records:records(log),gpu:gpu.gpu,gpuErrors:gpu.errors,
       footers:log.split(/\r?\n/).filter(line=>/^(?:PASS|FAIL|\d+ checks, \d+ failures|\d+ Prüfungen, \d+ fehlgeschlagen)$/.test(line))});
     item.passed=!item.error&&!item.signal&&!item.cleanupError&&item.status===item.expectedExit&&item.gpuErrors.length===0;
-    if(spec.native)item.passed=item.passed&&item.gpu.length>0&&item.records.length>0;
+    if(spec.native)item.passed=item.passed&&item.gpu.length>0&&Number.isInteger(spec.guardCount)
+      &&spec.guardCount>0&&item.records.length===spec.guardCount;
     if(!spec.negative)item.passed=item.passed&&item.records.every(record=>record.ok);
     if(spec.required)item.passed=item.passed&&item.footers.some(line=>/^\d+ Prüfungen, 0 fehlgeschlagen$/.test(line));
     if(spec.native&&!spec.negative)item.passed=item.passed&&item.footers.some(line=>line==='PASS'||/^\d+ checks, 0 failures$/.test(line));
+    if(spec.assetEvidence)item.assetEvidence={directory:path.relative(out,spec.assetEvidence),files:evidenceFiles(spec.assetEvidence)};
     if(spec.generate){
       const generated=path.join(out,'generated'),files={};
       for(const file of ['weltraum_kolonie.html','patchnotes-archiv.json','patchnotes.html','patchnotes.xml','version.txt']){
@@ -103,7 +136,7 @@ function run(spec){
       assert.match(path.basename(source),/^overview-hint-spacing-/);
       const target=path.join(out,'spacing-counterexample');fs.mkdirSync(target);
       item.retained={};
-      for(const name of ['positive.log','negative.log','result.json','positive.html','only-kepler-hint-text-33.html']){
+      for(const name of ['positive.log','negative.log','result.json','positive.html',spacingOriginal]){
         const data=fs.readFileSync(path.join(source,name));fs.writeFileSync(path.join(target,name),data,{flag:'wx'});
         item.retained[name]={bytes:data.length,sha256:sha(data)};
       }
@@ -119,16 +152,20 @@ function run(spec){
         &&witness.sourceSha256===frozen.frontend.files['weltraum_kolonie.html'].sha256
         &&witness.positiveSha256===item.retained['positive.html'].sha256
         &&witness.positiveSha256===witness.sourceSha256
-        &&witness.negativeSha256===item.retained['only-kepler-hint-text-33.html'].sha256;
+        &&witness.negativeSha256===item.retained[spacingOriginal].sha256;
+    }
+    if(spec.positive){
+      const positive=report.cases.find(entry=>entry.name===spec.positive);
+      item.comparedWith=spec.positive;
+      item.guardNamesIdentical=positive?.records?.length===spec.guardCount
+        &&item.records.length===spec.guardCount&&item.records.every((record,index)=>record.name===positive.records[index].name);
+      item.passed=item.passed&&positive?.passed===true&&item.guardNamesIdentical===true;
     }
     if(spec.negative){
-      const positive=report.cases.find(entry=>entry.name===spec.positive),failed=item.records.filter(record=>!record.ok);
+      const failed=item.records.filter(record=>!record.ok);
       const ids=failed.map(record=>record.name.split(':')[0]);
       item.expectedFailedIds=spec.failedIds;
-      item.passed=item.passed&&item.records.length===spec.guardCount
-        &&positive?.records.length===spec.guardCount
-        &&item.records.every((record,index)=>record.name===positive.records[index].name)
-        &&JSON.stringify(ids.slice().sort())===JSON.stringify(spec.failedIds.slice().sort())
+      item.passed=item.passed&&JSON.stringify(ids.slice().sort())===JSON.stringify(spec.failedIds.slice().sort())
         &&item.footers.at(-1)==='FAIL';
     }
   }catch(error){item.controllerError=error.stack||String(error);item.passed=false;}
@@ -149,37 +186,50 @@ try{
   frozen=freeze();report.before=frozen;
   for(const repository of Object.values(frozen))assert(Object.values(repository.files).every(file=>!file.error),'Every tracked source must be readable');
   saveReport();
-  // Export the real parent object byte-for-byte, never reconstruct a deliberately broken source.
-  const original=cp.execFileSync('git',['-C',root,'show','HEAD^:weltraum_kolonie.html'],{maxBuffer:16*1024*1024});
+  // Export the pinned genuine old object, independent of later temporary-controller commits.
+  assert.equal(gitAt(root,'rev-parse',originalCommit),originalCommit);
+  const original=cp.execFileSync('git',['-C',root,'show',originalRef],{maxBuffer:16*1024*1024});
   const originalBlob=crypto.createHash('sha1').update(Buffer.from('blob '+original.length+'\0')).update(original).digest('hex');
-  assert.equal(originalBlob,expectedOriginal,'Parent HTML must be the exact unchanged e703/5eaf original');
+  assert.equal(originalBlob,expectedOriginal,'Pinned HTML must be the exact unchanged e703/5eaf original');
   const originalPath=path.join(out,'genuine-parent-original.html');fs.writeFileSync(originalPath,original,{flag:'wx'});
-  report.original={ref:'HEAD^:weltraum_kolonie.html',parent:gitAt(root,'rev-parse','HEAD^'),blob:originalBlob,bytes:original.length,sha256:sha(original)};
+  report.original={ref:originalRef,commit:originalCommit,blob:originalBlob,bytes:original.length,sha256:sha(original)};
   const cases=[{name:'required',args:['tests/run.js','--nur-pflicht'],required:true}];
   const positives=[
-    ['overview','test_uebersicht_schrift.js'],['labels','test_beschriftung_ausweichen.js'],
-    ['region-hints','test_regionshinweise.js'],['map-directions','test_kartenrichtungen.js'],
-    ['map-layers','test_karte_ebenen.js'],['map-menu-scroll','test_kartenmenue_scrollen.js'],
-    ['sector-view','test_sektoransicht.js'],['landmarks','test_landmarken.js'],
-    ['map-captions','test_kartenbeschriftung.js'],['sector-hulls','test_sektorregionen.js']
+    ['overview','test_uebersicht_schrift.js',15],['labels','test_beschriftung_ausweichen.js',8],
+    ['region-hints','test_regionshinweise.js',15],['map-directions','test_kartenrichtungen.js',20],
+    ['map-layers','test_karte_ebenen.js',13],['map-menu-scroll','test_kartenmenue_scrollen.js',12],
+    ['sector-view','test_sektoransicht.js',9],['landmarks','test_landmarken.js',20],
+    ['map-captions','test_kartenbeschriftung.js',28],['sector-hulls','test_sektorregionen.js',8]
   ];
-  for(const [name,file]of positives)cases.push({name,args:['tests/http-run.js',file],native:true});
+  for(const [name,file,guardCount]of positives)cases.push({name,args:['tests/http-run.js',file],native:true,guardCount});
+  const assetCase=function(name,mode,extra={}){
+    const directory=path.join(out,name+'-evidence');
+    return {name,args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,guardCount:9,
+      env:{KEPLER_ASTEROID_ASSET_MODE:mode,KEPLER_ASTEROID_EVIDENCE_DIR:directory},assetEvidence:directory,...extra};
+  };
+  cases.push(assetCase('labels-assets-available','available'));
+  cases.push(assetCase('labels-assets-unavailable','unavailable'));
   cases.push({name:'spacing-counter',args:['tools/check-overview-hint-spacing-counterexample.cjs'],spacing:true,timeoutMs:600000});
-  for(const [name,file]of [['research-quest','test_command_quest_closed_layout.js'],['escape-windows','test_escape_fenster.js'],['visual-details','test_visual_details.js']])
-    cases.push({name,args:['tests/http-run.js',file],native:true,timeoutMs:name==='escape-windows'?600000:180000});
+  for(const [name,file,guardCount]of [['research-quest','test_command_quest_closed_layout.js',16],['escape-windows','test_escape_fenster.js',35],['visual-details','test_visual_details.js',67]])
+    cases.push({name,args:['tests/http-run.js',file],native:true,guardCount,timeoutMs:name==='escape-windows'?600000:180000});
   cases.push({name:'original-overview',args:['tests/http-run.js','test_uebersicht_schrift.js'],native:true,negative:true,
     game:originalPath,positive:'overview',guardCount:15,failedIds:['4b','4c']});
-  cases.push({name:'original-labels',args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,negative:true,
-    game:originalPath,positive:'labels',guardCount:8,failedIds:['1h']});
+  cases.push({name:'original-labels',args:['tests/http-run.js','test_beschriftung_ausweichen.js'],native:true,
+    game:originalPath,positive:'labels',guardCount:8});
+  cases.push(assetCase('original-labels-unavailable','unavailable',{
+    negative:true,game:originalPath,positive:'labels-assets-unavailable',failedIds:['1h']}));
   cases.push({name:'release-metadata-build',args:['build-patchnotes.js'],generate:true});
-  report.expectedCases=cases.map(entry=>entry.name);saveReport();
+  report.expectedCases=cases.map(entry=>entry.name);
+  report.expectedCaseMetadata=cases.map(entry=>({name:entry.name,guardCount:entry.guardCount,
+    expectedExit:entry.negative?1:0,assetMode:entry.env?.KEPLER_ASTEROID_ASSET_MODE,
+    comparedWith:entry.positive,expectedFailedIds:entry.failedIds}));saveReport();
   for(const spec of cases)run(spec); // Intentionally continue through every independent case after failures.
 }catch(error){report.error=error.stack||String(error);console.error(report.error);}
 finally{
   if(frozen){try{report.finalFreeze=verifyFrozen();}catch(error){report.freezeError=error.stack||String(error);report.freezeEverChanged=true;}}
   report.endedUTC=new Date().toISOString();
   report.passed=!report.error&&!report.freezeError&&!report.freezeEverChanged&&report.finalFreeze?.equal===true
-    &&report.cases.length===18&&report.expectedCases?.length===18
+    &&report.cases.length===21&&report.expectedCases?.length===21
     &&report.cases.every((item,index)=>item.name===report.expectedCases[index]&&item.passed===true);
   saveReport();console.log('PC map release admission: '+(report.passed?'PASS':'FAIL'));process.exitCode=report.passed?0:1;
 }

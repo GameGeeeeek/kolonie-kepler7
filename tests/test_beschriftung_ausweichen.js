@@ -55,11 +55,17 @@
 // Aufruf: KEPLER_SPIELDATEI=<kopie> KEPLER_ENTFLECHTER_GEGENPROBE=alt|entwurf
 const { starteBrowser, SPIEL_URL, ruhigeUhren, pruefer } = require('./lib/umgebung');
 const { oeffneSystemUeberSektoren } = require('./lib/karte');
+const { SPIELDATEI, WURZEL } = require('./lib/spieldatei');
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { check: rohCheck, ende } = pruefer();
 const ergebnis = {};
 const check = (name, bedingung, zusatz) => { ergebnis[String(name).split(':')[0]] = !!bedingung; rohCheck(name, bedingung, zusatz); };
 
 const SAB = process.env.KEPLER_ENTFLECHTER_GEGENPROBE || '';
+// Explicit HTTP modes add one non-vacuous image-state guard; the legacy run
+// keeps its eight original guards and historical counterexample semantics.
+const ASSET_MODE = process.env.KEPLER_ASTEROID_ASSET_MODE || '';
+const EVIDENCE_DIR = process.env.KEPLER_ASTEROID_EVIDENCE_DIR || '';
 /* GEMESSEN, nicht geschätzt - und dreimal nach unten korrigiert, weil die Messung mein Bauchgefühl
    jedes Mal widerlegt hat (erst 1e, dann 1g, dann 1c). 1a fehlt hier bewusst: Es ist die
    Vorbedingung (das Gürtelsystem zeigt überhaupt genug Objekte), gilt an beiden Ständen und
@@ -81,6 +87,105 @@ const SYS = 'chronos';
    hat immer Platz daneben. Jeder Halter bringt zusätzlich sein Kürzel als eigene Beschriftung mit,
    die Beschriftungen konkurrieren also auch untereinander. Das ist genau die Lage aus dem Bericht. */
 const PLAETZE = ['1', '2', '3', '4', '5'];
+
+function assetFixture(page, evidence){
+  const origin = new URL(process.env.KEPLER_HTTP_TEST_ORIGIN || '');
+  if (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1' || !origin.port)
+    throw new Error('Explicit asteroid asset modes require tests/http-run.js on loopback HTTP');
+  const manifest = JSON.parse(fs.readFileSync(path.join(WURZEL, 'docs/asteroid-mining-art-package.json'), 'utf8'));
+  const groups = manifest.groups.filter(g => g.tiles.some(t => t.rasterKey === 'asteroid:eisen'));
+  if (groups.length !== 1) throw new Error('Exactly one canonical iron asteroid atlas is required');
+  const art = groups[0], tile = art.tiles.find(t => t.rasterKey === 'asteroid:eisen');
+  const assets = ['webp', 'png'].map((ext, index) => ({
+    url: new URL(art.stem + '.' + ext + '?v=' + art[ext + 'Sha256'].slice(0, 12), origin).href,
+    status: index ? 503 : 404, ext
+  }));
+  const targets = new Map(assets.map(a => [a.url, a])), requests = new Map();
+  evidence.assets = assets;
+  page.on('request', request => {
+    if (!targets.has(request.url())) return;
+    const record = { url: request.url(), method: request.method(), type: request.resourceType(), status: null, failure: null, intercepted: false };
+    requests.set(request, record); evidence.network.push(record);
+  });
+  page.on('response', response => {
+    const record = requests.get(response.request());
+    if (record) record.status = response.status();
+  });
+  page.on('requestfailed', request => {
+    const record = requests.get(request);
+    if (record) record.failure = request.failure()?.errorText || 'request failed';
+  });
+  const route = page.route(url => targets.has(url.href), async route => {
+    const asset = targets.get(route.request().url()), record = requests.get(route.request());
+    if (record) record.intercepted = true;
+    if (ASSET_MODE === 'unavailable')
+      await route.fulfill({ status: asset.status, contentType: 'text/plain', body: 'Deliberately unavailable native asteroid atlas' });
+    else await route.continue();
+  });
+  return { route, art, tile, assets };
+}
+
+async function waitForAssetMode(page, evidence, fixture){
+  try {
+    const complete = () => ASSET_MODE === 'unavailable'
+      ? fixture.assets.every(a => evidence.network.some(r => r.url === a.url && r.status === a.status))
+      : evidence.network.some(r => r.status === 200);
+    const deadline = Date.now() + 10000;
+    while (!complete() && Date.now() < deadline) await page.waitForTimeout(50);
+    if (!complete()) throw new Error('The exact native atlas requests did not finish in the selected mode');
+    await page.waitForFunction(({ mode, places }) => {
+      const nodes = [...document.querySelectorAll('#galaxyMapSvg [data-map-asteroid]')];
+      return nodes.length === places.length && places.every(place => {
+        const g = nodes.find(n => n.getAttribute('data-map-asteroid') === place);
+        const image = g?.querySelector('[data-asteroid-image]'), fallback = g?.querySelector('[data-asteroid-fallback]');
+        if (!image || !fallback) return false;
+        return mode === 'available'
+          ? image.dataset.asteroidArtReady === 'true' && !!image.getAttribute('href') && getComputedStyle(fallback).visibility === 'hidden'
+          : image.dataset.asteroidArtReady !== 'true' && !image.getAttribute('href') && getComputedStyle(fallback).visibility === 'visible';
+      });
+    }, { mode: ASSET_MODE, places: PLAETZE }, { timeout: 8000 });
+  } catch (error) { evidence.waitError = error.message; }
+}
+
+function assetModeMatches(evidence, fixture, measured){
+  if (evidence.waitError || measured.asteroids.length !== PLAETZE.length) return false;
+  const exactPlaces = measured.asteroids.map(a => a.place).sort();
+  if (JSON.stringify(exactPlaces) !== JSON.stringify(PLAETZE.slice().sort())) return false;
+  const network = evidence.network;
+  if (!network.length || network.some(r => r.type !== 'image' || r.method !== 'GET' || !r.intercepted || r.failure)) return false;
+  const bodies = measured.asteroids.every(a => {
+    const selected = measured.flaechen.find(f => f.platz === a.place);
+    if (!selected || a.labels.length !== 1 || a.labels[0] !== '[RIV]' || !a.fallback || !a.image) return false;
+    const image = a.image;
+    if (image.key !== 'asteroid:eisen') return false;
+    if (ASSET_MODE === 'available') return selected.koerper.tag === 'image' && image.ready === 'true'
+      && image.atlas === fixture.art.stem && image.crop === fixture.tile.rect.join(',')
+      && image.href?.startsWith('data:image/png;base64,') && image.visibility === 'visible'
+      && a.fallback.visibility === 'hidden' && ['webp', 'png'].includes(image.format);
+    return selected.koerper.tag === 'circle' && selected.koerperInk.quelle === 'Körper und Kontur'
+      && selected.koerperInk.kontur > 0 && selected.b.w > 0 && selected.b.h > 0
+      && image.ready !== 'true' && !image.href && !image.box && a.fallback.visibility === 'visible' && a.fallback.polygons > 0;
+  });
+  return bodies && (ASSET_MODE === 'available'
+    ? network.every(r => r.status === 200)
+    : network.length === 2 && fixture.assets.every((a, index) => network[index].url === a.url && network[index].status === a.status));
+}
+
+async function preserveAssetEvidence(page, evidence){
+  if (!EVIDENCE_DIR) return;
+  fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
+  try {
+    if (!page || page.isClosed()) throw new Error('No open native page was available for the screenshot');
+    const map = page.locator('#galaxyMapSvg');
+    if (await map.isVisible()) await map.scrollIntoViewIfNeeded({ timeout: 5000 });
+    const png = await page.screenshot({ timeout: 10000, animations: 'allow', caret: 'initial' });
+    fs.writeFileSync(path.join(EVIDENCE_DIR, 'native.png'), png, { flag: 'wx' });
+    evidence.screenshot = { file: 'native.png', bytes: png.length, sha256: crypto.createHash('sha256').update(png).digest('hex') };
+  } catch (error) { evidence.screenshotError = error.stack || String(error); }
+  evidence.results = { ...ergebnis };
+  fs.writeFileSync(path.join(EVIDENCE_DIR, 'network-body.json'), JSON.stringify(evidence, null, 2) + '\n', { flag: 'wx' });
+  if (evidence.screenshotError) throw new Error(evidence.screenshotError);
+}
 
 function serverFeld(){
   const plaetze = {};
@@ -157,7 +262,9 @@ async function lage(page){
     };
     const flaechen = [];
     svg.querySelectorAll(OBJEKTE).forEach(g => {
-      let el = g.querySelector('image') || g.querySelector('circle.body');
+      // A failed/pending native SVG image can have an empty box. The renderer
+      // skips those images before its circle fallback; measure the same body.
+      let el = [...g.querySelectorAll('image')].find(image => kasten(image)) || g.querySelector('circle.body');
       if (!el){
         const kreise = [...g.querySelectorAll('circle')];
         if (kreise.length) el = kreise.reduce((a, c) => (+c.getAttribute('r') > +a.getAttribute('r') ? c : a));
@@ -165,7 +272,7 @@ async function lage(page){
       if (!el) return;
       const b = kasten(el), ganz = kasten(g);
       if (!b || !ganz) return;
-      flaechen.push({ nr: flaechen.length, b, ganz, koerperInk: koerperInkMessen(el, g, b),
+      flaechen.push({ nr: flaechen.length, b, ganz, platz: g.getAttribute('data-map-asteroid'), koerperInk: koerperInkMessen(el, g, b),
         koerper: { tag: el.tagName, klasse: el.getAttribute('class'),
           cy: el.getAttribute('cy'), r: el.getAttribute('r') },
         polygone: [...g.querySelectorAll('polygon')].map(kasten).filter(Boolean),
@@ -248,7 +355,15 @@ async function lage(page){
                glyphen, eigenInk: eigenInkMessen(t, stil, box, glyphen),
                eigenNr: eigen && eigen.__nr !== undefined ? eigen.__nr : -1 };
     }).filter(l => l.box);
-    return { flaechen, labels };
+    const asteroids = [...svg.querySelectorAll('[data-map-asteroid]')].map(g => {
+      const image = g.querySelector('[data-asteroid-image]'), fallback = g.querySelector('[data-asteroid-fallback]');
+      return { place: g.getAttribute('data-map-asteroid'), labels: [...g.querySelectorAll('text.planet-label')].map(t => t.textContent.trim()),
+        image: image ? { key: image.dataset.gameRasterKey, atlas: image.dataset.gameAtlas, crop: image.dataset.gameCrop,
+          format: image.dataset.gameFormat, ready: image.dataset.asteroidArtReady, href: image.getAttribute('href'),
+          visibility: getComputedStyle(image).visibility, box: kasten(image) } : null,
+        fallback: fallback ? { visibility: getComputedStyle(fallback).visibility, polygons: fallback.querySelectorAll('polygon').length } : null };
+    });
+    return { flaechen, labels, asteroids };
   });
 }
 
@@ -268,10 +383,19 @@ const mitteIn = (k, f) => {
 const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k.y + k.h/2) - (f.ganz.y + f.ganz.h/2));
 
 (async () => {
-  const browser = await starteBrowser();
+  let browser, ctx, page;
+  const evidence = { mode: ASSET_MODE || 'legacy', network: [], body: null };
+  try {
+  if (!['', 'available', 'unavailable'].includes(ASSET_MODE)) throw new Error('Unknown KEPLER_ASTEROID_ASSET_MODE');
+  if (ASSET_MODE && SAB) throw new Error('Explicit asset modes must retain the real exit code; do not combine them with historical SAB overrides');
+  if (ASSET_MODE || EVIDENCE_DIR) evidence.sources = Object.fromEntries([SPIELDATEI, __filename, path.join(WURZEL, 'docs/asteroid-mining-art-package.json')]
+    .map(file => [path.relative(WURZEL, file), crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
+  browser = await starteBrowser();
   const store = { [SAVE_KEY]: SPIELSTAND };
-  const ctx = await browser.newContext({ viewport: { width:1280, height:900 } });
-  const page = await ctx.newPage();
+  ctx = await browser.newContext({ viewport: { width:1280, height:900 } });
+  page = await ctx.newPage();
+  const assets = ASSET_MODE ? assetFixture(page, evidence) : null;
+  if (assets) await assets.route;
   const fehler = [];
   page.on('pageerror', e => fehler.push(String(e)));
   await page.route('**/api/**', backend(store));
@@ -287,9 +411,19 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
   await page.waitForTimeout(700);
   await oeffneSystemUeberSektoren(page, SYS);
   await page.waitForTimeout(1500);
+  if (assets) await waitForAssetMode(page, evidence, assets);
 
   const l = await lage(page);
-  if (l.fehler){ check('0a: Systemebene gezeichnet', false, l.fehler); await ctx.close(); await browser.close(); return ende(); }
+  evidence.body = l;
+  if (l.fehler){ check('0a: Systemebene gezeichnet', false, l.fehler); throw new Error(l.fehler); }
+  if (assets){
+    const asteroids = l.asteroids.map(a => ({ ...a, image: a.image ? { ...a.image, href: a.image.href ? {
+      prefix: a.image.href.slice(0, 32), characters: a.image.href.length, sha256: crypto.createHash('sha256').update(a.image.href).digest('hex')
+    } : null } : null }));
+    check('1i: expliziter Asteroiden-Bildmodus zeigt alle fünf nativen Körper', assetModeMatches(evidence, assets, l),
+    { mode: ASSET_MODE, waitError: evidence.waitError || null, network: evidence.network, asteroids,
+      bodies: l.flaechen.filter(f => f.platz !== null).map(f => ({ place: f.platz, body: f.koerper, box: f.b, ink: f.koerperInk })) });
+  }
 
   const vorkommen = l.flaechen.filter(f => /data-map-asteroid/.test(f.art));
   const namen = l.labels.filter(x => x.eigenNr >= 0);
@@ -427,8 +561,11 @@ const abstand = (k, f) => Math.hypot((k.x + k.w/2) - (f.ganz.x + f.ganz.w/2), (k
 
   check('1f: keine Skriptfehler beim Zeichnen', fehler.length === 0, fehler.slice(0, 2).join(' | ') || 'keine');
 
-  await ctx.close();
-  await browser.close();
+  } catch (error) { evidence.setupError = error.stack || String(error); throw error; }
+  finally {
+    try { await preserveAssetEvidence(page, evidence); }
+    finally { if (ctx) await ctx.close(); if (browser) await browser.close(); }
+  }
 
   if (SAB){
     const soll = MUSS_FALLEN[SAB] || [];

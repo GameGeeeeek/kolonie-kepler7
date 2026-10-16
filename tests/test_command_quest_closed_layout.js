@@ -72,11 +72,28 @@ const store={'kepler7-save-v3':JSON.stringify(fixture)};
   });
   const zero=r=>r.rects===0&&['width','height','left','top','right','bottom'].every(k=>r[k]===0);
   check('closed native daily quest popup has no retained layout boxes at 320',closedLayout.closed&&closedLayout.notes.length>0&&zero(closedLayout.popup)&&closedLayout.notes.every(zero),closedLayout);
-  const names=await page.locator('#research .bname').evaluateAll(es=>es.filter(e=>{
-   for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible'||+s.opacity<=0)return false;}
-   const r=e.getBoundingClientRect();return r.width>0&&r.height>0;
-  }).map(e=>({text:e.textContent.trim(),width:e.clientWidth,scroll:e.scrollWidth,height:e.getBoundingClientRect().height})));
-  check('research renders positive real names including an unbroken long word at 320',names.length>=10&&names.every(n=>n.text&&n.width>20&&n.height>0)&&names.some(n=>n.text.split(/\s+/).some(w=>w.length>=16)),{count:names.length,longest:names.map(n=>n.text).sort((a,b)=>b.length-a.length).slice(0,4)});
+  const nameSnapshot=await page.locator('#research .bname').evaluateAll(es=>{
+   const visible=es.filter(e=>{
+    for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility!=='visible'||+s.opacity<=0)return false;}
+    const r=e.getBoundingClientRect();return r.width>0&&r.height>0;
+   }).map(e=>({text:e.textContent.trim(),width:e.clientWidth,scroll:e.scrollWidth,height:e.getBoundingClientRect().height}));
+   if(visible.length)return {names:visible,diagnostics:null};
+   // Read in this same browser task, after the unchanged visibility/size selection.
+   const describe=e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {
+    tag:e.tagName,id:e.id||null,classes:e.getAttribute('class'),display:s.display,
+    visibility:s.visibility,opacity:s.opacity,transform:s.transform,
+    rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
+    clientRects:e.getClientRects().length,animationName:s.animationName,
+    animationDuration:s.animationDuration,animationPlayState:s.animationPlayState};};
+   const tab=document.getElementById('tab-forschung');
+   return {names:visible,diagnostics:{matched:es.length,tab:tab?describe(tab):null,
+    ancestors:es.map(e=>{const chain=[];for(let p=e;p;p=p.parentElement)chain.push(describe(p));return {text:e.textContent.trim(),chain};}),
+    tabAnimations:tab?tab.getAnimations().map(a=>({name:a.animationName||null,
+     playState:a.playState,currentTime:a.currentTime,pending:a.pending,
+     progress:a.effect?a.effect.getComputedTiming().progress:null})):[]}};
+  });
+  const names=nameSnapshot.names;
+  check('research renders positive real names including an unbroken long word at 320',names.length>=10&&names.every(n=>n.text&&n.width>20&&n.height>0)&&names.some(n=>n.text.split(/\s+/).some(w=>w.length>=16)),{count:names.length,longest:names.map(n=>n.text).sort((a,b)=>b.length-a.length).slice(0,4),diagnostics:nameSnapshot.diagnostics});
   check('all visible native research names fit their own content boxes at 320',names.length>=10&&names.every(n=>n.width>20&&n.height>0&&n.scroll<=n.width+1),names.filter(n=>n.scroll>n.width+1));
   const documentFit=await page.evaluate(()=>({client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));
   check('research content has no horizontal overflow within the real client width at 320',documentFit.client>0&&documentFit.scroll<=documentFit.client,documentFit);

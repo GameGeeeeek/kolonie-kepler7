@@ -735,7 +735,10 @@ async function vorpostenFenster(browser, merke){
       return { da:true, offen:o.classList.contains('open'),
                system: !!(back && back.style.display !== 'none'),
                deckt: Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
-               mitteMeins: !!(mitte && (mitte === o || o.contains(mitte))) };
+               mitteMeins: !!(mitte && (mitte === o || o.contains(mitte))),
+               layout:{rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
+                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
+                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
     }, id);
     merke('V4-' + nr + ': Vorbedingung - ' + name + ' offen und bildschirmfuellend, System darunter offen',
       vor.da === true && vor.offen === true && vor.system === true && vor.deckt === true, vor);
@@ -797,7 +800,10 @@ async function flottenwahlFenster(browser, merke){
     if (!o) return { da:false };
     const r = o.getBoundingClientRect();
     return { da:true, offen:o.classList.contains('open'),
-             deckt: Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight };
+             deckt: Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
+             layout:{rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height},
+                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
+                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
   });
   merke('V5: Vorbedingung - die Flottenwahl steht offen und deckt den Bildschirm',
     gabKnopf === true && vor.da === true && vor.offen === true && vor.deckt === true, vor);
@@ -868,7 +874,10 @@ async function flottenwahlUeberSystem(browser, merke){
     const r = o ? o.getBoundingClientRect() : null;
     return { da:!!o, offen: !!(o && o.classList.contains('open')),
              system: !!(back && back.style.display !== 'none'),
-             deckt: !!r && Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight };
+             deckt: !!r && Math.round(r.width) >= window.innerWidth && Math.round(r.height) >= window.innerHeight,
+             layout:{rect:r?{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null,
+                 viewport:{innerWidth:window.innerWidth,innerHeight:window.innerHeight,
+                   clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight}} };
   });
   merke('V9: Vorbedingung - die Flottenwahl steht bildschirmfuellend UEBER dem aufgeklappten System',
     sysDa === true && geklickt === true && vor.offen === true && vor.system === true && vor.deckt === true,
